@@ -77,7 +77,7 @@ impl core::fmt::Display for Error {
                 serial,
                 reason_code,
             } => match reason_code {
-                Some(code) => write!(f, "certificate {serial} is revoked (reason {code:?})"),
+                Some(code) => write!(f, "certificate {serial} is revoked (reason {})", crl_reason_name(*code)),
                 None => write!(f, "certificate {serial} is revoked"),
             },
             Error::CrlExpired => f.write_str("CRL validity window check failed"),
@@ -91,6 +91,22 @@ impl core::fmt::Display for Error {
                 "OCSP response is structurally invalid (malformed per RFC 6960)",
             ),
         }
+    }
+}
+
+/// Map a `CrlReason` variant to its RFC 5280 §5.3.1 camelCase name.
+fn crl_reason_name(r: CrlReason) -> &'static str {
+    match r {
+        CrlReason::Unspecified => "unspecified",
+        CrlReason::KeyCompromise => "keyCompromise",
+        CrlReason::CaCompromise => "cACompromise",
+        CrlReason::AffiliationChanged => "affiliationChanged",
+        CrlReason::Superseded => "superseded",
+        CrlReason::CessationOfOperation => "cessationOfOperation",
+        CrlReason::CertificateHold => "certificateHold",
+        CrlReason::RemoveFromCRL => "removeFromCRL",
+        CrlReason::PrivilegeWithdrawn => "privilegeWithdrawn",
+        CrlReason::AaCompromise => "aACompromise",
     }
 }
 
