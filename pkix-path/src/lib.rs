@@ -406,9 +406,12 @@ where
             continue;
         }
         // For self-issued certs the cert and anchor are the same entity; their
-        // SPKIs must match (RFC 5280 §3.2 name-collision guard).
+        // keys must match (RFC 5280 §3.2 name-collision guard).
         if is_self_issued
-            && anchor.subject_public_key_info != last_cert.tbs_certificate.subject_public_key_info
+            && !spki_key_matches(
+                &anchor.subject_public_key_info,
+                &last_cert.tbs_certificate.subject_public_key_info,
+            )
         {
             continue;
         }
@@ -428,6 +431,23 @@ where
 // ---------------------------------------------------------------------------
 // validate_path helpers — input guards and OID consistency (PKIX-6vu)
 // ---------------------------------------------------------------------------
+
+/// Compare two SPKIs for the purpose of the self-issued anchor guard.
+///
+/// Compares algorithm OID and key bytes only — not the parameters field.
+/// This is intentional: for RSA, explicit NULL parameters and absent
+/// parameters are both valid encodings of the same algorithm (RFC 3279
+/// §2.3.1); comparing the full `AlgorithmIdentifier` would wrongly reject
+/// a valid anchor whose SPKI parameter encoding differs from the cert's.
+/// For ECDSA, the parameters carry the curve OID, but two keys on different
+/// curves also differ in their raw key bytes, so OID + key comparison is
+/// still sufficient to distinguish them.
+fn spki_key_matches(
+    a: &spki::SubjectPublicKeyInfoOwned,
+    b: &spki::SubjectPublicKeyInfoOwned,
+) -> bool {
+    a.algorithm.oid == b.algorithm.oid && a.subject_public_key == b.subject_public_key
+}
 
 fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
     if chain.is_empty() || anchors.is_empty() {
@@ -1044,6 +1064,35 @@ mod tests_rsa {
                 .is_ok(),
             "self-signed RSA cert should verify"
         );
+    }
+
+    /// Regression (PKIX-5u0): `spki_key_matches` ignores the NULL-vs-absent
+    /// parameter encoding difference that exists for RSA SPKIs.
+    ///
+    /// RFC 3279 §2.3.1 allows both explicit NULL parameters and absent
+    /// parameters for `rsaEncryption`. The derived `PartialEq` in the `spki`
+    /// crate treats `Some(NULL) ≠ None`, so using `==` in the self-issued
+    /// anchor guard would wrongly reject a valid anchor.
+    #[test]
+    fn spki_key_matches_ignores_null_vs_absent_params() {
+        let der_bytes = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
+        let cert = Certificate::from_der(der_bytes).expect("parse cert");
+        let cert_spki = &cert.tbs_certificate.subject_public_key_info;
+
+        // Same OID and key bytes, but parameters: None instead of Some(NULL).
+        let spki_no_params: spki::SubjectPublicKeyInfoOwned = spki::SubjectPublicKeyInfoOwned {
+            algorithm: spki::AlgorithmIdentifier {
+                oid: cert_spki.algorithm.oid,
+                parameters: None,
+            },
+            subject_public_key: cert_spki.subject_public_key.clone(),
+        };
+
+        // PartialEq distinguishes Some(NULL) from None — document this behavior.
+        assert_ne!(cert_spki, &spki_no_params);
+
+        // spki_key_matches must return true: same OID + same key bytes.
+        assert!(super::spki_key_matches(cert_spki, &spki_no_params));
     }
 }
 
