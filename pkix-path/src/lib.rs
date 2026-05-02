@@ -246,6 +246,7 @@ impl Default for ValidationPolicy {
 }
 
 /// The result of a successful certificate path validation.
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
