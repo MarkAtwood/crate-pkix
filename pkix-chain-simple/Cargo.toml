@@ -16,7 +16,7 @@ categories  = ["cryptography"]
 default = []
 
 [dependencies]
-pkix-path = { workspace = true, features = ["rsa", "p256"] }
+pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 der        = { workspace = true }
 signature  = { workspace = true }
 spki       = { workspace = true }

@@ -59,7 +59,9 @@
 //! - Signature backend is always RustCrypto; for a custom backend use `pkix_path` directly.
 
 use der::asn1::ObjectIdentifier;
+use der::Decode;
 use pkix_path::{Error as PathError, TrustAnchor, ValidatedPath, ValidationPolicy};
+use x509_cert::ext::pkix::{BasicConstraints, KeyUsage};
 use x509_cert::Certificate;
 
 // ---------------------------------------------------------------------------
@@ -213,6 +215,45 @@ pub enum Error {
     Path(PathError),
 }
 
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::EmptyChain => write!(f, "chain is empty"),
+            Error::ChainTooLong { len } => {
+                write!(f, "chain has {len} certificates; maximum is {}", 1 + MAX_INTERMEDIATES)
+            }
+            Error::NoTrustAnchors => write!(f, "no trust anchors provided"),
+            Error::AlgorithmNotAllowed { index } => {
+                write!(f, "certificate at index {index} uses a disallowed signature algorithm")
+            }
+            Error::UnhandledCriticalExtension { index } => {
+                write!(f, "certificate at index {index} has an unhandled critical extension")
+            }
+            Error::UnexpectedExtension { index } => {
+                write!(f, "certificate at index {index} has an unexpected extension")
+            }
+            Error::MissingRequiredExtension { index } => {
+                write!(
+                    f,
+                    "intermediate at index {index} is missing a required extension \
+                     (BasicConstraints cA=TRUE or KeyUsage keyCertSign)"
+                )
+            }
+            Error::LeafIsCA => write!(f, "end-entity certificate has BasicConstraints cA=TRUE"),
+            Error::Path(e) => write!(f, "path validation: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Path(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
 impl From<PathError> for Error {
     fn from(e: PathError) -> Self {
         Error::Path(e)
@@ -267,7 +308,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// # let leaf_der: &[u8] = &[];
 /// # let root_der: &[u8] = &[];
 /// let leaf   = Certificate::from_der(leaf_der).unwrap();
-/// let anchor = TrustAnchor::new(Certificate::from_der(root_der).unwrap());
+/// let anchor = TrustAnchor::from_cert(Certificate::from_der(root_der).unwrap());
 ///
 /// verify_simple(&[leaf], &[anchor], 1_700_000_000)?;
 /// # Ok::<(), pkix_chain_simple::Error>(())
@@ -305,7 +346,8 @@ pub fn verify_simple(
         ..Default::default()
     };
 
-    pkix_path::validate_path(chain, anchors, &policy, &RustCryptoVerifier).map_err(Error::Path)
+    pkix_path::validate_path(chain, anchors, &policy, &RustCryptoVerifier::default())
+        .map_err(Error::Path)
 }
 
 // ---------------------------------------------------------------------------
@@ -339,35 +381,91 @@ fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
 ///   `BasicConstraints` cA is FALSE (or absent).
 /// - `is_leaf = false` → whitelist is [`ALLOWED_INTERMEDIATE_EXTENSIONS`]; also
 ///   checks `BasicConstraints` cA=TRUE and `KeyUsage` keyCertSign are present.
-fn check_extensions(_index: usize, _cert: &Certificate, _is_leaf: bool) -> Result<()> {
-    todo!(
-        "walk cert TBSCertificate.extensions; for each extension OID check \
-         against allowed set for is_leaf; enforce required extensions on \
-         intermediates; check BasicConstraints cA value"
-    )
+fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<()> {
+    let allowed = if is_leaf {
+        ALLOWED_LEAF_EXTENSIONS
+    } else {
+        ALLOWED_INTERMEDIATE_EXTENSIONS
+    };
+
+    let extensions = match &cert.tbs_certificate.extensions {
+        Some(exts) => exts,
+        None => {
+            if is_leaf {
+                return Ok(());
+            } else {
+                return Err(Error::MissingRequiredExtension { index });
+            }
+        }
+    };
+
+    // Whitelist check: every extension OID must be in the allowed set.
+    for ext in extensions.iter() {
+        if !allowed.contains(&ext.extn_id) {
+            return Err(Error::UnexpectedExtension { index });
+        }
+    }
+
+    if is_leaf {
+        // Check BasicConstraints if present: cA MUST be false.
+        if let Some(ext) = extensions.iter().find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS) {
+            let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
+                .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+            if bc.ca {
+                return Err(Error::LeafIsCA);
+            }
+        }
+    } else {
+        // BasicConstraints required, cA must be true.
+        let bc_ext = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
+            .ok_or(Error::MissingRequiredExtension { index })?;
+        let bc = BasicConstraints::from_der(bc_ext.extn_value.as_bytes())
+            .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+        if !bc.ca {
+            return Err(Error::MissingRequiredExtension { index });
+        }
+
+        // KeyUsage required, keyCertSign must be set.
+        let ku_ext = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_EXT_KEY_USAGE)
+            .ok_or(Error::MissingRequiredExtension { index })?;
+        let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
+            .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+        if !ku.key_cert_sign() {
+            return Err(Error::MissingRequiredExtension { index });
+        }
+    }
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
 // Internal RustCrypto verifier
 // ---------------------------------------------------------------------------
 
-/// Zero-sized RustCrypto-backed [`SignatureVerifier`] used internally.
+/// Internal [`SignatureVerifier`] that delegates to [`pkix_path::DefaultVerifier`].
 ///
 /// Not exported — callers who need a different backend should use
 /// [`pkix_path::validate_path`] or [`pkix_chain::verify_chain`] directly.
-struct RustCryptoVerifier;
+struct RustCryptoVerifier(pkix_path::DefaultVerifier);
+
+impl Default for RustCryptoVerifier {
+    fn default() -> Self {
+        Self(pkix_path::DefaultVerifier)
+    }
+}
 
 impl pkix_path::SignatureVerifier for RustCryptoVerifier {
     fn verify_signature(
         &self,
-        _algorithm: spki::AlgorithmIdentifierRef<'_>,
-        _issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        _message: &[u8],
-        _signature: &[u8],
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
+        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
     ) -> core::result::Result<(), signature::Error> {
-        todo!(
-            "dispatch to RustCrypto p256::ecdsa or rsa::pkcs1v15 based on \
-             algorithm.oid; tracked in pkix-chain-simple v0.1 implementation issue"
-        )
+        self.0.verify_signature(algorithm, issuer_spki, message, signature)
     }
 }

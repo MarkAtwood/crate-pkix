@@ -13,6 +13,9 @@ categories  = ["cryptography"]
 [features]
 default = []
 
+# Enable std::error::Error impl on Error type
+std = ["der/std"]
+
 # Offline CRL validation (no network; you provide the DER-encoded CRL bytes)
 crl  = []
 

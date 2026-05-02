@@ -13,6 +13,9 @@ categories  = ["cryptography", "no-std"]
 [features]
 default   = ["rsa", "p256"]
 
+# Enable std::error::Error impl on Error type (no_std cores stay no_std without this)
+std = ["der/std"]
+
 # RustCrypto algorithm backends — disable all to bring your own SignatureVerifier
 rustcrypto = ["rsa", "p256", "p384", "ed25519"]
 rsa        = ["dep:rsa", "dep:sha2"]

@@ -29,7 +29,7 @@
 //! )?;
 //! ```
 
-pub use pkix_path::{self, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
+pub use pkix_path::{self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
 use x509_cert::Certificate;
@@ -50,7 +50,7 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Path(e) => write!(f, "path validation: {e:?}"),
+            Error::Path(e) => write!(f, "path validation: {e}"),
             Error::Revocation(e) => write!(f, "revocation: {e}"),
         }
     }
@@ -58,9 +58,10 @@ impl core::fmt::Display for Error {
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        // TODO: chain sources after pkix_path::Error and pkix_revocation::Error
-        // get std::error::Error impls (tracked in PKIX-e9v).
-        None
+        match self {
+            Error::Path(e) => Some(e),
+            Error::Revocation(e) => Some(e),
+        }
     }
 }
 
@@ -78,6 +79,25 @@ impl From<pkix_revocation::Error> for Error {
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
+
+/// Verify a certificate chain using the default RustCrypto signature backends.
+///
+/// Convenience wrapper around [`verify_chain`] that uses [`DefaultVerifier`]
+/// (RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256) so callers do not need to
+/// construct a `SignatureVerifier` manually for the common case.
+///
+/// For a custom backend, call [`verify_chain`] directly.
+pub fn verify_chain_default<R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    policy: &ValidationPolicy,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    R: RevocationChecker,
+{
+    verify_chain(chain, anchors, policy, &DefaultVerifier, revocation)
+}
 
 /// Verify a certificate chain with signature validation and revocation checking.
 ///
@@ -126,4 +146,19 @@ where
     }
 
     Ok(validated)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Confirm DefaultVerifier re-export is the same type as pkix_path::DefaultVerifier.
+    /// A function that accepts &DefaultVerifier (crate re-export) must also accept
+    /// &pkix_path::DefaultVerifier — the compiler will enforce type identity.
+    #[test]
+    fn default_verifier_reexport_type_identity() {
+        fn _accepts(_v: &DefaultVerifier) {}
+        let _v: &pkix_path::DefaultVerifier = &DefaultVerifier;
+        _accepts(_v);
+    }
 }

@@ -17,8 +17,8 @@ crl         = ["pkix-revocation/crl"]
 ocsp        = ["pkix-revocation/ocsp"]
 
 [dependencies]
-pkix-path       = { workspace = true }
-pkix-revocation = { workspace = true }
+pkix-path       = { workspace = true, features = ["std"] }
+pkix-revocation = { workspace = true, features = ["std"] }
 x509-cert       = { workspace = true }
 
 [dev-dependencies]
