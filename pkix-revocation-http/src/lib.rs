@@ -83,6 +83,7 @@ impl std::error::Error for FetchError {
 ///
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "crl")]
+#[allow(dead_code)] // fields used once HttpCrlFetcher is implemented
 pub struct HttpCrlFetcher<F> {
     fetcher: F,
     now_unix: u64,
@@ -111,6 +112,7 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
 ///
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "ocsp")]
+#[allow(dead_code)] // fields used once HttpOcspFetcher is implemented
 pub struct HttpOcspFetcher<F> {
     fetcher: F,
     now_unix: u64,

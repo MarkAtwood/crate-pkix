@@ -87,7 +87,7 @@ pub enum Error {
     /// re-encode `TBSCertificate` for signature verification is too small.
     /// This is an **implementation limit**, not a certificate defect — the
     /// certificate may be perfectly valid. Certificates with TBSCertificate
-    /// > 8 KiB (large government / enterprise / HSM attestation certs) will
+    /// exceeding 8 KiB (large government / enterprise / HSM attestation certs) will
     /// trigger this error. This is tracked for v0.2 (heap-backed encoding).
     ///
     /// Callers that want a stable match target should check for `Error::Der(_)`
