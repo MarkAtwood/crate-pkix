@@ -154,6 +154,10 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// The trait is OID-dispatched: the `algorithm` argument carries the OID and
 /// any parameters from the certificate's `signatureAlgorithm` field.
 ///
+/// This trait is object-safe and can be used as `dyn SignatureVerifier`.
+/// All method arguments are either `&self` or borrows, so no `Sized` bound
+/// is implied.
+///
 /// # Implementing a custom backend
 ///
 /// ```rust,ignore
@@ -200,8 +204,14 @@ pub trait SignatureVerifier {
 /// A trust anchor is typically either a self-signed root CA certificate
 /// or a raw (name, SPKI) pair extracted from a platform trust store.
 /// The trust anchor itself is **not** signature-verified — it is trusted
-/// by definition.
-#[derive(Clone, Debug)]
+/// by definition (RFC 5280 §6.1.1(c)).
+///
+/// **Validity period**: RFC 5280 §6.1.1(c) explicitly excludes the trust
+/// anchor's notBefore/notAfter from path validation. An expired root CA
+/// certificate used as a trust anchor will still anchor valid paths — this
+/// is intentional behavior, not a bug. Callers are responsible for ensuring
+/// their trust store contains the anchors they intend to trust.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TrustAnchor {
     /// The subject distinguished name of the trust anchor.
     pub subject: x509_cert::name::Name,
@@ -229,10 +239,22 @@ impl TrustAnchor {
     ///
     /// This is the typical constructor when your trust store contains full
     /// self-signed root CA certificates.
+    ///
+    /// Prefer [`TrustAnchor::from`] (i.e. `TrustAnchor::from(&cert)`) when you
+    /// need to keep `cert` alive after building the anchor.
     pub fn from_cert(cert: Certificate) -> Self {
         Self {
             subject: cert.tbs_certificate.subject,
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+        }
+    }
+}
+
+impl From<&Certificate> for TrustAnchor {
+    fn from(cert: &Certificate) -> Self {
+        Self {
+            subject: cert.tbs_certificate.subject.clone(),
+            subject_public_key_info: cert.tbs_certificate.subject_public_key_info.clone(),
         }
     }
 }
@@ -243,7 +265,7 @@ impl TrustAnchor {
 ///
 /// v0.1 does not enforce NameConstraints, CertificatePolicies, or
 /// PolicyMappings. Fields for these will be added in v0.2.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.
     ///
@@ -303,7 +325,7 @@ impl Default for ValidationPolicy {
 /// code from constructing `ValidatedPath` directly and from pattern-matching
 /// exhaustively, preserving the ability to add fields in future minor versions
 /// without a breaking change.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
@@ -439,7 +461,7 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] =
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
 fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
     if let Some(exts) = cert.tbs_certificate.extensions.as_ref() {
-        for ext in exts.iter() {
+        for ext in exts {
             if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
                 return Err(Error::UnhandledCriticalExtension { index });
             }
@@ -689,6 +711,7 @@ impl<'a> Iterator for NormalizedIter<'a> {
 /// Handles OID `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
 /// Feature-gated behind `p256`.
 #[cfg(feature = "p256")]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct EcdsaP256Verifier;
 
 #[cfg(feature = "p256")]
@@ -726,6 +749,7 @@ impl SignatureVerifier for EcdsaP256Verifier {
 /// Handles OID `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
 /// Feature-gated behind `rsa`.
 #[cfg(feature = "rsa")]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct RsaPkcs1v15Sha256Verifier;
 
 #[cfg(feature = "rsa")]
@@ -833,11 +857,8 @@ fn chain_walk<V: SignatureVerifier>(
             }
 
             // (f) KeyUsage keyCertSign required (when policy demands it).
-            if policy.enforce_key_usage {
-                match has_key_cert_sign(cert) {
-                    Some(true) => {}
-                    _ => return Err(Error::KeyUsageMissing { index: i }),
-                }
+            if policy.enforce_key_usage && !matches!(has_key_cert_sign(cert), Some(true)) {
+                return Err(Error::KeyUsageMissing { index: i });
             }
 
             // (g) pathLenConstraint: the cert at position i has i-1 intermediates
@@ -874,6 +895,7 @@ fn chain_walk<V: SignatureVerifier>(
 /// To support additional algorithms, implement [`SignatureVerifier`] directly
 /// and dispatch your own OID table.
 #[cfg(any(feature = "p256", feature = "rsa"))]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultVerifier;
 
 #[cfg(any(feature = "p256", feature = "rsa"))]
