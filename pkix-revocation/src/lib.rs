@@ -18,6 +18,7 @@
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
 
+use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
 /// Errors returned by revocation checking.
@@ -142,6 +143,29 @@ pub trait RevocationChecker {
     /// is revoked or if revocation status cannot be determined and the policy
     /// requires a definitive answer (hard-fail mode).
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
+
+    /// Check whether `cert` (issued directly by a trust anchor) has been revoked.
+    ///
+    /// Called by `verify_chain` for the last certificate in the chain — the one
+    /// whose issuer is a [`TrustAnchor`] rather than another certificate in the
+    /// chain. For example, in the chain `[leaf, intermediate_CA]` this method is
+    /// called with `cert = intermediate_CA` and `anchor` set to the matched anchor.
+    ///
+    /// **Default implementation returns `Ok(())` (skip).** Override this method
+    /// to enforce revocation checking for certificates issued directly by a trust
+    /// anchor (e.g., fetch and verify the CA's CRL using the anchor's public key).
+    ///
+    /// `NoRevocation` inherits this default and skips the check, matching its
+    /// overall no-op behaviour. `CrlChecker` and `OcspChecker` also inherit the
+    /// default for v0.1; a future version will override when an issuer cert is
+    /// available.
+    fn check_revocation_against_anchor(
+        &self,
+        _cert: &Certificate,
+        _anchor: &TrustAnchor,
+    ) -> crate::Result<()> {
+        Ok(())
+    }
 }
 
 /// A no-op revocation checker that always reports certificates as not revoked.
