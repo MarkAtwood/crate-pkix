@@ -484,7 +484,7 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
     use x509_cert::ext::pkix::KeyUsage;
 
     let exts = cert.tbs_certificate.extensions.as_ref()?;
-    for ext in exts.iter() {
+    for ext in exts {
         if ext.extn_id == OID_KEY_USAGE {
             let ku = KeyUsage::from_der(ext.extn_value.as_bytes()).ok()?;
             return Some(ku.key_cert_sign());
@@ -506,7 +506,7 @@ fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::Ba
     use x509_cert::ext::pkix::BasicConstraints;
 
     let exts = cert.tbs_certificate.extensions.as_ref()?;
-    for ext in exts.iter() {
+    for ext in exts {
         if ext.extn_id == OID_BASIC_CONSTRAINTS {
             return BasicConstraints::from_der(ext.extn_value.as_bytes()).ok();
         }
@@ -634,10 +634,12 @@ fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
     }
 }
 
-/// Compare two ASCII byte slices after RFC 4518 whitespace normalization and case-folding.
+/// Compare two byte slices after RFC 4518 whitespace normalization and case-folding.
 ///
-/// Rules applied:
-/// 1. ASCII letters: case-fold to lowercase
+/// Rules applied (per RFC 4518 §2):
+/// 1. ASCII letters (0x41–0x5A): case-fold to lowercase. Non-ASCII bytes are
+///    passed through unchanged; full Unicode case-folding (NFKC + case-fold)
+///    is deferred to v0.2.
 /// 2. Leading/trailing spaces: ignored
 /// 3. Internal multiple spaces: collapsed to single space
 fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
