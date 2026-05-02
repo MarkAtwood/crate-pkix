@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-profiles"
+description = "CA/Browser Forum and RFC certificate profile policies for pkix-chain"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "pki", "cabforum", "tls"]
+categories  = ["cryptography"]
+
+[dependencies]
+pkix-path = { workspace = true, features = ["std"] }
+x509-cert = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

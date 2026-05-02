@@ -1,0 +1,24 @@
+[package]
+name        = "pkix-path-builder"
+description = "RFC 4158 certification path building for pkix-path"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "pki", "pkix", "path-building"]
+categories  = ["cryptography", "no-std"]
+
+[features]
+default = []
+std     = ["pkix-path/std", "der/std", "x509-cert/std"]
+
+[dependencies]
+pkix-path = { workspace = true }
+der        = { workspace = true }
+x509-cert  = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

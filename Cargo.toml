@@ -5,6 +5,12 @@ members = [
     "pkix-revocation",
     "pkix-chain",
     "pkix-chain-simple",
+    "pkix-path-builder",
+    "pkix-revocation-http",
+    "pkix-profiles",
+    "pkix-ct",
+    "pkix-composite",
+    "pkix-ac",
 ]
 
 [workspace.package]
@@ -17,8 +23,14 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 
 [workspace.dependencies]
 # Internal crates
-pkix-path        = { path = "pkix-path",        version = "0.1.0" }
-pkix-revocation  = { path = "pkix-revocation",  version = "0.1.0" }
+pkix-path             = { path = "pkix-path",             version = "0.1.0" }
+pkix-revocation       = { path = "pkix-revocation",       version = "0.1.0" }
+pkix-path-builder     = { path = "pkix-path-builder",     version = "0.1.0" }
+pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.1.0" }
+pkix-profiles         = { path = "pkix-profiles",         version = "0.1.0" }
+pkix-ct               = { path = "pkix-ct",               version = "0.1.0" }
+pkix-composite        = { path = "pkix-composite",        version = "0.1.0" }
+pkix-ac               = { path = "pkix-ac",               version = "0.1.0" }
 
 # RustCrypto core
 der       = "0.7"

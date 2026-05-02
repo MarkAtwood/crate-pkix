@@ -1,0 +1,21 @@
+[package]
+name        = "pkix-ct"
+description = "Certificate Transparency SCT verification for pkix-chain (RFC 6962)"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "transparency", "sct", "ct"]
+categories  = ["cryptography"]
+
+[dependencies]
+pkix-path = { workspace = true, features = ["std"] }
+der        = { workspace = true }
+x509-cert  = { workspace = true }
+signature  = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
