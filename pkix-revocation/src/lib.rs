@@ -18,39 +18,67 @@
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
 
-use x509_cert::Certificate;
+use x509_cert::{serial_number::SerialNumber, Certificate};
 
 /// Errors returned by revocation checking.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// The certificate at the given chain index has been revoked.
+    /// The certificate has been revoked.
     Revoked {
-        /// Zero-based index into the `chain` slice of the revoked certificate.
-        index: usize,
+        /// Serial number of the revoked certificate (for logging/diagnostics).
+        serial: SerialNumber,
+        /// RFC 5280 §5.3.1 reason code from the CRL entry, if present.
+        /// `0` means unspecified; `None` means no reason code was provided.
+        reason_code: Option<u8>,
     },
-    /// Revocation status could not be determined (e.g., CRL fetch failed).
-    ///
-    /// In hard-fail mode this is treated as a revocation error.
-    Unavailable {
-        /// Zero-based index into the `chain` slice of the certificate.
-        index: usize,
-    },
+
+    /// The CRL's `thisUpdate`/`nextUpdate` validity window has expired.
+    CrlExpired,
+
+    /// The CRL signature did not verify against the issuer's SPKI.
+    CrlSignatureInvalid,
+
+    /// DER decoding of a CRL failed.
+    CrlParseError(der::Error),
+
+    /// An OCSP response signature did not verify against the responder's key.
+    OcspSignatureInvalid,
+
+    /// The OCSP responder returned an `unknown` status (hard-fail mode).
+    OcspStatusUnknown,
+
+    /// DER decoding of an OCSP response failed.
+    OcspParseError(der::Error),
 }
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Revoked { index } => write!(f, "certificate at index {index} is revoked"),
-            Error::Unavailable { index } => {
-                write!(f, "revocation status unavailable for certificate at index {index}")
-            }
+            Error::Revoked { serial, reason_code } => match reason_code {
+                Some(code) => write!(f, "certificate {serial} is revoked (reason {code})"),
+                None => write!(f, "certificate {serial} is revoked"),
+            },
+            Error::CrlExpired => f.write_str("CRL validity window has expired"),
+            Error::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
+            Error::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
+            Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
+            Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
+            Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::CrlParseError(e) => Some(e),
+            Error::OcspParseError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -97,9 +125,3 @@ impl RevocationChecker for NoRevocation {
         Ok(())
     }
 }
-
-// TODO(crl feature): CrlChecker — validates a DER-encoded CRL against issuer
-// SPKI, checks serial against revoked list. Tracked in pkix-revocation roadmap.
-
-// TODO(ocsp feature): OcspChecker — validates a DER-encoded OCSP response,
-// checks cert status. Tracked in pkix-revocation roadmap.
