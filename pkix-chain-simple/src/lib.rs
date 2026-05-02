@@ -1,4 +1,4 @@
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
@@ -17,7 +17,7 @@
 //! - Certs use RSA-PKCS1v15-SHA-256 or ECDSA-P-256-SHA-256
 //! - You want strict, auditable validation with no silent fallbacks
 //!
-//! Use [`pkix_chain`] (or [`pkix_path`] directly) when:
+//! Use `pkix_chain` (or [`pkix_path`] directly) when:
 //! - You need NameConstraints, policy validation, or revocation checking
 //! - You need a custom signature backend (FIPS, HSM, wolfCrypt)
 //! - You need to accept a broader set of algorithms or extension profiles
@@ -124,13 +124,37 @@ pub const ALLOWED_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
 
 /// Extensions permitted on intermediate CA certificates.
 ///
-/// Any extension OID not in this slice causes [`Error::UnexpectedExtension`].
+/// Any extension OID not in this slice causes [`Error::UnexpectedExtension`]
+/// (non-critical) or [`Error::UnhandledCriticalExtension`] (critical).
 pub const ALLOWED_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
     OID_EXT_BASIC_CONSTRAINTS,
     OID_EXT_KEY_USAGE,
     OID_EXT_SUBJECT_KEY_ID,
     OID_EXT_AUTHORITY_KEY_ID,
 ];
+
+/// Extension OIDs that may appear as **critical** on the end-entity (leaf) certificate.
+///
+/// This is a strict subset of [`ALLOWED_LEAF_EXTENSIONS`]: every OID here is
+/// one that `pkix-path` actively handles when the extension is critical.
+/// A leaf cert whose critical extension is in [`ALLOWED_LEAF_EXTENSIONS`] but
+/// **not** in this slice is rejected with [`Error::UnhandledCriticalExtension`].
+///
+/// - `BasicConstraints`, `KeyUsage`, `SubjectAltName` are handled by `pkix-path`.
+/// - `ExtendedKeyUsage`, `SubjectKeyIdentifier`, `AuthorityKeyIdentifier` are
+///   not handled as critical by `pkix-path` and therefore not in this slice.
+pub const CRITICAL_OK_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
+    OID_EXT_BASIC_CONSTRAINTS,
+    OID_EXT_KEY_USAGE,
+    OID_EXT_SUBJECT_ALT_NAME,
+];
+
+/// Extension OIDs that may appear as **critical** on intermediate CA certificates.
+///
+/// Strict subset of [`ALLOWED_INTERMEDIATE_EXTENSIONS`]; same rationale as
+/// [`CRITICAL_OK_LEAF_EXTENSIONS`].
+pub const CRITICAL_OK_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] =
+    &[OID_EXT_BASIC_CONSTRAINTS, OID_EXT_KEY_USAGE];
 
 // ---------------------------------------------------------------------------
 // Chain shape limit
@@ -141,7 +165,7 @@ pub const ALLOWED_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
 /// [`Error::ChainTooLong`].
 ///
 /// This covers every real-world PKI the author is aware of at the time of
-/// writing. If you need deeper chains, use [`pkix_chain`] directly.
+/// writing. If you need deeper chains, use `pkix_chain` directly.
 ///
 /// **Note**: `chain[0]` is the end-entity (leaf) certificate. `chain[0]` is
 /// checked against [`ALLOWED_LEAF_EXTENSIONS`] — if it has
@@ -163,7 +187,7 @@ pub enum Error {
     /// Chain has more certificates than `1 + `[`MAX_INTERMEDIATES`].
     ///
     /// `len` is the number of certificates supplied (excluding the trust anchor).
-    /// Use [`pkix_chain`] for longer chains.
+    /// Use `pkix_chain` for longer chains.
     ChainTooLong {
         /// Number of certificates in the chain that was rejected.
         len: usize,
@@ -192,7 +216,7 @@ pub enum Error {
     ///
     /// `verify_simple` applies a whitelist even to non-critical extensions,
     /// treating any unknown extension as a signal that this chain is not
-    /// "simple". Use [`pkix_chain`] if you need to accept such certs.
+    /// "simple". Use `pkix_chain` if you need to accept such certs.
     UnexpectedExtension {
         /// Zero-based index into `chain` of the non-conforming certificate.
         index: usize,
@@ -311,7 +335,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// 1. Shape: [`Error::EmptyChain`], [`Error::ChainTooLong`], [`Error::NoTrustAnchors`]
 /// 2. Per-cert simplicity gate (leaf-first): [`Error::AlgorithmNotAllowed`],
-///    [`Error::UnexpectedExtension`], [`Error::UnhandledCriticalExtension`],
+///    [`Error::UnhandledCriticalExtension`] (unknown or unhandleable critical ext),
+///    [`Error::UnexpectedExtension`] (unknown non-critical ext),
 ///    [`Error::MissingRequiredExtension`], [`Error::LeafIsCA`]
 /// 3. Path validation: [`Error::Path`] — signature, validity, chain linkage
 ///
@@ -388,32 +413,43 @@ fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
 /// Reject the certificate if any extension OID falls outside the allowed set
 /// for its chain position, or if required extensions are absent.
 ///
-/// - `is_leaf = true`  → whitelist is [`ALLOWED_LEAF_EXTENSIONS`]; also checks
+/// - `is_leaf = true`  → whitelist is [`ALLOWED_LEAF_EXTENSIONS`]; critical
+///   extensions must be in [`CRITICAL_OK_LEAF_EXTENSIONS`]; also checks
 ///   `BasicConstraints` cA is FALSE (or absent).
-/// - `is_leaf = false` → whitelist is [`ALLOWED_INTERMEDIATE_EXTENSIONS`]; also
-///   checks `BasicConstraints` cA=TRUE and `KeyUsage` keyCertSign are present.
+/// - `is_leaf = false` → whitelist is [`ALLOWED_INTERMEDIATE_EXTENSIONS`];
+///   critical extensions must be in [`CRITICAL_OK_INTERMEDIATE_EXTENSIONS`];
+///   also checks `BasicConstraints` cA=TRUE and `KeyUsage` keyCertSign are present.
 fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<()> {
     let allowed = if is_leaf {
         ALLOWED_LEAF_EXTENSIONS
     } else {
         ALLOWED_INTERMEDIATE_EXTENSIONS
     };
+    let critical_ok = if is_leaf {
+        CRITICAL_OK_LEAF_EXTENSIONS
+    } else {
+        CRITICAL_OK_INTERMEDIATE_EXTENSIONS
+    };
 
     let extensions = match &cert.tbs_certificate.extensions {
         Some(exts) => exts,
-        None => {
-            if is_leaf {
-                return Ok(());
-            } else {
-                return Err(Error::MissingRequiredExtension { index });
-            }
-        }
+        None if is_leaf => return Ok(()),
+        None => return Err(Error::MissingRequiredExtension { index }),
     };
 
     // Whitelist check: every extension OID must be in the allowed set.
+    // Critical extensions must additionally be in the critical-OK set (those
+    // that pkix-path handles when the extension is marked critical).
     for ext in extensions.iter() {
         if !allowed.contains(&ext.extn_id) {
-            return Err(Error::UnexpectedExtension { index });
+            if ext.critical {
+                return Err(Error::UnhandledCriticalExtension { index });
+            } else {
+                return Err(Error::UnexpectedExtension { index });
+            }
+        }
+        if ext.critical && !critical_ok.contains(&ext.extn_id) {
+            return Err(Error::UnhandledCriticalExtension { index });
         }
     }
 

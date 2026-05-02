@@ -145,17 +145,19 @@ fn verify_simple_algorithm_not_allowed_p384() {
 // Extension errors
 // ---------------------------------------------------------------------------
 
-/// Leaf with an unknown extension (1.3.6.1.5.5.7.99.99 critical) → UnexpectedExtension.
+/// Leaf with an unknown **critical** extension (1.3.6.1.5.5.7.99.99) → UnhandledCriticalExtension.
 ///
 /// Oracle: pyca/cryptography — gry-leaf-unknown-crit.der has unknown critical OID.
+/// A critical extension that is not in the allowed-and-handleable set must be
+/// rejected as UnhandledCriticalExtension, not UnexpectedExtension.
 #[test]
-fn verify_simple_unexpected_extension_leaf() {
+fn verify_simple_unknown_critical_extension_leaf() {
     let leaf = load("gry-leaf-unknown-crit.der");
     let root = load("gry-root.der");
     let result = verify_simple(&[leaf], &[anchor(root)], NOW);
     assert!(
-        matches!(result, Err(Error::UnexpectedExtension { index: 0 })),
-        "leaf with unknown extension must return UnexpectedExtension {{ index: 0 }}, got: {result:?}"
+        matches!(result, Err(Error::UnhandledCriticalExtension { index: 0 })),
+        "leaf with unknown critical extension must return UnhandledCriticalExtension {{ index: 0 }}, got: {result:?}"
     );
 }
 

@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
@@ -18,7 +18,7 @@
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
 //!
 //! Revocation checking is handled by `pkix-revocation`. This crate never
-//! touches the network — use [`pkix_chain::verify_chain`] for the combined API.
+//! touches the network — use `pkix_chain::verify_chain` for the combined API.
 //!
 //! # Limitations
 //!
@@ -247,7 +247,7 @@ impl TrustAnchor {
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.
     ///
-    /// A chain of [leaf] is depth 0. [leaf, intermediate, root] is depth 1
+    /// A chain of `[leaf]` is depth 0. `[leaf, intermediate, root]` is depth 1
     /// (one intermediate). Validation fails if depth exceeds this value.
     pub max_path_len: u8,
 
@@ -303,7 +303,7 @@ impl Default for ValidationPolicy {
 /// code from constructing `ValidatedPath` directly and from pattern-matching
 /// exhaustively, preserving the ability to add fields in future minor versions
 /// without a breaking change.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
@@ -437,18 +437,15 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] =
     &[OID_KEY_USAGE, OID_BASIC_CONSTRAINTS, OID_SUBJECT_ALT_NAME];
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
-///
-/// Returns `true` if all critical extensions are handled, `false` otherwise.
-/// The caller injects the correct chain index when constructing the error.
-fn check_critical_extensions(cert: &Certificate) -> bool {
+fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
     if let Some(exts) = cert.tbs_certificate.extensions.as_ref() {
         for ext in exts.iter() {
             if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
-                return false;
+                return Err(Error::UnhandledCriticalExtension { index });
             }
         }
     }
-    true
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -478,35 +475,18 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
 // BasicConstraints extraction (PKIX-0q5)
 // ---------------------------------------------------------------------------
 
-/// Returns whether the certificate is a CA cert per BasicConstraints.
+/// Decode the `BasicConstraints` extension from a certificate, if present.
 ///
-/// - `None`         — BasicConstraints absent (treated as cA=FALSE per RFC 5280)
-/// - `Some(true)`   — BasicConstraints present and cA=TRUE
-/// - `Some(false)`  — BasicConstraints present and cA=FALSE
-fn cert_is_ca(cert: &Certificate) -> Option<bool> {
+/// Returns `None` if the extension is absent; decoding errors are silently
+/// treated as absent (the caller will then fail the cA=TRUE check).
+fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::BasicConstraints> {
     use der::Decode;
     use x509_cert::ext::pkix::BasicConstraints;
 
     let exts = cert.tbs_certificate.extensions.as_ref()?;
     for ext in exts.iter() {
         if ext.extn_id == OID_BASIC_CONSTRAINTS {
-            let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).ok()?;
-            return Some(bc.ca);
-        }
-    }
-    None
-}
-
-/// Returns the pathLenConstraint if present in BasicConstraints.
-fn cert_path_len_constraint(cert: &Certificate) -> Option<u8> {
-    use der::Decode;
-    use x509_cert::ext::pkix::BasicConstraints;
-
-    let exts = cert.tbs_certificate.extensions.as_ref()?;
-    for ext in exts.iter() {
-        if ext.extn_id == OID_BASIC_CONSTRAINTS {
-            let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).ok()?;
-            return bc.path_len_constraint;
+            return BasicConstraints::from_der(ext.extn_value.as_bytes()).ok();
         }
     }
     None
@@ -522,12 +502,14 @@ fn time_to_unix_secs(t: &x509_cert::time::Time) -> u64 {
 }
 
 /// RFC 5280 §6.1.3(a)(2): check notBefore ≤ now ≤ notAfter.
-///
-/// Returns `true` if the certificate is valid at `now_unix`, `false` otherwise.
-fn check_validity(cert: &Certificate, now_unix: u64) -> bool {
+fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()> {
     let not_before = time_to_unix_secs(&cert.tbs_certificate.validity.not_before);
     let not_after = time_to_unix_secs(&cert.tbs_certificate.validity.not_after);
-    now_unix >= not_before && now_unix <= not_after
+    if now_unix >= not_before && now_unix <= not_after {
+        Ok(())
+    } else {
+        Err(Error::ValidityPeriod { index })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -803,21 +785,19 @@ fn chain_walk<V: SignatureVerifier>(
         }
 
         // (c) Validity period.
-        if !check_validity(cert, policy.current_time_unix) {
-            return Err(Error::ValidityPeriod { index: i });
-        }
+        check_validity(cert, policy.current_time_unix, i)?;
 
         // (d) Critical extension guard.
-        if !check_critical_extensions(cert) {
-            return Err(Error::UnhandledCriticalExtension { index: i });
-        }
+        check_critical_extensions(cert, i)?;
 
         // (e–g) CA-only checks: apply to every cert except the leaf (chain[0]).
         //        This includes any intermediate CAs and the root CA cert if it
         //        is included in the chain rather than supplied only as an anchor.
         if i > 0 {
-            // (e) BasicConstraints cA=TRUE required.
-            if cert_is_ca(cert) != Some(true) {
+            // (e) BasicConstraints cA=TRUE required; (g) pathLenConstraint.
+            // Decode BasicConstraints once for both checks.
+            let bc = cert_basic_constraints(cert);
+            if bc.as_ref().map(|b| b.ca) != Some(true) {
                 return Err(Error::NotCA { index: i });
             }
 
@@ -831,7 +811,7 @@ fn chain_walk<V: SignatureVerifier>(
 
             // (g) pathLenConstraint: the cert at position i has i-1 intermediates
             // below it in the chain. Enforce the constraint.
-            if let Some(path_len) = cert_path_len_constraint(cert) {
+            if let Some(path_len) = bc.and_then(|b| b.path_len_constraint) {
                 if (i - 1) > path_len as usize {
                     return Err(Error::PathTooLong);
                 }

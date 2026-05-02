@@ -100,16 +100,14 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             None => return Err(Error::CrlExpired),
         }
 
-        // (4) Search the revoked list for this certificate's serial number.
+        // (5) Search the revoked list for this certificate's serial number.
         let cert_serial = &cert.tbs_certificate.serial_number;
         if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
-            for entry in revoked {
-                if &entry.serial_number == cert_serial {
-                    return Err(Error::Revoked {
-                        serial: cert_serial.clone(),
-                        reason_code: extract_reason_code(entry),
-                    });
-                }
+            if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
+                return Err(Error::Revoked {
+                    serial: cert_serial.clone(),
+                    reason_code: extract_reason_code(entry),
+                });
             }
         }
 
@@ -119,15 +117,12 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
 /// Extract the CRLReason code from a revoked cert entry's extensions, if present.
 ///
-/// Returns the numeric reason code (RFC 5280 §5.3.1) as a `u8`, or `None` if
-/// the `CRLReasons` extension is absent.
-fn extract_reason_code(entry: &RevokedCert) -> Option<u8> {
+/// Returns the `CrlReason` (RFC 5280 §5.3.1), or `None` if the extension is absent.
+fn extract_reason_code(entry: &RevokedCert) -> Option<CrlReason> {
     let exts = entry.crl_entry_extensions.as_ref()?;
     for ext in exts.iter() {
         if ext.extn_id == OID_CRL_REASONS {
-            let reason = CrlReason::from_der(ext.extn_value.as_bytes()).ok()?;
-            // CrlReason is a repr(u8) enum; the cast is always safe.
-            return Some(reason as u8);
+            return CrlReason::from_der(ext.extn_value.as_bytes()).ok();
         }
     }
     None

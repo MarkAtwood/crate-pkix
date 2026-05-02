@@ -1,4 +1,4 @@
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
@@ -35,6 +35,10 @@
 pub use pkix_path::{
     self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
 };
+#[cfg(feature = "crl")]
+pub use pkix_revocation::CrlChecker;
+#[cfg(feature = "ocsp")]
+pub use pkix_revocation::OcspChecker;
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
 use x509_cert::Certificate;

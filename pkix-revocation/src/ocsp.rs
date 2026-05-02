@@ -38,7 +38,13 @@ fn der_failed() -> der::Error {
 ///
 /// # Limitations (v0.1)
 ///
+/// - The OCSP response is re-parsed from DER on every [`check_revocation`] call.
+///   For chains with multiple certificates validated against the same response,
+///   this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
+///   `BasicOcspResponse` in `new`).
 /// - Only issuer-signed (direct) OCSP responses are supported.
+///
+/// [`check_revocation`]: crate::RevocationChecker::check_revocation
 ///   Delegated OCSP responders (responses signed by a separate responder
 ///   certificate, not by the issuer directly) will fail with
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
@@ -161,8 +167,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             CertStatus::Good(_) => Ok(()),
             CertStatus::Revoked(ref info) => Err(Error::Revoked {
                 serial: cert_serial.clone(),
-                // CrlReason is a repr(u8) enum; the cast is always safe.
-                reason_code: info.revocation_reason.map(|r| r as u8),
+                reason_code: info.revocation_reason,
             }),
             CertStatus::Unknown(_) => Err(Error::OcspStatusUnknown),
         }

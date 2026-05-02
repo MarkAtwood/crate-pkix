@@ -19,7 +19,7 @@
 use der::Decode as _;
 use pkix_path::DefaultVerifier;
 use pkix_revocation::{CrlChecker, Error, RevocationChecker as _};
-use x509_cert::Certificate;
+use x509_cert::{ext::pkix::crl::CrlReason, Certificate};
 
 /// Unix timestamp used as "now" for all tests (2026-06-01 00:00:00 UTC).
 const NOW: u64 = 1_780_272_000;
@@ -90,17 +90,17 @@ fn crl_cert_revoked_no_reason() {
     );
 }
 
-/// Revoked cert (serial=2) against crl-with-reason.der → Err(Revoked) with reason=1.
+/// Revoked cert (serial=2) against crl-with-reason.der → Err(Revoked) with reason=KeyCompromise.
 ///
-/// Oracle: pyca/cryptography; CRLReason=keyCompromise (RFC 5280 value 1).
+/// Oracle: pyca/cryptography; CRLReason=keyCompromise (RFC 5280 §5.3.1 value 1).
 #[test]
 fn crl_cert_revoked_with_reason_key_compromise() {
     let ca = load_cert("crl-ca.der");
     let revoked = load_cert("crl-leaf-revoked.der");
     let result = checker("crl-with-reason.der").check_revocation(&revoked, &ca);
     assert!(
-        matches!(result, Err(Error::Revoked { reason_code: Some(1), .. })),
-        "revoked cert (keyCompromise) must return Revoked {{ reason_code: Some(1) }}, got: {result:?}"
+        matches!(result, Err(Error::Revoked { reason_code: Some(CrlReason::KeyCompromise), .. })),
+        "revoked cert (keyCompromise) must return Revoked {{ reason_code: Some(KeyCompromise) }}, got: {result:?}"
     );
 }
 

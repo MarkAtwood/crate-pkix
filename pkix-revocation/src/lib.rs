@@ -1,5 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
@@ -18,7 +18,7 @@
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
 
-use x509_cert::{serial_number::SerialNumber, Certificate};
+use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
 /// Errors returned by revocation checking.
 #[derive(Debug)]
@@ -28,9 +28,9 @@ pub enum Error {
     Revoked {
         /// Serial number of the revoked certificate (for logging/diagnostics).
         serial: SerialNumber,
-        /// RFC 5280 §5.3.1 reason code from the CRL entry, if present.
-        /// `0` means unspecified; `None` means no reason code was provided.
-        reason_code: Option<u8>,
+        /// RFC 5280 §5.3.1 reason code from the CRL/OCSP entry, if present.
+        /// `None` means no reason code was provided.
+        reason_code: Option<CrlReason>,
     },
 
     /// The CRL validity window check failed.
@@ -70,7 +70,7 @@ impl core::fmt::Display for Error {
                 serial,
                 reason_code,
             } => match reason_code {
-                Some(code) => write!(f, "certificate {serial} is revoked (reason {code})"),
+                Some(code) => write!(f, "certificate {serial} is revoked (reason {code:?})"),
                 None => write!(f, "certificate {serial} is revoked"),
             },
             Error::CrlExpired => f.write_str("CRL validity window check failed"),
@@ -104,7 +104,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// after path signature validation has succeeded.
 ///
 /// Implement this trait to plug CRL, OCSP, or a custom revocation mechanism
-/// into [`pkix_chain::verify_chain`]. Use [`NoRevocation`] for offline or
+/// into `pkix_chain::verify_chain`. Use [`NoRevocation`] for offline or
 /// embedded environments.
 pub trait RevocationChecker {
     /// Check whether `cert` has been revoked.

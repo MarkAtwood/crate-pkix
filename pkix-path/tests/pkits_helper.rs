@@ -25,6 +25,9 @@ use x509_cert::Certificate;
 /// Unix timestamp in the PKITS cert validity window (notBefore=2010-01-01, notAfter=2030-12-31).
 ///
 /// Using 2020-01-01 00:00:00 UTC = 1 577 836 800.
+///
+/// **Keep in sync**: `pkix-chain/tests/e2e.rs` defines the same constant.
+/// If you update this value, update that file too.
 pub const PKITS_NOW: u64 = 1_577_836_800;
 
 /// PKITS cert base path relative to `CARGO_MANIFEST_DIR`.

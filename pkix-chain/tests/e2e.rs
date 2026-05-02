@@ -16,6 +16,7 @@ use x509_cert::Certificate;
 
 // PKITS cert validity: notBefore=2010-01-01 08:30 UTC, notAfter=2030-12-31 08:30 UTC.
 // PKITS_NOW is 2020-01-01 00:00:00 UTC, comfortably within the validity window.
+// Must match pkix-path/tests/pkits_helper.rs::PKITS_NOW.
 const PKITS_NOW: u64 = 1_577_836_800;
 
 // Cert bytes are compiled in; tests run fully offline.
