@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = [
+    "pkix-path",
+    "pkix-revocation",
+    "pkix-chain",
+]
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.73"
+license      = "Apache-2.0 OR MIT"
+repository   = "https://github.com/wolfssl-rs/pkix"
+authors      = ["wolfSSL Inc."]
+
+[workspace.dependencies]
+# Internal crates
+pkix-path        = { path = "pkix-path",        version = "0.1.0" }
+pkix-revocation  = { path = "pkix-revocation",  version = "0.1.0" }
+
+# RustCrypto core
+der       = "0.7"
+spki      = "0.7"
+x509-cert = "0.2"
+signature = "2"
+
+# Algorithm backends (feature-gated in pkix-path)
+p256           = { version = "0.13", default-features = false, features = ["ecdsa"] }
+p384           = { version = "0.13", default-features = false, features = ["ecdsa"] }
+rsa            = { version = "0.9",  default-features = false }
+sha2           = { version = "0.10", default-features = false }
+ed25519-dalek  = { version = "2",    default-features = false }
+
+# Revocation (pkix-revocation)
+# x509-ocsp = "0.2"  # TODO: confirm version once 0.3-pre stabilizes with x509-cert
