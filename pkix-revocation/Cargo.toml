@@ -20,7 +20,7 @@ std = ["der/std"]
 crl  = ["std"]
 
 # OCSP response validation (offline; you provide the DER-encoded response bytes)
-ocsp = ["std", "dep:x509-ocsp"]
+ocsp = ["std", "dep:x509-ocsp", "dep:sha1", "dep:sha2"]
 
 [dependencies]
 pkix-path = { workspace = true }
@@ -28,6 +28,8 @@ der        = { workspace = true }
 spki       = { workspace = true }
 x509-cert  = { workspace = true }
 x509-ocsp  = { workspace = true, optional = true }
+sha1       = { workspace = true, optional = true }
+sha2       = { workspace = true, optional = true }
 
 [dev-dependencies]
 der       = { workspace = true }

@@ -13,6 +13,10 @@ use x509_ocsp::{BasicOcspResponse, CertStatus, OcspResponse, OcspResponseStatus}
 const OID_PKIX_OCSP_BASIC: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.1");
 
+// Hash algorithm OIDs used in CertID (RFC 6960 §4.1.1)
+const OID_SHA1:   der::asn1::ObjectIdentifier = der::asn1::ObjectIdentifier::new_unwrap("1.3.14.3.2.26");
+const OID_SHA256: der::asn1::ObjectIdentifier = der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
+
 /// Offline OCSP-based revocation checker.
 ///
 /// Parses a pre-fetched DER-encoded OCSP response, verifies its signature
@@ -122,6 +126,32 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .find(|r| &r.cert_id.serial_number == cert_serial)
             .ok_or(Error::OcspStatusUnknown)?;
 
+        // (7a) Verify CertID issuer hashes (RFC 6960 §4.1.1).
+        //
+        // issuerNameHash = hash(DER(issuer.subject))
+        // issuerKeyHash  = hash(issuer.spki.subject_public_key.raw_bytes())
+        //
+        // Without this check a response produced for a cert with the same serial
+        // number issued by a *different* CA could pass serial-only matching.
+        let hash_oid = &single.cert_id.hash_algorithm.oid;
+        let name_der = issuer
+            .tbs_certificate
+            .subject
+            .to_der()
+            .map_err(Error::OcspParseError)?;
+        let key_raw = issuer
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes();
+        let expected_name_hash = hash_certid_input(hash_oid, &name_der)?;
+        let expected_key_hash = hash_certid_input(hash_oid, key_raw)?;
+        if single.cert_id.issuer_name_hash.as_bytes() != expected_name_hash.as_slice()
+            || single.cert_id.issuer_key_hash.as_bytes() != expected_key_hash.as_slice()
+        {
+            return Err(Error::OcspStatusUnknown);
+        }
+
         // (8) Check validity windows.
         //
         // producedAt must not be in the future: a future-dated response indicates
@@ -160,5 +190,24 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             }),
             CertStatus::Unknown(_) => Err(Error::OcspStatusUnknown),
         }
+    }
+}
+
+/// Hash `data` using the algorithm identified by `oid`.
+///
+/// Supports SHA-1 (OID 1.3.14.3.2.26) and SHA-256 (OID 2.16.840.1.101.3.4.2.1).
+/// Returns [`Error::OcspMalformed`] for any other OID.
+fn hash_certid_input(
+    oid: &der::asn1::ObjectIdentifier,
+    data: &[u8],
+) -> crate::Result<Vec<u8>> {
+    if oid == &OID_SHA1 {
+        use sha1::Digest as _;
+        Ok(sha1::Sha1::digest(data).to_vec())
+    } else if oid == &OID_SHA256 {
+        use sha2::Digest as _;
+        Ok(sha2::Sha256::digest(data).to_vec())
+    } else {
+        Err(Error::OcspMalformed)
     }
 }
