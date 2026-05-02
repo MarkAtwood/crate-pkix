@@ -961,7 +961,7 @@ mod tests_rsa {
 // ---------------------------------------------------------------------------
 #[cfg(test)]
 mod tests_normalized_iter {
-    use super::{normalized_eq, NormalizedIter};
+    use super::normalized_eq;
 
     /// Identical ASCII strings must compare equal.
     #[test]
@@ -1028,13 +1028,10 @@ mod tests_normalized_iter {
     /// trailing space).
     #[test]
     fn internal_then_trailing_space_no_trailing_emit() {
-        // "ab  " → normalized → "ab" (one word, no trailing space)
-        let collected: Vec<u8> = NormalizedIter::new(b"ab  ").collect();
-        assert_eq!(collected, b"ab");
-
-        // "ab  cd  " → normalized → "ab cd" (one internal space, no trailing space)
-        let collected: Vec<u8> = NormalizedIter::new(b"ab  cd  ").collect();
-        assert_eq!(collected, b"ab cd");
+        assert!(normalized_eq(b"ab  ", b"ab"),
+            "trailing spaces must not be emitted");
+        assert!(normalized_eq(b"ab  cd  ", b"ab cd"),
+            "internal double-space collapses; trailing spaces stripped");
     }
 }
 
