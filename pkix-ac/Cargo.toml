@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace     = true
 repository.workspace  = true
 authors.workspace     = true
-keywords    = ["x509", "certificate", "attribute-certificate", "pki", "authorization"]
+keywords    = ["x509", "certificate", "attr-cert", "pki", "authorization"]
 categories  = ["cryptography", "no-std"]
 
 [features]
