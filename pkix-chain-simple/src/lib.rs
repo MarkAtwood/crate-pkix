@@ -42,6 +42,8 @@
 //! - `SubjectAltName`
 //! - `SubjectKeyIdentifier`
 //! - `AuthorityKeyIdentifier`
+//! - `CRLDistributionPoints` (informational; content not inspected)
+//! - `AuthorityInfoAccess` (informational; content not inspected)
 //! - No other extensions permitted (critical or non-critical)
 //!
 //! **Extensions — intermediate certs** (`chain[1..]`):
@@ -110,6 +112,14 @@ pub const OID_EXT_SUBJECT_KEY_ID: ObjectIdentifier = ObjectIdentifier::new_unwra
 /// OID for the `AuthorityKeyIdentifier` extension (RFC 5280 §4.2.1.1).
 pub const OID_EXT_AUTHORITY_KEY_ID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.35");
 
+/// OID for the `CRLDistributionPoints` extension (RFC 5280 §4.2.1.13).
+pub const OID_EXT_CRL_DISTRIBUTION_POINTS: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.5.29.31");
+
+/// OID for the `AuthorityInfoAccess` extension (RFC 5280 §4.2.2.1).
+pub const OID_EXT_AUTHORITY_INFO_ACCESS: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1");
+
 /// Extensions permitted on the end-entity (leaf) certificate.
 ///
 /// Any extension OID not in this slice causes [`Error::UnexpectedExtension`].
@@ -120,6 +130,8 @@ pub const ALLOWED_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
     OID_EXT_SUBJECT_ALT_NAME,
     OID_EXT_SUBJECT_KEY_ID,
     OID_EXT_AUTHORITY_KEY_ID,
+    OID_EXT_CRL_DISTRIBUTION_POINTS,
+    OID_EXT_AUTHORITY_INFO_ACCESS,
 ];
 
 /// Extensions permitted on intermediate CA certificates.

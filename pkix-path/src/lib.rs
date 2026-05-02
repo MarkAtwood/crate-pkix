@@ -81,14 +81,18 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
-    /// ASN.1 / DER decoding error.
+    /// ASN.1 / DER encoding or decoding error.
     ///
-    /// Returned when DER encoding of a TBS structure fails inside `chain_walk`
-    /// (e.g. the TBS is too large for the internal stack buffer). The inner
-    /// `der::Error` is exposed for diagnostic purposes; callers that want a
-    /// stable match target should check for `Error::Der(_)` without inspecting
-    /// the inner value, as the specific `der::Error` variants are not part of
-    /// the stable API contract.
+    /// Most commonly returned when the internal 8 KiB stack buffer used to
+    /// re-encode `TBSCertificate` for signature verification is too small.
+    /// This is an **implementation limit**, not a certificate defect — the
+    /// certificate may be perfectly valid. Certificates with TBSCertificate
+    /// > 8 KiB (large government / enterprise / HSM attestation certs) will
+    /// trigger this error. This is tracked for v0.2 (heap-backed encoding).
+    ///
+    /// Callers that want a stable match target should check for `Error::Der(_)`
+    /// without inspecting the inner value; the specific `der::Error` variants
+    /// are not part of the stable API contract.
     Der(der::Error),
 }
 
@@ -483,14 +487,13 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
     use der::Decode;
     use x509_cert::ext::pkix::KeyUsage;
 
-    let exts = cert.tbs_certificate.extensions.as_ref()?;
-    for ext in exts {
-        if ext.extn_id == OID_KEY_USAGE {
-            let ku = KeyUsage::from_der(ext.extn_value.as_bytes()).ok()?;
-            return Some(ku.key_cert_sign());
-        }
-    }
-    None
+    cert.tbs_certificate
+        .extensions
+        .as_ref()?
+        .iter()
+        .find(|ext| ext.extn_id == OID_KEY_USAGE)
+        .and_then(|ext| KeyUsage::from_der(ext.extn_value.as_bytes()).ok())
+        .map(|ku| ku.key_cert_sign())
 }
 
 // ---------------------------------------------------------------------------
@@ -505,13 +508,12 @@ fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::Ba
     use der::Decode;
     use x509_cert::ext::pkix::BasicConstraints;
 
-    let exts = cert.tbs_certificate.extensions.as_ref()?;
-    for ext in exts {
-        if ext.extn_id == OID_BASIC_CONSTRAINTS {
-            return BasicConstraints::from_der(ext.extn_value.as_bytes()).ok();
-        }
-    }
-    None
+    cert.tbs_certificate
+        .extensions
+        .as_ref()?
+        .iter()
+        .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
+        .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
 }
 
 // ---------------------------------------------------------------------------
@@ -572,18 +574,27 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         if a_avas.len() != b_avas.len() {
             return false;
         }
-        // For each AVA in a_rdn, find a matching AVA in b_rdn (same OID, equal normalized value).
+        // Bijective AVA matching: every AVA in a_rdn must match some AVA in b_rdn,
+        // AND every AVA in b_rdn must match some AVA in a_rdn (both directions).
         //
-        // `.any()` is used rather than matched-pair tracking because X.509 well-formed
-        // RDNs SHOULD NOT contain two AVAs with the same OID (RFC 5280 §5.1.2.4). For
-        // such well-formed inputs, `.any()` is equivalent to a bijective pairing. The
-        // AVA count check above (`a_avas.len() != b_avas.len()`) handles malformed
-        // certificates that do contain duplicate OIDs conservatively: e.g.,
-        // `{CN=Alice, CN=Bob}` (len=2) will never match `{CN=Alice}` (len=1) because
-        // the count check fails first.
+        // The bidirectional check is equivalent to set equality for well-formed RDNs
+        // (RFC 5280 §5.1.2.4 SHOULD NOT contain duplicate OIDs), and also correctly
+        // handles the malformed-cert case where an RDN has duplicate OIDs:
+        //   a={CN=Alice, CN=Alice}, b={CN=Bob, CN=Alice} → both len=2, forward pass
+        //   finds CN=Alice for each a_ava, but the reverse pass finds no match for
+        //   CN=Bob → returns false (correct).
+        // The reverse pass is O(n²) on AVA count; n is 1–5 in practice.
         for a_ava in a_avas.iter() {
             let found = b_avas.iter().any(|b_ava| {
                 b_ava.oid == a_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
+            });
+            if !found {
+                return false;
+            }
+        }
+        for b_ava in b_avas.iter() {
+            let found = a_avas.iter().any(|a_ava| {
+                a_ava.oid == b_ava.oid && ava_values_match(&b_ava.value, &a_ava.value)
             });
             if !found {
                 return false;
@@ -708,6 +719,11 @@ impl<'a> Iterator for NormalizedIter<'a> {
 // ECDSA P-256 SHA-256 backend (PKIX-evy)
 // ---------------------------------------------------------------------------
 
+/// OID for `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
+#[cfg(feature = "p256")]
+const OID_ECDSA_P256_SHA256: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+
 /// ECDSA P-256 with SHA-256 signature verifier.
 ///
 /// Handles OID `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
@@ -726,9 +742,7 @@ impl SignatureVerifier for EcdsaP256Verifier {
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
         // Reject any OID other than ecdsa-with-SHA256.
-        const OID: der::asn1::ObjectIdentifier =
-            der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
-        if algorithm.oid != OID {
+        if algorithm.oid != OID_ECDSA_P256_SHA256 {
             return Err(SignatureError::new());
         }
 
@@ -745,6 +759,11 @@ impl SignatureVerifier for EcdsaP256Verifier {
 // ---------------------------------------------------------------------------
 // RSA PKCS#1 v1.5 SHA-256 backend (PKIX-gmv)
 // ---------------------------------------------------------------------------
+
+/// OID for `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
+#[cfg(feature = "rsa")]
+const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
 
 /// RSA with PKCS#1 v1.5 padding and SHA-256 signature verifier.
 ///
@@ -764,9 +783,7 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
         // Reject any OID other than sha256WithRSAEncryption.
-        const OID: der::asn1::ObjectIdentifier =
-            der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
-        if algorithm.oid != OID {
+        if algorithm.oid != OID_SHA256_WITH_RSA {
             return Err(SignatureError::new());
         }
 
@@ -819,9 +836,10 @@ fn chain_walk<V: SignatureVerifier>(
         let cert = &chain[i];
 
         // (a) Verify signature with the current issuer's SPKI.
-        //     8 KiB covers every well-formed certificate encountered in practice
-        //     (typical TLS certs are 1–3 KiB). Certificates exceeding this limit
-        //     return Error::Der; tracked for v0.2 with heap-backed encoding.
+        //     8 KiB covers typical TLS and code-signing certs (1–3 KiB), but
+        //     NOT large government / HSM certs. Certificates exceeding this limit
+        //     return Error::Der — an implementation limit, not a malformed cert.
+        //     Tracked for v0.2 with heap-backed encoding.
         let mut tbs_buf = [0u8; 8192];
         let tbs_bytes = cert
             .tbs_certificate
@@ -926,16 +944,6 @@ impl SignatureVerifier for DefaultVerifier {
         Err(SignatureError::new())
     }
 }
-
-/// OID for `ecdsa-with-SHA256` — used by `DefaultVerifier` dispatch.
-#[cfg(any(feature = "p256", feature = "rsa"))]
-const OID_ECDSA_P256_SHA256: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
-
-/// OID for `sha256WithRSAEncryption` — used by `DefaultVerifier` dispatch.
-#[cfg(any(feature = "p256", feature = "rsa"))]
-const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -3,7 +3,7 @@
 //! Enabled by the `ocsp` feature.
 
 use crate::{Error, RevocationChecker};
-use der::{Decode as _, Encode as _, ErrorKind, Length};
+use der::{Decode as _, Encode as _};
 use pkix_path::SignatureVerifier;
 use spki::der::referenced::OwnedToRef as _;
 use x509_cert::Certificate;
@@ -12,18 +12,6 @@ use x509_ocsp::{BasicOcspResponse, CertStatus, OcspResponse, OcspResponseStatus}
 // OID 1.3.6.1.5.5.7.48.1.1 — id-pkix-ocsp-basic
 const OID_PKIX_OCSP_BASIC: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.1");
-
-/// A placeholder `der::Error` used when a structural invariant is violated.
-///
-/// This is returned in two places:
-/// - `responseBytes` absent in a `Successful` response (RFC 6960 §4.2.1 requires it)
-/// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
-///
-/// Both indicate a malformed OCSP response that does not conform to RFC 6960.
-/// `Length::ZERO` is used as a placeholder since `der::Error` requires a length.
-fn der_failed() -> der::Error {
-    der::Error::new(ErrorKind::Failed, Length::ZERO)
-}
 
 /// Offline OCSP-based revocation checker.
 ///
@@ -93,11 +81,11 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // (3) Extract responseBytes (must be present for a Successful response).
         let resp_bytes = resp
             .response_bytes
-            .ok_or_else(|| Error::OcspParseError(der_failed()))?;
+            .ok_or(Error::OcspMalformed)?;
 
         // (4) Verify responseType is id-pkix-ocsp-basic.
         if resp_bytes.response_type != OID_PKIX_OCSP_BASIC {
-            return Err(Error::OcspParseError(der_failed()));
+            return Err(Error::OcspMalformed);
         }
 
         // (5) Parse the BasicOCSPResponse.

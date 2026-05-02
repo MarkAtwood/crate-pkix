@@ -45,7 +45,7 @@ pub trait RevocationFetcher {
 #[non_exhaustive]
 pub enum FetchError {
     /// Network or transport error.
-    Transport(String),
+    Transport(Box<dyn std::error::Error + Send + Sync + 'static>),
     /// HTTP error response (non-2xx status).
     HttpStatus(u16),
     /// Response body exceeded the configured size limit.
@@ -55,14 +55,21 @@ pub enum FetchError {
 impl core::fmt::Display for FetchError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            FetchError::Transport(msg) => write!(f, "transport error: {msg}"),
+            FetchError::Transport(e) => write!(f, "transport error: {e}"),
             FetchError::HttpStatus(code) => write!(f, "HTTP {code}"),
             FetchError::TooLarge => f.write_str("response too large"),
         }
     }
 }
 
-impl std::error::Error for FetchError {}
+impl std::error::Error for FetchError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FetchError::Transport(e) => Some(e.as_ref()),
+            _ => None,
+        }
+    }
+}
 
 /// A [`pkix_revocation::RevocationChecker`] that fetches CRLs on demand.
 ///

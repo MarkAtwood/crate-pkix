@@ -89,7 +89,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Limitations
 ///
-/// Not yet implemented.
+/// Not yet implemented. Until implemented, always returns
+/// [`Error::NoTrustedSct`].
 pub fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
-    Err(Error::NoScts)
+    Err(Error::NoTrustedSct)
 }

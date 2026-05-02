@@ -61,6 +61,13 @@ pub enum Error {
 
     /// DER decoding of an OCSP response failed.
     OcspParseError(der::Error),
+
+    /// The OCSP response is structurally invalid per RFC 6960 but DER-decodable.
+    ///
+    /// Currently returned in two cases:
+    /// - `responseBytes` is absent in a `Successful` response (RFC 6960 §4.2.1)
+    /// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
+    OcspMalformed,
 }
 
 impl core::fmt::Display for Error {
@@ -80,6 +87,9 @@ impl core::fmt::Display for Error {
             Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
             Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
+            Error::OcspMalformed => f.write_str(
+                "OCSP response is structurally invalid (malformed per RFC 6960)",
+            ),
         }
     }
 }

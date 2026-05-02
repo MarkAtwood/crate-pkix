@@ -62,6 +62,15 @@ impl CertPool {
     }
 }
 
+impl<'a> IntoIterator for &'a CertPool {
+    type Item = &'a x509_cert::Certificate;
+    type IntoIter = core::slice::Iter<'a, x509_cert::Certificate>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.certs.iter()
+    }
+}
+
 /// Errors returned by path building.
 #[derive(Debug)]
 #[non_exhaustive]

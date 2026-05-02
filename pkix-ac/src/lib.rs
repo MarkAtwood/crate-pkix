@@ -114,12 +114,13 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Limitations
 ///
-/// Not yet implemented.
+/// Not yet implemented. Until implemented, always returns
+/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)`.
 pub fn validate_attribute_cert(
     _ac: &AttributeCertificate,
     _aa_anchors: &[pkix_path::TrustAnchor],
     _now_unix: u64,
     _verifier: &impl pkix_path::SignatureVerifier,
 ) -> Result<()> {
-    Err(Error::ParseError)
+    Err(Error::AaPathInvalid(pkix_path::Error::NoTrustedPath))
 }
