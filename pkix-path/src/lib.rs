@@ -668,10 +668,11 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 
     match (a_str, b_str) {
         (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
-        // Both values are non-string types (e.g. OID, INTEGER): fall back to raw DER
-        // byte comparison. This is intentional — it correctly handles OID-valued
-        // attributes and other non-string types where byte equality is the right test.
-        (None, None) => a.value() == b.value(),
+        // Both values are non-string types (e.g. OID, INTEGER) or unhandled string
+        // types: compare tag AND content bytes (raw DER). Tag comparison ensures
+        // TeletexString and BMPString with coincidentally identical bytes are not
+        // considered equal.
+        (None, None) => a.tag() == b.tag() && a.value() == b.value(),
         // One value is a string type and the other is not. Return false (fail-closed).
         // A legitimate certificate chain will never encode the same attribute OID as a
         // string type in one cert and a non-string type in another, so this mismatch
@@ -680,18 +681,39 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     }
 }
 
-/// Extract the string content bytes from a DirectoryString Any value.
-/// Returns None if the tag is not a string type we handle.
+/// Extract the string content bytes from a DirectoryString Any value,
+/// returning `None` for types that require special pre-processing before
+/// normalization (see `ava_values_match` for the dispatch logic).
 ///
-/// **v0.1 limitation**: `TeletexString` (T61String) and `BMPString` (used in
-/// some legacy CA certificates) are not handled here and fall back to raw DER
-/// byte comparison in `ava_values_match`. Name matching against these string
-/// types may fail even when the names are semantically equivalent. Supporting
-/// these requires (1) a dedicated Unicode transcoding step (T.61 → Unicode per
-/// ISO/IEC 6429 + T.61 tables; BMP → UTF-16BE decode) and (2) applying RFC
-/// 4518 §2.3 NFKC normalization post-transcoding. This cannot be handled by
-/// extending `NormalizedIter` alone — it requires a new pre-processing pass
-/// and the `unicode-normalization` crate. Tracked for v0.2.
+/// # Normalization strategy by string type
+///
+/// **Currently handled (v0.1 partial normalization):**
+/// `UTF8String`, `PrintableString`, `IA5String`, `VisibleString` — raw
+/// content bytes are passed directly to `NormalizedIter`, which applies
+/// ASCII case-folding and insignificant-space handling (RFC 4518 §2.4 step
+/// 6 subset). Full Unicode NFKC normalization (RFC 4518 §2.3) is deferred
+/// to v0.2 along with the types below.
+///
+/// **v0.2 planned — decode then normalize:**
+/// - `BMPString` (UCS-2 BE, BMP only): decode UTF-16BE → apply full RFC
+///   4518 six-step preparation (Map → NFKC → Prohibit → CheckBidi →
+///   insignificant-space). RFC 4518 §2.1 classifies BMPString as "a subset
+///   of Unicode" — no custom transcoding required.
+/// - `UniversalString` (UCS-4 BE): decode UCS-4 BE → apply the same RFC
+///   4518 six-step preparation as BMPString.
+///
+/// v0.2 will also upgrade the currently-handled types to full RFC 4518
+/// six-step normalization (adding NFKC). All types except `TeletexString`
+/// will be normalized identically.
+///
+/// **Permanent exception — `TeletexString` (T61String):**
+/// Raw DER byte comparison only; decode-and-normalize will never be added.
+/// RFC 4518 §2.1 states: "As there is no standard for mapping TeletexString
+/// values to Unicode, the mapping is left a local matter." RFC 5280 §7.1
+/// classifies TeletexString support as OPTIONAL. No canonical T.61→Unicode
+/// table exists (OpenSSL, NSS, and GnuTLS each use incompatible vendor
+/// extensions). Introducing any mapping would silently accept mismatches
+/// that other validators reject.
 fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
     use der::Tag;
     match a.tag() {
