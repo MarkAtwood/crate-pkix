@@ -59,10 +59,23 @@ RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo +nightly doc --no-deps --all-featu
 cargo +1.73 check --workspace  # MSRV check
 ```
 
-## Beads Issue Tracker
+## Agent Workflow
 
-Run `bd prime` for workflow commands. All tasks tracked in beads, not markdown TODOs.
+Work is organized as **epics → issues → subagents**:
 
+1. **Decompose** — break any non-trivial feature into a beads epic with small, focused issues.
+   Each issue must be completable by a single subagent in one pass.
+2. **Parallelize** — spawn one subagent per ready issue. Use `TeamCreate` for parallel
+   workstreams (e.g., "implement RSA verifier" and "write PKITS vectors" run concurrently).
+3. **Subagent contract** — every subagent must:
+   - Claim its issue (`bd update <id> --claim`) before writing code
+   - Do exactly the work described in that one issue
+   - Close its issue (`bd close <id>`) when done
+   - Report back: what was done, what (if anything) is still blocked
+4. **Orchestrator** — the top-level agent creates epics/issues, spawns the team,
+   collects results, files follow-up issues for anything unfinished.
+
+One subagent = one bead. Never assign multiple issues to a single subagent.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker

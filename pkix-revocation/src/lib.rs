@@ -18,7 +18,7 @@
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
 
-use pkix_path::{Error, Result};
+use pkix_path::Result;
 use x509_cert::Certificate;
 
 /// Pluggable revocation checking.

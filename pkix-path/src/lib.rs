@@ -29,8 +29,6 @@
 //!
 //! These are tracked for v0.2+.
 
-extern crate alloc;
-
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
@@ -39,21 +37,39 @@ use x509_cert::Certificate;
 #[non_exhaustive]
 pub enum Error {
     /// Certificate signature verification failed at the given chain index.
-    SignatureInvalid { index: usize },
+    SignatureInvalid {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// Certificate validity period check failed (expired or not yet valid).
-    ValidityPeriod { index: usize },
+    ValidityPeriod {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// Issuer/subject name linkage is broken at the given chain index.
-    ChainBroken { index: usize },
+    ChainBroken {
+        /// Zero-based index into the `chain` slice where the break was found.
+        index: usize,
+    },
     /// No path from the subject certificate to any trust anchor was found.
     NoTrustedPath,
     /// Path length exceeds [`ValidationPolicy::max_path_len`].
     PathTooLong,
     /// An intermediate certificate is missing BasicConstraints cA=TRUE.
-    NotCA { index: usize },
+    NotCA {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// An intermediate certificate is missing KeyUsage keyCertSign.
-    KeyUsageMissing { index: usize },
+    KeyUsageMissing {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// A critical extension is present that this implementation does not handle.
-    UnhandledCriticalExtension { index: usize },
+    UnhandledCriticalExtension {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// ASN.1 / DER decoding error.
     Der(der::Error),
 }

@@ -53,6 +53,24 @@ PKITS happy-path subset green. All unimplemented features have rustdoc `# Limita
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
 Do not retry in a loop.
 
+## Agent Workflow
+
+Work is organized as **epics → issues → subagents**:
+
+1. **Decompose** — create a beads epic; break it into issues small enough for one
+   subagent each. Use `bd epic` and `bd create`.
+2. **Parallelize** — use `TeamCreate` to run one subagent per ready issue concurrently.
+   Check `bd ready` for issues with no outstanding blockers.
+3. **Subagent contract**:
+   - Claim the issue before touching code: `bd update <id> --claim`
+   - Work only the scope described in that issue — nothing more
+   - Close on completion: `bd close <id>`
+   - Return a brief summary: what changed, any new blockers discovered
+4. **Orchestrator** — top-level agent owns epics, spawns teams, collects results,
+   files follow-up issues for incomplete work.
+
+**Rule: one subagent = one bead. Never assign two issues to one subagent.**
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
