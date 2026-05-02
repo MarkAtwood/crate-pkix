@@ -83,7 +83,9 @@ impl core::fmt::Display for Error {
         match self {
             Error::ParseError => f.write_str("attribute certificate parse error"),
             Error::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
-            Error::ValidityPeriod => f.write_str("attribute certificate validity period check failed"),
+            Error::ValidityPeriod => {
+                f.write_str("attribute certificate validity period check failed")
+            }
             Error::AaPathInvalid(e) => write!(f, "attribute authority path invalid: {e}"),
         }
     }

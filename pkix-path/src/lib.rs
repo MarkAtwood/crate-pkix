@@ -529,6 +529,13 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 /// compared positionally (index 0 with index 0, etc.). Within each RDN —
 /// which is a `SET OF AttributeTypeAndValue` — comparison is order-independent:
 /// each AVA in one RDN is matched against any AVA in the other.
+///
+/// # Limitations
+///
+/// TeletexString and BMPString attribute values are not normalized — matching
+/// falls back to raw DER byte comparison. Certificates from legacy PKIs using
+/// these string types may fail name matching even when the names are
+/// semantically equivalent. Full support is deferred to v0.2.
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
     let b_rdns = b.0.as_slice();
@@ -543,7 +550,15 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         if a_avas.len() != b_avas.len() {
             return false;
         }
-        // For each AVA in a_rdn, find matching AVA in b_rdn (same OID, equal normalized value).
+        // For each AVA in a_rdn, find a matching AVA in b_rdn (same OID, equal normalized value).
+        //
+        // `.any()` is used rather than matched-pair tracking because X.509 well-formed
+        // RDNs SHOULD NOT contain two AVAs with the same OID (RFC 5280 §5.1.2.4). For
+        // such well-formed inputs, `.any()` is equivalent to a bijective pairing. The
+        // AVA count check above (`a_avas.len() != b_avas.len()`) handles malformed
+        // certificates that do contain duplicate OIDs conservatively: e.g.,
+        // `{CN=Alice, CN=Bob}` (len=2) will never match `{CN=Alice}` (len=1) because
+        // the count check fails first.
         for a_ava in a_avas.iter() {
             let found = b_avas.iter().any(|b_ava| {
                 b_ava.oid == a_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
@@ -563,8 +578,14 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 
     match (a_str, b_str) {
         (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
-        // Fall back to raw DER byte comparison if we can't decode as a string type.
+        // Both values are non-string types (e.g. OID, INTEGER): fall back to raw DER
+        // byte comparison. This is intentional — it correctly handles OID-valued
+        // attributes and other non-string types where byte equality is the right test.
         (None, None) => a.value() == b.value(),
+        // One value is a string type and the other is not. Return false (fail-closed).
+        // A legitimate certificate chain will never encode the same attribute OID as a
+        // string type in one cert and a non-string type in another, so this mismatch
+        // indicates a malformed or suspicious certificate.
         _ => false,
     }
 }
@@ -575,8 +596,12 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// **v0.1 limitation**: `TeletexString` (T61String) and `BMPString` (used in
 /// some legacy CA certificates) are not handled here and fall back to raw DER
 /// byte comparison in `ava_values_match`. Name matching against these string
-/// types may fail even when the names are semantically equivalent. Tracked
-/// for v0.2 (RFC 5280 §7.1 / RFC 4518 §2.6 legacy encoding support).
+/// types may fail even when the names are semantically equivalent. Supporting
+/// these requires (1) a dedicated Unicode transcoding step (T.61 → Unicode per
+/// ISO/IEC 6429 + T.61 tables; BMP → UTF-16BE decode) and (2) applying RFC
+/// 4518 §2.3 NFKC normalization post-transcoding. This cannot be handled by
+/// extending `NormalizedIter` alone — it requires a new pre-processing pass
+/// and the `unicode-normalization` crate. Tracked for v0.2.
 fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
     use der::Tag;
     match a.tag() {
@@ -625,8 +650,14 @@ impl<'a> NormalizedIter<'a> {
 impl<'a> Iterator for NormalizedIter<'a> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
-        // A space was already emitted on the previous call; skip any additional
-        // consecutive spaces now without emitting another space character.
+        // Invariant: `pending_space = true` means we emitted a space on the previous
+        // call but have not yet consumed the consecutive space run that follows it.
+        // On the next call we skip the entire run and resume with the next non-space
+        // byte. This ensures:
+        //   (a) internal space runs collapse to exactly one space, and
+        //   (b) trailing space runs do not emit a trailing space, because the run
+        //       ends at the trim boundary established in `new()` (trailing spaces
+        //       are excluded from `self.bytes` before iteration begins).
         if self.pending_space {
             self.pending_space = false;
             while self.pos < self.bytes.len() && self.bytes[self.pos] == b' ' {
@@ -1028,10 +1059,14 @@ mod tests_normalized_iter {
     /// trailing space).
     #[test]
     fn internal_then_trailing_space_no_trailing_emit() {
-        assert!(normalized_eq(b"ab  ", b"ab"),
-            "trailing spaces must not be emitted");
-        assert!(normalized_eq(b"ab  cd  ", b"ab cd"),
-            "internal double-space collapses; trailing spaces stripped");
+        assert!(
+            normalized_eq(b"ab  ", b"ab"),
+            "trailing spaces must not be emitted"
+        );
+        assert!(
+            normalized_eq(b"ab  cd  ", b"ab cd"),
+            "internal double-space collapses; trailing spaces stripped"
+        );
     }
 }
 
