@@ -18,8 +18,39 @@
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
 
-use pkix_path::Result;
 use x509_cert::Certificate;
+
+/// Errors returned by revocation checking.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// The certificate at the given chain index has been revoked.
+    Revoked {
+        /// Zero-based index into the `chain` slice of the revoked certificate.
+        index: usize,
+    },
+    /// Revocation status could not be determined (e.g., CRL fetch failed).
+    ///
+    /// In hard-fail mode this is treated as a revocation error.
+    Unavailable {
+        /// Zero-based index into the `chain` slice of the certificate.
+        index: usize,
+    },
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Revoked { index } => write!(f, "certificate at index {index} is revoked"),
+            Error::Unavailable { index } => {
+                write!(f, "revocation status unavailable for certificate at index {index}")
+            }
+        }
+    }
+}
+
+/// Result alias for this crate.
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// Pluggable revocation checking.
 ///
@@ -38,7 +69,7 @@ pub trait RevocationChecker {
     /// Returns `Ok(())` if the certificate is not revoked, or an `Err` if it
     /// is revoked or if revocation status cannot be determined and the policy
     /// requires a definitive answer (hard-fail mode).
-    fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> Result<()>;
+    fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
 }
 
 /// A no-op revocation checker that always reports certificates as not revoked.
@@ -59,7 +90,7 @@ pub struct NoRevocation;
 
 impl RevocationChecker for NoRevocation {
     #[inline]
-    fn check_revocation(&self, _cert: &Certificate, _issuer: &Certificate) -> Result<()> {
+    fn check_revocation(&self, _cert: &Certificate, _issuer: &Certificate) -> crate::Result<()> {
         Ok(())
     }
 }

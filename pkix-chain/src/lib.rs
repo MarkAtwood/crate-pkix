@@ -29,10 +29,55 @@
 //! )?;
 //! ```
 
-pub use pkix_path::{self, Error, Result, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
+pub use pkix_path::{self, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
 use x509_cert::Certificate;
+
+/// Combined error type for chain verification.
+///
+/// Wraps both path validation errors ([`pkix_path::Error`]) and
+/// revocation checking errors ([`pkix_revocation::Error`]).
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// RFC 5280 path validation failed.
+    Path(pkix_path::Error),
+    /// Revocation checking failed.
+    Revocation(pkix_revocation::Error),
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Path(e) => write!(f, "path validation: {e:?}"),
+            Error::Revocation(e) => write!(f, "revocation: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // TODO: chain sources after pkix_path::Error and pkix_revocation::Error
+        // get std::error::Error impls (tracked in PKIX-e9v).
+        None
+    }
+}
+
+impl From<pkix_path::Error> for Error {
+    fn from(e: pkix_path::Error) -> Self {
+        Error::Path(e)
+    }
+}
+
+impl From<pkix_revocation::Error> for Error {
+    fn from(e: pkix_revocation::Error) -> Self {
+        Error::Revocation(e)
+    }
+}
+
+/// Result alias for this crate.
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// Verify a certificate chain with signature validation and revocation checking.
 ///
@@ -58,7 +103,7 @@ pub fn verify_chain<V, R>(
     policy: &ValidationPolicy,
     verifier: &V,
     revocation: &R,
-) -> Result<ValidatedPath>
+) -> crate::Result<ValidatedPath>
 where
     V: SignatureVerifier,
     R: RevocationChecker,
@@ -73,11 +118,11 @@ where
     for i in 0..chain.len() {
         let cert = &chain[i];
         // Issuer of chain[i] is chain[i+1], or the trust anchor for the last cert.
-        // The trust anchor certificate is at anchors[validated.anchor_index].
-        let issuer = chain
-            .get(i + 1)
-            .unwrap_or(&anchors[validated.anchor_index].certificate);
-        revocation.check_revocation(cert, issuer)?;
+        // Revocation checking for the cert directly issued by the trust anchor would
+        // require the trust anchor's own CRL — out of scope for v0.1.
+        if let Some(issuer) = chain.get(i + 1) {
+            revocation.check_revocation(cert, issuer)?;
+        }
     }
 
     Ok(validated)

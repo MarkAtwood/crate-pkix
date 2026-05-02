@@ -318,11 +318,18 @@ pub fn verify_simple(
 /// Both the outer `signatureAlgorithm` field and the inner
 /// `TBSCertificate.signature` field are checked; RFC 5280 §4.1.1.2 requires
 /// them to be identical.
-fn check_algorithm(_index: usize, _cert: &Certificate) -> Result<()> {
-    todo!(
-        "check cert.signature_algorithm.oid against ALLOWED_SIG_ALGS; \
-         also verify outer == inner per RFC 5280 §4.1.1.2"
-    )
+fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
+    // RFC 5280 §4.1.1.2: outer signatureAlgorithm and inner TBSCertificate.signature
+    // must be identical.
+    if cert.signature_algorithm != cert.tbs_certificate.signature {
+        return Err(Error::AlgorithmNotAllowed { index });
+    }
+    // Check that the algorithm OID is in our allowed set.
+    let oid = cert.signature_algorithm.oid;
+    if !ALLOWED_SIG_ALGS.contains(&oid) {
+        return Err(Error::AlgorithmNotAllowed { index });
+    }
+    Ok(())
 }
 
 /// Reject the certificate if any extension OID falls outside the allowed set
@@ -357,7 +364,7 @@ impl pkix_path::SignatureVerifier for RustCryptoVerifier {
         _issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
         _message: &[u8],
         _signature: &[u8],
-    ) -> pkix_path::Result<()> {
+    ) -> core::result::Result<(), signature::Error> {
         todo!(
             "dispatch to RustCrypto p256::ecdsa or rsa::pkcs1v15 based on \
              algorithm.oid; tracked in pkix-chain-simple v0.1 implementation issue"

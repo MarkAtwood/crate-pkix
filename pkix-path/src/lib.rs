@@ -29,6 +29,8 @@
 //!
 //! These are tracked for v0.2+.
 
+use der::Tagged;
+use signature::Error as SignatureError;
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
@@ -101,11 +103,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///         issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
 ///         message: &[u8],
 ///         signature: &[u8],
-///     ) -> pkix_path::Result<()> {
+///     ) -> core::result::Result<(), signature::Error> {
 ///         match algorithm.oid {
 ///             MY_RSA_OID => { /* ... */ }
 ///             MY_ECDSA_OID => { /* ... */ }
-///             _ => Err(pkix_path::Error::SignatureInvalid { index: 0 }),
+///             _ => Err(signature::Error::new()),
 ///         }
 ///     }
 /// }
@@ -117,13 +119,17 @@ pub trait SignatureVerifier {
     /// - `issuer_spki`  — SPKI extracted from the issuer or trust anchor cert
     /// - `message`      — DER-encoded TBSCertificate (the bytes that were signed)
     /// - `signature`    — raw signature bytes (BitString content, not the wrapper)
+    ///
+    /// Returns `Ok(())` on success or `Err(signature::Error)` on failure.
+    /// The caller ([`validate_path`]) maps the error to [`Error::SignatureInvalid`]
+    /// with the correct chain index — the verifier does not need to know it.
     fn verify_signature(
         &self,
         algorithm: AlgorithmIdentifierRef<'_>,
         issuer_spki: SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
-    ) -> Result<()>;
+    ) -> core::result::Result<(), SignatureError>;
 }
 
 /// A trust anchor used to terminate path validation.
@@ -133,15 +139,33 @@ pub trait SignatureVerifier {
 /// The trust anchor itself is **not** signature-verified — it is trusted
 /// by definition.
 pub struct TrustAnchor {
-    /// The trusted certificate. Its subject name and SPKI are used to
-    /// anchor the chain; its own signature is not checked.
-    pub certificate: Certificate,
+    /// The subject distinguished name of the trust anchor.
+    pub subject: x509_cert::name::Name,
+    /// The subject public key info of the trust anchor.
+    pub subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
 }
 
 impl TrustAnchor {
-    /// Wrap a certificate as a trust anchor.
-    pub fn new(certificate: Certificate) -> Self {
-        Self { certificate }
+    /// Create a trust anchor from raw subject name and SPKI.
+    pub fn new(
+        subject: x509_cert::name::Name,
+        subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
+    ) -> Self {
+        Self {
+            subject,
+            subject_public_key_info,
+        }
+    }
+
+    /// Extract subject name and SPKI from a certificate to create a trust anchor.
+    ///
+    /// This is the typical constructor when your trust store contains full
+    /// self-signed root CA certificates.
+    pub fn from_cert(cert: Certificate) -> Self {
+        Self {
+            subject: cert.tbs_certificate.subject,
+            subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+        }
     }
 }
 
@@ -220,4 +244,282 @@ where
 {
     let _ = (chain, anchors, policy, verifier);
     todo!("RFC 5280 §6.1 state machine — tracked in pkix-path v0.1 issue")
+}
+
+// ---------------------------------------------------------------------------
+// validate_path helpers — input guards and OID consistency (PKIX-6vu)
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
+    if chain.is_empty() || anchors.is_empty() {
+        return Err(Error::NoTrustedPath);
+    }
+    Ok(())
+}
+
+/// RFC 5280 §4.1.1.2: outer signatureAlgorithm must equal inner TBSCertificate.signature.
+#[allow(dead_code)]
+fn check_oid_consistency(chain: &[Certificate]) -> Result<()> {
+    for (index, cert) in chain.iter().enumerate() {
+        if cert.signature_algorithm != cert.tbs_certificate.signature {
+            return Err(Error::SignatureInvalid { index });
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Critical extension guard (PKIX-ad6)
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+const OID_KEY_USAGE: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
+#[allow(dead_code)]
+const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.19");
+#[allow(dead_code)]
+const OID_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.17");
+
+/// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
+#[allow(dead_code)]
+const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
+    OID_KEY_USAGE,
+    OID_BASIC_CONSTRAINTS,
+    OID_SUBJECT_ALT_NAME, // recognized but application-level; path validator ignores value
+];
+
+/// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
+///
+/// Returns `Ok(())` on success, or `Err(())` to signal the *type* of error —
+/// the caller must inject the correct `index` when constructing `Error::UnhandledCriticalExtension`.
+#[allow(dead_code)]
+fn check_critical_extensions(cert: &Certificate) -> core::result::Result<(), ()> {
+    if let Some(exts) = cert.tbs_certificate.extensions.as_ref() {
+        for ext in exts.iter() {
+            if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
+                return Err(());
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// KeyUsage extraction (PKIX-8ae)
+// ---------------------------------------------------------------------------
+
+/// Returns whether the `keyCertSign` bit is set in the KeyUsage extension.
+///
+/// - `None`         — KeyUsage extension absent (no constraint)
+/// - `Some(true)`   — keyCertSign is set
+/// - `Some(false)`  — KeyUsage present, keyCertSign NOT set
+#[allow(dead_code)]
+fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
+    use der::Decode;
+    use x509_cert::ext::pkix::KeyUsage;
+
+    let exts = cert.tbs_certificate.extensions.as_ref()?;
+    for ext in exts.iter() {
+        if ext.extn_id == OID_KEY_USAGE {
+            let ku = KeyUsage::from_der(ext.extn_value.as_bytes()).ok()?;
+            return Some(ku.key_cert_sign());
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// BasicConstraints extraction (PKIX-0q5)
+// ---------------------------------------------------------------------------
+
+/// Returns whether the certificate is a CA cert per BasicConstraints.
+///
+/// - `None`         — BasicConstraints absent (treated as cA=FALSE per RFC 5280)
+/// - `Some(true)`   — BasicConstraints present and cA=TRUE
+/// - `Some(false)`  — BasicConstraints present and cA=FALSE
+#[allow(dead_code)]
+fn cert_is_ca(cert: &Certificate) -> Option<bool> {
+    use der::Decode;
+    use x509_cert::ext::pkix::BasicConstraints;
+
+    let exts = cert.tbs_certificate.extensions.as_ref()?;
+    for ext in exts.iter() {
+        if ext.extn_id == OID_BASIC_CONSTRAINTS {
+            let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).ok()?;
+            return Some(bc.ca);
+        }
+    }
+    None
+}
+
+/// Returns the pathLenConstraint if present in BasicConstraints.
+#[allow(dead_code)]
+fn cert_path_len_constraint(cert: &Certificate) -> Option<u8> {
+    use der::Decode;
+    use x509_cert::ext::pkix::BasicConstraints;
+
+    let exts = cert.tbs_certificate.extensions.as_ref()?;
+    for ext in exts.iter() {
+        if ext.extn_id == OID_BASIC_CONSTRAINTS {
+            let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).ok()?;
+            return bc.path_len_constraint;
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Validity period checker (PKIX-047)
+// ---------------------------------------------------------------------------
+
+/// Convert an `x509_cert::time::Time` to seconds since the Unix epoch.
+#[allow(dead_code)]
+fn time_to_unix_secs(t: &x509_cert::time::Time) -> u64 {
+    t.to_unix_duration().as_secs()
+}
+
+/// RFC 5280 §6.1.3(a)(2): check notBefore ≤ now ≤ notAfter.
+///
+/// Returns `Ok(())` or `Err(())` — caller injects the chain index.
+#[allow(dead_code)]
+fn check_validity(cert: &Certificate, now_unix: u64) -> core::result::Result<(), ()> {
+    let not_before = time_to_unix_secs(&cert.tbs_certificate.validity.not_before);
+    let not_after = time_to_unix_secs(&cert.tbs_certificate.validity.not_after);
+    if now_unix < not_before || now_unix > not_after {
+        Err(())
+    } else {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Name comparison — RFC 4518 string prep (PKIX-drv)
+// ---------------------------------------------------------------------------
+
+/// Compare two distinguished names per RFC 4518 string prep rules.
+///
+/// For v0.1: implements case-fold and whitespace normalization for ASCII
+/// characters. Full Unicode NFKD normalization is deferred to v0.2.
+///
+/// Returns `true` if the names are equivalent.
+pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
+    let a_rdns = a.0.as_slice();
+    let b_rdns = b.0.as_slice();
+
+    if a_rdns.len() != b_rdns.len() {
+        return false;
+    }
+
+    for (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns.iter()) {
+        let a_avas = a_rdn.0.as_slice();
+        let b_avas = b_rdn.0.as_slice();
+        if a_avas.len() != b_avas.len() {
+            return false;
+        }
+        // For each AVA in a_rdn, find matching AVA in b_rdn (same OID, equal normalized value).
+        for a_ava in a_avas.iter() {
+            let found = b_avas.iter().any(|b_ava| {
+                b_ava.oid == a_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
+            });
+            if !found {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Compare two AttributeTypeAndValue values after RFC 4518 normalization.
+fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
+    let a_str = any_to_str_bytes(a);
+    let b_str = any_to_str_bytes(b);
+
+    match (a_str, b_str) {
+        (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
+        // Fall back to raw DER byte comparison if we can't decode as a string type.
+        (None, None) => a.value() == b.value(),
+        _ => false,
+    }
+}
+
+/// Extract the string content bytes from a DirectoryString Any value.
+/// Returns None if the tag is not a string type we handle.
+fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
+    use der::Tag;
+    match a.tag() {
+        Tag::Utf8String | Tag::PrintableString | Tag::Ia5String | Tag::VisibleString => {
+            Some(a.value())
+        }
+        _ => None,
+    }
+}
+
+/// Compare two ASCII byte slices after RFC 4518 whitespace normalization and case-folding.
+///
+/// Rules applied:
+/// 1. ASCII letters: case-fold to lowercase
+/// 2. Leading/trailing spaces: ignored
+/// 3. Internal multiple spaces: collapsed to single space
+fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
+    NormalizedIter::new(a).eq(NormalizedIter::new(b))
+}
+
+/// Iterator that yields bytes after ASCII case-fold and whitespace normalization.
+struct NormalizedIter<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+    pending_space: bool,
+}
+
+impl<'a> NormalizedIter<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        // Skip leading spaces.
+        let start = bytes
+            .iter()
+            .position(|&b| b != b' ')
+            .unwrap_or(bytes.len());
+        // Find end (skip trailing spaces).
+        let end = bytes[start..]
+            .iter()
+            .rposition(|&b| b != b' ')
+            .map(|i| start + i + 1)
+            .unwrap_or(start);
+        Self {
+            bytes: &bytes[start..end],
+            pos: 0,
+            pending_space: false,
+        }
+    }
+}
+
+impl<'a> Iterator for NormalizedIter<'a> {
+    type Item = u8;
+    fn next(&mut self) -> Option<u8> {
+        if self.pending_space {
+            self.pending_space = false;
+            // Skip past all additional spaces in input.
+            while self.pos < self.bytes.len() && self.bytes[self.pos] == b' ' {
+                self.pos += 1;
+            }
+            if self.pos < self.bytes.len() {
+                return Some(b' ');
+            }
+            return None;
+        }
+        if self.pos >= self.bytes.len() {
+            return None;
+        }
+        let b = self.bytes[self.pos];
+        self.pos += 1;
+        if b == b' ' {
+            // Emit one space, then consume additional spaces next call.
+            self.pending_space = true;
+            Some(b' ')
+        } else {
+            Some(b.to_ascii_lowercase())
+        }
+    }
 }
