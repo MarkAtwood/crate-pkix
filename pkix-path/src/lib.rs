@@ -622,7 +622,7 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         }
         for b_ava in b_avas.iter() {
             let found = a_avas.iter().any(|a_ava| {
-                a_ava.oid == b_ava.oid && ava_values_match(&b_ava.value, &a_ava.value)
+                a_ava.oid == b_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
             });
             if !found {
                 return false;

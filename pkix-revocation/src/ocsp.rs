@@ -47,6 +47,7 @@ const OID_PKIX_OCSP_BASIC: der::asn1::ObjectIdentifier =
 /// - The `ResponderId` field is not verified against the issuer identity.
 /// - If no `SingleResponse` matches the certificate's serial number,
 ///   `OcspStatusUnknown` is returned (hard-fail).
+#[derive(Clone, Debug)]
 pub struct OcspChecker<V> {
     response_der: Vec<u8>,
     now_unix: u64,

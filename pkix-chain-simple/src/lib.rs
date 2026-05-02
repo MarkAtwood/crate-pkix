@@ -401,7 +401,7 @@ pub fn verify_simple(
     // --- Delegate to pkix-path ----------------------------------------------
     let policy = ValidationPolicy {
         current_time_unix: now_unix,
-        max_path_len: (1 + MAX_INTERMEDIATES) as u8,
+        max_path_len: MAX_INTERMEDIATES as u8,
         ..Default::default()
     };
 
@@ -417,7 +417,7 @@ pub fn verify_simple(
 ///
 /// The RFC 5280 §4.1.1.2 outer/inner OID consistency check is **not**
 /// duplicated here; `validate_path` handles it via `check_oid_consistency`
-/// and returns `Error::Path(SignatureInvalid)` for that case.
+/// and returns `Error::Path(MalformedCertificate { index })` for that case.
 fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
     let oid = cert.signature_algorithm.oid;
     if !ALLOWED_SIG_ALGS.contains(&oid) {

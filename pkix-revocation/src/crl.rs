@@ -37,6 +37,7 @@ const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
 ///   parsing. Tracked for v0.2 (cache the parsed `CertificateList` in `new`).
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
+#[derive(Clone, Debug)]
 pub struct CrlChecker<V> {
     crl_der: Vec<u8>,
     now_unix: u64,

@@ -42,12 +42,11 @@ pub use pkix_path::ValidationPolicy;
 ///
 /// # Limitations
 ///
-/// Not yet implemented; returns `ValidationPolicy::default()` (PKIX-y2j).
-pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
-    ValidationPolicy {
-        current_time_unix: now_unix,
-        ..ValidationPolicy::default()
-    }
+/// Not yet implemented. Calling this function will panic with
+/// `unimplemented!`. CA/B Forum TLS constraints (398-day validity cap,
+/// SAN requirement, SHA-1 prohibition, RSA ≥ 2048) are not yet enforced.
+pub fn web_pki_policy(_now_unix: u64) -> ValidationPolicy {
+    unimplemented!("web_pki_policy: CA/B Forum TLS constraints not yet implemented")
 }
 
 /// Return a [`ValidationPolicy`] conforming to the CA/Browser Forum
@@ -55,12 +54,10 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// # Limitations
 ///
-/// Not yet implemented; returns `ValidationPolicy::default()`.
-pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
-    ValidationPolicy {
-        current_time_unix: now_unix,
-        ..ValidationPolicy::default()
-    }
+/// Not yet implemented. Calling this function will panic with
+/// `unimplemented!`.
+pub fn smime_policy(_now_unix: u64) -> ValidationPolicy {
+    unimplemented!("smime_policy: CA/B Forum S/MIME constraints not yet implemented")
 }
 
 /// Return a [`ValidationPolicy`] conforming to the CA/Browser Forum
@@ -68,12 +65,10 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// # Limitations
 ///
-/// Not yet implemented; returns `ValidationPolicy::default()`.
-pub fn code_signing_policy(now_unix: u64) -> ValidationPolicy {
-    ValidationPolicy {
-        current_time_unix: now_unix,
-        ..ValidationPolicy::default()
-    }
+/// Not yet implemented. Calling this function will panic with
+/// `unimplemented!`.
+pub fn code_signing_policy(_now_unix: u64) -> ValidationPolicy {
+    unimplemented!("code_signing_policy: CA/B Forum Code Signing constraints not yet implemented")
 }
 
 /// Return a plain RFC 5280 [`ValidationPolicy`] with no CA/Browser Forum additions.
