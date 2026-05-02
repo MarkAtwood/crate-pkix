@@ -79,7 +79,13 @@ fn crl_cert_revoked_no_reason() {
     let revoked = load_cert("crl-leaf-revoked.der");
     let result = checker("crl-with-revocation.der").check_revocation(&revoked, &ca);
     assert!(
-        matches!(result, Err(Error::Revoked { reason_code: None, .. })),
+        matches!(
+            result,
+            Err(Error::Revoked {
+                reason_code: None,
+                ..
+            })
+        ),
         "revoked cert (no reason) must return Revoked {{ reason_code: None }}, got: {result:?}"
     );
 }

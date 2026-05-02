@@ -14,10 +14,7 @@ use pkits_helper::{pkits_validate, PKITS_NOW};
 /// Oracle: PKITS §4.3.1 MUST NOT validate.
 #[test]
 fn pkits_4_3_1_invalid_name_chaining() {
-    let result = pkits_validate(
-        &["InvalidNameChainingTest1EE", "GoodCACert"],
-        PKITS_NOW,
-    );
+    let result = pkits_validate(&["InvalidNameChainingTest1EE", "GoodCACert"], PKITS_NOW);
     assert!(
         matches!(result, Err(pkix_path::Error::ChainBroken { .. })),
         "mismatched issuer/subject must return ChainBroken, got: {result:?}"
@@ -75,10 +72,7 @@ fn pkits_4_3_5_valid_name_chaining_capitalization() {
 /// Oracle: PKITS §4.3.6 MUST validate.
 #[test]
 fn pkits_4_3_6_valid_name_uids() {
-    let result = pkits_validate(
-        &["ValidNameUIDsTest6EE", "UIDCACert"],
-        PKITS_NOW,
-    );
+    let result = pkits_validate(&["ValidNameUIDsTest6EE", "UIDCACert"], PKITS_NOW);
     result.expect("§4.3.6 must validate (UID attribute in names)");
 }
 
@@ -115,7 +109,10 @@ fn pkits_4_3_8_valid_optional_attribute_types() {
 #[test]
 fn pkits_4_3_9_valid_utf8_encoded_names() {
     let result = pkits_validate(
-        &["ValidUTF8StringEncodedNamesTest9EE", "UTF8StringEncodedNamesCACert"],
+        &[
+            "ValidUTF8StringEncodedNamesTest9EE",
+            "UTF8StringEncodedNamesCACert",
+        ],
         PKITS_NOW,
     );
     result.expect("§4.3.9 must validate (UTF8String names)");
@@ -140,7 +137,10 @@ fn pkits_4_3_10_valid_printable_to_utf8_rollover() {
 #[test]
 fn pkits_4_3_11_valid_utf8_case_insensitive() {
     let result = pkits_validate(
-        &["ValidUTF8StringCaseInsensitiveMatchTest11EE", "UTF8StringCaseInsensitiveMatchCACert"],
+        &[
+            "ValidUTF8StringCaseInsensitiveMatchTest11EE",
+            "UTF8StringCaseInsensitiveMatchCACert",
+        ],
         PKITS_NOW,
     );
     result.expect("§4.3.11 must validate (case-insensitive UTF8String match)");

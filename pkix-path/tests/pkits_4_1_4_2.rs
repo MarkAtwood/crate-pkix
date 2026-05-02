@@ -48,10 +48,7 @@ fn pkits_4_1_3_invalid_ee_signature() {
 #[test]
 #[ignore = "DSA signature algorithm not supported in v0.1 (tracked for v0.2)"]
 fn pkits_4_1_4_valid_dsa_signatures() {
-    let result = pkits_validate(
-        &["ValidDSASignaturesTest4EE", "DSACACert"],
-        PKITS_NOW,
-    );
+    let result = pkits_validate(&["ValidDSASignaturesTest4EE", "DSACACert"], PKITS_NOW);
     result.expect("§4.1.4 must validate");
 }
 
@@ -110,10 +107,7 @@ fn pkits_4_2_1_invalid_ca_notbefore() {
 /// Oracle: PKITS §4.2.2 MUST NOT validate.
 #[test]
 fn pkits_4_2_2_invalid_ee_notbefore() {
-    let result = pkits_validate(
-        &["InvalidEEnotBeforeDateTest2EE", "GoodCACert"],
-        PKITS_NOW,
-    );
+    let result = pkits_validate(&["InvalidEEnotBeforeDateTest2EE", "GoodCACert"], PKITS_NOW);
     assert!(
         matches!(result, Err(pkix_path::Error::ValidityPeriod { .. })),
         "not-yet-valid EE must return ValidityPeriod, got: {result:?}"
@@ -162,10 +156,7 @@ fn pkits_4_2_5_invalid_ca_notafter() {
 /// Oracle: PKITS §4.2.6 MUST NOT validate (EE.notAfter=2011).
 #[test]
 fn pkits_4_2_6_invalid_ee_notafter() {
-    let result = pkits_validate(
-        &["InvalidEEnotAfterDateTest6EE", "GoodCACert"],
-        PKITS_NOW,
-    );
+    let result = pkits_validate(&["InvalidEEnotAfterDateTest6EE", "GoodCACert"], PKITS_NOW);
     assert!(
         matches!(result, Err(pkix_path::Error::ValidityPeriod { .. })),
         "expired EE must return ValidityPeriod, got: {result:?}"

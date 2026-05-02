@@ -58,8 +58,7 @@ fn verify_simple_one_intermediate_ok() {
     let int_cert = load("gry-int.der");
     let root = load("gry-root.der");
     let anchors = [anchor(root)];
-    let vp =
-        verify_simple(&[leaf, int_cert], &anchors, NOW).expect("2-cert chain must validate");
+    let vp = verify_simple(&[leaf, int_cert], &anchors, NOW).expect("2-cert chain must validate");
     assert_eq!(vp.anchor_index, 0);
     assert_eq!(vp.depth, 1);
 }
@@ -227,7 +226,10 @@ fn verify_simple_expired_returns_path_error() {
     let root = load("gry-root.der");
     let result = verify_simple(&[leaf, int_cert], &[anchor(root)], BEFORE);
     assert!(
-        matches!(result, Err(Error::Path(pkix_path::Error::ValidityPeriod { .. }))),
+        matches!(
+            result,
+            Err(Error::Path(pkix_path::Error::ValidityPeriod { .. }))
+        ),
         "not-yet-valid chain must return Error::Path(ValidityPeriod), got: {result:?}"
     );
 }

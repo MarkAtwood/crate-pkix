@@ -10,6 +10,9 @@
 //! For fine-grained control — custom backends, per-cert revocation policy,
 //! `no_std` constraints — use the component crates directly.
 //!
+//! **`std` only.** This crate depends on `pkix-path/std` and
+//! `pkix-revocation/std`. Use [`pkix_path`] directly for `no_std` environments.
+//!
 //! # Quick start
 //!
 //! ```rust,ignore
@@ -29,7 +32,9 @@
 //! )?;
 //! ```
 
-pub use pkix_path::{self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
+pub use pkix_path::{
+    self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
+};
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
 use x509_cert::Certificate;
@@ -117,6 +122,14 @@ where
 ///
 /// Returns `Err` if path validation fails (signature, validity, chain linkage,
 /// policy) or if revocation checking indicates a revoked certificate.
+///
+/// # Limitations
+///
+/// The certificate at `chain[chain.len()-1]` — the one directly issued by the
+/// trust anchor — is **not** checked for revocation, because its issuer (the
+/// trust anchor) is not present as a `Certificate` in the chain. If revocation
+/// checking of trust-anchor-issued certs is required, include the issuer
+/// certificate in the chain or implement revocation at a higher layer.
 pub fn verify_chain<V, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],

@@ -12,8 +12,9 @@
 //!
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
 //! The default feature set (`rustcrypto`) wires in RustCrypto backends for
-//! RSA-PKCS1v15, P-256 ECDSA, and (with optional features) RSA-PSS, P-384,
-//! Ed25519. For FIPS-validated crypto, implement [`SignatureVerifier`] against
+//! RSA-PKCS1v15-SHA-256 (`rsa` feature) and ECDSA-P-256-SHA-256 (`p256` feature).
+//! P-384 and Ed25519 are planned for v0.2.
+//! For FIPS-validated crypto, implement [`SignatureVerifier`] against
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
 //!
 //! Revocation checking is handled by `pkix-revocation`. This crate never
@@ -41,6 +42,14 @@ pub enum Error {
     /// Certificate signature verification failed at the given chain index.
     SignatureInvalid {
         /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
+    /// A structural encoding error was found in a certificate.
+    ///
+    /// Currently returned when the outer `signatureAlgorithm` field differs from
+    /// the inner `TBSCertificate.signature` field (RFC 5280 §4.1.1.2).
+    MalformedCertificate {
+        /// Zero-based index into the `chain` slice of the malformed certificate.
         index: usize,
     },
     /// Certificate validity period check failed (expired or not yet valid).
@@ -73,6 +82,13 @@ pub enum Error {
         index: usize,
     },
     /// ASN.1 / DER decoding error.
+    ///
+    /// Returned when DER encoding of a TBS structure fails inside `chain_walk`
+    /// (e.g. the TBS is too large for the internal stack buffer). The inner
+    /// `der::Error` is exposed for diagnostic purposes; callers that want a
+    /// stable match target should check for `Error::Der(_)` without inspecting
+    /// the inner value, as the specific `der::Error` variants are not part of
+    /// the stable API contract.
     Der(der::Error),
 }
 
@@ -84,6 +100,9 @@ impl core::fmt::Display for Error {
             }
             Error::ValidityPeriod { index } => {
                 write!(f, "validity period check failed at chain index {index}")
+            }
+            Error::MalformedCertificate { index } => {
+                write!(f, "malformed certificate at chain index {index}")
             }
             Error::ChainBroken { index } => {
                 write!(f, "issuer/subject linkage broken at chain index {index}")
@@ -107,7 +126,15 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Der(e) => Some(e),
-            _ => None,
+            Error::SignatureInvalid { .. }
+            | Error::MalformedCertificate { .. }
+            | Error::ValidityPeriod { .. }
+            | Error::ChainBroken { .. }
+            | Error::NoTrustedPath
+            | Error::PathTooLong
+            | Error::NotCA { .. }
+            | Error::KeyUsageMissing { .. }
+            | Error::UnhandledCriticalExtension { .. } => None,
         }
     }
 }
@@ -174,10 +201,15 @@ pub trait SignatureVerifier {
 /// or a raw (name, SPKI) pair extracted from a platform trust store.
 /// The trust anchor itself is **not** signature-verified — it is trusted
 /// by definition.
+#[derive(Clone, Debug)]
 pub struct TrustAnchor {
     /// The subject distinguished name of the trust anchor.
     pub subject: x509_cert::name::Name,
     /// The subject public key info of the trust anchor.
+    ///
+    /// Must be a valid SPKI for the chosen signature algorithm. An empty or
+    /// malformed SPKI will cause signature verification to fail with
+    /// `Error::NoTrustedPath` (no anchor matched), not a panic.
     pub subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
 }
 
@@ -211,6 +243,7 @@ impl TrustAnchor {
 ///
 /// v0.1 does not enforce NameConstraints, CertificatePolicies, or
 /// PolicyMappings. Fields for these will be added in v0.2.
+#[derive(Clone, Debug)]
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.
     ///
@@ -222,6 +255,11 @@ pub struct ValidationPolicy {
     ///
     /// Used to check `notBefore` ≤ `now` ≤ `notAfter` on every certificate.
     /// **Must be set by the caller** — there is no platform clock in `no_std`.
+    ///
+    /// **Warning — the default is 0 (1970-01-01):** Any certificate issued
+    /// after 1970 has `notBefore > 0` and will fail the validity check with
+    /// [`Error::ValidityPeriod`]. If you see unexpected `ValidityPeriod`
+    /// errors, check that `current_time_unix` is set to the current time.
     ///
     /// **Warning**: passing `u64::MAX` causes all `notAfter` checks to pass.
     /// This effectively disables expiry checking — only use it in contexts
@@ -235,6 +273,20 @@ pub struct ValidationPolicy {
     pub enforce_key_usage: bool,
 }
 
+impl ValidationPolicy {
+    /// Construct a policy with the given time and sensible defaults.
+    ///
+    /// Equivalent to `ValidationPolicy { current_time_unix: now_unix, ..Default::default() }`.
+    /// This is the preferred constructor: it forces the caller to supply a timestamp,
+    /// preventing the silent validity failures caused by `Default`'s `current_time_unix = 0`.
+    pub fn new(now_unix: u64) -> Self {
+        Self {
+            current_time_unix: now_unix,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for ValidationPolicy {
     fn default() -> Self {
         Self {
@@ -246,6 +298,11 @@ impl Default for ValidationPolicy {
 }
 
 /// The result of a successful certificate path validation.
+///
+/// Fields are `pub` for direct read access. `#[non_exhaustive]` prevents external
+/// code from constructing `ValidatedPath` directly and from pattern-matching
+/// exhaustively, preserving the ability to add fields in future minor versions
+/// without a breaking change.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct ValidatedPath {
@@ -274,6 +331,10 @@ pub struct ValidatedPath {
 /// # Limitations
 ///
 /// See crate-level documentation for v0.1 scope limits.
+///
+/// Duplicate certificates in `chain` (same cert appearing at two indices) are
+/// not detected. They will fail signature verification or name linkage with a
+/// `SignatureInvalid` or `ChainBroken` error rather than a dedicated diagnostic.
 pub fn validate_path<V>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -287,21 +348,52 @@ where
     check_inputs(chain, anchors)?;
     check_oid_consistency(chain)?;
 
-    // (2–5) Full per-cert walk: anchor matching, signatures, name linkage,
-    //        validity, critical extensions, intermediate CA enforcement.
-    let anchor_index = chain_walk(chain, anchors, policy, verifier)?;
+    // (2) Path-length check (anchor-independent).
+    let num_intermediates = chain.len().saturating_sub(1);
+    if num_intermediates > policy.max_path_len as usize {
+        return Err(Error::PathTooLong);
+    }
 
-    // (6) Return validated path descriptor.
-    Ok(ValidatedPath {
-        anchor_index,
-        depth: chain.len().saturating_sub(1),
-    })
+    // (3) Try each name-matching anchor. Iterating all candidates handles key
+    //     rollover: multiple anchors may share a DN but have different keys
+    //     (e.g., during a root CA rotation). The first anchor that passes the
+    //     full chain walk is used; the last error is returned if none succeed.
+    //
+    //     Complexity: O(A × N) where A = number of anchors, N = chain length.
+    //     For the common case of O(1) matching anchors this is effectively O(N).
+    let last_cert = chain.last().ok_or(Error::NoTrustedPath)?;
+    let is_self_issued = names_match(
+        &last_cert.tbs_certificate.issuer,
+        &last_cert.tbs_certificate.subject,
+    );
+    let mut last_err = Error::NoTrustedPath;
+    for (anchor_index, anchor) in anchors.iter().enumerate() {
+        if !names_match(&anchor.subject, &last_cert.tbs_certificate.issuer) {
+            continue;
+        }
+        // For self-issued certs the cert and anchor are the same entity; their
+        // SPKIs must match (RFC 5280 §3.2 name-collision guard).
+        if is_self_issued
+            && anchor.subject_public_key_info != last_cert.tbs_certificate.subject_public_key_info
+        {
+            continue;
+        }
+        match chain_walk(chain, anchor, policy, verifier) {
+            Ok(()) => {
+                return Ok(ValidatedPath {
+                    anchor_index,
+                    depth: chain.len().saturating_sub(1),
+                });
+            }
+            Err(e) => last_err = e,
+        }
+    }
+    Err(last_err)
 }
 
 // ---------------------------------------------------------------------------
 // validate_path helpers — input guards and OID consistency (PKIX-6vu)
 // ---------------------------------------------------------------------------
-
 
 fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
     if chain.is_empty() || anchors.is_empty() {
@@ -314,7 +406,7 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
 fn check_oid_consistency(chain: &[Certificate]) -> Result<()> {
     for (index, cert) in chain.iter().enumerate() {
         if cert.signature_algorithm != cert.tbs_certificate.signature {
-            return Err(Error::SignatureInvalid { index });
+            return Err(Error::MalformedCertificate { index });
         }
     }
     Ok(())
@@ -323,7 +415,6 @@ fn check_oid_consistency(chain: &[Certificate]) -> Result<()> {
 // ---------------------------------------------------------------------------
 // Critical extension guard (PKIX-ad6)
 // ---------------------------------------------------------------------------
-
 
 const OID_KEY_USAGE: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
@@ -335,25 +426,29 @@ const OID_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.17");
 
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
-const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
-    OID_KEY_USAGE,
-    OID_BASIC_CONSTRAINTS,
-    OID_SUBJECT_ALT_NAME, // recognized but application-level; path validator ignores value
-];
+///
+/// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
+/// (e.g. TLS server certs) do not fail with `UnhandledCriticalExtension`. However,
+/// the SAN *value* is not inspected by path validation — name matching still uses the
+/// Subject DN. **v0.1 limitation**: a cert with an empty Subject and critical SAN
+/// will pass this check but fail name linkage since `names_match` compares against
+/// the empty Subject. This is tracked for v0.2 (RFC 5280 §4.2.1.6).
+const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] =
+    &[OID_KEY_USAGE, OID_BASIC_CONSTRAINTS, OID_SUBJECT_ALT_NAME];
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
 ///
-/// Returns `Ok(())` on success, or `Err(())` to signal the *type* of error —
-/// the caller must inject the correct `index` when constructing `Error::UnhandledCriticalExtension`.
-fn check_critical_extensions(cert: &Certificate) -> core::result::Result<(), ()> {
+/// Returns `true` if all critical extensions are handled, `false` otherwise.
+/// The caller injects the correct chain index when constructing the error.
+fn check_critical_extensions(cert: &Certificate) -> bool {
     if let Some(exts) = cert.tbs_certificate.extensions.as_ref() {
         for ext in exts.iter() {
             if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
-                return Err(());
+                return false;
             }
         }
     }
-    Ok(())
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -428,15 +523,11 @@ fn time_to_unix_secs(t: &x509_cert::time::Time) -> u64 {
 
 /// RFC 5280 §6.1.3(a)(2): check notBefore ≤ now ≤ notAfter.
 ///
-/// Returns `Ok(())` or `Err(())` — caller injects the chain index.
-fn check_validity(cert: &Certificate, now_unix: u64) -> core::result::Result<(), ()> {
+/// Returns `true` if the certificate is valid at `now_unix`, `false` otherwise.
+fn check_validity(cert: &Certificate, now_unix: u64) -> bool {
     let not_before = time_to_unix_secs(&cert.tbs_certificate.validity.not_before);
     let not_after = time_to_unix_secs(&cert.tbs_certificate.validity.not_after);
-    if now_unix < not_before || now_unix > not_after {
-        Err(())
-    } else {
-        Ok(())
-    }
+    now_unix >= not_before && now_unix <= not_after
 }
 
 // ---------------------------------------------------------------------------
@@ -449,6 +540,13 @@ fn check_validity(cert: &Certificate, now_unix: u64) -> core::result::Result<(),
 /// characters. Full Unicode NFKD normalization is deferred to v0.2.
 ///
 /// Returns `true` if the names are equivalent.
+///
+/// # Ordering
+///
+/// RFC 5280 §4.1.2.4 defines `Name` as `SEQUENCE OF RDN`, so RDNs are
+/// compared positionally (index 0 with index 0, etc.). Within each RDN —
+/// which is a `SET OF AttributeTypeAndValue` — comparison is order-independent:
+/// each AVA in one RDN is matched against any AVA in the other.
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
     let b_rdns = b.0.as_slice();
@@ -491,6 +589,12 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 
 /// Extract the string content bytes from a DirectoryString Any value.
 /// Returns None if the tag is not a string type we handle.
+///
+/// **v0.1 limitation**: `TeletexString` (T61String) and `BMPString` (used in
+/// some legacy CA certificates) are not handled here and fall back to raw DER
+/// byte comparison in `ava_values_match`. Name matching against these string
+/// types may fail even when the names are semantically equivalent. Tracked
+/// for v0.2 (RFC 5280 §7.1 / RFC 4518 §2.6 legacy encoding support).
 fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
     use der::Tag;
     match a.tag() {
@@ -521,10 +625,7 @@ struct NormalizedIter<'a> {
 impl<'a> NormalizedIter<'a> {
     fn new(bytes: &'a [u8]) -> Self {
         // Skip leading spaces.
-        let start = bytes
-            .iter()
-            .position(|&b| b != b' ')
-            .unwrap_or(bytes.len());
+        let start = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
         // Find end (skip trailing spaces).
         let end = bytes[start..]
             .iter()
@@ -542,16 +643,14 @@ impl<'a> NormalizedIter<'a> {
 impl<'a> Iterator for NormalizedIter<'a> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
+        // A space was already emitted on the previous call; skip any additional
+        // consecutive spaces now without emitting another space character.
         if self.pending_space {
             self.pending_space = false;
-            // Skip past all additional spaces in input.
             while self.pos < self.bytes.len() && self.bytes[self.pos] == b' ' {
                 self.pos += 1;
             }
-            if self.pos < self.bytes.len() {
-                return Some(b' ');
-            }
-            return None;
+            // Fall through: process the next non-space byte (or return None if at end).
         }
         if self.pos >= self.bytes.len() {
             return None;
@@ -559,51 +658,13 @@ impl<'a> Iterator for NormalizedIter<'a> {
         let b = self.bytes[self.pos];
         self.pos += 1;
         if b == b' ' {
-            // Emit one space, then consume additional spaces next call.
+            // Emit one space; next call will skip any further consecutive spaces.
             self.pending_space = true;
             Some(b' ')
         } else {
             Some(b.to_ascii_lowercase())
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Trust anchor matching (PKIX-1tb)
-// ---------------------------------------------------------------------------
-
-/// Find the index of the trust anchor that issued the last cert in the chain.
-///
-/// Matching rules (both must hold):
-/// 1. `anchor.subject` == `last_cert.tbs_certificate.issuer` per RFC 4518 string prep.
-/// 2. For self-issued certificates (issuer == subject), a direct SPKI comparison is
-///    also performed to prevent name-collision attacks: an attacker who creates a
-///    different root cert with the same DN but a different key is rejected here.
-///
-/// The anchor's own signature is NOT verified — trust anchors are trusted by definition.
-///
-/// Returns `Ok(i)` for the first matching anchor, or `Err(Error::NoTrustedPath)` if none.
-fn find_trust_anchor(last_cert: &Certificate, anchors: &[TrustAnchor]) -> Result<usize> {
-    let is_self_issued = names_match(
-        &last_cert.tbs_certificate.issuer,
-        &last_cert.tbs_certificate.subject,
-    );
-
-    for (i, anchor) in anchors.iter().enumerate() {
-        if !names_match(&anchor.subject, &last_cert.tbs_certificate.issuer) {
-            continue;
-        }
-        // For self-issued certs, also compare SPKIs directly to prevent
-        // name-collision attacks (RFC 5280 §3.2).
-        if is_self_issued
-            && anchor.subject_public_key_info
-                != last_cert.tbs_certificate.subject_public_key_info
-        {
-            continue;
-        }
-        return Ok(i);
-    }
-    Err(Error::NoTrustedPath)
 }
 
 // ---------------------------------------------------------------------------
@@ -621,11 +682,18 @@ pub struct EcdsaP256Verifier;
 impl SignatureVerifier for EcdsaP256Verifier {
     fn verify_signature(
         &self,
-        _algorithm: spki::AlgorithmIdentifierRef<'_>,
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
         issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
+        // Reject any OID other than ecdsa-with-SHA256.
+        const OID: der::asn1::ObjectIdentifier =
+            der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+        if algorithm.oid != OID {
+            return Err(SignatureError::new());
+        }
+
         use p256::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
 
         let vk = VerifyingKey::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
@@ -651,17 +719,24 @@ pub struct RsaPkcs1v15Sha256Verifier;
 impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
     fn verify_signature(
         &self,
-        _algorithm: spki::AlgorithmIdentifierRef<'_>,
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
         issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
+        // Reject any OID other than sha256WithRSAEncryption.
+        const OID: der::asn1::ObjectIdentifier =
+            der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+        if algorithm.oid != OID {
+            return Err(SignatureError::new());
+        }
+
         use rsa::pkcs1v15::{Signature, VerifyingKey};
         use rsa::signature::Verifier as _;
         use sha2::Sha256;
 
-        let vk = VerifyingKey::<Sha256>::try_from(issuer_spki)
-            .map_err(|_| SignatureError::new())?;
+        let vk =
+            VerifyingKey::<Sha256>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
 
         let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
 
@@ -675,39 +750,28 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
 
 /// Walk the chain from issuer to leaf, applying all RFC 5280 §6.1 per-cert checks.
 ///
-/// ## Algorithm
+/// Path-length and anchor-matching are handled by the caller (`validate_path`).
+/// This function walks `chain` in reverse (issuer-to-leaf) against `anchor`:
 ///
-/// 1. Reject early if the chain is too long per `policy.max_path_len`.
-/// 2. Match a trust anchor for the last cert in the chain.
-/// 3. Walk `chain` in reverse (issuer-to-leaf):
 ///    a. Verify signature with the current issuer's SPKI.
 ///    b. Verify issuer/subject name linkage.
 ///    c. Check validity period against `policy.current_time_unix`.
 ///    d. Reject any unhandled critical extensions.
-///    e. For intermediates (i > 0): require `BasicConstraints` cA=TRUE.
-///    f. For intermediates (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
-///    g. For intermediates (i > 0): enforce `pathLenConstraint` if present.
-///    h. Update working SPKI and issuer name for the next iteration.
+///    e. For all certs except the leaf (i > 0): require `BasicConstraints` cA=TRUE.
+///    f. For all certs except the leaf (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
+///    g. For all certs except the leaf (i > 0): enforce `pathLenConstraint` if present.
 ///
-/// Returns the trust anchor index on success.
+/// RFC 5280 §4.2.1.9 note on pathLenConstraint: for the cert at position `i`
+/// (leaf at 0, root-adjacent at chain.len()-1), there are exactly `i-1`
+/// intermediate certs below it. The constraint requires `i-1 ≤ pathLenConstraint`.
 fn chain_walk<V: SignatureVerifier>(
     chain: &[Certificate],
-    anchors: &[TrustAnchor],
+    anchor: &TrustAnchor,
     policy: &ValidationPolicy,
     verifier: &V,
-) -> Result<usize> {
+) -> Result<()> {
     use der::Encode;
     use spki::der::referenced::OwnedToRef as _;
-
-    // Early-out: number of intermediates is chain.len()-1 (chain[0] is the leaf).
-    let num_intermediates = chain.len().saturating_sub(1);
-    if num_intermediates > policy.max_path_len as usize {
-        return Err(Error::PathTooLong);
-    }
-
-    let anchor_index =
-        find_trust_anchor(chain.last().ok_or(Error::NoTrustedPath)?, anchors)?;
-    let anchor = &anchors[anchor_index];
 
     let mut working_spki = &anchor.subject_public_key_info;
     let mut working_issuer_name = &anchor.subject;
@@ -716,6 +780,9 @@ fn chain_walk<V: SignatureVerifier>(
         let cert = &chain[i];
 
         // (a) Verify signature with the current issuer's SPKI.
+        //     8 KiB covers every well-formed certificate encountered in practice
+        //     (typical TLS certs are 1–3 KiB). Certificates exceeding this limit
+        //     return Error::Der; tracked for v0.2 with heap-backed encoding.
         let mut tbs_buf = [0u8; 8192];
         let tbs_bytes = cert
             .tbs_certificate
@@ -736,14 +803,18 @@ fn chain_walk<V: SignatureVerifier>(
         }
 
         // (c) Validity period.
-        check_validity(cert, policy.current_time_unix)
-            .map_err(|()| Error::ValidityPeriod { index: i })?;
+        if !check_validity(cert, policy.current_time_unix) {
+            return Err(Error::ValidityPeriod { index: i });
+        }
 
         // (d) Critical extension guard.
-        check_critical_extensions(cert)
-            .map_err(|()| Error::UnhandledCriticalExtension { index: i })?;
+        if !check_critical_extensions(cert) {
+            return Err(Error::UnhandledCriticalExtension { index: i });
+        }
 
-        // (e–g) Intermediate-only checks.
+        // (e–g) CA-only checks: apply to every cert except the leaf (chain[0]).
+        //        This includes any intermediate CAs and the root CA cert if it
+        //        is included in the chain rather than supplied only as an anchor.
         if i > 0 {
             // (e) BasicConstraints cA=TRUE required.
             if cert_is_ca(cert) != Some(true) {
@@ -772,7 +843,7 @@ fn chain_walk<V: SignatureVerifier>(
         working_issuer_name = &cert.tbs_certificate.subject;
     }
 
-    Ok(anchor_index)
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -810,8 +881,12 @@ impl SignatureVerifier for DefaultVerifier {
         }
         #[cfg(feature = "rsa")]
         if oid == OID_SHA256_WITH_RSA {
-            return RsaPkcs1v15Sha256Verifier
-                .verify_signature(algorithm, issuer_spki, message, signature);
+            return RsaPkcs1v15Sha256Verifier.verify_signature(
+                algorithm,
+                issuer_spki,
+                message,
+                signature,
+            );
         }
         Err(SignatureError::new())
     }
@@ -901,77 +976,85 @@ mod tests_rsa {
     }
 }
 
+// ---------------------------------------------------------------------------
+// NormalizedIter / names_match unit tests
+// ---------------------------------------------------------------------------
 #[cfg(test)]
-mod tests_find_trust_anchor {
-    use super::*;
-    use der::Decode;
+mod tests_normalized_iter {
+    use super::{normalized_eq, NormalizedIter};
 
-    // Fixtures used across tests:
-    //   ec-p256-sha256.der   — self-signed, CN=PKIX-evy-test  (P-256 key)
-    //   rsa-pkcs1v15-sha256.der — self-signed, CN=PKIX-gmv-test (RSA-2048 key)
-    //
-    // Oracle: both certs were verified OK by `openssl verify -CAfile <cert> <cert>`.
-
-    fn load_p256_cert() -> Certificate {
-        let der = include_bytes!("../tests/fixtures/ec-p256-sha256.der");
-        Certificate::from_der(der).expect("parse P-256 cert")
-    }
-
-    fn load_rsa_cert() -> Certificate {
-        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
-        Certificate::from_der(der).expect("parse RSA cert")
-    }
-
-    /// Single matching anchor — name and SPKI both match the self-signed cert.
+    /// Identical ASCII strings must compare equal.
     #[test]
-    fn single_anchor_matches() {
-        let cert = load_p256_cert();
-        let anchors = [TrustAnchor::from_cert(cert.clone())];
-        assert_eq!(find_trust_anchor(&cert, &anchors).unwrap(), 0);
+    fn identical_strings_equal() {
+        assert!(normalized_eq(b"hello", b"hello"));
     }
 
-    /// Two anchors; only the second matches. Tests iteration order.
+    /// Case is folded to lowercase.
     #[test]
-    fn second_anchor_matches() {
-        let p256 = load_p256_cert();
-        let rsa = load_rsa_cert();
-        // First anchor has RSA name + RSA SPKI (won't match the P-256 cert).
-        // Second anchor has P-256 name + P-256 SPKI (will match).
-        let anchors = [TrustAnchor::from_cert(rsa), TrustAnchor::from_cert(p256.clone())];
-        assert_eq!(find_trust_anchor(&p256, &anchors).unwrap(), 1);
+    fn case_folding() {
+        assert!(normalized_eq(b"Hello", b"hello"));
+        assert!(normalized_eq(b"HELLO WORLD", b"hello world"));
     }
 
-    /// Security test: anchor name matches but SPKI is different — must reject.
+    /// Leading spaces are stripped.
+    #[test]
+    fn leading_spaces_stripped() {
+        assert!(normalized_eq(b"  hello", b"hello"));
+    }
+
+    /// Trailing spaces are stripped.
     ///
-    /// This guards against an attacker who publishes a different root cert with
-    /// the same DN as a trusted anchor. Name-only matching would wrongly accept it.
+    /// Regression test: NormalizedIter must not emit a trailing space for
+    /// input that ends with a space sequence.
     #[test]
-    fn name_match_spki_mismatch_rejected() {
-        let p256 = load_p256_cert();
-        let rsa = load_rsa_cert();
-        // Forge an anchor: P-256 cert's subject name, but RSA cert's SPKI.
-        let forged = TrustAnchor::new(
-            p256.tbs_certificate.subject.clone(),
-            rsa.tbs_certificate.subject_public_key_info.clone(),
-        );
-        let anchors = [forged];
-        assert!(
-            matches!(find_trust_anchor(&p256, &anchors), Err(Error::NoTrustedPath)),
-            "name match with wrong SPKI must return NoTrustedPath"
-        );
+    fn trailing_spaces_stripped() {
+        assert!(normalized_eq(b"hello  ", b"hello"));
+        assert!(normalized_eq(b"hello ", b"hello"));
     }
 
-    /// Anchor name does not match — must reject.
+    /// Multiple consecutive internal spaces are collapsed to a single space.
+    ///
+    /// Regression test for the double-space bug: `pending_space` must not
+    /// cause two spaces to be emitted for a single space in the input.
     #[test]
-    fn name_mismatch_rejected() {
-        let p256 = load_p256_cert();
-        let rsa = load_rsa_cert();
-        // RSA anchor has a different CN — no name match with the P-256 cert.
-        let anchors = [TrustAnchor::from_cert(rsa)];
-        assert!(
-            matches!(find_trust_anchor(&p256, &anchors), Err(Error::NoTrustedPath)),
-            "anchor with different name must return NoTrustedPath"
-        );
+    fn internal_spaces_collapsed() {
+        assert!(normalized_eq(b"hello  world", b"hello world"));
+        assert!(normalized_eq(b"hello   world", b"hello world"));
+    }
+
+    /// Combined: leading + trailing + internal spaces, case folding.
+    #[test]
+    fn combined_normalization() {
+        assert!(normalized_eq(b"  Hello   World  ", b"hello world"));
+    }
+
+    /// Empty string and all-spaces string must both yield zero bytes.
+    #[test]
+    fn empty_and_whitespace_only() {
+        assert!(normalized_eq(b"", b""));
+        assert!(normalized_eq(b"   ", b""));
+        assert!(normalized_eq(b"   ", b"   "));
+    }
+
+    /// Different strings must NOT compare equal after normalization.
+    #[test]
+    fn different_strings_not_equal() {
+        assert!(!normalized_eq(b"hello", b"world"));
+        assert!(!normalized_eq(b"ab", b"abc"));
+    }
+
+    /// NormalizedIter: input ending with an internal space sequence followed by
+    /// trailing spaces must emit the space and then stop (no double space, no
+    /// trailing space).
+    #[test]
+    fn internal_then_trailing_space_no_trailing_emit() {
+        // "ab  " → normalized → "ab" (one word, no trailing space)
+        let collected: Vec<u8> = NormalizedIter::new(b"ab  ").collect();
+        assert_eq!(collected, b"ab");
+
+        // "ab  cd  " → normalized → "ab cd" (one internal space, no trailing space)
+        let collected: Vec<u8> = NormalizedIter::new(b"ab  cd  ").collect();
+        assert_eq!(collected, b"ab cd");
     }
 }
 
@@ -982,14 +1065,17 @@ mod tests_validate_path {
     use der::Decode;
 
     // Fixtures and time constants reused from tests_chain_walk.
-    const GRY_NOW: u64 = 1_780_272_000;   // 2026-06-01
+    const GRY_NOW: u64 = 1_780_272_000; // 2026-06-01
 
     fn load(bytes: &[u8]) -> Certificate {
         Certificate::from_der(bytes).expect("parse cert")
     }
 
     fn policy_at(t: u64) -> ValidationPolicy {
-        ValidationPolicy { current_time_unix: t, ..Default::default() }
+        ValidationPolicy {
+            current_time_unix: t,
+            ..Default::default()
+        }
     }
 
     /// Happy-path 1-cert chain: self-signed cert is both chain and anchor.
@@ -1035,7 +1121,10 @@ mod tests_validate_path {
         let rsa = load(include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der"));
         // First anchor is the RSA cert (wrong name and SPKI for the P-256 chain).
         // Second anchor matches.
-        let anchors = [TrustAnchor::from_cert(rsa), TrustAnchor::from_cert(p256.clone())];
+        let anchors = [
+            TrustAnchor::from_cert(rsa),
+            TrustAnchor::from_cert(p256.clone()),
+        ];
         let result = validate_path(&[p256], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier)
             .expect("must find second anchor");
         assert_eq!(result.anchor_index, 1);
@@ -1107,11 +1196,11 @@ mod tests_validate_path {
     ///
     /// Patch the SECOND occurrence of the ECDSA-with-SHA256 OID bytes in vxf-leaf.der
     /// to ECDSA-with-SHA384. The inner TBS.signature remains SHA256.
-    /// check_oid_consistency detects this → SignatureInvalid { index: 0 }.
+    /// check_oid_consistency detects this → MalformedCertificate { index: 0 }.
     ///
     /// Oracle: RFC 5280 §4.1.1.2 requires outer and inner AlgorithmIdentifiers to be identical.
     #[test]
-    fn oid_mismatch_outer_returns_signature_invalid() {
+    fn oid_mismatch_outer_returns_malformed_certificate() {
         let mut leaf_der = include_bytes!("../tests/fixtures/vxf-leaf.der").to_vec();
         // ECDSA-with-SHA256 OID content bytes: 1.2.840.10045.4.3.2
         let oid_sha256: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02];
@@ -1132,8 +1221,7 @@ mod tests_validate_path {
         leaf_der[second..second + 8].copy_from_slice(oid_sha384);
         let leaf = Certificate::from_der(&leaf_der).expect("patched DER must parse");
         assert_ne!(
-            leaf.signature_algorithm,
-            leaf.tbs_certificate.signature,
+            leaf.signature_algorithm, leaf.tbs_certificate.signature,
             "outer/inner OIDs must differ after patch"
         );
         let int_cert = load(include_bytes!("../tests/fixtures/vxf-int.der"));
@@ -1147,9 +1235,9 @@ mod tests_validate_path {
                     &policy_at(GRY_NOW),
                     &EcdsaP256Verifier
                 ),
-                Err(Error::SignatureInvalid { index: 0 })
+                Err(Error::MalformedCertificate { index: 0 })
             ),
-            "outer/inner OID mismatch must return SignatureInvalid {{ index: 0 }}"
+            "outer/inner OID mismatch must return MalformedCertificate {{ index: 0 }}"
         );
     }
 
@@ -1165,7 +1253,12 @@ mod tests_validate_path {
         let anchors = [TrustAnchor::from_cert(root)];
         assert!(
             matches!(
-                validate_path(&[leaf, int_cert], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier),
+                validate_path(
+                    &[leaf, int_cert],
+                    &anchors,
+                    &policy_at(GRY_NOW),
+                    &EcdsaP256Verifier
+                ),
                 Err(Error::NotCA { index: 1 })
             ),
             "intermediate without BasicConstraints CA flag must return NotCA {{ index: 1 }}"
@@ -1188,6 +1281,34 @@ mod tests_validate_path {
                 Err(Error::KeyUsageMissing { index: 1 })
             ),
             "intermediate with KeyUsage but no keyCertSign must return KeyUsageMissing {{ index: 1 }}"
+        );
+    }
+
+    /// Security test: anchor with matching name but wrong SPKI must be rejected.
+    ///
+    /// Guards against a name-collision attack: an attacker who creates a root cert
+    /// with the same DN as a trusted anchor but a different key must not be accepted.
+    /// The self-issued SPKI guard in validate_path catches this.
+    #[test]
+    fn forged_anchor_name_match_spki_mismatch_rejected() {
+        use der::Decode as _;
+        let p256 = Certificate::from_der(include_bytes!("../tests/fixtures/ec-p256-sha256.der"))
+            .expect("parse P-256 cert");
+        let rsa =
+            Certificate::from_der(include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der"))
+                .expect("parse RSA cert");
+        // Forged anchor: P-256 cert's subject name + RSA cert's SPKI.
+        let forged = TrustAnchor::new(
+            p256.tbs_certificate.subject.clone(),
+            rsa.tbs_certificate.subject_public_key_info.clone(),
+        );
+        let anchors = [forged];
+        assert!(
+            matches!(
+                validate_path(&[p256], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier),
+                Err(Error::NoTrustedPath)
+            ),
+            "anchor with matching name but wrong SPKI must return NoTrustedPath"
         );
     }
 }
@@ -1239,14 +1360,10 @@ mod tests_chain_walk {
     #[test]
     fn single_cert_chain_ok() {
         let p256 = load(include_bytes!("../tests/fixtures/ec-p256-sha256.der"));
-        // The self-signed cert's notBefore is in the past (generated in 2026).
-        // Use a current time of 2026 to ensure it's valid.
         let policy = policy_at(GRY_NOW);
-        let anchors = [TrustAnchor::from_cert(p256.clone())];
-        assert_eq!(
-            chain_walk(&[p256], &anchors, &policy, &EcdsaP256Verifier).unwrap(),
-            0
-        );
+        let anchor = TrustAnchor::from_cert(p256.clone());
+        chain_walk(&[p256], &anchor, &policy, &EcdsaP256Verifier)
+            .expect("1-cert chain must pass chain_walk");
     }
 
     /// 2-cert chain (leaf + intermediate) with root as anchor.
@@ -1258,11 +1375,9 @@ mod tests_chain_walk {
         let int_cert = load(include_bytes!("../tests/fixtures/vxf-int.der"));
         let leaf = load(include_bytes!("../tests/fixtures/vxf-leaf.der"));
         let policy = policy_at(GRY_NOW);
-        let anchors = [TrustAnchor::from_cert(root)];
-        assert_eq!(
-            chain_walk(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier).unwrap(),
-            0
-        );
+        let anchor = TrustAnchor::from_cert(root);
+        chain_walk(&[leaf, int_cert], &anchor, &policy, &EcdsaP256Verifier)
+            .expect("2-cert chain must pass chain_walk");
     }
 
     /// Leaf with corrupted signature — last byte flipped.
@@ -1275,13 +1390,11 @@ mod tests_chain_walk {
         *leaf_der.last_mut().unwrap() ^= 0xFF;
         let leaf = Certificate::from_der(&leaf_der).expect("parse still succeeds after bit flip");
         let int_cert = load(include_bytes!("../tests/fixtures/vxf-int.der"));
-        let anchors = [TrustAnchor::from_cert(load(include_bytes!(
-            "../tests/fixtures/vxf-root.der"
-        )))];
+        let anchor = TrustAnchor::from_cert(load(include_bytes!("../tests/fixtures/vxf-root.der")));
         let policy = policy_at(GRY_NOW);
         assert!(
             matches!(
-                chain_walk(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                chain_walk(&[leaf, int_cert], &anchor, &policy, &EcdsaP256Verifier),
                 Err(Error::SignatureInvalid { index: 0 })
             ),
             "corrupted leaf signature must return SignatureInvalid {{ index: 0 }}"
@@ -1300,10 +1413,15 @@ mod tests_chain_walk {
             "../tests/fixtures/chk-leaf-wrong-issuer.der"
         ));
         let policy = policy_at(GRY_NOW);
-        let anchors = [TrustAnchor::from_cert(root)];
+        let anchor = TrustAnchor::from_cert(root);
         assert!(
             matches!(
-                chain_walk(&[leaf_wrong, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                chain_walk(
+                    &[leaf_wrong, int_cert],
+                    &anchor,
+                    &policy,
+                    &EcdsaP256Verifier
+                ),
                 Err(Error::ChainBroken { index: 0 })
             ),
             "leaf with wrong issuer must return ChainBroken {{ index: 0 }}"
@@ -1323,10 +1441,10 @@ mod tests_chain_walk {
         let int_cert = load(include_bytes!("../tests/fixtures/gry-int.der"));
         let leaf = load(include_bytes!("../tests/fixtures/gry-leaf.der"));
         let policy = policy_at(GRY_EXPIRED);
-        let anchors = [TrustAnchor::from_cert(root)];
+        let anchor = TrustAnchor::from_cert(root);
         assert!(
             matches!(
-                chain_walk(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                chain_walk(&[leaf, int_cert], &anchor, &policy, &EcdsaP256Verifier),
                 Err(Error::ValidityPeriod { index: 0 })
             ),
             "expired leaf must return ValidityPeriod {{ index: 0 }}"
@@ -1343,10 +1461,10 @@ mod tests_chain_walk {
         let int_cert = load(include_bytes!("../tests/fixtures/gry-int.der"));
         let leaf = load(include_bytes!("../tests/fixtures/gry-leaf.der"));
         let policy = policy_at(GRY_NOTYET);
-        let anchors = [TrustAnchor::from_cert(root)];
+        let anchor = TrustAnchor::from_cert(root);
         assert!(
             matches!(
-                chain_walk(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                chain_walk(&[leaf, int_cert], &anchor, &policy, &EcdsaP256Verifier),
                 Err(Error::ValidityPeriod { index: 1 })
             ),
             "not-yet-valid intermediate must return ValidityPeriod {{ index: 1 }}"
@@ -1361,17 +1479,14 @@ mod tests_chain_walk {
     fn unknown_critical_extension_returns_unhandled() {
         let root = load(include_bytes!("../tests/fixtures/gry-root.der"));
         let int_cert = load(include_bytes!("../tests/fixtures/gry-int.der"));
-        let leaf_unk = load(include_bytes!("../tests/fixtures/gry-leaf-unknown-crit.der"));
+        let leaf_unk = load(include_bytes!(
+            "../tests/fixtures/gry-leaf-unknown-crit.der"
+        ));
         let policy = policy_at(GRY_NOW);
-        let anchors = [TrustAnchor::from_cert(root)];
+        let anchor = TrustAnchor::from_cert(root);
         assert!(
             matches!(
-                chain_walk(
-                    &[leaf_unk, int_cert],
-                    &anchors,
-                    &policy,
-                    &EcdsaP256Verifier
-                ),
+                chain_walk(&[leaf_unk, int_cert], &anchor, &policy, &EcdsaP256Verifier),
                 Err(Error::UnhandledCriticalExtension { index: 0 })
             ),
             "unknown critical ext must return UnhandledCriticalExtension {{ index: 0 }}"

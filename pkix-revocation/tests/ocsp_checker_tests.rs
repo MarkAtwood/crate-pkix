@@ -70,7 +70,13 @@ fn ocsp_cert_revoked_with_reason() {
     let revoked = load_cert("ocsp-leaf-revoked.der");
     let result = checker("ocsp-revoked.der").check_revocation(&revoked, &ca);
     assert!(
-        matches!(result, Err(Error::Revoked { reason_code: Some(1), .. })),
+        matches!(
+            result,
+            Err(Error::Revoked {
+                reason_code: Some(1),
+                ..
+            })
+        ),
         "revoked cert must return Revoked {{ reason_code: Some(1) }}, got: {result:?}"
     );
 }
@@ -84,7 +90,13 @@ fn ocsp_cert_revoked_no_reason() {
     let revoked = load_cert("ocsp-leaf-revoked.der");
     let result = checker("ocsp-revoked-no-reason.der").check_revocation(&revoked, &ca);
     assert!(
-        matches!(result, Err(Error::Revoked { reason_code: None, .. })),
+        matches!(
+            result,
+            Err(Error::Revoked {
+                reason_code: None,
+                ..
+            })
+        ),
         "revoked cert (no reason) must return Revoked {{ reason_code: None }}, got: {result:?}"
     );
 }

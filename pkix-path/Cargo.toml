@@ -13,15 +13,16 @@ categories  = ["cryptography", "no-std"]
 [features]
 default   = ["rsa", "p256"]
 
-# Enable std::error::Error impl on Error type (no_std cores stay no_std without this)
-std = ["der/std"]
+# Enable std::error::Error impl on Error type (no_std cores stay no_std without this).
+# Propagate std to all workspace crates that gate behaviour behind it.
+std = ["der/std", "spki/std", "x509-cert/std", "signature/std"]
 
 # RustCrypto algorithm backends — disable all to bring your own SignatureVerifier
-rustcrypto = ["rsa", "p256", "p384", "ed25519"]
+# v0.1: only RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256 are implemented.
+# p384 and ed25519 are reserved for v0.2 and are not declared as features here.
+rustcrypto = ["rsa", "p256"]
 rsa        = ["dep:rsa", "dep:sha2"]
 p256       = ["dep:p256"]
-p384       = ["dep:p384"]
-ed25519    = ["dep:ed25519-dalek"]
 
 [dependencies]
 der       = { workspace = true }
@@ -29,12 +30,10 @@ spki      = { workspace = true }
 x509-cert = { workspace = true }
 signature = { workspace = true }
 
-# Algorithm backends (optional)
-p256          = { workspace = true, optional = true }
-p384          = { workspace = true, optional = true }
-rsa           = { workspace = true, optional = true }
-sha2          = { workspace = true, optional = true }
-ed25519-dalek = { workspace = true, optional = true }
+# Algorithm backends (optional; p384 and ed25519-dalek reserved for v0.2)
+p256 = { workspace = true, optional = true }
+rsa  = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
 
 [dev-dependencies]
 # PKITS test vectors and external oracle results go here

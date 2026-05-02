@@ -33,8 +33,19 @@ pub enum Error {
         reason_code: Option<u8>,
     },
 
-    /// The CRL's `thisUpdate`/`nextUpdate` validity window has expired.
+    /// The CRL validity window check failed.
+    ///
+    /// This covers two cases:
+    /// - `now < thisUpdate`: the CRL is not yet valid (clock skew or future-dated CRL)
+    /// - `now > nextUpdate`: the CRL has expired
+    /// - `nextUpdate` absent: treated as expired (no expiry information means stale)
     CrlExpired,
+
+    /// The CRL issuer name does not match the certificate's issuer.
+    ///
+    /// The CRL's `issuer` field must match the certificate's `issuer` field for the
+    /// CRL to apply to that certificate. A mismatch indicates the wrong CRL was provided.
+    CrlIssuerMismatch,
 
     /// The CRL signature did not verify against the issuer's SPKI.
     CrlSignatureInvalid,
@@ -55,11 +66,15 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Revoked { serial, reason_code } => match reason_code {
+            Error::Revoked {
+                serial,
+                reason_code,
+            } => match reason_code {
                 Some(code) => write!(f, "certificate {serial} is revoked (reason {code})"),
                 None => write!(f, "certificate {serial} is revoked"),
             },
-            Error::CrlExpired => f.write_str("CRL validity window has expired"),
+            Error::CrlExpired => f.write_str("CRL validity window check failed"),
+            Error::CrlIssuerMismatch => f.write_str("CRL issuer does not match certificate issuer"),
             Error::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
             Error::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
             Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),

@@ -14,6 +14,13 @@ const OID_PKIX_OCSP_BASIC: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.1");
 
 /// A placeholder `der::Error` used when a structural invariant is violated.
+///
+/// This is returned in two places:
+/// - `responseBytes` absent in a `Successful` response (RFC 6960 §4.2.1 requires it)
+/// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
+///
+/// Both indicate a malformed OCSP response that does not conform to RFC 6960.
+/// `Length::ZERO` is used as a placeholder since `der::Error` requires a length.
 fn der_failed() -> der::Error {
     der::Error::new(ErrorKind::Failed, Length::ZERO)
 }
@@ -32,10 +39,20 @@ fn der_failed() -> der::Error {
 /// # Limitations (v0.1)
 ///
 /// - Only issuer-signed (direct) OCSP responses are supported.
-///   Delegated OCSP responders (separate responder certificates) are not supported.
-/// - `SingleResponse` matching is by serial number only; `CertID` hash verification
-///   (issuer name hash / key hash) is not performed.
+///   Delegated OCSP responders (responses signed by a separate responder
+///   certificate, not by the issuer directly) will fail with
+///   [`Error::OcspSignatureInvalid`] because the signature is verified against
+///   the issuer's key. This is a v0.1 limitation tracked for v0.2.
+/// - **Security**: `SingleResponse` matching is by serial number only; the
+///   `CertID.issuerNameHash` and `CertID.issuerKeyHash` fields are not verified.
+///   Serial numbers are only unique within a single CA's issuance, not globally.
+///   An OCSP response for a certificate with the same serial number from a
+///   different CA could satisfy this check. For deployments where multiple CAs
+///   share an OCSP responder or serial number collisions are possible, verify
+///   the issuer hash fields before using this checker.
 /// - The `ResponderId` field is not verified against the issuer identity.
+/// - If no `SingleResponse` matches the certificate's serial number,
+///   `OcspStatusUnknown` is returned (hard-fail).
 pub struct OcspChecker<V> {
     response_der: Vec<u8>,
     now_unix: u64,
@@ -45,12 +62,12 @@ pub struct OcspChecker<V> {
 impl<V: SignatureVerifier> OcspChecker<V> {
     /// Create a new `OcspChecker`.
     ///
-    /// - `response_der` — DER-encoded `OCSPResponse`
+    /// - `response_der` — DER-encoded `OCSPResponse` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix`     — current time as seconds since the Unix epoch
     /// - `verifier`     — signature verifier used to authenticate the OCSP response
-    pub fn new(response_der: Vec<u8>, now_unix: u64, verifier: V) -> Self {
+    pub fn new(response_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
         Self {
-            response_der,
+            response_der: response_der.into(),
             now_unix,
             verifier,
         }
@@ -60,8 +77,7 @@ impl<V: SignatureVerifier> OcspChecker<V> {
 impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()> {
         // (1) Parse the outer OCSPResponse.
-        let resp =
-            OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
+        let resp = OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
 
         // (2) Require responseStatus == successful; any other → OcspStatusUnknown.
         if resp.response_status != OcspResponseStatus::Successful {
@@ -93,7 +109,10 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         self.verifier
             .verify_signature(
                 basic.signature_algorithm.owned_to_ref(),
-                issuer.tbs_certificate.subject_public_key_info.owned_to_ref(),
+                issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref(),
                 &tbs_bytes,
                 basic.signature.raw_bytes(),
             )
@@ -108,15 +127,33 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .find(|r| &r.cert_id.serial_number == cert_serial)
             .ok_or(Error::OcspStatusUnknown)?;
 
-        // (8) Check SingleResponse validity window: thisUpdate ≤ now ≤ nextUpdate.
+        // (8) Check validity windows.
+        //
+        // producedAt must not be in the future: a future-dated response indicates
+        // clock skew or a response generated after "now"; reject as unknown.
+        let produced_at = basic
+            .tbs_response_data
+            .produced_at
+            .as_ref()
+            .to_unix_duration()
+            .as_secs();
+        if self.now_unix < produced_at {
+            return Err(Error::OcspStatusUnknown);
+        }
+        // thisUpdate ≤ now: the SingleResponse is not yet valid.
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {
             return Err(Error::OcspStatusUnknown);
         }
-        if let Some(ref next_update) = single.next_update {
-            if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
-                return Err(Error::OcspStatusUnknown);
+        // now ≤ nextUpdate: absent nextUpdate is treated as unknown (no expiry info
+        // means we cannot trust the freshness of the status).
+        match &single.next_update {
+            Some(next_update) => {
+                if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
+                    return Err(Error::OcspStatusUnknown);
+                }
             }
+            None => return Err(Error::OcspStatusUnknown),
         }
 
         // (9) Return based on certStatus.
@@ -124,6 +161,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             CertStatus::Good(_) => Ok(()),
             CertStatus::Revoked(ref info) => Err(Error::Revoked {
                 serial: cert_serial.clone(),
+                // CrlReason is a repr(u8) enum; the cast is always safe.
                 reason_code: info.revocation_reason.map(|r| r as u8),
             }),
             CertStatus::Unknown(_) => Err(Error::OcspStatusUnknown),

@@ -4,7 +4,7 @@
 
 use crate::{Error, RevocationChecker};
 use der::{Decode as _, Encode as _};
-use pkix_path::SignatureVerifier;
+use pkix_path::{names_match, SignatureVerifier};
 use spki::der::referenced::OwnedToRef as _;
 use x509_cert::{
     crl::{CertificateList, RevokedCert},
@@ -32,7 +32,11 @@ const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
 /// - The CRL must be signed directly by the certificate issuer
 ///   (indirect CRLs are not supported).
 /// - Delta CRLs are not supported.
-/// - The CRL issuer name is not verified against the certificate issuer name.
+/// - The CRL is re-parsed from DER on every [`check_revocation`] call.
+///   For long chains validated against the same CRL, this is O(N) redundant
+///   parsing. Tracked for v0.2 (cache the parsed `CertificateList` in `new`).
+///
+/// [`check_revocation`]: crate::RevocationChecker::check_revocation
 pub struct CrlChecker<V> {
     crl_der: Vec<u8>,
     now_unix: u64,
@@ -42,12 +46,12 @@ pub struct CrlChecker<V> {
 impl<V: SignatureVerifier> CrlChecker<V> {
     /// Create a new `CrlChecker`.
     ///
-    /// - `crl_der`  — DER-encoded `CertificateList`
+    /// - `crl_der`  — DER-encoded `CertificateList` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix` — current time as seconds since the Unix epoch
     /// - `verifier` — signature verifier used to authenticate the CRL
-    pub fn new(crl_der: Vec<u8>, now_unix: u64, verifier: V) -> Self {
+    pub fn new(crl_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
         Self {
-            crl_der,
+            crl_der: crl_der.into(),
             now_unix,
             verifier,
         }
@@ -59,26 +63,41 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (1) Parse the CRL.
         let crl = CertificateList::from_der(&self.crl_der).map_err(Error::CrlParseError)?;
 
-        // (2) Verify the CRL signature against the issuer's SPKI.
+        // (2) Verify the CRL issuer name matches the certificate's issuer.
+        //     A CRL signed by a different CA does not convey revocation status for
+        //     certificates issued by this CA.
+        if !names_match(&crl.tbs_cert_list.issuer, &cert.tbs_certificate.issuer) {
+            return Err(Error::CrlIssuerMismatch);
+        }
+
+        // (3) Verify the CRL signature against the issuer's SPKI.
         let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
-                issuer.tbs_certificate.subject_public_key_info.owned_to_ref(),
+                issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref(),
                 &tbs_bytes,
                 crl.signature.raw_bytes(),
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
-        // (3) Check CRL validity window: thisUpdate ≤ now ≤ nextUpdate.
+        // (4) Check CRL validity window: thisUpdate ≤ now ≤ nextUpdate.
+        //     Absent nextUpdate is treated as expired: an indefinitely valid CRL would
+        //     allow a stale revocation list to suppress detection of revoked certificates.
         let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
         if self.now_unix < this_update {
             return Err(Error::CrlExpired);
         }
-        if let Some(ref next_update) = crl.tbs_cert_list.next_update {
-            if self.now_unix > next_update.to_unix_duration().as_secs() {
-                return Err(Error::CrlExpired);
+        match &crl.tbs_cert_list.next_update {
+            Some(next_update) => {
+                if self.now_unix > next_update.to_unix_duration().as_secs() {
+                    return Err(Error::CrlExpired);
+                }
             }
+            None => return Err(Error::CrlExpired),
         }
 
         // (4) Search the revoked list for this certificate's serial number.
@@ -107,6 +126,7 @@ fn extract_reason_code(entry: &RevokedCert) -> Option<u8> {
     for ext in exts.iter() {
         if ext.extn_id == OID_CRL_REASONS {
             let reason = CrlReason::from_der(ext.extn_value.as_bytes()).ok()?;
+            // CrlReason is a repr(u8) enum; the cast is always safe.
             return Some(reason as u8);
         }
     }

@@ -17,7 +17,10 @@ use pkits_helper::{pkits_validate, PKITS_NOW};
 #[test]
 fn pkits_4_6_1_missing_basic_constraints() {
     let result = pkits_validate(
-        &["InvalidMissingbasicConstraintsTest1EE", "MissingbasicConstraintsCACert"],
+        &[
+            "InvalidMissingbasicConstraintsTest1EE",
+            "MissingbasicConstraintsCACert",
+        ],
         PKITS_NOW,
     );
     assert!(
@@ -31,7 +34,10 @@ fn pkits_4_6_1_missing_basic_constraints() {
 #[test]
 fn pkits_4_6_2_ca_false_critical() {
     let result = pkits_validate(
-        &["InvalidcAFalseTest2EE", "basicConstraintsCriticalcAFalseCACert"],
+        &[
+            "InvalidcAFalseTest2EE",
+            "basicConstraintsCriticalcAFalseCACert",
+        ],
         PKITS_NOW,
     );
     assert!(
@@ -45,7 +51,10 @@ fn pkits_4_6_2_ca_false_critical() {
 #[test]
 fn pkits_4_6_3_ca_false_not_critical() {
     let result = pkits_validate(
-        &["InvalidcAFalseTest3EE", "basicConstraintsNotCriticalcAFalseCACert"],
+        &[
+            "InvalidcAFalseTest3EE",
+            "basicConstraintsNotCriticalcAFalseCACert",
+        ],
         PKITS_NOW,
     );
     assert!(
@@ -59,7 +68,10 @@ fn pkits_4_6_3_ca_false_not_critical() {
 #[test]
 fn pkits_4_6_4_basic_constraints_not_critical() {
     let result = pkits_validate(
-        &["ValidbasicConstraintsNotCriticalTest4EE", "basicConstraintsNotCriticalCACert"],
+        &[
+            "ValidbasicConstraintsNotCriticalTest4EE",
+            "basicConstraintsNotCriticalCACert",
+        ],
         PKITS_NOW,
     );
     result.expect("§4.6.4 must validate");
@@ -340,7 +352,10 @@ fn pkits_4_7_2_invalid_key_usage_not_critical_no_cert_sign() {
 #[test]
 fn pkits_4_7_3_valid_key_usage_not_critical() {
     let result = pkits_validate(
-        &["ValidkeyUsageNotCriticalTest3EE", "keyUsageNotCriticalCACert"],
+        &[
+            "ValidkeyUsageNotCriticalTest3EE",
+            "keyUsageNotCriticalCACert",
+        ],
         PKITS_NOW,
     );
     result.expect("§4.7.3 must validate");

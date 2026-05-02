@@ -21,8 +21,7 @@ const PKITS_NOW: u64 = 1_577_836_800;
 // Cert bytes are compiled in; tests run fully offline.
 const TRUST_ANCHOR_DER: &[u8] =
     include_bytes!("../../pkix-path/tests/pkits/certs/TrustAnchorRootCertificate.crt");
-const GOOD_CA_DER: &[u8] =
-    include_bytes!("../../pkix-path/tests/pkits/certs/GoodCACert.crt");
+const GOOD_CA_DER: &[u8] = include_bytes!("../../pkix-path/tests/pkits/certs/GoodCACert.crt");
 const VALID_EE_DER: &[u8] =
     include_bytes!("../../pkix-path/tests/pkits/certs/ValidCertificatePathTest1EE.crt");
 
@@ -68,7 +67,9 @@ fn e2e_verify_chain_default_expired_returns_validity_error() {
     assert!(
         matches!(
             result,
-            Err(pkix_chain::Error::Path(pkix_path::Error::ValidityPeriod { .. }))
+            Err(pkix_chain::Error::Path(
+                pkix_path::Error::ValidityPeriod { .. }
+            ))
         ),
         "before notBefore must return ValidityPeriod, got: {result:?}"
     );

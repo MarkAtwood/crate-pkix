@@ -60,7 +60,9 @@
 
 use der::asn1::ObjectIdentifier;
 use der::Decode;
-use pkix_path::{Error as PathError, TrustAnchor, ValidatedPath, ValidationPolicy};
+use pkix_path::{
+    DefaultVerifier, Error as PathError, TrustAnchor, ValidatedPath, ValidationPolicy,
+};
 use x509_cert::ext::pkix::{BasicConstraints, KeyUsage};
 use x509_cert::Certificate;
 
@@ -84,36 +86,29 @@ pub const OID_ECDSA_P256_SHA256: ObjectIdentifier =
 ///
 /// Any certificate whose `signatureAlgorithm` field carries an OID not in this
 /// slice is rejected with [`Error::AlgorithmNotAllowed`].
-pub const ALLOWED_SIG_ALGS: &[ObjectIdentifier] =
-    &[OID_RSA_PKCS1V15_SHA256, OID_ECDSA_P256_SHA256];
+pub const ALLOWED_SIG_ALGS: &[ObjectIdentifier] = &[OID_RSA_PKCS1V15_SHA256, OID_ECDSA_P256_SHA256];
 
 // ---------------------------------------------------------------------------
 // Allowed extension OIDs
 // ---------------------------------------------------------------------------
 
 /// OID for the `BasicConstraints` extension (RFC 5280 §4.2.1.9).
-pub const OID_EXT_BASIC_CONSTRAINTS: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.19");
+pub const OID_EXT_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
 
 /// OID for the `KeyUsage` extension (RFC 5280 §4.2.1.3).
-pub const OID_EXT_KEY_USAGE: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.15");
+pub const OID_EXT_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.15");
 
 /// OID for the `ExtendedKeyUsage` extension (RFC 5280 §4.2.1.12).
-pub const OID_EXT_EXTENDED_KEY_USAGE: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.37");
+pub const OID_EXT_EXTENDED_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.37");
 
 /// OID for the `SubjectAltName` extension (RFC 5280 §4.2.1.6).
-pub const OID_EXT_SUBJECT_ALT_NAME: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.17");
+pub const OID_EXT_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
 
 /// OID for the `SubjectKeyIdentifier` extension (RFC 5280 §4.2.1.2).
-pub const OID_EXT_SUBJECT_KEY_ID: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.14");
+pub const OID_EXT_SUBJECT_KEY_ID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.14");
 
 /// OID for the `AuthorityKeyIdentifier` extension (RFC 5280 §4.2.1.1).
-pub const OID_EXT_AUTHORITY_KEY_ID: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.35");
+pub const OID_EXT_AUTHORITY_KEY_ID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.35");
 
 /// Extensions permitted on the end-entity (leaf) certificate.
 ///
@@ -147,6 +142,11 @@ pub const ALLOWED_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
 ///
 /// This covers every real-world PKI the author is aware of at the time of
 /// writing. If you need deeper chains, use [`pkix_chain`] directly.
+///
+/// **Note**: `chain[0]` is the end-entity (leaf) certificate. `chain[0]` is
+/// checked against [`ALLOWED_LEAF_EXTENSIONS`] — if it has
+/// `BasicConstraints cA=TRUE`, [`Error::LeafIsCA`] is returned regardless of
+/// `MAX_INTERMEDIATES`. Pass a non-CA end-entity as `chain[0]`.
 pub const MAX_INTERMEDIATES: usize = 2;
 
 // ---------------------------------------------------------------------------
@@ -209,6 +209,10 @@ pub enum Error {
     /// The end-entity certificate has `BasicConstraints` cA=TRUE, which means
     /// it is a CA certificate, not a leaf. This crate does not validate chains
     /// where the subject is itself a CA.
+    ///
+    /// **Edge case**: if you want to validate a 1-cert "chain" where `chain[0]`
+    /// is a self-signed root CA that is also listed in `anchors`, this error
+    /// will fire. Use [`pkix_path::validate_path`] directly for that case.
     LeafIsCA,
 
     /// Underlying RFC 5280 path validation error from [`pkix_path`].
@@ -220,17 +224,30 @@ impl core::fmt::Display for Error {
         match self {
             Error::EmptyChain => write!(f, "chain is empty"),
             Error::ChainTooLong { len } => {
-                write!(f, "chain has {len} certificates; maximum is {}", 1 + MAX_INTERMEDIATES)
+                write!(
+                    f,
+                    "chain has {len} certificates; maximum is {}",
+                    1 + MAX_INTERMEDIATES
+                )
             }
             Error::NoTrustAnchors => write!(f, "no trust anchors provided"),
             Error::AlgorithmNotAllowed { index } => {
-                write!(f, "certificate at index {index} uses a disallowed signature algorithm")
+                write!(
+                    f,
+                    "certificate at index {index} uses a disallowed signature algorithm"
+                )
             }
             Error::UnhandledCriticalExtension { index } => {
-                write!(f, "certificate at index {index} has an unhandled critical extension")
+                write!(
+                    f,
+                    "certificate at index {index} has an unhandled critical extension"
+                )
             }
             Error::UnexpectedExtension { index } => {
-                write!(f, "certificate at index {index} has an unexpected extension")
+                write!(
+                    f,
+                    "certificate at index {index} has an unexpected extension"
+                )
             }
             Error::MissingRequiredExtension { index } => {
                 write!(
@@ -290,12 +307,13 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Errors
 ///
-/// - [`Error::EmptyChain`] / [`Error::ChainTooLong`] — chain shape violations
-/// - [`Error::AlgorithmNotAllowed`] — non-whitelisted signature algorithm
-/// - [`Error::UnhandledCriticalExtension`] / [`Error::UnexpectedExtension`] /
-///   [`Error::MissingRequiredExtension`] — extension profile violations
-/// - [`Error::LeafIsCA`] — end-entity cert has cA=TRUE
-/// - [`Error::Path`] — underlying RFC 5280 validation failure
+/// Checks are applied in this order; the first failure is returned:
+///
+/// 1. Shape: [`Error::EmptyChain`], [`Error::ChainTooLong`], [`Error::NoTrustAnchors`]
+/// 2. Per-cert simplicity gate (leaf-first): [`Error::AlgorithmNotAllowed`],
+///    [`Error::UnexpectedExtension`], [`Error::UnhandledCriticalExtension`],
+///    [`Error::MissingRequiredExtension`], [`Error::LeafIsCA`]
+/// 3. Path validation: [`Error::Path`] — signature, validity, chain linkage
 ///
 /// # Example
 ///
@@ -346,8 +364,7 @@ pub fn verify_simple(
         ..Default::default()
     };
 
-    pkix_path::validate_path(chain, anchors, &policy, &RustCryptoVerifier::default())
-        .map_err(Error::Path)
+    pkix_path::validate_path(chain, anchors, &policy, &DefaultVerifier).map_err(Error::Path)
 }
 
 // ---------------------------------------------------------------------------
@@ -357,16 +374,10 @@ pub fn verify_simple(
 /// Reject the certificate if its `signatureAlgorithm` OID is not in
 /// [`ALLOWED_SIG_ALGS`].
 ///
-/// Both the outer `signatureAlgorithm` field and the inner
-/// `TBSCertificate.signature` field are checked; RFC 5280 §4.1.1.2 requires
-/// them to be identical.
+/// The RFC 5280 §4.1.1.2 outer/inner OID consistency check is **not**
+/// duplicated here; `validate_path` handles it via `check_oid_consistency`
+/// and returns `Error::Path(SignatureInvalid)` for that case.
 fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
-    // RFC 5280 §4.1.1.2: outer signatureAlgorithm and inner TBSCertificate.signature
-    // must be identical.
-    if cert.signature_algorithm != cert.tbs_certificate.signature {
-        return Err(Error::AlgorithmNotAllowed { index });
-    }
-    // Check that the algorithm OID is in our allowed set.
     let oid = cert.signature_algorithm.oid;
     if !ALLOWED_SIG_ALGS.contains(&oid) {
         return Err(Error::AlgorithmNotAllowed { index });
@@ -408,7 +419,10 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
 
     if is_leaf {
         // Check BasicConstraints if present: cA MUST be false.
-        if let Some(ext) = extensions.iter().find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS) {
+        if let Some(ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
+        {
             let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
                 .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
             if bc.ca {
@@ -440,32 +454,4 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
     }
 
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Internal RustCrypto verifier
-// ---------------------------------------------------------------------------
-
-/// Internal [`SignatureVerifier`] that delegates to [`pkix_path::DefaultVerifier`].
-///
-/// Not exported — callers who need a different backend should use
-/// [`pkix_path::validate_path`] or [`pkix_chain::verify_chain`] directly.
-struct RustCryptoVerifier(pkix_path::DefaultVerifier);
-
-impl Default for RustCryptoVerifier {
-    fn default() -> Self {
-        Self(pkix_path::DefaultVerifier)
-    }
-}
-
-impl pkix_path::SignatureVerifier for RustCryptoVerifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), signature::Error> {
-        self.0.verify_signature(algorithm, issuer_spki, message, signature)
-    }
 }
