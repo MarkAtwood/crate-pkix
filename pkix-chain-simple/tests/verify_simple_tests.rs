@@ -215,6 +215,26 @@ fn verify_simple_leaf_is_ca_returns_error() {
 }
 
 // ---------------------------------------------------------------------------
+// Critical EKU
+// ---------------------------------------------------------------------------
+
+/// Leaf with critical ExtendedKeyUsage (serverAuth) → verify_simple must accept it.
+///
+/// Oracle: pyca/cryptography — eku-leaf.der issued by eku-root.der;
+/// leaf has critical KeyUsage (digitalSignature) + critical EKU (serverAuth).
+/// Previously rejected with UnhandledCriticalExtension before EKU was added
+/// to CRITICAL_OK_LEAF_EXTENSIONS and HANDLED_CRITICAL_OIDS.
+#[test]
+fn verify_simple_critical_eku_accepted() {
+    let leaf = load("eku-leaf.der");
+    let root = load("eku-root.der");
+    let vp = verify_simple(&[leaf], &[anchor(root)], NOW)
+        .expect("leaf with critical EKU must be accepted");
+    assert_eq!(vp.anchor_index, 0);
+    assert_eq!(vp.depth, 0);
+}
+
+// ---------------------------------------------------------------------------
 // Path validation errors
 // ---------------------------------------------------------------------------
 

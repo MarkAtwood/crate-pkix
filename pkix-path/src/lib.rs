@@ -1356,6 +1356,20 @@ mod tests_validate_path {
         );
     }
 
+    /// Leaf with critical ExtendedKeyUsage → validate_path must accept it.
+    ///
+    /// EKU is in HANDLED_CRITICAL_OIDS; its value is not inspected.
+    /// Oracle: pyca/cryptography — eku-critical-self-signed.der, critical=True, serverAuth.
+    #[test]
+    fn critical_eku_accepted() {
+        let cert = load(include_bytes!(
+            "../tests/fixtures/eku-critical-self-signed.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        validate_path(&[cert], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier)
+            .expect("cert with critical EKU must be accepted");
+    }
+
     /// Security test: anchor with matching name but wrong SPKI must be rejected.
     ///
     /// Guards against a name-collision attack: an attacker who creates a root cert
