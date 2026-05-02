@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ac"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pkix-path",
  "pkix-revocation",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain-simple"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -337,7 +337,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-composite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -358,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "p256",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path-builder"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pkix-path",
  "x509-cert",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation-http"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "der",
  "pkix-path",
