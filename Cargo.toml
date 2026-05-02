@@ -27,10 +27,10 @@ x509-cert = "0.2"
 signature = "2"
 
 # Algorithm backends (feature-gated in pkix-path)
-p256           = { version = "0.13", default-features = false, features = ["ecdsa"] }
+p256           = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8"] }
 p384           = { version = "0.13", default-features = false, features = ["ecdsa"] }
 rsa            = { version = "0.9",  default-features = false }
-sha2           = { version = "0.10", default-features = false }
+sha2           = { version = "0.10", default-features = false, features = ["oid"] }
 ed25519-dalek  = { version = "2",    default-features = false }
 
 # Revocation (pkix-revocation)
