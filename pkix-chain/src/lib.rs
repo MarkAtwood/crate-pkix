@@ -127,23 +127,22 @@ where
 /// Returns `Err` if path validation fails (signature, validity, chain linkage,
 /// policy) or if revocation checking indicates a revoked certificate.
 ///
-/// # Security: partial revocation coverage
+/// # Revocation coverage
 ///
-/// Only certificates whose issuer appears in `chain` are passed to
-/// `revocation.check_revocation`. Concretely: `chain[i]` is checked only if
-/// `chain[i+1]` exists. The **last** certificate in the chain — the one
-/// directly issued by the trust anchor — is **never** revocation-checked,
-/// because its issuer (the trust anchor) is not present in `chain`.
+/// Every certificate in `chain` is revocation-checked:
 ///
-/// For a typical two-cert chain `[leaf, intermediate_CA]`, this means only
-/// `leaf` is checked; `intermediate_CA` is **not**. A revoked intermediate CA
-/// will pass this function unchanged.
+/// - `chain[i]` where `chain[i+1]` exists: checked via
+///   [`RevocationChecker::check_revocation`] with `chain[i+1]` as the issuer.
+/// - The last cert in `chain` (issued directly by the trust anchor): checked via
+///   [`RevocationChecker::check_revocation_against_anchor`].
 ///
-/// If full-chain revocation is required, include the issuing CA certificate in
-/// `chain` (making it appear as an intermediate) so that its issuer is also
-/// present, or implement revocation at a higher layer.
-///
-/// This is a v0.1 limitation (see README).
+/// The **default implementation** of `check_revocation_against_anchor` returns
+/// `Ok(())` (skip). `NoRevocation`, `CrlChecker`, and `OcspChecker` all inherit
+/// this default, so the last cert is not actively checked unless you override the
+/// method. For full-chain revocation coverage, provide a custom
+/// [`RevocationChecker`] that overrides `check_revocation_against_anchor`, or
+/// include the issuing CA certificate as the last element of `chain` so it is
+/// covered by `check_revocation` as a normal intermediate.
 pub fn verify_chain<V, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -160,15 +159,15 @@ where
 
     // Then: revocation checking on each cert in the validated chain.
     // chain[i] was issued by chain[i+1]; the last cert was issued by the trust anchor.
-    // We pass the issuer cert for each position; the trust anchor cert is used for
-    // the last intermediate. Revocation of the trust anchor itself is not checked.
     for i in 0..chain.len() {
         let cert = &chain[i];
-        // Issuer of chain[i] is chain[i+1], or the trust anchor for the last cert.
-        // Revocation checking for the cert directly issued by the trust anchor would
-        // require the trust anchor's own CRL — out of scope for v0.1.
         if let Some(issuer) = chain.get(i + 1) {
             revocation.check_revocation(cert, issuer)?;
+        } else {
+            // Last cert: issued directly by the trust anchor.
+            // The default impl returns Ok(()); override to enforce CRL/OCSP here.
+            revocation
+                .check_revocation_against_anchor(cert, &anchors[validated.anchor_index])?;
         }
     }
 
