@@ -34,4 +34,4 @@ sha2           = { version = "0.10", default-features = false, features = ["oid"
 ed25519-dalek  = { version = "2",    default-features = false }
 
 # Revocation (pkix-revocation)
-# x509-ocsp = "0.2"  # TODO: confirm version once 0.3-pre stabilizes with x509-cert
+x509-ocsp = "0.2"

@@ -17,23 +17,29 @@ default = []
 std = ["der/std"]
 
 # Offline CRL validation (no network; you provide the DER-encoded CRL bytes)
-crl  = []
+crl  = ["std"]
 
 # OCSP response validation (offline; you provide the DER-encoded response bytes)
-ocsp = []
-
-# TODO: async HTTP fetch traits (pulls in async deps — never enabled for no_std targets)
-# fetch = ["dep:...", "crl", "ocsp"]
+ocsp = ["std", "dep:x509-ocsp"]
 
 [dependencies]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 spki       = { workspace = true }
 x509-cert  = { workspace = true }
-
-# TODO: x509-ocsp = { workspace = true, optional = true }  # enable with ocsp feature
+x509-ocsp  = { workspace = true, optional = true }
 
 [dev-dependencies]
+der       = { workspace = true }
+x509-cert = { workspace = true }
+
+[[test]]
+name = "crl_checker_tests"
+required-features = ["crl"]
+
+[[test]]
+name = "ocsp_checker_tests"
+required-features = ["ocsp"]
 
 [package.metadata.docs.rs]
 all-features = true

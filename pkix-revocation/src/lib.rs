@@ -125,3 +125,13 @@ impl RevocationChecker for NoRevocation {
         Ok(())
     }
 }
+
+#[cfg(feature = "crl")]
+mod crl;
+#[cfg(feature = "crl")]
+pub use crl::CrlChecker;
+
+#[cfg(feature = "ocsp")]
+mod ocsp;
+#[cfg(feature = "ocsp")]
+pub use ocsp::OcspChecker;
