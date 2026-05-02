@@ -11,7 +11,7 @@ keywords    = ["x509", "certificate", "transparency", "sct", "ct"]
 categories  = ["cryptography"]
 
 [dependencies]
-pkix-path = { workspace = true, features = ["std"] }
+pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
 signature  = { workspace = true }

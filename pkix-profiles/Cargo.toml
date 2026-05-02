@@ -11,7 +11,7 @@ keywords    = ["x509", "certificate", "pki", "cabforum", "tls"]
 categories  = ["cryptography"]
 
 [dependencies]
-pkix-path = { workspace = true, features = ["std"] }
+pkix-path = { workspace = true }
 x509-cert = { workspace = true }
 
 [package.metadata.docs.rs]
