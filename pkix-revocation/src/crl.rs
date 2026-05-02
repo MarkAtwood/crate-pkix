@@ -120,10 +120,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 /// Returns the `CrlReason` (RFC 5280 §5.3.1), or `None` if the extension is absent.
 fn extract_reason_code(entry: &RevokedCert) -> Option<CrlReason> {
     let exts = entry.crl_entry_extensions.as_ref()?;
-    for ext in exts.iter() {
-        if ext.extn_id == OID_CRL_REASONS {
-            return CrlReason::from_der(ext.extn_value.as_bytes()).ok();
-        }
-    }
-    None
+    exts.iter()
+        .find(|ext| ext.extn_id == OID_CRL_REASONS)
+        .and_then(|ext| CrlReason::from_der(ext.extn_value.as_bytes()).ok())
 }

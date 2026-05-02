@@ -46,8 +46,9 @@ pub enum Error {
     },
     /// A structural encoding error was found in a certificate.
     ///
-    /// Currently returned when the outer `signatureAlgorithm` field differs from
-    /// the inner `TBSCertificate.signature` field (RFC 5280 §4.1.1.2).
+    /// Currently returned when the outer `signatureAlgorithm` OID differs from
+    /// the inner `TBSCertificate.signature` OID (RFC 5280 §4.1.1.2).
+    /// Parameters are not compared; see `check_oid_consistency` for rationale.
     MalformedCertificate {
         /// Zero-based index into the `chain` slice of the malformed certificate.
         index: usize,
@@ -358,6 +359,13 @@ pub struct ValidatedPath {
 ///
 /// See crate-level documentation for v0.1 scope limits.
 ///
+/// **8 KiB TBSCertificate limit**: signature verification re-encodes each
+/// `TBSCertificate` into a fixed 8 KiB stack buffer. Certificates whose
+/// `TBSCertificate` DER encoding exceeds 8 KiB return [`Error::Der`].
+/// This is an implementation limit, not a certificate defect. Large
+/// government, enterprise, or HSM attestation certificates may trigger this.
+/// A heap-backed encoding path is planned for v0.2.
+///
 /// Duplicate certificates in `chain` (same cert appearing at two indices) are
 /// not detected. They will fail signature verification or name linkage with a
 /// `SignatureInvalid` or `ChainBroken` error rather than a dedicated diagnostic.
@@ -428,10 +436,18 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
     Ok(())
 }
 
-/// RFC 5280 §4.1.1.2: outer signatureAlgorithm must equal inner TBSCertificate.signature.
+/// RFC 5280 §4.1.1.2: outer signatureAlgorithm OID must equal inner TBSCertificate.signature OID.
+///
+/// Only OIDs are compared, not parameters.  RFC 5280 says the two
+/// AlgorithmIdentifiers MUST be identical, but many production CAs
+/// generate certs where one field has explicit NULL parameters and the other
+/// omits them — a mismatch that OpenSSL and other validators accept in
+/// practice.  OID-only comparison preserves the security intent (the same
+/// algorithm must be named in both places) without rejecting otherwise-valid
+/// certs from common PKI deployments.
 fn check_oid_consistency(chain: &[Certificate]) -> Result<()> {
     for (index, cert) in chain.iter().enumerate() {
-        if cert.signature_algorithm != cert.tbs_certificate.signature {
+        if cert.signature_algorithm.oid != cert.tbs_certificate.signature.oid {
             return Err(Error::MalformedCertificate { index });
         }
     }
@@ -451,6 +467,9 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 const OID_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.17");
 
+const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.37");
+
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
 ///
 /// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
@@ -459,8 +478,17 @@ const OID_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
 /// Subject DN. **v0.1 limitation**: a cert with an empty Subject and critical SAN
 /// will pass this check but fail name linkage since `names_match` compares against
 /// the empty Subject. This is tracked for v0.2 (RFC 5280 §4.2.1.6).
-const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] =
-    &[OID_KEY_USAGE, OID_BASIC_CONSTRAINTS, OID_SUBJECT_ALT_NAME];
+///
+/// `OID_EXTENDED_KEY_USAGE` is listed here so that certs with critical EKU
+/// (common in CA/B Forum TLS and code-signing certificates) do not fail with
+/// `UnhandledCriticalExtension`. RFC 5280 §6.1 path validation does not require
+/// inspecting EKU values; the extension is accepted and its content is not verified.
+const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
+    OID_KEY_USAGE,
+    OID_BASIC_CONSTRAINTS,
+    OID_SUBJECT_ALT_NAME,
+    OID_EXTENDED_KEY_USAGE,
+];
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
 fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
@@ -872,7 +900,7 @@ fn chain_walk<V: SignatureVerifier>(
             // (e) BasicConstraints cA=TRUE required; (g) pathLenConstraint.
             // Decode BasicConstraints once for both checks.
             let bc = cert_basic_constraints(cert);
-            if bc.as_ref().map(|b| b.ca) != Some(true) {
+            if !bc.as_ref().is_some_and(|b| b.ca) {
                 return Err(Error::NotCA { index: i });
             }
 

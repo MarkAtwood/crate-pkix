@@ -79,6 +79,13 @@ pub enum Error {
     NoPathFound,
     /// Path building exceeded the configured maximum candidate depth.
     DepthExceeded,
+    /// Path building is not yet implemented.
+    ///
+    /// `build_path` currently returns this error unconditionally. It is
+    /// distinct from [`Error::NoPathFound`] so callers can detect the stub
+    /// state and fail loudly rather than silently treating an unimplemented
+    /// function as "no path available". See PKIX-y2j.
+    NotYetImplemented,
 }
 
 impl core::fmt::Display for Error {
@@ -86,6 +93,7 @@ impl core::fmt::Display for Error {
         match self {
             Error::NoPathFound => f.write_str("no certification path found to a trust anchor"),
             Error::DepthExceeded => f.write_str("path building exceeded maximum candidate depth"),
+            Error::NotYetImplemented => f.write_str("path building is not yet implemented"),
         }
     }
 }
@@ -114,5 +122,5 @@ pub fn build_path(
     _pool: &CertPool,
     _anchors: &[pkix_path::TrustAnchor],
 ) -> Result<Vec<Certificate>> {
-    Err(Error::NoPathFound)
+    Err(Error::NotYetImplemented)
 }

@@ -127,13 +127,23 @@ where
 /// Returns `Err` if path validation fails (signature, validity, chain linkage,
 /// policy) or if revocation checking indicates a revoked certificate.
 ///
-/// # Limitations
+/// # Security: partial revocation coverage
 ///
-/// The certificate at `chain[chain.len()-1]` — the one directly issued by the
-/// trust anchor — is **not** checked for revocation, because its issuer (the
-/// trust anchor) is not present as a `Certificate` in the chain. If revocation
-/// checking of trust-anchor-issued certs is required, include the issuer
-/// certificate in the chain or implement revocation at a higher layer.
+/// Only certificates whose issuer appears in `chain` are passed to
+/// `revocation.check_revocation`. Concretely: `chain[i]` is checked only if
+/// `chain[i+1]` exists. The **last** certificate in the chain — the one
+/// directly issued by the trust anchor — is **never** revocation-checked,
+/// because its issuer (the trust anchor) is not present in `chain`.
+///
+/// For a typical two-cert chain `[leaf, intermediate_CA]`, this means only
+/// `leaf` is checked; `intermediate_CA` is **not**. A revoked intermediate CA
+/// will pass this function unchanged.
+///
+/// If full-chain revocation is required, include the issuing CA certificate in
+/// `chain` (making it appear as an intermediate) so that its issuer is also
+/// present, or implement revocation at a higher layer.
+///
+/// This is a v0.1 limitation (see README).
 pub fn verify_chain<V, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],

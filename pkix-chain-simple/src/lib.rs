@@ -5,9 +5,9 @@
 //! Strict, opinionated X.509 chain verifier for the common happy-path case.
 //!
 //! This crate accepts **only** the narrow subset of certificate configurations
-//! found in the overwhelming majority of TLS and code-signing chains. Any
-//! deviation — an unusual extension, a long chain, a non-whitelisted algorithm
-//! — returns an error rather than attempting to handle it.
+//! found in short, simple chains issued by a CA hierarchy you control or fully
+//! trust. Any deviation — an unusual extension, a long chain, a non-whitelisted
+//! algorithm — returns an error rather than attempting to handle it.
 //!
 //! # When to use this crate
 //!
@@ -18,6 +18,8 @@
 //! - You want strict, auditable validation with no silent fallbacks
 //!
 //! Use `pkix_chain` (or [`pkix_path`] directly) when:
+//! - You are validating certs from a public CA (CA/B Forum TLS, code-signing)
+//!   that may carry extensions not in this crate's allowlist
 //! - You need NameConstraints, policy validation, or revocation checking
 //! - You need a custom signature backend (FIPS, HSM, wolfCrypt)
 //! - You need to accept a broader set of algorithms or extension profiles
@@ -148,17 +150,19 @@ pub const ALLOWED_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
 /// Extension OIDs that may appear as **critical** on the end-entity (leaf) certificate.
 ///
 /// This is a strict subset of [`ALLOWED_LEAF_EXTENSIONS`]: every OID here is
-/// one that `pkix-path` actively handles when the extension is critical.
+/// one that `pkix-path` accepts when the extension is critical.
 /// A leaf cert whose critical extension is in [`ALLOWED_LEAF_EXTENSIONS`] but
 /// **not** in this slice is rejected with [`Error::UnhandledCriticalExtension`].
 ///
-/// - `BasicConstraints`, `KeyUsage`, `SubjectAltName` are handled by `pkix-path`.
-/// - `ExtendedKeyUsage`, `SubjectKeyIdentifier`, `AuthorityKeyIdentifier` are
-///   not handled as critical by `pkix-path` and therefore not in this slice.
+/// - `BasicConstraints`, `KeyUsage`, `SubjectAltName`, `ExtendedKeyUsage` are
+///   accepted as critical by `pkix-path` (EKU content is not inspected; RFC 5280
+///   §6.1 path validation does not require it).
+/// - `SubjectKeyIdentifier`, `AuthorityKeyIdentifier` are not accepted as critical.
 pub const CRITICAL_OK_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
     OID_EXT_BASIC_CONSTRAINTS,
     OID_EXT_KEY_USAGE,
     OID_EXT_SUBJECT_ALT_NAME,
+    OID_EXT_EXTENDED_KEY_USAGE,
 ];
 
 /// Extension OIDs that may appear as **critical** on intermediate CA certificates.
