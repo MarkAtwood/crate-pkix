@@ -343,10 +343,18 @@ impl TryFrom<Certificate> for TrustAnchor {
 
 /// Policy parameters controlling path validation.
 ///
+/// # Stability
+///
+/// `ValidationPolicy` is `#[non_exhaustive]`: fields for PolicyConstraints,
+/// PolicyMappings, and initial-policy-set enforcement will be added in v0.2.
+/// Construct via [`ValidationPolicy::new`] or [`Default`] + field assignment.
+/// Do not use struct literal syntax.
+///
 /// # Limitations
 ///
 /// v0.1 does not enforce CertificatePolicies or PolicyMappings.
 /// Fields for these will be added in v0.2.
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.

@@ -399,11 +399,8 @@ pub fn verify_simple(
     }
 
     // --- Delegate to pkix-path ----------------------------------------------
-    let policy = ValidationPolicy {
-        current_time_unix: now_unix,
-        max_path_len: MAX_INTERMEDIATES as u8,
-        ..Default::default()
-    };
+    let mut policy = ValidationPolicy::new(now_unix);
+    policy.max_path_len = MAX_INTERMEDIATES as u8;
 
     pkix_path::validate_path(chain, anchors, &policy, &DefaultVerifier).map_err(Error::Path)
 }

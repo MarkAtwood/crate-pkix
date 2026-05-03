@@ -42,10 +42,7 @@ fn load(der: &[u8]) -> Certificate {
 fn e2e_verify_chain_default_pkits_4_1_1() {
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
-    let policy = ValidationPolicy {
-        current_time_unix: PKITS_NOW,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(PKITS_NOW);
 
     let result = verify_chain_default(&chain, &anchors, &policy, &NoRevocation);
     let vp = result.expect("PKITS §4.1.1 must validate via verify_chain_default");
@@ -61,10 +58,7 @@ fn e2e_verify_chain_default_pkits_4_1_1() {
 fn e2e_verify_chain_default_expired_returns_validity_error() {
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
-    let policy = ValidationPolicy {
-        current_time_unix: 0,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(0);
 
     let result = verify_chain_default(&chain, &anchors, &policy, &NoRevocation);
     assert!(
@@ -110,10 +104,7 @@ fn e2e_anchor_issued_cert_revocation_check_is_called() {
 
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
-    let policy = ValidationPolicy {
-        current_time_unix: PKITS_NOW,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(PKITS_NOW);
     let spy = SpyChecker {
         anchor_check_called: Cell::new(false),
     };
@@ -133,10 +124,7 @@ fn e2e_anchor_issued_cert_revocation_check_is_called() {
 fn e2e_verify_chain_explicit_verifier() {
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
-    let policy = ValidationPolicy {
-        current_time_unix: PKITS_NOW,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(PKITS_NOW);
 
     let result = verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &NoRevocation);
     let vp = result.expect("PKITS §4.1.1 must validate via verify_chain with DefaultVerifier");
