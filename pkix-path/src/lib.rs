@@ -26,7 +26,6 @@
 //! - PolicyConstraints / certificate policy validation (§4.2.1.9, §6.1.5)
 //! - Revocation (use `pkix-revocation`)
 //! - Cross-certificate path building (RFC 4158)
-//! - Self-issued certificate NC exemption (RFC 5280 §6.1.3; tracked PKIX-8wp)
 //!
 //! These are tracked for v0.2+.
 
@@ -468,8 +467,12 @@ where
     check_oid_consistency(chain)?;
 
     // (2) Path-length check (anchor-independent).
-    let num_intermediates = chain.len().saturating_sub(1);
-    if num_intermediates > policy.max_path_len as usize {
+    // RFC 5280 §4.2.1.9: pathLen counts non-self-issued intermediates only.
+    let num_non_si_intermediates = chain[1..]
+        .iter()
+        .filter(|c| !is_self_issued_cert(c))
+        .count();
+    if num_non_si_intermediates > policy.max_path_len as usize {
         return Err(Error::PathTooLong);
     }
 
@@ -788,6 +791,12 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         }
     }
     true
+}
+
+/// RFC 5280 §3.3: a certificate is self-issued if subject == issuer and neither is empty.
+fn is_self_issued_cert(cert: &Certificate) -> bool {
+    !cert.tbs_certificate.subject.is_empty()
+        && names_match(&cert.tbs_certificate.subject, &cert.tbs_certificate.issuer)
 }
 
 /// Compare two AttributeTypeAndValue values after RFC 4518 normalization.
@@ -1322,7 +1331,11 @@ fn chain_walk<V: SignatureVerifier>(
         check_critical_extensions(cert, i)?;
 
         // (e) NameConstraints: check this cert's names against accumulated state.
-        check_name_constraints(cert, &nc_permitted, &nc_excluded, nc_constrained_types, i)?;
+        // RFC 5280 §6.1.3(b): self-issued non-leaf certs are exempt from NC name checking.
+        // The NC state is still updated from their extensions in step (i).
+        if i == 0 || !is_self_issued_cert(cert) {
+            check_name_constraints(cert, &nc_permitted, &nc_excluded, nc_constrained_types, i)?;
+        }
 
         // (f–h) CA-only checks: apply to every cert except the leaf (chain[0]).
         //        This includes any intermediate CAs and the root CA cert if it
@@ -1340,10 +1353,15 @@ fn chain_walk<V: SignatureVerifier>(
                 return Err(Error::KeyUsageMissing { index: i });
             }
 
-            // (h) pathLenConstraint: the cert at position i has i-1 intermediates
-            // below it in the chain. Enforce the constraint.
+            // (h) pathLenConstraint: count only non-self-issued intermediates below position i
+            // (RFC 5280 §4.2.1.9: "non-self-issued intermediate certificates").
+            // chain[1..i] = the intermediate positions between the leaf (0) and this cert (i).
             if let Some(path_len) = bc.and_then(|b| b.path_len_constraint) {
-                if (i - 1) > path_len as usize {
+                let effective_depth = chain[1..i]
+                    .iter()
+                    .filter(|c| !is_self_issued_cert(c))
+                    .count();
+                if effective_depth > path_len as usize {
                     return Err(Error::PathTooLong);
                 }
             }

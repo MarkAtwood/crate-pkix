@@ -2,11 +2,6 @@
 //!
 //! All cert names and expected outcomes come from the PKITS vectors.
 //! Oracle: NIST PKITS (SP 800-89) document §4.13.
-//!
-//! # Known limitations (v0.1)
-//!
-//! Tests 18 and 19 require self-issued certificate NC exemption (RFC 5280 §6.1.3),
-//! which is not implemented in v0.1 (tracked: PKIX-8wp). All other tests pass.
 
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
@@ -342,34 +337,30 @@ fn pkits_4_13_17_invalid_dn_name_constraints_dn3_subca2() {
 // §4.13.18–20 DN name constraints with self-issued CA
 // ---------------------------------------------------------------------------
 
-/// §4.13.18 Valid DN name constraints Test18 — self-issued CA in chain.
+/// §4.13.18 Valid DN name constraints Test18 — DN3 subCA2 in chain.
 /// Oracle: PKITS §4.13.18 MUST validate.
-/// Note: v0.1 does not exempt self-issued certs from NC checks (RFC 5280 §6.1.3).
 #[test]
-#[ignore = "self-issued NC exemption not in v0.1 (tracked: PKIX-8wp)"]
 fn pkits_4_13_18_valid_dn_name_constraints_self_issued() {
     let result = pkits_validate(
         &[
             "ValidDNnameConstraintsTest18EE",
-            "nameConstraintsDN1subCA1Cert",
-            "nameConstraintsDN1SelfIssuedCACert",
-            "nameConstraintsDN1CACert",
+            "nameConstraintsDN3subCA2Cert",
+            "nameConstraintsDN3CACert",
         ],
         PKITS_NOW,
     );
     result.expect("§4.13.18 must validate");
 }
 
-/// §4.13.19 Valid DN name constraints Test19 — self-issued CA in chain.
+/// §4.13.19 Valid Self-Issued DN name constraints Test19 — self-issued CA in chain.
 /// Oracle: PKITS §4.13.19 MUST validate.
-/// Note: v0.1 does not exempt self-issued certs from NC checks (RFC 5280 §6.1.3).
+/// The self-issued nameConstraintsDN1SelfIssuedCACert carries updated NC and is exempt
+/// from NC checking (RFC 5280 §6.1.3(b)).
 #[test]
-#[ignore = "self-issued NC exemption not in v0.1 (tracked: PKIX-8wp)"]
 fn pkits_4_13_19_valid_dn_name_constraints_self_issued() {
     let result = pkits_validate(
         &[
             "ValidDNnameConstraintsTest19EE",
-            "nameConstraintsDN1subCA1Cert",
             "nameConstraintsDN1SelfIssuedCACert",
             "nameConstraintsDN1CACert",
         ],
@@ -378,15 +369,14 @@ fn pkits_4_13_19_valid_dn_name_constraints_self_issued() {
     result.expect("§4.13.19 must validate");
 }
 
-/// §4.13.20 Invalid DN name constraints Test20 — self-issued CA in chain.
+/// §4.13.20 Invalid Self-Issued DN name constraints Test20.
 /// Oracle: PKITS §4.13.20 MUST NOT validate.
+/// EE is self-issued (leaf), so NC exemption does not apply; NC violation expected.
 #[test]
 fn pkits_4_13_20_invalid_dn_name_constraints_self_issued() {
     let result = pkits_validate(
         &[
             "InvalidDNnameConstraintsTest20EE",
-            "nameConstraintsDN1subCA1Cert",
-            "nameConstraintsDN1SelfIssuedCACert",
             "nameConstraintsDN1CACert",
         ],
         PKITS_NOW,
