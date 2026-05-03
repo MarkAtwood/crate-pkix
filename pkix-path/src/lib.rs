@@ -82,6 +82,11 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
+    /// Certificate name constraints violated (RFC 5280 §4.2.1.10); `index` is the 0-based chain position.
+    NameConstraintViolation {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// ASN.1 / DER encoding or decoding error.
     ///
     /// Most commonly returned when the internal 8 KiB stack buffer used to
@@ -121,6 +126,9 @@ impl core::fmt::Display for Error {
             Error::UnhandledCriticalExtension { index } => {
                 write!(f, "unhandled critical extension at chain index {index}")
             }
+            Error::NameConstraintViolation { index } => {
+                write!(f, "name constraints violated at certificate index {index}")
+            }
             Error::Der(e) => write!(f, "DER error: {e}"),
         }
     }
@@ -139,7 +147,8 @@ impl std::error::Error for Error {
             | Error::PathTooLong
             | Error::NotCA { .. }
             | Error::KeyUsageMissing { .. }
-            | Error::UnhandledCriticalExtension { .. } => None,
+            | Error::UnhandledCriticalExtension { .. }
+            | Error::NameConstraintViolation { .. } => None,
         }
     }
 }
@@ -499,6 +508,9 @@ const OID_SUBJECT_ALT_NAME: der::asn1::ObjectIdentifier =
 const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.37");
 
+const OID_NAME_CONSTRAINTS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.30");
+
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
 ///
 /// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
@@ -517,6 +529,7 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
     OID_BASIC_CONSTRAINTS,
     OID_SUBJECT_ALT_NAME,
     OID_EXTENDED_KEY_USAGE,
+    OID_NAME_CONSTRAINTS,
 ];
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
@@ -571,6 +584,47 @@ fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::Ba
         .iter()
         .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
         .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
+}
+
+// ---------------------------------------------------------------------------
+// SubjectAltName extraction (PKIX-f0m)
+// ---------------------------------------------------------------------------
+
+/// Decode the `SubjectAltName` extension from a certificate, if present.
+///
+/// Returns `None` if the extension is absent; decoding errors are silently
+/// treated as absent.
+fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::SubjectAltName> {
+    use der::Decode;
+    use x509_cert::ext::pkix::SubjectAltName;
+
+    cert.tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
+        .and_then(|e| SubjectAltName::from_der(e.extn_value.as_bytes()).ok())
+}
+
+// ---------------------------------------------------------------------------
+// NameConstraints extraction (PKIX-xlp)
+// ---------------------------------------------------------------------------
+
+/// Decode the `NameConstraints` extension from a certificate, if present.
+///
+/// Returns `None` if the extension is absent; decoding errors are silently
+/// treated as absent.
+fn cert_name_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::constraints::name::NameConstraints> {
+    use der::Decode as _;
+    use x509_cert::ext::pkix::constraints::name::NameConstraints;
+    cert.tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_NAME_CONSTRAINTS)
+        .and_then(|e| NameConstraints::from_der(e.extn_value.as_bytes()).ok())
 }
 
 // ---------------------------------------------------------------------------
@@ -795,6 +849,229 @@ impl<'a> Iterator for NormalizedIter<'a> {
 }
 
 // ---------------------------------------------------------------------------
+// NameConstraints matching (PKIX-mew)
+// ---------------------------------------------------------------------------
+
+/// Bitmask bits representing each constrained GeneralName name type.
+/// Used by `nc_constrained_types` to track which types have been constrained
+/// by at least one CA certificate in the path, even if the intersection later
+/// empties the permitted set for that type.
+const NC_TYPE_RFC822: u32 = 1 << 0;
+const NC_TYPE_DNS: u32 = 1 << 1;
+const NC_TYPE_DIRECTORY_NAME: u32 = 1 << 2;
+const NC_TYPE_URI: u32 = 1 << 3;
+const NC_TYPE_IP_ADDRESS: u32 = 1 << 4;
+
+/// Return the bitmask bit for the name type of `name`, or 0 for unrecognized types.
+fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> u32 {
+    use x509_cert::ext::pkix::name::GeneralName;
+    match name {
+        GeneralName::Rfc822Name(_) => NC_TYPE_RFC822,
+        GeneralName::DnsName(_) => NC_TYPE_DNS,
+        GeneralName::DirectoryName(_) => NC_TYPE_DIRECTORY_NAME,
+        GeneralName::UniformResourceIdentifier(_) => NC_TYPE_URI,
+        GeneralName::IpAddress(_) => NC_TYPE_IP_ADDRESS,
+        _ => 0,
+    }
+}
+
+/// Returns true if `subject` DN is within the subtree rooted at `constraint`.
+///
+/// RFC 5280 §4.2.1.10: a DirectoryName constraint is satisfied when the subject's
+/// DN has the constraint DN as a prefix (most-general to most-specific order).
+/// E.g., constraint `{C=US, O=Test}` matches subject `{C=US, O=Test, CN=Alice}`.
+fn dn_within_subtree(
+    subject: &x509_cert::name::Name,
+    constraint: &x509_cert::name::Name,
+) -> bool {
+    let c_rdns = &constraint.0;
+    let s_rdns = &subject.0;
+    if c_rdns.len() > s_rdns.len() {
+        return false;
+    }
+    c_rdns.iter().zip(s_rdns.iter()).all(|(c_rdn, s_rdn)| {
+        // Each pair of RDNs must have matching attribute-value pairs.
+        if c_rdn.0.len() != s_rdn.0.len() {
+            return false;
+        }
+        c_rdn.0.iter().all(|c_ava| {
+            s_rdn.0.iter().any(|s_ava| {
+                c_ava.oid == s_ava.oid && ava_values_match(&c_ava.value, &s_ava.value)
+            })
+        })
+    })
+}
+
+/// Returns true if `a` and `b` are the same `GeneralName` variant.
+///
+/// Used to determine whether a permitted-subtrees list constrains a given name type.
+fn same_nc_variant(
+    a: &x509_cert::ext::pkix::name::GeneralName,
+    b: &x509_cert::ext::pkix::name::GeneralName,
+) -> bool {
+    use x509_cert::ext::pkix::name::GeneralName;
+    matches!(
+        (a, b),
+        (GeneralName::Rfc822Name(_), GeneralName::Rfc822Name(_))
+            | (GeneralName::DnsName(_), GeneralName::DnsName(_))
+            | (GeneralName::DirectoryName(_), GeneralName::DirectoryName(_))
+            | (
+                GeneralName::UniformResourceIdentifier(_),
+                GeneralName::UniformResourceIdentifier(_)
+            )
+            | (GeneralName::IpAddress(_), GeneralName::IpAddress(_))
+    )
+}
+
+/// Returns true if `name` satisfies the `subtree` constraint.
+fn name_matches_subtree(
+    name: &x509_cert::ext::pkix::name::GeneralName,
+    subtree: &x509_cert::ext::pkix::constraints::name::GeneralSubtree,
+) -> bool {
+    use x509_cert::ext::pkix::name::GeneralName;
+    match (name, &subtree.base) {
+        (GeneralName::DnsName(subj), GeneralName::DnsName(constr)) => {
+            matches_dns_name(subj.as_str(), constr.as_str())
+        }
+        (GeneralName::DirectoryName(subj), GeneralName::DirectoryName(constr)) => {
+            dn_within_subtree(subj, constr)
+        }
+        (GeneralName::Rfc822Name(subj), GeneralName::Rfc822Name(constr)) => {
+            matches_rfc822_name(subj.as_str(), constr.as_str())
+        }
+        (GeneralName::UniformResourceIdentifier(subj), GeneralName::UniformResourceIdentifier(constr)) => {
+            matches_uri(subj.as_str(), constr.as_str())
+        }
+        (GeneralName::IpAddress(subj), GeneralName::IpAddress(constr)) => {
+            matches_ip_address(subj.as_bytes(), constr.as_bytes())
+        }
+        // Mismatched variants or unhandled types: no match.
+        _ => false,
+    }
+}
+
+/// DNS name constraint matching (RFC 5280 §4.2.1.10).
+///
+/// If `constraint` starts with '.', `subject` must be a subdomain of it
+/// (label-aware suffix check). Otherwise exact match (case-insensitive).
+fn matches_dns_name(subject: &str, constraint: &str) -> bool {
+    if constraint.is_empty() {
+        return false;
+    }
+    if let Some(suffix) = constraint.strip_prefix('.') {
+        // Subdomain match: subject must end with ".suffix" (not just "suffix").
+        if subject.eq_ignore_ascii_case(suffix) {
+            // The constraint is ".example.com"; subject "example.com" is the
+            // apex — RFC 5280 §4.2.1.10 excludes the apex from subdomain constraints.
+            return false;
+        }
+        let dot_suffix = constraint; // already starts with '.'
+        subject.len() > dot_suffix.len()
+            && subject[subject.len() - dot_suffix.len()..]
+                .eq_ignore_ascii_case(dot_suffix)
+    } else {
+        // RFC 5280 §4.2.1.10: a constraint without a leading period matches
+        // the hostname exactly AND any subdomain (labels added to the left).
+        // E.g., "example.com" matches "example.com" and "host.example.com".
+        subject.eq_ignore_ascii_case(constraint)
+            || (subject.len() > constraint.len() + 1
+                && subject.as_bytes()[subject.len() - constraint.len() - 1] == b'.'
+                && subject[subject.len() - constraint.len()..]
+                    .eq_ignore_ascii_case(constraint))
+    }
+}
+
+/// RFC 822 (email) name constraint matching (RFC 5280 §4.2.1.10).
+fn matches_rfc822_name(subject: &str, constraint: &str) -> bool {
+    if constraint.contains('@') {
+        // Constraint is a specific mailbox address: exact match required.
+        return subject.eq_ignore_ascii_case(constraint);
+    }
+    // Constraint is a domain (or .domain); extract the domain part of subject.
+    let domain = match subject.split_once('@') {
+        Some((_, d)) => d,
+        None => return false, // malformed subject
+    };
+    if let Some(suffix) = constraint.strip_prefix('.') {
+        // Domain must end with .suffix.
+        if domain.eq_ignore_ascii_case(suffix) {
+            return false; // apex excluded
+        }
+        let dot_suffix = constraint;
+        domain.len() > dot_suffix.len()
+            && domain[domain.len() - dot_suffix.len()..]
+                .eq_ignore_ascii_case(dot_suffix)
+    } else {
+        // Domain must equal the constraint exactly.
+        domain.eq_ignore_ascii_case(constraint)
+    }
+}
+
+/// URI host name constraint matching (RFC 5280 §4.2.1.10).
+///
+/// URI constraints use different semantics from DNS constraints:
+/// - Leading period: subdomains only (same as DNS).
+/// - No leading period: **exact host only** (unlike DNS, which also matches subdomains).
+fn matches_uri_host(host: &str, constraint: &str) -> bool {
+    if constraint.is_empty() {
+        return false;
+    }
+    if let Some(suffix) = constraint.strip_prefix('.') {
+        // Leading dot: subdomains only, apex excluded (same rule as DNS).
+        if host.eq_ignore_ascii_case(suffix) {
+            return false;
+        }
+        let dot_suffix = constraint;
+        host.len() > dot_suffix.len()
+            && host[host.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
+    } else {
+        // RFC 5280 §4.2.1.10: URI constraint without leading period matches
+        // the exact host only — subdomains are NOT included.
+        host.eq_ignore_ascii_case(constraint)
+    }
+}
+
+/// URI name constraint matching (RFC 5280 §4.2.1.10).
+///
+/// Extracts the host from the URI and applies URI host matching rules.
+fn matches_uri(subject_uri: &str, constraint: &str) -> bool {
+    // Extract host: everything between "://" and the next '/' or '?' or '#' or end.
+    let host = if let Some(after_scheme) = subject_uri.find("://") {
+        let rest = &subject_uri[after_scheme + 3..];
+        // Strip userinfo if present (user:pass@host).
+        let rest = rest.split_once('@').map(|(_, h)| h).unwrap_or(rest);
+        // Strip port and path.
+        let host_end = rest
+            .find(['/', '?', '#', ':'])
+            .unwrap_or(rest.len());
+        &rest[..host_end]
+    } else {
+        return false; // not a URI with scheme
+    };
+    matches_uri_host(host, constraint)
+}
+
+/// IP address name constraint matching (RFC 5280 §4.2.1.10).
+///
+/// `constraint_bytes` must be 8 bytes (IPv4: addr + mask) or 32 bytes (IPv6).
+/// `subject_bytes` must be 4 bytes (IPv4) or 16 bytes (IPv6).
+fn matches_ip_address(subject_bytes: &[u8], constraint_bytes: &[u8]) -> bool {
+    let (expected_subj_len, half) = match constraint_bytes.len() {
+        8 => (4usize, 4usize),
+        32 => (16usize, 16usize),
+        _ => return false,
+    };
+    if subject_bytes.len() != expected_subj_len {
+        return false;
+    }
+    let (addr, mask) = constraint_bytes.split_at(half);
+    subject_bytes
+        .iter()
+        .zip(addr.iter().zip(mask.iter()))
+        .all(|(s, (a, m))| s & m == a & m)
+}
+
+// ---------------------------------------------------------------------------
 // ECDSA P-256 SHA-256 backend (PKIX-evy)
 // ---------------------------------------------------------------------------
 
@@ -911,6 +1188,15 @@ fn chain_walk<V: SignatureVerifier>(
     let mut working_spki = &anchor.subject_public_key_info;
     let mut working_issuer_name = &anchor.subject;
 
+    // RFC 5280 §6.1.2: NameConstraints state (wired up in PKIX-fr4).
+    let mut nc_permitted: Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees> = None;
+    let mut nc_excluded: x509_cert::ext::pkix::constraints::name::GeneralSubtrees = Default::default();
+    // Bitmask of name types (NC_TYPE_* constants) that have been explicitly
+    // constrained by at least one permittedSubtrees entry in any CA cert seen so far.
+    // Needed to detect violations when intersection empties the permitted set
+    // for a type (e.g., two incompatible DN constraints → empty, but DN still forbidden).
+    let mut nc_constrained_types: u32 = 0;
+
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
 
@@ -944,7 +1230,10 @@ fn chain_walk<V: SignatureVerifier>(
         // (d) Critical extension guard.
         check_critical_extensions(cert, i)?;
 
-        // (e–g) CA-only checks: apply to every cert except the leaf (chain[0]).
+        // (e) NameConstraints: check this cert's names against accumulated state.
+        check_name_constraints(cert, &nc_permitted, &nc_excluded, nc_constrained_types, i)?;
+
+        // (f–h) CA-only checks: apply to every cert except the leaf (chain[0]).
         //        This includes any intermediate CAs and the root CA cert if it
         //        is included in the chain rather than supplied only as an anchor.
         if i > 0 {
@@ -967,11 +1256,214 @@ fn chain_walk<V: SignatureVerifier>(
                     return Err(Error::PathTooLong);
                 }
             }
+
+            // (h) NameConstraints state update (RFC 5280 §6.1.4(b)).
+            //     INTERSECTION for permitted, UNION for excluded.
+            if let Some(nc) = cert_name_constraints(cert) {
+                // permittedSubtrees: intersect with current state.
+                if let Some(new_permitted) = nc.permitted_subtrees {
+                    // Track which types this CA is constraining.
+                    for entry in new_permitted.iter() {
+                        nc_constrained_types |= name_type_bit(&entry.base);
+                    }
+                    match nc_permitted.as_mut() {
+                        None => {
+                            // First constraint seen; adopt it directly.
+                            nc_permitted = Some(new_permitted);
+                        }
+                        Some(current) => {
+                            // Type-aware intersection of two permitted-subtrees sets.
+                            //
+                            // RFC 5280 §6.1.4(b): intersect entry-by-entry, but only
+                            // compare entries of the SAME name type. Entries of types
+                            // not present in new_permitted are unchanged (new doesn't
+                            // constrain that type). Entries of types not in current
+                            // are added directly (new adds a fresh constraint).
+                            //
+                            // For entries of matching type, keep:
+                            //   1. new entries within (⊆) some same-type current entry.
+                            //   2. current entries within (⊆) some same-type new entry.
+                            // (If neither is within the other the intersection for that
+                            // type is empty — tracked via nc_constrained_types.)
+                            let mut result = x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default();
+
+                            for n in new_permitted.iter() {
+                                let current_has_same_type =
+                                    current.iter().any(|c| same_nc_variant(&c.base, &n.base));
+                                if !current_has_same_type {
+                                    // Type not previously constrained → add directly.
+                                    result.push(n.clone());
+                                } else if current.iter().any(|c| {
+                                    same_nc_variant(&c.base, &n.base)
+                                        && name_matches_subtree(&n.base, c)
+                                }) {
+                                    // n is within some same-type current entry → keep.
+                                    result.push(n.clone());
+                                }
+                                // else: n is not within any current entry of same type → drop.
+                            }
+
+                            for c in current.iter() {
+                                let new_has_same_type =
+                                    new_permitted.iter().any(|n| same_nc_variant(&n.base, &c.base));
+                                if !new_has_same_type {
+                                    // Type not in new_permitted → keep unchanged.
+                                    result.push(c.clone());
+                                } else if new_permitted.iter().any(|n| {
+                                    same_nc_variant(&n.base, &c.base)
+                                        && name_matches_subtree(&c.base, n)
+                                }) {
+                                    // c is more specific than some new entry; keep unless
+                                    // an equivalent entry is already in result.
+                                    if !result.iter().any(|e| {
+                                        same_nc_variant(&e.base, &c.base)
+                                            && name_matches_subtree(&e.base, c)
+                                            && name_matches_subtree(&c.base, e)
+                                    }) {
+                                        result.push(c.clone());
+                                    }
+                                }
+                                // else: c is not within any new entry of same type → drop.
+                            }
+
+                            *current = result;
+                        }
+                    }
+                }
+                // excludedSubtrees: union — simply append.
+                if let Some(new_excluded) = nc.excluded_subtrees {
+                    nc_excluded.extend(new_excluded);
+                }
+            }
         }
 
         // Update state for next iteration.
         working_spki = &cert.tbs_certificate.subject_public_key_info;
         working_issuer_name = &cert.tbs_certificate.subject;
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// NameConstraints enforcement (PKIX-xji)
+// ---------------------------------------------------------------------------
+
+/// Check that all names in `cert` satisfy the current NameConstraints state.
+///
+/// Called once per certificate during chain_walk, BEFORE updating the NC
+/// state from that certificate's own NameConstraints extension.
+///
+/// RFC 5280 §6.1.4(b)(1)–(2): check excluded subtrees first, then
+/// permitted subtrees.
+/// OID for the emailAddress attribute in Distinguished Names (PKCS #9).
+const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.1");
+
+fn check_name_constraints(
+    cert: &x509_cert::Certificate,
+    nc_permitted: &Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees>,
+    nc_excluded: &x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
+    nc_constrained_types: u32,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    // Build the name set for this certificate:
+    // - subject DN always present as DirectoryName
+    // - SAN entries if present
+    let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone());
+    let san = cert_subject_alt_names(cert);
+
+    // Helper: check all cert names (subject DN + SAN) against `subtrees`.
+    //
+    // `require_match = false` → excluded check: any match is a violation.
+    // `require_match = true`  → permitted check: a name type is constrained
+    // if any CA in the path ever added a permittedSubtrees entry of that type
+    // (tracked in nc_constrained_types). Constrained types must match at least
+    // one permitted subtree entry; unconstrained types are always accepted.
+    let check_names = |subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+                       require_match: bool|
+     -> crate::Result<()> {
+        let type_constrained = |name: &GeneralName| -> bool {
+            nc_constrained_types & name_type_bit(name) != 0
+        };
+
+        // subject DN (always present as DirectoryName).
+        if !require_match {
+            if subtrees.iter().any(|st| name_matches_subtree(&subject, st)) {
+                return Err(Error::NameConstraintViolation { index });
+            }
+        } else if type_constrained(&subject)
+            && !subtrees.iter().any(|st| name_matches_subtree(&subject, st))
+        {
+            return Err(Error::NameConstraintViolation { index });
+        }
+
+        // SAN entries.
+        if let Some(ref san_ext) = san {
+            for name in san_ext.0.iter() {
+                if !require_match {
+                    if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
+                        return Err(Error::NameConstraintViolation { index });
+                    }
+                } else if type_constrained(name)
+                    && !subtrees.iter().any(|st| name_matches_subtree(name, st))
+                {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            }
+        }
+        Ok(())
+    };
+
+    // (1) Excluded check: any excluded subtree match → violation.
+    check_names(nc_excluded.as_slice(), false)?;
+
+    // (2) Permitted check: if permitted set is constrained, every name must
+    //     match at least one permitted subtree.
+    if let Some(permitted) = nc_permitted {
+        check_names(permitted.as_slice(), true)?;
+    }
+
+    // (3) RFC 5280 §4.2.1.10: emailAddress attributes in the subject DN MUST
+    //     be checked against the rfc822Name constraint.
+    //     Walk subject RDNs for emailAddress (OID 1.2.840.113549.1.9.1).
+    if nc_constrained_types & NC_TYPE_RFC822 != 0 || !nc_excluded.is_empty() {
+        for rdn in cert.tbs_certificate.subject.0.iter() {
+            for ava in rdn.0.iter() {
+                if ava.oid != OID_EMAIL_ADDRESS {
+                    continue;
+                }
+                let Ok(email_ia5) =
+                    ava.value.decode_as::<der::asn1::Ia5StringRef<'_>>() else {
+                    continue;
+                };
+                let email_str = email_ia5.as_str();
+                // Excluded check.
+                for st in nc_excluded.iter() {
+                    if let GeneralName::Rfc822Name(constraint) = &st.base {
+                        if matches_rfc822_name(email_str, constraint.as_str()) {
+                            return Err(Error::NameConstraintViolation { index });
+                        }
+                    }
+                }
+                // Permitted check (only when RFC822 has been constrained).
+                if nc_constrained_types & NC_TYPE_RFC822 != 0 {
+                    if let Some(permitted) = nc_permitted {
+                        if !permitted.iter().any(|st| {
+                            if let GeneralName::Rfc822Name(constraint) = &st.base {
+                                matches_rfc822_name(email_str, constraint.as_str())
+                            } else {
+                                false
+                            }
+                        }) {
+                            return Err(Error::NameConstraintViolation { index });
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
