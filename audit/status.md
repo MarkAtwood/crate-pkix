@@ -17,3 +17,14 @@
 [22:27:17] REVIEW round 2: P0=0 P1=1 P2=1
 [22:27:34] COORDINATOR: review loop converged at round 2
 [22:27:39] COORDINATOR: epic PKIX-nip complete
+[23:05:53] COORDINATOR: claimed epic PKIX-4yq — Name constraints
+[23:05:59] COORDINATOR: phase0 done
+[12:57:48] COORDINATOR: claimed epic PKIX-aoe — TrustAnchor NC seeding
+[12:57:57] COORDINATOR: phase0 complete
+[13:13:41] COORDINATOR: phase2 done, all 4 beads closed
+[13:13:42] COORDINATOR: review round 1, epic PKIX-onc
+[13:28:02] REVIEW round 1 fix wave done: P0=0 P1=0 P2=0
+[13:28:12] COORDINATOR: review round 2, epic PKIX-s54
+[13:35:25] REVIEW round 2: P0=0 P1=2 P2=2 — dispatching fix wave
+[13:41:02] REVIEW round 2 done: P0=0 P1=0 P2=0 — stopping condition met
+[13:41:08] COORDINATOR: phase3 done, review converged
