@@ -50,10 +50,7 @@ fn pkits_4_1_2_trust_anchor_root_only() {
     .expect("read TrustAnchorRootCertificate.crt");
     let root = Certificate::from_der(&root_der).expect("parse");
     let anchors = [TrustAnchor::from_cert(root.clone())];
-    let policy = ValidationPolicy {
-        current_time_unix: PKITS_NOW,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(PKITS_NOW);
     let result = pkix_path::validate_path(&[root], &anchors, &policy, &pkix_path::DefaultVerifier);
     let vp = result.expect("PKITS §4.1.2 must validate");
     assert_eq!(vp.anchor_index, 0);

@@ -63,9 +63,6 @@ pub fn pkits_trust_anchor() -> TrustAnchor {
 pub fn pkits_validate(cert_names: &[&str], now_unix: u64) -> pkix_path::Result<ValidatedPath> {
     let chain: Vec<Certificate> = cert_names.iter().map(|n| pkits_cert(n)).collect();
     let anchors = [pkits_trust_anchor()];
-    let policy = ValidationPolicy {
-        current_time_unix: now_unix,
-        ..Default::default()
-    };
+    let policy = ValidationPolicy::new(now_unix);
     pkix_path::validate_path(&chain, &anchors, &policy, &DefaultVerifier)
 }

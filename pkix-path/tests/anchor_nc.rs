@@ -44,10 +44,7 @@ fn anchor_nc_fixture(name: &str) -> String {
 }
 
 fn policy() -> ValidationPolicy {
-    ValidationPolicy {
-        current_time_unix: ANCHOR_NC_NOW,
-        ..Default::default()
-    }
+    ValidationPolicy::new(ANCHOR_NC_NOW)
 }
 
 /// Test 1: valid leaf passes anchor permitted NC.

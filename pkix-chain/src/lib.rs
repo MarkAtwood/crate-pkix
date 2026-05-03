@@ -18,10 +18,7 @@
 //! ```rust,ignore
 //! use pkix_chain::{verify_chain, NoRevocation, ValidationPolicy, TrustAnchor};
 //!
-//! let policy = ValidationPolicy {
-//!     current_time_unix: /* seconds since Unix epoch */ 0,
-//!     ..Default::default()
-//! };
+//! let policy = ValidationPolicy::new(now_unix_timestamp);
 //!
 //! let result = verify_chain(
 //!     &chain,          // &[Certificate], leaf first

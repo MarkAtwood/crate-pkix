@@ -73,8 +73,5 @@ pub fn code_signing_policy(_now_unix: u64) -> ValidationPolicy {
 
 /// Return a plain RFC 5280 [`ValidationPolicy`] with no CA/Browser Forum additions.
 pub fn rfc5280_policy(now_unix: u64) -> ValidationPolicy {
-    ValidationPolicy {
-        current_time_unix: now_unix,
-        ..ValidationPolicy::default()
-    }
+    ValidationPolicy::new(now_unix)
 }
