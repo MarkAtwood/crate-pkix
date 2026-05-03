@@ -166,8 +166,7 @@ where
         } else {
             // Last cert: issued directly by the trust anchor.
             // The default impl returns Ok(()); override to enforce CRL/OCSP here.
-            revocation
-                .check_revocation_against_anchor(cert, &anchors[validated.anchor_index])?;
+            revocation.check_revocation_against_anchor(cert, &anchors[validated.anchor_index])?;
         }
     }
 
