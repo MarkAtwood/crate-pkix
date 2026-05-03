@@ -39,7 +39,6 @@ never in `pkix-path`. This constraint protects embedded users (Caliptra, DPE).
 - No PolicyConstraints / policy validation (§4.2.1.9, §6.1.5)
 - No revocation (use `pkix-revocation::NoRevocation`)
 - Fixed-depth only (configurable max, no path builder with cross-sign handling)
-- No self-issued certificate NC exemption (tracked PKIX-8wp)
 
 ## Test Requirements
 

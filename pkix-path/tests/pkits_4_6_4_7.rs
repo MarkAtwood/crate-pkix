@@ -256,9 +256,7 @@ fn pkits_4_6_14_valid_path_len_deep() {
 
 /// §4.6.15 Valid Self-Issued pathLenConstraint Test15.
 /// Self-issued certs must not count against pathLenConstraint (RFC 5280 §6.1.3).
-/// v0.1 does not implement self-issued cert exemption — tracked for v0.2.
 #[test]
-#[ignore = "self-issued pathLen exemption not implemented in v0.1 (tracked for v0.2)"]
 fn pkits_4_6_15_valid_self_issued_path_len() {
     let result = pkits_validate(
         &[
@@ -274,7 +272,6 @@ fn pkits_4_6_15_valid_self_issued_path_len() {
 /// §4.6.16 Invalid Self-Issued pathLenConstraint Test16.
 /// Oracle: PKITS §4.6.16 MUST NOT validate.
 #[test]
-#[ignore = "self-issued pathLen exemption not implemented in v0.1 (tracked for v0.2)"]
 fn pkits_4_6_16_invalid_self_issued_path_len() {
     let result = pkits_validate(
         &[
@@ -291,7 +288,6 @@ fn pkits_4_6_16_invalid_self_issued_path_len() {
 /// §4.6.17 Valid Self-Issued pathLenConstraint Test17.
 /// Oracle: PKITS §4.6.17 MUST validate.
 #[test]
-#[ignore = "self-issued pathLen exemption not implemented in v0.1 (tracked for v0.2)"]
 fn pkits_4_6_17_valid_self_issued_path_len() {
     let result = pkits_validate(
         &[
