@@ -14,8 +14,10 @@ const OID_PKIX_OCSP_BASIC: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.1");
 
 // Hash algorithm OIDs used in CertID (RFC 6960 §4.1.1)
-const OID_SHA1:   der::asn1::ObjectIdentifier = der::asn1::ObjectIdentifier::new_unwrap("1.3.14.3.2.26");
-const OID_SHA256: der::asn1::ObjectIdentifier = der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
+const OID_SHA1: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.14.3.2.26");
+const OID_SHA256: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
 
 /// Offline OCSP-based revocation checker.
 ///
@@ -84,9 +86,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         }
 
         // (3) Extract responseBytes (must be present for a Successful response).
-        let resp_bytes = resp
-            .response_bytes
-            .ok_or(Error::OcspMalformed)?;
+        let resp_bytes = resp.response_bytes.ok_or(Error::OcspMalformed)?;
 
         // (4) Verify responseType is id-pkix-ocsp-basic.
         if resp_bytes.response_type != OID_PKIX_OCSP_BASIC {
@@ -197,10 +197,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 ///
 /// Supports SHA-1 (OID 1.3.14.3.2.26) and SHA-256 (OID 2.16.840.1.101.3.4.2.1).
 /// Returns [`Error::OcspMalformed`] for any other OID.
-fn hash_certid_input(
-    oid: &der::asn1::ObjectIdentifier,
-    data: &[u8],
-) -> crate::Result<Vec<u8>> {
+fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {
     if oid == &OID_SHA1 {
         use sha1::Digest as _;
         Ok(sha1::Sha1::digest(data).to_vec())

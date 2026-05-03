@@ -10,7 +10,9 @@
 //!   PKITS_NOW  = 2020-01-01 00:00:00 UTC = 1 577 836 800
 //!   PKITS_PAST = 1970-01-01 00:00:00 UTC = 0  (before notBefore)
 
-use pkix_chain::{verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker};
+use pkix_chain::{
+    verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker,
+};
 use pkix_path::{TrustAnchor, ValidationPolicy};
 use x509_cert::Certificate;
 
@@ -108,11 +110,15 @@ fn e2e_anchor_issued_cert_revocation_check_is_called() {
 
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
-    let policy = ValidationPolicy { current_time_unix: PKITS_NOW, ..Default::default() };
-    let spy = SpyChecker { anchor_check_called: Cell::new(false) };
+    let policy = ValidationPolicy {
+        current_time_unix: PKITS_NOW,
+        ..Default::default()
+    };
+    let spy = SpyChecker {
+        anchor_check_called: Cell::new(false),
+    };
 
-    verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &spy)
-        .expect("chain must validate");
+    verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &spy).expect("chain must validate");
     assert!(
         spy.anchor_check_called.get(),
         "check_revocation_against_anchor must be called for the anchor-issued cert"

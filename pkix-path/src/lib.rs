@@ -23,10 +23,10 @@
 //! # Limitations
 //!
 //! v0.1 does **not** implement:
-//! - NameConstraints (RFC 5280 §4.2.1.10)
 //! - PolicyConstraints / certificate policy validation (§4.2.1.9, §6.1.5)
 //! - Revocation (use `pkix-revocation`)
 //! - Cross-certificate path building (RFC 4158)
+//! - Self-issued certificate NC exemption (RFC 5280 §6.1.3; tracked PKIX-8wp)
 //!
 //! These are tracked for v0.2+.
 
@@ -286,8 +286,8 @@ impl From<&Certificate> for TrustAnchor {
 ///
 /// # Limitations
 ///
-/// v0.1 does not enforce NameConstraints, CertificatePolicies, or
-/// PolicyMappings. Fields for these will be added in v0.2.
+/// v0.1 does not enforce CertificatePolicies or PolicyMappings.
+/// Fields for these will be added in v0.2.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.
@@ -511,6 +511,11 @@ const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
 const OID_NAME_CONSTRAINTS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.30");
 
+/// OID for the emailAddress attribute in Distinguished Names (PKCS #9 §5.2.1).
+/// Used when enforcing RFC 5280 §4.2.1.10 rfc822Name constraints against DN attributes.
+const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.1");
+
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
 ///
 /// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
@@ -567,64 +572,39 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
 }
 
 // ---------------------------------------------------------------------------
-// BasicConstraints extraction (PKIX-0q5)
+// Extension extraction helpers
 // ---------------------------------------------------------------------------
 
-/// Decode the `BasicConstraints` extension from a certificate, if present.
+/// Find and decode an X.509 extension from a certificate by OID.
 ///
-/// Returns `None` if the extension is absent; decoding errors are silently
-/// treated as absent (the caller will then fail the cA=TRUE check).
+/// Returns `None` if the extension is absent or the DER value cannot be decoded.
+/// Decoding errors are silently treated as absent; callers that need to distinguish
+/// parse errors from absence should call this directly and inspect the error.
+fn find_cert_ext<T: der::DecodeOwned>(
+    cert: &Certificate,
+    oid: der::asn1::ObjectIdentifier,
+) -> Option<T> {
+    cert.tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == oid)
+        .and_then(|e| T::from_der(e.extn_value.as_bytes()).ok())
+}
+
 fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::BasicConstraints> {
-    use der::Decode;
-    use x509_cert::ext::pkix::BasicConstraints;
-
-    cert.tbs_certificate
-        .extensions
-        .as_ref()?
-        .iter()
-        .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
-        .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
+    find_cert_ext(cert, OID_BASIC_CONSTRAINTS)
 }
 
-// ---------------------------------------------------------------------------
-// SubjectAltName extraction (PKIX-f0m)
-// ---------------------------------------------------------------------------
-
-/// Decode the `SubjectAltName` extension from a certificate, if present.
-///
-/// Returns `None` if the extension is absent; decoding errors are silently
-/// treated as absent.
 fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::SubjectAltName> {
-    use der::Decode;
-    use x509_cert::ext::pkix::SubjectAltName;
-
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
-        .iter()
-        .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
-        .and_then(|e| SubjectAltName::from_der(e.extn_value.as_bytes()).ok())
+    find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
 }
 
-// ---------------------------------------------------------------------------
-// NameConstraints extraction (PKIX-xlp)
-// ---------------------------------------------------------------------------
-
-/// Decode the `NameConstraints` extension from a certificate, if present.
-///
-/// Returns `None` if the extension is absent; decoding errors are silently
-/// treated as absent.
-fn cert_name_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::constraints::name::NameConstraints> {
-    use der::Decode as _;
-    use x509_cert::ext::pkix::constraints::name::NameConstraints;
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
-        .iter()
-        .find(|e| e.extn_id == OID_NAME_CONSTRAINTS)
-        .and_then(|e| NameConstraints::from_der(e.extn_value.as_bytes()).ok())
+fn cert_name_constraints(
+    cert: &Certificate,
+) -> Option<x509_cert::ext::pkix::constraints::name::NameConstraints> {
+    find_cert_ext(cert, OID_NAME_CONSTRAINTS)
 }
 
 // ---------------------------------------------------------------------------
@@ -880,10 +860,7 @@ fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> u32 {
 /// RFC 5280 §4.2.1.10: a DirectoryName constraint is satisfied when the subject's
 /// DN has the constraint DN as a prefix (most-general to most-specific order).
 /// E.g., constraint `{C=US, O=Test}` matches subject `{C=US, O=Test, CN=Alice}`.
-fn dn_within_subtree(
-    subject: &x509_cert::name::Name,
-    constraint: &x509_cert::name::Name,
-) -> bool {
+fn dn_within_subtree(subject: &x509_cert::name::Name, constraint: &x509_cert::name::Name) -> bool {
     let c_rdns = &constraint.0;
     let s_rdns = &subject.0;
     if c_rdns.len() > s_rdns.len() {
@@ -895,32 +872,24 @@ fn dn_within_subtree(
             return false;
         }
         c_rdn.0.iter().all(|c_ava| {
-            s_rdn.0.iter().any(|s_ava| {
-                c_ava.oid == s_ava.oid && ava_values_match(&c_ava.value, &s_ava.value)
-            })
+            s_rdn
+                .0
+                .iter()
+                .any(|s_ava| c_ava.oid == s_ava.oid && ava_values_match(&c_ava.value, &s_ava.value))
         })
     })
 }
 
-/// Returns true if `a` and `b` are the same `GeneralName` variant.
+/// Returns true if `a` and `b` are the same handled `GeneralName` variant.
 ///
-/// Used to determine whether a permitted-subtrees list constrains a given name type.
+/// Uses `name_type_bit` as the single source of truth so that adding a new
+/// handled type to `name_type_bit` automatically extends this check with no
+/// separate update required.
 fn same_nc_variant(
     a: &x509_cert::ext::pkix::name::GeneralName,
     b: &x509_cert::ext::pkix::name::GeneralName,
 ) -> bool {
-    use x509_cert::ext::pkix::name::GeneralName;
-    matches!(
-        (a, b),
-        (GeneralName::Rfc822Name(_), GeneralName::Rfc822Name(_))
-            | (GeneralName::DnsName(_), GeneralName::DnsName(_))
-            | (GeneralName::DirectoryName(_), GeneralName::DirectoryName(_))
-            | (
-                GeneralName::UniformResourceIdentifier(_),
-                GeneralName::UniformResourceIdentifier(_)
-            )
-            | (GeneralName::IpAddress(_), GeneralName::IpAddress(_))
-    )
+    name_type_bit(a) != 0 && name_type_bit(a) == name_type_bit(b)
 }
 
 /// Returns true if `name` satisfies the `subtree` constraint.
@@ -939,9 +908,10 @@ fn name_matches_subtree(
         (GeneralName::Rfc822Name(subj), GeneralName::Rfc822Name(constr)) => {
             matches_rfc822_name(subj.as_str(), constr.as_str())
         }
-        (GeneralName::UniformResourceIdentifier(subj), GeneralName::UniformResourceIdentifier(constr)) => {
-            matches_uri(subj.as_str(), constr.as_str())
-        }
+        (
+            GeneralName::UniformResourceIdentifier(subj),
+            GeneralName::UniformResourceIdentifier(constr),
+        ) => matches_uri(subj.as_str(), constr.as_str()),
         (GeneralName::IpAddress(subj), GeneralName::IpAddress(constr)) => {
             matches_ip_address(subj.as_bytes(), constr.as_bytes())
         }
@@ -967,8 +937,7 @@ fn matches_dns_name(subject: &str, constraint: &str) -> bool {
         }
         let dot_suffix = constraint; // already starts with '.'
         subject.len() > dot_suffix.len()
-            && subject[subject.len() - dot_suffix.len()..]
-                .eq_ignore_ascii_case(dot_suffix)
+            && subject[subject.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
     } else {
         // RFC 5280 §4.2.1.10: a constraint without a leading period matches
         // the hostname exactly AND any subdomain (labels added to the left).
@@ -976,8 +945,7 @@ fn matches_dns_name(subject: &str, constraint: &str) -> bool {
         subject.eq_ignore_ascii_case(constraint)
             || (subject.len() > constraint.len() + 1
                 && subject.as_bytes()[subject.len() - constraint.len() - 1] == b'.'
-                && subject[subject.len() - constraint.len()..]
-                    .eq_ignore_ascii_case(constraint))
+                && subject[subject.len() - constraint.len()..].eq_ignore_ascii_case(constraint))
     }
 }
 
@@ -999,8 +967,7 @@ fn matches_rfc822_name(subject: &str, constraint: &str) -> bool {
         }
         let dot_suffix = constraint;
         domain.len() > dot_suffix.len()
-            && domain[domain.len() - dot_suffix.len()..]
-                .eq_ignore_ascii_case(dot_suffix)
+            && domain[domain.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
     } else {
         // Domain must equal the constraint exactly.
         domain.eq_ignore_ascii_case(constraint)
@@ -1041,9 +1008,7 @@ fn matches_uri(subject_uri: &str, constraint: &str) -> bool {
         // Strip userinfo if present (user:pass@host).
         let rest = rest.split_once('@').map(|(_, h)| h).unwrap_or(rest);
         // Strip port and path.
-        let host_end = rest
-            .find(['/', '?', '#', ':'])
-            .unwrap_or(rest.len());
+        let host_end = rest.find(['/', '?', '#', ':']).unwrap_or(rest.len());
         &rest[..host_end]
     } else {
         return false; // not a URI with scheme
@@ -1169,9 +1134,12 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
 ///    b. Verify issuer/subject name linkage.
 ///    c. Check validity period against `policy.current_time_unix`.
 ///    d. Reject any unhandled critical extensions.
-///    e. For all certs except the leaf (i > 0): require `BasicConstraints` cA=TRUE.
-///    f. For all certs except the leaf (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
-///    g. For all certs except the leaf (i > 0): enforce `pathLenConstraint` if present.
+///    e. Check cert names (subject DN + SAN) against accumulated NC state.
+///    f. For all certs except the leaf (i > 0): require `BasicConstraints` cA=TRUE.
+///    g. For all certs except the leaf (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
+///    h. For all certs except the leaf (i > 0): enforce `pathLenConstraint` if present.
+///    i. For all certs except the leaf (i > 0): accumulate NameConstraints state
+///       (INTERSECTION for permittedSubtrees, UNION for excludedSubtrees).
 ///
 /// RFC 5280 §4.2.1.9 note on pathLenConstraint: for the cert at position `i`
 /// (leaf at 0, root-adjacent at chain.len()-1), there are exactly `i-1`
@@ -1188,13 +1156,22 @@ fn chain_walk<V: SignatureVerifier>(
     let mut working_spki = &anchor.subject_public_key_info;
     let mut working_issuer_name = &anchor.subject;
 
-    // RFC 5280 §6.1.2: NameConstraints state (wired up in PKIX-fr4).
+    // RFC 5280 §6.1.2: NameConstraints working state.
+    // TODO(PKIX-27p.1): seed initial state from the trust anchor's own NC extension.
     let mut nc_permitted: Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees> = None;
-    let mut nc_excluded: x509_cert::ext::pkix::constraints::name::GeneralSubtrees = Default::default();
+    let mut nc_excluded: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+        Default::default();
     // Bitmask of name types (NC_TYPE_* constants) that have been explicitly
     // constrained by at least one permittedSubtrees entry in any CA cert seen so far.
     // Needed to detect violations when intersection empties the permitted set
     // for a type (e.g., two incompatible DN constraints → empty, but DN still forbidden).
+    //
+    // INVARIANT: bits are ORed in and never cleared. Once a type bit is set,
+    // nc_permitted must contain zero entries of that type to represent "empty
+    // intersection" (all names of that type are forbidden). Do NOT derive
+    // "is type constrained?" from nc_permitted contents alone — that would
+    // silently allow names of a type whose permitted set was emptied by
+    // conflicting CA constraints.
     let mut nc_constrained_types: u32 = 0;
 
     for i in (0..chain.len()).rev() {
@@ -1285,7 +1262,8 @@ fn chain_walk<V: SignatureVerifier>(
                             //   2. current entries within (⊆) some same-type new entry.
                             // (If neither is within the other the intersection for that
                             // type is empty — tracked via nc_constrained_types.)
-                            let mut result = x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default();
+                            let mut result =
+                                x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default();
 
                             for n in new_permitted.iter() {
                                 let current_has_same_type =
@@ -1304,8 +1282,9 @@ fn chain_walk<V: SignatureVerifier>(
                             }
 
                             for c in current.iter() {
-                                let new_has_same_type =
-                                    new_permitted.iter().any(|n| same_nc_variant(&n.base, &c.base));
+                                let new_has_same_type = new_permitted
+                                    .iter()
+                                    .any(|n| same_nc_variant(&n.base, &c.base));
                                 if !new_has_same_type {
                                     // Type not in new_permitted → keep unchanged.
                                     result.push(c.clone());
@@ -1356,10 +1335,6 @@ fn chain_walk<V: SignatureVerifier>(
 ///
 /// RFC 5280 §6.1.4(b)(1)–(2): check excluded subtrees first, then
 /// permitted subtrees.
-/// OID for the emailAddress attribute in Distinguished Names (PKCS #9).
-const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.1");
-
 fn check_name_constraints(
     cert: &x509_cert::Certificate,
     nc_permitted: &Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees>,
@@ -1370,9 +1345,10 @@ fn check_name_constraints(
     use x509_cert::ext::pkix::name::GeneralName;
 
     // Build the name set for this certificate:
-    // - subject DN always present as DirectoryName
+    // - subject DN only when non-empty (RFC 5280 §6.1.3(b) skips empty subject)
     // - SAN entries if present
     let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone());
+    let subject_is_empty = cert.tbs_certificate.subject.0.is_empty();
     let san = cert_subject_alt_names(cert);
 
     // Helper: check all cert names (subject DN + SAN) against `subtrees`.
@@ -1385,19 +1361,20 @@ fn check_name_constraints(
     let check_names = |subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
                        require_match: bool|
      -> crate::Result<()> {
-        let type_constrained = |name: &GeneralName| -> bool {
-            nc_constrained_types & name_type_bit(name) != 0
-        };
+        let type_constrained =
+            |name: &GeneralName| -> bool { nc_constrained_types & name_type_bit(name) != 0 };
 
-        // subject DN (always present as DirectoryName).
-        if !require_match {
-            if subtrees.iter().any(|st| name_matches_subtree(&subject, st)) {
+        // subject DN — skipped when empty per RFC 5280 §6.1.3(b).
+        if !subject_is_empty {
+            if !require_match {
+                if subtrees.iter().any(|st| name_matches_subtree(&subject, st)) {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            } else if type_constrained(&subject)
+                && !subtrees.iter().any(|st| name_matches_subtree(&subject, st))
+            {
                 return Err(Error::NameConstraintViolation { index });
             }
-        } else if type_constrained(&subject)
-            && !subtrees.iter().any(|st| name_matches_subtree(&subject, st))
-        {
-            return Err(Error::NameConstraintViolation { index });
         }
 
         // SAN entries.
@@ -1435,8 +1412,7 @@ fn check_name_constraints(
                 if ava.oid != OID_EMAIL_ADDRESS {
                     continue;
                 }
-                let Ok(email_ia5) =
-                    ava.value.decode_as::<der::asn1::Ia5StringRef<'_>>() else {
+                let Ok(email_ia5) = ava.value.decode_as::<der::asn1::Ia5StringRef<'_>>() else {
                     continue;
                 };
                 let email_str = email_ia5.as_str();

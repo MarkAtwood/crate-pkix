@@ -78,7 +78,11 @@ impl core::fmt::Display for Error {
                 serial,
                 reason_code,
             } => match reason_code {
-                Some(code) => write!(f, "certificate {serial} is revoked (reason {})", crl_reason_name(*code)),
+                Some(code) => write!(
+                    f,
+                    "certificate {serial} is revoked (reason {})",
+                    crl_reason_name(*code)
+                ),
                 None => write!(f, "certificate {serial} is revoked"),
             },
             Error::CrlExpired => f.write_str("CRL validity window check failed"),
@@ -88,9 +92,9 @@ impl core::fmt::Display for Error {
             Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
             Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
-            Error::OcspMalformed => f.write_str(
-                "OCSP response is structurally invalid (malformed per RFC 6960)",
-            ),
+            Error::OcspMalformed => {
+                f.write_str("OCSP response is structurally invalid (malformed per RFC 6960)")
+            }
         }
     }
 }
@@ -133,6 +137,17 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Implement this trait to plug CRL, OCSP, or a custom revocation mechanism
 /// into `pkix_chain::verify_chain`. Use [`NoRevocation`] for offline or
 /// embedded environments.
+/// # Implementing this trait
+///
+/// Implementors MUST provide [`RevocationChecker::check_revocation`].
+///
+/// Implementors that want **full-chain** revocation coverage — i.e., revocation
+/// checking for every certificate including the one issued directly by a trust
+/// anchor — MUST also override
+/// [`RevocationChecker::check_revocation_against_anchor`]. The default
+/// implementation skips the check silently; forgetting to override it will
+/// leave the anchor-issued certificate unchecked with no compile error or
+/// runtime warning.
 pub trait RevocationChecker {
     /// Check whether `cert` has been revoked.
     ///
