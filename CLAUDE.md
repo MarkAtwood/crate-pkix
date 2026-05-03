@@ -36,10 +36,10 @@ never in `pkix-path`. This constraint protects embedded users (Caliptra, DPE).
 
 ## v0.1 Scope Limits (document in rustdoc `# Limitations`)
 
-- No NameConstraints (RFC 5280 §4.2.1.10)
 - No PolicyConstraints / policy validation (§4.2.1.9, §6.1.5)
 - No revocation (use `pkix-revocation::NoRevocation`)
 - Fixed-depth only (configurable max, no path builder with cross-sign handling)
+- No self-issued certificate NC exemption (tracked PKIX-8wp)
 
 ## Test Requirements
 

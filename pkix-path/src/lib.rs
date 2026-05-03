@@ -35,6 +35,9 @@ use signature::Error as SignatureError;
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
+/// Re-exported for use with [`TrustAnchor::name_constraints`].
+pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
+
 /// Errors returned by path validation.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -234,7 +237,14 @@ pub trait SignatureVerifier {
 /// `==` to deduplicate a trust store; use [`names_match`] and compare
 /// `algorithm.oid` plus `subject_public_key` bytes directly. Path validation
 /// already handles this internally, so it is not affected by this encoding difference.
+///
+/// # Stability
+///
+/// `TrustAnchor` is `#[non_exhaustive]`: new fields may be added in minor
+/// versions. Construct via [`TrustAnchor::new`], [`TrustAnchor::from_cert`],
+/// or `TrustAnchor::from`/`try_from`. Do not use struct literal syntax.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TrustAnchor {
     /// The subject distinguished name of the trust anchor.
     pub subject: x509_cert::name::Name,
@@ -244,6 +254,13 @@ pub struct TrustAnchor {
     /// malformed SPKI will cause signature verification to fail with
     /// `Error::NoTrustedPath` (no anchor matched), not a panic.
     pub subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
+    /// NameConstraints from the trust anchor certificate, if present.
+    ///
+    /// When set, `chain_walk` seeds the initial `permitted_subtrees` and
+    /// `excluded_subtrees` state from this value before walking the chain.
+    /// Populated automatically by `from_cert`; `None` for programmatically
+    /// constructed anchors unless explicitly set.
+    pub name_constraints: Option<x509_cert::ext::pkix::constraints::name::NameConstraints>,
 }
 
 impl TrustAnchor {
@@ -255,6 +272,7 @@ impl TrustAnchor {
         Self {
             subject,
             subject_public_key_info,
+            name_constraints: None,
         }
     }
 
@@ -265,10 +283,24 @@ impl TrustAnchor {
     ///
     /// Prefer [`TrustAnchor::from`] (i.e. `TrustAnchor::from(&cert)`) when you
     /// need to keep `cert` alive after building the anchor.
+    ///
+    /// # NameConstraints and malformed extensions
+    ///
+    /// If the anchor certificate contains a malformed or unparseable
+    /// `NameConstraints` extension, `from_cert` silently sets
+    /// `name_constraints = None` and continues. The resulting anchor
+    /// will not enforce NC constraints from that extension.
+    ///
+    /// For strict RFC 5280 §4.2 compliance — where a critical extension
+    /// that cannot be parsed MUST cause rejection — use
+    /// [`TrustAnchor::try_from`] instead. That path propagates the
+    /// `der::Error` to the caller.
     pub fn from_cert(cert: Certificate) -> Self {
+        let name_constraints = find_cert_ext(&cert, OID_NAME_CONSTRAINTS);
         Self {
             subject: cert.tbs_certificate.subject,
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+            name_constraints,
         }
     }
 }
@@ -278,7 +310,34 @@ impl From<&Certificate> for TrustAnchor {
         Self {
             subject: cert.tbs_certificate.subject.clone(),
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info.clone(),
+            name_constraints: find_cert_ext(cert, OID_NAME_CONSTRAINTS),
         }
+    }
+}
+
+/// Fail-closed construction from an owned certificate.
+///
+/// Returns `Err(der::Error)` if the certificate contains a `NameConstraints`
+/// extension with malformed DER. Use this when building a trust store that
+/// must reject certificates with unparseable critical extensions per
+/// RFC 5280 §4.2.
+///
+/// # Why only `TryFrom<Certificate>` and not `TryFrom<&Certificate>`
+///
+/// `TryFrom<&Certificate>` would conflict with the blanket impl
+/// `impl<T, U: Into<T>> TryFrom<U>` provided by Rust core, because
+/// `From<&Certificate>` is already implemented (and `From` implies `Into`).
+/// Use `TrustAnchor::try_from(cert.clone())` if you need to keep `cert`.
+impl TryFrom<Certificate> for TrustAnchor {
+    type Error = der::Error;
+
+    fn try_from(cert: Certificate) -> core::result::Result<Self, Self::Error> {
+        let name_constraints = try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS)?;
+        Ok(TrustAnchor {
+            subject: cert.tbs_certificate.subject,
+            subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+            name_constraints,
+        })
     }
 }
 
@@ -578,8 +637,9 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
 /// Find and decode an X.509 extension from a certificate by OID.
 ///
 /// Returns `None` if the extension is absent or the DER value cannot be decoded.
-/// Decoding errors are silently treated as absent; callers that need to distinguish
-/// parse errors from absence should call this directly and inspect the error.
+/// Decoding errors are silently treated as absent (fail-open).
+/// Callers that need to propagate parse errors (fail-closed) should use
+/// [`try_find_cert_ext`] instead.
 fn find_cert_ext<T: der::DecodeOwned>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
@@ -591,6 +651,33 @@ fn find_cert_ext<T: der::DecodeOwned>(
         .iter()
         .find(|e| e.extn_id == oid)
         .and_then(|e| T::from_der(e.extn_value.as_bytes()).ok())
+}
+
+/// Look up a certificate extension by OID and decode it.
+///
+/// Returns:
+/// - `Ok(None)` if the extension is absent.
+/// - `Ok(Some(T))` if the extension is present and parses successfully.
+/// - `Err(der::Error)` if the extension is present but DER decoding fails.
+///
+/// Prefer [`find_cert_ext`] when a parse failure should be treated as absent
+/// (fail-open). Use this function when a parse failure must be propagated
+/// (fail-closed), e.g. in [`TrustAnchor::try_from`].
+fn try_find_cert_ext<T: der::DecodeOwned>(
+    cert: &Certificate,
+    oid: der::asn1::ObjectIdentifier,
+) -> der::Result<Option<T>> {
+    match cert
+        .tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == oid)
+    {
+        None => Ok(None),
+        Some(e) => T::from_der(e.extn_value.as_bytes()).map(Some),
+    }
 }
 
 fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::BasicConstraints> {
@@ -1156,11 +1243,21 @@ fn chain_walk<V: SignatureVerifier>(
     let mut working_spki = &anchor.subject_public_key_info;
     let mut working_issuer_name = &anchor.subject;
 
-    // RFC 5280 §6.1.2: NameConstraints working state.
-    // TODO(PKIX-27p.1): seed initial state from the trust anchor's own NC extension.
-    let mut nc_permitted: Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees> = None;
-    let mut nc_excluded: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
-        Default::default();
+    // RFC 5280 §6.1.2 (b)+(c): seed the initial permitted/excluded subtrees
+    // from the trust anchor. These initial constraints apply to ALL certs in
+    // the chain (including intermediates), not just to leaves — the chain walk
+    // enforces them from the first certificate onward.
+    let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {
+        None => (
+            None,
+            x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default(),
+        ),
+        Some(nc) => (
+            // Clone necessary: nc_permitted and nc_excluded are mutated during the walk.
+            nc.permitted_subtrees.clone(),
+            nc.excluded_subtrees.clone().unwrap_or_default(),
+        ),
+    };
     // Bitmask of name types (NC_TYPE_* constants) that have been explicitly
     // constrained by at least one permittedSubtrees entry in any CA cert seen so far.
     // Needed to detect violations when intersection empties the permitted set
@@ -1172,7 +1269,16 @@ fn chain_walk<V: SignatureVerifier>(
     // "is type constrained?" from nc_permitted contents alone — that would
     // silently allow names of a type whose permitted set was emptied by
     // conflicting CA constraints.
-    let mut nc_constrained_types: u32 = 0;
+    let mut nc_constrained_types: u32 = match &nc_permitted {
+        None => 0,
+        Some(permitted) => {
+            let mut bits: u32 = 0;
+            for st in permitted {
+                bits |= name_type_bit(&st.base);
+            }
+            bits
+        }
+    };
 
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
@@ -1214,19 +1320,19 @@ fn chain_walk<V: SignatureVerifier>(
         //        This includes any intermediate CAs and the root CA cert if it
         //        is included in the chain rather than supplied only as an anchor.
         if i > 0 {
-            // (e) BasicConstraints cA=TRUE required; (g) pathLenConstraint.
+            // (f) BasicConstraints cA=TRUE required; (h) pathLenConstraint.
             // Decode BasicConstraints once for both checks.
             let bc = cert_basic_constraints(cert);
             if !bc.as_ref().is_some_and(|b| b.ca) {
                 return Err(Error::NotCA { index: i });
             }
 
-            // (f) KeyUsage keyCertSign required (when policy demands it).
+            // (g) KeyUsage keyCertSign required (when policy demands it).
             if policy.enforce_key_usage && !matches!(has_key_cert_sign(cert), Some(true)) {
                 return Err(Error::KeyUsageMissing { index: i });
             }
 
-            // (g) pathLenConstraint: the cert at position i has i-1 intermediates
+            // (h) pathLenConstraint: the cert at position i has i-1 intermediates
             // below it in the chain. Enforce the constraint.
             if let Some(path_len) = bc.and_then(|b| b.path_len_constraint) {
                 if (i - 1) > path_len as usize {
@@ -1234,7 +1340,7 @@ fn chain_walk<V: SignatureVerifier>(
                 }
             }
 
-            // (h) NameConstraints state update (RFC 5280 §6.1.4(b)).
+            // (i) NC update: NameConstraints state update (RFC 5280 §6.1.4(b)).
             //     INTERSECTION for permitted, UNION for excluded.
             if let Some(nc) = cert_name_constraints(cert) {
                 // permittedSubtrees: intersect with current state.
@@ -1347,7 +1453,6 @@ fn check_name_constraints(
     // Build the name set for this certificate:
     // - subject DN only when non-empty (RFC 5280 §6.1.3(b) skips empty subject)
     // - SAN entries if present
-    let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone());
     let subject_is_empty = cert.tbs_certificate.subject.0.is_empty();
     let san = cert_subject_alt_names(cert);
 
@@ -1366,6 +1471,7 @@ fn check_name_constraints(
 
         // subject DN — skipped when empty per RFC 5280 §6.1.3(b).
         if !subject_is_empty {
+            let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone());
             if !require_match {
                 if subtrees.iter().any(|st| name_matches_subtree(&subject, st)) {
                     return Err(Error::NameConstraintViolation { index });
