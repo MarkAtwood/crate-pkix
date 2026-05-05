@@ -99,6 +99,33 @@ fn test_build_path_no_path() {
     );
 }
 
+/// Pool contains a self-signed cert that is NOT a trust anchor.
+///
+/// build_path must NOT terminate at it — it must continue searching for the
+/// real anchor. The correct chain uses GoodCACert; the self-signed BadSignedCACert
+/// (subject ≠ trust anchor subject) must be skipped.
+#[test]
+fn test_build_path_self_signed_non_anchor_in_pool() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let intermediate = pkits_cert("GoodCACert");
+    // BadSignedCACert is self-signed (subject == issuer) but NOT the trust anchor.
+    let bad_ca = pkits_cert("BadSignedCACert");
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(intermediate);
+    pool.add(bad_ca); // self-signed, different CA, not the anchor
+
+    let path = build_path(&ee, &pool, &[anchor.clone()])
+        .expect("build_path must find the correct path ignoring the self-signed non-anchor");
+
+    // The built path must still validate end-to-end.
+    let policy = pkix_path::ValidationPolicy::new(PKITS_NOW);
+    let verifier = pkix_path::DefaultVerifier;
+    pkix_path::validate_path(&path, &[anchor], &policy, &verifier)
+        .expect("validate_path should succeed on the built chain");
+}
+
 /// Test that build_path returns NoPathFound when the pool contains a cert
 /// that does not link to the target's issuer.
 #[test]

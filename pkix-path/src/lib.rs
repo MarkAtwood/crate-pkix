@@ -22,9 +22,9 @@
 //! # Limitations
 //!
 //! v0.1 does **not** implement:
-//! - PolicyConstraints / certificate policy validation (§4.2.1.9, §6.1.5)
 //! - Revocation (use `pkix-revocation`)
 //! - Cross-certificate path building (RFC 4158)
+//! - RFC 4518 full Unicode NFKC DN normalization (BMPString/UniversalString)
 //!
 //! These are tracked for v0.2+.
 
@@ -655,7 +655,6 @@ const OID_INHIBIT_ANY_POLICY: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.54");
 
 /// OID for the `anyPolicy` wildcard (2.5.29.32.0 — a child of id-ce-certificatePolicies).
-#[allow(dead_code)] // used by the policy state machine in a future child issue
 const OID_ANY_POLICY: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.32.0");
 
@@ -718,6 +717,10 @@ struct PolicyNode {
     /// The policy OID this node represents.
     valid_policy: der::asn1::ObjectIdentifier,
     /// Policy qualifiers attached to this policy in the certificate.
+    ///
+    /// Stored for completeness per RFC 5280 §6.1.2(a) but not currently
+    /// inspected by the validator.  Path-level qualifier enforcement is deferred
+    /// to v0.2 (application-specific qualifier processing).
     #[allow(dead_code)]
     qualifier_set: Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
     /// Policies in the NEXT certificate that are consistent with this node.
@@ -746,31 +749,44 @@ fn init_policy_tree() -> Vec<PolicyNode> {
 /// Works upward from `cert_depth - 1` toward 1.  The depth-0 root is left
 /// in place (it is only removed when `policy_tree` is set to `None`).
 fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
+    // Walk upward from cert_depth-1 down to depth 1 (inclusive), pruning nodes
+    // that have no surviving child at depth d+1.  Depth 0 (the anyPolicy root
+    // sentinel) is never pruned here — the caller clears policy_tree entirely
+    // when it becomes effectively NULL (no nodes at depth ≥ 1).
+    //
+    // RFC 5280 §6.1.3(d)(3): "If there is a node in the valid_policy_tree of
+    // depth i-1 or less without any child nodes, delete that node. Repeat this
+    // step until there are no nodes of depth i-1 or less without children."
+    //
+    // Iteration: d starts at cert_depth, decrements to 1.  At each step we
+    // prune depth d-1 against children at depth d, then continue upward.
+    // We stop at d==1 because depth 0 is the root sentinel and is excluded.
     let mut d = cert_depth;
-    while d > 0 {
-        d -= 1;
+    loop {
         if d == 0 {
-            break; // depth-0 root is always kept; caller checks for effective NULL
+            break; // depth-0 root sentinel — never prune it
         }
-        let child_depth = d + 1;
+        let prune_depth = d - 1; // depth to prune (children are at d)
+        if prune_depth == 0 {
+            break; // depth-0 root sentinel — never prune it
+        }
         let child_policies: Vec<der::asn1::ObjectIdentifier> = tree
             .iter()
-            .filter(|n| n.depth == child_depth)
+            .filter(|n| n.depth == d)
             .map(|n| n.valid_policy)
             .collect();
-        // Remove nodes at depth d that have no surviving child at depth d+1.
-        // RFC 5280 §6.1.3(d)(3): "If there is a node in the valid_policy_tree
-        // of depth i-1 or less without any child nodes, delete that node."
-        // This applies to ALL nodes including anyPolicy.
+        // Remove nodes at prune_depth that have no surviving child at depth d.
+        // A node has a child if some child's valid_policy appears in its
+        // expected_policy_set (policy mappings may have changed those).
+        // anyPolicy nodes are not exempt — they get pruned the same way.
         tree.retain(|n| {
-            if n.depth != d {
+            if n.depth != prune_depth {
                 return true; // leave nodes at other depths untouched
             }
-            // A node has a child if some child's valid_policy is in its
-            // expected_policy_set.
             child_policies.iter().any(|cp| n.expected_policy_set.contains(cp))
         });
-        // Continue upward even if this level became empty — the parent level
+        d -= 1;
+        // Continue upward even if prune_depth became empty — the level above
         // may now also be childless and needs pruning.
     }
 }
@@ -852,6 +868,12 @@ fn try_find_cert_ext<T: der::DecodeOwned>(
     }
 }
 
+// NOTE: uses fail-open (find_cert_ext): a malformed BasicConstraints extension
+// is treated as absent, not as an error. This is intentional — a malformed but
+// non-critical BC extension should not block validation; chain_walk separately
+// enforces cA=TRUE which will return NotCA if BC is absent or malformed. For
+// the NC extension, fail-closed is required (see cert_name_constraints) because
+// a silently-ignored NC constraint is a security bypass.
 fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::BasicConstraints> {
     find_cert_ext(cert, OID_BASIC_CONSTRAINTS)
 }
@@ -1147,9 +1169,20 @@ impl NcTypeMask {
     const URI: NcTypeMask = NcTypeMask(1 << 3);
     const IP_ADDRESS: NcTypeMask = NcTypeMask(1 << 4);
 
-    /// Returns true if `self` has any of the bits in `other` set.
-    fn contains(self, other: NcTypeMask) -> bool {
+    /// Returns `true` if `self` and `other` share at least one bit (non-empty intersection).
+    ///
+    /// Named `intersects` rather than `contains` because this is a bitmask test,
+    /// not a set-membership check — `a.intersects(b)` is symmetric, while `contains`
+    /// implies `a ⊇ b`.
+    fn intersects(self, other: NcTypeMask) -> bool {
         self.0 & other.0 != 0
+    }
+}
+
+impl core::ops::BitOr for NcTypeMask {
+    type Output = NcTypeMask;
+    fn bitor(self, rhs: NcTypeMask) -> NcTypeMask {
+        NcTypeMask(self.0 | rhs.0)
     }
 }
 
@@ -1159,24 +1192,16 @@ impl core::ops::BitOrAssign for NcTypeMask {
     }
 }
 
-// Keep NC_TYPE_* as module-level constants for backwards-compatible internal use,
-// now delegating to the newtype values.
-const NC_TYPE_RFC822: NcTypeMask = NcTypeMask::RFC822;
-const NC_TYPE_DNS: NcTypeMask = NcTypeMask::DNS;
-const NC_TYPE_DIRECTORY_NAME: NcTypeMask = NcTypeMask::DIRECTORY_NAME;
-const NC_TYPE_URI: NcTypeMask = NcTypeMask::URI;
-const NC_TYPE_IP_ADDRESS: NcTypeMask = NcTypeMask::IP_ADDRESS;
-
 /// Return the `NcTypeMask` bit for the name type of `name`, or `EMPTY` for
 /// unrecognized types.
 fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
     use x509_cert::ext::pkix::name::GeneralName;
     match name {
-        GeneralName::Rfc822Name(_) => NC_TYPE_RFC822,
-        GeneralName::DnsName(_) => NC_TYPE_DNS,
-        GeneralName::DirectoryName(_) => NC_TYPE_DIRECTORY_NAME,
-        GeneralName::UniformResourceIdentifier(_) => NC_TYPE_URI,
-        GeneralName::IpAddress(_) => NC_TYPE_IP_ADDRESS,
+        GeneralName::Rfc822Name(_) => NcTypeMask::RFC822,
+        GeneralName::DnsName(_) => NcTypeMask::DNS,
+        GeneralName::DirectoryName(_) => NcTypeMask::DIRECTORY_NAME,
+        GeneralName::UniformResourceIdentifier(_) => NcTypeMask::URI,
+        GeneralName::IpAddress(_) => NcTypeMask::IP_ADDRESS,
         _ => NcTypeMask::EMPTY,
     }
 }
@@ -1478,6 +1503,7 @@ fn chain_walk<V: SignatureVerifier>(
 ) -> Result<()> {
     use der::Encode;
     use spki::der::referenced::OwnedToRef as _;
+    use x509_cert::ext::pkix::{InhibitAnyPolicy, PolicyConstraints, PolicyMappings};
 
     let mut working_spki = &anchor.subject_public_key_info;
     let mut working_issuer_name = &anchor.subject;
@@ -1497,7 +1523,7 @@ fn chain_walk<V: SignatureVerifier>(
             nc.excluded_subtrees.clone().unwrap_or_default(),
         ),
     };
-    // Bitmask of name types (NC_TYPE_* constants) that have been explicitly
+    // Bitmask of NcTypeMask bits for name types that have been explicitly
     // constrained by at least one permittedSubtrees entry in any CA cert seen so far.
     // Needed to detect violations when intersection empties the permitted set
     // for a type (e.g., two incompatible DN constraints → empty, but DN still forbidden).
@@ -1579,14 +1605,17 @@ fn chain_walk<V: SignatureVerifier>(
         // Cert depth in the RFC 5280 §6.1 sense: 1 = root-adjacent, n = leaf.
         let cert_depth = n - i;
 
+        // Decode the cert's CertificatePolicies extension once per cert.
+        // Used in both step (d) (policy tree update) and step (a/b) (PolicyMappings
+        // anyPolicy qualifier lookup).  Decoding here avoids a second parse inside
+        // the mapping loop (b5r.12).
+        let cert_cp: Option<x509_cert::ext::pkix::certpolicy::CertificatePolicies> =
+            find_cert_ext(cert, OID_CERTIFICATE_POLICIES);
+
         // (policy-d) CertificatePolicies extension (RFC 5280 §6.1.3(d)).
         // Only processed when the policy tree is still alive.
         if let Some(ref mut tree) = policy_tree {
-            use x509_cert::ext::pkix::certpolicy::CertificatePolicies;
-
-            if let Some(cp_ext) =
-                find_cert_ext::<CertificatePolicies>(cert, OID_CERTIFICATE_POLICIES)
-            {
+            if let Some(ref cp_ext) = cert_cp {
                 let mut new_nodes: Vec<PolicyNode> = Vec::new();
                 let mut any_policy_qualifiers: Option<
                     Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
@@ -1610,17 +1639,15 @@ fn chain_walk<V: SignatureVerifier>(
                     // (d)(1)(i): for each parent at depth i-1 whose
                     // expected_policy_set contains p_oid, create a child.
                     let mut matched_via_i = false;
-                    let parents_with_match: Vec<usize> = tree
+                    let match_count = tree
                         .iter()
-                        .enumerate()
-                        .filter(|(_, parent)| {
+                        .filter(|parent| {
                             parent.depth == cert_depth - 1
                                 && parent.expected_policy_set.contains(p_oid)
                         })
-                        .map(|(idx, _)| idx)
-                        .collect();
+                        .count();
 
-                    for _ in &parents_with_match {
+                    for _ in 0..match_count {
                         matched_via_i = true;
                         new_nodes.push(PolicyNode {
                             depth: cert_depth,
@@ -1733,14 +1760,11 @@ fn chain_walk<V: SignatureVerifier>(
             }
             // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
             // force explicit_policy to 0.
+            if let Some(pc) =
+                find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
             {
-                use x509_cert::ext::pkix::PolicyConstraints;
-                if let Some(pc) =
-                    find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
-                {
-                    if pc.require_explicit_policy == Some(0) {
-                        explicit_policy = 0;
-                    }
+                if pc.require_explicit_policy == Some(0) {
+                    explicit_policy = 0;
                 }
             }
         }
@@ -1779,11 +1803,9 @@ fn chain_walk<V: SignatureVerifier>(
             // (policy-b) Apply mappings to the tree or delete mapped nodes.
             // NOTE: Policy mappings use the current policy_mapping counter value
             // (before decrement); the decrement happens in §6.1.4(h) below.
+            if let Some(pm) =
+                find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS)
             {
-                use x509_cert::ext::pkix::PolicyMappings;
-                if let Some(pm) =
-                    find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS)
-                {
                     // §6.1.4(a): reject anyPolicy as issuer or subject domain.
                     for mapping in pm.0.iter() {
                         if mapping.issuer_domain_policy == OID_ANY_POLICY
@@ -1824,31 +1846,20 @@ fn chain_walk<V: SignatureVerifier>(
                                     });
                                     if has_any {
                                         // Get qualifier from anyPolicy in cert.
-                                        let ap_q = pm
-                                            .0
-                                            .iter()
-                                            .find(|m| &m.issuer_domain_policy == idp)
-                                            .and_then(|_| {
-                                                if let Some(ref cp) =
-                                                    find_cert_ext::<
-                                                        x509_cert::ext::pkix::certpolicy::CertificatePolicies,
-                                                    >(
-                                                        cert,
-                                                        OID_CERTIFICATE_POLICIES,
-                                                    )
-                                                {
-                                                    cp.0.iter()
-                                                        .find(|pi| {
-                                                            pi.policy_identifier == OID_ANY_POLICY
-                                                        })
-                                                        .and_then(|pi| {
-                                                            pi.policy_qualifiers
-                                                                .as_deref()
-                                                                .map(|q| q.to_vec())
-                                                        })
-                                                } else {
-                                                    None
-                                                }
+                                        // Use the already-decoded cert_cp to avoid
+                                        // a redundant extension parse (b5r.12).
+                                        let ap_q = cert_cp
+                                            .as_ref()
+                                            .and_then(|cp| {
+                                                cp.0.iter()
+                                                    .find(|pi| {
+                                                        pi.policy_identifier == OID_ANY_POLICY
+                                                    })
+                                                    .and_then(|pi| {
+                                                        pi.policy_qualifiers
+                                                            .as_deref()
+                                                            .map(|q| q.to_vec())
+                                                    })
                                             })
                                             .unwrap_or_default();
                                         tree.push(PolicyNode {
@@ -1877,7 +1888,6 @@ fn chain_walk<V: SignatureVerifier>(
                             }
                         }
                     }
-                }
             }
             // Check if tree became effectively NULL after mapping operations.
             if let Some(ref t) = policy_tree {
@@ -1898,28 +1908,22 @@ fn chain_walk<V: SignatureVerifier>(
 
             // (policy-i) PolicyConstraints (RFC 5280 §6.1.4(c)): clamp
             // explicit_policy and policy_mapping from the extension.
+            if let Some(pc) =
+                find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
             {
-                use x509_cert::ext::pkix::PolicyConstraints;
-                if let Some(pc) =
-                    find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
-                {
-                    if let Some(req) = pc.require_explicit_policy {
-                        explicit_policy = explicit_policy.min(req);
-                    }
-                    if let Some(ipm) = pc.inhibit_policy_mapping {
-                        policy_mapping = policy_mapping.min(ipm);
-                    }
+                if let Some(req) = pc.require_explicit_policy {
+                    explicit_policy = explicit_policy.min(req);
+                }
+                if let Some(ipm) = pc.inhibit_policy_mapping {
+                    policy_mapping = policy_mapping.min(ipm);
                 }
             }
 
             // (policy-j) InhibitAnyPolicy (RFC 5280 §6.1.4(d)): clamp inhibit_any.
+            if let Some(iap) =
+                find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
             {
-                use x509_cert::ext::pkix::InhibitAnyPolicy;
-                if let Some(iap) =
-                    find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
-                {
-                    inhibit_any = inhibit_any.min(iap.0);
-                }
+                inhibit_any = inhibit_any.min(iap.0);
             }
 
             // (i) NC update: NameConstraints state update (RFC 5280 §6.1.4(b)).
@@ -2127,15 +2131,11 @@ fn chain_walk<V: SignatureVerifier>(
 
             // Step (iii)(3): materialise nodes for initial_policy_set members
             // not yet present, if there's an anyPolicy node at leaf depth.
-            let has_leaf_any = tree.iter().any(|nd| {
-                nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY
-            });
-            if has_leaf_any {
-                let ap_qual = tree
-                    .iter()
-                    .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
-                    .map(|nd| nd.qualifier_set.clone())
-                    .unwrap_or_default();
+            if let Some(leaf_any_node) = tree
+                .iter()
+                .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
+            {
+                let ap_qual = leaf_any_node.qualifier_set.clone();
                 let mut additions = Vec::new();
                 for p_oid in &policy.initial_policy_set {
                     if !vpns_policies.contains(p_oid) {
@@ -2187,7 +2187,7 @@ fn chain_walk<V: SignatureVerifier>(
 /// Using an explicit enum instead of a bare `bool` makes call sites
 /// self-documenting: `CheckMode::Excluded` / `CheckMode::Permitted` vs
 /// opaque `false` / `true` (vjc.25).
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CheckMode {
     /// Excluded subtrees: any name that matches is a violation.
     Excluded,
@@ -2230,14 +2230,14 @@ fn check_name_constraints(
                        mode: CheckMode|
      -> crate::Result<()> {
         let type_constrained =
-            |name: &GeneralName| -> bool { nc_constrained_types.contains(name_type_bit(name)) };
+            |name: &GeneralName| -> bool { nc_constrained_types.intersects(name_type_bit(name)) };
 
         // subject DN — skipped when empty per RFC 5280 §6.1.3(b).
         // Avoid constructing a GeneralName::DirectoryName (which requires a clone)
         // by handling DirectoryName constraints inline: pull DirectoryName entries
         // from `subtrees` and test directly against the subject Name (vjc.24).
         if !subject_is_empty {
-            let subject_constrained = nc_constrained_types.contains(NC_TYPE_DIRECTORY_NAME);
+            let subject_constrained = nc_constrained_types.intersects(NcTypeMask::DIRECTORY_NAME);
             let dn_matches_any = subtrees.iter().any(|st| {
                 if let GeneralName::DirectoryName(constr) = &st.base {
                     dn_within_subtree(subject, constr)
@@ -2301,7 +2301,7 @@ fn check_name_constraints(
         .iter()
         .any(|st| matches!(st.base, GeneralName::Rfc822Name(_)));
     let has_rfc822_constraint =
-        nc_constrained_types.contains(NC_TYPE_RFC822) || has_rfc822_excluded;
+        nc_constrained_types.intersects(NcTypeMask::RFC822) || has_rfc822_excluded;
 
     if has_rfc822_constraint && !subject_is_empty {
         // Pre-filter the permitted rfc822 entries once, outside the RDN loop,
@@ -2311,8 +2311,18 @@ fn check_name_constraints(
         // Collect into a local GeneralSubtrees so the slice borrow lives as long
         // as this block. `None` means RFC822 permitted check is inactive (only
         // excluded may apply).
-        let permitted_rfc822_vec: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
-            if nc_constrained_types.contains(NC_TYPE_RFC822) {
+        // Collect the RFC822 permitted subtrees once so the slice borrow lives
+        // for the whole RDN loop.  `None` means the permitted check is inactive
+        // (only an excluded check may apply).  The NcTypeMask::RFC822 condition is
+        // checked once here; `permitted_rfc822` carries the result forward.
+        //
+        // `permitted_rfc822_storage` holds the allocation when the check is
+        // active; `Option` is used so the else branch requires no dummy
+        // assignment that would trigger an unused-assignment warning.
+        let permitted_rfc822_storage: Option<
+            x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
+        > = if nc_constrained_types.intersects(NcTypeMask::RFC822) {
+            Some(
                 nc_permitted
                     .map(|p| {
                         p.iter()
@@ -2320,18 +2330,14 @@ fn check_name_constraints(
                             .cloned()
                             .collect()
                     })
-                    .unwrap_or_default()
-            } else {
-                x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default()
-            };
-        // Only active when RFC822 permitted constraints were actually found.
-        let permitted_rfc822: Option<
-            &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
-        > = if nc_constrained_types.contains(NC_TYPE_RFC822) {
-            Some(permitted_rfc822_vec.as_slice())
+                    .unwrap_or_default(),
+            )
         } else {
             None
         };
+        let permitted_rfc822: Option<
+            &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+        > = permitted_rfc822_storage.as_deref();
 
         for rdn in subject.0.iter() {
             for ava in rdn.0.iter() {

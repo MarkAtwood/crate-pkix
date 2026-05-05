@@ -130,20 +130,27 @@ fn cert_is_ca(cert: &Certificate) -> bool {
 /// `path` is the current (partial) chain, leaf-first. On success it contains
 /// the complete chain from the original target to an anchor-issued cert.
 /// Returns `true` if a complete path was found; `false` otherwise.
+///
+/// The invariant `path` is never empty is established by `build_path` (which
+/// pushes the target before calling `dfs`) and maintained by the push/pop
+/// discipline below. `debug_assert` catches violations in test builds without
+/// panicking in release builds.
 fn dfs(
     path: &mut Vec<Certificate>,
     pool: &[Certificate],
     anchors: &[pkix_path::TrustAnchor],
     depth_remaining: usize,
 ) -> bool {
-    // Clone the issuer name out of path.last() immediately so we do not hold
-    // an immutable borrow into `path` across the mutable push/pop below.
-    let current_issuer = path
-        .last()
-        .expect("path is never empty")
-        .tbs_certificate
-        .issuer
-        .clone();
+    // Extract the issuer DN by cloning so the immutable borrow on `path` is
+    // released before the mutable push/pop below.
+    let current_issuer = match path.last() {
+        Some(c) => c.tbs_certificate.issuer.clone(),
+        None => {
+            // Invariant violated: path must never be empty when dfs is called.
+            debug_assert!(false, "dfs called with empty path — invariant violated");
+            return false;
+        }
+    };
 
     // Base case: does any trust anchor directly issue `current`?
     for anchor in anchors {
@@ -157,14 +164,7 @@ fn dfs(
     }
 
     // Recursive step: find pool certs that could issue `current`.
-    //
-    // We iterate over the pool by index to avoid borrowing `path` and `pool`
-    // simultaneously. Cloning the candidate before pushing is necessary anyway
-    // because `path` takes ownership.
-    let pool_len = pool.len();
-    for i in 0..pool_len {
-        let candidate = &pool[i];
-
+    for candidate in pool {
         // Candidate subject must match current issuer.
         if !pkix_path::names_match(&candidate.tbs_certificate.subject, &current_issuer) {
             continue;
@@ -176,18 +176,22 @@ fn dfs(
         }
 
         // Cycle guard: skip if candidate's subject is already in the path.
-        // Clone the subject out before the mutable borrow.
-        let candidate_subject = candidate.tbs_certificate.subject.clone();
+        // The issuer DN is already cloned above, so we do not need an extra
+        // clone here — compare candidate's subject against all path entries.
         let already_in_path = path.iter().any(|in_path| {
-            pkix_path::names_match(&in_path.tbs_certificate.subject, &candidate_subject)
+            pkix_path::names_match(
+                &in_path.tbs_certificate.subject,
+                &candidate.tbs_certificate.subject,
+            )
         });
         if already_in_path {
             continue;
         }
 
         // Push a clone of the candidate, recurse, pop on backtrack.
-        let candidate_clone = pool[i].clone();
-        path.push(candidate_clone);
+        // Single clone per push (no separate subject clone needed, since
+        // current_issuer was extracted once at the top of this frame).
+        path.push(candidate.clone());
         if dfs(path, pool, anchors, depth_remaining - 1) {
             return true;
         }

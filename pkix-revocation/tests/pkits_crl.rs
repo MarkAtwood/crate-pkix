@@ -670,3 +670,27 @@ fn pkits_4_14_14_invalid_only_attribute_certs() {
          (path validator must hard-fail)"
     );
 }
+
+/// Edge case: base CRL has no revoked entries, delta CRL has one revoked entry.
+///
+/// Oracle: PKITS §4.15.3 — InvaliddeltaCRLTest3EE is revoked in the delta CRL.
+/// The merge must find the revocation even though the base CRL is empty for
+/// this certificate.
+#[test]
+fn delta_empty_base_revocation_in_delta() {
+    let ca_der = pkits_cert("deltaCRLCA1Cert");
+    let leaf_der = pkits_cert("InvaliddeltaCRLTest3EE");
+    let base = pkits_crl("deltaCRLCA1CRL");
+    let delta = pkits_crl("deltaCRLCA1deltaCRL");
+
+    let ca = load_cert(&ca_der);
+    let leaf = load_cert(&leaf_der);
+
+    let checker = CrlChecker::with_delta(base, delta, PKITS_NOW, DefaultVerifier)
+        .expect("valid base+delta");
+    let result = checker.check_revocation(&leaf, &ca);
+    assert!(
+        matches!(result, Err(Error::Revoked { .. })),
+        "cert revoked in delta must be detected; got: {result:?}"
+    );
+}
