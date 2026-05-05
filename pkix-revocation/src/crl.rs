@@ -17,7 +17,6 @@ const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.21");
 
 /// OID for CRLNumber extension (RFC 5280 §5.2.3) — id-ce-cRLNumber: 2.5.29.20
-#[allow(dead_code)]
 const OID_CRL_NUMBER: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.20");
 
@@ -120,8 +119,10 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             CertificateList::from_der(&delta_der_bytes).map_err(Error::CrlParseError)?;
 
         // The base CRL MUST NOT itself be a delta CRL (RFC 5280 §5.2.4: only a
-        // full CRL may serve as the base).
-        if base_crl_number(&base_crl).is_some() {
+        // full CRL may serve as the base).  Detect by OID presence alone — do not
+        // rely on successful decode, since a malformed deltaCRLIndicator value
+        // would cause base_crl_number() to return None and silently pass as a base.
+        if has_delta_crl_indicator(&base_crl) {
             return Err(Error::DeltaCrlBaseMismatch);
         }
 
@@ -314,7 +315,6 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 ///
 /// Returns `None` if the integer is larger than 8 bytes (would overflow `u64`).
 /// CRL numbers in PKITS are small (1–5), so this is not a practical limit.
-#[allow(dead_code)]
 fn uint_to_u64(n: &der::asn1::Uint) -> Option<u64> {
     let b = n.as_bytes();
     if b.len() > 8 {
@@ -341,6 +341,22 @@ fn crl_number(crl: &CertificateList) -> Option<u64> {
                 .ok()
                 .and_then(|n| uint_to_u64(&n))
         })
+}
+
+/// Returns `true` if `crl` contains a `deltaCRLIndicator` extension (OID 2.5.29.27),
+/// regardless of whether the extension value can be decoded.
+///
+/// Presence of this OID (which MUST be critical) is the canonical marker that a
+/// CRL is a delta CRL per RFC 5280 §5.2.4.  Checking presence — not decode success —
+/// is important: a malformed value still makes the CRL a delta CRL and must prevent
+/// it from being used as a base.
+fn has_delta_crl_indicator(crl: &CertificateList) -> bool {
+    crl.tbs_cert_list
+        .crl_extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .any(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)
 }
 
 /// Extract the BaseCRLNumber from a delta CRL's extensions.
@@ -373,11 +389,15 @@ fn base_crl_number(crl: &CertificateList) -> Option<u64> {
 fn issuer_has_crl_sign(cert: &Certificate) -> bool {
     use x509_cert::ext::pkix::KeyUsage;
 
-    let Some(exts) = cert.tbs_certificate.extensions.as_ref() else {
-        return true; // No extensions at all → no KeyUsage constraint
-    };
-    let Some(ku_ext) = exts.iter().find(|e| e.extn_id == OID_KEY_USAGE_CRL) else {
-        return true; // KeyUsage absent → no constraint
+    let Some(ku_ext) = cert
+        .tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_KEY_USAGE_CRL)
+    else {
+        return true; // KeyUsage absent (or no extensions) → no constraint
     };
     KeyUsage::from_der(ku_ext.extn_value.as_bytes())
         .map(|ku| ku.crl_sign())
