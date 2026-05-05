@@ -2061,10 +2061,20 @@ fn chain_walk<V: SignatureVerifier>(
         if let Some(ref mut tree) = policy_tree {
             let leaf_depth = n;
 
-            // Collect the valid_policy_node_set: nodes whose parent is anyPolicy.
-            // Parent is anyPolicy when there exists a node at (depth - 1) with
-            // valid_policy == OID_ANY_POLICY. For depth=1 the parent is the
-            // depth-0 root which is always anyPolicy.
+            // §6.1.5(g)(iii): intersect the valid_policy_tree with
+            // user-initial-policy-set.
+            //
+            // The RFC defines valid_policy_node_set (vpns) as nodes in the tree
+            // whose PARENT has valid_policy == anyPolicy.  Because the depth-0 root
+            // is always anyPolicy, this includes ALL depth-1 nodes.  For deeper trees,
+            // it also includes nodes at any depth whose immediate parent is anyPolicy.
+            //
+            // Step (iii)(2): delete every vpns node whose valid_policy is not anyPolicy
+            // AND not in the user-initial-policy-set.  Then prune ancestors that
+            // become childless.
+            //
+            // Implementation: collect vpns_policies (the valid_policies of vpns nodes)
+            // for step (iii)(3) dedup, then delete out-of-set nodes.
             let vpns_indices: Vec<usize> = tree
                 .iter()
                 .enumerate()
@@ -2077,21 +2087,13 @@ fn chain_walk<V: SignatureVerifier>(
                 .map(|(idx, _)| idx)
                 .collect();
 
-            // Collect valid_policies already in vpns (for step 3 dedup).
+            // Collect valid_policies already in vpns (for step (iii)(3) dedup).
             let vpns_policies: Vec<der::asn1::ObjectIdentifier> = vpns_indices
                 .iter()
                 .map(|&idx| tree[idx].valid_policy)
                 .collect();
 
-            // Step (iii)(2): delete vpns nodes not in initial_policy_set,
-            // along with all their descendants (RFC 5280 §6.1.5(g)(iii)(2)).
-            //
-            // A vpns node is deleted if:
-            //   - its valid_policy is not anyPolicy, AND
-            //   - its valid_policy is not in the user-initial-policy-set.
-            //
-            // After deleting vpns nodes, remove all descendants of deleted
-            // nodes (those that now have no reachable ancestor at depth 1).
+            // Identify vpns nodes to delete: not anyPolicy and not in initial_policy_set.
             let to_delete_vpns: Vec<(usize, der::asn1::ObjectIdentifier)> = vpns_indices
                 .iter()
                 .filter(|&&idx| {
@@ -2102,16 +2104,14 @@ fn chain_walk<V: SignatureVerifier>(
                 .collect();
 
             if !to_delete_vpns.is_empty() {
-                // Delete the vpns nodes themselves.
+                // Delete the out-of-set vpns nodes.
                 tree.retain(|nd| {
                     !to_delete_vpns.iter().any(|(d, vp)| nd.depth == *d && &nd.valid_policy == vp)
                 });
-                // Propagate deletion downward: remove any node at depth > 1
-                // that is no longer reachable from a living parent node.
-                // Iterate from depth 2 to leaf_depth, removing orphans.
+                // Cascade deletion downward: remove any node that is no longer
+                // reachable from a living parent node.
                 for d in 2..=leaf_depth {
                     let parent_depth = d - 1;
-                    // Build the set of valid_policies expected by living parents.
                     let reachable: Vec<der::asn1::ObjectIdentifier> = tree
                         .iter()
                         .filter(|nd| nd.depth == parent_depth)
