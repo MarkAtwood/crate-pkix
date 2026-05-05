@@ -28,8 +28,12 @@
 //!
 //! These are tracked for v0.2+.
 
-// For no_std builds, pull in the alloc crate explicitly so `alloc::` paths resolve.
+// For no_std builds, pull in the alloc crate explicitly so `alloc::` paths
+// and the `vec!` macro resolve. `#[macro_use]` re-exports alloc macros
+// (vec!, format!, etc.) into the crate root, making them available everywhere
+// without qualifying them as `alloc::vec!(...)`.
 #[cfg(not(feature = "std"))]
+#[macro_use]
 extern crate alloc;
 
 // Unified Vec import: alloc::vec::Vec in no_std, std::vec::Vec under std.
@@ -695,6 +699,80 @@ fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Policy tree (RFC 5280 §6.1) — PKIX-mi3.2
+// ---------------------------------------------------------------------------
+
+/// A node in the certificate policy tree (RFC 5280 §6.1.2(a)).
+///
+/// Stored as a flat `Vec<PolicyNode>`.  Depth 0 is the synthetic anyPolicy
+/// root (initialized before any cert is processed).  Depth `d` corresponds
+/// to the d-th certificate from the trust-anchor end (depth 1 = CA adjacent
+/// to trust anchor, depth n = leaf).
+#[derive(Clone, Debug)]
+struct PolicyNode {
+    /// Certificate depth at which this node was added (0 = root sentinel).
+    depth: usize,
+    /// The policy OID this node represents.
+    valid_policy: der::asn1::ObjectIdentifier,
+    /// Policy qualifiers attached to this policy in the certificate.
+    #[allow(dead_code)]
+    qualifier_set: Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
+    /// Policies in the NEXT certificate that are consistent with this node.
+    /// Initialized to `{valid_policy}`; updated by PolicyMappings.
+    expected_policy_set: Vec<der::asn1::ObjectIdentifier>,
+}
+
+/// Initialise the policy tree with the anyPolicy root node (RFC 5280 §6.1.2(a)).
+fn init_policy_tree() -> Vec<PolicyNode> {
+    vec![PolicyNode {
+        depth: 0,
+        valid_policy: OID_ANY_POLICY,
+        qualifier_set: Vec::new(),
+        expected_policy_set: vec![OID_ANY_POLICY],
+    }]
+}
+
+/// Prune nodes at depth < `cert_depth` that have no children at depth+1.
+///
+/// After processing certificate at depth `d`, any ancestor node with no
+/// surviving child must be deleted (RFC 5280 §6.1.3(d)(3)): "If there is a
+/// node in the valid_policy_tree of depth i-1 or less without any child
+/// nodes, delete that node.  Repeat this step until there are no nodes of
+/// depth i-1 or less without children."
+///
+/// Works upward from `cert_depth - 1` toward 1.  The depth-0 root is left
+/// in place (it is only removed when `policy_tree` is set to `None`).
+fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
+    let mut d = cert_depth;
+    while d > 0 {
+        d -= 1;
+        if d == 0 {
+            break; // depth-0 root is always kept; caller checks for effective NULL
+        }
+        let child_depth = d + 1;
+        let child_policies: Vec<der::asn1::ObjectIdentifier> = tree
+            .iter()
+            .filter(|n| n.depth == child_depth)
+            .map(|n| n.valid_policy)
+            .collect();
+        // Remove nodes at depth d that have no surviving child at depth d+1.
+        // RFC 5280 §6.1.3(d)(3): "If there is a node in the valid_policy_tree
+        // of depth i-1 or less without any child nodes, delete that node."
+        // This applies to ALL nodes including anyPolicy.
+        tree.retain(|n| {
+            if n.depth != d {
+                return true; // leave nodes at other depths untouched
+            }
+            // A node has a child if some child's valid_policy is in its
+            // expected_policy_set.
+            child_policies.iter().any(|cp| n.expected_policy_set.contains(cp))
+        });
+        // Continue upward even if this level became empty — the parent level
+        // may now also be childless and needs pruning.
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1441,6 +1519,30 @@ fn chain_walk<V: SignatureVerifier>(
         }
     };
 
+    // RFC 5280 §6.1.2: initialise policy state variables (PKIX-mi3.3).
+    //
+    // The counters represent "skip N more non-self-issued certificates before
+    // the constraint activates".  Setting a counter to `n + 1` means the
+    // constraint never triggers unless a CA certificate forces it lower.
+    let n = chain.len();
+    let mut explicit_policy: u32 = if policy.initial_explicit_policy {
+        0
+    } else {
+        (n as u32).saturating_add(1)
+    };
+    let mut inhibit_any: u32 = if policy.initial_any_policy_inhibit {
+        0
+    } else {
+        (n as u32).saturating_add(1)
+    };
+    let mut policy_mapping: u32 = if policy.initial_policy_mapping_inhibit {
+        0
+    } else {
+        (n as u32).saturating_add(1)
+    };
+    // §6.1.2(a): initial valid_policy_tree — single anyPolicy root node.
+    let mut policy_tree: Option<Vec<PolicyNode>> = Some(init_policy_tree());
+
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
 
@@ -1474,6 +1576,133 @@ fn chain_walk<V: SignatureVerifier>(
         // (d) Critical extension guard.
         check_critical_extensions(cert, i)?;
 
+        // Cert depth in the RFC 5280 §6.1 sense: 1 = root-adjacent, n = leaf.
+        let cert_depth = n - i;
+
+        // (policy-d) CertificatePolicies extension (RFC 5280 §6.1.3(d)).
+        // Only processed when the policy tree is still alive.
+        if let Some(ref mut tree) = policy_tree {
+            use x509_cert::ext::pkix::certpolicy::CertificatePolicies;
+
+            if let Some(cp_ext) =
+                find_cert_ext::<CertificatePolicies>(cert, OID_CERTIFICATE_POLICIES)
+            {
+                let mut new_nodes: Vec<PolicyNode> = Vec::new();
+                let mut any_policy_qualifiers: Option<
+                    Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
+                > = None;
+
+                // Step (d)(1): process each specific policy P ≠ anyPolicy.
+                for policy_info in cp_ext.0.iter() {
+                    let p_oid = &policy_info.policy_identifier;
+                    if p_oid == &OID_ANY_POLICY {
+                        // Defer anyPolicy processing to step (d)(2).
+                        any_policy_qualifiers = Some(
+                            policy_info
+                                .policy_qualifiers
+                                .as_deref()
+                                .unwrap_or(&[])
+                                .to_vec(),
+                        );
+                        continue;
+                    }
+
+                    // (d)(1)(i): for each parent at depth i-1 whose
+                    // expected_policy_set contains p_oid, create a child.
+                    let mut matched_via_i = false;
+                    let parents_with_match: Vec<usize> = tree
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, parent)| {
+                            parent.depth == cert_depth - 1
+                                && parent.expected_policy_set.contains(p_oid)
+                        })
+                        .map(|(idx, _)| idx)
+                        .collect();
+
+                    for _ in &parents_with_match {
+                        matched_via_i = true;
+                        new_nodes.push(PolicyNode {
+                            depth: cert_depth,
+                            valid_policy: *p_oid,
+                            qualifier_set: policy_info
+                                .policy_qualifiers
+                                .as_deref()
+                                .unwrap_or(&[])
+                                .to_vec(),
+                            expected_policy_set: vec![*p_oid],
+                        });
+                    }
+
+                    // (d)(1)(ii): if no match in (i), check for an anyPolicy
+                    // parent at depth i-1.
+                    if !matched_via_i {
+                        let has_any_parent = tree.iter().any(|parent| {
+                            parent.depth == cert_depth - 1
+                                && parent.valid_policy == OID_ANY_POLICY
+                        });
+                        if has_any_parent {
+                            new_nodes.push(PolicyNode {
+                                depth: cert_depth,
+                                valid_policy: *p_oid,
+                                qualifier_set: policy_info
+                                    .policy_qualifiers
+                                    .as_deref()
+                                    .unwrap_or(&[])
+                                    .to_vec(),
+                                expected_policy_set: vec![*p_oid],
+                            });
+                        }
+                    }
+                }
+
+                // Step (d)(2): if cert has anyPolicy and (inhibit_any > 0 or
+                // self-issued non-leaf), expand for each unmatched expected
+                // policy from parent nodes.
+                if let Some(ref ap_qualifiers) = any_policy_qualifiers {
+                    let may_expand =
+                        inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
+                    if may_expand {
+                        // Already-covered valid_policies at this depth.
+                        let already_covered: Vec<der::asn1::ObjectIdentifier> =
+                            new_nodes.iter().map(|nd| nd.valid_policy).collect();
+                        for parent in tree.iter().filter(|nd| nd.depth == cert_depth - 1) {
+                            for ep in parent.expected_policy_set.iter() {
+                                if !already_covered.contains(ep) {
+                                    new_nodes.push(PolicyNode {
+                                        depth: cert_depth,
+                                        valid_policy: *ep,
+                                        qualifier_set: ap_qualifiers.clone(),
+                                        expected_policy_set: vec![*ep],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                tree.extend(new_nodes);
+
+                // Step (d)(3): prune ancestors with no children.
+                if cert_depth > 1 {
+                    prune_policy_tree(tree, cert_depth);
+                }
+                // If no nodes at depth >= 1 remain, tree is effectively NULL.
+                if !tree.iter().any(|nd| nd.depth >= 1) {
+                    policy_tree = None;
+                }
+            } else {
+                // §6.1.3(e): CertificatePolicies absent → tree becomes NULL.
+                policy_tree = None;
+            }
+        }
+
+        // (policy-f) RFC 5280 §6.1.3(f): explicit_policy == 0 and tree NULL
+        // → policy violation.
+        if explicit_policy == 0 && policy_tree.is_none() {
+            return Err(Error::PolicyViolation { index: i });
+        }
+
         // Decode SAN once per cert: used in both the NC name check (e) and
         // potentially cached for the NC state update (i). Avoids scanning the
         // extension list twice per cert when both checks are active (vjc.13).
@@ -1491,6 +1720,29 @@ fn chain_walk<V: SignatureVerifier>(
                 nc_constrained_types,
                 i,
             )?;
+        }
+
+        // (policy-leaf) §6.1.5(a-b): leaf-cert policy finalisation.
+        // Only applied to the leaf certificate (i == 0).
+        if i == 0 {
+            // §6.1.5(a): if the leaf is not self-issued, decrement counters.
+            if !is_self_issued_cert(cert) {
+                explicit_policy = explicit_policy.saturating_sub(1);
+                inhibit_any = inhibit_any.saturating_sub(1);
+                policy_mapping = policy_mapping.saturating_sub(1);
+            }
+            // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
+            // force explicit_policy to 0.
+            {
+                use x509_cert::ext::pkix::PolicyConstraints;
+                if let Some(pc) =
+                    find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
+                {
+                    if pc.require_explicit_policy == Some(0) {
+                        explicit_policy = 0;
+                    }
+                }
+            }
         }
 
         // (f–h) CA-only checks: apply to every cert except the leaf (chain[0]).
@@ -1519,6 +1771,154 @@ fn chain_walk<V: SignatureVerifier>(
                     .count();
                 if effective_depth > path_len as usize {
                     return Err(Error::PathTooLong);
+                }
+            }
+
+            // (policy-a) PolicyMappings (RFC 5280 §6.1.4(a)): anyPolicy must
+            // not appear on either side of a mapping.
+            // (policy-b) Apply mappings to the tree or delete mapped nodes.
+            // NOTE: Policy mappings use the current policy_mapping counter value
+            // (before decrement); the decrement happens in §6.1.4(h) below.
+            {
+                use x509_cert::ext::pkix::PolicyMappings;
+                if let Some(pm) =
+                    find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS)
+                {
+                    // §6.1.4(a): reject anyPolicy as issuer or subject domain.
+                    for mapping in pm.0.iter() {
+                        if mapping.issuer_domain_policy == OID_ANY_POLICY
+                            || mapping.subject_domain_policy == OID_ANY_POLICY
+                        {
+                            return Err(Error::PolicyViolation { index: i });
+                        }
+                    }
+
+                    // §6.1.4(b)(1): if policy_mapping > 0, update expected_policy_set.
+                    // §6.1.4(b)(2): if policy_mapping == 0, delete mapped nodes.
+                    if let Some(ref mut tree) = policy_tree {
+                        if policy_mapping > 0 {
+                            // For each issuerDomainPolicy ID-P in the mappings,
+                            // update expected_policy_set of matching nodes.
+                            for mapping in pm.0.iter() {
+                                let idp = &mapping.issuer_domain_policy;
+                                let sdp = &mapping.subject_domain_policy;
+                                let mut found = false;
+                                for node in tree.iter_mut() {
+                                    if node.depth == cert_depth
+                                        && &node.valid_policy == idp
+                                    {
+                                        found = true;
+                                        node.expected_policy_set.retain(|p| p != idp);
+                                        if !node.expected_policy_set.contains(sdp) {
+                                            node.expected_policy_set.push(*sdp);
+                                        }
+                                    }
+                                }
+                                // If no node at cert_depth has valid_policy = ID-P
+                                // but there is an anyPolicy node, generate a new
+                                // child of the depth-(i-1) anyPolicy node.
+                                if !found {
+                                    let has_any = tree.iter().any(|nd| {
+                                        nd.depth == cert_depth
+                                            && nd.valid_policy == OID_ANY_POLICY
+                                    });
+                                    if has_any {
+                                        // Get qualifier from anyPolicy in cert.
+                                        let ap_q = pm
+                                            .0
+                                            .iter()
+                                            .find(|m| &m.issuer_domain_policy == idp)
+                                            .and_then(|_| {
+                                                if let Some(ref cp) =
+                                                    find_cert_ext::<
+                                                        x509_cert::ext::pkix::certpolicy::CertificatePolicies,
+                                                    >(
+                                                        cert,
+                                                        OID_CERTIFICATE_POLICIES,
+                                                    )
+                                                {
+                                                    cp.0.iter()
+                                                        .find(|pi| {
+                                                            pi.policy_identifier == OID_ANY_POLICY
+                                                        })
+                                                        .and_then(|pi| {
+                                                            pi.policy_qualifiers
+                                                                .as_deref()
+                                                                .map(|q| q.to_vec())
+                                                        })
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .unwrap_or_default();
+                                        tree.push(PolicyNode {
+                                            depth: cert_depth,
+                                            valid_policy: *idp,
+                                            qualifier_set: ap_q,
+                                            expected_policy_set: vec![*sdp],
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            // policy_mapping == 0: delete nodes whose valid_policy
+                            // is an issuer_domain_policy in a mapping.
+                            let mapped_policies: Vec<der::asn1::ObjectIdentifier> = pm
+                                .0
+                                .iter()
+                                .map(|m| m.issuer_domain_policy)
+                                .collect();
+                            tree.retain(|nd| {
+                                nd.depth != cert_depth
+                                    || !mapped_policies.contains(&nd.valid_policy)
+                            });
+                            if cert_depth > 0 {
+                                prune_policy_tree(tree, cert_depth);
+                            }
+                        }
+                    }
+                }
+            }
+            // Check if tree became effectively NULL after mapping operations.
+            if let Some(ref t) = policy_tree {
+                if !t.iter().any(|nd| nd.depth >= 1) {
+                    policy_tree = None;
+                }
+            }
+
+            // (policy-h) RFC 5280 §6.1.4(h): decrement policy counters for
+            // non-self-issued intermediate certificates.
+            // This happens AFTER policy mappings processing (§6.1.4(b)) and
+            // BEFORE clamping from extensions (§6.1.4(i)/(j)).
+            if !is_self_issued_cert(cert) {
+                explicit_policy = explicit_policy.saturating_sub(1);
+                policy_mapping = policy_mapping.saturating_sub(1);
+                inhibit_any = inhibit_any.saturating_sub(1);
+            }
+
+            // (policy-i) PolicyConstraints (RFC 5280 §6.1.4(c)): clamp
+            // explicit_policy and policy_mapping from the extension.
+            {
+                use x509_cert::ext::pkix::PolicyConstraints;
+                if let Some(pc) =
+                    find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
+                {
+                    if let Some(req) = pc.require_explicit_policy {
+                        explicit_policy = explicit_policy.min(req);
+                    }
+                    if let Some(ipm) = pc.inhibit_policy_mapping {
+                        policy_mapping = policy_mapping.min(ipm);
+                    }
+                }
+            }
+
+            // (policy-j) InhibitAnyPolicy (RFC 5280 §6.1.4(d)): clamp inhibit_any.
+            {
+                use x509_cert::ext::pkix::InhibitAnyPolicy;
+                if let Some(iap) =
+                    find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
+                {
+                    inhibit_any = inhibit_any.min(iap.0);
                 }
             }
 
@@ -1638,6 +2038,140 @@ fn chain_walk<V: SignatureVerifier>(
         // Update state for next iteration.
         working_spki = &cert.tbs_certificate.subject_public_key_info;
         working_issuer_name = &cert.tbs_certificate.subject;
+    }
+
+    // RFC 5280 §6.1.5(g): intersect the valid_policy_tree with the
+    // user-initial-policy-set (PKIX-mi3.5).
+    //
+    // An empty initial_policy_set means {anyPolicy} — no trimming needed.
+    //
+    // When the set is non-empty:
+    //   §6.1.5(g)(iii)(1): valid_policy_node_set = nodes whose parent
+    //     has valid_policy = anyPolicy.
+    //   §6.1.5(g)(iii)(2): delete nodes in that set not in initial_policy_set
+    //     (and not anyPolicy themselves) along with their descendants.
+    //   §6.1.5(g)(iii)(3): if a leaf anyPolicy node exists, materialise
+    //     nodes for each P-OID in initial_policy_set not already present.
+    //   §6.1.5(g)(iii)(4): prune childless ancestors.
+    if !policy.initial_policy_set.is_empty() {
+        if let Some(ref mut tree) = policy_tree {
+            let leaf_depth = n;
+
+            // Collect the valid_policy_node_set: nodes whose parent is anyPolicy.
+            // Parent is anyPolicy when there exists a node at (depth - 1) with
+            // valid_policy == OID_ANY_POLICY. For depth=1 the parent is the
+            // depth-0 root which is always anyPolicy.
+            let vpns_indices: Vec<usize> = tree
+                .iter()
+                .enumerate()
+                .filter(|(_, nd)| {
+                    nd.depth >= 1
+                        && tree.iter().any(|p| {
+                            p.depth == nd.depth - 1 && p.valid_policy == OID_ANY_POLICY
+                        })
+                })
+                .map(|(idx, _)| idx)
+                .collect();
+
+            // Collect valid_policies already in vpns (for step 3 dedup).
+            let vpns_policies: Vec<der::asn1::ObjectIdentifier> = vpns_indices
+                .iter()
+                .map(|&idx| tree[idx].valid_policy)
+                .collect();
+
+            // Step (iii)(2): delete vpns nodes not in initial_policy_set,
+            // along with all their descendants (RFC 5280 §6.1.5(g)(iii)(2)).
+            //
+            // A vpns node is deleted if:
+            //   - its valid_policy is not anyPolicy, AND
+            //   - its valid_policy is not in the user-initial-policy-set.
+            //
+            // After deleting vpns nodes, remove all descendants of deleted
+            // nodes (those that now have no reachable ancestor at depth 1).
+            let to_delete_vpns: Vec<(usize, der::asn1::ObjectIdentifier)> = vpns_indices
+                .iter()
+                .filter(|&&idx| {
+                    tree[idx].valid_policy != OID_ANY_POLICY
+                        && !policy.initial_policy_set.contains(&tree[idx].valid_policy)
+                })
+                .map(|&idx| (tree[idx].depth, tree[idx].valid_policy))
+                .collect();
+
+            if !to_delete_vpns.is_empty() {
+                // Delete the vpns nodes themselves.
+                tree.retain(|nd| {
+                    !to_delete_vpns.iter().any(|(d, vp)| nd.depth == *d && &nd.valid_policy == vp)
+                });
+                // Propagate deletion downward: remove any node at depth > 1
+                // that is no longer reachable from a living parent node.
+                // Iterate from depth 2 to leaf_depth, removing orphans.
+                for d in 2..=leaf_depth {
+                    let parent_depth = d - 1;
+                    // Build the set of valid_policies expected by living parents.
+                    let reachable: Vec<der::asn1::ObjectIdentifier> = tree
+                        .iter()
+                        .filter(|nd| nd.depth == parent_depth)
+                        .flat_map(|nd| nd.expected_policy_set.iter().cloned())
+                        .collect();
+                    let any_parent = tree
+                        .iter()
+                        .any(|nd| nd.depth == parent_depth && nd.valid_policy == OID_ANY_POLICY);
+                    tree.retain(|nd| {
+                        if nd.depth != d {
+                            return true;
+                        }
+                        reachable.contains(&nd.valid_policy) || any_parent
+                    });
+                }
+            }
+
+            // Step (iii)(3): materialise nodes for initial_policy_set members
+            // not yet present, if there's an anyPolicy node at leaf depth.
+            let has_leaf_any = tree.iter().any(|nd| {
+                nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY
+            });
+            if has_leaf_any {
+                let ap_qual = tree
+                    .iter()
+                    .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
+                    .map(|nd| nd.qualifier_set.clone())
+                    .unwrap_or_default();
+                let mut additions = Vec::new();
+                for p_oid in &policy.initial_policy_set {
+                    if !vpns_policies.contains(p_oid) {
+                        // Find the anyPolicy node at leaf_depth - 1 to be the parent.
+                        additions.push(PolicyNode {
+                            depth: leaf_depth,
+                            valid_policy: *p_oid,
+                            qualifier_set: ap_qual.clone(),
+                            expected_policy_set: vec![*p_oid],
+                        });
+                    }
+                }
+                tree.extend(additions);
+                // Delete the leaf anyPolicy node.
+                tree.retain(|nd| {
+                    !(nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
+                });
+            }
+
+            // Step (iii)(4): prune childless ancestors.
+            if n > 0 {
+                prune_policy_tree(tree, leaf_depth);
+            }
+            // The tree is effectively NULL if no nodes exist at depth >= 1
+            // (only the synthetic depth-0 anyPolicy root is left, which
+            // does not represent any actual valid policy).
+            if !tree.iter().any(|nd| nd.depth >= 1) {
+                policy_tree = None;
+            }
+        }
+    }
+
+    // §6.1.5 final check: path is valid iff explicit_policy > 0 OR tree
+    // is non-NULL.
+    if explicit_policy == 0 && policy_tree.is_none() {
+        return Err(Error::PolicyViolation { index: 0 });
     }
 
     Ok(())
