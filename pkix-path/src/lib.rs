@@ -645,12 +645,14 @@ fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
 // Extension extraction helpers
 // ---------------------------------------------------------------------------
 
-/// Find and decode an X.509 extension from a certificate by OID.
+/// Find and decode an X.509 extension from `cert` by OID.
 ///
-/// Returns `None` if the extension is absent or the DER value cannot be decoded.
-/// Decoding errors are silently treated as absent (fail-open).
-/// Callers that need to propagate parse errors (fail-closed) should use
-/// [`try_find_cert_ext`] instead.
+/// **Fail-open**: returns `None` if the extension is absent *or* if its DER
+/// value cannot be decoded. Decoding errors are silently discarded.
+///
+/// Use this for extensions where a parse failure is tolerable (e.g., optional
+/// informational extensions). For security-critical extensions where a parse
+/// failure must be propagated, use [`try_find_cert_ext`] instead.
 fn find_cert_ext<T: der::DecodeOwned>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
@@ -664,16 +666,19 @@ fn find_cert_ext<T: der::DecodeOwned>(
         .and_then(|e| T::from_der(e.extn_value.as_bytes()).ok())
 }
 
-/// Look up a certificate extension by OID and decode it.
+/// Look up and decode an X.509 extension from `cert` by OID.
+///
+/// **Fail-closed**: propagates DER decoding errors to the caller rather than
+/// discarding them. This is appropriate for security-critical extensions where
+/// a malformed value must not be silently ignored.
 ///
 /// Returns:
-/// - `Ok(None)` if the extension is absent.
-/// - `Ok(Some(T))` if the extension is present and parses successfully.
-/// - `Err(der::Error)` if the extension is present but DER decoding fails.
+/// - `Ok(None)` — extension absent.
+/// - `Ok(Some(T))` — extension present and decoded successfully.
+/// - `Err(der::Error)` — extension present but DER decoding failed.
 ///
-/// Prefer [`find_cert_ext`] when a parse failure should be treated as absent
-/// (fail-open). Use this function when a parse failure must be propagated
-/// (fail-closed), e.g. in [`TrustAnchor::try_from`].
+/// For non-critical extensions where a parse failure should be treated as
+/// absent, use [`find_cert_ext`] (fail-open) instead.
 fn try_find_cert_ext<T: der::DecodeOwned>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
@@ -699,10 +704,41 @@ fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::Su
     find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
 }
 
+/// Decode the NameConstraints extension from `cert`.
+///
+/// Returns `Err(MalformedCertificate)` if the extension is present but:
+/// - its DER cannot be decoded (vjc.7: fail-closed on security-critical extension), or
+/// - any GeneralSubtree has a non-zero `minimum` or a present `maximum` field
+///   (vjc.8: RFC 5280 §4.2.1.10 MUST require minimum=0, maximum=absent).
+///
+/// Returns `Ok(None)` if the extension is absent.
 fn cert_name_constraints(
     cert: &Certificate,
-) -> Option<x509_cert::ext::pkix::constraints::name::NameConstraints> {
-    find_cert_ext(cert, OID_NAME_CONSTRAINTS)
+    index: usize,
+) -> crate::Result<Option<x509_cert::ext::pkix::constraints::name::NameConstraints>> {
+    use x509_cert::ext::pkix::constraints::name::NameConstraints;
+
+    let nc = try_find_cert_ext::<NameConstraints>(cert, OID_NAME_CONSTRAINTS)
+        .map_err(|_| Error::MalformedCertificate { index })?;
+
+    if let Some(ref nc) = nc {
+        // RFC 5280 §4.2.1.10: "the minimum and maximum fields are not used with
+        // any name forms, thus minimum MUST be zero, maximum MUST be absent."
+        // Reject certs that encode non-conformant subtrees rather than silently
+        // applying potentially unexpected constraint semantics.
+        let subtrees_iter = nc
+            .permitted_subtrees
+            .iter()
+            .flatten()
+            .chain(nc.excluded_subtrees.iter().flatten());
+        for st in subtrees_iter {
+            if st.minimum != 0 || st.maximum.is_some() {
+                return Err(Error::MalformedCertificate { index });
+            }
+        }
+    }
+
+    Ok(nc)
 }
 
 // ---------------------------------------------------------------------------
@@ -936,18 +972,48 @@ impl<'a> Iterator for NormalizedIter<'a> {
 // NameConstraints matching (PKIX-mew)
 // ---------------------------------------------------------------------------
 
-/// Bitmask bits representing each constrained GeneralName name type.
+/// Newtype wrapping a bitmask of `GeneralName` name types for NameConstraints.
+///
 /// Used by `nc_constrained_types` to track which types have been constrained
 /// by at least one CA certificate in the path, even if the intersection later
 /// empties the permitted set for that type.
-const NC_TYPE_RFC822: u32 = 1 << 0;
-const NC_TYPE_DNS: u32 = 1 << 1;
-const NC_TYPE_DIRECTORY_NAME: u32 = 1 << 2;
-const NC_TYPE_URI: u32 = 1 << 3;
-const NC_TYPE_IP_ADDRESS: u32 = 1 << 4;
+///
+/// Bare `u32` constants would allow silent misuse (e.g., confusing a count
+/// with a mask). The newtype makes the intent explicit at every operation site.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct NcTypeMask(u32);
 
-/// Return the bitmask bit for the name type of `name`, or 0 for unrecognized types.
-fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> u32 {
+impl NcTypeMask {
+    const EMPTY: NcTypeMask = NcTypeMask(0);
+    const RFC822: NcTypeMask = NcTypeMask(1 << 0);
+    const DNS: NcTypeMask = NcTypeMask(1 << 1);
+    const DIRECTORY_NAME: NcTypeMask = NcTypeMask(1 << 2);
+    const URI: NcTypeMask = NcTypeMask(1 << 3);
+    const IP_ADDRESS: NcTypeMask = NcTypeMask(1 << 4);
+
+    /// Returns true if `self` has any of the bits in `other` set.
+    fn contains(self, other: NcTypeMask) -> bool {
+        self.0 & other.0 != 0
+    }
+}
+
+impl core::ops::BitOrAssign for NcTypeMask {
+    fn bitor_assign(&mut self, rhs: NcTypeMask) {
+        self.0 |= rhs.0;
+    }
+}
+
+// Keep NC_TYPE_* as module-level constants for backwards-compatible internal use,
+// now delegating to the newtype values.
+const NC_TYPE_RFC822: NcTypeMask = NcTypeMask::RFC822;
+const NC_TYPE_DNS: NcTypeMask = NcTypeMask::DNS;
+const NC_TYPE_DIRECTORY_NAME: NcTypeMask = NcTypeMask::DIRECTORY_NAME;
+const NC_TYPE_URI: NcTypeMask = NcTypeMask::URI;
+const NC_TYPE_IP_ADDRESS: NcTypeMask = NcTypeMask::IP_ADDRESS;
+
+/// Return the `NcTypeMask` bit for the name type of `name`, or `EMPTY` for
+/// unrecognized types.
+fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
     use x509_cert::ext::pkix::name::GeneralName;
     match name {
         GeneralName::Rfc822Name(_) => NC_TYPE_RFC822,
@@ -955,7 +1021,7 @@ fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> u32 {
         GeneralName::DirectoryName(_) => NC_TYPE_DIRECTORY_NAME,
         GeneralName::UniformResourceIdentifier(_) => NC_TYPE_URI,
         GeneralName::IpAddress(_) => NC_TYPE_IP_ADDRESS,
-        _ => 0,
+        _ => NcTypeMask::EMPTY,
     }
 }
 
@@ -993,7 +1059,7 @@ fn same_nc_variant(
     a: &x509_cert::ext::pkix::name::GeneralName,
     b: &x509_cert::ext::pkix::name::GeneralName,
 ) -> bool {
-    name_type_bit(a) != 0 && name_type_bit(a) == name_type_bit(b)
+    name_type_bit(a) != NcTypeMask::EMPTY && name_type_bit(a) == name_type_bit(b)
 }
 
 /// Returns true if `name` satisfies the `subtree` constraint.
@@ -1286,10 +1352,10 @@ fn chain_walk<V: SignatureVerifier>(
     // "is type constrained?" from nc_permitted contents alone — that would
     // silently allow names of a type whose permitted set was emptied by
     // conflicting CA constraints.
-    let mut nc_constrained_types: u32 = match &nc_permitted {
-        None => 0,
+    let mut nc_constrained_types: NcTypeMask = match &nc_permitted {
+        None => NcTypeMask::EMPTY,
         Some(permitted) => {
-            let mut bits: u32 = 0;
+            let mut bits = NcTypeMask::EMPTY;
             for st in permitted {
                 bits |= name_type_bit(&st.base);
             }
@@ -1330,11 +1396,23 @@ fn chain_walk<V: SignatureVerifier>(
         // (d) Critical extension guard.
         check_critical_extensions(cert, i)?;
 
+        // Decode SAN once per cert: used in both the NC name check (e) and
+        // potentially cached for the NC state update (i). Avoids scanning the
+        // extension list twice per cert when both checks are active (vjc.13).
+        let san = cert_subject_alt_names(cert);
+
         // (e) NameConstraints: check this cert's names against accumulated state.
         // RFC 5280 §6.1.3(b): self-issued non-leaf certs are exempt from NC name checking.
         // The NC state is still updated from their extensions in step (i).
         if i == 0 || !is_self_issued_cert(cert) {
-            check_name_constraints(cert, &nc_permitted, &nc_excluded, nc_constrained_types, i)?;
+            check_name_constraints(
+                cert,
+                san.as_ref(),
+                nc_permitted.as_ref(),
+                &nc_excluded,
+                nc_constrained_types,
+                i,
+            )?;
         }
 
         // (f–h) CA-only checks: apply to every cert except the leaf (chain[0]).
@@ -1368,7 +1446,10 @@ fn chain_walk<V: SignatureVerifier>(
 
             // (i) NC update: NameConstraints state update (RFC 5280 §6.1.4(b)).
             //     INTERSECTION for permitted, UNION for excluded.
-            if let Some(nc) = cert_name_constraints(cert) {
+            //     cert_name_constraints is fail-closed: a malformed or non-conformant
+            //     NC extension (e.g., non-zero minimum/maximum) returns MalformedCertificate
+            //     rather than silently ignoring the constraints (vjc.7, vjc.8).
+            if let Some(nc) = cert_name_constraints(cert, i)? {
                 // permittedSubtrees: intersect with current state.
                 if let Some(new_permitted) = nc.permitted_subtrees {
                     // Track which types this CA is constraining.
@@ -1397,16 +1478,23 @@ fn chain_walk<V: SignatureVerifier>(
                             let mut result =
                                 x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default();
 
+                            // For each new entry, pre-filter current entries of the
+                            // same type to avoid calling same_nc_variant twice per
+                            // pair (vjc.16: duplicated guard + containment check).
                             for n in new_permitted.iter() {
-                                let current_has_same_type =
-                                    current.iter().any(|c| same_nc_variant(&c.base, &n.base));
-                                if !current_has_same_type {
+                                let same_type_in_current: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+                                    current
+                                        .iter()
+                                        .filter(|c| same_nc_variant(&c.base, &n.base))
+                                        .cloned()
+                                        .collect();
+                                if same_type_in_current.is_empty() {
                                     // Type not previously constrained → add directly.
                                     result.push(n.clone());
-                                } else if current.iter().any(|c| {
-                                    same_nc_variant(&c.base, &n.base)
-                                        && name_matches_subtree(&n.base, c)
-                                }) {
+                                } else if same_type_in_current
+                                    .iter()
+                                    .any(|c| name_matches_subtree(&n.base, c))
+                                {
                                     // n is within some same-type current entry → keep.
                                     result.push(n.clone());
                                 }
@@ -1414,23 +1502,29 @@ fn chain_walk<V: SignatureVerifier>(
                             }
 
                             for c in current.iter() {
-                                let new_has_same_type = new_permitted
-                                    .iter()
-                                    .any(|n| same_nc_variant(&n.base, &c.base));
-                                if !new_has_same_type {
+                                let same_type_in_new: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+                                    new_permitted
+                                        .iter()
+                                        .filter(|n| same_nc_variant(&n.base, &c.base))
+                                        .cloned()
+                                        .collect();
+                                if same_type_in_new.is_empty() {
                                     // Type not in new_permitted → keep unchanged.
                                     result.push(c.clone());
-                                } else if new_permitted.iter().any(|n| {
-                                    same_nc_variant(&n.base, &c.base)
-                                        && name_matches_subtree(&c.base, n)
-                                }) {
+                                } else if same_type_in_new
+                                    .iter()
+                                    .any(|n| name_matches_subtree(&c.base, n))
+                                {
                                     // c is more specific than some new entry; keep unless
-                                    // an equivalent entry is already in result.
-                                    if !result.iter().any(|e| {
+                                    // an equivalent entry is already in result (dedup
+                                    // within the result set for this type).
+                                    let same_type_in_result: &[_] = result.as_slice();
+                                    let already_in_result = same_type_in_result.iter().any(|e| {
                                         same_nc_variant(&e.base, &c.base)
                                             && name_matches_subtree(&e.base, c)
                                             && name_matches_subtree(&c.base, e)
-                                    }) {
+                                    });
+                                    if !already_in_result {
                                         result.push(c.clone());
                                     }
                                 }
@@ -1441,9 +1535,24 @@ fn chain_walk<V: SignatureVerifier>(
                         }
                     }
                 }
-                // excludedSubtrees: union — simply append.
+                // excludedSubtrees: union — append only entries not already present,
+                // avoiding monotonic growth that would make per-cert NC checks O(chain²)
+                // when the same excluded subtrees are repeated across multiple CAs (vjc.12).
                 if let Some(new_excluded) = nc.excluded_subtrees {
-                    nc_excluded.extend(new_excluded);
+                    for new_entry in new_excluded.iter() {
+                        // Deduplication uses name_matches_subtree as a two-way equality
+                        // check: two entries are considered the same subtree when each
+                        // matches the other (i.e., they are semantically equivalent, not
+                        // just byte-equal).
+                        let already_present = nc_excluded.iter().any(|existing| {
+                            same_nc_variant(&existing.base, &new_entry.base)
+                                && name_matches_subtree(&existing.base, new_entry)
+                                && name_matches_subtree(&new_entry.base, existing)
+                        });
+                        if !already_present {
+                            nc_excluded.push(new_entry.clone());
+                        }
+                    }
                 }
             }
         }
@@ -1460,66 +1569,100 @@ fn chain_walk<V: SignatureVerifier>(
 // NameConstraints enforcement (PKIX-xji)
 // ---------------------------------------------------------------------------
 
+/// Whether a name-constraint check requires a match (permitted) or forbids a
+/// match (excluded).
+///
+/// Using an explicit enum instead of a bare `bool` makes call sites
+/// self-documenting: `CheckMode::Excluded` / `CheckMode::Permitted` vs
+/// opaque `false` / `true` (vjc.25).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CheckMode {
+    /// Excluded subtrees: any name that matches is a violation.
+    Excluded,
+    /// Permitted subtrees: a constrained name type that matches *no* entry is a violation.
+    Permitted,
+}
+
 /// Check that all names in `cert` satisfy the current NameConstraints state.
 ///
 /// Called once per certificate during chain_walk, BEFORE updating the NC
 /// state from that certificate's own NameConstraints extension.
 ///
+/// `san` is the pre-decoded SubjectAltName for this cert (pass `None` if the
+/// extension is absent). Decoding it before the call avoids a second scan of
+/// the extension list when both NC check and NC update are needed (vjc.13).
+///
 /// RFC 5280 §6.1.4(b)(1)–(2): check excluded subtrees first, then
 /// permitted subtrees.
 fn check_name_constraints(
     cert: &x509_cert::Certificate,
-    nc_permitted: &Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees>,
+    san: Option<&x509_cert::ext::pkix::SubjectAltName>,
+    nc_permitted: Option<&x509_cert::ext::pkix::constraints::name::GeneralSubtrees>,
     nc_excluded: &x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
-    nc_constrained_types: u32,
+    nc_constrained_types: NcTypeMask,
     index: usize,
 ) -> crate::Result<()> {
     use x509_cert::ext::pkix::name::GeneralName;
 
-    // Build the name set for this certificate:
-    // - subject DN only when non-empty (RFC 5280 §6.1.3(b) skips empty subject)
-    // - SAN entries if present
-    let subject_is_empty = cert.tbs_certificate.subject.0.is_empty();
-    let san = cert_subject_alt_names(cert);
+    let subject = &cert.tbs_certificate.subject;
+    let subject_is_empty = subject.0.is_empty();
 
     // Helper: check all cert names (subject DN + SAN) against `subtrees`.
     //
-    // `require_match = false` → excluded check: any match is a violation.
-    // `require_match = true`  → permitted check: a name type is constrained
-    // if any CA in the path ever added a permittedSubtrees entry of that type
-    // (tracked in nc_constrained_types). Constrained types must match at least
-    // one permitted subtree entry; unconstrained types are always accepted.
+    // CheckMode::Excluded → any match is a violation.
+    // CheckMode::Permitted → a name type is constrained if any CA in the path
+    // ever added a permittedSubtrees entry of that type (tracked in
+    // nc_constrained_types). Constrained types must match at least one permitted
+    // subtree entry; unconstrained types are always accepted.
     let check_names = |subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
-                       require_match: bool|
+                       mode: CheckMode|
      -> crate::Result<()> {
         let type_constrained =
-            |name: &GeneralName| -> bool { nc_constrained_types & name_type_bit(name) != 0 };
+            |name: &GeneralName| -> bool { nc_constrained_types.contains(name_type_bit(name)) };
 
         // subject DN — skipped when empty per RFC 5280 §6.1.3(b).
+        // Avoid constructing a GeneralName::DirectoryName (which requires a clone)
+        // by handling DirectoryName constraints inline: pull DirectoryName entries
+        // from `subtrees` and test directly against the subject Name (vjc.24).
         if !subject_is_empty {
-            let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone());
-            if !require_match {
-                if subtrees.iter().any(|st| name_matches_subtree(&subject, st)) {
-                    return Err(Error::NameConstraintViolation { index });
+            let subject_constrained = nc_constrained_types.contains(NC_TYPE_DIRECTORY_NAME);
+            let dn_matches_any = subtrees.iter().any(|st| {
+                if let GeneralName::DirectoryName(constr) = &st.base {
+                    dn_within_subtree(subject, constr)
+                } else {
+                    false
                 }
-            } else if type_constrained(&subject)
-                && !subtrees.iter().any(|st| name_matches_subtree(&subject, st))
-            {
-                return Err(Error::NameConstraintViolation { index });
+            });
+            match mode {
+                CheckMode::Excluded => {
+                    if dn_matches_any {
+                        return Err(Error::NameConstraintViolation { index });
+                    }
+                }
+                CheckMode::Permitted => {
+                    if subject_constrained && !dn_matches_any {
+                        return Err(Error::NameConstraintViolation { index });
+                    }
+                }
             }
         }
 
         // SAN entries.
-        if let Some(ref san_ext) = san {
+        if let Some(san_ext) = san {
             for name in san_ext.0.iter() {
-                if !require_match {
-                    if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
-                        return Err(Error::NameConstraintViolation { index });
+                match mode {
+                    CheckMode::Excluded => {
+                        if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
+                            return Err(Error::NameConstraintViolation { index });
+                        }
                     }
-                } else if type_constrained(name)
-                    && !subtrees.iter().any(|st| name_matches_subtree(name, st))
-                {
-                    return Err(Error::NameConstraintViolation { index });
+                    CheckMode::Permitted => {
+                        if type_constrained(name)
+                            && !subtrees.iter().any(|st| name_matches_subtree(name, st))
+                        {
+                            return Err(Error::NameConstraintViolation { index });
+                        }
+                    }
                 }
             }
         }
@@ -1527,19 +1670,58 @@ fn check_name_constraints(
     };
 
     // (1) Excluded check: any excluded subtree match → violation.
-    check_names(nc_excluded.as_slice(), false)?;
+    check_names(nc_excluded.as_slice(), CheckMode::Excluded)?;
 
     // (2) Permitted check: if permitted set is constrained, every name must
     //     match at least one permitted subtree.
     if let Some(permitted) = nc_permitted {
-        check_names(permitted.as_slice(), true)?;
+        check_names(permitted.as_slice(), CheckMode::Permitted)?;
     }
 
     // (3) RFC 5280 §4.2.1.10: emailAddress attributes in the subject DN MUST
     //     be checked against the rfc822Name constraint.
-    //     Walk subject RDNs for emailAddress (OID 1.2.840.113549.1.9.1).
-    if nc_constrained_types & NC_TYPE_RFC822 != 0 || !nc_excluded.is_empty() {
-        for rdn in cert.tbs_certificate.subject.0.iter() {
+    //     Guard: only enter the RDN walk if RFC822 constraints are actually
+    //     present — either a permitted-subtrees entry for RFC822 exists, OR at
+    //     least one excluded entry is an Rfc822Name.  Checking !nc_excluded.is_empty()
+    //     without filtering by type would cause the walk whenever ANY excluded
+    //     name type exists, even if none are Rfc822Name (vjc.11).
+    let has_rfc822_excluded = nc_excluded
+        .iter()
+        .any(|st| matches!(st.base, GeneralName::Rfc822Name(_)));
+    let has_rfc822_constraint =
+        nc_constrained_types.contains(NC_TYPE_RFC822) || has_rfc822_excluded;
+
+    if has_rfc822_constraint && !subject_is_empty {
+        // Pre-filter the permitted rfc822 entries once, outside the RDN loop,
+        // to avoid re-checking the Option and iterating nc_permitted on every
+        // emailAddress AVA found (vjc.26).
+        //
+        // Collect into a local GeneralSubtrees so the slice borrow lives as long
+        // as this block. `None` means RFC822 permitted check is inactive (only
+        // excluded may apply).
+        let permitted_rfc822_vec: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+            if nc_constrained_types.contains(NC_TYPE_RFC822) {
+                nc_permitted
+                    .map(|p| {
+                        p.iter()
+                            .filter(|st| matches!(st.base, GeneralName::Rfc822Name(_)))
+                            .cloned()
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            } else {
+                x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default()
+            };
+        // Only active when RFC822 permitted constraints were actually found.
+        let permitted_rfc822: Option<
+            &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+        > = if nc_constrained_types.contains(NC_TYPE_RFC822) {
+            Some(permitted_rfc822_vec.as_slice())
+        } else {
+            None
+        };
+
+        for rdn in subject.0.iter() {
             for ava in rdn.0.iter() {
                 if ava.oid != OID_EMAIL_ADDRESS {
                     continue;
@@ -1548,7 +1730,7 @@ fn check_name_constraints(
                     continue;
                 };
                 let email_str = email_ia5.as_str();
-                // Excluded check.
+                // Excluded check — walk only Rfc822Name excluded entries.
                 for st in nc_excluded.iter() {
                     if let GeneralName::Rfc822Name(constraint) = &st.base {
                         if matches_rfc822_name(email_str, constraint.as_str()) {
@@ -1557,17 +1739,15 @@ fn check_name_constraints(
                     }
                 }
                 // Permitted check (only when RFC822 has been constrained).
-                if nc_constrained_types & NC_TYPE_RFC822 != 0 {
-                    if let Some(permitted) = nc_permitted {
-                        if !permitted.iter().any(|st| {
-                            if let GeneralName::Rfc822Name(constraint) = &st.base {
-                                matches_rfc822_name(email_str, constraint.as_str())
-                            } else {
-                                false
-                            }
-                        }) {
-                            return Err(Error::NameConstraintViolation { index });
+                if let Some(permitted) = permitted_rfc822 {
+                    if !permitted.iter().any(|st| {
+                        if let GeneralName::Rfc822Name(constraint) = &st.base {
+                            matches_rfc822_name(email_str, constraint.as_str())
+                        } else {
+                            false
                         }
+                    }) {
+                        return Err(Error::NameConstraintViolation { index });
                     }
                 }
             }
