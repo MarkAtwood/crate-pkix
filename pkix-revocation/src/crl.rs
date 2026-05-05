@@ -16,6 +16,30 @@ use x509_cert::{
 const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.21");
 
+/// OID for CRLNumber extension (RFC 5280 §5.2.3) — id-ce-cRLNumber: 2.5.29.20
+#[allow(dead_code)]
+const OID_CRL_NUMBER: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.20");
+
+/// OID for deltaCRLIndicator extension (RFC 5280 §5.2.4) — id-ce-deltaCRLIndicator: 2.5.29.27
+/// This extension is CRITICAL; its presence marks a delta CRL.
+#[allow(dead_code)]
+const OID_DELTA_CRL_INDICATOR: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.27");
+
+/// OID for issuingDistributionPoint extension (RFC 5280 §5.2.5) — 2.5.29.28
+/// Note: x509-cert 0.2.5 has a wrong AssociatedOid for IssuingDistributionPoint
+/// (it uses SubjectInfoAccess OID instead). Always look up this extension by
+/// raw OID rather than using AssociatedOid-based helpers.
+#[allow(dead_code)]
+const OID_ISSUING_DISTRIBUTION_POINT: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.28");
+
+/// OID for KeyUsage extension (RFC 5280 §4.2.1.3) — id-ce-keyUsage: 2.5.29.15
+/// Used to check the cRLSign bit on the CRL issuer.
+const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
+
 /// Offline CRL-based revocation checker.
 ///
 /// Parses a DER-encoded [`CertificateList`][x509_cert::crl::CertificateList],
@@ -85,6 +109,11 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
+        // (3b) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
+        if !issuer_has_crl_sign(issuer) {
+            return Err(Error::CrlSignMissing);
+        }
+
         // (4) Check CRL validity window: thisUpdate ≤ now ≤ nextUpdate.
         //     Absent nextUpdate is treated as expired: an indefinitely valid CRL would
         //     allow a stale revocation list to suppress detection of revoked certificates.
@@ -114,6 +143,85 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         Ok(())
     }
+}
+
+/// Convert a DER [`Uint`][der::asn1::Uint] to a `u64`, padding from the left.
+///
+/// Returns `None` if the integer is larger than 8 bytes (would overflow `u64`).
+/// CRL numbers in PKITS are small (1–5), so this is not a practical limit.
+#[allow(dead_code)]
+fn uint_to_u64(n: &der::asn1::Uint) -> Option<u64> {
+    let b = n.as_bytes();
+    if b.len() > 8 {
+        return None; // too large for u64
+    }
+    let mut arr = [0u8; 8];
+    arr[8 - b.len()..].copy_from_slice(b);
+    Some(u64::from_be_bytes(arr))
+}
+
+/// Extract the CRL number from a `CertificateList`'s extensions.
+///
+/// Returns `None` if the CRLNumber extension is absent or cannot be decoded.
+/// CRLNumber is a non-negative INTEGER (RFC 5280 §5.2.3).
+#[allow(dead_code)]
+fn crl_number(crl: &x509_cert::crl::CertificateList) -> Option<u64> {
+    use der::Decode as _;
+    crl.tbs_cert_list
+        .crl_extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_CRL_NUMBER)
+        .and_then(|e| {
+            der::asn1::Uint::from_der(e.extn_value.as_bytes())
+                .ok()
+                .and_then(|n| uint_to_u64(&n))
+        })
+}
+
+/// Extract the BaseCRLNumber from a delta CRL's extensions.
+///
+/// The `deltaCRLIndicator` extension value IS the BaseCRLNumber — it is an
+/// INTEGER encoding the CRL number of the base CRL this delta updates.
+/// This extension MUST be critical (RFC 5280 §5.2.4).
+///
+/// Returns `None` if the extension is absent (CRL is not a delta CRL),
+/// or the `u64` value if it is present.
+#[allow(dead_code)]
+fn base_crl_number(crl: &x509_cert::crl::CertificateList) -> Option<u64> {
+    use der::Decode as _;
+    crl.tbs_cert_list
+        .crl_extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)
+        .and_then(|e| {
+            der::asn1::Uint::from_der(e.extn_value.as_bytes())
+                .ok()
+                .and_then(|n| uint_to_u64(&n))
+        })
+}
+
+/// Returns `true` if the certificate has `cRLSign` set in its KeyUsage extension,
+/// OR if the KeyUsage extension is absent (no constraint).
+///
+/// RFC 5280 §6.3.3(f): a CRL issuer that has a KeyUsage extension MUST assert
+/// the `cRLSign` bit. If KeyUsage is absent, there is no constraint.
+fn issuer_has_crl_sign(cert: &x509_cert::Certificate) -> bool {
+    use der::Decode as _;
+    use x509_cert::ext::pkix::KeyUsage;
+
+    let Some(exts) = cert.tbs_certificate.extensions.as_ref() else {
+        return true; // No extensions at all → no KeyUsage constraint
+    };
+    let Some(ku_ext) = exts.iter().find(|e| e.extn_id == OID_KEY_USAGE_CRL) else {
+        return true; // KeyUsage absent → no constraint
+    };
+    KeyUsage::from_der(ku_ext.extn_value.as_bytes())
+        .map(|ku| ku.crl_sign())
+        .unwrap_or(false) // malformed KeyUsage → treat as missing the bit
 }
 
 /// Extract the CRLReason code from a revoked cert entry's extensions, if present.
