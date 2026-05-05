@@ -34,6 +34,7 @@ sha2       = { workspace = true, optional = true }
 [dev-dependencies]
 der       = { workspace = true }
 x509-cert = { workspace = true }
+pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 
 [[test]]
 name = "crl_checker_tests"
@@ -42,6 +43,10 @@ required-features = ["crl"]
 [[test]]
 name = "ocsp_checker_tests"
 required-features = ["ocsp"]
+
+[[test]]
+name = "pkits_crl"
+required-features = ["crl"]
 
 [package.metadata.docs.rs]
 all-features = true
