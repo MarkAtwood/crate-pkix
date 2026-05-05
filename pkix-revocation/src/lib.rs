@@ -69,6 +69,18 @@ pub enum Error {
     /// - `responseBytes` is absent in a `Successful` response (RFC 6960 §4.2.1)
     /// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
     OcspMalformed,
+
+    /// The CRL issuer certificate does not have the `cRLSign` bit set in KeyUsage
+    /// (RFC 5280 §6.3.3(f)).
+    CrlSignMissing,
+
+    /// A delta CRL was supplied but no base CRL is available, or the delta's
+    /// `BaseCRLNumber` does not match the base CRL's `CRLNumber`.
+    DeltaCrlBaseMismatch,
+
+    /// The CRL's CRL number is lower than expected (base CRL must have a number
+    /// ≥ the delta's `BaseCRLNumber`).
+    CrlNumberMismatch,
 }
 
 impl core::fmt::Display for Error {
@@ -94,6 +106,15 @@ impl core::fmt::Display for Error {
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
             Error::OcspMalformed => {
                 f.write_str("OCSP response is structurally invalid (malformed per RFC 6960)")
+            }
+            Error::CrlSignMissing => {
+                f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
+            }
+            Error::DeltaCrlBaseMismatch => f.write_str(
+                "delta CRL BaseCRLNumber does not match the base CRL's CRLNumber",
+            ),
+            Error::CrlNumberMismatch => {
+                f.write_str("CRL number is lower than expected")
             }
         }
     }

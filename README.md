@@ -25,7 +25,7 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 | [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only | v0.1 |
 | [`pkix-chain`] | Umbrella: combines path + revocation | — | v0.1 |
 | [`pkix-chain-simple`] | Opinionated single-call validator | — | v0.1 |
-| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | planned |
+| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | v0.1 |
 | [`pkix-revocation-http`] | Online CRL/OCSP fetching from CDP/AIA | — | planned |
 | [`pkix-profiles`] | CA/B Forum policy pre-configurations | — | planned |
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
@@ -125,11 +125,12 @@ Implemented:
 - OCSP revocation checking (offline, direct responder)
 
 Not yet implemented (v0.2+):
-- Name constraints (RFC 5280 §4.2.1.10) — PKIX-4yq
+- RFC 4518 DN string normalization — PKIX-pyc
+
+In progress for v0.1:
 - Policy validation (RFC 5280 §6.1 state machine) — PKIX-mi3
 - Path building from unordered certs (RFC 4158) — PKIX-y2j
 - Delta CRLs and CRL Distribution Points — PKIX-58m
-- RFC 4518 DN string normalization — PKIX-pyc
 
 ## Standards
 

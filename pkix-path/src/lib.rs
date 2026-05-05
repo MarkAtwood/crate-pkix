@@ -2,7 +2,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
-
 //! RFC 5280 X.509 certificate path validation — pure Rust, `no_std`.
 //!
 //! Implements certificate path building and validation per
@@ -28,6 +27,18 @@
 //! - Cross-certificate path building (RFC 4158)
 //!
 //! These are tracked for v0.2+.
+
+// For no_std builds, pull in the alloc crate explicitly so `alloc::` paths resolve.
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+// Unified Vec import: alloc::vec::Vec in no_std, std::vec::Vec under std.
+// Both map to the same concrete type; this alias lets the rest of the file
+// write `Vec<_>` without cfg-gating every use site.
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::vec::Vec;
 
 use der::Tagged;
 use signature::Error as SignatureError;
@@ -89,6 +100,14 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
+    /// Certificate policy validation failed (RFC 5280 §6.1.5(g)).
+    ///
+    /// Returned when `explicit_policy` reaches zero and the valid policy tree
+    /// is empty, meaning no acceptable certificate policy exists for the chain.
+    PolicyViolation {
+        /// Zero-based index of the certificate where the violation was detected.
+        index: usize,
+    },
     /// ASN.1 / DER encoding or decoding error.
     ///
     /// Most commonly returned when the internal 8 KiB stack buffer used to
@@ -131,6 +150,9 @@ impl core::fmt::Display for Error {
             Error::NameConstraintViolation { index } => {
                 write!(f, "name constraints violated at certificate index {index}")
             }
+            Error::PolicyViolation { index } => {
+                write!(f, "certificate policy violation at chain index {index}")
+            }
             Error::Der(e) => write!(f, "DER error: {e}"),
         }
     }
@@ -150,7 +172,8 @@ impl std::error::Error for Error {
             | Error::NotCA { .. }
             | Error::KeyUsageMissing { .. }
             | Error::UnhandledCriticalExtension { .. }
-            | Error::NameConstraintViolation { .. } => None,
+            | Error::NameConstraintViolation { .. }
+            | Error::PolicyViolation { .. } => None,
         }
     }
 }
@@ -344,15 +367,15 @@ impl TryFrom<Certificate> for TrustAnchor {
 ///
 /// # Stability
 ///
-/// `ValidationPolicy` is `#[non_exhaustive]`: fields for PolicyConstraints,
-/// PolicyMappings, and initial-policy-set enforcement will be added in v0.2.
+/// `ValidationPolicy` is `#[non_exhaustive]`.
 /// Construct via [`ValidationPolicy::new`] or [`Default`] + field assignment.
 /// Do not use struct literal syntax.
 ///
-/// # Limitations
-///
-/// v0.1 does not enforce CertificatePolicies or PolicyMappings.
-/// Fields for these will be added in v0.2.
+/// Policy enforcement (CertificatePolicies, PolicyMappings, PolicyConstraints,
+/// InhibitAnyPolicy) is implemented per RFC 5280 §6.1. Use the
+/// `initial_explicit_policy`, `initial_any_policy_inhibit`,
+/// `initial_policy_mapping_inhibit`, and `initial_policy_set` fields to
+/// configure the initial policy state.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
@@ -382,6 +405,36 @@ pub struct ValidationPolicy {
     /// When `true`, an intermediate certificate missing `keyCertSign` in its
     /// KeyUsage will be rejected even if BasicConstraints cA=TRUE.
     pub enforce_key_usage: bool,
+
+    /// Initial explicit-policy indicator (RFC 5280 §6.1.1).
+    ///
+    /// When `true`, path validation requires that at least one valid policy exists
+    /// from the initial policy set. When `false` (the default), any valid path is
+    /// accepted even if no certificate policy is asserted.
+    pub initial_explicit_policy: bool,
+
+    /// Initial any-policy inhibit indicator (RFC 5280 §6.1.1).
+    ///
+    /// When `true`, the `anyPolicy` OID is not considered a match for any other
+    /// policy at the start of the path. When `false` (the default), `anyPolicy`
+    /// is accepted as a wildcard unless later inhibited by a CA certificate.
+    pub initial_any_policy_inhibit: bool,
+
+    /// Initial policy-mapping inhibit indicator (RFC 5280 §6.1.1).
+    ///
+    /// When `true`, policy mappings are not permitted in any certificate in the
+    /// chain. When `false` (the default), policy mappings are allowed.
+    pub initial_policy_mapping_inhibit: bool,
+
+    /// Initial user-requested policy set (RFC 5280 §6.1.1).
+    ///
+    /// The set of certificate policies acceptable to the relying party. An empty
+    /// vec is treated as `{anyPolicy}` — all policies are acceptable. Set this
+    /// to restrict which policies are recognized in the output.
+    ///
+    /// Note: this is `pub` but clones the OID set, so prefer constructing once
+    /// and reusing the `ValidationPolicy`.
+    pub initial_policy_set: Vec<der::asn1::ObjectIdentifier>,
 }
 
 impl ValidationPolicy {
@@ -404,6 +457,10 @@ impl Default for ValidationPolicy {
             max_path_len: 10,
             current_time_unix: 0, // caller must set to avoid silent clock skew
             enforce_key_usage: true,
+            initial_explicit_policy: false,
+            initial_any_policy_inhibit: false,
+            initial_policy_mapping_inhibit: false,
+            initial_policy_set: Vec::new(),
         }
     }
 }
@@ -581,6 +638,23 @@ const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
 const OID_NAME_CONSTRAINTS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.30");
 
+const OID_CERTIFICATE_POLICIES: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.32");
+
+const OID_POLICY_MAPPINGS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.33");
+
+const OID_POLICY_CONSTRAINTS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.36");
+
+const OID_INHIBIT_ANY_POLICY: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.54");
+
+/// OID for the `anyPolicy` wildcard (2.5.29.32.0 — a child of id-ce-certificatePolicies).
+#[allow(dead_code)] // used by the policy state machine in a future child issue
+const OID_ANY_POLICY: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.32.0");
+
 /// OID for the emailAddress attribute in Distinguished Names (PKCS #9 §5.2.1).
 /// Used when enforcing RFC 5280 §4.2.1.10 rfc822Name constraints against DN attributes.
 const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
@@ -605,6 +679,10 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
     OID_SUBJECT_ALT_NAME,
     OID_EXTENDED_KEY_USAGE,
     OID_NAME_CONSTRAINTS,
+    OID_CERTIFICATE_POLICIES,
+    OID_POLICY_MAPPINGS,
+    OID_POLICY_CONSTRAINTS,
+    OID_INHIBIT_ANY_POLICY,
 ];
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
