@@ -316,11 +316,13 @@ fn pkits_4_15_10_invalid_only_delta_no_base_ca3() {
     let delta_as_base = pkits_crl("deltaCRLCA3deltaCRL");
     let checker = CrlChecker::new(delta_as_base, PKITS_NOW, DefaultVerifier);
     // The EE cert (serial=1) is not in the delta's (empty) revoked list → Ok().
-    // Path-level validation would still fail because no proper base is provided.
-    let _result = checker.check_revocation(&ee, &ca);
-    // No assertion on result — this test documents that the checker alone cannot
-    // enforce the "base must be present" invariant; it falls to the path validator.
-    // The construction test in §4.15.9 already covers the with_delta failure path.
+    // Path-level validation would still fail because no proper base is provided,
+    // but that invariant is enforced at construction time (see §4.15.9 test).
+    let result = checker.check_revocation(&ee, &ca);
+    assert!(
+        result.is_ok(),
+        "§4.15.10: EE not in empty delta list → checker must return Ok(); got {result:?}"
+    );
 }
 
 // ============================================================================

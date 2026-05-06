@@ -19,10 +19,18 @@ Fixtures:
   leaf-rsa2048-365d-san-eku.der     Leaf: RSA-2048, 365 days, SAN, serverAuth EKU
   leaf-rsa1024-365d-san-eku.der     Leaf: RSA-1024, 365 days, SAN, serverAuth EKU
   webpki-self-signed-365d.der       Self-signed P-256 cert: 365 days, SAN, serverAuth EKU
+  smime-self-signed-365d.der        Self-signed P-256 cert: 365 days, SAN rfc822Name,
+                                    emailProtection EKU (smime_policy happy path)
+  codesign-self-signed-365d.der     Self-signed P-256 cert: 365 days, no SAN,
+                                    codeSigning EKU (code_signing_policy happy path)
 
 Oracle (chained fixtures):  openssl verify -CAfile <root.pem> -untrusted <int.pem> <leaf.pem>
 Oracle (webpki-self-signed-365d): openssl verify -CAfile webpki-self-signed-365d.pem \
     webpki-self-signed-365d.pem → OK (self-signed; cert is both anchor and subject)
+Oracle (smime-self-signed-365d): openssl verify -CAfile smime-self-signed-365d.pem \
+    smime-self-signed-365d.pem → OK (self-signed)
+Oracle (codesign-self-signed-365d): openssl verify -CAfile codesign-self-signed-365d.pem \
+    codesign-self-signed-365d.pem → OK (self-signed)
 
 All certs use NOT_BEFORE = 2025-01-01. Tests run at GRY_NOW = 2026-06-01 (unix 1780272000),
 which is within the validity window of all certs generated here.
@@ -293,6 +301,91 @@ webpki_self_signed = (
 )
 
 # ---------------------------------------------------------------------------
+# Self-signed 365-day cert for smime_policy conforming test
+#
+# smime_policy sets max_validity_secs = 1185 days which applies to ALL certs.
+# A 1-cert self-signed chain sidesteps the CA cert validity check.
+#
+# This cert has: 365-day validity, SAN=rfc822Name:test@example.com,
+# emailProtection EKU, cA=True (self-signed anchor + leaf).
+# Oracle: openssl verify -CAfile smime-self-signed-365d.pem smime-self-signed-365d.pem → OK
+# ---------------------------------------------------------------------------
+key_smime_self = ec.generate_private_key(ec.SECP256R1())
+smime_self_signed = (
+    x509.CertificateBuilder()
+    .subject_name(make_name("PKIX-smime-self"))
+    .issuer_name(make_name("PKIX-smime-self"))
+    .public_key(key_smime_self.public_key())
+    .serial_number(next_serial())
+    .not_valid_before(NOT_BEFORE)
+    .not_valid_after(NOT_AFTER_365)
+    .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    .add_extension(
+        x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=True,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    .add_extension(
+        x509.SubjectAlternativeName([x509.RFC822Name("test@example.com")]),
+        critical=False,
+    )
+    .add_extension(
+        x509.ExtendedKeyUsage([ExtendedKeyUsageOID.EMAIL_PROTECTION]),
+        critical=False,
+    )
+    .sign(key_smime_self, hashes.SHA256())
+)
+
+# ---------------------------------------------------------------------------
+# Self-signed 365-day cert for code_signing_policy conforming test
+#
+# code_signing_policy does NOT require SAN (require_subject_alt_name=False).
+# It requires codeSigning EKU and min_rsa_key_bits=3072 (N/A for P-256).
+#
+# This cert has: 365-day validity, no SAN, codeSigning EKU, cA=True.
+# Oracle: openssl verify -CAfile codesign-self-signed-365d.pem codesign-self-signed-365d.pem → OK
+# ---------------------------------------------------------------------------
+key_codesign_self = ec.generate_private_key(ec.SECP256R1())
+codesign_self_signed = (
+    x509.CertificateBuilder()
+    .subject_name(make_name("PKIX-codesign-self"))
+    .issuer_name(make_name("PKIX-codesign-self"))
+    .public_key(key_codesign_self.public_key())
+    .serial_number(next_serial())
+    .not_valid_before(NOT_BEFORE)
+    .not_valid_after(NOT_AFTER_365)
+    .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    .add_extension(
+        x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=True,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    .add_extension(
+        x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CODE_SIGNING]),
+        critical=False,
+    )
+    .sign(key_codesign_self, hashes.SHA256())
+)
+
+# ---------------------------------------------------------------------------
 # Write DER files
 # ---------------------------------------------------------------------------
 files = {
@@ -308,6 +401,8 @@ files = {
     "leaf-rsa2048-365d-san-eku.der": leaf_rsa2048_365d_san_eku,
     "leaf-rsa1024-365d-san-eku.der": leaf_rsa1024_365d_san_eku,
     "webpki-self-signed-365d.der": webpki_self_signed,
+    "smime-self-signed-365d.der": smime_self_signed,
+    "codesign-self-signed-365d.der": codesign_self_signed,
 }
 
 for name, cert in files.items():
