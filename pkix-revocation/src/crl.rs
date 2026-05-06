@@ -274,7 +274,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     and the primary issuer-name check.  The extra checks below are
         //     defense-in-depth: they guard against any future code path that bypasses
         //     the with_delta() constructor and against subtle cross-name mismatches.
-        let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
+        let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
             // Extra check: delta CRL issuer must also match the base CRL issuer
             // (construction-time invariant, re-checked here for defense-in-depth).
             // We parse once to get the issuer, then rely on the helper for the rest.
@@ -400,7 +400,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (6) Delta CRL merge — if a delta CRL is present, verify issuer consistency
         //     and merge it.  Uses the anchor SPKI for the delta signature check.
-        let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
+        let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
             // Cross-check: delta CRL issuer must match base CRL issuer and anchor subject.
             // Mirrors the three-way check performed in check_revocation for the cert-issuer path.
             {
