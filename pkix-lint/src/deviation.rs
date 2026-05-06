@@ -458,11 +458,11 @@ impl DeviationStore {
     }
 
     /// Return all deviations targeting `lint_id` that are active at `now_unix`.
-    pub fn active_for_lint(
-        &self,
-        lint_id: &str,
+    pub fn active_for_lint<'a>(
+        &'a self,
+        lint_id: &'a str,
         now_unix: u64,
-    ) -> impl Iterator<Item = &Deviation> + '_ {
+    ) -> impl Iterator<Item = &'a Deviation> {
         self.deviations
             .iter()
             .filter(move |d| d.target_lint == lint_id && d.is_active_at(now_unix))
