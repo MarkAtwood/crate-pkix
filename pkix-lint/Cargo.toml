@@ -9,11 +9,13 @@ authors.workspace = true
 description = "Lint engine for X.509 certificates — structured soft-fail and advisory results"
 
 [dependencies]
-pkix-path   = { workspace = true }
-x509-cert   = { workspace = true }
-der         = { workspace = true }
+pkix-path     = { workspace = true }
+pkix-profiles = { workspace = true }
+x509-cert     = { workspace = true }
+der           = { workspace = true }
 
 [dev-dependencies]
-pkix-path   = { workspace = true, features = ["p256", "std"] }
-der         = { workspace = true }
-x509-cert   = { workspace = true }
+pkix-path     = { workspace = true, features = ["p256", "std"] }
+pkix-profiles = { workspace = true }
+der           = { workspace = true }
+x509-cert     = { workspace = true }
