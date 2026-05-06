@@ -83,6 +83,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// - `crl_der`  — DER-encoded `CertificateList` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix` — current time as seconds since the Unix epoch
     /// - `verifier` — signature verifier used to authenticate the CRL
+    #[must_use]
     pub fn new(crl_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
         Self {
             crl_der: crl_der.into(),

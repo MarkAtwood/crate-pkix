@@ -66,6 +66,7 @@ impl<V: SignatureVerifier> OcspChecker<V> {
     /// - `response_der` — DER-encoded `OCSPResponse` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix`     — current time as seconds since the Unix epoch
     /// - `verifier`     — signature verifier used to authenticate the OCSP response
+    #[must_use]
     pub fn new(response_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
         Self {
             response_der: response_der.into(),

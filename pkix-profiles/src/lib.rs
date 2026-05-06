@@ -348,20 +348,6 @@ mod tests {
             web_pki_policy(NOW).require_subject_alt_name,
             "web_pki_policy must set require_subject_alt_name=true"
         );
-        // Verify the enforcement works: self-signed cert with SAN removed.
-        // Since webpki-self-signed-365d.der HAS a SAN, we test with a policy
-        // that requires SAN and a cert that lacks it (leaf-p256-365d-no-san).
-        // We use a custom policy to avoid the CA cert validity issue.
-        let mut policy = pkix_path::ValidationPolicy::new(NOW);
-        policy.require_subject_alt_name = true;
-        // Use the self-signed cert chain where leaf is the anchor.
-        // But we need a cert WITHOUT SAN. The no-san leaf is not self-signed.
-        // Instead, verify the constraint fire via MissingSan on the self-signed cert
-        // by temporarily building a policy with require_subject_alt_name and
-        // using the self-signed cert (which HAS a SAN — this should PASS).
-        // Then separately test that MissingSan is the error for missing SAN
-        // (already proven in pkix-path unit tests, which we trust).
-        // This test validates that web_pki_policy returns require_subject_alt_name=true.
         let cert = load(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
         ));
@@ -469,6 +455,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn smime_policy_max_path_len_is_1() {
+        let p = smime_policy(NOW);
+        assert_eq!(
+            p.max_path_len, 1,
+            "smime_policy: max_path_len must be 1 (S/MIME BR §7.2.2)"
+        );
+    }
+
     /// Verify that `smime_policy` requires `emailProtection` EKU, and that a cert with
     /// `serverAuth` (not `emailProtection`) is rejected.
     ///
@@ -497,22 +492,6 @@ mod tests {
                 Err(pkix_path::Error::MissingEku)
             ),
             "cert with serverAuth (not emailProtection) must fail smime_policy EKU check"
-        );
-    }
-
-    /// smime_policy rejects a cert that has serverAuth EKU instead of emailProtection.
-    #[test]
-    fn smime_policy_server_auth_eku_rejected() {
-        let cert = load(include_bytes!(
-            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
-        ));
-        let anchors = [TrustAnchor::from_cert(cert.clone())];
-        assert!(
-            matches!(
-                pkix_path::validate_path(&[cert], &anchors, &smime_policy(NOW), &EcdsaP256Verifier),
-                Err(pkix_path::Error::MissingEku)
-            ),
-            "leaf with serverAuth (not emailProtection) EKU must be rejected by smime_policy"
         );
     }
 
@@ -546,6 +525,15 @@ mod tests {
         assert!(
             !p.require_subject_alt_name,
             "code_signing_policy: require_subject_alt_name must be false (CS certs use DN)"
+        );
+    }
+
+    #[test]
+    fn code_signing_policy_max_path_len_is_1() {
+        let p = code_signing_policy(NOW);
+        assert_eq!(
+            p.max_path_len, 1,
+            "code_signing_policy: max_path_len must be 1 (CS BR §7.1.1)"
         );
     }
 
