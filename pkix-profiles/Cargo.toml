@@ -12,6 +12,7 @@ categories  = ["cryptography"]
 
 [dependencies]
 der       = { workspace = true }
+# Default features (rsa, p256) are intentionally enabled: pkix-profiles tests use EcdsaP256Verifier.
 pkix-path = { workspace = true }
 
 [dev-dependencies]

@@ -25,6 +25,13 @@
 //! | [`code_signing_policy`] | CA/B Forum Code Signing BR | Code signing EKU, timestamping |
 //! | [`rfc5280_policy`] | RFC 5280 only | No CA/B Forum additions |
 //!
+//! # Dependencies
+//!
+//! This crate depends on `pkix-path` with its default features (`rsa`, `p256`)
+//! enabled. Users who want a narrower feature set should depend on `pkix-path`
+//! directly with only the needed features and use [`pkix_path::ValidationPolicy`]
+//! without this crate.
+//!
 //! # Spec references
 //!
 //! - CA/Browser Forum Baseline Requirements for TLS Server Certificates

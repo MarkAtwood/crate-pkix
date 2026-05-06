@@ -54,6 +54,21 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///
 /// Only available when the `crl` feature is enabled.
 ///
+/// # Return value semantics
+///
+/// [`RevocationChecker::check_revocation`] returns `Ok(())` in two distinct cases:
+///
+/// 1. **Not revoked**: the CRL covers this certificate type and the serial number
+///    was not found in the revoked list.
+/// 2. **Not covered**: the CRL's `IssuingDistributionPoint` scope flags
+///    (`onlyContainsUserCerts`, `onlyContainsCACerts`, `onlyContainsAttributeCerts`)
+///    indicate the CRL does not apply to this certificate type.
+///
+/// These two outcomes are indistinguishable from the caller's perspective.
+/// Callers enforcing a **hard-fail** revocation policy must separately verify
+/// that at least one CRL or OCSP response actually covers the certificate
+/// in question; receiving `Ok(())` alone is not sufficient.
+///
 /// # Limitations (v0.1)
 ///
 /// - The CRL must be signed directly by the certificate issuer
@@ -227,16 +242,22 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if let Some(idp) = parse_issuing_dp(&crl) {
             // onlyContainsAttributeCerts: we never handle attribute certs.
             if idp.only_contains_attribute_certs {
-                return Ok(()); // CRL does not cover this certificate
+                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
+                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
+                return Ok(());
             }
             let cert_is_ca = cert_is_ca_cert(cert);
             // onlyContainsUserCerts: CRL only covers end-entity (non-CA) certs.
             if idp.only_contains_user_certs && cert_is_ca {
-                return Ok(()); // CRL does not cover CA certs
+                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
+                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
+                return Ok(());
             }
             // onlyContainsCACerts: CRL only covers CA certs.
             if idp.only_contains_ca_certs && !cert_is_ca {
-                return Ok(()); // CRL does not cover end-entity certs
+                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
+                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
+                return Ok(());
             }
         }
 
