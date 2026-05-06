@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-composite"
 description = "Composite signature verifier for pkix-path (draft-ietf-lamps-pq-composite-sigs)"
-version.workspace     = true
+version               = "0.1.1"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
