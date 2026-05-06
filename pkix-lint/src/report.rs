@@ -195,8 +195,8 @@ mod tests {
 
     fn pass_finding() -> Finding {
         Finding {
-            lint_id: "test.lint",
-            citation: "test",
+            lint_id: std::borrow::Cow::Borrowed("test.lint"),
+            citation: std::borrow::Cow::Borrowed("test"),
             rule_bundle_version: "v0.2.0",
             result: LintResult::Pass,
             cert_index: Some(0),

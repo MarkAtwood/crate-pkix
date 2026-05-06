@@ -60,7 +60,7 @@ use crate::Severity;
 use x509_cert::Certificate;
 
 #[cfg(feature = "serde")]
-use crate::de_static_str;
+use crate::de_cow_static;
 
 /// Error returned by [`DeviationStore::add`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -308,14 +308,8 @@ impl DeviationScope {
             DeviationScope::Any => true,
 
             DeviationScope::IssuerDnContains(substring) => {
-                // `substring` is stored pre-lowercased (lowercased at construction
-                // time). Only the cert's issuer string is lowercased here, avoiding
-                // repeated allocation on every call.
-                cert.tbs_certificate
-                    .issuer
-                    .to_string()
-                    .to_lowercase()
-                    .contains(substring.as_str())
+                let issuer_lower = cert.tbs_certificate.issuer.to_string().to_lowercase();
+                issuer_lower.contains(substring.to_lowercase().as_str())
             }
 
             DeviationScope::IssuerDnExact(name) => {
@@ -457,15 +451,14 @@ pub enum DeviationAction {
 /// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
 /// operators can navigate to the backing waiver document without a second lookup.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-    pub lint_id: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub lint_id: std::borrow::Cow<'static, str>,
     /// The citation for the lint that produced this finding.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-    pub citation: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub citation: std::borrow::Cow<'static, str>,
     /// The original lint result before the deviation was applied.
     pub original_result: crate::LintResult,
     /// The deviation ID that was applied.
@@ -480,6 +473,11 @@ pub struct DeviatedFinding {
     pub evidence_uri: Option<String>,
     /// For certificate-scope findings, the zero-based chain index.
     pub cert_index: Option<usize>,
+    /// Unix epoch seconds at which the lint was evaluated.
+    ///
+    /// Propagated from [`crate::Finding::evaluated_at_unix`] when the deviation
+    /// is applied. Matches the `now_unix` passed to the runner method.
+    pub evaluated_at_unix: u64,
 }
 
 impl DeviatedFinding {
@@ -784,7 +782,7 @@ impl DeviationRunner {
             }
             match self
                 .store
-                .find_deviation(finding.lint_id, cert, now_unix)
+                .find_deviation(&finding.lint_id, cert, now_unix)
             {
                 None => {
                     result.findings.push(finding);
@@ -799,6 +797,7 @@ impl DeviationRunner {
                         justification: dev.justification.clone(),
                         evidence_uri: dev.evidence_uri.clone(),
                         cert_index: finding.cert_index,
+                        evaluated_at_unix: finding.evaluated_at_unix,
                     });
                 }
             }
@@ -923,49 +922,6 @@ mod tests {
         let cert = load_cert();
         let scope = DeviationScope::IssuerDnContains("XYZ_NONEXISTENT_ISSUER_9999".to_string());
         assert!(!scope.matches(&cert));
-    }
-
-    /// Uppercase substring never matches — callers must pre-lowercase.
-    ///
-    /// `IssuerDnContains` stores the substring pre-lowercased. At match time,
-    /// only the cert's issuer string is lowercased; the stored substring is used
-    /// as-is. An uppercase stored substring will never match any cert because the
-    /// cert's issuer string (lowercased) cannot contain uppercase letters.
-    ///
-    /// This test documents the silent-no-match behavior so callers know they must
-    /// pre-lowercase the substring when constructing the scope.
-    #[test]
-    fn scope_issuer_dn_contains_uppercase_silently_fails() {
-        let cert = load_cert();
-        // Get a word from the issuer that we know is in the cert's DN.
-        let issuer = cert.tbs_certificate.issuer.to_string();
-        // Find a word that exists in lowercase in the cert issuer.
-        let word = issuer
-            .split(|c: char| !c.is_alphanumeric())
-            .find(|w| !w.is_empty())
-            .unwrap_or("test");
-        let lowercase_word = word.to_lowercase();
-
-        // Sanity: lowercase substring must match.
-        let scope_lower = DeviationScope::IssuerDnContains(lowercase_word.clone());
-        assert!(
-            scope_lower.matches(&cert),
-            "pre-lowercased substring must match"
-        );
-
-        // Uppercase substring never matches — callers must pre-lowercase.
-        // The uppercase version of a nonempty lowercase word differs from the
-        // lowercased cert issuer, so this must fail.
-        let uppercase_word = lowercase_word.to_uppercase();
-        if uppercase_word != lowercase_word {
-            // Only assert no-match when the word actually has uppercase form distinct from lowercase.
-            let scope_upper = DeviationScope::IssuerDnContains(uppercase_word);
-            assert!(
-                !scope_upper.matches(&cert),
-                "uppercase substring never matches — callers must pre-lowercase the substring \
-                 when constructing IssuerDnContains"
-            );
-        }
     }
 
     /// `DeviationStore::add` normalizes `IssuerDnContains` to lowercase so that
@@ -1264,14 +1220,15 @@ mod tests {
     #[test]
     fn deviated_finding_effective_severity() {
         let f = DeviatedFinding {
-            lint_id: "test.lint",
-            citation: "test citation",
+            lint_id: std::borrow::Cow::Borrowed("test.lint"),
+            citation: std::borrow::Cow::Borrowed("test citation"),
             original_result: LintResult::Error("original"),
             deviation_id: "d1".to_string(),
             action: DeviationAction::DowngradeSeverityTo(Severity::Info),
             justification: "test justification".to_string(),
             evidence_uri: None,
             cert_index: None,
+            evaluated_at_unix: 0,
         };
         assert_eq!(f.effective_severity(), Some(Severity::Info));
 
