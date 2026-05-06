@@ -3,3 +3,10 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# Cargo build output
+/target/
+
+# Stray build artifacts in repo root
+*.rlib
+test_must_use*
