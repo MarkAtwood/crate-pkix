@@ -1192,16 +1192,6 @@ fn try_find_cert_ext<T: der::DecodeOwned>(
     }
 }
 
-// NOTE: uses fail-open (find_cert_ext): a malformed BasicConstraints extension
-// is treated as absent, not as an error. This is intentional — a malformed but
-// non-critical BC extension should not block validation; chain_walk separately
-// enforces cA=TRUE which will return NotCA if BC is absent or malformed. For
-// the NC extension, fail-closed is required (see cert_name_constraints) because
-// a silently-ignored NC constraint is a security bypass.
-fn cert_basic_constraints(cert: &Certificate) -> Option<x509_cert::ext::pkix::BasicConstraints> {
-    find_cert_ext(cert, OID_BASIC_CONSTRAINTS)
-}
-
 fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::SubjectAltName> {
     find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
 }
@@ -2275,7 +2265,16 @@ fn chain_walk<V: SignatureVerifier>(
         if i > 0 {
             // (f) BasicConstraints cA=TRUE required; (h) pathLenConstraint.
             // Decode BasicConstraints once for both checks.
-            let bc = cert_basic_constraints(cert);
+            //
+            // Fail-closed: if the extension is structurally present but DER-malformed
+            // on an intermediate CA, propagate MalformedCertificate rather than
+            // treating it as absent (which would fall through to NotCA and hide the
+            // real structural problem).
+            let bc = try_find_cert_ext::<x509_cert::ext::pkix::BasicConstraints>(
+                cert,
+                OID_BASIC_CONSTRAINTS,
+            )
+            .map_err(|_| Error::MalformedCertificate { index: i })?;
             if !bc.as_ref().is_some_and(|b| b.ca) {
                 return Err(Error::NotCA { index: i });
             }
