@@ -122,7 +122,7 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 /// grows process memory permanently. If this becomes a concern, replace with an
 /// interning cache with eviction.
 #[cfg(feature = "serde")]
-fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
+pub(crate) fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

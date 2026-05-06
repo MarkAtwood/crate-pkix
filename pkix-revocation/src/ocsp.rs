@@ -401,26 +401,15 @@ fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::R
 /// Returns [`Error::OcspSignatureInvalid`] on mismatch, as a mismatch means
 /// the response was not produced by the expected issuer.
 fn verify_responder_id(id: &ResponderId, issuer: &Certificate) -> crate::Result<()> {
-    match id {
-        ResponderId::ByName(name) => {
-            if !names_match(name, &issuer.tbs_certificate.subject) {
-                return Err(Error::OcspSignatureInvalid);
-            }
-        }
-        ResponderId::ByKey(key_hash) => {
-            use sha1::Digest as _;
-            let raw = issuer
-                .tbs_certificate
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes();
-            let expected: [u8; 20] = sha1::Sha1::digest(raw).into();
-            if key_hash.as_bytes() != expected.as_ref() {
-                return Err(Error::OcspSignatureInvalid);
-            }
-        }
-    }
-    Ok(())
+    verify_responder_id_impl(
+        id,
+        &issuer.tbs_certificate.subject,
+        issuer
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes(),
+    )
 }
 
 /// Same as [`verify_responder_id`] but uses a [`TrustAnchor`]'s identity instead
@@ -429,19 +418,34 @@ fn verify_responder_id(id: &ResponderId, issuer: &Certificate) -> crate::Result<
 /// Used by [`OcspChecker::check_revocation_against_anchor`] where only the
 /// anchor's subject DN and SPKI are available.
 fn verify_responder_id_anchor(id: &ResponderId, anchor: &TrustAnchor) -> crate::Result<()> {
+    verify_responder_id_impl(
+        id,
+        &anchor.subject,
+        anchor
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes(),
+    )
+}
+
+/// Common implementation for [`verify_responder_id`] and [`verify_responder_id_anchor`].
+///
+/// Checks that the OCSP `ResponderId` matches the expected identity
+/// (either a certificate subject or a trust anchor subject).
+fn verify_responder_id_impl(
+    id: &ResponderId,
+    subject: &x509_cert::name::Name,
+    spki_raw: &[u8],
+) -> crate::Result<()> {
     match id {
         ResponderId::ByName(name) => {
-            if !names_match(name, &anchor.subject) {
+            if !names_match(name, subject) {
                 return Err(Error::OcspSignatureInvalid);
             }
         }
         ResponderId::ByKey(key_hash) => {
             use sha1::Digest as _;
-            let raw = anchor
-                .subject_public_key_info
-                .subject_public_key
-                .raw_bytes();
-            let expected: [u8; 20] = sha1::Sha1::digest(raw).into();
+            let expected: [u8; 20] = sha1::Sha1::digest(spki_raw).into();
             if key_hash.as_bytes() != expected.as_ref() {
                 return Err(Error::OcspSignatureInvalid);
             }

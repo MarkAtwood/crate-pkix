@@ -158,13 +158,11 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             // No deltaCRLIndicator OID → this is not a delta CRL.
             return Err(Error::DeltaCrlBaseMismatch);
         }
-        let delta_base_num = base_crl_number(&delta_crl);
-        if delta_base_num.is_none() {
-            // deltaCRLIndicator OID is present but its INTEGER value cannot be decoded.
-            return Err(Error::CrlParseError(der::Error::from(
-                der::ErrorKind::Failed,
-            )));
-        }
+        // deltaCRLIndicator OID is present (checked above) but its INTEGER value
+        // cannot be decoded → structural error.
+        let delta_base_num = base_crl_number(&delta_crl).ok_or_else(|| {
+            Error::CrlParseError(der::Error::from(der::ErrorKind::Failed))
+        })?;
 
         // The base CRL and delta CRL MUST have the same issuer.
         if !names_match(
@@ -174,11 +172,10 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             return Err(Error::DeltaCrlBaseMismatch);
         }
 
-        // If both CRL numbers are present, the delta's BaseCRLNumber must be
-        // ≤ the base's CRLNumber (we have a base that is at least as current as
-        // what the delta expects).
-        if let (Some(base_num), Some(db_num)) = (crl_number(&base_crl), delta_base_num) {
-            if db_num > base_num {
+        // If the base CRL has a CRL number, the delta's BaseCRLNumber must be
+        // ≤ it (we have a base that is at least as current as what the delta expects).
+        if let Some(base_num) = crl_number(&base_crl) {
+            if delta_base_num > base_num {
                 return Err(Error::CrlNumberMismatch);
             }
         }
