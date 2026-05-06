@@ -302,12 +302,12 @@ mod tests {
         assert!(json.contains("\"evaluated_at_unix\""), "JSON must contain evaluated_at_unix");
 
         // Round-trip: deserialize back into EvaluationReport and verify key fields.
-        // Use from_value (not from_str) because EvaluationReport requires 'de: 'static
-        // due to internal &'static str fields — from_value produces fully-owned data.
-        let parsed: serde_json::Value =
-            serde_json::from_str(&json).expect("JSON must be valid");
+        // EvaluationReport requires 'de: 'static (due to &'static str fields like
+        // rule_bundle_version). Box::leak promotes the owned JSON string to 'static
+        // so the deserializer satisfies that bound. This is acceptable in tests.
+        let json_static: &'static str = Box::leak(json.into_boxed_str());
         let r2: EvaluationReport =
-            serde_json::from_value(parsed).expect("deserialization must succeed");
+            serde_json::from_str(json_static).expect("deserialization must succeed");
         assert_eq!(r2.profile_id, r.profile_id);
         assert_eq!(r2.profile_version, r.profile_version);
         assert_eq!(r2.rule_bundle_version, r.rule_bundle_version);
