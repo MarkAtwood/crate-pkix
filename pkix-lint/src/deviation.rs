@@ -202,6 +202,7 @@ impl DeviationScope {
 }
 
 /// What a [`Deviation`] does to a matching finding.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviationAction {
     /// Change the finding's severity to the specified level.
@@ -231,6 +232,7 @@ pub enum DeviationAction {
 /// Display deviated findings as "DEVIATION APPLIED" rather than green/pass.
 /// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
 /// operators can navigate to the backing waiver document without a second lookup.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.

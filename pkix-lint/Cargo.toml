@@ -8,14 +8,21 @@ repository.workspace = true
 authors.workspace = true
 description = "Lint engine for X.509 certificates — structured soft-fail and advisory results"
 
+[features]
+# Enable serde Serialize/Deserialize on Finding, DeviatedFinding, and EvaluationReport.
+# Off by default so the core engine stays dep-light for embedded / constrained targets.
+serde = ["dep:serde"]
+
 [dependencies]
 pkix-path     = { workspace = true }
 pkix-profiles = { workspace = true }
 x509-cert     = { workspace = true }
 der           = { workspace = true }
+serde         = { workspace = true, optional = true }
 
 [dev-dependencies]
 pkix-path     = { workspace = true, features = ["p256", "std"] }
 pkix-profiles = { workspace = true }
 der           = { workspace = true }
 x509-cert     = { workspace = true }
+serde_json    = { workspace = true }

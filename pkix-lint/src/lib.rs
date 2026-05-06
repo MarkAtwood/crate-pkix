@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Lint engine for X.509 certificate chains — structured soft-fail and advisory results.
 //!
@@ -104,6 +105,7 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 
 pub mod cabf_tls_br;
 pub mod deviation;
+pub mod report;
 
 // ---------------------------------------------------------------------------
 // Severity
@@ -114,6 +116,7 @@ pub mod deviation;
 /// Severity is a property of the lint definition, not the result. A lint that
 /// checks a MUST requirement from a normative spec should be [`Severity::Error`].
 /// A lint that checks a SHOULD or advisory requirement should be [`Severity::Warn`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Severity {
     /// Advisory / best-practice — does not constitute a violation.
@@ -191,6 +194,7 @@ impl SubjectKind {
 ///
 /// The variant names and associated `&'static str` detail fields are stable.
 /// Dynamic `String` detail is planned for v0.3 via `Cow<'static, str>`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LintResult {
     /// The lint check passed — no finding.
@@ -349,18 +353,17 @@ pub trait Lint: Send + Sync {
 ///
 /// # Evidence pack support
 ///
-/// `Finding` carries the minimum metadata needed to construct an evidence pack
+/// `Finding` carries the metadata needed to construct an evidence pack
 /// (a bundle of cert + path + findings + citations exportable as structured JSON
 /// or OSCAL Assessment Results). The `citation` field records the normative
 /// citation from [`Lint::citation`]; `evaluated_at_unix` records when the lint
-/// was run.
+/// was run; `rule_bundle_version` records which version of the lint bundle was active.
 ///
 /// # Planned fields (v0.3)
 ///
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
-/// - `rule_bundle_version: &'static str` — version of the lint bundle (e.g., crate version).
-///   Deferred pending a stable versioning mechanism for lint bundles.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
@@ -370,6 +373,17 @@ pub struct Finding {
     /// Included here so consumers of `Vec<Finding>` do not need to re-look up
     /// the lint to get the citation for report generation and evidence packs.
     pub citation: &'static str,
+    /// Version string of the rule bundle that produced this finding.
+    ///
+    /// Set by [`LintRunner::with_bundle_version`]. Defaults to `""` when the runner
+    /// was constructed with [`LintRunner::new`] without a version.
+    ///
+    /// Example: `"pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
+    ///
+    /// This field enables the "yellow today, green tomorrow because we updated the
+    /// rule bundle from v1.3 to v1.4" explanation that prevents operators from
+    /// treating a finding change as a tool defect.
+    pub rule_bundle_version: &'static str,
     /// The outcome of the lint evaluation.
     pub result: LintResult,
     /// For certificate-scope lints, the zero-based chain index of the evaluated cert.
@@ -429,21 +443,58 @@ impl Finding {
 /// (enforced by the `Lint: Send + Sync` bound).
 pub struct LintRunner {
     lints: Vec<Box<dyn Lint>>,
+    /// Version string stamped into every [`Finding`] produced by this runner.
+    ///
+    /// Set via [`LintRunner::with_bundle_version`]. Defaults to `""`.
+    bundle_version: &'static str,
 }
 
 impl LintRunner {
-    /// Create a new runner from a set of lints.
+    /// Create a new runner from a set of lints, with no bundle version string.
     ///
     /// Lints are evaluated in the order supplied. Duplicates (same `id()`) are
     /// allowed but will produce duplicate findings — callers should deduplicate.
+    ///
+    /// To set a bundle version (recommended for production use), use
+    /// [`LintRunner::with_bundle_version`].
     #[must_use]
     pub fn new(lints: Vec<Box<dyn Lint>>) -> Self {
-        Self { lints }
+        Self {
+            lints,
+            bundle_version: "",
+        }
+    }
+
+    /// Create a new runner with an explicit bundle version string.
+    ///
+    /// The `version` string is stamped into every [`Finding`] produced by this runner
+    /// as [`Finding::rule_bundle_version`]. Use this in production to record which
+    /// version of the rule bundle was active when findings were generated.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let runner = LintRunner::with_bundle_version(
+    ///     lints,
+    ///     "pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081",
+    /// );
+    /// ```
+    #[must_use]
+    pub fn with_bundle_version(lints: Vec<Box<dyn Lint>>, version: &'static str) -> Self {
+        Self {
+            lints,
+            bundle_version: version,
+        }
     }
 
     /// Return a reference to the registered lints.
     pub fn lints(&self) -> &[Box<dyn Lint>] {
         &self.lints
+    }
+
+    /// Return the bundle version string set on this runner.
+    pub fn bundle_version(&self) -> &'static str {
+        self.bundle_version
     }
 
     /// Evaluate all certificate-scope lints against `cert`.
@@ -491,6 +542,7 @@ impl LintRunner {
             findings.push(Finding {
                 lint_id: lint.id(),
                 citation: lint.citation(),
+                rule_bundle_version: self.bundle_version,
                 result,
                 cert_index: Some(cert_index),
                 evaluated_at_unix: now_unix,
@@ -573,6 +625,7 @@ impl LintRunner {
             findings.push(Finding {
                 lint_id: lint.id(),
                 citation: lint.citation(),
+                rule_bundle_version: self.bundle_version,
                 result,
                 cert_index: None,
                 evaluated_at_unix: now_unix,
@@ -975,6 +1028,7 @@ mod tests {
         let f_pass = Finding {
             lint_id: "x",
             citation: "test",
+            rule_bundle_version: "",
             result: LintResult::Pass,
             cert_index: None,
             evaluated_at_unix: 0,
@@ -982,6 +1036,7 @@ mod tests {
         let f_warn = Finding {
             lint_id: "x",
             citation: "test",
+            rule_bundle_version: "",
             result: LintResult::Warn("w"),
             cert_index: None,
             evaluated_at_unix: 0,
@@ -1018,5 +1073,29 @@ mod tests {
             findings[0].evaluated_at_unix, expected_unix,
             "run_cert_at_issuance must use cert notBefore as evaluated_at_unix"
         );
+    }
+
+    #[test]
+    fn bundle_version_stamped_into_findings() {
+        let cert = load_fixture_cert();
+        let runner = LintRunner::with_bundle_version(
+            vec![Box::new(AlwaysPass)],
+            "pkix-lint/cabf_tls_br v0.2.0",
+        );
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].rule_bundle_version,
+            "pkix-lint/cabf_tls_br v0.2.0",
+            "rule_bundle_version must be stamped from runner into Finding"
+        );
+    }
+
+    #[test]
+    fn bundle_version_empty_by_default() {
+        let cert = load_fixture_cert();
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        assert_eq!(findings[0].rule_bundle_version, "");
     }
 }
