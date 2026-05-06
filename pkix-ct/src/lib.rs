@@ -40,8 +40,7 @@ pub struct SignedCertificateTimestamp {
 /// <https://www.gstatic.com/ct/log_list/v3/log_list.json>) before verifying.
 #[derive(Debug, Default)]
 pub struct CtLogList {
-    // log public keys indexed by log_id
-    // not yet implemented
+    // log public keys indexed by log_id — not yet implemented (tracked for v0.2)
 }
 
 impl CtLogList {
@@ -89,8 +88,9 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Limitations
 ///
-/// Not yet implemented. Until implemented, always returns
-/// [`Error::NoTrustedSct`].
+/// Not yet implemented (tracked for v0.2). Returns [`Error::NoTrustedSct`]
+/// until SCT parsing, log-list lookup, and Merkle proof verification are
+/// implemented.
 pub fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
     Err(Error::NoTrustedSct)
 }

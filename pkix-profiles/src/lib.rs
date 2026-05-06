@@ -247,8 +247,8 @@ mod tests {
     // -----------------------------------------------------------------------
     // web_pki_policy field-value checks
     //
-    // Oracle: CA/B Forum TLS BR values hardcoded in web_pki_policy(); we
-    // assert the returned struct matches the spec rather than testing
+    // Oracle: CA/B Forum TLS BR spec values are constants in web_pki_policy();
+    // we assert the returned struct matches the spec rather than testing
     // round-trips through the code under test itself.
     // -----------------------------------------------------------------------
 

@@ -71,8 +71,8 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///
 /// # Limitations (v0.1)
 ///
-/// - The CRL must be signed directly by the certificate issuer
-///   (indirect CRLs are not supported).
+ /// - The CRL must be signed directly by the certificate issuer
+///   (indirect CRLs are not supported; deferred to v0.2).
 /// - CRL Distribution Point name matching (CDP vs IDP name) is not implemented.
 ///   The checker does enforce `onlyContainsUserCerts`, `onlyContainsCACerts`, and
 ///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is v0.2.
@@ -240,7 +240,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
         //     (critical), check scope constraints against the certificate.
         if let Some(idp) = parse_issuing_dp(&crl) {
-            // onlyContainsAttributeCerts: we never handle attribute certs.
+            // onlyContainsAttributeCerts: attribute cert validation is out of scope
+            // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
             if idp.only_contains_attribute_certs {
                 // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
                 // Callers with hard-fail revocation requirements must verify CRL coverage separately.
