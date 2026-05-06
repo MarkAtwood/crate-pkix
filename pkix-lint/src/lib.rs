@@ -136,6 +136,7 @@ pub enum Severity {
 // ---------------------------------------------------------------------------
 
 /// Whether a lint evaluates a single certificate or the complete validated path.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Scope {
     /// The lint evaluates one certificate in isolation.
@@ -152,6 +153,7 @@ pub enum Scope {
 ///
 /// Used both as a filter in [`Lint::applies_to`] (which certs the lint checks)
 /// and as the label in [`LintRunner`] when calling the lint (what cert we're at).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SubjectKind {
     /// End-entity (leaf) certificate — the subject of the chain.
@@ -596,8 +598,7 @@ impl LintRunner {
         let mut all = Vec::new();
         for (i, cert) in chain.iter().enumerate() {
             let kind = kinds.get(i).copied().unwrap_or(SubjectKind::IntermediateCa);
-            let mut findings = self.run_cert(cert, kind, i, now_unix);
-            all.append(&mut findings);
+            all.extend(self.run_cert(cert, kind, i, now_unix));
         }
         all
     }
@@ -663,10 +664,9 @@ pub trait LintProfile: Profile {
 
     /// Convenience: produce a [`LintRunner`] from this profile's lints.
     ///
-    /// This clones the lint IDs (not the lint objects themselves) by rebuilding
-    /// the runner from a new `Vec`. If you need to run lints repeatedly, call
-    /// [`LintProfile::lints`] and construct a [`LintRunner`] manually to avoid
-    /// repeated allocation.
+    /// Implementors should document whether this method caches the runner or
+    /// allocates fresh on each call. Callers that invoke this repeatedly should
+    /// cache the returned [`LintRunner`] themselves.
     fn lint_runner(&self) -> LintRunner;
 }
 
