@@ -240,13 +240,9 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if self.now_unix < this_update {
             return Err(Error::CrlExpired);
         }
-        match &crl.tbs_cert_list.next_update {
-            Some(next_update) => {
-                if self.now_unix > next_update.to_unix_duration().as_secs() {
-                    return Err(Error::CrlExpired);
-                }
-            }
-            None => return Err(Error::CrlExpired),
+        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        if self.now_unix > next_update.to_unix_duration().as_secs() {
+            return Err(Error::CrlExpired);
         }
 
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
@@ -274,77 +270,47 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             }
         }
 
-        // (6) §5.2.4 delta CRL merge: if a delta CRL is present, collect its revoked
-        //     entries and merge with the base CRL's revoked list.
+        // (6) §5.2.4 delta CRL merge: if a delta CRL is present, verify and collect
+        //     its revoked entries.  verify_delta_crl_and_collect handles sig, expiry,
+        //     and the primary issuer-name check.  The extra checks below are
+        //     defense-in-depth: they guard against any future code path that bypasses
+        //     the with_delta() constructor and against subtle cross-name mismatches.
         let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
-            let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
-
-            // Defense-in-depth: verify delta CRL issuer matches the base CRL issuer.
-            // The with_delta() constructor already enforces this at construction time,
-            // but re-checking here guards against any future path that bypasses the
-            // constructor (RFC 5280 §5.2.4: base and delta must come from the same CA).
-            if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
-                return Err(Error::CrlIssuerMismatch);
-            }
-
-            // Verify delta CRL issuer also matches the certificate's issuer
-            // (transitively guaranteed by the two checks above, but explicit for clarity).
-            if !names_match(
-                &delta_crl.tbs_cert_list.issuer,
-                &cert.tbs_certificate.issuer,
-            ) {
-                return Err(Error::CrlIssuerMismatch);
-            }
+            // Extra check: delta CRL issuer must also match the base CRL issuer
+            // (construction-time invariant, re-checked here for defense-in-depth).
+            // We parse once to get the issuer, then rely on the helper for the rest.
+            let delta_issuer = {
+                let delta_hdr =
+                    CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+                if !names_match(&delta_hdr.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
+                    return Err(Error::CrlIssuerMismatch);
+                }
+                // Also verify against cert's issuer (transitively guaranteed above, explicit for clarity).
+                if !names_match(
+                    &delta_hdr.tbs_cert_list.issuer,
+                    &cert.tbs_certificate.issuer,
+                ) {
+                    return Err(Error::CrlIssuerMismatch);
+                }
+                delta_hdr.tbs_cert_list.issuer
+            };
 
             // Verify the `issuer` Certificate's subject DN matches the delta CRL issuer.
-            // Mirrors step (2b) for the base CRL: without this check, the delta sig and
-            // cRLSign checks below operate on an unverified `issuer` cert identity.
-            if !names_match(
-                &issuer.tbs_certificate.subject,
-                &delta_crl.tbs_cert_list.issuer,
-            ) {
+            // Mirrors step (2b) for the base CRL.
+            if !names_match(&issuer.tbs_certificate.subject, &delta_issuer) {
                 return Err(Error::CrlIssuerMismatch);
             }
 
-            // Verify delta CRL signature.
-            let delta_tbs_bytes = delta_crl
-                .tbs_cert_list
-                .to_der()
-                .map_err(Error::CrlParseError)?;
-            self.verifier
-                .verify_signature(
-                    delta_crl.signature_algorithm.owned_to_ref(),
-                    issuer
-                        .tbs_certificate
-                        .subject_public_key_info
-                        .owned_to_ref(),
-                    &delta_tbs_bytes,
-                    delta_crl.signature.raw_bytes(),
-                )
-                .map_err(|_| Error::CrlSignatureInvalid)?;
-
-            // Verify delta CRL validity window.
-            let delta_this_update = delta_crl
-                .tbs_cert_list
-                .this_update
-                .to_unix_duration()
-                .as_secs();
-            if self.now_unix < delta_this_update {
-                return Err(Error::CrlExpired);
-            }
-            match &delta_crl.tbs_cert_list.next_update {
-                Some(nu) => {
-                    if self.now_unix > nu.to_unix_duration().as_secs() {
-                        return Err(Error::CrlExpired);
-                    }
-                }
-                None => return Err(Error::CrlExpired),
-            }
-
-            delta_crl
-                .tbs_cert_list
-                .revoked_certificates
-                .unwrap_or_default()
+            verify_delta_crl_and_collect(
+                delta_der,
+                &self.verifier,
+                issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref(),
+                &issuer.tbs_certificate.subject,
+                self.now_unix,
+            )?
         } else {
             Vec::new()
         };
@@ -428,13 +394,9 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if self.now_unix < this_update {
             return Err(Error::CrlExpired);
         }
-        match &crl.tbs_cert_list.next_update {
-            Some(next_update) => {
-                if self.now_unix > next_update.to_unix_duration().as_secs() {
-                    return Err(Error::CrlExpired);
-                }
-            }
-            None => return Err(Error::CrlExpired),
+        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        if self.now_unix > next_update.to_unix_duration().as_secs() {
+            return Err(Error::CrlExpired);
         }
 
         // (5) IssuingDistributionPoint scope check (same as check_revocation).
@@ -454,46 +416,13 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (6) Delta CRL merge — if a delta CRL is present, verify and merge it.
         //     Uses the anchor SPKI for the delta signature check.
         let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
-            let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
-
-            if !names_match(&delta_crl.tbs_cert_list.issuer, &anchor.subject) {
-                return Err(Error::CrlIssuerMismatch);
-            }
-
-            let delta_tbs_bytes = delta_crl
-                .tbs_cert_list
-                .to_der()
-                .map_err(Error::CrlParseError)?;
-            self.verifier
-                .verify_signature(
-                    delta_crl.signature_algorithm.owned_to_ref(),
-                    anchor.subject_public_key_info.owned_to_ref(),
-                    &delta_tbs_bytes,
-                    delta_crl.signature.raw_bytes(),
-                )
-                .map_err(|_| Error::CrlSignatureInvalid)?;
-
-            let delta_this_update = delta_crl
-                .tbs_cert_list
-                .this_update
-                .to_unix_duration()
-                .as_secs();
-            if self.now_unix < delta_this_update {
-                return Err(Error::CrlExpired);
-            }
-            match &delta_crl.tbs_cert_list.next_update {
-                Some(nu) => {
-                    if self.now_unix > nu.to_unix_duration().as_secs() {
-                        return Err(Error::CrlExpired);
-                    }
-                }
-                None => return Err(Error::CrlExpired),
-            }
-
-            delta_crl
-                .tbs_cert_list
-                .revoked_certificates
-                .unwrap_or_default()
+            verify_delta_crl_and_collect(
+                delta_der,
+                &self.verifier,
+                anchor.subject_public_key_info.owned_to_ref(),
+                &anchor.subject,
+                self.now_unix,
+            )?
         } else {
             Vec::new()
         };
@@ -526,6 +455,71 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------------------
+// Delta-CRL helper
+// ---------------------------------------------------------------------------
+
+/// Verify a delta CRL and return its revoked-certificate entries.
+///
+/// Performs (in order):
+/// 1. Parse the delta DER.
+/// 2. Check that the delta CRL issuer matches `expected_issuer_name`.
+/// 3. Verify the delta signature using `issuer_spki`.
+/// 4. Check the delta validity window against `now_unix`.
+/// 5. Return the delta's revoked-certificates list (empty if absent).
+///
+/// The caller is responsible for any additional issuer-name cross-checks
+/// needed by the calling context (e.g., checking the delta issuer against
+/// the base CRL issuer or the subject certificate's issuer).
+fn verify_delta_crl_and_collect<V: SignatureVerifier>(
+    delta_der: &[u8],
+    verifier: &V,
+    issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+    expected_issuer_name: &x509_cert::name::Name,
+    now_unix: u64,
+) -> crate::Result<Vec<RevokedCert>> {
+    let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+
+    if !names_match(&delta_crl.tbs_cert_list.issuer, expected_issuer_name) {
+        return Err(Error::CrlIssuerMismatch);
+    }
+
+    let delta_tbs_bytes = delta_crl
+        .tbs_cert_list
+        .to_der()
+        .map_err(Error::CrlParseError)?;
+    verifier
+        .verify_signature(
+            delta_crl.signature_algorithm.owned_to_ref(),
+            issuer_spki,
+            &delta_tbs_bytes,
+            delta_crl.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::CrlSignatureInvalid)?;
+
+    let delta_this_update = delta_crl
+        .tbs_cert_list
+        .this_update
+        .to_unix_duration()
+        .as_secs();
+    if now_unix < delta_this_update {
+        return Err(Error::CrlExpired);
+    }
+    let delta_next_update = delta_crl
+        .tbs_cert_list
+        .next_update
+        .as_ref()
+        .ok_or(Error::CrlExpired)?;
+    if now_unix > delta_next_update.to_unix_duration().as_secs() {
+        return Err(Error::CrlExpired);
+    }
+
+    Ok(delta_crl
+        .tbs_cert_list
+        .revoked_certificates
+        .unwrap_or_default())
 }
 
 // ---------------------------------------------------------------------------

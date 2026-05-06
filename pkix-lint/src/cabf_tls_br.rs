@@ -119,9 +119,17 @@ impl Lint for ValidityMaxLint {
         let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
         let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
 
-        // Validity duration in seconds; saturate to avoid underflow on malformed certs.
-        let duration_secs = not_after.saturating_sub(not_before);
+        // Structurally invalid cert: notAfter precedes notBefore.
+        // No separate validity-range lint exists that catches this case, so we
+        // return Error here rather than silently passing (duration = 0 via
+        // saturating_sub would always pass the cap check, masking the defect).
+        if not_after < not_before {
+            return LintResult::Error(
+                "leaf certificate notAfter precedes notBefore (inverted validity period)",
+            );
+        }
 
+        let duration_secs = not_after - not_before;
         let cap = pkix_profiles::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
@@ -544,6 +552,19 @@ pub fn all_lints() -> Vec<Box<dyn Lint>> {
 }
 
 impl LintProfile for CabfTlsBrProfile {
+    /// Return the shared lint list for this profile.
+    ///
+    /// The returned slice is backed by a lazily-initialized `static OnceLock`.
+    /// The lint instances returned here are different objects from those used
+    /// inside a `LintRunner` produced by [`lint_runner`][Self::lint_runner]:
+    /// each call to `lint_runner()` constructs a fresh set of instances via
+    /// [`all_lints()`]. Both use the same lint types and IDs, but the instances
+    /// are not shared.
+    ///
+    /// Note: if `Lint` implementations ever become stateful, callers should
+    /// prefer [`lint_runner`][Self::lint_runner] for a self-contained runner
+    /// rather than mixing a call to `lints()` with a separately constructed
+    /// runner.
     fn lints(&self) -> &[Box<dyn Lint>] {
         // `OnceLock` (stable since Rust 1.70) gives us a lazily-initialized
         // static `Vec<Box<dyn Lint>>` whose reference outlives `&self`.
@@ -551,11 +572,16 @@ impl LintProfile for CabfTlsBrProfile {
         LINTS.get_or_init(all_lints)
     }
 
-    /// Allocates a fresh [`LintRunner`] on each call.
+    /// Allocates a fresh [`LintRunner`] backed by a new set of lint instances
+    /// on each call.
     ///
-    /// For repeated use, prefer calling [`LintProfile::lints`] once and
-    /// constructing a [`LintRunner`] manually, or cache the returned
-    /// [`LintRunner`] at the call site.
+    /// The lint instances inside the returned runner are independent from those
+    /// returned by [`lints()`][Self::lints]: both source their lint types from
+    /// [`all_lints()`], but the objects are distinct allocations. The set of
+    /// lint IDs is identical.
+    ///
+    /// For repeated use, cache the returned [`LintRunner`] at the call site
+    /// rather than calling this method on every evaluation.
     fn lint_runner(&self) -> LintRunner {
         LintRunner::new(all_lints())
     }

@@ -108,11 +108,11 @@ pub enum Error {
     /// maximum number of intermediates. Try increasing `max_depth` in the call
     /// to [`build_path`].
     DepthExceeded,
-    /// The internal DFS node-visit budget was exhausted before a path was found.
+    /// The internal DFS node-visit budget was exhausted in a single round.
     ///
     /// This guards against adversarial certificate pools that would otherwise
-    /// cause exponential search time. The budget is fixed at [`DFS_BUDGET`]
-    /// node visits across all iterative-deepening rounds.
+    /// cause exponential search time. Each iterative-deepening round and the
+    /// depth probe start with a fresh budget of [`DFS_BUDGET`] node visits.
     BudgetExceeded,
 }
 
@@ -255,11 +255,16 @@ fn dfs(
     Ok(false)
 }
 
-/// Total DFS node-visit budget shared across all iterative-deepening rounds.
+/// DFS node-visit budget for a single iterative-deepening round (or probe).
 ///
 /// Each call to the inner `dfs()` function consumes one unit regardless of
 /// whether the node results in a match. When the counter reaches zero,
 /// [`build_path`] returns [`Error::BudgetExceeded`].
+///
+/// The budget is reset to this value at the start of each round of iterative
+/// deepening and for the depth-probe at `MAX_DEPTH + 1`. This prevents
+/// earlier rounds (which re-traverse all nodes from rounds 1..k-1) from
+/// exhausting the budget before depth k is explored.
 ///
 /// 10 000 visits is sufficient for legitimate chains (real-world PKI hierarchies
 /// have at most a handful of intermediates and small pools). It prevents
@@ -280,8 +285,12 @@ const DFS_BUDGET: usize = 10_000;
 /// Returns the shortest valid topology first. Cycles are detected and pruned
 /// by comparing SubjectPublicKeyInfo DER bytes of certificates already in the path.
 ///
-/// A shared budget of [`DFS_BUDGET`] node visits is enforced across all rounds.
-/// If the budget is exhausted before a path is found, [`Error::BudgetExceeded`]
+/// Each round and the depth probe get a fresh budget of [`DFS_BUDGET`] node
+/// visits.  Resetting per-round prevents earlier rounds (which re-traverse all
+/// nodes from rounds 1..k-1) from consuming budget that round k needs.  The
+/// depth probe at `MAX_DEPTH + 1` also starts with a fresh budget.
+///
+/// If any round exhausts its budget before finding a path, [`Error::BudgetExceeded`]
 /// is returned. This bounds worst-case complexity against adversarial inputs.
 ///
 /// # Errors
@@ -291,8 +300,9 @@ const DFS_BUDGET: usize = 10_000;
 /// - [`Error::DepthExceeded`] — a path exists topologically but requires more
 ///   than 10 intermediate certificates; increase the depth limit or provide a
 ///   shorter chain.
-/// - [`Error::BudgetExceeded`] — the DFS node-visit budget was exhausted; the
-///   pool may be adversarially large or structured to produce exponential search.
+/// - [`Error::BudgetExceeded`] — the DFS node-visit budget was exhausted in
+///   some round; the pool may be adversarially large or structured to produce
+///   exponential search.
 ///
 /// # Limitations
 ///
@@ -304,7 +314,8 @@ const DFS_BUDGET: usize = 10_000;
 /// # Security
 ///
 /// Pool contents should be from a trusted source. [`DFS_BUDGET`] enforces a hard
-/// cap on search work to prevent denial-of-service via oversized or crafted pools.
+/// cap on search work per round to prevent denial-of-service via oversized or
+/// crafted pools.
 #[must_use = "path building result must be checked"]
 pub fn build_path(
     target: &Certificate,
@@ -314,9 +325,12 @@ pub fn build_path(
     const MAX_DEPTH: usize = 10;
 
     let pool_slice: &[Certificate] = &pool.certs;
-    let mut budget = DFS_BUDGET;
 
     for max_depth in 1..=MAX_DEPTH {
+        // Reset budget at the start of each round so that earlier rounds
+        // (which re-traverse the same shallower nodes) do not exhaust the
+        // budget before deeper rounds get a chance to run.
+        let mut budget = DFS_BUDGET;
         let mut path = alloc::vec![target.clone()];
         if dfs(&mut path, pool_slice, anchors, max_depth, &mut budget)? {
             return Ok(path);
@@ -325,8 +339,10 @@ pub fn build_path(
 
     // No path found within MAX_DEPTH. Check if a path exists at MAX_DEPTH+1
     // to distinguish "no path exists at all" from "path exists but too deep".
+    // The probe uses its own fresh budget so it is not affected by prior rounds.
+    let mut probe_budget = DFS_BUDGET;
     let mut probe = alloc::vec![target.clone()];
-    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1, &mut budget)? {
+    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1, &mut probe_budget)? {
         return Err(Error::DepthExceeded);
     }
 

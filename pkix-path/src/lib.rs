@@ -1057,6 +1057,7 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
         if prune_depth == 0 {
             break; // depth-0 root sentinel — never prune it
         }
+        // collect to release the shared borrow before tree.retain() takes &mut
         let child_policies: Vec<der::asn1::ObjectIdentifier> = tree
             .iter()
             .filter(|n| n.depth == d)
