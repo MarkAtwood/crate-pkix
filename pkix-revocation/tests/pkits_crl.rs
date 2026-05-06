@@ -644,8 +644,9 @@ fn pkits_4_14_13_valid_only_ca_certs_crl_for_ca() {
 ///
 /// Oracle: PKITS §4.14.14 MUST NOT validate.
 ///
-/// The CRL has `onlyContainsAttributeCerts=TRUE`. Our IDP check returns `Ok()`
-/// (not covered) for any certificate, since we never handle attribute certs.
+/// The CRL has `onlyContainsAttributeCerts=TRUE`. The IDP check returns `Ok()`
+/// (not covered) because attribute cert validation is out of scope for
+/// `pkix-revocation` (handled by `pkix-ac`, tracked for v0.2).
 /// A full path validator must treat "not covered" as a hard-fail.
 #[test]
 fn pkits_4_14_14_invalid_only_attribute_certs() {

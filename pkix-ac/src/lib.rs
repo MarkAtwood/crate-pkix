@@ -114,8 +114,9 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Limitations
 ///
-/// Not yet implemented. Until implemented, always returns
-/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)`.
+/// Not yet implemented (tracked for v0.2). Returns
+/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)` until
+/// the RFC 5755 §5 validation algorithm is implemented.
 pub fn validate_attribute_cert(
     _ac: &AttributeCertificate,
     _aa_anchors: &[pkix_path::TrustAnchor],

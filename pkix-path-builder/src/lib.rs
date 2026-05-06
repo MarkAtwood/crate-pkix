@@ -50,7 +50,8 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// and order the subset that forms a valid path to a trust anchor.
 ///
 /// Note: `Hash` is not derived because `x509_cert::Certificate` does not
-/// implement `Hash`, so `CertPool` cannot be used as a hash-map key.
+/// currently implement `Hash` (upstream limitation); `CertPool` cannot be
+/// used as a hash-map key until that changes.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct CertPool {
     certs: Vec<Certificate>,
