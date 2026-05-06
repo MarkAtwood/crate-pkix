@@ -176,6 +176,14 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if !names_match(&crl.tbs_cert_list.issuer, &cert.tbs_certificate.issuer) {
             return Err(Error::CrlIssuerMismatch);
         }
+        // (2b) Verify the `issuer` Certificate's subject DN matches the CRL issuer.
+        //      This guards against a caller passing a mismatched issuer certificate
+        //      (e.g., a cert from a different CA whose name happens to appear in a
+        //      CRL distribution point). Without this check, the cRLSign and SPKI
+        //      checks below would operate on the wrong certificate.
+        if !names_match(&issuer.tbs_certificate.subject, &crl.tbs_cert_list.issuer) {
+            return Err(Error::CrlIssuerMismatch);
+        }
 
         // (3) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
         //     Check this before verifying the signature so we reject on the correct error

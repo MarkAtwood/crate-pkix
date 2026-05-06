@@ -68,6 +68,11 @@ pub enum Error {
     /// Parameters are not compared; see `check_oid_consistency` for rationale.
     MalformedCertificate {
         /// Zero-based index into the `chain` slice of the malformed certificate.
+        ///
+        /// The underlying `der::Error` is intentionally not stored here to keep
+        /// this variant `no_std`-compatible and to preserve the stable API shape.
+        /// Callers that need the root-cause parse error should validate the
+        /// DER certificate independently before calling [`validate_path`].
         index: usize,
     },
     /// Certificate validity period check failed (expired or not yet valid).

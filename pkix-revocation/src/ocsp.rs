@@ -37,12 +37,12 @@ const OID_SHA256: der::asn1::ObjectIdentifier =
 ///   this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
 ///   `BasicOcspResponse` in `new`).
 /// - Only issuer-signed (direct) OCSP responses are supported.
-///
-/// [`check_revocation`]: crate::RevocationChecker::check_revocation
 ///   Delegated OCSP responders (responses signed by a separate responder
 ///   certificate, not by the issuer directly) will fail with
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
 ///   the issuer's key. This is a v0.1 limitation tracked for v0.2.
+///
+/// [`check_revocation`]: crate::RevocationChecker::check_revocation
 /// - **Security**: `SingleResponse` matching is by serial number only; the
 ///   `CertID.issuerNameHash` and `CertID.issuerKeyHash` fields are not verified.
 ///   Serial numbers are only unique within a single CA's issuance, not globally.

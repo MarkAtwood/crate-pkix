@@ -583,6 +583,29 @@ mod tests {
         );
     }
 
+    /// Verify that `code_signing_policy` requires `codeSigning` EKU and that a cert
+    /// with `serverAuth` (not `codeSigning`) is rejected with `MissingEku`.
+    #[test]
+    fn code_signing_policy_rejects_wrong_eku() {
+        // Use the webpki-self-signed-365d cert which has serverAuth, not codeSigning.
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        assert!(
+            matches!(
+                pkix_path::validate_path(
+                    &[cert],
+                    &anchors,
+                    &code_signing_policy(NOW),
+                    &EcdsaP256Verifier
+                ),
+                Err(pkix_path::Error::MissingEku)
+            ),
+            "cert with serverAuth (not codeSigning) must fail code_signing_policy EKU check"
+        );
+    }
+
     /// Higher RSA floor than web_pki_policy: 3072 vs 2048.
     #[test]
     fn code_signing_policy_rsa_floor_higher_than_web_pki() {
