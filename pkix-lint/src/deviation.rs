@@ -533,7 +533,7 @@ impl DeviationStore {
         // Normalize IssuerDnContains substrings to lowercase at insertion time
         // so that matching logic does not need to re-normalize on every call.
         // This prevents a silent no-match when callers pass mixed-case strings.
-        if let DeviationScope::IssuerDnContains(ref mut s) = deviation.scope {
+        if let DeviationScope::IssuerDnContains(s) = &mut deviation.scope {
             let lower = s.to_lowercase();
             if *s != lower {
                 *s = lower;
@@ -1135,7 +1135,7 @@ mod tests {
     fn store_rejects_empty_justification() {
         let mut store = DeviationStore::new();
         let result = store.add(Deviation {
-            justification: "".to_string(),
+            justification: String::new(),
             ..make_deviation("d1", "test.lint")
         });
         assert_eq!(
@@ -1149,7 +1149,7 @@ mod tests {
     fn store_rejects_empty_authorized_by() {
         let mut store = DeviationStore::new();
         let result = store.add(Deviation {
-            authorized_by: "".to_string(),
+            authorized_by: String::new(),
             ..make_deviation("d1", "test.lint")
         });
         assert_eq!(

@@ -1187,7 +1187,7 @@ fn cert_name_constraints(
     let nc = try_find_cert_ext::<NameConstraints>(cert, OID_NAME_CONSTRAINTS)
         .map_err(|_| Error::MalformedCertificate { index })?;
 
-    if let Some(ref nc) = nc {
+    if let Some(nc) = &nc {
         // RFC 5280 §4.2.1.10: "the minimum and maximum fields are not used with
         // any name forms, thus minimum MUST be zero, maximum MUST be absent."
         // Reject certs that encode non-conformant subtrees rather than silently
@@ -1964,7 +1964,7 @@ fn chain_walk<V: SignatureVerifier>(
         //      requires to be identical to the inner TBSCertificate.signature OID.
         //      Applies to every cert in the chain (no i == 0 guard), matching
         //      CA/B Forum profile intent.
-        if let Some(ref allowed) = policy.allowed_signature_algs {
+        if let Some(allowed) = &policy.allowed_signature_algs {
             // O(n) over a typically 2–6 element list; acceptable for the common case.
             if !allowed.contains(&cert.signature_algorithm.oid) {
                 return Err(Error::AlgorithmNotAllowed { index: i });
@@ -2063,8 +2063,8 @@ fn chain_walk<V: SignatureVerifier>(
 
         // (policy-d) CertificatePolicies extension (RFC 5280 §6.1.3(d)).
         // Only processed when the policy tree is still alive.
-        if let Some(ref mut tree) = policy_tree {
-            if let Some(ref cp_ext) = cert_cp {
+        if let Some(tree) = &mut policy_tree {
+            if let Some(cp_ext) = &cert_cp {
                 let mut new_nodes: Vec<PolicyNode> = Vec::new();
                 let mut has_any_policy = false;
 
@@ -2196,7 +2196,7 @@ fn chain_walk<V: SignatureVerifier>(
         //      anyExtendedKeyUsage (OID 2.5.29.37.0) does NOT satisfy a specific
         //      OID requirement — only explicit listing in the cert's EKU counts.
         if i == 0 {
-            if let Some(ref required_ekus) = policy.required_leaf_eku {
+            if let Some(required_ekus) = &policy.required_leaf_eku {
                 use x509_cert::ext::pkix::ExtendedKeyUsage;
                 match try_find_cert_ext::<ExtendedKeyUsage>(cert, OID_EXTENDED_KEY_USAGE)
                     .map_err(|_| Error::MalformedCertificate { index: 0 })?
@@ -2289,7 +2289,7 @@ fn chain_walk<V: SignatureVerifier>(
 
                 // §6.1.4(b)(1): if policy_mapping > 0, update expected_policy_set.
                 // §6.1.4(b)(2): if policy_mapping == 0, delete mapped nodes.
-                if let Some(ref mut tree) = policy_tree {
+                if let Some(tree) = &mut policy_tree {
                     if policy_mapping > 0 {
                         // For each issuerDomainPolicy ID-P in the mappings,
                         // update expected_policy_set of matching nodes.
@@ -2337,7 +2337,7 @@ fn chain_walk<V: SignatureVerifier>(
                 }
             }
             // Check if tree became effectively NULL after mapping operations.
-            if let Some(ref t) = policy_tree {
+            if let Some(t) = &policy_tree {
                 if !t.iter().any(|nd| nd.depth >= 1) {
                     policy_tree = None;
                 }
@@ -2547,7 +2547,7 @@ fn chain_walk<V: SignatureVerifier>(
     //     nodes for each P-OID in initial_policy_set not already present.
     //   §6.1.5(g)(iii)(4): prune childless ancestors.
     if !policy.initial_policy_set.is_empty() {
-        if let Some(ref mut tree) = policy_tree {
+        if let Some(tree) = &mut policy_tree {
             let leaf_depth = n;
 
             // §6.1.5(g)(iii): intersect the valid_policy_tree with
