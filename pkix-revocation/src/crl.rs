@@ -262,6 +262,16 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 return Err(Error::CrlIssuerMismatch);
             }
 
+            // Verify the `issuer` Certificate's subject DN matches the delta CRL issuer.
+            // Mirrors step (2b) for the base CRL: without this check, the delta sig and
+            // cRLSign checks below operate on an unverified `issuer` cert identity.
+            if !names_match(
+                &issuer.tbs_certificate.subject,
+                &delta_crl.tbs_cert_list.issuer,
+            ) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+
             // Verify delta CRL signature.
             let delta_tbs_bytes = delta_crl
                 .tbs_cert_list
