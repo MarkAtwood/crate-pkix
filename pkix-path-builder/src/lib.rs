@@ -27,6 +27,12 @@
 //!
 //! - RFC 4158 — Internet X.509 PKI: Certification Path Building
 //! - RFC 5280 §6.1 — the validation algorithm this crate feeds into
+//!
+//! # `no_std`
+//!
+//! This crate is `no_std` but requires the `alloc` crate. The `extern crate alloc`
+//! declaration is provided automatically; you do not need to add it yourself, but
+//! your target must supply a global allocator (e.g., `#[global_allocator]`).
 
 extern crate alloc;
 
@@ -97,7 +103,9 @@ impl<'a> IntoIterator for &'a CertPool {
 pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.
     NoPathFound,
-    /// Path building exceeded the configured maximum candidate depth.
+    /// A topologically valid path exists but requires more than the configured
+    /// maximum number of intermediates. Try increasing `max_depth` in the call
+    /// to [`build_path`].
     DepthExceeded,
 }
 
@@ -105,7 +113,9 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::NoPathFound => f.write_str("no certification path found to a trust anchor"),
-            Self::DepthExceeded => f.write_str("path building exceeded maximum candidate depth"),
+            Self::DepthExceeded => f.write_str(
+                "no certification path found within depth limit (try increasing max_depth)",
+            ),
         }
     }
 }
@@ -233,6 +243,7 @@ fn dfs(
 /// - [`Error::DepthExceeded`] — a path exists topologically but requires more
 ///   than 10 intermediate certificates; increase the depth limit or provide a
 ///   shorter chain.
+#[must_use = "path building result must be checked"]
 pub fn build_path(
     target: &Certificate,
     pool: &CertPool,
