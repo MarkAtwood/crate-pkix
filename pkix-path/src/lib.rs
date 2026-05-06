@@ -253,7 +253,7 @@ impl core::fmt::Display for Error {
             Self::DuplicateCertificate { first, second } => {
                 write!(
                     f,
-                    "duplicate certificate SPKI at chain indices {first} and {second}"
+                    "duplicate certificate (issuer+serial) at chain indices {first} and {second}"
                 )
             }
         }
