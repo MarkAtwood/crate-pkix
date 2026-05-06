@@ -25,4 +25,6 @@ pkix-path     = { workspace = true, features = ["p256", "std"] }
 pkix-profiles = { workspace = true }
 der           = { workspace = true }
 x509-cert     = { workspace = true }
+# serde_json is used by the json_round_trip test which requires --features serde.
+# Run with: cargo test -p pkix-lint --features serde
 serde_json    = { workspace = true }
