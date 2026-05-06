@@ -53,6 +53,12 @@ const OID_SHA256: der::asn1::ObjectIdentifier =
 /// - The `ResponderId` field is not verified against the issuer identity.
 /// - If no `SingleResponse` matches the certificate's serial number,
 ///   `OcspStatusUnknown` is returned (hard-fail).
+/// - [`RevocationChecker::check_revocation_against_anchor`] is not overridden.
+///   The certificate immediately issued by the trust anchor is not
+///   revocation-checked by this type; revocation against the anchor is the
+///   responsibility of the path validator (a v0.1 limitation).
+///
+/// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct OcspChecker<V> {
     response_der: Vec<u8>,

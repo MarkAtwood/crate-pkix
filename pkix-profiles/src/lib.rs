@@ -4,6 +4,14 @@
 
 //! CA/Browser Forum and RFC certificate profile policies for `pkix-chain`.
 //!
+//! # `std` requirement
+//!
+//! This crate requires `std`. It does not support `no_std` in v0.1 because
+//! [`ValidationPolicy`] holds owned `Vec` fields that currently require the
+//! standard allocator. `no_std` + `alloc` support is planned for a future
+//! release; until then, downstream `no_std` crates should construct
+//! [`ValidationPolicy`] directly rather than using this crate.
+//!
 //! Provides pre-configured [`ValidationPolicy`] values for common
 //! certificate use cases, encoding the additional constraints imposed by
 //! the CA/Browser Forum Baseline Requirements beyond RFC 5280.
@@ -133,7 +141,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
 /// | `require_subject_alt_name` | true | rfc822Name SAN required for Mailbox-validated |
 /// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
-/// | `max_path_len` | 1 | S/MIME BR §7.2.2 (Root CA issues Subordinate CA directly) |
+/// | `max_path_len` | 1 | S/MIME BR §7.2 (at most one Subordinate CA between Root and EE) |
 ///
 /// # Limitations
 ///
@@ -154,7 +162,7 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
     p.require_subject_alt_name = true;
     // S/MIME BR §7.3: id-kp-emailProtection must be asserted.
     p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
-    // S/MIME BR §7.2.2: Root CA issues Subordinate CA directly; at most 1 intermediate.
+    // S/MIME BR §7.2: at most one Subordinate CA between Root and end-entity; max_path_len=1.
     p.max_path_len = 1;
     p
 }
@@ -460,16 +468,25 @@ mod tests {
         let p = smime_policy(NOW);
         assert_eq!(
             p.max_path_len, 1,
-            "smime_policy: max_path_len must be 1 (S/MIME BR §7.2.2)"
+            "smime_policy: max_path_len must be 1 (S/MIME BR §7.2)"
         );
+    }
+
+    /// Oracle: openssl verify -CAfile smime-self-signed-365d.pem smime-self-signed-365d.pem → OK
+    #[test]
+    fn smime_conforming_cert_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(&[cert], &anchors, &smime_policy(NOW), &EcdsaP256Verifier)
+            .expect(
+                "self-signed 365-day cert with rfc822Name SAN and emailProtection EKU must pass smime_policy",
+            );
     }
 
     /// Verify that `smime_policy` requires `emailProtection` EKU, and that a cert with
     /// `serverAuth` (not `emailProtection`) is rejected.
-    ///
-    /// **Note**: This is a rejection test using a cert with the wrong EKU, NOT an
-    /// end-to-end passing test (which would require a fixture with `emailProtection` EKU).
-    /// An end-to-end passing test is tracked for a future fixture addition.
     #[test]
     fn smime_policy_requires_email_protection_eku_and_rejects_wrong_eku() {
         // Verify that smime_policy requires emailProtection.
@@ -545,6 +562,24 @@ mod tests {
         assert!(
             ekus.contains(&code_sign),
             "code_signing_policy: required_leaf_eku must contain id-kp-codeSigning"
+        );
+    }
+
+    /// Oracle: openssl verify -CAfile codesign-self-signed-365d.pem codesign-self-signed-365d.pem → OK
+    #[test]
+    fn code_signing_conforming_cert_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/codesign-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &code_signing_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect(
+            "self-signed 365-day cert with codeSigning EKU must pass code_signing_policy",
         );
     }
 

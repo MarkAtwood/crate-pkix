@@ -65,8 +65,13 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///   every [`check_revocation`] call. For long chains validated against the same
 ///   CRL pair, this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
 ///   `CertificateList` in `new` / `with_delta`).
+/// - [`RevocationChecker::check_revocation_against_anchor`] is not overridden.
+///   The certificate immediately issued by the trust anchor is not
+///   revocation-checked by this type; revocation against the anchor is the
+///   responsibility of the path validator (a v0.1 limitation).
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
+/// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct CrlChecker<V> {
     crl_der: Vec<u8>,
@@ -172,7 +177,14 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             return Err(Error::CrlIssuerMismatch);
         }
 
-        // (3) Verify the CRL signature against the issuer's SPKI.
+        // (3) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
+        //     Check this before verifying the signature so we reject on the correct error
+        //     (CrlSignMissing rather than CrlSignatureInvalid) when the key lacks cRLSign.
+        if !issuer_has_crl_sign(issuer) {
+            return Err(Error::CrlSignMissing);
+        }
+
+        // (3b) Verify the CRL signature against the issuer's SPKI.
         let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
         self.verifier
             .verify_signature(
@@ -185,11 +197,6 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 crl.signature.raw_bytes(),
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
-
-        // (3b) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
-        if !issuer_has_crl_sign(issuer) {
-            return Err(Error::CrlSignMissing);
-        }
 
         // (4) Check CRL validity window: thisUpdate ≤ now ≤ nextUpdate.
         //     Absent nextUpdate is treated as expired: an indefinitely valid CRL would

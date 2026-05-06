@@ -877,8 +877,9 @@ fn init_policy_tree() -> Vec<PolicyNode> {
 /// nodes, delete that node.  Repeat this step until there are no nodes of
 /// depth i-1 or less without children."
 ///
-/// Works upward from `cert_depth - 1` toward 1.  The depth-0 root is left
-/// in place (it is only removed when `policy_tree` is set to `None`).
+/// Starts by pruning depth `cert_depth - 1` (checking against children at
+/// `cert_depth`), then walks upward toward depth 1.  The depth-0 root is
+/// left in place (it is only removed when `policy_tree` is set to `None`).
 fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
     // Walk upward from cert_depth-1 down to depth 1 (inclusive), pruning nodes
     // that have no surviving child at depth d+1.  Depth 0 (the anyPolicy root
@@ -2047,7 +2048,12 @@ fn chain_walk<V: SignatureVerifier>(
             // (policy-b) Apply mappings to the tree or delete mapped nodes.
             // NOTE: Policy mappings use the current policy_mapping counter value
             // (before decrement); the decrement happens in §6.1.4(h) below.
-            if let Some(pm) = find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS) {
+            // try_find_cert_ext (fail-closed): a malformed PolicyMappings extension
+            // must cause rejection rather than silent ignore; a silently-discarded
+            // mapping could allow a policy bypass (e.g., inhibit_policy_mapping bypass).
+            if let Some(pm) = try_find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS)
+                .map_err(|_| Error::MalformedCertificate { index: i })?
+            {
                 // §6.1.4(a): reject anyPolicy as issuer or subject domain.
                 for mapping in pm.0.iter() {
                     if mapping.issuer_domain_policy == OID_ANY_POLICY
@@ -2125,7 +2131,12 @@ fn chain_walk<V: SignatureVerifier>(
 
             // (policy-i) PolicyConstraints (RFC 5280 §6.1.4(c)): clamp
             // explicit_policy and policy_mapping from the extension.
-            if let Some(pc) = find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS) {
+            // try_find_cert_ext (fail-closed): malformed PolicyConstraints must reject;
+            // silently ignoring it could allow explicit_policy bypass.
+            if let Some(pc) =
+                try_find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
+                    .map_err(|_| Error::MalformedCertificate { index: i })?
+            {
                 if let Some(req) = pc.require_explicit_policy {
                     explicit_policy = explicit_policy.min(req);
                 }
@@ -2135,7 +2146,12 @@ fn chain_walk<V: SignatureVerifier>(
             }
 
             // (policy-j) InhibitAnyPolicy (RFC 5280 §6.1.4(d)): clamp inhibit_any.
-            if let Some(iap) = find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY) {
+            // try_find_cert_ext (fail-closed): malformed InhibitAnyPolicy must reject;
+            // silently ignoring it could allow anyPolicy through when it should be inhibited.
+            if let Some(iap) =
+                try_find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
+                    .map_err(|_| Error::MalformedCertificate { index: i })?
+            {
                 inhibit_any = inhibit_any.min(iap.0);
             }
 
@@ -2277,7 +2293,12 @@ fn chain_walk<V: SignatureVerifier>(
         }
         // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
         // force explicit_policy to 0.
-        if let Some(pc) = find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS) {
+        // try_find_cert_ext (fail-closed): consistent with per-loop treatment of
+        // PolicyConstraints; a malformed extension on the leaf must also reject.
+        if let Some(pc) =
+            try_find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS)
+                .map_err(|_| Error::MalformedCertificate { index: 0 })?
+        {
             if pc.require_explicit_policy == Some(0) {
                 explicit_policy = 0;
             }

@@ -42,7 +42,7 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// Certificates are stored by DER bytes and decoded on demand. Add all
 /// candidate intermediate certificates here; the path builder will select
 /// and order the subset that forms a valid path to a trust anchor.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct CertPool {
     certs: Vec<Certificate>,
 }
@@ -89,7 +89,7 @@ impl<'a> IntoIterator for &'a CertPool {
 }
 
 /// Errors returned by path building.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.
