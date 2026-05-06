@@ -317,31 +317,11 @@ fn sha1_prohibited_oid_detection_logic() {
     assert_ne!(actual_oid, &sha1_ecdsa, "fixture cert must not use ecdsa-with-SHA1");
 }
 
-/// Negative test: a cert actually signed with SHA-1 must return Error.
-///
-/// This test requires a DER fixture signed with SHA-1, which cannot be generated
-/// without external cryptographic tooling (openssl or similar). The test is
-/// marked `#[ignore]` until the fixture is available.
-///
-/// To generate the fixture and enable this test:
-/// 1. Run:
-///      openssl req -x509 -newkey rsa:2048 -sha1 -days 365 \
-///        -subj "/CN=sha1-test" -noenc \
-///        -out /tmp/leaf-rsa2048-sha1.pem -keyout /tmp/leaf-rsa2048-sha1.key
-///      openssl x509 -in /tmp/leaf-rsa2048-sha1.pem -outform DER \
-///        -out pkix-path/tests/fixtures/policy-checks/leaf-rsa2048-sha1.der
-/// 2. Replace the runtime `std::fs::read` below with `load_cert!("leaf-rsa2048-sha1.der")`.
-/// 3. Remove the `#[ignore]` attribute and commit the fixture.
+/// Oracle: openssl req -x509 -newkey rsa:2048 -sha1 -days 365 -subj "/CN=sha1-test" -noenc
+///         openssl x509 -outform DER → sha1WithRSAEncryption (OID 1.2.840.113549.1.1.5)
 #[test]
-#[ignore = "requires leaf-rsa2048-sha1.der fixture — see comment above for generation steps"]
 fn sha1_prohibited_error_on_sha1_cert() {
-    // Use runtime read so this test compiles without the fixture present.
-    let fixture_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../pkix-path/tests/fixtures/policy-checks/leaf-rsa2048-sha1.der"
-    );
-    let der = std::fs::read(fixture_path).expect("fixture leaf-rsa2048-sha1.der must exist");
-    let cert = Certificate::from_der(&der).expect("fixture is valid DER");
+    let cert = load_cert!("leaf-rsa2048-sha1.der");
     let lint = Sha1ProhibitedLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
     assert!(
