@@ -80,7 +80,7 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier =
 /// - 2027-03-15 to 2029-03-15: 100 days
 /// - 2029-03-15 onwards: 47 days
 ///
-/// The cap is evaluated at `now_unix` (the relying party's current time).
+/// The cap is evaluated at the certificate's `notBefore` (issuance time).
 ///
 /// Citation: CA/B Forum TLS BR §6.3.2 (SC-081)
 pub struct ValidityMaxLint;
@@ -106,7 +106,7 @@ impl Lint for ValidityMaxLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let tbs = &cert.tbs_certificate;
         let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
         let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
@@ -114,7 +114,7 @@ impl Lint for ValidityMaxLint {
         // Validity duration in seconds; saturate to avoid underflow on malformed certs.
         let duration_secs = not_after.saturating_sub(not_before);
 
-        let cap = pkix_profiles::sc081_validity_cap(now_unix);
+        let cap = pkix_profiles::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
             LintResult::Error("leaf certificate validity period exceeds SC-081 cap")
@@ -257,7 +257,7 @@ fn rsa_modulus_byte_len(der: &[u8]) -> Option<usize> {
 
 /// Strip a DER TLV wrapper with the given `expected_tag` and return
 /// `(value_bytes, remaining_bytes)`.  Returns `None` on mismatch or truncation.
-fn der_peel_tlv<'a>(input: &'a [u8], expected_tag: u8) -> Option<(&'a [u8], &'a [u8])> {
+fn der_peel_tlv(input: &[u8], expected_tag: u8) -> Option<(&[u8], &[u8])> {
     let (tag, rest) = input.split_first()?;
     if *tag != expected_tag {
         return None;
@@ -554,6 +554,9 @@ impl LintProfile for CabfTlsBrProfile {
         LINTS.get_or_init(all_lints)
     }
 
+    /// Allocates a new [`LintRunner`] on each call. `LintRunner` is cheap to
+    /// construct, so this is acceptable for one-shot use. For repeated use,
+    /// cache the returned runner at the call site.
     fn lint_runner(&self) -> LintRunner {
         LintRunner::new(all_lints())
     }

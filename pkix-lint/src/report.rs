@@ -85,6 +85,18 @@ pub struct EvaluationReport {
     pub deviated_findings: Vec<DeviatedFinding>,
 }
 
+/// Extract the [`crate::Severity`] from a [`crate::LintResult`], if any.
+///
+/// `Pass` and `NotApplicable` carry no severity and return `None`.
+fn severity_of(r: &crate::LintResult) -> Option<crate::Severity> {
+    match r {
+        crate::LintResult::Warn(_) => Some(crate::Severity::Warn),
+        crate::LintResult::Error(_) => Some(crate::Severity::Error),
+        crate::LintResult::Fatal(_) => Some(crate::Severity::Fatal),
+        _ => None,
+    }
+}
+
 impl EvaluationReport {
     /// Create an empty report with the given metadata.
     #[must_use]
@@ -123,17 +135,7 @@ impl EvaluationReport {
     pub fn findings_at_or_above(&self, min_severity: crate::Severity) -> Vec<&Finding> {
         self.findings
             .iter()
-            .filter(|f| {
-                f.result
-                    .detail()
-                    .is_some()
-                    && matches!(
-                        (&f.result, min_severity),
-                        (crate::LintResult::Warn(_), crate::Severity::Info | crate::Severity::Warn)
-                        | (crate::LintResult::Error(_), crate::Severity::Info | crate::Severity::Warn | crate::Severity::Error)
-                        | (crate::LintResult::Fatal(_), _)
-                    )
-            })
+            .filter(|f| severity_of(&f.result).is_some_and(|s| s >= min_severity))
             .collect()
     }
 
