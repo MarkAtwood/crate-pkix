@@ -8,6 +8,7 @@ members = [
     "pkix-path-builder",
     "pkix-revocation-http",
     "pkix-profiles",
+    "pkix-lint",
     "pkix-ct",
     "pkix-composite",
     "pkix-ac",
@@ -28,6 +29,7 @@ pkix-revocation       = { path = "pkix-revocation",       version = "0.2.0" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.2.0" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.1.1" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.2.0" }
+pkix-lint             = { path = "pkix-lint",             version = "0.2.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.1.1" }
 pkix-composite        = { path = "pkix-composite",        version = "0.1.1" }
 pkix-ac               = { path = "pkix-ac",               version = "0.1.1" }

@@ -357,6 +357,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-lint"
+version = "0.2.0"
+dependencies = [
+ "der",
+ "pkix-path",
+ "x509-cert",
+]
+
+[[package]]
 name = "pkix-path"
 version = "0.2.0"
 dependencies = [
