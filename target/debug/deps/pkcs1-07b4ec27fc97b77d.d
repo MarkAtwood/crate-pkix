@@ -1,0 +1,13 @@
+/home/mark/PROJECT/PKIX/target/debug/deps/pkcs1-07b4ec27fc97b77d.d: /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/lib.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/error.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/params.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key/other_prime_info.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/public_key.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/traits.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/version.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/../README.md
+
+/home/mark/PROJECT/PKIX/target/debug/deps/libpkcs1-07b4ec27fc97b77d.rmeta: /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/lib.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/error.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/params.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key/other_prime_info.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/public_key.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/traits.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/version.rs /home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/../README.md
+
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/lib.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/error.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/params.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/private_key/other_prime_info.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/public_key.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/traits.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/version.rs:
+/home/mark/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5/src/../README.md:

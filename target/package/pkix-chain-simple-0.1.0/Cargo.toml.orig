@@ -1,0 +1,27 @@
+[package]
+name        = "pkix-chain-simple"
+description = "Strict, opinionated X.509 chain verifier for the common happy-path case"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "pki", "pkix", "chain"]
+categories  = ["cryptography"]
+
+[features]
+# No optional features: algorithm backends are always included.
+# If you need a custom verifier or revocation, use pkix-chain instead.
+default = []
+
+[dependencies]
+pkix-path = { workspace = true, features = ["rsa", "p256"] }
+der        = { workspace = true }
+spki       = { workspace = true }
+x509-cert  = { workspace = true }
+
+[dev-dependencies]
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]

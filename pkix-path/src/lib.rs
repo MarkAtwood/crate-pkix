@@ -167,45 +167,45 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::SignatureInvalid { index } => {
+            Self::SignatureInvalid { index } => {
                 write!(f, "signature invalid at chain index {index}")
             }
-            Error::ValidityPeriod { index } => {
+            Self::ValidityPeriod { index } => {
                 write!(f, "validity period check failed at chain index {index}")
             }
-            Error::MalformedCertificate { index } => {
+            Self::MalformedCertificate { index } => {
                 write!(f, "malformed certificate at chain index {index}")
             }
-            Error::ChainBroken { index } => {
+            Self::ChainBroken { index } => {
                 write!(f, "issuer/subject linkage broken at chain index {index}")
             }
-            Error::NoTrustedPath => write!(f, "no path to a trusted anchor"),
-            Error::PathTooLong => write!(f, "path length exceeds maximum"),
-            Error::NotCA { index } => write!(f, "certificate at index {index} is not a CA"),
-            Error::KeyUsageMissing { index } => {
+            Self::NoTrustedPath => write!(f, "no path to a trusted anchor"),
+            Self::PathTooLong => write!(f, "path length exceeds maximum"),
+            Self::NotCA { index } => write!(f, "certificate at index {index} is not a CA"),
+            Self::KeyUsageMissing { index } => {
                 write!(f, "keyCertSign missing at chain index {index}")
             }
-            Error::UnhandledCriticalExtension { index } => {
+            Self::UnhandledCriticalExtension { index } => {
                 write!(f, "unhandled critical extension at chain index {index}")
             }
-            Error::NameConstraintViolation { index } => {
+            Self::NameConstraintViolation { index } => {
                 write!(f, "name constraints violated at certificate index {index}")
             }
-            Error::PolicyViolation { index } => {
+            Self::PolicyViolation { index } => {
                 write!(f, "certificate policy violation at chain index {index}")
             }
-            Error::Der(e) => write!(f, "DER error: {e}"),
-            Error::ValidityPeriodExceedsMax { index } => {
+            Self::Der(e) => write!(f, "DER error: {e}"),
+            Self::ValidityPeriodExceedsMax { index } => {
                 write!(f, "validity period exceeds maximum at chain index {index}")
             }
-            Error::AlgorithmNotAllowed { index } => {
+            Self::AlgorithmNotAllowed { index } => {
                 write!(f, "signature algorithm not allowed at chain index {index}")
             }
-            Error::KeyTooSmall { index } => {
+            Self::KeyTooSmall { index } => {
                 write!(f, "RSA key too small at chain index {index}")
             }
-            Error::MissingSan => write!(f, "leaf certificate is missing SubjectAltName"),
-            Error::MissingEku => {
+            Self::MissingSan => write!(f, "leaf certificate is missing SubjectAltName"),
+            Self::MissingEku => {
                 write!(
                     f,
                     "leaf certificate is missing required ExtendedKeyUsage OID(s)"
@@ -219,30 +219,30 @@ impl core::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Der(e) => Some(e),
-            Error::SignatureInvalid { .. }
-            | Error::MalformedCertificate { .. }
-            | Error::ValidityPeriod { .. }
-            | Error::ChainBroken { .. }
-            | Error::NoTrustedPath
-            | Error::PathTooLong
-            | Error::NotCA { .. }
-            | Error::KeyUsageMissing { .. }
-            | Error::UnhandledCriticalExtension { .. }
-            | Error::NameConstraintViolation { .. }
-            | Error::PolicyViolation { .. }
-            | Error::ValidityPeriodExceedsMax { .. }
-            | Error::AlgorithmNotAllowed { .. }
-            | Error::KeyTooSmall { .. }
-            | Error::MissingSan
-            | Error::MissingEku => None,
+            Self::Der(e) => Some(e),
+            Self::SignatureInvalid { .. }
+            | Self::MalformedCertificate { .. }
+            | Self::ValidityPeriod { .. }
+            | Self::ChainBroken { .. }
+            | Self::NoTrustedPath
+            | Self::PathTooLong
+            | Self::NotCA { .. }
+            | Self::KeyUsageMissing { .. }
+            | Self::UnhandledCriticalExtension { .. }
+            | Self::NameConstraintViolation { .. }
+            | Self::PolicyViolation { .. }
+            | Self::ValidityPeriodExceedsMax { .. }
+            | Self::AlgorithmNotAllowed { .. }
+            | Self::KeyTooSmall { .. }
+            | Self::MissingSan
+            | Self::MissingEku => None,
         }
     }
 }
 
 impl From<der::Error> for Error {
     fn from(e: der::Error) -> Self {
-        Error::Der(e)
+        Self::Der(e)
     }
 }
 
@@ -349,6 +349,7 @@ pub struct TrustAnchor {
 
 impl TrustAnchor {
     /// Create a trust anchor from raw subject name and SPKI.
+    #[must_use]
     pub fn new(
         subject: x509_cert::name::Name,
         subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
@@ -379,6 +380,7 @@ impl TrustAnchor {
     /// that cannot be parsed MUST cause rejection — use
     /// [`TrustAnchor::try_from`] instead. That path propagates the
     /// `der::Error` to the caller.
+    #[must_use]
     pub fn from_cert(cert: Certificate) -> Self {
         let name_constraints = find_cert_ext(&cert, OID_NAME_CONSTRAINTS);
         Self {
@@ -554,6 +556,7 @@ impl ValidationPolicy {
     /// Equivalent to `ValidationPolicy { current_time_unix: now_unix, ..Default::default() }`.
     /// This is the preferred constructor: it forces the caller to supply a timestamp,
     /// preventing the silent validity failures caused by `Default`'s `current_time_unix = 0`.
+    #[must_use]
     pub fn new(now_unix: u64) -> Self {
         Self {
             current_time_unix: now_unix,
@@ -1077,6 +1080,7 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 /// falls back to raw DER byte comparison. Certificates from legacy PKIs using
 /// these string types may fail name matching even when the names are
 /// semantically equivalent. Full support is deferred to v0.2.
+#[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
     let b_rdns = b.0.as_slice();
@@ -1217,8 +1221,7 @@ impl<'a> NormalizedIter<'a> {
         let end = bytes[start..]
             .iter()
             .rposition(|&b| b != b' ')
-            .map(|i| start + i + 1)
-            .unwrap_or(start);
+            .map_or(start, |i| start + i + 1);
         Self {
             bytes: &bytes[start..end],
             pos: 0,
@@ -1471,7 +1474,7 @@ fn matches_uri(subject_uri: &str, constraint: &str) -> bool {
     let host = if let Some(after_scheme) = subject_uri.find("://") {
         let rest = &subject_uri[after_scheme + 3..];
         // Strip userinfo if present (user:pass@host).
-        let rest = rest.split_once('@').map(|(_, h)| h).unwrap_or(rest);
+        let rest = rest.split_once('@').map_or(rest, |(_, h)| h);
         // Strip port and path.
         let host_end = rest.find(['/', '?', '#', ':']).unwrap_or(rest.len());
         &rest[..host_end]
@@ -1527,12 +1530,12 @@ impl SignatureVerifier for EcdsaP256Verifier {
         message: &[u8],
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
+        use p256::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
+
         // Reject any OID other than ecdsa-with-SHA256.
         if algorithm.oid != OID_ECDSA_P256_SHA256 {
             return Err(SignatureError::new());
         }
-
-        use p256::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
 
         let vk = VerifyingKey::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
 
@@ -1568,14 +1571,14 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
         message: &[u8],
         signature: &[u8],
     ) -> core::result::Result<(), SignatureError> {
+        use rsa::pkcs1v15::{Signature, VerifyingKey};
+        use rsa::signature::Verifier as _;
+        use sha2::Sha256;
+
         // Reject any OID other than sha256WithRSAEncryption.
         if algorithm.oid != OID_SHA256_WITH_RSA {
             return Err(SignatureError::new());
         }
-
-        use rsa::pkcs1v15::{Signature, VerifyingKey};
-        use rsa::signature::Verifier as _;
-        use sha2::Sha256;
 
         let vk =
             VerifyingKey::<Sha256>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
@@ -1640,7 +1643,9 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
         .ok()?;
 
     // saturating_mul guards against overflow on a hypothetical absurdly large modulus.
-    Some(modulus_byte_len.saturating_mul(8) as u32)
+    // The result fits in u32: the largest practical RSA key is 16384 bits (2048 bytes),
+    // well within u32::MAX. u32::try_from is used to make the bound explicit.
+    u32::try_from(modulus_byte_len.saturating_mul(8)).ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -1722,20 +1727,25 @@ fn chain_walk<V: SignatureVerifier>(
     // the constraint activates".  Setting a counter to `n + 1` means the
     // constraint never triggers unless a CA certificate forces it lower.
     let n = chain.len();
+    // Convert n (usize) to u32 safely. Chains with >4 billion certs are not
+    // realistic, but a truncating cast would produce a wrong counter value.
+    // u32::MAX is safe: counters are only decremented (saturating), so u32::MAX
+    // behaves identically to any value > the chain length for these semantics.
+    let n_u32 = u32::try_from(n).unwrap_or(u32::MAX);
     let mut explicit_policy: u32 = if policy.initial_explicit_policy {
         0
     } else {
-        (n as u32).saturating_add(1)
+        n_u32.saturating_add(1)
     };
     let mut inhibit_any: u32 = if policy.initial_any_policy_inhibit {
         0
     } else {
-        (n as u32).saturating_add(1)
+        n_u32.saturating_add(1)
     };
     let mut policy_mapping: u32 = if policy.initial_policy_mapping_inhibit {
         0
     } else {
-        (n as u32).saturating_add(1)
+        n_u32.saturating_add(1)
     };
     // §6.1.2(a): initial valid_policy_tree — single anyPolicy root node.
     let mut policy_tree: Option<Vec<PolicyNode>> = Some(init_policy_tree());
@@ -1991,7 +2001,7 @@ fn chain_walk<V: SignatureVerifier>(
         //      and is already available — no second extension scan needed.
         if i == 0 && policy.require_subject_alt_name {
             // san is None if the extension is absent; Some(v) where v.0 may be empty.
-            let san_is_nonempty = san.as_ref().map(|s| !s.0.is_empty()).unwrap_or(false);
+            let san_is_nonempty = san.as_ref().is_some_and(|s| !s.0.is_empty());
             if !san_is_nonempty {
                 return Err(Error::MissingSan);
             }
@@ -2359,7 +2369,7 @@ fn chain_walk<V: SignatureVerifier>(
                     let reachable: Vec<der::asn1::ObjectIdentifier> = tree
                         .iter()
                         .filter(|nd| nd.depth == parent_depth)
-                        .flat_map(|nd| nd.expected_policy_set.iter().cloned())
+                        .flat_map(|nd| nd.expected_policy_set.iter().copied())
                         .collect();
                     let any_parent = tree
                         .iter()

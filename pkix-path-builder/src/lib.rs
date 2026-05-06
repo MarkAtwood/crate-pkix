@@ -49,6 +49,7 @@ pub struct CertPool {
 
 impl CertPool {
     /// Create an empty pool.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -59,13 +60,23 @@ impl CertPool {
     }
 
     /// Return the number of certificates in the pool.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.certs.len()
     }
 
     /// Return `true` if the pool contains no certificates.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.certs.is_empty()
+    }
+
+    /// Iterate over the certificates in the pool.
+    ///
+    /// Equivalent to `(&pool).into_iter()`.
+    #[must_use]
+    pub fn iter(&self) -> core::slice::Iter<'_, x509_cert::Certificate> {
+        self.certs.iter()
     }
 }
 
@@ -91,8 +102,8 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::NoPathFound => f.write_str("no certification path found to a trust anchor"),
-            Error::DepthExceeded => f.write_str("path building exceeded maximum candidate depth"),
+            Self::NoPathFound => f.write_str("no certification path found to a trust anchor"),
+            Self::DepthExceeded => f.write_str("path building exceeded maximum candidate depth"),
         }
     }
 }
@@ -121,8 +132,7 @@ fn cert_is_ca(cert: &Certificate) -> bool {
         .iter()
         .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
         .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
-        .map(|bc| bc.ca)
-        .unwrap_or(false)
+        .map_or(false, |bc| bc.ca)
 }
 
 /// Inner DFS step.
@@ -218,8 +228,10 @@ fn dfs(
 ///
 /// - [`Error::NoPathFound`] — no topologically valid path through `pool` leads
 ///   to any of the given trust anchors.
-/// - [`Error::DepthExceeded`] — the path would require more than 10 intermediate
-///   certificates; increase the depth limit or provide a shorter chain.
+/// - [`Error::DepthExceeded`] — a path exists topologically but requires more
+///   than 10 intermediate certificates; increase the depth limit or provide a
+///   shorter chain.
+#[must_use]
 pub fn build_path(
     target: &Certificate,
     pool: &CertPool,
@@ -236,10 +248,12 @@ pub fn build_path(
         }
     }
 
-    // If the target is directly issued by an anchor, depth=0 is the answer,
-    // but the loop above starts at 1. Check that case separately.
-    // (depth=1 DFS already covers this: depth_remaining=1 checks anchors first,
-    // so the base-case check in dfs handles it. The loop is correct as-is.)
+    // No path found within MAX_DEPTH. Check if a path exists at MAX_DEPTH+1
+    // to distinguish "no path exists at all" from "path exists but too deep".
+    let mut probe = alloc::vec![target.clone()];
+    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1) {
+        return Err(Error::DepthExceeded);
+    }
 
     Err(Error::NoPathFound)
 }

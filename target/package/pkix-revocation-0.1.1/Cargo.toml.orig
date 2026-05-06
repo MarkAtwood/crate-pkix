@@ -1,0 +1,46 @@
+[package]
+name        = "pkix-revocation"
+description = "Certificate revocation checking (CRL, OCSP) for pkix-path"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "crl", "ocsp", "pki"]
+categories  = ["cryptography"]
+
+[features]
+default = []
+
+# Enable std::error::Error impl on Error type
+std = ["der/std"]
+
+# Offline CRL validation (no network; you provide the DER-encoded CRL bytes)
+crl  = ["std"]
+
+# OCSP response validation (offline; you provide the DER-encoded response bytes)
+ocsp = ["std", "dep:x509-ocsp"]
+
+[dependencies]
+pkix-path = { workspace = true }
+der        = { workspace = true }
+spki       = { workspace = true }
+x509-cert  = { workspace = true }
+x509-ocsp  = { workspace = true, optional = true }
+
+[dev-dependencies]
+der       = { workspace = true }
+x509-cert = { workspace = true }
+
+[[test]]
+name = "crl_checker_tests"
+required-features = ["crl"]
+
+[[test]]
+name = "ocsp_checker_tests"
+required-features = ["ocsp"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

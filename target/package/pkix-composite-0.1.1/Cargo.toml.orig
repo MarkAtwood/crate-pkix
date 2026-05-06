@@ -1,0 +1,26 @@
+[package]
+name        = "pkix-composite"
+description = "Composite signature verifier for pkix-path (draft-ietf-lamps-pq-composite-sigs)"
+version.workspace     = true
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "pki", "post-quantum", "composite"]
+categories  = ["cryptography", "no-std"]
+
+[features]
+default = []
+std     = ["der/std", "x509-cert/std"]
+
+[dependencies]
+pkix-path = { workspace = true }
+der        = { workspace = true }
+x509-cert  = { workspace = true }
+signature  = { workspace = true }
+spki       = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
