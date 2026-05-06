@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-lint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Lint engine for X.509 certificates — structured soft-fail and advisory results"
+
+[dependencies]
+pkix-path   = { workspace = true }
+x509-cert   = { workspace = true }
+der         = { workspace = true }
+
+[dev-dependencies]
+pkix-path   = { workspace = true, features = ["p256", "std"] }
+der         = { workspace = true }
+x509-cert   = { workspace = true }
