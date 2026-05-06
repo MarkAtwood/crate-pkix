@@ -511,7 +511,12 @@ impl DeviationStore {
 pub struct DeviationRunResult {
     /// Findings that were not affected by any deviation.
     ///
-    /// Same semantics as [`crate::Finding`] — this is what you report to the operator.
+    /// Contains the full output of the inner [`crate::LintRunner`] minus any
+    /// findings that were moved to [`Self::deviated`]. This includes
+    /// [`crate::LintResult::Pass`] and [`crate::LintResult::NotApplicable`]
+    /// findings as well as actionable ones — mirroring the behaviour of
+    /// [`crate::LintRunner::run_cert`]. Callers that want only actionable
+    /// results should filter with [`crate::Finding::is_finding`].
     pub findings: Vec<crate::Finding>,
 
     /// Findings that had a deviation applied.

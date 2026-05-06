@@ -152,25 +152,6 @@ fn cert_is_ca(cert: &Certificate) -> bool {
 ///
 /// Used for SPKI-fingerprint-based cycle detection: two certificates are the
 /// same node in the path graph if and only if they have byte-identical SPKIs.
-/// This correctly handles key-rollover topologies where multiple certs share
-/// a subject DN but carry different public keys.
-///
-/// On encoding error (should not happen for well-formed certs from a `CertPool`)
-/// returns an empty `Vec`, causing the cycle check to conservatively assume
-/// no match and allowing the candidate to be considered.
-fn spki_der_bytes(
-    spki: &x509_cert::spki::SubjectPublicKeyInfoOwned,
-) -> alloc::vec::Vec<u8> {
-    use der::Encode as _;
-    let mut buf = alloc::vec::Vec::new();
-    // Encoding a well-formed SubjectPublicKeyInfo should never fail; the only
-    // realistic failure mode is OOM, which would propagate as a panic anyway.
-    if spki.encode_to_vec(&mut buf).is_err() {
-        buf.clear();
-    }
-    buf
-}
-
 /// Inner DFS step.
 ///
 /// `path` is the current (partial) chain, leaf-first. On success it contains
@@ -223,7 +204,7 @@ fn dfs(
 
         // Cycle guard: skip if candidate's SPKI is already in the path.
         //
-        // We compare SubjectPublicKeyInfo DER bytes (not subject DNs) because:
+        // We compare SubjectPublicKeyInfo by value (not subject DNs) because:
         // - Multiple certificates may share a subject DN (key rollover, bridge CA).
         //   DN-based cycle detection would incorrectly prune valid paths in those
         //   topologies.
@@ -231,11 +212,11 @@ fn dfs(
         //   but different keys have different SPKIs and are distinct nodes in the
         //   path graph.
         //
-        // Using DER encoding avoids a runtime SHA-256 dependency and is allocation-
-        // bounded by O(depth × spki_size) which is well within practical limits.
-        let candidate_spki = spki_der_bytes(&candidate.tbs_certificate.subject_public_key_info);
+        // SubjectPublicKeyInfoOwned derives PartialEq, so no DER re-encoding is
+        // needed — the comparison is a direct field-by-field equality check.
+        let candidate_spki = &candidate.tbs_certificate.subject_public_key_info;
         let already_in_path = path.iter().any(|in_path| {
-            spki_der_bytes(&in_path.tbs_certificate.subject_public_key_info) == candidate_spki
+            &in_path.tbs_certificate.subject_public_key_info == candidate_spki
         });
         if already_in_path {
             continue;

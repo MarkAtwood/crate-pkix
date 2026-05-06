@@ -10,7 +10,7 @@
 //! # Architecture
 //!
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
-//! The default feature set (`rustcrypto`) wires in RustCrypto backends for
+//! The default feature set (`rustcrypto`) wires in `RustCrypto` backends for
 //! RSA-PKCS1v15-SHA-256 (`rsa` feature) and ECDSA-P-256-SHA-256 (`p256` feature).
 //! P-384 and Ed25519 are planned for v0.2.
 //! For FIPS-validated crypto, implement [`SignatureVerifier`] against
@@ -97,7 +97,7 @@ pub enum Error {
     /// An intermediate certificate has a `KeyUsage` extension with `keyCertSign` not set.
     ///
     /// This error is only returned when a `KeyUsage` extension is **present** and the
-    /// `keyCertSign` bit is explicitly absent or zero (RFC 5280 §6.1.4(n): "If a KeyUsage
+    /// `keyCertSign` bit is explicitly absent or zero (RFC 5280 §6.1.4(n): "If a `KeyUsage`
     /// extension is present, verify that the keyCertSign bit is set.").
     ///
     /// Certificates with **no** `KeyUsage` extension are not rejected by this check;
@@ -179,7 +179,7 @@ pub enum Error {
     /// `anyExtendedKeyUsage` (2.5.29.37.0) does not satisfy a specific OID
     /// requirement — each required OID must be listed explicitly.
     MissingEku,
-    /// Two certificates in the chain have identical SubjectPublicKeyInfo.
+    /// Two certificates in the chain have identical `SubjectPublicKeyInfo`.
     ///
     /// A certificate appearing at two positions in the chain (or two distinct
     /// certificates that share the same public key) indicates a likely error in
@@ -381,7 +381,7 @@ pub struct TrustAnchor {
     /// malformed SPKI will cause signature verification to fail with
     /// `Error::NoTrustedPath` (no anchor matched), not a panic.
     pub subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
-    /// NameConstraints from the trust anchor certificate, if present.
+    /// `NameConstraints` from the trust anchor certificate, if present.
     ///
     /// When set, `chain_walk` seeds the initial `permitted_subtrees` and
     /// `excluded_subtrees` state from this value before walking the chain.
@@ -412,7 +412,7 @@ impl TrustAnchor {
     /// Prefer [`TrustAnchor::from`] (i.e. `TrustAnchor::from(&cert)`) when you
     /// need to keep `cert` alive after building the anchor.
     ///
-    /// # NameConstraints and malformed extensions
+    /// # `NameConstraints` and malformed extensions
     ///
     /// If the anchor certificate contains a malformed or unparseable
     /// `NameConstraints` extension, `from_cert` silently sets
@@ -484,8 +484,8 @@ impl TryFrom<Certificate> for TrustAnchor {
 /// and reused for the lifetime of the application. Repeated construction is
 /// unnecessary.
 ///
-/// Policy enforcement (CertificatePolicies, PolicyMappings, PolicyConstraints,
-/// InhibitAnyPolicy) is implemented per RFC 5280 §6.1. Use the
+/// Policy enforcement (`CertificatePolicies`, `PolicyMappings`, `PolicyConstraints`,
+/// `InhibitAnyPolicy`) is implemented per RFC 5280 §6.1. Use the
 /// `initial_explicit_policy`, `initial_any_policy_inhibit`,
 /// `initial_policy_mapping_inhibit`, and `initial_policy_set` fields to
 /// configure the initial policy state.
@@ -522,7 +522,7 @@ pub struct ValidationPolicy {
     /// where you explicitly want permissive (clock-free) validation.
     pub current_time_unix: u64,
 
-    /// Enforce the KeyUsage extension when present. Default: `true`.
+    /// Enforce the `KeyUsage` extension when present. Default: `true`.
     ///
     /// When `true`, an intermediate certificate whose `KeyUsage` extension is
     /// **present** but does not include `keyCertSign` will be rejected with
@@ -587,7 +587,7 @@ pub struct ValidationPolicy {
     pub min_rsa_key_bits: Option<u32>,
 
     /// If `true`, the leaf certificate (chain index 0) must have a non-empty
-    /// SubjectAltName extension. `false` means no SAN requirement (the default).
+    /// `SubjectAltName` extension. `false` means no SAN requirement (the default).
     ///
     /// Intermediate CA certificates are not checked by this field.
     /// Violations produce [`Error::MissingSan`].
@@ -605,7 +605,7 @@ pub struct ValidationPolicy {
     pub require_rfc822_san: bool,
 
     /// If `Some(oids)`, the leaf certificate must explicitly assert every OID in
-    /// `oids` via its ExtendedKeyUsage extension. `None` means no EKU requirement
+    /// `oids` via its `ExtendedKeyUsage` extension. `None` means no EKU requirement
     /// (the default).
     ///
     /// `anyExtendedKeyUsage` (2.5.29.37.0) does **not** satisfy a specific OID
@@ -889,7 +889,7 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
 /// RFC 5280 §4.1.1.2: outer signatureAlgorithm OID must equal inner TBSCertificate.signature OID.
 ///
 /// Only OIDs are compared, not parameters.  RFC 5280 says the two
-/// AlgorithmIdentifiers MUST be identical, but many production CAs
+/// `AlgorithmIdentifiers` MUST be identical, but many production CAs
 /// generate certs where one field has explicit NULL parameters and the other
 /// omits them — a mismatch that OpenSSL and other validators accept in
 /// practice.  OID-only comparison preserves the security intent (the same
@@ -1004,7 +1004,7 @@ struct PolicyNode {
     /// The policy OID this node represents.
     valid_policy: der::asn1::ObjectIdentifier,
     /// Policies in the NEXT certificate that are consistent with this node.
-    /// Initialized to `{valid_policy}`; updated by PolicyMappings.
+    /// Initialized to `{valid_policy}`; updated by `PolicyMappings`.
     expected_policy_set: Vec<der::asn1::ObjectIdentifier>,
 }
 
@@ -1021,7 +1021,7 @@ fn init_policy_tree() -> Vec<PolicyNode> {
 ///
 /// After processing certificate at depth `d`, any ancestor node with no
 /// surviving child must be deleted (RFC 5280 §6.1.3(d)(3)): "If there is a
-/// node in the valid_policy_tree of depth i-1 or less without any child
+/// node in the `valid_policy_tree` of depth i-1 or less without any child
 /// nodes, delete that node.  Repeat this step until there are no nodes of
 /// depth i-1 or less without children."
 ///
@@ -1077,11 +1077,11 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
 // KeyUsage extraction (PKIX-8ae)
 // ---------------------------------------------------------------------------
 
-/// Returns whether the `keyCertSign` bit is set in the KeyUsage extension.
+/// Returns whether the `keyCertSign` bit is set in the `KeyUsage` extension.
 ///
-/// - `None`         — KeyUsage extension absent (no constraint)
+/// - `None`         — `KeyUsage` extension absent (no constraint)
 /// - `Some(true)`   — keyCertSign is set
-/// - `Some(false)`  — KeyUsage present, keyCertSign NOT set
+/// - `Some(false)`  — `KeyUsage` present, keyCertSign NOT set
 fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
     use der::Decode;
     use x509_cert::ext::pkix::KeyUsage;
@@ -1164,11 +1164,11 @@ fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::Su
     find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
 }
 
-/// Decode the NameConstraints extension from `cert`.
+/// Decode the `NameConstraints` extension from `cert`.
 ///
 /// Returns `Err(MalformedCertificate)` if the extension is present but:
 /// - its DER cannot be decoded (vjc.7: fail-closed on security-critical extension), or
-/// - any GeneralSubtree has a non-zero `minimum` or a present `maximum` field
+/// - any `GeneralSubtree` has a non-zero `minimum` or a present `maximum` field
 ///   (vjc.8: RFC 5280 §4.2.1.10 MUST require minimum=0, maximum=absent).
 ///
 /// Returns `Ok(None)` if the extension is absent.
@@ -1296,11 +1296,11 @@ fn is_self_issued_cert(cert: &Certificate) -> bool {
         && names_match(&cert.tbs_certificate.subject, &cert.tbs_certificate.issuer)
 }
 
-/// Returns `true` if `cert` is identified by its SubjectAltName rather than its
+/// Returns `true` if `cert` is identified by its `SubjectAltName` rather than its
 /// Subject DN.
 ///
 /// RFC 5280 §4.2.1.6 specifies that a certificate with an empty Subject field and
-/// a **critical** SubjectAltName extension is identified by the SAN, not the DN.
+/// a **critical** `SubjectAltName` extension is identified by the SAN, not the DN.
 /// In this case, name linkage checks against the Subject DN are meaningless.
 ///
 /// Returns `false` for any cert that has a non-empty Subject or a non-critical SAN.
@@ -1318,7 +1318,7 @@ fn cert_has_san_identity(cert: &Certificate) -> bool {
         .any(|ext| ext.extn_id == OID_SUBJECT_ALT_NAME && ext.critical)
 }
 
-/// Compare two AttributeTypeAndValue values after RFC 4518 normalization.
+/// Compare two `AttributeTypeAndValue` values after RFC 4518 normalization.
 fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     let a_str = any_to_str_bytes(a);
     let b_str = any_to_str_bytes(b);
@@ -1338,7 +1338,7 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     }
 }
 
-/// Extract the string content bytes from a DirectoryString Any value,
+/// Extract the string content bytes from a `DirectoryString` Any value,
 /// returning `None` for types that require special pre-processing before
 /// normalization (see `ava_values_match` for the dispatch logic).
 ///
@@ -1353,11 +1353,11 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 ///
 /// **v0.2 planned — decode then normalize:**
 /// - `BMPString` (UCS-2 BE, BMP only): decode UTF-16BE → apply full RFC
-///   4518 six-step preparation (Map → NFKC → Prohibit → CheckBidi →
-///   insignificant-space). RFC 4518 §2.1 classifies BMPString as "a subset
+///   4518 six-step preparation (Map → NFKC → Prohibit → `CheckBidi` →
+///   insignificant-space). RFC 4518 §2.1 classifies `BMPString` as "a subset
 ///   of Unicode" — no custom transcoding required.
 /// - `UniversalString` (UCS-4 BE): decode UCS-4 BE → apply the same RFC
-///   4518 six-step preparation as BMPString.
+///   4518 six-step preparation as `BMPString`.
 ///
 /// v0.2 will also upgrade the currently-handled types to full RFC 4518
 /// six-step normalization (adding NFKC). All types except `TeletexString`
@@ -1365,10 +1365,10 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 ///
 /// **Deferred — `TeletexString` (T61String):**
 /// Raw DER byte comparison only. RFC 4518 §2.1 states: "As there is no
-/// standard for mapping TeletexString values to Unicode, the mapping is
-/// left a local matter." RFC 5280 §7.1 classifies TeletexString support
+/// standard for mapping `TeletexString` values to Unicode, the mapping is
+/// left a local matter." RFC 5280 §7.1 classifies `TeletexString` support
 /// as OPTIONAL. No canonical T.61→Unicode table exists — OpenSSL, NSS,
-/// and GnuTLS each use incompatible vendor extensions. Any mapping we
+/// and `GnuTLS` each use incompatible vendor extensions. Any mapping we
 /// choose would silently accept mismatches that other validators reject,
 /// or reject chains those validators accept. Support is deferred until a
 /// clear interoperability target exists (e.g., alignment with OpenSSL's
@@ -1456,7 +1456,7 @@ impl<'a> Iterator for NormalizedIter<'a> {
 // NameConstraints matching (PKIX-mew)
 // ---------------------------------------------------------------------------
 
-/// Newtype wrapping a bitmask of `GeneralName` name types for NameConstraints.
+/// Newtype wrapping a bitmask of `GeneralName` name types for `NameConstraints`.
 ///
 /// Used by `nc_constrained_types` to track which types have been constrained
 /// by at least one CA certificate in the path, even if the intersection later
@@ -1514,7 +1514,7 @@ fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
 
 /// Returns true if `subject` DN is within the subtree rooted at `constraint`.
 ///
-/// RFC 5280 §4.2.1.10: a DirectoryName constraint is satisfied when the subject's
+/// RFC 5280 §4.2.1.10: a `DirectoryName` constraint is satisfied when the subject's
 /// DN has the constraint DN as a prefix (most-general to most-specific order).
 /// E.g., constraint `{C=US, O=Test}` matches subject `{C=US, O=Test, CN=Alice}`.
 fn dn_within_subtree(subject: &x509_cert::name::Name, constraint: &x509_cert::name::Name) -> bool {
@@ -1856,7 +1856,7 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
 ///    f. For all certs except the leaf (i > 0): require `BasicConstraints` cA=TRUE.
 ///    g. For all certs except the leaf (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
 ///    h. For all certs except the leaf (i > 0): enforce `pathLenConstraint` if present.
-///    i. For all certs except the leaf (i > 0): accumulate NameConstraints state
+///    i. For all certs except the leaf (i > 0): accumulate `NameConstraints` state
 ///       (INTERSECTION for permittedSubtrees, UNION for excludedSubtrees).
 ///
 /// RFC 5280 §4.2.1.9 note on pathLenConstraint: for the cert at position `i`
@@ -2673,12 +2673,12 @@ enum CheckMode {
     Permitted,
 }
 
-/// Check that all names in `cert` satisfy the current NameConstraints state.
+/// Check that all names in `cert` satisfy the current `NameConstraints` state.
 ///
-/// Called once per certificate during chain_walk, BEFORE updating the NC
-/// state from that certificate's own NameConstraints extension.
+/// Called once per certificate during `chain_walk`, BEFORE updating the NC
+/// state from that certificate's own `NameConstraints` extension.
 ///
-/// `san` is the pre-decoded SubjectAltName for this cert (pass `None` if the
+/// `san` is the pre-decoded `SubjectAltName` for this cert (pass `None` if the
 /// extension is absent). Decoding it before the call avoids a second scan of
 /// the extension list when both NC check and NC update are needed (vjc.13).
 ///
@@ -2849,10 +2849,10 @@ fn check_name_constraints(
 // DefaultVerifier — OID-dispatching RustCrypto backend (PKIX-8wg)
 // ---------------------------------------------------------------------------
 
-/// A [`SignatureVerifier`] that dispatches to available RustCrypto backends by OID.
+/// A [`SignatureVerifier`] that dispatches to available `RustCrypto` backends by OID.
 ///
 /// This is the recommended out-of-the-box verifier for applications that use
-/// the default RustCrypto feature set. It supports:
+/// the default `RustCrypto` feature set. It supports:
 ///
 /// - `ecdsa-with-SHA256` (1.2.840.10045.4.3.2) — via the `p256` feature
 /// - `sha256WithRSAEncryption` (1.2.840.113549.1.1.11) — via the `rsa` feature
