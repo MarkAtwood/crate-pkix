@@ -43,13 +43,10 @@ const OID_SHA256: der::asn1::ObjectIdentifier =
 ///   the issuer's key. This is a v0.1 limitation tracked for v0.2.
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
-/// - **Security**: `SingleResponse` matching is by serial number only; the
-///   `CertID.issuerNameHash` and `CertID.issuerKeyHash` fields are not verified.
-///   Serial numbers are only unique within a single CA's issuance, not globally.
-///   An OCSP response for a certificate with the same serial number from a
-///   different CA could satisfy this check. For deployments where multiple CAs
-///   share an OCSP responder or serial number collisions are possible, verify
-///   the issuer hash fields before using this checker.
+/// - `SingleResponse` matching uses both serial number and the `CertID`
+///   `issuerNameHash`/`issuerKeyHash` fields (RFC 6960 §4.1.1). An OCSP
+///   response from a different CA with the same serial number will be rejected
+///   by the hash checks.
 /// - The `ResponderId` field is not verified against the issuer identity.
 /// - If no `SingleResponse` matches the certificate's serial number,
 ///   `OcspStatusUnknown` is returned (hard-fail).
