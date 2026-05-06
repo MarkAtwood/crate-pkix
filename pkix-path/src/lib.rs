@@ -845,6 +845,40 @@ where
     Err(last_err)
 }
 
+/// Validate a certificate chain using a [`Profile`] to produce the policy.
+///
+/// This is a convenience wrapper around [`validate_path`] for callers that
+/// work with a `Profile` implementation rather than constructing a
+/// [`ValidationPolicy`] directly.
+///
+/// The profile's [`Policy::policy`][Profile::policy] method is called with
+/// `now_unix` to produce the `ValidationPolicy`.  A `debug_assert!` enforces
+/// the `Profile` contract that the returned policy must have
+/// `current_time_unix == now_unix`; this fires in debug/test builds and is
+/// a no-op in release.
+///
+/// See [`validate_path`] for full documentation of the remaining parameters
+/// and error semantics.
+#[must_use = "path validation result must be checked"]
+pub fn validate_path_with_profile<V, P>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    profile: &P,
+    now_unix: u64,
+    verifier: &V,
+) -> Result<ValidatedPath>
+where
+    V: SignatureVerifier,
+    P: Profile,
+{
+    let policy = profile.policy(now_unix);
+    debug_assert_eq!(
+        policy.current_time_unix, now_unix,
+        "Profile::policy() must set current_time_unix == now_unix"
+    );
+    validate_path(chain, anchors, &policy, verifier)
+}
+
 // ---------------------------------------------------------------------------
 // validate_path helpers — input guards and OID consistency (PKIX-6vu)
 // ---------------------------------------------------------------------------
