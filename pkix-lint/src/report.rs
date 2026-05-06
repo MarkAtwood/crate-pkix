@@ -1,0 +1,264 @@
+//! Evidence pack: `EvaluationReport` bundles all findings from a lint run.
+//!
+//! An [`EvaluationReport`] is the exportable unit for the "evidence pack" workflow:
+//! one operator exports it, attaches it to a CA help-desk ticket, and the CA sees
+//! exactly which cert, which rule, which version, and which time produced each finding.
+//! This eliminates the "send me the cert details" round-trip.
+//!
+//! # JSON export
+//!
+//! Enable the `serde` feature to get `serde::Serialize`/`Deserialize` on all types
+//! in this module. The JSON schema is stable — field names are part of the public API.
+//!
+//! ```toml
+//! pkix-lint = { version = "0.2", features = ["serde"] }
+//! ```
+//!
+//! # OSCAL compatibility
+//!
+//! The `EvaluationReport` fields map to OSCAL Assessment Results as follows:
+//! - `evaluated_at_unix` → `assessment-results.metadata.last-modified`
+//! - `profile_id` / `profile_version` → `assessment-results.import-ap.href` (profile reference)
+//! - `rule_bundle_version` → `assessment-results.metadata.prop[name=rule-bundle-version]`
+//! - `findings` → `assessment-results.results.findings` (non-deviated)
+//! - `deviated_findings` → `assessment-results.results.risks[status=deviation-approved]`
+//!
+//! A full OSCAL export adapter is planned for the `pkix-lint-oscal` crate (v0.3).
+
+use crate::deviation::DeviatedFinding;
+use crate::Finding;
+
+/// The complete output of a lint evaluation run.
+///
+/// Bundles all findings (both clean and deviated) with the metadata needed to
+/// reconstruct who ran what, when, and against which cert chain. This is the
+/// "evidence pack" that operators attach to CA help-desk tickets.
+///
+/// # Stable JSON schema
+///
+/// All field names in this struct are part of the public API and will not be
+/// renamed without a semver-major bump. Consumers may safely parse them
+/// across minor version updates.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, Default)]
+pub struct EvaluationReport {
+    /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
+    ///
+    /// Example: `"cabf.br.tls"`. Empty string if no profile was specified.
+    pub profile_id: &'static str,
+
+    /// The profile version string (from [`crate::Profile::version`]).
+    ///
+    /// Example: `"SC-081"`. Empty string if no profile was specified.
+    pub profile_version: &'static str,
+
+    /// The rule bundle version string (from [`crate::LintRunner::bundle_version`]).
+    ///
+    /// Example: `"pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
+    /// Empty string if the runner was constructed without a bundle version.
+    pub rule_bundle_version: &'static str,
+
+    /// The number of certificates in the evaluated chain.
+    pub chain_length: usize,
+
+    /// Unix epoch seconds at which the evaluation was performed.
+    ///
+    /// For audit-mode (time-of-issuance), this is the cert's `notBefore`.
+    /// For operational-mode (current time), this is the wall-clock time.
+    ///
+    /// Note: individual findings also carry `evaluated_at_unix`, which may
+    /// differ from this field when different certs in the chain were evaluated
+    /// at different times (e.g., in a mixed audit+operational run). Prefer
+    /// per-finding `evaluated_at_unix` for precise attribution.
+    pub evaluated_at_unix: u64,
+
+    /// Findings that were not affected by any deviation.
+    ///
+    /// These are the normal compliance findings. Yellow/red in the operator UI.
+    pub findings: Vec<Finding>,
+
+    /// Findings that had a deviation applied.
+    ///
+    /// Always included for auditability — never hidden. The operator UI should
+    /// display these as "DEVIATION APPLIED by <id>" with the justification and
+    /// `evidence_uri` (when present) shown inline.
+    pub deviated_findings: Vec<DeviatedFinding>,
+}
+
+impl EvaluationReport {
+    /// Create an empty report with the given metadata.
+    #[must_use]
+    pub fn new(
+        profile_id: &'static str,
+        profile_version: &'static str,
+        rule_bundle_version: &'static str,
+        chain_length: usize,
+        evaluated_at_unix: u64,
+    ) -> Self {
+        Self {
+            profile_id,
+            profile_version,
+            rule_bundle_version,
+            chain_length,
+            evaluated_at_unix,
+            findings: Vec::new(),
+            deviated_findings: Vec::new(),
+        }
+    }
+
+    /// Return `true` if there are any actionable findings (Warn, Error, or Fatal).
+    ///
+    /// Deviated findings do not count toward this result regardless of their
+    /// original severity — the deviation has already been applied.
+    #[must_use]
+    pub fn has_findings(&self) -> bool {
+        self.findings.iter().any(|f| f.is_finding())
+    }
+
+    /// Return all findings at or above the given severity.
+    ///
+    /// Useful for rendering: show only Error+ findings in a summary panel,
+    /// or Warn+ in a detail view.
+    #[must_use]
+    pub fn findings_at_or_above(&self, min_severity: crate::Severity) -> Vec<&Finding> {
+        self.findings
+            .iter()
+            .filter(|f| {
+                f.result
+                    .detail()
+                    .is_some()
+                    && matches!(
+                        (&f.result, min_severity),
+                        (crate::LintResult::Warn(_), crate::Severity::Info | crate::Severity::Warn)
+                        | (crate::LintResult::Error(_), crate::Severity::Info | crate::Severity::Warn | crate::Severity::Error)
+                        | (crate::LintResult::Fatal(_), _)
+                    )
+            })
+            .collect()
+    }
+
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{LintResult, Severity};
+
+    fn empty_report() -> EvaluationReport {
+        EvaluationReport::new("cabf.br.tls", "SC-081", "v0.2.0", 2, 1_780_272_000)
+    }
+
+    fn pass_finding() -> Finding {
+        Finding {
+            lint_id: "test.lint",
+            citation: "test",
+            rule_bundle_version: "v0.2.0",
+            result: LintResult::Pass,
+            cert_index: Some(0),
+            evaluated_at_unix: 1_780_272_000,
+        }
+    }
+
+    fn error_finding() -> Finding {
+        Finding {
+            result: LintResult::Error("something wrong"),
+            ..pass_finding()
+        }
+    }
+
+    fn warn_finding() -> Finding {
+        Finding {
+            result: LintResult::Warn("advisory"),
+            ..pass_finding()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // EvaluationReport basic tests
+    // Oracle: the field semantics in EvaluationReport doc comments.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn empty_report_has_no_findings() {
+        let r = empty_report();
+        assert!(!r.has_findings());
+        assert!(r.findings.is_empty());
+        assert!(r.deviated_findings.is_empty());
+    }
+
+    #[test]
+    fn report_with_only_pass_has_no_findings() {
+        let mut r = empty_report();
+        r.findings.push(pass_finding());
+        assert!(!r.has_findings(), "Pass result must not count as a finding");
+    }
+
+    #[test]
+    fn report_with_error_has_findings() {
+        let mut r = empty_report();
+        r.findings.push(error_finding());
+        assert!(r.has_findings());
+    }
+
+    #[test]
+    fn findings_at_or_above_error_excludes_warn() {
+        let mut r = empty_report();
+        r.findings.push(error_finding());
+        r.findings.push(warn_finding());
+        let at_error = r.findings_at_or_above(Severity::Error);
+        assert_eq!(at_error.len(), 1, "only Error findings at Error threshold");
+        assert!(matches!(at_error[0].result, LintResult::Error(_)));
+    }
+
+    #[test]
+    fn findings_at_or_above_warn_includes_error() {
+        let mut r = empty_report();
+        r.findings.push(error_finding());
+        r.findings.push(warn_finding());
+        let at_warn = r.findings_at_or_above(Severity::Warn);
+        assert_eq!(at_warn.len(), 2, "both Error and Warn at Warn threshold");
+    }
+
+    #[test]
+    fn report_metadata_fields_preserved() {
+        let r = EvaluationReport::new("cabf.br.tls", "SC-081", "bundle-v1", 3, 999_000);
+        assert_eq!(r.profile_id, "cabf.br.tls");
+        assert_eq!(r.profile_version, "SC-081");
+        assert_eq!(r.rule_bundle_version, "bundle-v1");
+        assert_eq!(r.chain_length, 3);
+        assert_eq!(r.evaluated_at_unix, 999_000);
+    }
+
+    // -----------------------------------------------------------------------
+    // JSON serialization test (requires serde feature)
+    // Oracle: serde_json round-trip — the deserialized report must equal the original.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn json_round_trip() {
+        let mut r = empty_report();
+        r.findings.push(error_finding());
+        r.findings.push(warn_finding());
+
+        // Serialize using serde_json (dev-dependency).
+        let json = serde_json::to_string_pretty(&r).expect("serialization must succeed");
+        // Verify it's valid JSON and contains expected fields.
+        assert!(json.contains("\"profile_id\""), "JSON must contain profile_id");
+        assert!(json.contains("\"cabf.br.tls\""), "JSON must contain profile id value");
+        assert!(json.contains("\"lint_id\""), "JSON must contain lint_id");
+        assert!(json.contains("\"rule_bundle_version\""), "JSON must contain rule_bundle_version");
+        assert!(json.contains("\"evaluated_at_unix\""), "JSON must contain evaluated_at_unix");
+
+        // Round-trip: parse back and check key fields.
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).expect("JSON must be valid");
+        assert_eq!(parsed["profile_id"], "cabf.br.tls");
+        assert_eq!(parsed["chain_length"], 2);
+        assert_eq!(parsed["findings"].as_array().unwrap().len(), 2);
+    }
+}
