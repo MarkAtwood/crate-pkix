@@ -24,8 +24,7 @@ fn pkits_cert(name: &str) -> Certificate {
         .join(format!("{}.crt", name));
     let der_bytes = std::fs::read(&path)
         .unwrap_or_else(|e| panic!("fixture not found at {}: {}", path.display(), e));
-    Certificate::from_der(&der_bytes)
-        .unwrap_or_else(|e| panic!("failed to parse cert {name}: {e}"))
+    Certificate::from_der(&der_bytes).unwrap_or_else(|e| panic!("failed to parse cert {name}: {e}"))
 }
 
 /// Build a trust anchor from the PKITS root certificate.
@@ -48,7 +47,10 @@ fn test_build_path_two_cert_chain() {
         .expect("build_path should succeed for PKITS §4.1.1 chain");
 
     // Chain must be leaf-first with at least [EE, GoodCACert].
-    assert!(path.len() >= 2, "path should contain at least EE + intermediate");
+    assert!(
+        path.len() >= 2,
+        "path should contain at least EE + intermediate"
+    );
 
     // Validate the built path end-to-end.
     let policy = ValidationPolicy::new(PKITS_NOW);
@@ -90,8 +92,8 @@ fn test_build_path_no_path() {
 
     let pool = CertPool::new(); // empty pool
 
-    let err = build_path(&ee, &pool, &[anchor])
-        .expect_err("build_path should fail with an empty pool");
+    let err =
+        build_path(&ee, &pool, &[anchor]).expect_err("build_path should fail with an empty pool");
 
     assert!(
         matches!(err, pkix_path_builder::Error::NoPathFound),

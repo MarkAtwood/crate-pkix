@@ -74,7 +74,6 @@ impl CertPool {
     /// Iterate over the certificates in the pool.
     ///
     /// Equivalent to `(&pool).into_iter()`.
-    #[must_use]
     pub fn iter(&self) -> core::slice::Iter<'_, x509_cert::Certificate> {
         self.certs.iter()
     }
@@ -132,7 +131,7 @@ fn cert_is_ca(cert: &Certificate) -> bool {
         .iter()
         .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
         .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
-        .map_or(false, |bc| bc.ca)
+        .is_some_and(|bc| bc.ca)
 }
 
 /// Inner DFS step.
@@ -231,7 +230,6 @@ fn dfs(
 /// - [`Error::DepthExceeded`] — a path exists topologically but requires more
 ///   than 10 intermediate certificates; increase the depth limit or provide a
 ///   shorter chain.
-#[must_use]
 pub fn build_path(
     target: &Certificate,
     pool: &CertPool,

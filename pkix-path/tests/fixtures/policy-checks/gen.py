@@ -18,8 +18,11 @@ Fixtures:
   int-rsa2048.der                   RSA-2048 intermediate signed by RSA root
   leaf-rsa2048-365d-san-eku.der     Leaf: RSA-2048, 365 days, SAN, serverAuth EKU
   leaf-rsa1024-365d-san-eku.der     Leaf: RSA-1024, 365 days, SAN, serverAuth EKU
+  webpki-self-signed-365d.der       Self-signed P-256 cert: 365 days, SAN, serverAuth EKU
 
-Oracle: openssl verify -CAfile <root.pem> -untrusted <int.pem> <leaf.pem>
+Oracle (chained fixtures):  openssl verify -CAfile <root.pem> -untrusted <int.pem> <leaf.pem>
+Oracle (webpki-self-signed-365d): openssl verify -CAfile webpki-self-signed-365d.pem \
+    webpki-self-signed-365d.pem → OK (self-signed; cert is both anchor and subject)
 
 All certs use NOT_BEFORE = 2025-01-01. Tests run at GRY_NOW = 2026-06-01 (unix 1780272000),
 which is within the validity window of all certs generated here.

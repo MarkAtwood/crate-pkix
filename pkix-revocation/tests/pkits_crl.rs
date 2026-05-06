@@ -289,8 +289,7 @@ fn pkits_4_15_9_invalid_only_delta_no_base_construction_fails() {
     // Actually the delta has deltaCRLIndicator so it IS a delta; using it as base means
     // our with_delta call on the actual delta will try to verify BaseCRLNumber vs
     // the "base" CRL number. Since both are deltas, the delta's BaseCRLNumber won't match.
-    let result =
-        CrlChecker::with_delta(delta.clone(), delta, PKITS_NOW, DefaultVerifier);
+    let result = CrlChecker::with_delta(delta.clone(), delta, PKITS_NOW, DefaultVerifier);
     assert!(
         result.is_err(),
         "§4.15.9: supplying a delta CRL as the base must fail; got Ok"
@@ -618,9 +617,7 @@ fn pkits_4_14_12_invalid_only_ca_certs_for_ee() {
     // Our IDP check returns Ok() because the CRL doesn't cover EE certs.
     // This is the correct CrlChecker behaviour: coverage decision, not revocation decision.
     // The path validator must treat "not covered" as a hard-fail in PKITS mode.
-    result.expect(
-        "§4.14.12: onlyContainsCACerts CRL does not cover EE cert → not covered → Ok()"
-    );
+    result.expect("§4.14.12: onlyContainsCACerts CRL does not cover EE cert → not covered → Ok()");
 }
 
 /// §4.14.13: Valid — onlyContainsCACerts CRL applied to CA cert check.
@@ -667,7 +664,7 @@ fn pkits_4_14_14_invalid_only_attribute_certs() {
     let result = checker.check_revocation(&ee, &ca);
     result.expect(
         "§4.14.14: onlyContainsAttributeCerts CRL → not covered → Ok() \
-         (path validator must hard-fail)"
+         (path validator must hard-fail)",
     );
 }
 
@@ -686,8 +683,8 @@ fn delta_empty_base_revocation_in_delta() {
     let ca = load_cert(&ca_der);
     let leaf = load_cert(&leaf_der);
 
-    let checker = CrlChecker::with_delta(base, delta, PKITS_NOW, DefaultVerifier)
-        .expect("valid base+delta");
+    let checker =
+        CrlChecker::with_delta(base, delta, PKITS_NOW, DefaultVerifier).expect("valid base+delta");
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
         matches!(result, Err(Error::Revoked { .. })),
