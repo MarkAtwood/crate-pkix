@@ -243,6 +243,19 @@ fn dfs(
 /// - [`Error::DepthExceeded`] — a path exists topologically but requires more
 ///   than 10 intermediate certificates; increase the depth limit or provide a
 ///   shorter chain.
+///
+/// # Limitations
+///
+/// Cycle detection is based on subject DN comparison. In key-rollover or
+/// bridge-CA topologies where multiple certificates share a subject DN, the
+/// path builder may fail to find valid paths. This is a v0.1 limitation;
+/// v0.2 will use certificate identity (SPKI fingerprint) for cycle detection.
+///
+/// # Security
+///
+/// The DFS path builder has worst-case exponential complexity in the pool size.
+/// Do not populate the certificate pool from untrusted input without prior size
+/// limits. A future version will add a configurable budget cap.
 #[must_use = "path building result must be checked"]
 pub fn build_path(
     target: &Certificate,

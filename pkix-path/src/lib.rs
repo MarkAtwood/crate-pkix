@@ -447,6 +447,12 @@ impl TryFrom<Certificate> for TrustAnchor {
 /// Construct via [`ValidationPolicy::new`] or [`Default`] + field assignment.
 /// Do not use struct literal syntax.
 ///
+/// # Performance note
+///
+/// Policy objects are intended to be constructed once (e.g., at server startup)
+/// and reused for the lifetime of the application. Repeated construction is
+/// unnecessary.
+///
 /// Policy enforcement (CertificatePolicies, PolicyMappings, PolicyConstraints,
 /// InhibitAnyPolicy) is implemented per RFC 5280 §6.1. Use the
 /// `initial_explicit_policy`, `initial_any_policy_inhibit`,
@@ -1795,6 +1801,7 @@ fn chain_walk<V: SignatureVerifier>(
         //      Applies to every cert in the chain (no i == 0 guard), matching
         //      CA/B Forum profile intent.
         if let Some(ref allowed) = policy.allowed_signature_algs {
+            // O(n) over a typically 2–6 element list; acceptable for the common case.
             if !allowed.contains(&cert.signature_algorithm.oid) {
                 return Err(Error::AlgorithmNotAllowed { index: i });
             }

@@ -176,6 +176,20 @@ pub trait RevocationChecker {
     /// Returns `Ok(())` if the certificate is not revoked, or an `Err` if it
     /// is revoked or if revocation status cannot be determined and the policy
     /// requires a definitive answer (hard-fail mode).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::CertRevoked`] — the certificate's serial number appears in the
+    ///   CRL's or OCSP response's revoked list.
+    /// - [`Error::CrlExpired`] / [`Error::OcspExpired`] — the revocation data has
+    ///   passed its `nextUpdate` timestamp.
+    /// - Other [`Error`] variants for parse failures, signature verification
+    ///   failures, or structural constraint violations.
+    ///
+    /// **`Ok(())` dual semantics**: implementations may return `Ok(())` both when
+    /// a certificate is confirmed not-revoked *and* when the revocation source does
+    /// not cover this certificate type (see [`CrlChecker`] for details). Hard-fail
+    /// callers must ensure at least one revocation source covers the certificate.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
 
