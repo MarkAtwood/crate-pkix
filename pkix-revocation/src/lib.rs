@@ -22,7 +22,7 @@ use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
 /// Errors returned by revocation checking.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate has been revoked.
@@ -176,6 +176,7 @@ pub trait RevocationChecker {
     /// Returns `Ok(())` if the certificate is not revoked, or an `Err` if it
     /// is revoked or if revocation status cannot be determined and the policy
     /// requires a definitive answer (hard-fail mode).
+    #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
 
     /// Check whether `cert` (issued directly by a trust anchor) has been revoked.
@@ -193,6 +194,7 @@ pub trait RevocationChecker {
     /// overall no-op behaviour. `CrlChecker` and `OcspChecker` also inherit the
     /// default for v0.1; a future version will override when an issuer cert is
     /// available.
+    #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,
         _cert: &Certificate,

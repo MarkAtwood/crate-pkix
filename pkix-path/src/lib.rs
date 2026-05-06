@@ -53,7 +53,7 @@ use x509_cert::Certificate;
 pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
 
 /// Errors returned by path validation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// Certificate signature verification failed at the given chain index.
@@ -94,7 +94,14 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
-    /// An intermediate certificate is missing `KeyUsage` `keyCertSign`.
+    /// An intermediate certificate has a `KeyUsage` extension with `keyCertSign` not set.
+    ///
+    /// This error is only returned when a `KeyUsage` extension is **present** and the
+    /// `keyCertSign` bit is explicitly absent or zero (RFC 5280 §6.1.4(n): "If a KeyUsage
+    /// extension is present, verify that the keyCertSign bit is set.").
+    ///
+    /// Certificates with **no** `KeyUsage` extension are not rejected by this check;
+    /// RFC 5280 does not require the extension to be present on CA certificates.
     KeyUsageMissing {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
@@ -480,8 +487,12 @@ pub struct ValidationPolicy {
 
     /// Enforce the KeyUsage extension when present. Default: `true`.
     ///
-    /// When `true`, an intermediate certificate missing `keyCertSign` in its
-    /// `KeyUsage` will be rejected even if `BasicConstraints` `cA=TRUE`.
+    /// When `true`, an intermediate certificate whose `KeyUsage` extension is
+    /// **present** but does not include `keyCertSign` will be rejected with
+    /// [`Error::KeyUsageMissing`], per RFC 5280 §6.1.4(n).
+    ///
+    /// Certificates with **no** `KeyUsage` extension are not affected; RFC 5280
+    /// only mandates the check when the extension is present.
     pub enforce_key_usage: bool,
 
     /// Initial explicit-policy indicator (RFC 5280 §6.1.1).
@@ -652,6 +663,7 @@ pub struct ValidatedPath {
 /// Duplicate certificates in `chain` (same cert appearing at two indices) are
 /// not detected. They will fail signature verification or name linkage with a
 /// `SignatureInvalid` or `ChainBroken` error rather than a dedicated diagnostic.
+#[must_use = "path validation result must be checked"]
 pub fn validate_path<V>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -1630,7 +1642,9 @@ const OID_RSA_ENCRYPTION: der::asn1::ObjectIdentifier =
 /// `UintRef::as_bytes()` strips the leading 0x00 sign byte from a DER unsigned INTEGER,
 /// returning only the magnitude. Bit length is derived as `magnitude_bytes * 8`, which
 /// over-counts by at most 7 bits for keys whose high magnitude byte has leading zero bits —
-/// this conservative rounding is acceptable for a minimum-floor check.
+/// this lenient rounding is acceptable for a minimum-floor check: a real 2040-bit key
+/// would measure as 2048 bits and pass a 2048-bit floor. Key-generation tools always
+/// produce keys whose top bit is set, so the practical impact is zero.
 fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
     use der::{asn1::UintRef, Reader};
 
@@ -2031,7 +2045,10 @@ fn chain_walk<V: SignatureVerifier>(
             }
 
             // (g) KeyUsage keyCertSign required (when policy demands it).
-            if policy.enforce_key_usage && !matches!(has_key_cert_sign(cert), Some(true)) {
+            // RFC 5280 §6.1.4(n): "If a KeyUsage extension is present, verify that the
+            // keyCertSign bit is set."  Only reject when KeyUsage IS present (Some(_)) and
+            // keyCertSign is NOT set (== Some(false)).  Absent KeyUsage (None) is allowed.
+            if policy.enforce_key_usage && has_key_cert_sign(cert) == Some(false) {
                 return Err(Error::KeyUsageMissing { index: i });
             }
 
@@ -2567,21 +2584,14 @@ fn check_name_constraints(
         nc_constrained_types.intersects(NcTypeMask::RFC822) || has_rfc822_excluded;
 
     if has_rfc822_constraint && !subject_is_empty {
-        // Pre-filter the permitted rfc822 entries once, outside the RDN loop,
+        // Collect the RFC822 permitted subtrees once, outside the RDN loop,
         // to avoid re-checking the Option and iterating nc_permitted on every
-        // emailAddress AVA found (vjc.26).
-        //
-        // Collect into a local GeneralSubtrees so the slice borrow lives as long
-        // as this block. `None` means RFC822 permitted check is inactive (only
-        // excluded may apply).
-        // Collect the RFC822 permitted subtrees once so the slice borrow lives
-        // for the whole RDN loop.  `None` means the permitted check is inactive
-        // (only an excluded check may apply).  The NcTypeMask::RFC822 condition is
-        // checked once here; `permitted_rfc822` carries the result forward.
-        //
-        // `permitted_rfc822_storage` holds the allocation when the check is
-        // active; `Option` is used so the else branch requires no dummy
-        // assignment that would trigger an unused-assignment warning.
+        // emailAddress AVA found (vjc.26). `None` means the permitted check is
+        // inactive (only an excluded check may apply); the NcTypeMask::RFC822
+        // condition is evaluated once here and the result carried forward via
+        // `permitted_rfc822`. `permitted_rfc822_storage` holds the allocation
+        // when the check is active; `Option` avoids a dummy assignment that
+        // would trigger an unused-assignment warning.
         let permitted_rfc822_storage: Option<
             x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
         > = if nc_constrained_types.intersects(NcTypeMask::RFC822) {
