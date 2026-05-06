@@ -395,9 +395,21 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             }
         }
 
-        // (6) Delta CRL merge — if a delta CRL is present, verify and merge it.
-        //     Uses the anchor SPKI for the delta signature check.
+        // (6) Delta CRL merge — if a delta CRL is present, verify issuer consistency
+        //     and merge it.  Uses the anchor SPKI for the delta signature check.
         let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
+            // Cross-check: delta CRL issuer must match base CRL issuer and anchor subject.
+            // Mirrors the three-way check performed in check_revocation for the cert-issuer path.
+            {
+                let delta_hdr =
+                    CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+                if !names_match(&delta_hdr.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
+                    return Err(Error::CrlIssuerMismatch);
+                }
+                if !names_match(&delta_hdr.tbs_cert_list.issuer, &anchor.subject) {
+                    return Err(Error::CrlIssuerMismatch);
+                }
+            }
             verify_delta_crl_and_collect(
                 delta_der,
                 &self.verifier,

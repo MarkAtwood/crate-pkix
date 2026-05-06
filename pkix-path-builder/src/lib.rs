@@ -104,9 +104,8 @@ impl<'a> IntoIterator for &'a CertPool {
 pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.
     NoPathFound,
-    /// A topologically valid path exists but requires more than the configured
-    /// maximum number of intermediates. Try increasing `max_depth` in the call
-    /// to [`build_path`].
+    /// A topologically valid path exists but requires more intermediates than
+    /// the maximum depth (10) this builder supports.
     DepthExceeded,
     /// The internal DFS node-visit budget was exhausted in a single round.
     ///
@@ -121,7 +120,7 @@ impl core::fmt::Display for Error {
         match self {
             Self::NoPathFound => f.write_str("no certification path found to a trust anchor"),
             Self::DepthExceeded => f.write_str(
-                "no certification path found within depth limit (try increasing max_depth)",
+                "maximum intermediate chain depth (10) exceeded; the chain may require a deeper path than this builder supports",
             ),
             Self::BudgetExceeded => f.write_str(
                 "DFS node-visit budget exceeded; pool may be adversarially large",
