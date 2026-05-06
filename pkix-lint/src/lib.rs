@@ -113,6 +113,14 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 ///
 /// In practice this is only called when loading stored reports; the normal path
 /// constructs `Finding` from `&'static str` lint metadata without any allocation.
+///
+/// # Memory
+///
+/// This leaks one heap allocation per unique deserialized string, permanently.
+/// In short-lived processes (CLI tools, test runners), this is acceptable.
+/// In long-running services deserializing untrusted JSON, each unique string value
+/// grows process memory permanently. If this becomes a concern, replace with an
+/// interning cache with eviction.
 #[cfg(feature = "serde")]
 fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
 where

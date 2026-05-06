@@ -62,6 +62,14 @@ use x509_cert::Certificate;
 /// Serde deserializer helper for `&'static str` fields in this module.
 ///
 /// See the identical function in `crate::de_static_str` for rationale.
+///
+/// # Memory
+///
+/// This leaks one heap allocation per unique deserialized string, permanently.
+/// In short-lived processes (CLI tools, test runners), this is acceptable.
+/// In long-running services deserializing untrusted JSON, each unique string value
+/// grows process memory permanently. If this becomes a concern, replace with an
+/// interning cache with eviction.
 #[cfg(feature = "serde")]
 fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
 where
