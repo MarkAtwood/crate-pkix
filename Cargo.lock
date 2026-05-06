@@ -382,6 +382,7 @@ dependencies = [
 name = "pkix-profiles"
 version = "0.1.1"
 dependencies = [
+ "der",
  "pkix-path",
  "x509-cert",
 ]
