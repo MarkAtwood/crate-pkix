@@ -102,45 +102,15 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspSignatureInvalid);
         }
 
-        // (1) Parse the outer OCSPResponse.
-        let resp = OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
-
-        // (2) Require responseStatus == successful; any other → OcspStatusUnknown.
-        if resp.response_status != OcspResponseStatus::Successful {
-            return Err(Error::OcspStatusUnknown);
-        }
-
-        // (3) Extract responseBytes (must be present for a Successful response).
-        let resp_bytes = resp.response_bytes.ok_or(Error::OcspMalformed)?;
-
-        // (4) Verify responseType is id-pkix-ocsp-basic.
-        if resp_bytes.response_type != OID_PKIX_OCSP_BASIC {
-            return Err(Error::OcspMalformed);
-        }
-
-        // (5) Parse the BasicOCSPResponse.
-        let basic = BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
-            .map_err(Error::OcspParseError)?;
-
-        // (6) Verify the OCSP signature against the issuer's SPKI.
-        //
-        // v0.1 limitation: assumes the response is signed directly by the issuer.
-        // The signature covers the DER encoding of ResponseData (tbs_response_data).
-        let tbs_bytes = basic
-            .tbs_response_data
-            .to_der()
-            .map_err(Error::OcspParseError)?;
-        self.verifier
-            .verify_signature(
-                basic.signature_algorithm.owned_to_ref(),
-                issuer
-                    .tbs_certificate
-                    .subject_public_key_info
-                    .owned_to_ref(),
-                &tbs_bytes,
-                basic.signature.raw_bytes(),
-            )
-            .map_err(|_| Error::OcspSignatureInvalid)?;
+        // (1)-(6) Parse and verify the BasicOCSPResponse.
+        let basic = parse_and_verify_basic_response(
+            &self.response_der,
+            &self.verifier,
+            issuer
+                .tbs_certificate
+                .subject_public_key_info
+                .owned_to_ref(),
+        )?;
 
         // (6b) RFC 6960 §2.2: verify ResponderId against the issuer identity.
         //
@@ -256,40 +226,12 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspSignatureInvalid);
         }
 
-        // (1) Parse the outer OCSPResponse.
-        let resp =
-            OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
-
-        // (2) Require responseStatus == successful.
-        if resp.response_status != OcspResponseStatus::Successful {
-            return Err(Error::OcspStatusUnknown);
-        }
-
-        // (3) Extract responseBytes.
-        let resp_bytes = resp.response_bytes.ok_or(Error::OcspMalformed)?;
-
-        // (4) Verify responseType is id-pkix-ocsp-basic.
-        if resp_bytes.response_type != OID_PKIX_OCSP_BASIC {
-            return Err(Error::OcspMalformed);
-        }
-
-        // (5) Parse the BasicOCSPResponse.
-        let basic = BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
-            .map_err(Error::OcspParseError)?;
-
-        // (6) Verify the OCSP signature against the anchor's SPKI.
-        let tbs_bytes = basic
-            .tbs_response_data
-            .to_der()
-            .map_err(Error::OcspParseError)?;
-        self.verifier
-            .verify_signature(
-                basic.signature_algorithm.owned_to_ref(),
-                anchor.subject_public_key_info.owned_to_ref(),
-                &tbs_bytes,
-                basic.signature.raw_bytes(),
-            )
-            .map_err(|_| Error::OcspSignatureInvalid)?;
+        // (1)-(6) Parse and verify the BasicOCSPResponse.
+        let basic = parse_and_verify_basic_response(
+            &self.response_der,
+            &self.verifier,
+            anchor.subject_public_key_info.owned_to_ref(),
+        )?;
 
         // (6b) Verify ResponderId against the anchor's identity.
         verify_responder_id_anchor(&basic.tbs_response_data.responder_id, anchor)?;
@@ -356,6 +298,65 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             CertStatus::Unknown(_) => Err(Error::OcspStatusUnknown),
         }
     }
+}
+
+/// Parse a DER-encoded `OCSPResponse`, verify its structure, and return the
+/// verified [`BasicOcspResponse`].
+///
+/// Performs steps 1-6 common to both `check_revocation` and
+/// `check_revocation_against_anchor`:
+/// 1. Parse the outer `OcspResponse` from DER.
+/// 2. Require `response_status == Successful`.
+/// 3. Extract `response_bytes` (error if absent).
+/// 4. Verify `response_type == id-pkix-ocsp-basic`.
+/// 5. Parse the `BasicOcspResponse`.
+/// 6. Verify the signature over `tbs_response_data` using `issuer_spki`.
+///
+/// The caller is responsible for the `ResponderId` check (step 6b) and all
+/// subsequent steps, which differ between the two callers.
+fn parse_and_verify_basic_response<V: SignatureVerifier>(
+    response_der: &[u8],
+    verifier: &V,
+    issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+) -> crate::Result<BasicOcspResponse> {
+    // (1) Parse the outer OCSPResponse.
+    let resp = OcspResponse::from_der(response_der).map_err(Error::OcspParseError)?;
+
+    // (2) Require responseStatus == successful; any other → OcspStatusUnknown.
+    if resp.response_status != OcspResponseStatus::Successful {
+        return Err(Error::OcspStatusUnknown);
+    }
+
+    // (3) Extract responseBytes (must be present for a Successful response).
+    let resp_bytes = resp.response_bytes.ok_or(Error::OcspMalformed)?;
+
+    // (4) Verify responseType is id-pkix-ocsp-basic.
+    if resp_bytes.response_type != OID_PKIX_OCSP_BASIC {
+        return Err(Error::OcspMalformed);
+    }
+
+    // (5) Parse the BasicOCSPResponse.
+    let basic = BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
+        .map_err(Error::OcspParseError)?;
+
+    // (6) Verify the OCSP signature against the supplied SPKI.
+    //
+    // v0.1 limitation: assumes the response is signed directly by the issuer.
+    // The signature covers the DER encoding of ResponseData (tbs_response_data).
+    let tbs_bytes = basic
+        .tbs_response_data
+        .to_der()
+        .map_err(Error::OcspParseError)?;
+    verifier
+        .verify_signature(
+            basic.signature_algorithm.owned_to_ref(),
+            issuer_spki,
+            &tbs_bytes,
+            basic.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::OcspSignatureInvalid)?;
+
+    Ok(basic)
 }
 
 /// Hash `data` using the algorithm identified by `oid`.
