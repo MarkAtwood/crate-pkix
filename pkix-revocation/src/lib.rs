@@ -203,9 +203,25 @@ pub trait RevocationChecker {
     /// - `cert`   — the certificate being checked
     /// - `issuer` — the certificate that issued `cert` (signature-validated)
     ///
-    /// Returns `Ok(())` if the certificate is not revoked, or an `Err` if it
-    /// is revoked or if revocation status cannot be determined and the policy
-    /// requires a definitive answer (hard-fail mode).
+    /// # Return value
+    ///
+    /// `Ok(())` has **dual semantics** — it can mean either of:
+    ///
+    /// 1. **Not revoked**: the revocation source covers this certificate and the
+    ///    serial number was not found in the revoked list.
+    /// 2. **Not covered**: the revocation source's scope does not apply to this
+    ///    certificate type (e.g., a CRL scoped to CA certificates when checking an
+    ///    end-entity, or an OCSP response with no matching `SingleResponse`).
+    ///
+    /// These two outcomes are **indistinguishable** from the `Ok(())` return alone.
+    /// Callers enforcing a hard-fail revocation policy must separately verify that
+    /// at least one revocation source actually covers the certificate in question.
+    /// Note that individual implementations may differ: [`CrlChecker`] returns
+    /// `Ok(())` for out-of-scope certificates, while [`OcspChecker`] returns
+    /// `Err(`[`Error::OcspStatusUnknown`]`)` when no matching `SingleResponse` is found.
+    ///
+    /// Returns `Err` if the certificate is confirmed revoked or if a required
+    /// revocation check fails (e.g., expired CRL, invalid signature).
     ///
     /// # Errors
     ///
@@ -216,11 +232,6 @@ pub trait RevocationChecker {
     ///   its validity window check failed.
     /// - Other [`Error`] variants for parse failures, signature verification
     ///   failures, or structural constraint violations.
-    ///
-    /// **`Ok(())` dual semantics**: implementations may return `Ok(())` both when
-    /// a certificate is confirmed not-revoked *and* when the revocation source does
-    /// not cover this certificate type (see [`CrlChecker`] for details). Hard-fail
-    /// callers must ensure at least one revocation source covers the certificate.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
 

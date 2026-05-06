@@ -365,28 +365,53 @@ fn parse_and_verify_basic_response<V: SignatureVerifier>(
     Ok(basic)
 }
 
+/// Stack-allocated hash output for CertID hash comparisons.
+///
+/// Holds the digest bytes for one of the four hash algorithms recognised in
+/// CertID (RFC 6960 §4.1.1), without heap allocation.
+enum HashOutput {
+    Sha1([u8; 20]),
+    Sha256([u8; 32]),
+    Sha384([u8; 48]),
+    Sha512([u8; 64]),
+}
+
+impl HashOutput {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Sha1(b) => b,
+            Self::Sha256(b) => b,
+            Self::Sha384(b) => b,
+            Self::Sha512(b) => b,
+        }
+    }
+}
+
 /// Hash `data` using the algorithm identified by `oid`.
 ///
 /// Supports SHA-1 (OID 1.3.14.3.2.26), SHA-256 (OID 2.16.840.1.101.3.4.2.1),
 /// SHA-384 (OID 2.16.840.1.101.3.4.2.2), and SHA-512 (OID 2.16.840.1.101.3.4.2.3).
 /// Returns [`Error::OcspMalformed`] for any other OID.
-fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {
+fn hash_certid_input(
+    oid: &der::asn1::ObjectIdentifier,
+    data: &[u8],
+) -> crate::Result<HashOutput> {
     match *oid {
         OID_SHA1 => {
             use sha1::Digest as _;
-            Ok(sha1::Sha1::digest(data).to_vec())
+            Ok(HashOutput::Sha1(sha1::Sha1::digest(data).into()))
         }
         OID_SHA256 => {
             use sha2::Digest as _;
-            Ok(sha2::Sha256::digest(data).to_vec())
+            Ok(HashOutput::Sha256(sha2::Sha256::digest(data).into()))
         }
         OID_SHA384 => {
             use sha2::Digest as _;
-            Ok(sha2::Sha384::digest(data).to_vec())
+            Ok(HashOutput::Sha384(sha2::Sha384::digest(data).into()))
         }
         OID_SHA512 => {
             use sha2::Digest as _;
-            Ok(sha2::Sha512::digest(data).to_vec())
+            Ok(HashOutput::Sha512(sha2::Sha512::digest(data).into()))
         }
         _ => Err(Error::OcspMalformed),
     }
@@ -477,7 +502,7 @@ mod tests {
             0x12, 0x62, 0x55, 0xd1, 0x96, 0x04, 0x7d, 0xfe, 0xdf, 0x17, 0xa0, 0xa9,
         ];
         let result = hash_certid_input(&OID_SHA384, b"test").expect("SHA-384 must succeed");
-        assert_eq!(result, expected, "SHA-384(\"test\") must match Python oracle");
+        assert_eq!(result.as_slice(), expected, "SHA-384(\"test\") must match Python oracle");
     }
 
     /// SHA-512 of b"test".
@@ -495,7 +520,7 @@ mod tests {
             0x00, 0x28, 0xa8, 0xff,
         ];
         let result = hash_certid_input(&OID_SHA512, b"test").expect("SHA-512 must succeed");
-        assert_eq!(result, expected, "SHA-512(\"test\") must match Python oracle");
+        assert_eq!(result.as_slice(), expected, "SHA-512(\"test\") must match Python oracle");
     }
 
     /// Unknown OID must return OcspMalformed.

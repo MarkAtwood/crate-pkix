@@ -155,6 +155,10 @@ impl Profile for WebPkiProfile {
 
     fn version(&self) -> &str {
         // SC-081 is the most recent ballot materially changing validity policy.
+        // Note: this string identifies the normative document whose rules were last
+        // incorporated into this profile.  SC-081 validity cap enforcement is
+        // intentionally delegated to `pkix-lint`'s `ValidityMaxLint`; it is NOT
+        // enforced by this profile (see struct-level doc for rationale).
         "SC-081"
     }
 
@@ -211,7 +215,9 @@ impl Profile for SmimeProfile {
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
-        // S/MIME BR §6.3.2: strict profile maximum validity ~39 months (1185 days).
+        // S/MIME BR §6.3.2: ~39 calendar months. Approximated as 1185 days;
+        // exact calendar-month enforcement requires notBefore date arithmetic
+        // not available in ValidationPolicy.
         p.max_validity_secs = Some(1185 * 86_400);
         // S/MIME BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
