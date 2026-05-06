@@ -103,6 +103,7 @@ use x509_cert::Certificate;
 pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 
 pub mod cabf_tls_br;
+pub mod deviation;
 
 // ---------------------------------------------------------------------------
 // Severity
