@@ -11,7 +11,8 @@
 //!   2027-03-15T00:00:00Z = 1_805_068_800
 //!   2029-03-15T00:00:00Z = 1_868_227_200
 //! - Fixture cert properties verified with: openssl x509 -in <file> -inform DER -noout -text
-//!   webpki-self-signed-365d.der : P-256, serverAuth EKU, DNS SAN, 365 days
+//!   webpki-self-signed-365d.der           : P-256, serverAuth EKU, DNS SAN, 365 days, notBefore=2026-01-01
+//!   webpki-self-signed-365d-post-sc081.der : P-256, serverAuth EKU, DNS SAN, 365 days, notBefore=2026-03-16
 //!   leaf-p256-365d-san-eku.der  : P-256, serverAuth EKU, DNS SAN, 365 days
 //!   leaf-p256-365d-no-san.der   : P-256, serverAuth EKU, NO SAN, 365 days
 //!   leaf-p256-365d-no-eku.der   : P-256, NO EKU, DNS SAN, 365 days
@@ -59,38 +60,62 @@ const T_AFTER_SC081_200D: u64 = 1_773_619_200;
 // ---------------------------------------------------------------------------
 //
 // Oracle: SC-081 phases (independent of pkix-profiles source):
-//   before 2026-03-15: cap = 398 days = 34_387_200 s
-//   on/after 2026-03-15: cap = 200 days = 17_280_000 s
+//   notBefore before 2026-03-15: cap = 398 days = 34_387_200 s
+//   notBefore on/after 2026-03-15: cap = 200 days = 17_280_000 s
 //
-// webpki-self-signed-365d.der validity: 365 days = 31_536_000 s
-//   31_536_000 <= 34_387_200 → Pass   (pre-SC-081 cap)
+// The cap is evaluated at issuance time (notBefore), NOT at now_unix.
+// A cert issued before 2026-03-15 retains the 398-day cap regardless of
+// when validation occurs.
+//
+// webpki-self-signed-365d.der: notBefore=2026-01-01, 365 days = 31_536_000 s
+//   cap = 398 days (pre-SC-081, notBefore < 2026-03-15)
+//   31_536_000 <= 34_387_200 → Pass   (pre-SC-081 cap, regardless of now_unix)
+//
+// webpki-self-signed-365d-post-sc081.der: notBefore=2026-03-16, 365 days = 31_536_000 s
+//   cap = 200 days (post-SC-081, notBefore >= 2026-03-15)
 //   31_536_000  > 17_280_000 → Error  (post-SC-081 200-day cap)
 //
-// leaf-p256-400d-san-eku.der validity: 400 days = 34_560_000 s
+// leaf-p256-400d-san-eku.der: notBefore=2026-01-01, 400 days = 34_560_000 s
+//   cap = 398 days (pre-SC-081, notBefore < 2026-03-15)
 //   34_560_000 > 34_387_200 → Error   (exceeds pre-SC-081 398-day cap)
 
 #[test]
 fn validity_max_pass_pre_sc081() {
-    // 365-day cert evaluated before 2026-03-15: cap is 398 days → Pass.
+    // 365-day cert with notBefore=2026-01-01 (pre-SC-081): cap is 398 days → Pass.
     let cert = load_cert!("webpki-self-signed-365d.der");
     let lint = ValidityMaxLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, T_2026_JAN_01);
     assert_eq!(
         result,
         LintResult::Pass,
-        "365-day cert must Pass the 398-day pre-SC-081 cap"
+        "365-day cert issued pre-SC-081 must Pass the 398-day cap"
+    );
+}
+
+#[test]
+fn validity_max_pass_pre_sc081_evaluated_late() {
+    // Regression: a cert issued before 2026-03-15 must still pass when
+    // validated after 2026-03-15.  The cap is determined by notBefore (issuance
+    // time), not by now_unix.  Prior bug used now_unix → would have returned Error.
+    let cert = load_cert!("webpki-self-signed-365d.der");
+    let lint = ValidityMaxLint;
+    let result = lint.check_cert(&cert, SubjectKind::Leaf, T_AFTER_SC081_200D);
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "365-day cert issued pre-SC-081 must Pass even when validated post-SC-081"
     );
 }
 
 #[test]
 fn validity_max_error_post_sc081_200d() {
-    // 365-day cert evaluated after 2026-03-15: cap is 200 days → Error.
-    let cert = load_cert!("webpki-self-signed-365d.der");
+    // 365-day cert with notBefore=2026-03-16 (post-SC-081): cap is 200 days → Error.
+    let cert = load_cert!("webpki-self-signed-365d-post-sc081.der");
     let lint = ValidityMaxLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, T_AFTER_SC081_200D);
     assert!(
         matches!(result, LintResult::Error(_)),
-        "365-day cert must Error against the 200-day post-SC-081 cap, got {result:?}"
+        "365-day cert issued post-SC-081 must Error against the 200-day cap, got {result:?}"
     );
 }
 
