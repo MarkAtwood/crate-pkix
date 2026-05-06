@@ -158,7 +158,7 @@ impl Lint for Sha1ProhibitedLint {
         SubjectKind::Any
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let sig_alg = &cert.signature_algorithm.oid;
         if sig_alg == &SHA1_WITH_RSA || sig_alg == &ECDSA_WITH_SHA1 {
             LintResult::Error("certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3")
@@ -210,7 +210,7 @@ impl Lint for RsaMinKeySizeLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let spki = &cert.tbs_certificate.subject_public_key_info;
 
         // Only check RSA keys.
@@ -336,7 +336,7 @@ impl Lint for SanRequiredLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent"),
@@ -394,7 +394,7 @@ impl Lint for EkuServerAuthLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => return LintResult::Error("leaf certificate has no extensions; ExtendedKeyUsage absent"),
@@ -456,7 +456,7 @@ impl Lint for BcCaFlagLint {
         SubjectKind::IntermediateCa
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => {
