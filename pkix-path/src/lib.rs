@@ -3400,8 +3400,7 @@ mod tests_validate_path {
         // Default policy has enforce_key_usage = true.
         // nku-int has no KeyUsage — must NOT trigger KeyUsageMissing per RFC 5280 §6.1.4(n).
         let now: u64 = 1_720_000_000; // 2024-07-03, within nku-int validity (2024-2030)
-        let mut policy = ValidationPolicy::default();
-        policy.current_time_unix = now;
+        let policy = ValidationPolicy { current_time_unix: now, ..Default::default() };
         validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
             .expect("intermediate with absent KeyUsage must be accepted when enforce_key_usage=true");
     }
