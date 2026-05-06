@@ -110,12 +110,10 @@ impl core::fmt::Display for Error {
             Error::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
             }
-            Error::DeltaCrlBaseMismatch => f.write_str(
-                "delta CRL BaseCRLNumber does not match the base CRL's CRLNumber",
-            ),
-            Error::CrlNumberMismatch => {
-                f.write_str("CRL number is lower than expected")
+            Error::DeltaCrlBaseMismatch => {
+                f.write_str("delta CRL BaseCRLNumber does not match the base CRL's CRLNumber")
             }
+            Error::CrlNumberMismatch => f.write_str("CRL number is lower than expected"),
         }
     }
 }

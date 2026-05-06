@@ -86,10 +86,25 @@ const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6
 /// - CAA DNS records (network check; out of scope for `pkix-path`)
 /// - CT log SCTs (separate verification step)
 /// - OCSP/CRL revocation (use `pkix-revocation`)
+///
+/// ## SC-081 validity reduction schedule
+///
+/// CA/B Forum Ballot SC-081 (approved March 2024) introduces a phased reduction
+/// of TLS certificate maximum validity:
+/// - 398 days → current cap (enforced here; pre-SC-081 deployments)
+/// - 200 days → effective 2026-03-15
+/// - 100 days → effective 2027-03-15
+/// - 47 days  → effective 2029-03-15
+///
+/// This function uses the 398-day cap and is correct for certificates issued
+/// before the SC-081 phase-in dates. Relying parties validating certificates
+/// after 2026-03-15 should tighten `max_validity_secs` to match the applicable
+/// cap for their deployment context.
 #[must_use]
 pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
     let mut p = ValidationPolicy::new(now_unix);
-    // BR §6.3.2: maximum certificate validity is 398 days.
+    // BR §6.3.2: maximum certificate validity is 398 days (pre-SC-081).
+    // See the SC-081 note in the doc comment for the phased reduction schedule.
     p.max_validity_secs = Some(398 * 86_400);
     // BR §6.1.5: SHA-1 prohibited; only the listed modern hash algorithms are accepted.
     p.allowed_signature_algs = Some(CABF_ALLOWED_ALGS.to_vec());
@@ -320,19 +335,14 @@ mod tests {
         );
     }
 
-    /// Oracle: a self-signed cert with no SAN extension must be rejected.
-    /// We derive the policy from web_pki_policy and test with leaf-p256-365d-no-san.der
-    /// presented as a 1-cert self-signed chain (the fixture is not self-signed, so
-    /// we test via direct policy field — the SAN check fires before signature for
-    /// the leaf, and the fixture has no SAN). Since the cert is not self-signed,
-    /// we test via a different approach: use web_pki_policy on a chain where
-    /// the leaf has no SAN. The CA certs will fail max_validity first (3652 days)
-    /// but the MissingSan check is on the leaf. We need a special approach.
+    /// Verify that `web_pki_policy` sets `require_subject_alt_name = true` and that a
+    /// cert with a SAN passes (proving the field is wired correctly).
     ///
-    /// Approach: test the constraint directly using rfc5280_policy + require_subject_alt_name=true
-    /// to isolate the SAN check, then trust that web_pki_policy sets the same field.
+    /// **Note**: This test checks the field value and validates that a conforming cert
+    /// passes. It does NOT test that a cert without a SAN is rejected — that rejection
+    /// path is covered by `pkix_path::tests_policy_fields::require_san_fails_when_san_absent`.
     #[test]
-    fn web_pki_missing_san_rejected() {
+    fn web_pki_policy_san_field_is_true() {
         // Verify the field is set in web_pki_policy.
         assert!(
             web_pki_policy(NOW).require_subject_alt_name,
@@ -459,10 +469,14 @@ mod tests {
         );
     }
 
-    /// Oracle: webpki-self-signed-365d.der has serverAuth EKU; smime_policy requires
-    /// emailProtection → MissingEku.
+    /// Verify that `smime_policy` requires `emailProtection` EKU, and that a cert with
+    /// `serverAuth` (not `emailProtection`) is rejected.
+    ///
+    /// **Note**: This is a rejection test using a cert with the wrong EKU, NOT an
+    /// end-to-end passing test (which would require a fixture with `emailProtection` EKU).
+    /// An end-to-end passing test is tracked for a future fixture addition.
     #[test]
-    fn smime_policy_email_protection_eku_passes() {
+    fn smime_policy_requires_email_protection_eku_and_rejects_wrong_eku() {
         // Verify that smime_policy requires emailProtection.
         assert!(
             smime_policy(NOW)
@@ -473,8 +487,6 @@ mod tests {
             "smime_policy must require id-kp-emailProtection"
         );
         // Verify that a cert with serverAuth (not emailProtection) is rejected.
-        // (A cert with emailProtection would need a new fixture; we trust the
-        // field-value assertion above and the enforcement tests in pkix-path.)
         let cert = load(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
         ));

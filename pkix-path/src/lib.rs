@@ -84,12 +84,12 @@ pub enum Error {
     NoTrustedPath,
     /// Path length exceeds [`ValidationPolicy::max_path_len`].
     PathTooLong,
-    /// An intermediate certificate is missing BasicConstraints cA=TRUE.
+    /// An intermediate certificate is missing `BasicConstraints` `cA=TRUE`.
     NotCA {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
-    /// An intermediate certificate is missing KeyUsage keyCertSign.
+    /// An intermediate certificate is missing `KeyUsage` `keyCertSign`.
     KeyUsageMissing {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
@@ -117,7 +117,7 @@ pub enum Error {
     /// Most commonly returned when the internal 8 KiB stack buffer used to
     /// re-encode `TBSCertificate` for signature verification is too small.
     /// This is an **implementation limit**, not a certificate defect — the
-    /// certificate may be perfectly valid. Certificates with TBSCertificate
+    /// certificate may be perfectly valid. Certificates with `TBSCertificate`
     /// exceeding 8 KiB (large government / enterprise / HSM attestation certs) will
     /// trigger this error. This is tracked for v0.2 (heap-backed encoding).
     ///
@@ -150,7 +150,7 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
-    /// The leaf certificate (chain index 0) has no SubjectAltName extension,
+    /// The leaf certificate (chain index 0) has no `SubjectAltName` extension,
     /// or the extension is present but empty.
     ///
     /// Only checked when [`ValidationPolicy::require_subject_alt_name`] is `true`.
@@ -285,8 +285,8 @@ pub trait SignatureVerifier {
     ///
     /// - `algorithm`    — from the subject cert's `signatureAlgorithm` field
     /// - `issuer_spki`  — SPKI extracted from the issuer or trust anchor cert
-    /// - `message`      — DER-encoded TBSCertificate (the bytes that were signed)
-    /// - `signature`    — raw signature bytes (BitString content, not the wrapper)
+    /// - `message`      — DER-encoded `TBSCertificate` (the bytes that were signed)
+    /// - `signature`    — raw signature bytes (`BitString` content, not the wrapper)
     ///
     /// Returns `Ok(())` on success or `Err(signature::Error)` on failure.
     /// The caller ([`validate_path`]) maps the error to [`Error::SignatureInvalid`]
@@ -476,7 +476,7 @@ pub struct ValidationPolicy {
     /// Enforce the KeyUsage extension when present. Default: `true`.
     ///
     /// When `true`, an intermediate certificate missing `keyCertSign` in its
-    /// KeyUsage will be rejected even if BasicConstraints cA=TRUE.
+    /// `KeyUsage` will be rejected even if `BasicConstraints` `cA=TRUE`.
     pub enforce_key_usage: bool,
 
     /// Initial explicit-policy indicator (RFC 5280 §6.1.1).
@@ -592,12 +592,28 @@ impl Default for ValidationPolicy {
 /// code from constructing `ValidatedPath` directly and from pattern-matching
 /// exhaustively, preserving the ability to add fields in future minor versions
 /// without a breaking change.
+///
+/// # Copy stability
+///
+/// `ValidatedPath` derives `Copy` and is committed to remain `Copy` in all v0.1.x
+/// releases. Any future field additions that are non-`Copy` will be added in a new
+/// minor version (v0.2+) with an explicit removal of the `Copy` derive, constituting
+/// a breaking change per semantic versioning. Callers may depend on `Copy` within
+/// the v0.1 series.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
     pub anchor_index: usize,
-    /// Depth of the validated chain (number of intermediates, excluding trust anchor).
+    /// Number of certificates in the validated chain minus one (`chain.len() - 1`).
+    ///
+    /// For a single self-signed certificate, `depth == 0`. For a leaf + one
+    /// intermediate, `depth == 1`. This equals `chain.len().saturating_sub(1)`.
+    ///
+    /// Note: this counts all certificates except the trust anchor — including
+    /// self-issued intermediates that RFC 5280 §4.2.1.9 excludes from the
+    /// `pathLenConstraint` count. For chains with self-issued intermediates the
+    /// `depth` field may be larger than the RFC 5280 path length.
     pub depth: usize,
 }
 
@@ -621,7 +637,7 @@ pub struct ValidatedPath {
 ///
 /// See crate-level documentation for v0.1 scope limits.
 ///
-/// **8 KiB TBSCertificate limit**: signature verification re-encodes each
+/// **8 KiB `TBSCertificate` limit**: signature verification re-encodes each
 /// `TBSCertificate` into a fixed 8 KiB stack buffer. Certificates whose
 /// `TBSCertificate` DER encoding exceeds 8 KiB return [`Error::Der`].
 /// This is an implementation limit, not a certificate defect. Large
@@ -827,19 +843,18 @@ fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
 /// root (initialized before any cert is processed).  Depth `d` corresponds
 /// to the d-th certificate from the trust-anchor end (depth 1 = CA adjacent
 /// to trust anchor, depth n = leaf).
+///
+/// # Limitations (v0.1)
+///
+/// Policy qualifiers (`qualifier_set` per RFC 5280 §6.1.2(a)) are not stored
+/// or enforced. They are discarded on ingestion. Application-specific qualifier
+/// processing is deferred to v0.2.
 #[derive(Clone, Debug)]
 struct PolicyNode {
     /// Certificate depth at which this node was added (0 = root sentinel).
     depth: usize,
     /// The policy OID this node represents.
     valid_policy: der::asn1::ObjectIdentifier,
-    /// Policy qualifiers attached to this policy in the certificate.
-    ///
-    /// Stored for completeness per RFC 5280 §6.1.2(a) but not currently
-    /// inspected by the validator.  Path-level qualifier enforcement is deferred
-    /// to v0.2 (application-specific qualifier processing).
-    #[allow(dead_code)]
-    qualifier_set: Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
     /// Policies in the NEXT certificate that are consistent with this node.
     /// Initialized to `{valid_policy}`; updated by PolicyMappings.
     expected_policy_set: Vec<der::asn1::ObjectIdentifier>,
@@ -850,7 +865,6 @@ fn init_policy_tree() -> Vec<PolicyNode> {
     vec![PolicyNode {
         depth: 0,
         valid_policy: OID_ANY_POLICY,
-        qualifier_set: Vec::new(),
         expected_policy_set: vec![OID_ANY_POLICY],
     }]
 }
@@ -1847,22 +1861,14 @@ fn chain_walk<V: SignatureVerifier>(
         if let Some(ref mut tree) = policy_tree {
             if let Some(ref cp_ext) = cert_cp {
                 let mut new_nodes: Vec<PolicyNode> = Vec::new();
-                let mut any_policy_qualifiers: Option<
-                    Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
-                > = None;
+                let mut has_any_policy = false;
 
                 // Step (d)(1): process each specific policy P ≠ anyPolicy.
                 for policy_info in cp_ext.0.iter() {
                     let p_oid = &policy_info.policy_identifier;
                     if p_oid == &OID_ANY_POLICY {
                         // Defer anyPolicy processing to step (d)(2).
-                        any_policy_qualifiers = Some(
-                            policy_info
-                                .policy_qualifiers
-                                .as_deref()
-                                .unwrap_or(&[])
-                                .to_vec(),
-                        );
+                        has_any_policy = true;
                         continue;
                     }
 
@@ -1882,11 +1888,6 @@ fn chain_walk<V: SignatureVerifier>(
                         new_nodes.push(PolicyNode {
                             depth: cert_depth,
                             valid_policy: *p_oid,
-                            qualifier_set: policy_info
-                                .policy_qualifiers
-                                .as_deref()
-                                .unwrap_or(&[])
-                                .to_vec(),
                             expected_policy_set: vec![*p_oid],
                         });
                     }
@@ -1901,11 +1902,6 @@ fn chain_walk<V: SignatureVerifier>(
                             new_nodes.push(PolicyNode {
                                 depth: cert_depth,
                                 valid_policy: *p_oid,
-                                qualifier_set: policy_info
-                                    .policy_qualifiers
-                                    .as_deref()
-                                    .unwrap_or(&[])
-                                    .to_vec(),
                                 expected_policy_set: vec![*p_oid],
                             });
                         }
@@ -1915,7 +1911,7 @@ fn chain_walk<V: SignatureVerifier>(
                 // Step (d)(2): if cert has anyPolicy and (inhibit_any > 0 or
                 // self-issued non-leaf), expand for each unmatched expected
                 // policy from parent nodes.
-                if let Some(ref ap_qualifiers) = any_policy_qualifiers {
+                if has_any_policy {
                     let may_expand = inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
                     if may_expand {
                         // Already-covered valid_policies at this depth.
@@ -1927,7 +1923,6 @@ fn chain_walk<V: SignatureVerifier>(
                                     new_nodes.push(PolicyNode {
                                         depth: cert_depth,
                                         valid_policy: *ep,
-                                        qualifier_set: ap_qualifiers.clone(),
                                         expected_policy_set: vec![*ep],
                                     });
                                 }
@@ -1975,24 +1970,6 @@ fn chain_walk<V: SignatureVerifier>(
                 nc_constrained_types,
                 i,
             )?;
-        }
-
-        // (policy-leaf) §6.1.5(a-b): leaf-cert policy finalisation.
-        // Only applied to the leaf certificate (i == 0).
-        if i == 0 {
-            // §6.1.5(a): if the leaf is not self-issued, decrement counters.
-            if !is_self_issued_cert(cert) {
-                explicit_policy = explicit_policy.saturating_sub(1);
-                inhibit_any = inhibit_any.saturating_sub(1);
-                policy_mapping = policy_mapping.saturating_sub(1);
-            }
-            // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
-            // force explicit_policy to 0.
-            if let Some(pc) = find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS) {
-                if pc.require_explicit_policy == Some(0) {
-                    explicit_policy = 0;
-                }
-            }
         }
 
         // (e2) Require non-empty SubjectAltName on leaf cert.
@@ -2107,25 +2084,9 @@ fn chain_walk<V: SignatureVerifier>(
                                     nd.depth == cert_depth && nd.valid_policy == OID_ANY_POLICY
                                 });
                                 if has_any {
-                                    // Get qualifier from anyPolicy in cert.
-                                    // Use the already-decoded cert_cp to avoid
-                                    // a redundant extension parse (b5r.12).
-                                    let ap_q = cert_cp
-                                        .as_ref()
-                                        .and_then(|cp| {
-                                            cp.0.iter()
-                                                .find(|pi| pi.policy_identifier == OID_ANY_POLICY)
-                                                .and_then(|pi| {
-                                                    pi.policy_qualifiers
-                                                        .as_deref()
-                                                        .map(|q| q.to_vec())
-                                                })
-                                        })
-                                        .unwrap_or_default();
                                     tree.push(PolicyNode {
                                         depth: cert_depth,
                                         valid_policy: *idp,
-                                        qualifier_set: ap_q,
                                         expected_policy_set: vec![*sdp],
                                     });
                                 }
@@ -2296,6 +2257,33 @@ fn chain_walk<V: SignatureVerifier>(
         working_issuer_name = &cert.tbs_certificate.subject;
     }
 
+    // RFC 5280 §6.1.5(a-b): post-loop leaf policy finalisation.
+    //
+    // §6.1.5 is a post-loop step in the RFC.  These operations apply only to
+    // the leaf certificate (chain[0]), which was the last iteration (i == 0).
+    // Placing them here rather than inside the loop at i == 0 matches the RFC
+    // section numbering and makes clear that they happen after all per-cert
+    // §6.1.3/§6.1.4 steps have completed.
+    {
+        let leaf = &chain[0];
+        // §6.1.5(a): if the leaf is not self-issued, decrement counters.
+        // inhibit_any and policy_mapping are decremented per RFC 5280 §6.1.5(a)
+        // but are not used after this point in the algorithm — only explicit_policy
+        // is tested in §6.1.5(g) and the final check.
+        if !is_self_issued_cert(leaf) {
+            explicit_policy = explicit_policy.saturating_sub(1);
+            // Per §6.1.5(a): RFC also decrements inhibit_any and policy_mapping here,
+            // but neither is read after §6.1.5(a) in our implementation.
+        }
+        // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
+        // force explicit_policy to 0.
+        if let Some(pc) = find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS) {
+            if pc.require_explicit_policy == Some(0) {
+                explicit_policy = 0;
+            }
+        }
+    }
+
     // RFC 5280 §6.1.5(g): intersect the valid_policy_tree with the
     // user-initial-policy-set (PKIX-mi3.5).
     //
@@ -2385,19 +2373,16 @@ fn chain_walk<V: SignatureVerifier>(
 
             // Step (iii)(3): materialise nodes for initial_policy_set members
             // not yet present, if there's an anyPolicy node at leaf depth.
-            if let Some(leaf_any_node) = tree
+            let has_leaf_any = tree
                 .iter()
-                .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
-            {
-                let ap_qual = leaf_any_node.qualifier_set.clone();
+                .any(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY);
+            if has_leaf_any {
                 let mut additions = Vec::new();
                 for p_oid in &policy.initial_policy_set {
                     if !vpns_policies.contains(p_oid) {
-                        // Find the anyPolicy node at leaf_depth - 1 to be the parent.
                         additions.push(PolicyNode {
                             depth: leaf_depth,
                             valid_policy: *p_oid,
-                            qualifier_set: ap_qual.clone(),
                             expected_policy_set: vec![*p_oid],
                         });
                     }

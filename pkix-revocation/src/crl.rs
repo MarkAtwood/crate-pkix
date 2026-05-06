@@ -16,7 +16,7 @@ use x509_cert::{
 const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.21");
 
-/// OID for CRLNumber extension (RFC 5280 §5.2.3) — id-ce-cRLNumber: 2.5.29.20
+/// OID for `CRLNumber` extension (RFC 5280 §5.2.3) — id-ce-cRLNumber: 2.5.29.20
 const OID_CRL_NUMBER: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.20");
 
@@ -26,18 +26,18 @@ const OID_DELTA_CRL_INDICATOR: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.27");
 
 /// OID for issuingDistributionPoint extension (RFC 5280 §5.2.5) — 2.5.29.28
-/// Note: x509-cert 0.2.5 has a wrong AssociatedOid for IssuingDistributionPoint
-/// (it uses SubjectInfoAccess OID instead). Always look up this extension by
+/// Note: x509-cert 0.2.5 has a wrong `AssociatedOid` for `IssuingDistributionPoint`
+/// (it uses `SubjectInfoAccess` OID instead). Always look up this extension by
 /// raw OID rather than using AssociatedOid-based helpers.
 const OID_ISSUING_DISTRIBUTION_POINT: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.28");
 
-/// OID for KeyUsage extension (RFC 5280 §4.2.1.3) — id-ce-keyUsage: 2.5.29.15
-/// Used to check the cRLSign bit on the CRL issuer.
+/// OID for `KeyUsage` extension (RFC 5280 §4.2.1.3) — id-ce-keyUsage: 2.5.29.15
+/// Used to check the `cRLSign` bit on the CRL issuer.
 const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
 
-/// OID for BasicConstraints extension (RFC 5280 §4.2.1.9) — id-ce-basicConstraints: 2.5.29.19
+/// OID for `BasicConstraints` extension (RFC 5280 §4.2.1.9) — id-ce-basicConstraints: 2.5.29.19
 const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.19");
 
@@ -61,9 +61,10 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// - CRL Distribution Point name matching (CDP vs IDP name) is not implemented.
 ///   The checker does enforce `onlyContainsUserCerts`, `onlyContainsCACerts`, and
 ///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is v0.2.
-/// - The CRL is re-parsed from DER on every [`check_revocation`] call.
-///   For long chains validated against the same CRL, this is O(N) redundant
-///   parsing. Tracked for v0.2 (cache the parsed `CertificateList` in `new`).
+/// - Both the base CRL and the delta CRL (if present) are re-parsed from DER on
+///   every [`check_revocation`] call. For long chains validated against the same
+///   CRL pair, this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
+///   `CertificateList` in `new` / `with_delta`).
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
 #[derive(Clone, Debug)]
@@ -113,8 +114,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         let delta_der_bytes = delta_der.into();
 
         // Parse both to validate structure and extract CRL numbers.
-        let base_crl =
-            CertificateList::from_der(&base_der).map_err(Error::CrlParseError)?;
+        let base_crl = CertificateList::from_der(&base_der).map_err(Error::CrlParseError)?;
         let delta_crl =
             CertificateList::from_der(&delta_der_bytes).map_err(Error::CrlParseError)?;
 
@@ -134,7 +134,10 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         }
 
         // The base CRL and delta CRL MUST have the same issuer.
-        if !names_match(&base_crl.tbs_cert_list.issuer, &delta_crl.tbs_cert_list.issuer) {
+        if !names_match(
+            &base_crl.tbs_cert_list.issuer,
+            &delta_crl.tbs_cert_list.issuer,
+        ) {
             return Err(Error::DeltaCrlBaseMismatch);
         }
 
@@ -224,11 +227,22 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (6) §5.2.4 delta CRL merge: if a delta CRL is present, collect its revoked
         //     entries and merge with the base CRL's revoked list.
         let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
-            let delta_crl =
-                CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+            let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
 
-            // Verify delta CRL issuer matches the certificate's issuer.
-            if !names_match(&delta_crl.tbs_cert_list.issuer, &cert.tbs_certificate.issuer) {
+            // Defense-in-depth: verify delta CRL issuer matches the base CRL issuer.
+            // The with_delta() constructor already enforces this at construction time,
+            // but re-checking here guards against any future path that bypasses the
+            // constructor (RFC 5280 §5.2.4: base and delta must come from the same CA).
+            if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+
+            // Verify delta CRL issuer also matches the certificate's issuer
+            // (transitively guaranteed by the two checks above, but explicit for clarity).
+            if !names_match(
+                &delta_crl.tbs_cert_list.issuer,
+                &cert.tbs_certificate.issuer,
+            ) {
                 return Err(Error::CrlIssuerMismatch);
             }
 
@@ -281,7 +295,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         let cert_serial = &cert.tbs_certificate.serial_number;
 
         // Check delta CRL entries (they take precedence).
-        if let Some(delta_entry) = delta_entries.iter().find(|e| &e.serial_number == cert_serial) {
+        if let Some(delta_entry) = delta_entries
+            .iter()
+            .find(|e| &e.serial_number == cert_serial)
+        {
             let reason = extract_reason_code(delta_entry);
             if reason == Some(CrlReason::RemoveFromCRL) {
                 // certificateHold was lifted; cert is not revoked.
@@ -327,8 +344,8 @@ fn uint_to_u64(n: &der::asn1::Uint) -> Option<u64> {
 
 /// Extract the CRL number from a `CertificateList`'s extensions.
 ///
-/// Returns `None` if the CRLNumber extension is absent or cannot be decoded.
-/// CRLNumber is a non-negative INTEGER (RFC 5280 §5.2.3).
+/// Returns `None` if the `CRLNumber` extension is absent or cannot be decoded.
+/// `CRLNumber` is a non-negative INTEGER (RFC 5280 §5.2.3).
 fn crl_number(crl: &CertificateList) -> Option<u64> {
     crl.tbs_cert_list
         .crl_extensions
@@ -359,9 +376,9 @@ fn has_delta_crl_indicator(crl: &CertificateList) -> bool {
         .any(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)
 }
 
-/// Extract the BaseCRLNumber from a delta CRL's extensions.
+/// Extract the `BaseCRLNumber` from a delta CRL's extensions.
 ///
-/// The `deltaCRLIndicator` extension value IS the BaseCRLNumber — it is an
+/// The `deltaCRLIndicator` extension value IS the `BaseCRLNumber` — it is an
 /// INTEGER encoding the CRL number of the base CRL this delta updates.
 /// This extension MUST be critical (RFC 5280 §5.2.4).
 ///
@@ -381,11 +398,11 @@ fn base_crl_number(crl: &CertificateList) -> Option<u64> {
         })
 }
 
-/// Returns `true` if the certificate has `cRLSign` set in its KeyUsage extension,
-/// OR if the KeyUsage extension is absent (no constraint).
+/// Returns `true` if the certificate has `cRLSign` set in its `KeyUsage` extension,
+/// OR if the `KeyUsage` extension is absent (no constraint).
 ///
-/// RFC 5280 §6.3.3(f): a CRL issuer that has a KeyUsage extension MUST assert
-/// the `cRLSign` bit. If KeyUsage is absent, there is no constraint.
+/// RFC 5280 §6.3.3(f): a CRL issuer that has a `KeyUsage` extension MUST assert
+/// the `cRLSign` bit. If `KeyUsage` is absent, there is no constraint.
 fn issuer_has_crl_sign(cert: &Certificate) -> bool {
     use x509_cert::ext::pkix::KeyUsage;
 
@@ -404,7 +421,7 @@ fn issuer_has_crl_sign(cert: &Certificate) -> bool {
         .unwrap_or(false) // malformed KeyUsage → treat as missing the bit
 }
 
-/// Extract the CRLReason code from a revoked cert entry's extensions, if present.
+/// Extract the `CRLReason` code from a revoked cert entry's extensions, if present.
 ///
 /// Returns the `CrlReason` (RFC 5280 §5.3.1), or `None` if the extension is absent.
 fn extract_reason_code(entry: &RevokedCert) -> Option<CrlReason> {
@@ -414,10 +431,10 @@ fn extract_reason_code(entry: &RevokedCert) -> Option<CrlReason> {
         .and_then(|ext| CrlReason::from_der(ext.extn_value.as_bytes()).ok())
 }
 
-/// Extract the IssuingDistributionPoint from a CRL, if present.
+/// Extract the `IssuingDistributionPoint` from a CRL, if present.
 ///
 /// Uses raw OID lookup because x509-cert 0.2.5 has a wrong `AssociatedOid` for
-/// this type (it maps to SubjectInfoAccess instead of 2.5.29.28).
+/// this type (it maps to `SubjectInfoAccess` instead of 2.5.29.28).
 fn parse_issuing_dp(
     crl: &CertificateList,
 ) -> Option<x509_cert::ext::pkix::crl::IssuingDistributionPoint> {
@@ -432,7 +449,7 @@ fn parse_issuing_dp(
         .and_then(|e| IssuingDistributionPoint::from_der(e.extn_value.as_bytes()).ok())
 }
 
-/// Returns `true` if `cert` is a CA certificate (BasicConstraints cA = TRUE).
+/// Returns `true` if `cert` is a CA certificate (`BasicConstraints` `cA = TRUE`).
 fn cert_is_ca_cert(cert: &Certificate) -> bool {
     use x509_cert::ext::pkix::BasicConstraints;
 
