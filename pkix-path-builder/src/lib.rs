@@ -108,6 +108,12 @@ pub enum Error {
     /// maximum number of intermediates. Try increasing `max_depth` in the call
     /// to [`build_path`].
     DepthExceeded,
+    /// The internal DFS node-visit budget was exhausted before a path was found.
+    ///
+    /// This guards against adversarial certificate pools that would otherwise
+    /// cause exponential search time. The budget is fixed at [`DFS_BUDGET`]
+    /// node visits across all iterative-deepening rounds.
+    BudgetExceeded,
 }
 
 impl core::fmt::Display for Error {
@@ -116,6 +122,9 @@ impl core::fmt::Display for Error {
             Self::NoPathFound => f.write_str("no certification path found to a trust anchor"),
             Self::DepthExceeded => f.write_str(
                 "no certification path found within depth limit (try increasing max_depth)",
+            ),
+            Self::BudgetExceeded => f.write_str(
+                "DFS node-visit budget exceeded; pool may be adversarially large",
             ),
         }
     }
@@ -148,15 +157,19 @@ fn cert_is_ca(cert: &Certificate) -> bool {
         .is_some_and(|bc| bc.ca)
 }
 
-/// Return the DER encoding of a SubjectPublicKeyInfo as a byte vector.
-///
-/// Used for SPKI-fingerprint-based cycle detection: two certificates are the
-/// same node in the path graph if and only if they have byte-identical SPKIs.
 /// Inner DFS step.
 ///
 /// `path` is the current (partial) chain, leaf-first. On success it contains
 /// the complete chain from the original target to an anchor-issued cert.
-/// Returns `true` if a complete path was found; `false` otherwise.
+///
+/// Returns:
+/// - `Ok(true)`  — complete path found; `path` holds the result.
+/// - `Ok(false)` — no path at this depth; `path` is restored to its entry state.
+/// - `Err(())`   — budget exhausted; propagate up to `build_path` immediately.
+///
+/// `budget` is decremented on every call (one visit = one DFS node). When it
+/// reaches zero the function returns `Err(())` without further exploration.
+/// The caller maps this to [`Error::BudgetExceeded`].
 ///
 /// The invariant `path` is never empty is established by `build_path` (which
 /// pushes the target before calling `dfs`) and maintained by the push/pop
@@ -167,7 +180,14 @@ fn dfs(
     pool: &[Certificate],
     anchors: &[pkix_path::TrustAnchor],
     depth_remaining: usize,
-) -> bool {
+    budget: &mut usize,
+) -> Result<bool> {
+    // Count this node visit against the budget.
+    if *budget == 0 {
+        return Err(Error::BudgetExceeded);
+    }
+    *budget -= 1;
+
     // Extract the issuer DN by cloning so the immutable borrow on `path` is
     // released before the mutable push/pop below.
     let current_issuer = match path.last() {
@@ -175,19 +195,19 @@ fn dfs(
         None => {
             // Invariant violated: path must never be empty when dfs is called.
             debug_assert!(false, "dfs called with empty path — invariant violated");
-            return false;
+            return Ok(false);
         }
     };
 
     // Base case: does any trust anchor directly issue `current`?
     for anchor in anchors {
         if pkix_path::names_match(&anchor.subject, &current_issuer) {
-            return true;
+            return Ok(true);
         }
     }
 
     if depth_remaining == 0 {
-        return false;
+        return Ok(false);
     }
 
     // Recursive step: find pool certs that could issue `current`.
@@ -226,14 +246,26 @@ fn dfs(
         // Single clone per push (no separate subject clone needed, since
         // current_issuer was extracted once at the top of this frame).
         path.push(candidate.clone());
-        if dfs(path, pool, anchors, depth_remaining - 1) {
-            return true;
+        if dfs(path, pool, anchors, depth_remaining - 1, budget)? {
+            return Ok(true);
         }
         path.pop();
     }
 
-    false
+    Ok(false)
 }
+
+/// Total DFS node-visit budget shared across all iterative-deepening rounds.
+///
+/// Each call to the inner `dfs()` function consumes one unit regardless of
+/// whether the node results in a match. When the counter reaches zero,
+/// [`build_path`] returns [`Error::BudgetExceeded`].
+///
+/// 10 000 visits is sufficient for legitimate chains (real-world PKI hierarchies
+/// have at most a handful of intermediates and small pools). It prevents
+/// exponential blow-up against adversarially constructed pools of O(N) CA
+/// certificates with identical subject/issuer names.
+const DFS_BUDGET: usize = 10_000;
 
 /// Build a certification path from `target` through certificates in `pool`
 /// to one of the provided trust anchors.
@@ -248,6 +280,10 @@ fn dfs(
 /// Returns the shortest valid topology first. Cycles are detected and pruned
 /// by comparing SubjectPublicKeyInfo DER bytes of certificates already in the path.
 ///
+/// A shared budget of [`DFS_BUDGET`] node visits is enforced across all rounds.
+/// If the budget is exhausted before a path is found, [`Error::BudgetExceeded`]
+/// is returned. This bounds worst-case complexity against adversarial inputs.
+///
 /// # Errors
 ///
 /// - [`Error::NoPathFound`] — no topologically valid path through `pool` leads
@@ -255,6 +291,8 @@ fn dfs(
 /// - [`Error::DepthExceeded`] — a path exists topologically but requires more
 ///   than 10 intermediate certificates; increase the depth limit or provide a
 ///   shorter chain.
+/// - [`Error::BudgetExceeded`] — the DFS node-visit budget was exhausted; the
+///   pool may be adversarially large or structured to produce exponential search.
 ///
 /// # Limitations
 ///
@@ -265,9 +303,8 @@ fn dfs(
 ///
 /// # Security
 ///
-/// The DFS path builder has worst-case exponential complexity in the pool size.
-/// Do not populate the certificate pool from untrusted input without prior size
-/// limits. A future version will add a configurable budget cap.
+/// Pool contents should be from a trusted source. [`DFS_BUDGET`] enforces a hard
+/// cap on search work to prevent denial-of-service via oversized or crafted pools.
 #[must_use = "path building result must be checked"]
 pub fn build_path(
     target: &Certificate,
@@ -277,10 +314,11 @@ pub fn build_path(
     const MAX_DEPTH: usize = 10;
 
     let pool_slice: &[Certificate] = &pool.certs;
+    let mut budget = DFS_BUDGET;
 
     for max_depth in 1..=MAX_DEPTH {
         let mut path = alloc::vec![target.clone()];
-        if dfs(&mut path, pool_slice, anchors, max_depth) {
+        if dfs(&mut path, pool_slice, anchors, max_depth, &mut budget)? {
             return Ok(path);
         }
     }
@@ -288,7 +326,7 @@ pub fn build_path(
     // No path found within MAX_DEPTH. Check if a path exists at MAX_DEPTH+1
     // to distinguish "no path exists at all" from "path exists but too deep".
     let mut probe = alloc::vec![target.clone()];
-    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1) {
+    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1, &mut budget)? {
         return Err(Error::DepthExceeded);
     }
 

@@ -238,6 +238,12 @@ mod tests {
     // -----------------------------------------------------------------------
     // JSON serialization test (requires serde feature)
     // Oracle: serde_json round-trip — the deserialized report must equal the original.
+    //
+    // NOTE: this test is compiled and run only when the `serde` feature is
+    // enabled. To exercise it explicitly:
+    //   cargo test -p pkix-lint --features serde
+    // or:
+    //   cargo test -p pkix-lint --all-features
     // -----------------------------------------------------------------------
 
     #[test]

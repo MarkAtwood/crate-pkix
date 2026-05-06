@@ -3,6 +3,7 @@
 //! Uses PKITS (NIST SP 800-89) certificate fixtures from the pkix-path crate.
 //! All tests are fully offline; no network access is performed.
 
+use der::asn1::BitString;
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
 use pkix_path_builder::{build_path, CertPool};
@@ -196,9 +197,73 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
         let mut seen = std::collections::HashSet::new();
         spkis.iter().filter(|s| seen.insert(*s)).count()
     };
-    assert_eq!(
+        assert_eq!(
         spkis.len(),
         deduped_len,
         "path must not contain duplicate SPKI entries"
+    );
+}
+
+/// Adversarial pool test: verify that `build_path` returns `BudgetExceeded`
+/// within a reasonable time when given a pool engineered to maximise DFS
+/// branching.
+///
+/// Construction: take the PKITS `GoodCACert` as a template CA certificate
+/// (it has `BasicConstraints cA=TRUE`).  Clone it 30 times, each clone with:
+/// - `subject`  = "GoodCA" (same as template — so all clones are candidates
+///   whenever another cert's issuer is "GoodCA")
+/// - `issuer`   = "GoodCA" (same as `subject` — so at every DFS level the
+///   algorithm searches the pool for a parent and finds all unvisited clones)
+/// - unique `subject_public_key` bytes — bypasses the SPKI cycle guard so
+///   the same logical DN may be visited repeatedly via different key material
+///
+/// The EE target has `issuer` = "GoodCA", so the DFS starts with 30 candidates
+/// at depth 1, 29 unvisited at depth 2 (for each of the 30), etc.
+/// Without the budget cap this would run in O(30!) time; the cap must fire
+/// well before 10 000 node visits and return `BudgetExceeded`.
+///
+/// Oracle: `matches!(err, Error::BudgetExceeded)`.
+/// The test also asserts it completes in under two seconds to guard against
+/// accidental budget removal.
+#[test]
+fn test_build_path_adversarial_pool_budget_exceeded() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    // Template CA: subject = target's issuer DN; has BasicConstraints cA=TRUE.
+    let template_ca = pkits_cert("GoodCACert");
+
+    // Use a trust anchor whose subject does NOT match any cert in the pool,
+    // so no path can succeed and the DFS exhausts all candidates.
+    // Use a cert whose subject is unrelated to GoodCACert's issuer chain so
+    // no path can terminate successfully and the DFS exhausts all candidates.
+    let fake_anchor = TrustAnchor::from(&pkits_cert("BadSignedCACert"));
+
+    // Create 30 CA clones with the same subject/issuer but distinct SPKIs.
+    const N: usize = 30;
+    let mut pool = CertPool::new();
+    for i in 0..N {
+        let mut ca = template_ca.clone();
+        // Make issuer == subject: each clone will look for its own parent
+        // in the pool, finding all other clones as candidates → exponential fan-out.
+        ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
+        // Unique SPKI defeats the cycle guard so all N clones are treated as
+        // distinct DFS nodes.
+        ca.tbs_certificate.subject_public_key_info.subject_public_key =
+            BitString::new(0, vec![i as u8; 32])
+                .expect("BitString construction must succeed for valid parameters");
+        pool.add(ca);
+    }
+
+    let start = std::time::Instant::now();
+    let err = build_path(&ee, &pool, std::slice::from_ref(&fake_anchor))
+        .expect_err("adversarial pool should not find a valid path");
+    let elapsed = start.elapsed();
+
+    assert!(
+        matches!(err, pkix_path_builder::Error::BudgetExceeded),
+        "expected BudgetExceeded, got {err}"
+    );
+    assert!(
+        elapsed.as_secs() < 2,
+        "build_path took {elapsed:?}; budget enforcement must prevent exponential blowup"
     );
 }

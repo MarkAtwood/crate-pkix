@@ -161,9 +161,9 @@ impl Profile for WebPkiProfile {
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
         // BR §6.3.2: SC-081 phased validity caps.
-        // 2026-03-15T00:00:00Z = 1_742_000_000 (approx). Use 1_741_996_800 exactly.
-        // 2027-03-15T00:00:00Z = 1_773_532_800
-        // 2029-03-15T00:00:00Z = 1_836_604_800
+        // 2026-03-15T00:00:00Z = 1_773_532_800
+        // 2027-03-15T00:00:00Z = 1_805_068_800
+        // 2029-03-15T00:00:00Z = 1_868_227_200
         p.max_validity_secs = Some(sc081_validity_cap(now_unix));
         // BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_TLS_BR_ALLOWED_ALGS.to_vec());
