@@ -54,6 +54,12 @@ where
 /// All field names in this struct are part of the public API and will not be
 /// renamed without a semver-major bump. Consumers may safely parse them
 /// across minor version updates.
+///
+/// # Serde note
+///
+/// When the `serde` feature is enabled, deserialization requires a `'static`-lifetime
+/// deserializer (e.g., `serde_json::from_str`, not `serde_json::from_slice`).
+/// This constraint arises from internal `&'static str` fields in `Finding`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, Default)]
