@@ -608,6 +608,82 @@ impl Default for ValidationPolicy {
     }
 }
 
+/// A PKI regime profile that bundles identity, citation, and a validation policy.
+///
+/// # Design rationale
+///
+/// `ValidationPolicy` is the *mechanism*. A `Profile` is the *policy authority*: it
+/// records *who* mandates the policy (e.g., CA/B Forum TLS BR §7.1), supplies a
+/// stable machine-readable identifier, and produces the appropriate
+/// [`ValidationPolicy`] for a given point in time.
+///
+/// Placing the trait in `pkix-path` rather than `pkix-profiles` means that third-party
+/// profile crates (e.g., `pkix-fpki`, `pkix-etsi`) can implement `Profile` by depending
+/// only on `pkix-path` — they do not need to pull in `pkix-profiles`, which would create
+/// a circular coupling between reference implementations and the trait definition.
+///
+/// # `no_std` compatibility
+///
+/// The trait is `no_std`-safe: it uses only `&str`, `&[ObjectIdentifier]`, and
+/// `ValidationPolicy` (all of which are available without `std`).
+/// Implementors on embedded targets may return static `&'static str` slices and
+/// construct `ValidationPolicy` without allocation.
+///
+/// # Implementing `Profile`
+///
+/// ```rust,ignore
+/// use pkix_path::{Profile, ValidationPolicy};
+///
+/// struct MyCorpProfile;
+///
+/// impl Profile for MyCorpProfile {
+///     fn id(&self) -> &str { "example.corp.internal" }
+///     fn version(&self) -> &str { "2024-01" }
+///     fn policy(&self, now_unix: u64) -> ValidationPolicy {
+///         let mut p = ValidationPolicy::new(now_unix);
+///         p.max_validity_secs = Some(365 * 86_400);
+///         p
+///     }
+///     fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier] { &[] }
+/// }
+/// ```
+pub trait Profile {
+    /// Stable, dot-separated identifier for this profile.
+    ///
+    /// The identifier MUST be unique across all deployed profiles and MUST NOT
+    /// change between versions of the same profile. Use reverse-DNS or
+    /// CABF/IETF-style naming conventions, e.g.:
+    /// - `"cabf.br.tls"` — CA/B Forum TLS Baseline Requirements
+    /// - `"cabf.smime"` — CA/B Forum S/MIME Baseline Requirements
+    /// - `"fpki.common-policy"` — US Federal PKI Common Policy
+    ///
+    /// Lint engines use this ID as a namespace prefix for finding IDs.
+    fn id(&self) -> &str;
+
+    /// Human-readable version string for this profile.
+    ///
+    /// Typically the ballot or specification version that last changed the
+    /// policy rules, e.g., `"SC-081"`, `"2024-01"`, or `"v2.0.1"`.
+    /// Used for diagnostic messages and audit logs; not parsed by the engine.
+    fn version(&self) -> &str;
+
+    /// Produce the [`ValidationPolicy`] for the given point in time.
+    ///
+    /// `now_unix` is seconds since the Unix epoch. The profile may use this to
+    /// implement phased validity caps or algorithm retirement schedules.
+    /// The returned `ValidationPolicy` MUST have `current_time_unix` set to
+    /// `now_unix`.
+    #[must_use]
+    fn policy(&self, now_unix: u64) -> ValidationPolicy;
+
+    /// The certificate policy OIDs that this profile recognises as its own.
+    ///
+    /// Used by registry and composition tools to detect when two profiles
+    /// claim overlapping policy space. Returns an empty slice if the profile
+    /// does not restrict certificate policy OIDs.
+    fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier];
+}
+
 /// The result of a successful certificate path validation.
 ///
 /// Fields are `pub` for direct read access. `#[non_exhaustive]` prevents external
