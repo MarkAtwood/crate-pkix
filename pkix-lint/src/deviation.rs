@@ -714,6 +714,9 @@ impl DeviationRunner {
     }
 
     /// Evaluate certificate-scope lints on every cert in `chain` and apply deviations.
+    ///
+    /// `kinds` maps chain index to [`crate::SubjectKind`]. If `kinds` is shorter than
+    /// `chain`, remaining certificates are treated as [`crate::SubjectKind::IntermediateCa`].
     #[must_use]
     pub fn run_chain(
         &self,

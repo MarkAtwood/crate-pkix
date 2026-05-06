@@ -2527,8 +2527,8 @@ fn chain_walk<V: SignatureVerifier>(
             try_find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS)
                 .map_err(|_| Error::MalformedCertificate { index: 0 })?
         {
-            if pc.require_explicit_policy == Some(0) {
-                explicit_policy = 0;
+            if let Some(req) = pc.require_explicit_policy {
+                explicit_policy = explicit_policy.min(req);
             }
         }
     }
@@ -2562,8 +2562,8 @@ fn chain_walk<V: SignatureVerifier>(
             // AND not in the user-initial-policy-set.  Then prune ancestors that
             // become childless.
             //
-            // Implementation: collect vpns_policies (the valid_policies of vpns nodes)
-            // for step (iii)(3) dedup, then delete out-of-set nodes.
+            // Implementation: collect vpns node indices, delete out-of-set nodes,
+            // then cascade-prune childless descendants.
             let vpns_indices: Vec<usize> = tree
                 .iter()
                 .enumerate()
@@ -2574,12 +2574,6 @@ fn chain_walk<V: SignatureVerifier>(
                             .any(|p| p.depth == nd.depth - 1 && p.valid_policy == OID_ANY_POLICY)
                 })
                 .map(|(idx, _)| idx)
-                .collect();
-
-            // Collect valid_policies already in vpns (for step (iii)(3) dedup).
-            let vpns_policies: Vec<der::asn1::ObjectIdentifier> = vpns_indices
-                .iter()
-                .map(|&idx| tree[idx].valid_policy)
                 .collect();
 
             // Identify vpns nodes to delete: not anyPolicy and not in initial_policy_set.
@@ -2626,9 +2620,18 @@ fn chain_walk<V: SignatureVerifier>(
                 .iter()
                 .any(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY);
             if has_leaf_any {
+                // Collect ALL valid_policy values at leaf_depth (not just vpns_policies,
+                // which only covers nodes whose parent is anyPolicy).  Using the full
+                // set prevents materialising a duplicate node for a policy already
+                // present at leaf depth via a non-anyPolicy parent.
+                let leaf_policies: Vec<der::asn1::ObjectIdentifier> = tree
+                    .iter()
+                    .filter(|nd| nd.depth == leaf_depth)
+                    .map(|nd| nd.valid_policy)
+                    .collect();
                 let mut additions = Vec::new();
                 for p_oid in &policy.initial_policy_set {
-                    if !vpns_policies.contains(p_oid) {
+                    if !leaf_policies.contains(p_oid) {
                         additions.push(PolicyNode {
                             depth: leaf_depth,
                             valid_policy: *p_oid,
