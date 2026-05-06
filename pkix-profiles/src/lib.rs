@@ -196,9 +196,8 @@ impl Profile for WebPkiProfile {
 ///
 /// # Limitations
 ///
-/// The `require_subject_alt_name` flag causes `pkix-path` to require a non-empty
-/// SubjectAltName extension; it does **not** verify that the SAN contains an
-/// `rfc822Name` entry. Verifying the specific SAN type is tracked in PKIX-7a4.
+/// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
+/// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
 ///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
 #[derive(Clone, Debug)]
@@ -222,8 +221,9 @@ impl Profile for SmimeProfile {
         p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
         // S/MIME BR §6.1.5: RSA keys must be at least 2048 bits.
         p.min_rsa_key_bits = Some(2048);
-        // Mailbox-validated: non-empty SAN required (rfc822Name type not verified — PKIX-7a4).
+        // Mailbox-validated: non-empty SAN required; must contain an rfc822Name entry.
         p.require_subject_alt_name = true;
+        p.require_rfc822_san = true;
         // S/MIME BR §7.3: id-kp-emailProtection must be asserted.
         p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
         // S/MIME BR §7.2: at most one Subordinate CA between Root and end-entity.
@@ -393,6 +393,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | S/MIME BR §7.1.3 |
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
 /// | `require_subject_alt_name` | true | non-empty SubjectAltName extension required |
+/// | `require_rfc822_san` | true | at least one `rfc822Name` entry required in SAN |
 /// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
 /// | `max_path_len` | 1 | S/MIME BR §7.2 |
 ///
@@ -400,10 +401,6 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
 /// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
-///
-/// The `require_subject_alt_name` flag causes `pkix-path` to require a non-empty
-/// SubjectAltName extension; it does **not** verify that the SAN contains an
-/// `rfc822Name` entry. Verifying the specific SAN type is tracked in PKIX-7a4.
 ///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
 #[must_use]
@@ -1024,6 +1021,71 @@ mod tests {
                 .unwrap_or(&[])
                 .contains(&bogus),
             "modifying web_pki allowed_algs must not affect code_signing_policy"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // smime_policy rfc822Name SAN enforcement (PKIX-zw3)
+    //
+    // Oracle: smime-self-signed-365d.der has SAN=rfc822Name:test@example.com
+    //         (openssl x509 -inform DER -in smime-self-signed-365d.der -text -noout
+    //          shows: Subject Alternative Name: email:test@example.com)
+    //         webpki-self-signed-365d.der has SAN=dNSName:test.example.com only.
+    // -----------------------------------------------------------------------
+
+    /// smime_policy sets require_rfc822_san = true.
+    #[test]
+    fn smime_policy_requires_rfc822_san() {
+        let p = smime_policy(NOW);
+        assert!(
+            p.require_rfc822_san,
+            "smime_policy must set require_rfc822_san=true"
+        );
+    }
+
+    /// Cert with rfc822Name SAN passes smime_policy.
+    ///
+    /// Oracle: smime-self-signed-365d.der — SAN contains email:test@example.com
+    /// (rfc822Name). Verified by openssl: X509v3 Subject Alternative Name: email:test@example.com
+    #[test]
+    fn smime_rfc822_san_cert_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(&[cert], &anchors, &smime_policy(NOW), &EcdsaP256Verifier)
+            .expect("cert with rfc822Name SAN must pass smime_policy");
+    }
+
+    /// Cert with ONLY dNSName SAN fails smime_policy with MissingRfc822San.
+    ///
+    /// Oracle: webpki-self-signed-365d.der has SAN=DNS:test.example.com (dNSName only).
+    /// Verified by openssl: X509v3 Subject Alternative Name: DNS:test.example.com
+    /// smime_policy requires an rfc822Name entry; dNSName does not satisfy this.
+    ///
+    /// The EKU check (e3) fires before the rfc822 SAN type check (e4) in chain_walk.
+    /// We override required_leaf_eku to serverAuth (which matches the cert) so that
+    /// EKU passes and MissingRfc822San is the error that fires.
+    ///
+    /// Use pre-SC-081 time (1_767_225_600) so the validity cap does not fire.
+    #[test]
+    fn smime_dnsname_only_san_fails_with_missing_rfc822_san() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let pre_sc081: u64 = 1_767_225_600;
+        let mut policy = smime_policy(pre_sc081);
+        // webpki-self-signed-365d has serverAuth EKU; override required EKU to serverAuth
+        // so the EKU check passes and the rfc822Name SAN type check fires.
+        let server_auth: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+        policy.required_leaf_eku = Some(vec![server_auth]);
+        assert!(
+            matches!(
+                pkix_path::validate_path(&[cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(pkix_path::Error::MissingRfc822San)
+            ),
+            "cert with dNSName-only SAN must fail smime_policy with MissingRfc822San"
         );
     }
 }
