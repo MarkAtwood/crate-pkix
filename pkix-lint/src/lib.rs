@@ -106,13 +106,10 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 /// Serde deserializer helper for `&'static str` fields.
 ///
 /// Deserializes any string input as an owned `String`, then leaks it to produce a
-/// `&'static str`.  This is intentional: `Finding` and related structs use
-/// `&'static str` for their ID/citation fields because those are always compile-time
-/// constants in normal usage.  When deserializing from JSON (e.g., loading a saved
-/// evidence pack), we accept the small allocation + leak to preserve the field type.
-///
-/// In practice this is only called when loading stored reports; the normal path
-/// constructs `Finding` from `&'static str` lint metadata without any allocation.
+/// `&'static str`.  This is intentional: `LintResult` uses `&'static str` for its
+/// detail fields because those are always compile-time constants in normal usage.
+/// When deserializing from JSON (e.g., loading a saved evidence pack), we accept
+/// the small allocation + leak to preserve the field type.
 ///
 /// # Memory
 ///
@@ -129,6 +126,27 @@ where
     use serde::Deserialize as _;
     let s = String::deserialize(deserializer)?;
     Ok(Box::leak(s.into_boxed_str()))
+}
+
+/// Serde deserializer helper for `Cow<'static, str>` fields.
+///
+/// Deserializes any string input as an owned `String` wrapped in `Cow::Owned`.
+/// Unlike [`de_static_str`], this does not leak memory — the allocation is owned
+/// and freed when the containing struct is dropped.
+///
+/// Used for `Finding.lint_id`, `Finding.citation`, and `DeviatedFinding` fields
+/// that are `&'static str` at construction time (populated from lint metadata) but
+/// need to round-trip through serde without leaking.
+#[cfg(feature = "serde")]
+pub(crate) fn de_cow_static<'de, D>(
+    deserializer: D,
+) -> Result<std::borrow::Cow<'static, str>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let s = String::deserialize(deserializer)?;
+    Ok(std::borrow::Cow::Owned(s))
 }
 
 pub mod cabf_tls_br;
@@ -452,18 +470,17 @@ pub trait Lint: Send + Sync {
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-    pub lint_id: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub lint_id: std::borrow::Cow<'static, str>,
     /// The normative citation for this lint (from [`Lint::citation`]).
     ///
     /// Included here so consumers of `Vec<Finding>` do not need to re-look up
     /// the lint to get the citation for report generation and evidence packs.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-    pub citation: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub citation: std::borrow::Cow<'static, str>,
     /// Version string of the rule bundle that produced this finding.
     ///
     /// Set by [`LintRunner::with_bundle_version`]. Defaults to `""` when the runner
@@ -641,8 +658,8 @@ impl LintRunner {
             };
             let is_fatal = result.is_fatal();
             findings.push(Finding {
-                lint_id: lint.id(),
-                citation: lint.citation(),
+                lint_id: std::borrow::Cow::Borrowed(lint.id()),
+                citation: std::borrow::Cow::Borrowed(lint.citation()),
                 rule_bundle_version: self.bundle_version,
                 result,
                 cert_index: Some(cert_index),
@@ -736,8 +753,8 @@ impl LintRunner {
             let result = lint.check_path(chain, path, now_unix);
             let is_fatal = result.is_fatal();
             findings.push(Finding {
-                lint_id: lint.id(),
-                citation: lint.citation(),
+                lint_id: std::borrow::Cow::Borrowed(lint.id()),
+                citation: std::borrow::Cow::Borrowed(lint.citation()),
                 rule_bundle_version: self.bundle_version,
                 result,
                 cert_index: None,
@@ -1139,16 +1156,16 @@ mod tests {
     #[test]
     fn finding_is_finding_reflects_result() {
         let f_pass = Finding {
-            lint_id: "x",
-            citation: "test",
+            lint_id: std::borrow::Cow::Borrowed("x"),
+            citation: std::borrow::Cow::Borrowed("test"),
             rule_bundle_version: "",
             result: LintResult::Pass,
             cert_index: None,
             evaluated_at_unix: 0,
         };
         let f_warn = Finding {
-            lint_id: "x",
-            citation: "test",
+            lint_id: std::borrow::Cow::Borrowed("x"),
+            citation: std::borrow::Cow::Borrowed("test"),
             rule_bundle_version: "",
             result: LintResult::Warn("w"),
             cert_index: None,
