@@ -52,7 +52,11 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// Note: `Hash` is not derived because `x509_cert::Certificate` does not
 /// currently implement `Hash` (upstream limitation); `CertPool` cannot be
 /// used as a hash-map key until that changes.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+///
+/// Note: `PartialEq`/`Eq` are not derived. `CertPool` is documented as an
+/// unordered bag, so a derived implementation (which compares the internal
+/// `Vec` in insertion order) would be semantically wrong.
+#[derive(Clone, Debug, Default)]
 pub struct CertPool {
     certs: Vec<Certificate>,
 }

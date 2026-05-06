@@ -546,6 +546,14 @@ impl Finding {
 /// lints for the current item (cert or path) and records the fatal finding.
 /// See [`LintResult::Fatal`] for the definition of "fatal within lint evaluation."
 ///
+/// # Duplicate lint IDs
+///
+/// While the runner does not reject duplicate lint IDs, supplying lints with
+/// duplicate IDs interacts poorly with the deviation mechanism: a deviation
+/// keyed on a given ID will apply to every finding with that ID, which is
+/// unlikely to be the intended behavior and makes the audit trail ambiguous.
+/// Avoid duplicate IDs; in debug builds [`LintRunner::new`] asserts uniqueness.
+///
 /// # Thread safety
 ///
 /// `LintRunner` is `Send + Sync` as long as all supplied lints are `Send + Sync`
@@ -570,13 +578,22 @@ impl core::fmt::Debug for LintRunner {
 impl LintRunner {
     /// Create a new runner from a set of lints, with no bundle version string.
     ///
-    /// Lints are evaluated in the order supplied. Duplicates (same `id()`) are
-    /// allowed but will produce duplicate findings — callers should deduplicate.
+    /// Lints are evaluated in the order supplied. Duplicate lint IDs interact
+    /// poorly with the deviation mechanism — see the [`LintRunner`] doc for
+    /// details. In debug builds a `debug_assert!` fires if duplicates are found.
     ///
     /// To set a bundle version (recommended for production use), use
     /// [`LintRunner::with_bundle_version`].
     #[must_use]
     pub fn new(lints: Vec<Box<dyn Lint>>) -> Self {
+        debug_assert!(
+            {
+                let mut ids: Vec<_> = lints.iter().map(|l| l.id()).collect();
+                ids.sort_unstable();
+                ids.windows(2).all(|w| w[0] != w[1])
+            },
+            "duplicate lint IDs will produce confusing deviation behavior"
+        );
         Self {
             lints,
             bundle_version: "",
@@ -633,9 +650,10 @@ impl LintRunner {
     /// Both modes are valid and different — lints with effective dates (e.g., SC-081
     /// validity caps) produce different results depending on which mode is used.
     ///
-    /// Only lints with `scope() == Scope::Certificate` whose `applies_to()` matches
-    /// `kind` are invoked. Lints that do not apply return `NotApplicable` findings
-    /// (recorded for audit completeness).
+    /// Lints whose `scope()` is not [`Scope::Certificate`] are skipped entirely
+    /// (no finding recorded). Lints in scope but whose `applies_to()` does not
+    /// match `kind` produce a [`LintResult::NotApplicable`] finding recorded for
+    /// audit completeness.
     ///
     /// Evaluation stops early if any lint returns `Fatal`.
     #[must_use]

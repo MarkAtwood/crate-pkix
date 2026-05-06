@@ -271,10 +271,8 @@ impl Lint for RsaMinKeySizeLint {
 fn rsa_modulus_byte_len(der: &[u8]) -> Option<usize> {
     // Expect SEQUENCE tag 0x30.
     let (seq_content, _rest) = der_peel_tlv(der, 0x30)?;
-    // First element inside SEQUENCE: INTEGER tag 0x02.
-    let (_modulus_value, _) = der_peel_tlv(seq_content, 0x02)?;
-    // We want the *length* of the value field, not the value itself.
-    // Re-derive it from the raw bytes we already parsed.
+    // First element inside SEQUENCE must be the modulus INTEGER (tag 0x02).
+    // der_tlv_value_len returns None on tag mismatch, so no separate peel needed.
     der_tlv_value_len(seq_content, 0x02)
 }
 

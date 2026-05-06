@@ -301,11 +301,16 @@ mod tests {
         assert!(json.contains("\"rule_bundle_version\""), "JSON must contain rule_bundle_version");
         assert!(json.contains("\"evaluated_at_unix\""), "JSON must contain evaluated_at_unix");
 
-        // Round-trip: parse back and check key fields.
+        // Round-trip: deserialize back into EvaluationReport and verify key fields.
+        // Use from_value (not from_str) because EvaluationReport requires 'de: 'static
+        // due to internal &'static str fields — from_value produces fully-owned data.
         let parsed: serde_json::Value =
             serde_json::from_str(&json).expect("JSON must be valid");
-        assert_eq!(parsed["profile_id"], "cabf.br.tls");
-        assert_eq!(parsed["chain_length"], 2);
-        assert_eq!(parsed["findings"].as_array().unwrap().len(), 2);
+        let r2: EvaluationReport =
+            serde_json::from_value(parsed).expect("deserialization must succeed");
+        assert_eq!(r2.profile_id, r.profile_id);
+        assert_eq!(r2.profile_version, r.profile_version);
+        assert_eq!(r2.rule_bundle_version, r.rule_bundle_version);
+        assert_eq!(r2.findings.len(), r.findings.len());
     }
 }
