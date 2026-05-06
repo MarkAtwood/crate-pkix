@@ -236,6 +236,7 @@ impl Deviation {
 ///
 /// - `SubjectDnContains(String)` — for subscriber-identity scoping
 /// - `PolicyOid(ObjectIdentifier)` — certs asserting a specific CP OID
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviationScope {
     /// The deviation applies to all certificates.
@@ -442,6 +443,7 @@ fn strip_leading_zeros(bytes: &[u8]) -> &[u8] {
 }
 
 /// What a [`Deviation`] does to a matching finding.
+#[non_exhaustive]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviationAction {

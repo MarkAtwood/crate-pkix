@@ -267,7 +267,7 @@ pub trait RevocationChecker {
 /// will pass validation. Only use this when your threat model permits
 /// unenforced revocation (e.g., closed networks, short-lived certificates,
 /// hardware attestation where issuance itself is the control).
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct NoRevocation;
 
 impl RevocationChecker for NoRevocation {
