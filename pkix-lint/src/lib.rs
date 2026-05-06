@@ -118,6 +118,7 @@ pub mod report;
 /// A lint that checks a SHOULD or advisory requirement should be [`Severity::Warn`].
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Severity {
     /// Advisory / best-practice — does not constitute a violation.
     Info,
@@ -138,6 +139,7 @@ pub enum Severity {
 /// Whether a lint evaluates a single certificate or the complete validated path.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Scope {
     /// The lint evaluates one certificate in isolation.
     Certificate,
@@ -155,6 +157,7 @@ pub enum Scope {
 /// and as the label in [`LintRunner`] when calling the lint (what cert we're at).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum SubjectKind {
     /// End-entity (leaf) certificate — the subject of the chain.
     Leaf,
@@ -198,6 +201,7 @@ impl SubjectKind {
 /// Dynamic `String` detail is planned for v0.3 via `Cow<'static, str>`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LintResult {
     /// The lint check passed — no finding.
     Pass,
@@ -266,6 +270,50 @@ impl LintResult {
         match self {
             LintResult::Warn(d) | LintResult::Error(d) | LintResult::Fatal(d) => Some(d),
             _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display implementations
+// ---------------------------------------------------------------------------
+
+impl core::fmt::Display for Severity {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Severity::Info => f.write_str("info"),
+            Severity::Warn => f.write_str("warn"),
+            Severity::Error => f.write_str("error"),
+            Severity::Fatal => f.write_str("fatal"),
+        }
+    }
+}
+
+impl core::fmt::Display for LintResult {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            LintResult::Pass => f.write_str("Pass"),
+            LintResult::NotApplicable => f.write_str("NotApplicable"),
+            LintResult::Warn(msg) => write!(f, "Warn: {msg}"),
+            LintResult::Error(msg) => write!(f, "Error: {msg}"),
+            LintResult::Fatal(msg) => write!(f, "Fatal: {msg}"),
+        }
+    }
+}
+
+impl core::fmt::Display for Finding {
+    /// Format: `"lint_id [severity]: message"` for findings, `"lint_id [pass]"` for non-findings.
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let severity_label = match &self.result {
+            LintResult::Warn(_) => "warn",
+            LintResult::Error(_) => "error",
+            LintResult::Fatal(_) => "fatal",
+            LintResult::Pass => "pass",
+            LintResult::NotApplicable => "n/a",
+        };
+        match self.result.detail() {
+            Some(msg) => write!(f, "{} [{}]: {}", self.lint_id, severity_label, msg),
+            None => write!(f, "{} [{}]", self.lint_id, severity_label),
         }
     }
 }
@@ -451,6 +499,15 @@ pub struct LintRunner {
     bundle_version: &'static str,
 }
 
+impl core::fmt::Debug for LintRunner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LintRunner")
+            .field("lint_count", &self.lints.len())
+            .field("bundle_version", &self.bundle_version)
+            .finish()
+    }
+}
+
 impl LintRunner {
     /// Create a new runner from a set of lints, with no bundle version string.
     ///
@@ -588,6 +645,19 @@ impl LintRunner {
     /// `chain`, remaining certs are treated as [`SubjectKind::IntermediateCa`].
     ///
     /// Returns a flat `Vec<Finding>` with cert_index set for each.
+    ///
+    /// # Determining the `AnchorIssued` position
+    ///
+    /// The `AnchorIssued` certificate is the one directly signed by the trust anchor —
+    /// typically the last certificate in the chain before the anchor itself (i.e., the
+    /// highest-index intermediate). Callers are responsible for identifying this
+    /// position and passing [`SubjectKind::AnchorIssued`] in `kinds`. The runner has
+    /// no access to trust anchor information and cannot determine this automatically.
+    ///
+    /// # Fatal behavior across certificates
+    ///
+    /// Note: [`LintResult::Fatal`] stops lint evaluation for the *current certificate
+    /// only*. Subsequent certificates in the chain continue to be evaluated.
     #[must_use]
     pub fn run_chain(
         &self,
@@ -667,6 +737,7 @@ pub trait LintProfile: Profile {
     /// Implementors should document whether this method caches the runner or
     /// allocates fresh on each call. Callers that invoke this repeatedly should
     /// cache the returned [`LintRunner`] themselves.
+    #[must_use]
     fn lint_runner(&self) -> LintRunner;
 }
 

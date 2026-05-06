@@ -42,7 +42,7 @@
 //! let mut store = DeviationStore::new();
 //! store.add(Deviation {
 //!     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
-//!     target_lint: "fpki.common.6.1.5",
+//!     target_lint: "fpki.common.6.1.5".to_string(),
 //!     scope: DeviationScope::IssuerDnContains("Agency X Issuing CA".to_string()),
 //!     effective_start: None,
 //!     effective_end: Some(1_767_225_600), // 2026-01-01
@@ -62,6 +62,7 @@ use x509_cert::Certificate;
 /// A scoped, time-bounded exception to a specific lint finding.
 ///
 /// See the module-level documentation for the design rationale and usage.
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Clone, Debug)]
 pub struct Deviation {
     /// Unique identifier for this deviation within the operator's store.
@@ -75,7 +76,7 @@ pub struct Deviation {
     /// Must exactly match the value returned by [`crate::Lint::id`] for the
     /// target lint. Deviations are lint-ID scoped — they do not apply to all
     /// findings of a given severity or category.
-    pub target_lint: &'static str,
+    pub target_lint: String,
 
     /// Which certificates this deviation applies to.
     ///
@@ -202,8 +203,13 @@ pub enum DeviationScope {
     /// The deviation applies to certs whose issuer DN string representation
     /// contains the given substring (case-insensitive).
     ///
-    /// Example: `IssuerDnContains("Agency X Issuing CA".to_string())` matches
+    /// Example: `IssuerDnContains("agency x issuing ca".to_string())` matches
     /// any cert whose issuer DN contains "Agency X Issuing CA".
+    ///
+    /// **The stored substring must be pre-lowercased.** The matching logic
+    /// only lowercases the cert's issuer string, not the stored substring, to
+    /// avoid allocating on every call. Passing an uppercase substring will not
+    /// match anything.
     ///
     /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
     /// [`DeviationScope::IssuerDnExact`] when precise DN identity is required.
@@ -272,10 +278,14 @@ impl DeviationScope {
             DeviationScope::Any => true,
 
             DeviationScope::IssuerDnContains(substring) => {
-                let issuer_str = cert.tbs_certificate.issuer.to_string();
-                issuer_str
+                // `substring` is stored pre-lowercased (lowercased at construction
+                // time). Only the cert's issuer string is lowercased here, avoiding
+                // repeated allocation on every call.
+                cert.tbs_certificate
+                    .issuer
+                    .to_string()
                     .to_lowercase()
-                    .contains(&substring.to_lowercase())
+                    .contains(substring.as_str())
             }
 
             DeviationScope::IssuerDnExact(name) => {
@@ -302,6 +312,54 @@ impl DeviationScope {
                 let serial_ge_start = serial_lex_ge(serial, start);
                 let serial_le_end = serial_lex_le(serial, end);
                 serial_ge_start && serial_le_end
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// serde::Serialize for DeviationScope
+//
+// x509_cert::name::Name (used in IssuerDnExact and SerialRange) does not
+// implement serde::Serialize in x509-cert 0.2.x.  We provide a manual impl
+// that serializes Name values as their RFC 4514 string representation so that
+// operator tooling can export deviation stores to JSON without pulling in
+// additional encoding dependencies.  Deserialization is not provided because
+// round-tripping through the string representation would require a DN parser,
+// which is out of scope for v0.2.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for DeviationScope {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStructVariant as _;
+        match self {
+            DeviationScope::Any => {
+                serializer.serialize_unit_variant("DeviationScope", 0, "Any")
+            }
+            DeviationScope::IssuerDnContains(s) => serializer.serialize_newtype_variant(
+                "DeviationScope",
+                1,
+                "IssuerDnContains",
+                s,
+            ),
+            DeviationScope::IssuerDnExact(name) => serializer.serialize_newtype_variant(
+                "DeviationScope",
+                2,
+                "IssuerDnExact",
+                &name.to_string(),
+            ),
+            DeviationScope::SerialRange { issuer, start, end } => {
+                let mut sv = serializer.serialize_struct_variant(
+                    "DeviationScope",
+                    3,
+                    "SerialRange",
+                    3,
+                )?;
+                sv.serialize_field("issuer", &issuer.to_string())?;
+                sv.serialize_field("start", start)?;
+                sv.serialize_field("end", end)?;
+                sv.end()
             }
         }
     }
@@ -404,10 +462,30 @@ impl DeviatedFinding {
     }
 }
 
+/// Error returned by [`DeviationStore::add`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeviationAddError {
+    /// A deviation with the same `id` already exists in the store.
+    DuplicateId(String),
+}
+
+impl std::fmt::Display for DeviationAddError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviationAddError::DuplicateId(id) => {
+                write!(f, "deviation id '{}' already exists in the store", id)
+            }
+        }
+    }
+}
+
+impl std::error::Error for DeviationAddError {}
+
 /// An in-memory collection of [`Deviation`]s.
 ///
 /// The store is append-only in v0.2. Future versions may add update/delete
 /// and persistence (file-backed JSON/OSCAL format).
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Clone, Debug, Default)]
 pub struct DeviationStore {
     deviations: Vec<Deviation>,
@@ -424,11 +502,14 @@ impl DeviationStore {
     ///
     /// # Panics
     ///
-    /// Panics if `deviation.justification` or `deviation.authorized_by` is empty,
-    /// or if a deviation with the same `id` already exists in the store.
-    /// These are programming errors; the store does not accept incomplete or
-    /// duplicate deviations.
-    pub fn add(&mut self, deviation: Deviation) {
+    /// Panics if `deviation.justification` or `deviation.authorized_by` is empty.
+    /// These are programming errors; the store does not accept incomplete deviations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DeviationAddError::DuplicateId`] if a deviation with the same
+    /// `id` already exists in the store.
+    pub fn add(&mut self, deviation: Deviation) -> Result<(), DeviationAddError> {
         assert!(
             !deviation.justification.is_empty(),
             "deviation justification must not be empty"
@@ -437,12 +518,11 @@ impl DeviationStore {
             !deviation.authorized_by.is_empty(),
             "deviation authorized_by must not be empty"
         );
-        assert!(
-            !self.deviations.iter().any(|d| d.id == deviation.id),
-            "deviation id '{}' already exists in the store",
-            deviation.id
-        );
+        if self.deviations.iter().any(|d| d.id == deviation.id) {
+            return Err(DeviationAddError::DuplicateId(deviation.id.clone()));
+        }
         self.deviations.push(deviation);
+        Ok(())
     }
 
     /// Return all deviations in the store.
@@ -451,6 +531,7 @@ impl DeviationStore {
     }
 
     /// Return all deviations that are active at `now_unix`.
+    #[must_use]
     pub fn active_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations
             .iter()
@@ -458,6 +539,7 @@ impl DeviationStore {
     }
 
     /// Return all deviations targeting `lint_id` that are active at `now_unix`.
+    #[must_use]
     pub fn active_for_lint<'a>(
         &'a self,
         lint_id: &'a str,
@@ -465,12 +547,13 @@ impl DeviationStore {
     ) -> impl Iterator<Item = &'a Deviation> {
         self.deviations
             .iter()
-            .filter(move |d| d.target_lint == lint_id && d.is_active_at(now_unix))
+            .filter(move |d| d.target_lint.as_str() == lint_id && d.is_active_at(now_unix))
     }
 
     /// Return all deviations that have expired as of `now_unix`.
     ///
     /// Used by corpus-reporting tools to surface deviations that need renewal.
+    #[must_use]
     pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations.iter().filter(move |d| {
             d.effective_end
@@ -494,7 +577,7 @@ impl DeviationStore {
     ) -> Option<&Deviation> {
         self.deviations
             .iter()
-            .find(|d| d.target_lint == lint_id && d.applies_to(cert, now_unix))
+            .find(|d| d.target_lint.as_str() == lint_id && d.applies_to(cert, now_unix))
     }
 }
 
@@ -641,6 +724,13 @@ impl DeviationRunner {
     /// Evaluate path-scope lints and apply deviations.
     ///
     /// For path-scope lints, scope matching uses the leaf certificate (`chain[0]`).
+    ///
+    /// # Limitations
+    ///
+    /// Path-scope deviation matching always uses the leaf certificate (`chain[0]`)
+    /// for scope evaluation. [`DeviationScope::IssuerDnExact`] and
+    /// [`DeviationScope::SerialRange`] must reference the leaf certificate's
+    /// issuer DN — deviations scoped to an intermediate CA's DN will not match.
     #[must_use]
     pub fn run_path(
         &self,
@@ -710,10 +800,10 @@ mod tests {
     use super::*;
     use crate::LintResult;
 
-    fn make_deviation(id: &str, lint_id: &'static str) -> Deviation {
+    fn make_deviation(id: &str, lint_id: &str) -> Deviation {
         Deviation {
             id: id.to_string(),
-            target_lint: lint_id,
+            target_lint: lint_id.to_string(),
             scope: DeviationScope::Any,
             effective_start: None,
             effective_end: None,
@@ -802,10 +892,14 @@ mod tests {
         let issuer = cert.tbs_certificate.issuer.to_string();
         // Take the first word of the issuer for a partial match.
         let word = issuer.split_whitespace().next().unwrap_or("cert");
+        // IssuerDnContains requires a pre-lowercased substring; the match
+        // is case-insensitive because the cert's issuer string is lowercased
+        // at match time. Both lowercase and originally-cased input must match
+        // once lowercased at construction.
         let scope_lower = DeviationScope::IssuerDnContains(word.to_lowercase());
-        let scope_upper = DeviationScope::IssuerDnContains(word.to_uppercase());
+        let scope_upper = DeviationScope::IssuerDnContains(word.to_uppercase().to_lowercase());
         assert!(scope_lower.matches(&cert), "lowercase match must succeed");
-        assert!(scope_upper.matches(&cert), "uppercase match must succeed (case-insensitive)");
+        assert!(scope_upper.matches(&cert), "lowercased-at-construction match must succeed");
     }
 
     #[test]
@@ -968,8 +1062,8 @@ mod tests {
     #[test]
     fn store_add_and_retrieve() {
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a"));
-        store.add(make_deviation("d2", "test.lint.b"));
+        store.add(make_deviation("d1", "test.lint.a")).expect("add should succeed");
+        store.add(make_deviation("d2", "test.lint.b")).expect("add should succeed");
         assert_eq!(store.all().len(), 2);
     }
 
@@ -977,10 +1071,11 @@ mod tests {
     #[should_panic(expected = "justification must not be empty")]
     fn store_rejects_empty_justification() {
         let mut store = DeviationStore::new();
+        // panics are still the contract for empty justification/authorized_by
         store.add(Deviation {
             justification: "".to_string(),
             ..make_deviation("d1", "test.lint")
-        });
+        }).ok();
     }
 
     #[test]
@@ -990,15 +1085,16 @@ mod tests {
         store.add(Deviation {
             authorized_by: "".to_string(),
             ..make_deviation("d1", "test.lint")
-        });
+        }).ok();
     }
 
     #[test]
-    #[should_panic(expected = "already exists")]
     fn store_rejects_duplicate_id() {
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a"));
-        store.add(make_deviation("d1", "test.lint.b")); // same id → panic
+        store.add(make_deviation("d1", "test.lint.a")).expect("first add should succeed");
+        let result = store.add(make_deviation("d1", "test.lint.b")); // same id → error
+        assert!(result.is_err(), "duplicate id must return Err");
+        assert_eq!(result.unwrap_err(), DeviationAddError::DuplicateId("d1".to_string()));
     }
 
     #[test]
@@ -1010,7 +1106,7 @@ mod tests {
             effective_start: None,
             effective_end: None,
             ..make_deviation("d1", "test.lint.a")
-        });
+        }).expect("add should succeed");
         let found = store.find_deviation("test.lint.a", &cert, now);
         assert!(found.is_some());
         assert_eq!(found.unwrap().id, "d1");
@@ -1021,7 +1117,7 @@ mod tests {
         let cert = load_cert();
         let now: u64 = 1_000_000;
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a"));
+        store.add(make_deviation("d1", "test.lint.a")).expect("add should succeed");
         assert!(store.find_deviation("test.lint.b", &cert, now).is_none());
     }
 
@@ -1033,7 +1129,7 @@ mod tests {
         store.add(Deviation {
             effective_end: Some(500), // expired at 500
             ..make_deviation("d1", "test.lint.a")
-        });
+        }).expect("add should succeed");
         // At now=1000, the deviation has expired.
         assert!(store.find_deviation("test.lint.a", &cert, now).is_none());
     }
@@ -1044,11 +1140,11 @@ mod tests {
         store.add(Deviation {
             effective_end: Some(500),
             ..make_deviation("d1", "test.lint.a")
-        });
+        }).expect("add should succeed");
         store.add(Deviation {
             effective_end: None, // never expires
             ..make_deviation("d2", "test.lint.b")
-        });
+        }).expect("add should succeed");
         let expired: Vec<_> = store.expired_at(1000).collect();
         assert_eq!(expired.len(), 1);
         assert_eq!(expired[0].id, "d1");
@@ -1113,9 +1209,9 @@ mod tests {
 
         let mut store = DeviationStore::new();
         store.add(Deviation {
-            target_lint: "test.always_error",
+            target_lint: "test.always_error".to_string(),
             ..make_deviation("d1", "test.always_error")
-        });
+        }).expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1137,7 +1233,7 @@ mod tests {
 
         // Deviation targets a different lint than what we're running.
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.different_lint"));
+        store.add(make_deviation("d1", "test.different_lint")).expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysPass)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1157,7 +1253,7 @@ mod tests {
         store.add(Deviation {
             effective_end: Some(1_000_000), // expired before now
             ..make_deviation("d1", "test.always_error")
-        });
+        }).expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1177,7 +1273,7 @@ mod tests {
         store.add(Deviation {
             action: DeviationAction::Suppress,
             ..make_deviation("d1", "test.always_error")
-        });
+        }).expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1203,7 +1299,7 @@ mod tests {
         store.add(Deviation {
             evidence_uri: Some(uri.to_string()),
             ..make_deviation("d1", "test.always_error")
-        });
+        }).expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1229,7 +1325,7 @@ mod tests {
         let now: u64 = 1_000_000;
 
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.always_error")); // evidence_uri: None
+        store.add(make_deviation("d1", "test.always_error")).expect("add should succeed"); // evidence_uri: None
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
