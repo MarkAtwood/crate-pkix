@@ -86,6 +86,7 @@ const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6
 /// - CAA DNS records (network check; out of scope for `pkix-path`)
 /// - CT log SCTs (separate verification step)
 /// - OCSP/CRL revocation (use `pkix-revocation`)
+#[must_use]
 pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
     let mut p = ValidationPolicy::new(now_unix);
     // BR §6.3.2: maximum certificate validity is 398 days.
@@ -117,6 +118,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
 /// | `require_subject_alt_name` | true | rfc822Name SAN required for Mailbox-validated |
 /// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
+/// | `max_path_len` | 1 | S/MIME BR §7.2.2 (Root CA issues Subordinate CA directly) |
 ///
 /// # Limitations
 ///
@@ -124,6 +126,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
 ///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
+#[must_use]
 pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
     let mut p = ValidationPolicy::new(now_unix);
     // S/MIME BR §6.3.2: strict profile maximum validity ~39 months (1185 days).
@@ -136,6 +139,8 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
     p.require_subject_alt_name = true;
     // S/MIME BR §7.3: id-kp-emailProtection must be asserted.
     p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
+    // S/MIME BR §7.2.2: Root CA issues Subordinate CA directly; at most 1 intermediate.
+    p.max_path_len = 1;
     p
 }
 
@@ -151,11 +156,13 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 /// | `min_rsa_key_bits` | 3072 | CS BR §6.1.5 (effective 2023-06-01) |
 /// | `require_subject_alt_name` | false | CS certs identify subjects by DN |
 /// | `required_leaf_eku` | id-kp-codeSigning (1.3.6.1.5.5.7.3.3) | CS BR §7.1.2.3 |
+/// | `max_path_len` | 1 | CS BR §7.1.1 (Root CA issues Subordinate CA directly) |
 ///
 /// # Limitations
 ///
 /// Timestamp authority verification is out of scope for `pkix-path`;
 /// use a dedicated timestamp verifier. Revocation is handled by `pkix-revocation`.
+#[must_use]
 pub fn code_signing_policy(now_unix: u64) -> ValidationPolicy {
     let mut p = ValidationPolicy::new(now_unix);
     // CS BR §6.3.2: maximum validity ~39 months (1185 days).
@@ -169,10 +176,13 @@ pub fn code_signing_policy(now_unix: u64) -> ValidationPolicy {
     p.require_subject_alt_name = false;
     // CS BR §7.1.2.3: id-kp-codeSigning must be asserted.
     p.required_leaf_eku = Some(vec![ID_KP_CODE_SIGNING]);
+    // CS BR §7.1.1: Root CA issues Subordinate CA directly; at most 1 intermediate.
+    p.max_path_len = 1;
     p
 }
 
 /// Return a plain RFC 5280 [`ValidationPolicy`] with no CA/Browser Forum additions.
+#[must_use]
 pub fn rfc5280_policy(now_unix: u64) -> ValidationPolicy {
     ValidationPolicy::new(now_unix)
 }

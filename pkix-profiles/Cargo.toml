@@ -13,6 +13,8 @@ categories  = ["cryptography"]
 [dependencies]
 der       = { workspace = true }
 pkix-path = { workspace = true }
+
+[dev-dependencies]
 x509-cert = { workspace = true }
 
 [package.metadata.docs.rs]
