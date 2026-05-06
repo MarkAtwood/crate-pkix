@@ -460,9 +460,9 @@ impl DeviationStore {
     /// Return all deviations targeting `lint_id` that are active at `now_unix`.
     pub fn active_for_lint(
         &self,
-        lint_id: &'static str,
+        lint_id: &str,
         now_unix: u64,
-    ) -> impl Iterator<Item = &Deviation> {
+    ) -> impl Iterator<Item = &Deviation> + '_ {
         self.deviations
             .iter()
             .filter(move |d| d.target_lint == lint_id && d.is_active_at(now_unix))
@@ -474,7 +474,7 @@ impl DeviationStore {
     pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations.iter().filter(move |d| {
             d.effective_end
-                .map_or(false, |end| now_unix >= end)
+                .is_some_and(|end| now_unix >= end)
         })
     }
 
@@ -488,7 +488,7 @@ impl DeviationStore {
     #[must_use]
     pub fn find_deviation(
         &self,
-        lint_id: &'static str,
+        lint_id: &str,
         cert: &Certificate,
         now_unix: u64,
     ) -> Option<&Deviation> {
@@ -589,6 +589,28 @@ impl DeviationRunner {
         self.apply_deviations(raw, cert, now_unix)
     }
 
+    /// Evaluate certificate-scope lints as of the cert's `notBefore` date and
+    /// apply deviations.
+    ///
+    /// Mirrors [`crate::LintRunner::run_cert_at_issuance`]: extracts the
+    /// `notBefore` timestamp and calls `run_cert` with that value as `now_unix`.
+    /// This answers "was this cert compliant when it was issued?"
+    #[must_use]
+    pub fn run_cert_at_issuance(
+        &self,
+        cert: &Certificate,
+        kind: crate::SubjectKind,
+        cert_index: usize,
+    ) -> DeviationRunResult {
+        let issuance_unix = cert
+            .tbs_certificate
+            .validity
+            .not_before
+            .to_unix_duration()
+            .as_secs();
+        self.run_cert(cert, kind, cert_index, issuance_unix)
+    }
+
     /// Evaluate certificate-scope lints on every cert in `chain` and apply deviations.
     #[must_use]
     pub fn run_chain(
@@ -643,6 +665,12 @@ impl DeviationRunner {
     ) -> DeviationRunResult {
         let mut result = DeviationRunResult::default();
         for finding in raw {
+            // Only attempt to apply deviations to actionable findings.
+            // Pass and NotApplicable findings are never waived.
+            if !finding.result.is_finding() {
+                result.findings.push(finding);
+                continue;
+            }
             match self
                 .store
                 .find_deviation(finding.lint_id, cert, now_unix)
