@@ -346,15 +346,42 @@ pub trait Lint: Send + Sync {
 // ---------------------------------------------------------------------------
 
 /// A recorded lint outcome, associating a lint ID with its result.
+///
+/// # Evidence pack support
+///
+/// `Finding` carries the minimum metadata needed to construct an evidence pack
+/// (a bundle of cert + path + findings + citations exportable as structured JSON
+/// or OSCAL Assessment Results). The `citation` field records the normative
+/// citation from [`Lint::citation`]; `evaluated_at_unix` records when the lint
+/// was run.
+///
+/// # Planned fields (v0.3)
+///
+/// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
+///   Deferred to avoid adding a SHA-256 dependency to the engine core.
+/// - `rule_bundle_version: &'static str` — version of the lint bundle (e.g., crate version).
+///   Deferred pending a stable versioning mechanism for lint bundles.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
     pub lint_id: &'static str,
+    /// The normative citation for this lint (from [`Lint::citation`]).
+    ///
+    /// Included here so consumers of `Vec<Finding>` do not need to re-look up
+    /// the lint to get the citation for report generation and evidence packs.
+    pub citation: &'static str,
     /// The outcome of the lint evaluation.
     pub result: LintResult,
     /// For certificate-scope lints, the zero-based chain index of the evaluated cert.
     /// `None` for path-scope lints.
     pub cert_index: Option<usize>,
+    /// Unix epoch seconds at which the lint was evaluated.
+    ///
+    /// For audit-mode evaluations (pass issuance time), this records the issuance time.
+    /// For operational-mode evaluations (pass current time), this records the current time.
+    /// Together with `cert_index` and the chain, this is sufficient to reconstruct
+    /// the evaluation context in an evidence pack.
+    pub evaluated_at_unix: u64,
 }
 
 impl Finding {
@@ -424,6 +451,19 @@ impl LintRunner {
     /// `kind` is the position of this certificate in the chain (leaf, intermediate, etc.).
     /// `now_unix` is the evaluation time (seconds since Unix epoch).
     ///
+    /// # Evaluation modes
+    ///
+    /// Pass the **issuance time** (`cert.tbs_certificate.validity.not_before`) for
+    /// audit-mode evaluation: "was this cert compliant when it was issued?"
+    ///
+    /// Pass the **current time** for operational-mode evaluation: "is this cert
+    /// compliant under current rules?"
+    ///
+    /// Use [`LintRunner::run_cert_at_issuance`] as a convenience wrapper for audit mode.
+    ///
+    /// Both modes are valid and different — lints with effective dates (e.g., SC-081
+    /// validity caps) produce different results depending on which mode is used.
+    ///
     /// Only lints with `scope() == Scope::Certificate` whose `applies_to()` matches
     /// `kind` are invoked. Lints that do not apply return `NotApplicable` findings
     /// (recorded for audit completeness).
@@ -450,14 +490,42 @@ impl LintRunner {
             let is_fatal = result.is_fatal();
             findings.push(Finding {
                 lint_id: lint.id(),
+                citation: lint.citation(),
                 result,
                 cert_index: Some(cert_index),
+                evaluated_at_unix: now_unix,
             });
             if is_fatal {
                 break;
             }
         }
         findings
+    }
+
+    /// Evaluate certificate-scope lints as of the certificate's issuance time.
+    ///
+    /// Convenience wrapper for **audit mode**: extracts `notBefore` from the cert
+    /// and passes it as `now_unix` to `run_cert`. This answers: "was this cert
+    /// compliant when it was issued?"
+    ///
+    /// For operational mode ("is it compliant under current rules?"), call `run_cert`
+    /// directly with the current time.
+    ///
+    /// See `run_cert` for full documentation on evaluation modes.
+    #[must_use]
+    pub fn run_cert_at_issuance(
+        &self,
+        cert: &Certificate,
+        kind: SubjectKind,
+        cert_index: usize,
+    ) -> Vec<Finding> {
+        let issuance_unix = cert
+            .tbs_certificate
+            .validity
+            .not_before
+            .to_unix_duration()
+            .as_secs();
+        self.run_cert(cert, kind, cert_index, issuance_unix)
     }
 
     /// Evaluate all certificate-scope lints against every certificate in `chain`.
@@ -504,8 +572,10 @@ impl LintRunner {
             let is_fatal = result.is_fatal();
             findings.push(Finding {
                 lint_id: lint.id(),
+                citation: lint.citation(),
                 result,
                 cert_index: None,
+                evaluated_at_unix: now_unix,
             });
             if is_fatal {
                 break;
@@ -904,15 +974,49 @@ mod tests {
     fn finding_is_finding_reflects_result() {
         let f_pass = Finding {
             lint_id: "x",
+            citation: "test",
             result: LintResult::Pass,
             cert_index: None,
+            evaluated_at_unix: 0,
         };
         let f_warn = Finding {
             lint_id: "x",
+            citation: "test",
             result: LintResult::Warn("w"),
             cert_index: None,
+            evaluated_at_unix: 0,
         };
         assert!(!f_pass.is_finding());
         assert!(f_warn.is_finding());
+    }
+
+    #[test]
+    fn finding_citation_is_threaded_from_lint() {
+        let cert = load_fixture_cert();
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 12345);
+        assert_eq!(findings.len(), 1);
+        // Citation must come from the lint's citation() method.
+        assert_eq!(findings[0].citation, "test", "citation must be threaded from Lint::citation()");
+        assert_eq!(findings[0].evaluated_at_unix, 12345, "evaluated_at_unix must be the passed now_unix");
+    }
+
+    #[test]
+    fn run_cert_at_issuance_uses_not_before() {
+        let cert = load_fixture_cert();
+        // Get the expected issuance time from the cert's notBefore.
+        let expected_unix = cert
+            .tbs_certificate
+            .validity
+            .not_before
+            .to_unix_duration()
+            .as_secs();
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let findings = runner.run_cert_at_issuance(&cert, SubjectKind::Leaf, 0);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].evaluated_at_unix, expected_unix,
+            "run_cert_at_issuance must use cert notBefore as evaluated_at_unix"
+        );
     }
 }

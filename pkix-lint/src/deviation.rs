@@ -1,48 +1,49 @@
-/// Deviation (waiver) mechanism for `pkix-lint`.
-///
-/// A [`Deviation`] is an operator-authored, scoped, time-bounded exception to a
-/// specific lint finding. Deviations are the only mechanism for suppressing or
-/// downgrading lint findings — there are no CLI flags or global overrides.
-///
-/// # Design rationale
-///
-/// The deviation mechanism is designed to:
-/// - Make suppression **explicit and attributable**: every deviation has an ID,
-///   a justification, and an authorized_by field that appear in reports.
-/// - Force **scoping**: deviations match specific certs (by issuer DN, serial, etc.),
-///   not all certs globally.
-/// - Enforce **expiry**: deviations with an `effective_end` re-activate findings
-///   after they expire, forcing renewal and re-justification.
-/// - **Not launder violations**: a suppressed finding is recorded as "DEVIATION
-///   APPLIED by <id>" in the output, not silently removed. Auditors can see it.
-///
-/// # No vendor deviation packs
-///
-/// `pkix-lint` never ships deviation packs. CAs, vendors, or policy authorities
-/// who want to ship deviations for their customers must distribute them separately,
-/// and operators must explicitly load them into their own [`DeviationStore`]. This
-/// prevents the tool from becoming an instrument for CA-side laundering.
-///
-/// # Usage
-///
-/// ```rust,ignore
-/// use pkix_lint::deviation::{Deviation, DeviationAction, DeviationScope, DeviationStore};
-/// use pkix_lint::Severity;
-///
-/// let mut store = DeviationStore::new();
-/// store.add(Deviation {
-///     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
-///     target_lint: "fpki.common.6.1.5",
-///     scope: DeviationScope::IssuerDnContains("Agency X Issuing CA".to_string()),
-///     effective_start: None,
-///     effective_end: Some(1_767_225_600), // 2026-01-01
-///     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
-///     justification: "FPKIPA waiver memo 2025-11-03".to_string(),
-///     authorized_by: "agency-x-ciso@agency.gov".to_string(),
-/// });
-///
-/// // Use a DeviationRunner (wraps LintRunner) to apply deviations automatically.
-/// ```
+//! Deviation (waiver) mechanism for `pkix-lint`.
+//!
+//! A [`Deviation`] is an operator-authored, scoped, time-bounded exception to a
+//! specific lint finding. Deviations are the only mechanism for suppressing or
+//! downgrading lint findings — there are no CLI flags or global overrides.
+//!
+//! # Design rationale
+//!
+//! The deviation mechanism is designed to:
+//! - Make suppression **explicit and attributable**: every deviation has an ID,
+//!   a justification, and an authorized_by field that appear in reports.
+//! - Force **scoping**: deviations match specific certs (by issuer DN, serial, etc.),
+//!   not all certs globally.
+//! - Enforce **expiry**: deviations with an `effective_end` re-activate findings
+//!   after they expire, forcing renewal and re-justification.
+//! - **Not launder violations**: a suppressed finding is recorded as a
+//!   [`DeviatedFinding`] in the output, not silently removed. Auditors can see it.
+//!
+//! # No vendor deviation packs
+//!
+//! `pkix-lint` never ships deviation packs. CAs, vendors, or policy authorities
+//! who want to ship deviations for their customers must distribute them separately,
+//! and operators must explicitly load them into their own [`DeviationStore`]. This
+//! prevents the tool from becoming an instrument for CA-side laundering.
+//!
+//! # Usage
+//!
+//! ```rust,ignore
+//! use pkix_lint::deviation::{Deviation, DeviationAction, DeviationScope, DeviationStore};
+//! use pkix_lint::Severity;
+//!
+//! let mut store = DeviationStore::new();
+//! store.add(Deviation {
+//!     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
+//!     target_lint: "fpki.common.6.1.5",
+//!     scope: DeviationScope::IssuerDnContains("Agency X Issuing CA".to_string()),
+//!     effective_start: None,
+//!     effective_end: Some(1_767_225_600), // 2026-01-01
+//!     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
+//!     justification: "FPKIPA waiver memo 2025-11-03".to_string(),
+//!     authorized_by: "agency-x-ciso@agency.gov".to_string(),
+//! });
+//!
+//! // Use a DeviationRunner (wraps LintRunner) to apply deviations automatically.
+//! ```
+
 use crate::Severity;
 use x509_cert::Certificate;
 
