@@ -148,6 +148,29 @@ fn cert_is_ca(cert: &Certificate) -> bool {
         .is_some_and(|bc| bc.ca)
 }
 
+/// Return the DER encoding of a SubjectPublicKeyInfo as a byte vector.
+///
+/// Used for SPKI-fingerprint-based cycle detection: two certificates are the
+/// same node in the path graph if and only if they have byte-identical SPKIs.
+/// This correctly handles key-rollover topologies where multiple certs share
+/// a subject DN but carry different public keys.
+///
+/// On encoding error (should not happen for well-formed certs from a `CertPool`)
+/// returns an empty `Vec`, causing the cycle check to conservatively assume
+/// no match and allowing the candidate to be considered.
+fn spki_der_bytes(
+    spki: &x509_cert::spki::SubjectPublicKeyInfoOwned,
+) -> alloc::vec::Vec<u8> {
+    use der::Encode as _;
+    let mut buf = alloc::vec::Vec::new();
+    // Encoding a well-formed SubjectPublicKeyInfo should never fail; the only
+    // realistic failure mode is OOM, which would propagate as a panic anyway.
+    if spki.encode_to_vec(&mut buf).is_err() {
+        buf.clear();
+    }
+    buf
+}
+
 /// Inner DFS step.
 ///
 /// `path` is the current (partial) chain, leaf-first. On success it contains
@@ -198,14 +221,21 @@ fn dfs(
             continue;
         }
 
-        // Cycle guard: skip if candidate's subject is already in the path.
-        // The issuer DN is already cloned above, so we do not need an extra
-        // clone here — compare candidate's subject against all path entries.
+        // Cycle guard: skip if candidate's SPKI is already in the path.
+        //
+        // We compare SubjectPublicKeyInfo DER bytes (not subject DNs) because:
+        // - Multiple certificates may share a subject DN (key rollover, bridge CA).
+        //   DN-based cycle detection would incorrectly prune valid paths in those
+        //   topologies.
+        // - SPKI uniquely identifies the signing key: two certs with the same DN
+        //   but different keys have different SPKIs and are distinct nodes in the
+        //   path graph.
+        //
+        // Using DER encoding avoids a runtime SHA-256 dependency and is allocation-
+        // bounded by O(depth × spki_size) which is well within practical limits.
+        let candidate_spki = spki_der_bytes(&candidate.tbs_certificate.subject_public_key_info);
         let already_in_path = path.iter().any(|in_path| {
-            pkix_path::names_match(
-                &in_path.tbs_certificate.subject,
-                &candidate.tbs_certificate.subject,
-            )
+            spki_der_bytes(&in_path.tbs_certificate.subject_public_key_info) == candidate_spki
         });
         if already_in_path {
             continue;
@@ -235,7 +265,7 @@ fn dfs(
 ///
 /// Iterative-deepening DFS: tries maximum intermediate depths 1 through 10.
 /// Returns the shortest valid topology first. Cycles are detected and pruned
-/// by comparing subject DNs already present in the path.
+/// by comparing SubjectPublicKeyInfo DER bytes of certificates already in the path.
 ///
 /// # Errors
 ///
@@ -247,10 +277,10 @@ fn dfs(
 ///
 /// # Limitations
 ///
-/// Cycle detection is based on subject DN comparison. In key-rollover or
-/// bridge-CA topologies where multiple certificates share a subject DN, the
-/// path builder may fail to find valid paths. This is a v0.1 limitation;
-/// v0.2 will use certificate identity (SPKI fingerprint) for cycle detection.
+/// Cycle detection is based on SubjectPublicKeyInfo DER identity rather than
+/// subject DN. Two certificates with the same subject DN but different public
+/// keys (e.g., during a key rollover or in a bridge CA topology) are treated
+/// as distinct nodes and will not incorrectly prune valid paths.
 ///
 /// # Security
 ///
