@@ -178,7 +178,8 @@ fn ocsp_bad_signature_returns_error() {
 /// CA-B's serial=1 cert even though the serial matches.
 ///
 /// The response's CertID.issuerNameHash and issuerKeyHash were computed from
-/// CA-A. When verified against CA-B as issuer, the hashes differ → OcspStatusUnknown.
+/// CA-A. When verified against CA-B as issuer, the signature or CertID hash check
+/// fails → some Err variant (OcspSignatureInvalid or OcspCertIdMismatch).
 ///
 /// Oracle: pyca/cryptography (gen_ocsp_cross_ca_fixture.py).
 /// Fixtures: ocsp-ca-a.der, ocsp-ca-b.der, ocsp-ca-b-leaf.der, ocsp-ca-a-good.der.
