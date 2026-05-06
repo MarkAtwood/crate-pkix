@@ -43,7 +43,7 @@
 //! store.add(Deviation {
 //!     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
 //!     target_lint: "fpki.common.6.1.5".to_string(),
-//!     scope: DeviationScope::IssuerDnContains("Agency X Issuing CA".to_string()),
+//!     scope: DeviationScope::IssuerDnContains("agency x issuing ca".to_string()),
 //!     effective_start: None,
 //!     effective_end: Some(1_767_225_600), // 2026-01-01
 //!     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
@@ -71,6 +71,30 @@ where
     let s = String::deserialize(deserializer)?;
     Ok(Box::leak(s.into_boxed_str()))
 }
+
+/// Error returned by [`DeviationStore::add`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeviationAddError {
+    /// A deviation with the same `id` already exists in the store.
+    DuplicateId(String),
+    /// A required string field (`justification` or `authorized_by`) was empty.
+    EmptyField(String),
+}
+
+impl std::fmt::Display for DeviationAddError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviationAddError::DuplicateId(id) => {
+                write!(f, "deviation id '{}' already exists in the store", id)
+            }
+            DeviationAddError::EmptyField(field) => {
+                write!(f, "deviation field '{}' must not be empty", field)
+            }
+        }
+    }
+}
+
+impl std::error::Error for DeviationAddError {}
 
 /// A scoped, time-bounded exception to a specific lint finding.
 ///
@@ -478,25 +502,6 @@ impl DeviatedFinding {
     }
 }
 
-/// Error returned by [`DeviationStore::add`].
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DeviationAddError {
-    /// A deviation with the same `id` already exists in the store.
-    DuplicateId(String),
-}
-
-impl std::fmt::Display for DeviationAddError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeviationAddError::DuplicateId(id) => {
-                write!(f, "deviation id '{}' already exists in the store", id)
-            }
-        }
-    }
-}
-
-impl std::error::Error for DeviationAddError {}
-
 /// An in-memory collection of [`Deviation`]s.
 ///
 /// The store is append-only in v0.2. Future versions may add update/delete
@@ -516,24 +521,19 @@ impl DeviationStore {
 
     /// Add a deviation to the store.
     ///
-    /// # Panics
-    ///
-    /// Panics if `deviation.justification` or `deviation.authorized_by` is empty.
-    /// These are programming errors; the store does not accept incomplete deviations.
-    ///
     /// # Errors
     ///
-    /// Returns [`DeviationAddError::DuplicateId`] if a deviation with the same
-    /// `id` already exists in the store.
+    /// - [`DeviationAddError::EmptyField`] if `deviation.justification` or
+    ///   `deviation.authorized_by` is empty.
+    /// - [`DeviationAddError::DuplicateId`] if a deviation with the same
+    ///   `id` already exists in the store.
     pub fn add(&mut self, deviation: Deviation) -> Result<(), DeviationAddError> {
-        assert!(
-            !deviation.justification.is_empty(),
-            "deviation justification must not be empty"
-        );
-        assert!(
-            !deviation.authorized_by.is_empty(),
-            "deviation authorized_by must not be empty"
-        );
+        if deviation.justification.is_empty() {
+            return Err(DeviationAddError::EmptyField("justification".into()));
+        }
+        if deviation.authorized_by.is_empty() {
+            return Err(DeviationAddError::EmptyField("authorized_by".into()));
+        }
         if self.deviations.iter().any(|d| d.id == deviation.id) {
             return Err(DeviationAddError::DuplicateId(deviation.id.clone()));
         }
@@ -1081,24 +1081,31 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "justification must not be empty")]
     fn store_rejects_empty_justification() {
         let mut store = DeviationStore::new();
-        // panics are still the contract for empty justification/authorized_by
-        store.add(Deviation {
+        let result = store.add(Deviation {
             justification: "".to_string(),
             ..make_deviation("d1", "test.lint")
-        }).ok();
+        });
+        assert_eq!(
+            result,
+            Err(DeviationAddError::EmptyField("justification".into())),
+            "empty justification must return EmptyField error"
+        );
     }
 
     #[test]
-    #[should_panic(expected = "authorized_by must not be empty")]
     fn store_rejects_empty_authorized_by() {
         let mut store = DeviationStore::new();
-        store.add(Deviation {
+        let result = store.add(Deviation {
             authorized_by: "".to_string(),
             ..make_deviation("d1", "test.lint")
-        }).ok();
+        });
+        assert_eq!(
+            result,
+            Err(DeviationAddError::EmptyField("authorized_by".into())),
+            "empty authorized_by must return EmptyField error"
+        );
     }
 
     #[test]
