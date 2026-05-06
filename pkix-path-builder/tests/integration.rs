@@ -149,3 +149,56 @@ fn test_build_path_wrong_pool() {
         "expected NoPathFound, got {err}"
     );
 }
+
+/// Verify SPKI-based cycle detection: adding the same intermediate certificate
+/// twice to the pool must not cause a duplicate-SPKI loop. The path builder
+/// must still find the correct path (the duplicate is pruned by SPKI identity).
+///
+/// Oracle: the PKITS §4.1.1 chain is known-valid. If cycle detection incorrectly
+/// pruned a legitimate certificate (false positive), build_path would return
+/// NoPathFound. If it failed to prune duplicates (false negative), it might
+/// return duplicate entries in the chain or loop indefinitely.
+#[test]
+fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let intermediate = pkits_cert("GoodCACert");
+    let anchor = pkits_trust_anchor();
+
+    // Add the same intermediate twice — same SPKI, so one should be pruned.
+    let mut pool = CertPool::new();
+    pool.add(intermediate.clone());
+    pool.add(intermediate); // duplicate — different Vec slot, same SPKI
+
+    let path = build_path(&ee, &pool, &[anchor.clone()])
+        .expect("build_path must find path even with duplicate certs in pool");
+
+    // Validate the result to confirm it's a real path, not a loop.
+    let mut policy = ValidationPolicy::new(PKITS_NOW);
+    policy.enforce_key_usage = false;
+    pkix_path::validate_path(&path, &[anchor], &policy, &DefaultVerifier)
+        .expect("path returned with duplicate pool entries must be valid");
+
+    // Chain must not have duplicates — SPKI-based pruning ensures the same
+    // intermediate was not selected twice at different positions.
+    let spkis: Vec<_> = path
+        .iter()
+        .map(|c| {
+            use der::Encode as _;
+            let mut buf = Vec::new();
+            c.tbs_certificate
+                .subject_public_key_info
+                .encode_to_vec(&mut buf)
+                .unwrap();
+            buf
+        })
+        .collect();
+    let deduped_len = {
+        let mut seen = std::collections::HashSet::new();
+        spkis.iter().filter(|s| seen.insert(*s)).count()
+    };
+    assert_eq!(
+        spkis.len(),
+        deduped_len,
+        "path must not contain duplicate SPKI entries"
+    );
+}
