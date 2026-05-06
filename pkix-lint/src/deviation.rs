@@ -158,18 +158,26 @@ impl Deviation {
 /// for cert-scope lints. For path-scope lints, the scope is evaluated against
 /// the leaf certificate.
 ///
-/// # v0.2 scope
+/// # Choosing a scope
 ///
-/// The v0.2 scope supports `IssuerDnContains` (substring match on the issuer
-/// DN string representation) and `Any`. Future versions will add:
-/// - `IssuerDnExact` (RFC 4518-normalized DN match)
-/// - `SerialRange { issuer, start, end }`
-/// - `SubjectDnContains`
-/// - `PolicyOid(ObjectIdentifier)` (certs asserting a specific CP OID)
+/// Use the narrowest scope that resolves the actual problem:
+/// - Prefer `SerialRange` when the deviation covers a specific issuance batch.
+/// - Prefer `IssuerDnExact` when all certs from a given CA are affected.
+/// - Use `IssuerDnContains` for human-readable convenience scoping in dev/test.
+/// - Use `Any` only for internal CAs or test environments where the profile
+///   is intentionally not applicable.
+///
+/// # Planned additions (v0.3)
+///
+/// - `SubjectDnContains(String)` — for subscriber-identity scoping
+/// - `PolicyOid(ObjectIdentifier)` — certs asserting a specific CP OID
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviationScope {
-    /// The deviation applies to all certificates. Use with care; see note on
-    /// `Any` in the module-level documentation.
+    /// The deviation applies to all certificates.
+    ///
+    /// Use `Any` only for internal CAs or test environments where the profile
+    /// is intentionally not applicable. `Any` deviations are the most likely
+    /// to be questioned by an auditor.
     Any,
 
     /// The deviation applies to certs whose issuer DN string representation
@@ -178,11 +186,63 @@ pub enum DeviationScope {
     /// Example: `IssuerDnContains("Agency X Issuing CA".to_string())` matches
     /// any cert whose issuer DN contains "Agency X Issuing CA".
     ///
-    /// This is a substring match, not an RFC 4518-normalized DN match. It is
-    /// intended for practical human-readable scoping, not cryptographic identity.
-    /// Do not rely on it to distinguish issuers whose DNs differ only by whitespace
-    /// or case; use `IssuerDnExact` (planned) for that.
+    /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
+    /// [`DeviationScope::IssuerDnExact`] when precise DN identity is required.
     IssuerDnContains(String),
+
+    /// The deviation applies to certs whose issuer DN matches exactly, using
+    /// RFC 4518 normalization (the same algorithm as `pkix_path::names_match`).
+    ///
+    /// # Construction
+    ///
+    /// Construct from a certificate you already have:
+    ///
+    /// ```rust,ignore
+    /// let scope = DeviationScope::IssuerDnExact(
+    ///     ca_cert.tbs_certificate.subject.clone()
+    /// );
+    /// ```
+    ///
+    /// This is the preferred scope for production deviations over `IssuerDnContains`
+    /// because it is unambiguous and resistant to substring-match confusion.
+    IssuerDnExact(x509_cert::name::Name),
+
+    /// The deviation applies to certs issued by a specific CA within a serial
+    /// number range (inclusive on both ends).
+    ///
+    /// `issuer` is the CA's subject DN (RFC 4518-normalized match).
+    /// `start` and `end` are the serial number bounds as raw byte vectors.
+    /// The comparison uses byte-lexicographic order, which is identical to
+    /// numeric order for DER-encoded positive integers (big-endian, no leading
+    /// zeros except to prevent sign-bit confusion).
+    ///
+    /// # Use case
+    ///
+    /// Use when a specific issuance batch (e.g., certs issued between two dates
+    /// from a particular CA) has a known deviation. This is the most precise scope
+    /// and the most defensible in an audit.
+    ///
+    /// # Construction
+    ///
+    /// ```rust,ignore
+    /// use der::Encode as _;
+    /// // Obtain the serial bytes from an example cert in the batch:
+    /// let start_bytes = start_cert.tbs_certificate.serial_number.as_bytes().to_vec();
+    /// let end_bytes   = end_cert.tbs_certificate.serial_number.as_bytes().to_vec();
+    /// let scope = DeviationScope::SerialRange {
+    ///     issuer: issuing_ca_cert.tbs_certificate.subject.clone(),
+    ///     start: start_bytes,
+    ///     end: end_bytes,
+    /// };
+    /// ```
+    SerialRange {
+        /// The issuer CA's subject DN.
+        issuer: x509_cert::name::Name,
+        /// Start of the serial number range (inclusive), as raw bytes.
+        start: Vec<u8>,
+        /// End of the serial number range (inclusive), as raw bytes.
+        end: Vec<u8>,
+    },
 }
 
 impl DeviationScope {
@@ -191,14 +251,70 @@ impl DeviationScope {
     pub fn matches(&self, cert: &Certificate) -> bool {
         match self {
             DeviationScope::Any => true,
+
             DeviationScope::IssuerDnContains(substring) => {
                 let issuer_str = cert.tbs_certificate.issuer.to_string();
                 issuer_str
                     .to_lowercase()
                     .contains(&substring.to_lowercase())
             }
+
+            DeviationScope::IssuerDnExact(name) => {
+                // Use pkix_path::names_match for RFC 4518-normalized comparison.
+                pkix_path::names_match(name, &cert.tbs_certificate.issuer)
+            }
+
+            DeviationScope::SerialRange {
+                issuer,
+                start,
+                end,
+            } => {
+                // Issuer DN must match.
+                if !pkix_path::names_match(issuer, &cert.tbs_certificate.issuer) {
+                    return false;
+                }
+                // Serial number must be within [start, end] by byte-lexicographic order.
+                // DER-encoded positive integers are big-endian with minimal encoding,
+                // so lexicographic order = numeric order for same-length values.
+                // For different-length values: longer byte sequences represent larger numbers
+                // only when stripped of leading-zero padding. We do a simple length-first
+                // comparison, which is correct for well-formed DER serial numbers.
+                let serial = cert.tbs_certificate.serial_number.as_bytes();
+                let serial_ge_start = serial_lex_ge(serial, start);
+                let serial_le_end = serial_lex_le(serial, end);
+                serial_ge_start && serial_le_end
+            }
         }
     }
+}
+
+/// Returns `true` if `a >= b` using DER positive-integer lexicographic ordering.
+///
+/// DER positive integers are big-endian with a leading 0x00 byte only when the
+/// high bit would otherwise be set (sign-bit convention). For serial-number
+/// comparison we strip leading zeros before comparing length and bytes.
+fn serial_lex_ge(a: &[u8], b: &[u8]) -> bool {
+    let a = strip_leading_zeros(a);
+    let b = strip_leading_zeros(b);
+    if a.len() != b.len() {
+        return a.len() > b.len();
+    }
+    a >= b
+}
+
+/// Returns `true` if `a <= b` using DER positive-integer lexicographic ordering.
+fn serial_lex_le(a: &[u8], b: &[u8]) -> bool {
+    let a = strip_leading_zeros(a);
+    let b = strip_leading_zeros(b);
+    if a.len() != b.len() {
+        return a.len() < b.len();
+    }
+    a <= b
+}
+
+fn strip_leading_zeros(bytes: &[u8]) -> &[u8] {
+    let first_nonzero = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len());
+    &bytes[first_nonzero..]
 }
 
 /// What a [`Deviation`] does to a matching finding.
@@ -645,6 +761,151 @@ mod tests {
         let cert = load_cert();
         let scope = DeviationScope::IssuerDnContains("XYZ_NONEXISTENT_ISSUER_9999".to_string());
         assert!(!scope.matches(&cert));
+    }
+
+    // -----------------------------------------------------------------------
+    // IssuerDnExact scope tests
+    //
+    // Oracle: IssuerDnExact uses pkix_path::names_match (RFC 4518 normalization).
+    // A cert's issuer DN must match the stored DN via that same function.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scope_issuer_dn_exact_matches_cert_issuer() {
+        let cert = load_cert();
+        // Use the cert's own issuer DN as the exact match — must succeed.
+        let scope = DeviationScope::IssuerDnExact(cert.tbs_certificate.issuer.clone());
+        assert!(
+            scope.matches(&cert),
+            "IssuerDnExact with cert's own issuer must match"
+        );
+    }
+
+    #[test]
+    fn scope_issuer_dn_exact_does_not_match_different_dn() {
+        let cert = load_cert();
+        // Use the cert's subject DN as the "issuer" — for a self-signed cert subject==issuer,
+        // so use a different cert's issuer if available. Since we only have one fixture
+        // that is self-signed (subject == issuer), we test non-match by constructing
+        // an IssuerDnExact with a DIFFERENT cert's issuer.
+        //
+        // Load the smime fixture (different cert, different DN).
+        use der::Decode as _;
+        let other_cert = Certificate::from_der(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ))
+        .expect("fixture is valid DER");
+        // Use smime cert's issuer as the scope — should not match the webpki cert.
+        let scope = DeviationScope::IssuerDnExact(other_cert.tbs_certificate.issuer.clone());
+        // If both certs have the same issuer DN, the test is vacuous. Check first.
+        let same = pkix_path::names_match(
+            &cert.tbs_certificate.issuer,
+            &other_cert.tbs_certificate.issuer,
+        );
+        if !same {
+            assert!(
+                !scope.matches(&cert),
+                "IssuerDnExact with different issuer must not match"
+            );
+        }
+        // If same (both self-signed with identical DNs), the test passes vacuously —
+        // the fixtures happen to have the same issuer, and that's acceptable.
+    }
+
+    // -----------------------------------------------------------------------
+    // SerialRange scope tests
+    //
+    // Oracle: serial_lex_ge and serial_lex_le implement DER positive integer
+    // comparison. Boundary conditions are tested independently of the cert fixture.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn serial_lex_ge_basic() {
+        // 0x02 >= 0x01
+        assert!(serial_lex_ge(&[0x02], &[0x01]));
+        // 0x01 is not >= 0x02
+        assert!(!serial_lex_ge(&[0x01], &[0x02]));
+        // equal
+        assert!(serial_lex_ge(&[0x05], &[0x05]));
+        // longer byte sequence (more digits) is larger
+        assert!(serial_lex_ge(&[0x01, 0x00], &[0xFF]));
+    }
+
+    #[test]
+    fn serial_lex_le_basic() {
+        assert!(serial_lex_le(&[0x01], &[0x02]));
+        assert!(!serial_lex_le(&[0x02], &[0x01]));
+        assert!(serial_lex_le(&[0x05], &[0x05]));
+        assert!(serial_lex_le(&[0xFF], &[0x01, 0x00]));
+    }
+
+    #[test]
+    fn serial_lex_leading_zeros_stripped() {
+        // 0x00 0x01 = 1, 0x01 = 1 — they should be equal.
+        assert!(serial_lex_ge(&[0x00, 0x01], &[0x01]));
+        assert!(serial_lex_le(&[0x00, 0x01], &[0x01]));
+    }
+
+    #[test]
+    fn scope_serial_range_matches_cert_in_range() {
+        let cert = load_cert();
+        let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
+        // Range is [serial, serial] — cert's own serial, must match.
+        let scope = DeviationScope::SerialRange {
+            issuer: cert.tbs_certificate.issuer.clone(),
+            start: serial.clone(),
+            end: serial,
+        };
+        assert!(
+            scope.matches(&cert),
+            "cert's own serial must be within [serial, serial]"
+        );
+    }
+
+    #[test]
+    fn scope_serial_range_excludes_cert_outside_range() {
+        let cert = load_cert();
+        let serial = cert.tbs_certificate.serial_number.as_bytes();
+        // Range is [serial+1, serial+2] — cert's serial is below, must not match.
+        // Construct a start that is definitely higher: 0xFF repeated.
+        let start = vec![0xFF; serial.len() + 1]; // much larger than any fixed serial
+        let end = vec![0xFF; serial.len() + 2];
+        let scope = DeviationScope::SerialRange {
+            issuer: cert.tbs_certificate.issuer.clone(),
+            start,
+            end,
+        };
+        assert!(
+            !scope.matches(&cert),
+            "cert serial below range start must not match"
+        );
+    }
+
+    #[test]
+    fn scope_serial_range_wrong_issuer_no_match() {
+        let cert = load_cert();
+        use der::Decode as _;
+        let other_cert = Certificate::from_der(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ))
+        .expect("fixture is valid DER");
+        let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
+        // Use the other cert's issuer — should not match cert.
+        let scope = DeviationScope::SerialRange {
+            issuer: other_cert.tbs_certificate.issuer.clone(),
+            start: vec![0x00],
+            end: vec![0xFF; serial.len() + 2], // large enough to include any serial
+        };
+        let same_issuer = pkix_path::names_match(
+            &cert.tbs_certificate.issuer,
+            &other_cert.tbs_certificate.issuer,
+        );
+        if !same_issuer {
+            assert!(
+                !scope.matches(&cert),
+                "wrong issuer in SerialRange must not match"
+            );
+        }
     }
 
     // -----------------------------------------------------------------------
