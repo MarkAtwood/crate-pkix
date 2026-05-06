@@ -251,10 +251,12 @@ pub enum DeviationScope {
     /// Example: `IssuerDnContains("agency x issuing ca".to_string())` matches
     /// any cert whose issuer DN contains "Agency X Issuing CA".
     ///
-    /// **The stored substring must be pre-lowercased.** The matching logic
-    /// only lowercases the cert's issuer string, not the stored substring, to
-    /// avoid allocating on every call. Passing an uppercase substring will not
-    /// match anything.
+    /// The substring is automatically lowercased by [`DeviationStore::add`].
+    /// Constructing the scope with a mixed-case string and inserting it via
+    /// `add()` is safe; the stored string will be normalized. Direct
+    /// construction of a scope without going through `add()` (e.g., for
+    /// serialization round-trips) should use a pre-lowercased string to
+    /// preserve the invariant that matching logic assumes.
     ///
     /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
     /// [`DeviationScope::IssuerDnExact`] when precise DN identity is required.
@@ -535,7 +537,7 @@ impl DeviationStore {
     ///   `deviation.authorized_by` is empty.
     /// - [`DeviationAddError::DuplicateId`] if a deviation with the same
     ///   `id` already exists in the store.
-    pub fn add(&mut self, deviation: Deviation) -> Result<(), DeviationAddError> {
+    pub fn add(&mut self, mut deviation: Deviation) -> Result<(), DeviationAddError> {
         if deviation.justification.is_empty() {
             return Err(DeviationAddError::EmptyField("justification".into()));
         }
@@ -544,6 +546,15 @@ impl DeviationStore {
         }
         if self.deviations.iter().any(|d| d.id == deviation.id) {
             return Err(DeviationAddError::DuplicateId(deviation.id.clone()));
+        }
+        // Normalize IssuerDnContains substrings to lowercase at insertion time
+        // so that matching logic does not need to re-normalize on every call.
+        // This prevents a silent no-match when callers pass mixed-case strings.
+        if let DeviationScope::IssuerDnContains(ref mut s) = deviation.scope {
+            let lower = s.to_lowercase();
+            if *s != lower {
+                *s = lower;
+            }
         }
         self.deviations.push(deviation);
         Ok(())
@@ -971,6 +982,51 @@ mod tests {
                  when constructing IssuerDnContains"
             );
         }
+    }
+
+    /// `DeviationStore::add` normalizes `IssuerDnContains` to lowercase so that
+    /// callers who pass a mixed-case substring get a working deviation rather than
+    /// a silently inactive one.
+    #[test]
+    fn deviation_store_add_normalizes_issuer_dn_contains_to_lowercase() {
+        let cert = load_cert();
+        let issuer = cert.tbs_certificate.issuer.to_string();
+        let word = issuer
+            .split(|c: char| !c.is_alphanumeric())
+            .find(|w| !w.is_empty())
+            .unwrap_or("test");
+        let uppercase_word = word.to_uppercase();
+
+        // Only run the assertion when the word has a meaningful uppercase form.
+        if uppercase_word == word.to_lowercase() {
+            return;
+        }
+
+        // Add a deviation whose scope uses an UPPERCASE substring.
+        let mut store = DeviationStore::new();
+        let deviation = Deviation {
+            scope: DeviationScope::IssuerDnContains(uppercase_word.clone()),
+            ..make_deviation("norm-test", "test.lint")
+        };
+        store.add(deviation).expect("add must succeed");
+
+        // The stored substring must have been normalized to lowercase.
+        match &store.all()[0].scope {
+            DeviationScope::IssuerDnContains(s) => {
+                assert_eq!(
+                    *s,
+                    uppercase_word.to_lowercase(),
+                    "DeviationStore::add must lowercase IssuerDnContains substring"
+                );
+            }
+            other => panic!("expected IssuerDnContains, got {other:?}"),
+        }
+
+        // And the normalized deviation must match the cert.
+        assert!(
+            store.all()[0].scope.matches(&cert),
+            "normalized IssuerDnContains must match cert"
+        );
     }
 
     // -----------------------------------------------------------------------

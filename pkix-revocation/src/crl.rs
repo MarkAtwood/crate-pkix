@@ -349,8 +349,15 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (1) Parse the base CRL.
         let crl = CertificateList::from_der(&self.crl_der).map_err(Error::CrlParseError)?;
 
-        // (2) The CRL issuer must match the anchor's subject DN.
+        // (2) The CRL issuer must match the anchor's subject DN, and the
+        // certificate being checked must also be issued by that anchor.
+        // Without the second check a caller can supply an anchor for CA-A and
+        // a cert issued by CA-B and get Ok(()) (cert not found in CA-A's CRL)
+        // when it should get CrlIssuerMismatch.
         if !names_match(&crl.tbs_cert_list.issuer, &anchor.subject) {
+            return Err(Error::CrlIssuerMismatch);
+        }
+        if !names_match(&cert.tbs_certificate.issuer, &anchor.subject) {
             return Err(Error::CrlIssuerMismatch);
         }
 

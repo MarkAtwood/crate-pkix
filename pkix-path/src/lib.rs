@@ -885,7 +885,7 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
         for j in (i + 1)..chain.len() {
             let a = &chain[i].tbs_certificate;
             let b = &chain[j].tbs_certificate;
-            if a.issuer == b.issuer && a.serial_number == b.serial_number {
+            if names_match(&a.issuer, &b.issuer) && a.serial_number == b.serial_number {
                 return Err(Error::DuplicateCertificate { first: i, second: j });
             }
         }
