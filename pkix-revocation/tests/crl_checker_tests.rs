@@ -17,7 +17,7 @@
 //! All valid CRLs have thisUpdate=2026-01-01, nextUpdate=2027-01-01.
 
 use der::Decode as _;
-use pkix_path::DefaultVerifier;
+use pkix_path::{DefaultVerifier, TrustAnchor};
 use pkix_revocation::{CrlChecker, Error, RevocationChecker as _};
 use x509_cert::{ext::pkix::crl::CrlReason, Certificate};
 
@@ -155,5 +155,84 @@ fn crl_parse_error_truncated_der() {
     assert!(
         matches!(result, Err(Error::CrlParseError(_))),
         "truncated CRL must return CrlParseError, got: {result:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// check_revocation_against_anchor (PKIX-x1i / CRL path)
+// ---------------------------------------------------------------------------
+
+/// check_revocation_against_anchor: cert issued by anchor not in CRL → Ok(()).
+///
+/// crl-ca.der is treated as the trust anchor (its self-signed cert matches the
+/// CRL issuer).  crl-leaf-good.der is the cert immediately issued by that anchor.
+/// crl-empty.der is a valid CRL signed by the anchor CA containing no revocations.
+///
+/// Oracle: pyca/cryptography (gen_crl_fixtures.py); crl-empty.der has no entries.
+#[test]
+fn crl_check_revocation_against_anchor_good_cert_empty_crl() {
+    let anchor_cert = load_cert("crl-ca.der");
+    let anchor = TrustAnchor::from(&anchor_cert);
+    let leaf = load_cert("crl-leaf-good.der");
+    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier);
+    let result = checker.check_revocation_against_anchor(&leaf, &anchor);
+    result.expect("cert not in CRL issued by anchor must return Ok(())");
+}
+
+/// check_revocation_against_anchor: cert in CRL issued by anchor → Err(Revoked).
+///
+/// crl-with-revocation.der revokes serial=2.  crl-leaf-revoked.der has serial=2.
+///
+/// Oracle: pyca/cryptography (gen_crl_fixtures.py).
+#[test]
+fn crl_check_revocation_against_anchor_revoked_cert() {
+    let anchor_cert = load_cert("crl-ca.der");
+    let anchor = TrustAnchor::from(&anchor_cert);
+    let revoked = load_cert("crl-leaf-revoked.der");
+    let checker = CrlChecker::new(fixture("crl-with-revocation.der"), NOW, DefaultVerifier);
+    let result = checker.check_revocation_against_anchor(&revoked, &anchor);
+    assert!(
+        matches!(result, Err(Error::Revoked { reason_code: None, .. })),
+        "revoked cert must return Revoked when checked via anchor, got: {result:?}"
+    );
+}
+
+/// check_revocation_against_anchor: CRL issuer does not match anchor subject → Err(CrlIssuerMismatch).
+///
+/// Supply the leaf cert as the anchor (wrong subject / wrong key) so the CRL
+/// issuer name will not match the anchor's subject DN.
+///
+/// Oracle: crl-empty.der's issuer is CN=CRL Test CA; crl-leaf-good.der's
+/// subject is something else (a leaf CN).
+#[test]
+fn crl_check_revocation_against_anchor_issuer_mismatch() {
+    // Load the CRL CA cert and leaf; use the *leaf* cert as the anchor to
+    // produce a subject mismatch with the CRL issuer.
+    let leaf_cert = load_cert("crl-leaf-good.der");
+    let wrong_anchor = TrustAnchor::from(&leaf_cert);
+    let checked_cert = load_cert("crl-leaf-good.der");
+    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier);
+    let result = checker.check_revocation_against_anchor(&checked_cert, &wrong_anchor);
+    assert!(
+        matches!(result, Err(Error::CrlIssuerMismatch)),
+        "CRL issuer ≠ anchor subject must return CrlIssuerMismatch, got: {result:?}"
+    );
+}
+
+/// check_revocation_against_anchor: expired CRL → Err(CrlExpired).
+///
+/// crl-expired.der has nextUpdate=2021-01-01 < NOW=2026-06-01.
+///
+/// Oracle: pyca/cryptography (gen_crl_fixtures.py).
+#[test]
+fn crl_check_revocation_against_anchor_expired_crl() {
+    let anchor_cert = load_cert("crl-ca.der");
+    let anchor = TrustAnchor::from(&anchor_cert);
+    let good = load_cert("crl-leaf-good.der");
+    let checker = CrlChecker::new(fixture("crl-expired.der"), NOW, DefaultVerifier);
+    let result = checker.check_revocation_against_anchor(&good, &anchor);
+    assert!(
+        matches!(result, Err(Error::CrlExpired)),
+        "expired CRL in anchor check must return CrlExpired, got: {result:?}"
     );
 }

@@ -4,7 +4,7 @@
 
 use crate::{Error, RevocationChecker};
 use der::{Decode as _, Encode as _};
-use pkix_path::{names_match, SignatureVerifier};
+use pkix_path::{names_match, SignatureVerifier, TrustAnchor};
 use spki::der::referenced::OwnedToRef as _;
 use x509_cert::{
     crl::{CertificateList, RevokedCert},
@@ -80,10 +80,13 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///   every [`check_revocation`] call. For long chains validated against the same
 ///   CRL pair, this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
 ///   `CertificateList` in `new` / `with_delta`).
-/// - [`RevocationChecker::check_revocation_against_anchor`] is not overridden.
-///   The certificate immediately issued by the trust anchor is not
-///   revocation-checked by this type; revocation against the anchor is the
-///   responsibility of the path validator (a v0.1 limitation).
+/// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
+///   For the certificate issued directly by a trust anchor, the CRL is verified
+///   using the anchor's subject DN and SPKI in place of the missing issuer
+///   `Certificate`.  The `cRLSign` KeyUsage check is omitted for trust anchors
+///   (anchors are trusted by construction; they carry no KeyUsage to inspect).
+///   If the CRL's issuer name does not match the anchor, the method returns
+///   [`Error::CrlIssuerMismatch`] rather than `Ok(())`.
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
 /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
@@ -359,6 +362,150 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         }
 
         // Check base CRL entries.
+        if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
+            if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
+                return Err(Error::Revoked {
+                    serial: cert_serial.clone(),
+                    reason_code: extract_reason_code(entry),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check revocation for `cert` issued directly by a trust anchor.
+    ///
+    /// Uses the anchor's `subject` and `subject_public_key_info` in place of
+    /// an issuer `Certificate` to verify the CRL.  The `cRLSign` KeyUsage bit
+    /// check is omitted because trust anchors do not carry a `Certificate` with
+    /// extensions to inspect.
+    ///
+    /// # Limitations (v0.1)
+    ///
+    /// CRL discovery via the `cRLDistributionPoints` extension is not
+    /// implemented.  The CRL DER must be supplied at construction time.
+    /// If the CRL's issuer name does not match the anchor's subject, this
+    /// method returns [`Error::CrlIssuerMismatch`] rather than `Ok(())`,
+    /// ensuring a mismatched CRL is surfaced rather than silently skipped.
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> crate::Result<()> {
+        // (1) Parse the base CRL.
+        let crl = CertificateList::from_der(&self.crl_der).map_err(Error::CrlParseError)?;
+
+        // (2) The CRL issuer must match the anchor's subject DN.
+        if !names_match(&crl.tbs_cert_list.issuer, &anchor.subject) {
+            return Err(Error::CrlIssuerMismatch);
+        }
+
+        // (3) Verify the CRL signature against the anchor's SPKI.
+        //     cRLSign KeyUsage check is skipped: trust anchors have no KeyUsage
+        //     extension accessible to us (they are trusted by construction).
+        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
+        self.verifier
+            .verify_signature(
+                crl.signature_algorithm.owned_to_ref(),
+                anchor.subject_public_key_info.owned_to_ref(),
+                &tbs_bytes,
+                crl.signature.raw_bytes(),
+            )
+            .map_err(|_| Error::CrlSignatureInvalid)?;
+
+        // (4) Check CRL validity window.
+        let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
+        if self.now_unix < this_update {
+            return Err(Error::CrlExpired);
+        }
+        match &crl.tbs_cert_list.next_update {
+            Some(next_update) => {
+                if self.now_unix > next_update.to_unix_duration().as_secs() {
+                    return Err(Error::CrlExpired);
+                }
+            }
+            None => return Err(Error::CrlExpired),
+        }
+
+        // (5) IssuingDistributionPoint scope check (same as check_revocation).
+        if let Some(idp) = parse_issuing_dp(&crl) {
+            if idp.only_contains_attribute_certs {
+                return Ok(());
+            }
+            let cert_is_ca = cert_is_ca_cert(cert);
+            if idp.only_contains_user_certs && cert_is_ca {
+                return Ok(());
+            }
+            if idp.only_contains_ca_certs && !cert_is_ca {
+                return Ok(());
+            }
+        }
+
+        // (6) Delta CRL merge — if a delta CRL is present, verify and merge it.
+        //     Uses the anchor SPKI for the delta signature check.
+        let delta_entries: Vec<RevokedCert> = if let Some(ref delta_der) = self.delta_crl_der {
+            let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+
+            if !names_match(&delta_crl.tbs_cert_list.issuer, &anchor.subject) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+
+            let delta_tbs_bytes = delta_crl
+                .tbs_cert_list
+                .to_der()
+                .map_err(Error::CrlParseError)?;
+            self.verifier
+                .verify_signature(
+                    delta_crl.signature_algorithm.owned_to_ref(),
+                    anchor.subject_public_key_info.owned_to_ref(),
+                    &delta_tbs_bytes,
+                    delta_crl.signature.raw_bytes(),
+                )
+                .map_err(|_| Error::CrlSignatureInvalid)?;
+
+            let delta_this_update = delta_crl
+                .tbs_cert_list
+                .this_update
+                .to_unix_duration()
+                .as_secs();
+            if self.now_unix < delta_this_update {
+                return Err(Error::CrlExpired);
+            }
+            match &delta_crl.tbs_cert_list.next_update {
+                Some(nu) => {
+                    if self.now_unix > nu.to_unix_duration().as_secs() {
+                        return Err(Error::CrlExpired);
+                    }
+                }
+                None => return Err(Error::CrlExpired),
+            }
+
+            delta_crl
+                .tbs_cert_list
+                .revoked_certificates
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        // (7) Search for the certificate's serial (delta entries take precedence).
+        let cert_serial = &cert.tbs_certificate.serial_number;
+
+        if let Some(delta_entry) = delta_entries
+            .iter()
+            .find(|e| &e.serial_number == cert_serial)
+        {
+            let reason = extract_reason_code(delta_entry);
+            if reason == Some(CrlReason::RemoveFromCRL) {
+                return Ok(());
+            }
+            return Err(Error::Revoked {
+                serial: cert_serial.clone(),
+                reason_code: reason,
+            });
+        }
+
         if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
             if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
                 return Err(Error::Revoked {

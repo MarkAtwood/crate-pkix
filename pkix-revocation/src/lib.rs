@@ -206,9 +206,9 @@ pub trait RevocationChecker {
     /// anchor (e.g., fetch and verify the CA's CRL using the anchor's public key).
     ///
     /// `NoRevocation` inherits this default and skips the check, matching its
-    /// overall no-op behaviour. `CrlChecker` and `OcspChecker` also inherit the
-    /// default for v0.1; a future version will override when an issuer cert is
-    /// available.
+    /// overall no-op behaviour. `CrlChecker` and `OcspChecker` both override
+    /// this method: they verify the pre-loaded CRL or OCSP response against the
+    /// anchor's subject DN and SPKI.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,
