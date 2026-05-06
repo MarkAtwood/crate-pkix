@@ -8,13 +8,23 @@
 //!
 //! The deviation mechanism is designed to:
 //! - Make suppression **explicit and attributable**: every deviation has an ID,
-//!   a justification, and an authorized_by field that appear in reports.
+//!   a justification, and an `authorized_by` field that appear in reports.
 //! - Force **scoping**: deviations match specific certs (by issuer DN, serial, etc.),
 //!   not all certs globally.
 //! - Enforce **expiry**: deviations with an `effective_end` re-activate findings
 //!   after they expire, forcing renewal and re-justification.
 //! - **Not launder violations**: a suppressed finding is recorded as a
 //!   [`DeviatedFinding`] in the output, not silently removed. Auditors can see it.
+//!
+//! # Verification via git, not signatures
+//!
+//! `authorized_by` is human-readable attribution (name or email), not a
+//! cryptographic signature. The audit trail comes from the git history of
+//! the deviation store: the git log records who committed the deviation file,
+//! when, and from which identity. Store deviation files in a git repository
+//! with appropriate access controls and signed commits. This provides the
+//! same audit properties as an in-band signature without requiring additional
+//! key infrastructure that most operators don't have wired into their PKI tooling.
 //!
 //! # No vendor deviation packs
 //!
@@ -37,8 +47,10 @@
 //!     effective_start: None,
 //!     effective_end: Some(1_767_225_600), // 2026-01-01
 //!     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
-//!     justification: "FPKIPA waiver memo 2025-11-03".to_string(),
+//!     justification: "FPKIPA waiver memo 2025-11-03; see exception register entry 47".to_string(),
 //!     authorized_by: "agency-x-ciso@agency.gov".to_string(),
+//!     // Optional: URI to the backing document. git commit history is the audit trail.
+//!     evidence_uri: Some("https://pkipolicy.agency.gov/waivers/2025-11-03".to_string()),
 //! });
 //!
 //! // Use a DeviationRunner (wraps LintRunner) to apply deviations automatically.
@@ -97,10 +109,17 @@ pub struct Deviation {
 
     /// Who authorized this deviation.
     ///
-    /// Typically a name, email, or key reference of the person with authority to
-    /// approve the deviation. Examples: "agency-x-ciso@agency.gov",
-    /// "CN=PKI Officer, OU=CISO, O=Agency X".
-    /// Appears in finding output and audit reports. Must be non-empty.
+    /// The name or email of the person with authority to approve the deviation.
+    /// Examples: `"agency-x-ciso@agency.gov"`, `"CN=PKI Officer, OU=CISO, O=Agency X"`.
+    ///
+    /// This is human-readable attribution, not a cryptographic signature.
+    /// The verification layer is the git commit history of the deviation store:
+    /// the git log records who committed the deviation file, when, and from
+    /// which identity. Store your deviation files in a git repository with
+    /// appropriate access controls and signed commits; that provides the
+    /// audit trail without requiring additional signing infrastructure here.
+    ///
+    /// Must be non-empty.
     pub authorized_by: String,
 
     /// Optional URI pointing to the backing waiver or authorization document.
