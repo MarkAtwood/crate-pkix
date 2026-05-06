@@ -67,6 +67,15 @@ pub enum Error {
     /// An OCSP response signature did not verify against the responder's key.
     OcspSignatureInvalid,
 
+    /// The OCSP response's `CertID` issuer hashes do not match the expected issuer.
+    ///
+    /// The `issuerNameHash` or `issuerKeyHash` field in a `SingleResponse`
+    /// identifies which issuer the status assertion covers. A mismatch means
+    /// the response was produced for a certificate from a *different* CA
+    /// (or was tampered with) — it is not a responder-reported "unknown"
+    /// status. Callers MUST NOT treat this error as "try another responder".
+    OcspCertIdMismatch,
+
     /// The OCSP responder returned an `unknown` status (hard-fail mode).
     OcspStatusUnknown,
 
@@ -112,6 +121,9 @@ impl core::fmt::Display for Error {
             Error::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
             Error::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
             Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
+            Error::OcspCertIdMismatch => {
+                f.write_str("OCSP CertID issuer hashes do not match the expected issuer")
+            }
             Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
             Error::OcspMalformed => {

@@ -155,7 +155,9 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         if single.cert_id.issuer_name_hash.as_bytes() != expected_name_hash.as_slice()
             || single.cert_id.issuer_key_hash.as_bytes() != expected_key_hash.as_slice()
         {
-            return Err(Error::OcspStatusUnknown);
+            // The response was produced for a certificate from a different CA;
+            // this is not a responder-reported "unknown" — it is an identity mismatch.
+            return Err(Error::OcspCertIdMismatch);
         }
 
         // (8) Check validity windows.
@@ -260,7 +262,9 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         if single.cert_id.issuer_name_hash.as_bytes() != expected_name_hash.as_slice()
             || single.cert_id.issuer_key_hash.as_bytes() != expected_key_hash.as_slice()
         {
-            return Err(Error::OcspStatusUnknown);
+            // Response covers a certificate from a different CA — identity mismatch,
+            // not a responder-reported "unknown".
+            return Err(Error::OcspCertIdMismatch);
         }
 
         // (8) Check validity windows.
