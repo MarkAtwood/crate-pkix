@@ -60,6 +60,7 @@ pub fn pkits_trust_anchor() -> TrustAnchor {
 ///
 /// Uses [`DefaultVerifier`] (RSA-PKCS1v15-SHA256 and ECDSA-P256-SHA256) and the
 /// standard PKITS trust anchor.
+#[allow(dead_code)]
 pub fn pkits_validate(cert_names: &[&str], now_unix: u64) -> pkix_path::Result<ValidatedPath> {
     let chain: Vec<Certificate> = cert_names.iter().map(|n| pkits_cert(n)).collect();
     let anchors = [pkits_trust_anchor()];
