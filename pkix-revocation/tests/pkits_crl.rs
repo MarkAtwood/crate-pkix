@@ -37,20 +37,15 @@ fn load_cert(der: &[u8]) -> Certificate {
 // §4.15 Delta CRL tests
 // ============================================================================
 
-/// §4.15.1: Invalid — the only CRL available for deltaCRLIndicatorNoBase CA is itself
-/// a delta CRL (has deltaCRLIndicator), with no corresponding base CRL.
+/// §4.15.1: Invalid — `deltaCRLIndicatorNoBaseCACRL` is a delta CRL for a different
+/// issuer than `GoodCACRL`. When paired as (base=GoodCACRL, delta=deltaCRLIndicatorNoBaseCACRL),
+/// `CrlChecker::with_delta` must reject the pair at construction time.
 ///
 /// Oracle: PKITS §4.15.1 MUST NOT validate.
-/// `CrlChecker::with_delta` must return `Err(DeltaCrlBaseMismatch)` when the
-/// supplied "delta" has no `BaseCRLNumber` extension — i.e., it is not a delta CRL.
-/// Here we invert: the deltaCRLIndicatorNoBaseCACRL IS a delta (has the extension),
-/// so supplying it as the *base* should fail because a base CRL must NOT have
-/// deltaCRLIndicator, and supplying it as the delta with itself as base should fail
-/// because its BaseCRLNumber won't match GoodCACRL's CRLNumber.
 ///
-/// Simplest verifiable assertion: using `GoodCACRL` as base and
-/// `deltaCRLIndicatorNoBaseCACRL` as delta must fail at construction time because
-/// the delta's BaseCRLNumber does not match the base's CRLNumber.
+/// Failure path: the issuer mismatch check fires first — `deltaCRLIndicatorNoBaseCACRL`
+/// was issued by the `deltaCRLIndicatorNoBase CA`, not the `Good CA` that issued
+/// `GoodCACRL`. `with_delta` returns an error before reaching the CRL number check.
 #[test]
 fn pkits_4_15_1_invalid_delta_no_base_construction_fails() {
     // GoodCACRL is unrelated; its CRLNumber won't match deltaCRLIndicatorNoBaseCACRL's
