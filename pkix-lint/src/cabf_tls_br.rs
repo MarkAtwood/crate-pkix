@@ -80,7 +80,10 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier =
 /// - 2027-03-15 to 2029-03-15: 100 days
 /// - 2029-03-15 onwards: 47 days
 ///
-/// The cap is evaluated at `now_unix` (the relying party's current time).
+/// The cap phase is evaluated at the certificate's `notBefore` (issuance time),
+/// not at the relying party's current time. This matches the SC-081 requirement:
+/// the validity period cap that applied when the cert was issued governs that
+/// cert for its lifetime.
 ///
 /// Citation: CA/B Forum TLS BR §6.3.2 (SC-081)
 pub struct ValidityMaxLint;
@@ -106,7 +109,7 @@ impl Lint for ValidityMaxLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let tbs = &cert.tbs_certificate;
         let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
         let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
@@ -114,7 +117,8 @@ impl Lint for ValidityMaxLint {
         // Validity duration in seconds; saturate to avoid underflow on malformed certs.
         let duration_secs = not_after.saturating_sub(not_before);
 
-        let cap = pkix_profiles::sc081_validity_cap(now_unix);
+        // Cap is determined by issuance time (notBefore), not validation time.
+        let cap = pkix_profiles::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
             LintResult::Error("leaf certificate validity period exceeds SC-081 cap")
