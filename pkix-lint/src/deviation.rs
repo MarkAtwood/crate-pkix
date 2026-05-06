@@ -102,6 +102,22 @@ pub struct Deviation {
     /// "CN=PKI Officer, OU=CISO, O=Agency X".
     /// Appears in finding output and audit reports. Must be non-empty.
     pub authorized_by: String,
+
+    /// Optional URI pointing to the backing waiver or authorization document.
+    ///
+    /// When present, this URI is included in [`DeviatedFinding`] output so that
+    /// operators can navigate directly to the authorization document when
+    /// reviewing or escalating a deviated finding.
+    ///
+    /// # Examples
+    ///
+    /// - `Some("file:///var/lib/agency-x-pki/waivers/2025-11-03.pdf")` — local file
+    /// - `Some("https://pkipolicy.agency.gov/waivers/2025-11-03")` — web document
+    /// - `Some("https://github.com/agency-x/pki-exceptions/issues/47")` — issue tracker
+    ///
+    /// `None` is acceptable but discouraged for production deviations in gov/mil
+    /// contexts where the IG may ask for the authorizing document.
+    pub evidence_uri: Option<String>,
 }
 
 impl Deviation {
@@ -209,16 +225,30 @@ pub enum DeviationAction {
 ///
 /// The underlying lint ID, original result, and deviation metadata are all
 /// preserved for audit purposes. A `DeviatedFinding` is never silently hidden.
+///
+/// # Operator UI guidance
+///
+/// Display deviated findings as "DEVIATION APPLIED" rather than green/pass.
+/// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
+/// operators can navigate to the backing waiver document without a second lookup.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.
     pub lint_id: &'static str,
+    /// The citation for the lint that produced this finding.
+    pub citation: &'static str,
     /// The original lint result before the deviation was applied.
     pub original_result: crate::LintResult,
     /// The deviation ID that was applied.
     pub deviation_id: String,
     /// The action taken by the deviation.
     pub action: DeviationAction,
+    /// Human-readable justification from the deviation.
+    pub justification: String,
+    /// URI pointing to the backing waiver document, if one was provided.
+    ///
+    /// `None` if the deviation did not include an `evidence_uri`.
+    pub evidence_uri: Option<String>,
     /// For certificate-scope findings, the zero-based chain index.
     pub cert_index: Option<usize>,
 }
@@ -486,9 +516,12 @@ impl DeviationRunner {
                 Some(dev) => {
                     result.deviated.push(DeviatedFinding {
                         lint_id: finding.lint_id,
+                        citation: finding.citation,
                         original_result: finding.result,
                         deviation_id: dev.id.clone(),
                         action: dev.action.clone(),
+                        justification: dev.justification.clone(),
+                        evidence_uri: dev.evidence_uri.clone(),
                         cert_index: finding.cert_index,
                     });
                 }
@@ -517,6 +550,7 @@ mod tests {
             action: DeviationAction::DowngradeSeverityTo(Severity::Info),
             justification: "test justification".to_string(),
             authorized_by: "test-author@example.com".to_string(),
+            evidence_uri: None,
         }
     }
 
@@ -709,9 +743,12 @@ mod tests {
     fn deviated_finding_effective_severity() {
         let f = DeviatedFinding {
             lint_id: "test.lint",
+            citation: "test citation",
             original_result: LintResult::Error("original"),
             deviation_id: "d1".to_string(),
             action: DeviationAction::DowngradeSeverityTo(Severity::Info),
+            justification: "test justification".to_string(),
+            evidence_uri: None,
             cert_index: None,
         };
         assert_eq!(f.effective_severity(), Some(Severity::Info));
@@ -835,5 +872,55 @@ mod tests {
         assert_eq!(result.deviated.len(), 1);
         // Suppressed findings have no effective severity.
         assert_eq!(result.deviated[0].effective_severity(), None);
+    }
+
+    /// evidence_uri flows from Deviation through to DeviatedFinding.
+    ///
+    /// Oracle: DeviatedFinding.evidence_uri must equal Deviation.evidence_uri.
+    /// This is the field operators use to navigate to the waiver document.
+    #[test]
+    fn evidence_uri_flows_to_deviated_finding() {
+        let cert = load_cert();
+        let now: u64 = 1_000_000;
+        let uri = "https://pkipolicy.agency.gov/waivers/2025-11-03";
+
+        let mut store = DeviationStore::new();
+        store.add(Deviation {
+            evidence_uri: Some(uri.to_string()),
+            ..make_deviation("d1", "test.always_error")
+        });
+
+        let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
+        let dev_runner = DeviationRunner::new(runner, store);
+        let result = dev_runner.run_cert(&cert, crate::SubjectKind::Leaf, 0, now);
+
+        assert_eq!(result.deviated.len(), 1);
+        assert_eq!(
+            result.deviated[0].evidence_uri.as_deref(),
+            Some(uri),
+            "evidence_uri must flow from Deviation to DeviatedFinding"
+        );
+        // justification also flows through.
+        assert_eq!(
+            result.deviated[0].justification,
+            "test justification"
+        );
+    }
+
+    /// When evidence_uri is None, DeviatedFinding.evidence_uri is None.
+    #[test]
+    fn evidence_uri_none_when_deviation_has_no_uri() {
+        let cert = load_cert();
+        let now: u64 = 1_000_000;
+
+        let mut store = DeviationStore::new();
+        store.add(make_deviation("d1", "test.always_error")); // evidence_uri: None
+
+        let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
+        let dev_runner = DeviationRunner::new(runner, store);
+        let result = dev_runner.run_cert(&cert, crate::SubjectKind::Leaf, 0, now);
+
+        assert_eq!(result.deviated.len(), 1);
+        assert_eq!(result.deviated[0].evidence_uri, None);
     }
 }
