@@ -893,9 +893,7 @@ fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::Su
 fn cert_name_constraints(
     cert: &Certificate,
     index: usize,
-) -> crate::Result<Option<x509_cert::ext::pkix::constraints::name::NameConstraints>> {
-    use x509_cert::ext::pkix::constraints::name::NameConstraints;
-
+) -> crate::Result<Option<NameConstraints>> {
     let nc = try_find_cert_ext::<NameConstraints>(cert, OID_NAME_CONSTRAINTS)
         .map_err(|_| Error::MalformedCertificate { index })?;
 

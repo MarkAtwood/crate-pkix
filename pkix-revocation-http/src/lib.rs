@@ -5,8 +5,8 @@
 //! Online CRL and OCSP fetching for [`pkix_revocation`].
 //!
 //! Extends `pkix-revocation` with the ability to fetch revocation data from
-//! URLs found in certificates ([`CRLDistributionPoints`][cdp],
-//! [`AuthorityInfoAccess`][aia]), rather than requiring the caller to supply
+//! URLs found in certificates (`CRLDistributionPoints`,
+//! `AuthorityInfoAccess`), rather than requiring the caller to supply
 //! pre-fetched DER bytes.
 //!
 //! # Design

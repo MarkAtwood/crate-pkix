@@ -4,7 +4,7 @@
 
 //! CA/Browser Forum and RFC certificate profile policies for `pkix-chain`.
 //!
-//! Provides pre-configured [`ValidationPolicy`][vp] values for common
+//! Provides pre-configured [`ValidationPolicy`] values for common
 //! certificate use cases, encoding the additional constraints imposed by
 //! the CA/Browser Forum Baseline Requirements beyond RFC 5280.
 //!
