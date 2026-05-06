@@ -330,18 +330,18 @@ impl Profile for Rfc5280Profile {
 ///
 /// Verified via: `python3 -c "import calendar; print(calendar.timegm((YYYY,3,15,0,0,0,0,0,0)))"`
 #[must_use]
-pub fn sc081_validity_cap(now_unix: u64) -> u64 {
+pub fn sc081_validity_cap(not_before_unix: u64) -> u64 {
     // Exact UTC midnight boundaries.
     // Computed: python3 -c "import calendar; print(calendar.timegm((2026,3,15,0,0,0,0,0,0)))"
     const SC081_200D_EPOCH: u64 = 1_773_532_800; // 2026-03-15T00:00:00Z
     const SC081_100D_EPOCH: u64 = 1_805_068_800; // 2027-03-15T00:00:00Z
     const SC081_47D_EPOCH: u64 = 1_868_227_200; // 2029-03-15T00:00:00Z
 
-    if now_unix >= SC081_47D_EPOCH {
+    if not_before_unix >= SC081_47D_EPOCH {
         47 * 86_400
-    } else if now_unix >= SC081_100D_EPOCH {
+    } else if not_before_unix >= SC081_100D_EPOCH {
         100 * 86_400
-    } else if now_unix >= SC081_200D_EPOCH {
+    } else if not_before_unix >= SC081_200D_EPOCH {
         200 * 86_400
     } else {
         398 * 86_400
