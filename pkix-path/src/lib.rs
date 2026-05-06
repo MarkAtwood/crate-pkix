@@ -168,6 +168,12 @@ pub enum Error {
     /// Only checked when [`ValidationPolicy::require_subject_alt_name`] is `true`.
     /// Intermediate CA certificates are not subject to this check.
     MissingSan,
+    /// The leaf certificate (chain index 0) has a `SubjectAltName` extension but
+    /// none of its entries is an `rfc822Name` (email address).
+    ///
+    /// Only checked when [`ValidationPolicy::require_rfc822_san`] is `true`.
+    /// Intermediate CA certificates are not subject to this check.
+    MissingRfc822San,
     /// The leaf certificate (chain index 0) does not assert all OIDs required
     /// by [`ValidationPolicy::required_leaf_eku`].
     ///
@@ -217,6 +223,10 @@ impl core::fmt::Display for Error {
                 write!(f, "RSA key too small at chain index {index}")
             }
             Self::MissingSan => write!(f, "leaf certificate is missing SubjectAltName"),
+            Self::MissingRfc822San => write!(
+                f,
+                "leaf certificate SubjectAltName contains no rfc822Name entry"
+            ),
             Self::MissingEku => {
                 write!(
                     f,
@@ -247,6 +257,7 @@ impl std::error::Error for Error {
             | Self::AlgorithmNotAllowed { .. }
             | Self::KeyTooSmall { .. }
             | Self::MissingSan
+            | Self::MissingRfc822San
             | Self::MissingEku => None,
         }
     }
@@ -562,6 +573,17 @@ pub struct ValidationPolicy {
     /// Violations produce [`Error::MissingSan`].
     pub require_subject_alt_name: bool,
 
+    /// If `true`, at least one `rfc822Name` entry must be present in the leaf's
+    /// `SubjectAltName` extension.
+    ///
+    /// Only meaningful when [`require_subject_alt_name`][Self::require_subject_alt_name]
+    /// is also `true`. When `require_subject_alt_name` is `false`, this field has
+    /// no effect.
+    ///
+    /// Default: `false` (backward compatible).
+    /// Violations produce [`Error::MissingRfc822San`].
+    pub require_rfc822_san: bool,
+
     /// If `Some(oids)`, the leaf certificate must explicitly assert every OID in
     /// `oids` via its ExtendedKeyUsage extension. `None` means no EKU requirement
     /// (the default).
@@ -603,6 +625,7 @@ impl Default for ValidationPolicy {
             allowed_signature_algs: None,
             min_rsa_key_bits: None,
             require_subject_alt_name: false,
+            require_rfc822_san: false,
             required_leaf_eku: None,
         }
     }
@@ -2117,6 +2140,23 @@ fn chain_walk<V: SignatureVerifier>(
                         }
                     }
                 }
+            }
+        }
+
+        // (e4) If require_rfc822_san is set, at least one rfc822Name entry must
+        //      be present in the leaf's SAN extension.
+        //      Only meaningful (and checked) when require_subject_alt_name is also
+        //      true; the non-empty SAN check above (e2) already guards the absent
+        //      / empty SAN case. EKU is checked first (e3) so that a cert with both
+        //      wrong EKU and wrong SAN type reports MissingEku (more actionable).
+        if i == 0 && policy.require_subject_alt_name && policy.require_rfc822_san {
+            use x509_cert::ext::pkix::name::GeneralName;
+            let has_rfc822 = san.as_ref().is_some_and(|s| {
+                s.0.iter()
+                    .any(|name| matches!(name, GeneralName::Rfc822Name(_)))
+            });
+            if !has_rfc822 {
+                return Err(Error::MissingRfc822San);
             }
         }
 

@@ -18,6 +18,10 @@ const OID_SHA1: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.3.14.3.2.26");
 const OID_SHA256: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.1");
+const OID_SHA384: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.2");
+const OID_SHA512: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.3");
 
 /// Offline OCSP-based revocation checker.
 ///
@@ -334,7 +338,8 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 
 /// Hash `data` using the algorithm identified by `oid`.
 ///
-/// Supports SHA-1 (OID 1.3.14.3.2.26) and SHA-256 (OID 2.16.840.1.101.3.4.2.1).
+/// Supports SHA-1 (OID 1.3.14.3.2.26), SHA-256 (OID 2.16.840.1.101.3.4.2.1),
+/// SHA-384 (OID 2.16.840.1.101.3.4.2.2), and SHA-512 (OID 2.16.840.1.101.3.4.2.3).
 /// Returns [`Error::OcspMalformed`] for any other OID.
 fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {
     match *oid {
@@ -345,6 +350,14 @@ fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::R
         OID_SHA256 => {
             use sha2::Digest as _;
             Ok(sha2::Sha256::digest(data).to_vec())
+        }
+        OID_SHA384 => {
+            use sha2::Digest as _;
+            Ok(sha2::Sha384::digest(data).to_vec())
+        }
+        OID_SHA512 => {
+            use sha2::Digest as _;
+            Ok(sha2::Sha512::digest(data).to_vec())
         }
         _ => Err(Error::OcspMalformed),
     }
@@ -408,4 +421,58 @@ fn verify_responder_id_anchor(id: &ResponderId, anchor: &TrustAnchor) -> crate::
         }
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests for hash_certid_input
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// SHA-384 of b"test".
+    ///
+    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha384(b'test').digest()).decode())"
+    /// → 768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9
+    #[test]
+    fn hash_certid_sha384() {
+        let expected: &[u8] = &[
+            0x76, 0x84, 0x12, 0x32, 0x0f, 0x7b, 0x0a, 0xa5, 0x81, 0x2f, 0xce, 0x42,
+            0x8d, 0xc4, 0x70, 0x6b, 0x3c, 0xae, 0x50, 0xe0, 0x2a, 0x64, 0xca, 0xa1,
+            0x6a, 0x78, 0x22, 0x49, 0xbf, 0xe8, 0xef, 0xc4, 0xb7, 0xef, 0x1c, 0xcb,
+            0x12, 0x62, 0x55, 0xd1, 0x96, 0x04, 0x7d, 0xfe, 0xdf, 0x17, 0xa0, 0xa9,
+        ];
+        let result = hash_certid_input(&OID_SHA384, b"test").expect("SHA-384 must succeed");
+        assert_eq!(result, expected, "SHA-384(\"test\") must match Python oracle");
+    }
+
+    /// SHA-512 of b"test".
+    ///
+    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha512(b'test').digest()).decode())"
+    /// → ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff
+    #[test]
+    fn hash_certid_sha512() {
+        let expected: &[u8] = &[
+            0xee, 0x26, 0xb0, 0xdd, 0x4a, 0xf7, 0xe7, 0x49, 0xaa, 0x1a, 0x8e, 0xe3,
+            0xc1, 0x0a, 0xe9, 0x92, 0x3f, 0x61, 0x89, 0x80, 0x77, 0x2e, 0x47, 0x3f,
+            0x88, 0x19, 0xa5, 0xd4, 0x94, 0x0e, 0x0d, 0xb2, 0x7a, 0xc1, 0x85, 0xf8,
+            0xa0, 0xe1, 0xd5, 0xf8, 0x4f, 0x88, 0xbc, 0x88, 0x7f, 0xd6, 0x7b, 0x14,
+            0x37, 0x32, 0xc3, 0x04, 0xcc, 0x5f, 0xa9, 0xad, 0x8e, 0x6f, 0x57, 0xf5,
+            0x00, 0x28, 0xa8, 0xff,
+        ];
+        let result = hash_certid_input(&OID_SHA512, b"test").expect("SHA-512 must succeed");
+        assert_eq!(result, expected, "SHA-512(\"test\") must match Python oracle");
+    }
+
+    /// Unknown OID must return OcspMalformed.
+    #[test]
+    fn hash_certid_unknown_oid_returns_malformed() {
+        let unknown = der::asn1::ObjectIdentifier::new_unwrap("1.2.3.4.5");
+        let result = hash_certid_input(&unknown, b"test");
+        assert!(
+            matches!(result, Err(Error::OcspMalformed)),
+            "unknown hash OID must return OcspMalformed"
+        );
+    }
 }
