@@ -98,7 +98,7 @@ impl<'a> IntoIterator for &'a CertPool {
 }
 
 /// Errors returned by path building.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.
