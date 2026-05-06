@@ -1114,10 +1114,12 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 ///
 /// # Limitations
 ///
-/// TeletexString and BMPString attribute values are not normalized — matching
-/// falls back to raw DER byte comparison. Certificates from legacy PKIs using
-/// these string types may fail name matching even when the names are
-/// semantically equivalent. Full support is deferred to v0.2.
+/// `BMPString` and `UniversalString` attribute values are not yet normalized —
+/// matching falls back to raw DER byte comparison. `TeletexString` also uses
+/// raw DER comparison; T.61→Unicode mapping is deferred pending a clear
+/// interoperability target (see `any_to_str_bytes`). Certificates from legacy
+/// PKIs using these string types may fail name matching even when the names
+/// are semantically equivalent. Full normalization is deferred to v0.2.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
@@ -1177,9 +1179,9 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     match (a_str, b_str) {
         (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
         // Both values are non-string types (e.g. OID, INTEGER) or unhandled string
-        // types: compare tag AND content bytes (raw DER). Tag comparison ensures
-        // TeletexString and BMPString with coincidentally identical bytes are not
-        // considered equal.
+        // types (TeletexString, BMPString, UniversalString — deferred to v0.2):
+        // compare tag AND content bytes (raw DER). Tag comparison ensures two
+        // different string encodings of the same text are not considered equal.
         (None, None) => a.tag() == b.tag() && a.value() == b.value(),
         // One value is a string type and the other is not. Return false (fail-closed).
         // A legitimate certificate chain will never encode the same attribute OID as a
@@ -1214,14 +1216,16 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// six-step normalization (adding NFKC). All types except `TeletexString`
 /// will be normalized identically.
 ///
-/// **Permanent exception — `TeletexString` (T61String):**
-/// Raw DER byte comparison only; decode-and-normalize will never be added.
-/// RFC 4518 §2.1 states: "As there is no standard for mapping TeletexString
-/// values to Unicode, the mapping is left a local matter." RFC 5280 §7.1
-/// classifies TeletexString support as OPTIONAL. No canonical T.61→Unicode
-/// table exists (OpenSSL, NSS, and GnuTLS each use incompatible vendor
-/// extensions). Introducing any mapping would silently accept mismatches
-/// that other validators reject.
+/// **Deferred — `TeletexString` (T61String):**
+/// Raw DER byte comparison only. RFC 4518 §2.1 states: "As there is no
+/// standard for mapping TeletexString values to Unicode, the mapping is
+/// left a local matter." RFC 5280 §7.1 classifies TeletexString support
+/// as OPTIONAL. No canonical T.61→Unicode table exists — OpenSSL, NSS,
+/// and GnuTLS each use incompatible vendor extensions. Any mapping we
+/// choose would silently accept mismatches that other validators reject,
+/// or reject chains those validators accept. Support is deferred until a
+/// clear interoperability target exists (e.g., alignment with OpenSSL's
+/// table). Tracked in PKIX-19l.
 fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
     use der::Tag;
     match a.tag() {
