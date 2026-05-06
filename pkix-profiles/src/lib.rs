@@ -139,7 +139,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `max_validity_secs` | 1185 days (~39 months) | S/MIME BR §6.3.2 |
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | S/MIME BR §6.1.5 |
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
-/// | `require_subject_alt_name` | true | rfc822Name SAN required for Mailbox-validated |
+/// | `require_subject_alt_name` | true | non-empty SubjectAltName extension required |
 /// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
 /// | `max_path_len` | 1 | S/MIME BR §7.2 (at most one Subordinate CA between Root and EE) |
 ///
@@ -147,6 +147,11 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
 /// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
+///
+/// The `require_subject_alt_name` flag causes `pkix-path` to require a non-empty
+/// SubjectAltName extension; it does **not** verify that the SAN contains an
+/// `rfc822Name` entry. A certificate with only a `dNSName` SAN would pass this
+/// check. Verifying the specific SAN type is planned for v0.2.
 ///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
 #[must_use]
@@ -158,7 +163,7 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
     p.allowed_signature_algs = Some(CABF_ALLOWED_ALGS.to_vec());
     // S/MIME BR §6.1.5: RSA keys must be at least 2048 bits.
     p.min_rsa_key_bits = Some(2048);
-    // Mailbox-validated: rfc822Name SAN required.
+    // Mailbox-validated: non-empty SAN required (rfc822Name type not verified in v0.1).
     p.require_subject_alt_name = true;
     // S/MIME BR §7.3: id-kp-emailProtection must be asserted.
     p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);

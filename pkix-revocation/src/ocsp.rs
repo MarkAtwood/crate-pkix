@@ -202,13 +202,15 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 /// Supports SHA-1 (OID 1.3.14.3.2.26) and SHA-256 (OID 2.16.840.1.101.3.4.2.1).
 /// Returns [`Error::OcspMalformed`] for any other OID.
 fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {
-    if oid == &OID_SHA1 {
-        use sha1::Digest as _;
-        Ok(sha1::Sha1::digest(data).to_vec())
-    } else if oid == &OID_SHA256 {
-        use sha2::Digest as _;
-        Ok(sha2::Sha256::digest(data).to_vec())
-    } else {
-        Err(Error::OcspMalformed)
+    match *oid {
+        OID_SHA1 => {
+            use sha1::Digest as _;
+            Ok(sha1::Sha1::digest(data).to_vec())
+        }
+        OID_SHA256 => {
+            use sha2::Digest as _;
+            Ok(sha2::Sha256::digest(data).to_vec())
+        }
+        _ => Err(Error::OcspMalformed),
     }
 }
