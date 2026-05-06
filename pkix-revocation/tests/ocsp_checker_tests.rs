@@ -138,7 +138,7 @@ fn ocsp_unknown_status_returns_error() {
 // Validity window
 // ---------------------------------------------------------------------------
 
-/// Valid cert against ocsp-expired.der (nextUpdate=2021-01-01 < NOW=2026) → Err(OcspStatusUnknown).
+/// Valid cert against ocsp-expired.der (nextUpdate=2021-01-01 < NOW=2026) → Err(OcspExpired).
 ///
 /// Oracle: ocsp-expired.der has nextUpdate=2021-01-01 08:00:00 UTC.
 #[test]
@@ -147,8 +147,8 @@ fn ocsp_expired_response_returns_error() {
     let good = load_cert("ocsp-leaf-good.der");
     let result = checker("ocsp-expired.der").check_revocation(&good, &ca);
     assert!(
-        matches!(result, Err(Error::OcspStatusUnknown)),
-        "expired OCSP response must return OcspStatusUnknown, got: {result:?}"
+        matches!(result, Err(Error::OcspExpired)),
+        "expired OCSP response must return OcspExpired, got: {result:?}"
     );
 }
 

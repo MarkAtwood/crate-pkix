@@ -115,7 +115,7 @@ pub enum Error {
     ///
     /// This guards against adversarial certificate pools that would otherwise
     /// cause exponential search time. Each iterative-deepening round and the
-    /// depth probe start with a fresh budget of [`DFS_BUDGET`] node visits.
+    /// depth probe start with a fresh budget of `DFS_BUDGET` node visits.
     BudgetExceeded,
 }
 
@@ -288,7 +288,7 @@ const DFS_BUDGET: usize = 10_000;
 /// Returns the shortest valid topology first. Cycles are detected and pruned
 /// by comparing SubjectPublicKeyInfo DER bytes of certificates already in the path.
 ///
-/// Each round and the depth probe get a fresh budget of [`DFS_BUDGET`] node
+/// Each round and the depth probe get a fresh budget of `DFS_BUDGET` node
 /// visits.  Resetting per-round prevents earlier rounds (which re-traverse all
 /// nodes from rounds 1..k-1) from consuming budget that round k needs.  The
 /// depth probe at `MAX_DEPTH + 1` also starts with a fresh budget.
@@ -316,7 +316,7 @@ const DFS_BUDGET: usize = 10_000;
 ///
 /// # Security
 ///
-/// Pool contents should be from a trusted source. [`DFS_BUDGET`] enforces a hard
+/// Pool contents should be from a trusted source. `DFS_BUDGET` enforces a hard
 /// cap on search work per round to prevent denial-of-service via oversized or
 /// crafted pools.
 #[must_use = "path building result must be checked"]

@@ -79,6 +79,13 @@ pub enum Error {
     /// The OCSP responder returned an `unknown` status (hard-fail mode).
     OcspStatusUnknown,
 
+    /// The OCSP response's validity window is in the past (stale) or absent.
+    ///
+    /// Returned in two cases:
+    /// - `now > nextUpdate`: the `SingleResponse` has expired
+    /// - `nextUpdate` absent: no freshness guarantee is available; treated as stale
+    OcspExpired,
+
     /// DER decoding of an OCSP response failed.
     OcspParseError(der::Error),
 
@@ -125,6 +132,7 @@ impl core::fmt::Display for Error {
                 f.write_str("OCSP CertID issuer hashes do not match the expected issuer")
             }
             Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
+            Error::OcspExpired => f.write_str("OCSP response is stale or has no nextUpdate"),
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
             Error::OcspMalformed => {
                 f.write_str("OCSP response is structurally invalid (malformed per RFC 6960)")

@@ -1,2 +1,2 @@
-createSrcSidebar('[["pkix_profiles",["",[],["lib.rs"]]]]');
-//{"start":19,"fragment_lengths":[36]}
+createSrcSidebar('[["pkix_path_builder",["",[],["lib.rs"]]]]');
+//{"start":19,"fragment_lengths":[40]}

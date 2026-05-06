@@ -71,7 +71,7 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///
 /// # Limitations (v0.1)
 ///
- /// - The CRL must be signed directly by the certificate issuer
+/// - The CRL must be signed directly by the certificate issuer
 ///   (indirect CRLs are not supported; deferred to v0.2).
 /// - CRL Distribution Point name matching (CDP vs IDP name) is not implemented.
 ///   The checker does enforce `onlyContainsUserCerts`, `onlyContainsCACerts`, and
@@ -216,7 +216,21 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             return Err(Error::CrlSignMissing);
         }
 
-        // (3b) Verify the CRL signature against the issuer's SPKI.
+        // (3b) Check CRL validity window before verifying the signature.
+        //     Rejecting stale CRLs early avoids a potentially expensive signature
+        //     verification on a CRL we would discard anyway.
+        //     Absent nextUpdate is treated as expired: an indefinitely valid CRL would
+        //     allow a stale revocation list to suppress detection of revoked certificates.
+        let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
+        if self.now_unix < this_update {
+            return Err(Error::CrlExpired);
+        }
+        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        if self.now_unix > next_update.to_unix_duration().as_secs() {
+            return Err(Error::CrlExpired);
+        }
+
+        // (4) Verify the CRL signature against the issuer's SPKI.
         let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
         self.verifier
             .verify_signature(
@@ -229,18 +243,6 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 crl.signature.raw_bytes(),
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
-
-        // (4) Check CRL validity window: thisUpdate ≤ now ≤ nextUpdate.
-        //     Absent nextUpdate is treated as expired: an indefinitely valid CRL would
-        //     allow a stale revocation list to suppress detection of revoked certificates.
-        let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
-        if self.now_unix < this_update {
-            return Err(Error::CrlExpired);
-        }
-        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
-        if self.now_unix > next_update.to_unix_duration().as_secs() {
-            return Err(Error::CrlExpired);
-        }
 
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
         //     (critical), check scope constraints against the certificate.
@@ -358,7 +360,18 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             return Err(Error::CrlIssuerMismatch);
         }
 
-        // (3) Verify the CRL signature against the anchor's SPKI.
+        // (3) Check CRL validity window before verifying the signature.
+        //     Same rationale as check_revocation: reject stale CRLs early.
+        let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
+        if self.now_unix < this_update {
+            return Err(Error::CrlExpired);
+        }
+        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        if self.now_unix > next_update.to_unix_duration().as_secs() {
+            return Err(Error::CrlExpired);
+        }
+
+        // (4) Verify the CRL signature against the anchor's SPKI.
         //     cRLSign KeyUsage check is skipped: trust anchors have no KeyUsage
         //     extension accessible to us (they are trusted by construction).
         let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
@@ -370,16 +383,6 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 crl.signature.raw_bytes(),
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
-
-        // (4) Check CRL validity window.
-        let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
-        if self.now_unix < this_update {
-            return Err(Error::CrlExpired);
-        }
-        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
-        if self.now_unix > next_update.to_unix_duration().as_secs() {
-            return Err(Error::CrlExpired);
-        }
 
         // (5) IssuingDistributionPoint scope check (same as check_revocation).
         if let Some(idp) = parse_issuing_dp(&crl) {
@@ -497,25 +500,19 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     expected_issuer_name: &x509_cert::name::Name,
     now_unix: u64,
 ) -> crate::Result<Vec<RevokedCert>> {
+    // FIXME(tog.13): delta CRL DER is parsed twice — once in check_revocation /
+    // check_revocation_against_anchor for the issuer-name guard, and again here.
+    // Refactoring to accept an already-parsed `&CertificateList` would eliminate
+    // the redundant parse but requires changing this function's signature.
+    // Tracked for v0.3 along with the general parsed-CRL caching work.
     let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
 
     if !names_match(&delta_crl.tbs_cert_list.issuer, expected_issuer_name) {
         return Err(Error::CrlIssuerMismatch);
     }
 
-    let delta_tbs_bytes = delta_crl
-        .tbs_cert_list
-        .to_der()
-        .map_err(Error::CrlParseError)?;
-    verifier
-        .verify_signature(
-            delta_crl.signature_algorithm.owned_to_ref(),
-            issuer_spki,
-            &delta_tbs_bytes,
-            delta_crl.signature.raw_bytes(),
-        )
-        .map_err(|_| Error::CrlSignatureInvalid)?;
-
+    // Check validity window before signature verification (same rationale as
+    // the base CRL paths: reject stale deltas early without paying sig-verify cost).
     let delta_this_update = delta_crl
         .tbs_cert_list
         .this_update
@@ -532,6 +529,19 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     if now_unix > delta_next_update.to_unix_duration().as_secs() {
         return Err(Error::CrlExpired);
     }
+
+    let delta_tbs_bytes = delta_crl
+        .tbs_cert_list
+        .to_der()
+        .map_err(Error::CrlParseError)?;
+    verifier
+        .verify_signature(
+            delta_crl.signature_algorithm.owned_to_ref(),
+            issuer_spki,
+            &delta_tbs_bytes,
+            delta_crl.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::CrlSignatureInvalid)?;
 
     Ok(delta_crl
         .tbs_cert_list

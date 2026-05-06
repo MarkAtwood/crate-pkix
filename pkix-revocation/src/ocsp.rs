@@ -99,7 +99,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             &issuer.tbs_certificate.subject,
             &cert.tbs_certificate.issuer,
         ) {
-            return Err(Error::OcspSignatureInvalid);
+            return Err(Error::OcspCertIdMismatch);
         }
 
         // (1)-(6) Parse and verify the BasicOCSPResponse.
@@ -179,13 +179,13 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // thisUpdate ≤ now: the SingleResponse is not yet valid.
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspMalformed);
         }
-        // now ≤ nextUpdate: absent nextUpdate is treated as unknown (no expiry info
-        // means we cannot trust the freshness of the status).
-        let next_update = single.next_update.as_ref().ok_or(Error::OcspStatusUnknown)?;
+        // now ≤ nextUpdate: absent nextUpdate is treated as stale (no freshness
+        // guarantee means we cannot rely on the response).
+        let next_update = single.next_update.as_ref().ok_or(Error::OcspExpired)?;
         if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspExpired);
         }
 
         // (9) Return based on certStatus.
@@ -225,7 +225,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // Defense-in-depth: guards against a caller passing an anchor whose SPKI
         // happens to verify the OCSP response but which did not issue `cert`.
         if !names_match(&anchor.subject, &cert.tbs_certificate.issuer) {
-            return Err(Error::OcspSignatureInvalid);
+            return Err(Error::OcspCertIdMismatch);
         }
 
         // (1)-(6) Parse and verify the BasicOCSPResponse.
@@ -285,11 +285,11 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         }
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspMalformed);
         }
-        let next_update = single.next_update.as_ref().ok_or(Error::OcspStatusUnknown)?;
+        let next_update = single.next_update.as_ref().ok_or(Error::OcspExpired)?;
         if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspExpired);
         }
 
         // (9) Return based on certStatus.
@@ -310,7 +310,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 /// Performs steps 1-6 common to both `check_revocation` and
 /// `check_revocation_against_anchor`:
 /// 1. Parse the outer `OcspResponse` from DER.
-/// 2. Require `response_status == Successful`.
+/// 2. Require `response_status == Successful` (others return `OcspMalformed`).
 /// 3. Extract `response_bytes` (error if absent).
 /// 4. Verify `response_type == id-pkix-ocsp-basic`.
 /// 5. Parse the `BasicOcspResponse`.
@@ -326,9 +326,11 @@ fn parse_and_verify_basic_response<V: SignatureVerifier>(
     // (1) Parse the outer OCSPResponse.
     let resp = OcspResponse::from_der(response_der).map_err(Error::OcspParseError)?;
 
-    // (2) Require responseStatus == successful; any other → OcspStatusUnknown.
+    // (2) Require responseStatus == successful; any other (TryLater,
+    // InternalError, MalformedRequest, SigRequired, Unauthorized) → OcspMalformed.
+    // These are server-side error codes, not a responder-reported "unknown" status.
     if resp.response_status != OcspResponseStatus::Successful {
-        return Err(Error::OcspStatusUnknown);
+        return Err(Error::OcspMalformed);
     }
 
     // (3) Extract responseBytes (must be present for a Successful response).
