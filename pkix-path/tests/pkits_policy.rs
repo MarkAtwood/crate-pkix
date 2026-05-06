@@ -100,7 +100,10 @@ fn pkits_4_8_1_sp3_p2_explicit_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.1 sp3: P2 not in cert, should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.1 sp3: P2 not in cert, should fail; got {result:?}"
+    );
 }
 
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 4)
@@ -142,7 +145,10 @@ fn pkits_4_8_2_sp2_no_policies_explicit_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.2 sp2: explicit_policy with no cert policies should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.2 sp2: explicit_policy with no cert policies should fail; got {result:?}"
+    );
 }
 
 /// 4.8.3 Different Policies Test3 (Subpart 1)
@@ -150,7 +156,11 @@ fn pkits_4_8_2_sp2_no_policies_explicit_fail() {
 #[test]
 fn pkits_4_8_3_sp1_different_policies_ok() {
     pkits_policy_validate(
-        &["DifferentPoliciesTest3EE", "PoliciesP2subCACert", "GoodCACert"],
+        &[
+            "DifferentPoliciesTest3EE",
+            "PoliciesP2subCACert",
+            "GoodCACert",
+        ],
         &[],
         false,
         false,
@@ -164,13 +174,20 @@ fn pkits_4_8_3_sp1_different_policies_ok() {
 #[test]
 fn pkits_4_8_3_sp2_different_policies_explicit_fail() {
     let result = pkits_policy_validate(
-        &["DifferentPoliciesTest3EE", "PoliciesP2subCACert", "GoodCACert"],
+        &[
+            "DifferentPoliciesTest3EE",
+            "PoliciesP2subCACert",
+            "GoodCACert",
+        ],
         &[],
         true,
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.3 sp2: explicit_policy, empty intersection → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.3 sp2: explicit_policy, empty intersection → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.3 Different Policies Test3 (Subpart 3)
@@ -178,7 +195,11 @@ fn pkits_4_8_3_sp2_different_policies_explicit_fail() {
 #[test]
 fn pkits_4_8_3_sp3_different_policies_p1_p2_fail() {
     let result = pkits_policy_validate(
-        &["DifferentPoliciesTest3EE", "PoliciesP2subCACert", "GoodCACert"],
+        &[
+            "DifferentPoliciesTest3EE",
+            "PoliciesP2subCACert",
+            "GoodCACert",
+        ],
         &[P1, P2],
         true,
         false,
@@ -206,7 +227,11 @@ fn pkits_4_8_4_different_policies_fail() {
 #[test]
 fn pkits_4_8_5_different_policies_fail() {
     let result = pkits_policy_validate(
-        &["DifferentPoliciesTest5EE", "PoliciesP2subCA2Cert", "GoodCACert"],
+        &[
+            "DifferentPoliciesTest5EE",
+            "PoliciesP2subCA2Cert",
+            "GoodCACert",
+        ],
         &[],
         false,
         false,
@@ -269,7 +294,10 @@ fn pkits_4_8_6_sp3_overlapping_p2_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.6 sp3: P2 not in intersection → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.6 sp3: P2 not in intersection → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.7 Different Policies Test7
@@ -287,7 +315,10 @@ fn pkits_4_8_7_different_policies_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.7: tree becomes NULL → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.7: tree becomes NULL → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.8 Different Policies Test8
@@ -305,7 +336,10 @@ fn pkits_4_8_8_different_policies_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.8: tree becomes NULL → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.8: tree becomes NULL → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.9 Different Policies Test9
@@ -324,7 +358,10 @@ fn pkits_4_8_9_different_policies_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.9: tree becomes NULL → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.9: tree becomes NULL → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.10 All Certificates Same Policies Test10 (Subpart 1)
@@ -408,7 +445,10 @@ fn pkits_4_8_12_different_policies_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.12: tree becomes NULL mid-chain → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.12: tree becomes NULL mid-chain → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.13 All Certificates Same Policies Test13 (Subpart 1)
@@ -490,21 +530,18 @@ fn pkits_4_8_14_sp2_anypolicy_p2_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.8.14 sp2: P2 not in leaf policy set → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.8.14 sp2: P2 not in leaf policy set → should fail; got {result:?}"
+    );
 }
 
 /// 4.8.15 User Notice Qualifier Test15
 /// Qualifiers should not affect validation
 #[test]
 fn pkits_4_8_15_user_notice_qualifier_valid() {
-    pkits_policy_validate(
-        &["UserNoticeQualifierTest15EE"],
-        &[],
-        false,
-        false,
-        false,
-    )
-    .expect("4.8.15: user notice qualifier → should validate");
+    pkits_policy_validate(&["UserNoticeQualifierTest15EE"], &[], false, false, false)
+        .expect("4.8.15: user notice qualifier → should validate");
 }
 
 /// 4.8.16 User Notice Qualifier Test16
@@ -564,14 +601,8 @@ fn pkits_4_8_18_sp2_user_notice_p2() {
 /// 4.8.19 User Notice Qualifier Test19
 #[test]
 fn pkits_4_8_19_user_notice_qualifier_valid() {
-    pkits_policy_validate(
-        &["UserNoticeQualifierTest19EE"],
-        &[],
-        false,
-        false,
-        false,
-    )
-    .expect("4.8.19: user notice qualifier → should validate");
+    pkits_policy_validate(&["UserNoticeQualifierTest19EE"], &[], false, false, false)
+        .expect("4.8.19: user notice qualifier → should validate");
 }
 
 /// 4.8.20 CPS Pointer Qualifier Test20
@@ -650,7 +681,10 @@ fn pkits_4_9_3_require_explicit_policy_4_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.9.3: requireExplicitPolicy=4, no policies → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.9.3: requireExplicitPolicy=4, no policies → should fail; got {result:?}"
+    );
 }
 
 /// 4.9.4 Valid require Explicit Policy Test4
@@ -690,7 +724,10 @@ fn pkits_4_9_5_require_explicit_policy_7_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.9.5: conflicting requireExplicitPolicy → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.9.5: conflicting requireExplicitPolicy → should fail; got {result:?}"
+    );
 }
 
 /// 4.9.6 Valid Self-Issued require Explicit Policy Test6
@@ -726,7 +763,10 @@ fn pkits_4_9_7_self_issued_require_explicit_policy_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.9.7: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.9.7: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.9.8 Invalid Self-Issued require Explicit Policy Test8
@@ -745,7 +785,10 @@ fn pkits_4_9_8_self_issued_require_explicit_policy_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.9.8: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.9.8: counter expires → should fail; got {result:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -777,7 +820,10 @@ fn pkits_4_10_1_sp2_mapping_p2_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.1.2: P2 in initial set but P2 is subject domain → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.1.2: P2 in initial set but P2 is subject domain → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.1.3 Valid Policy Mapping Test1 (Subpart 3)
@@ -791,7 +837,10 @@ fn pkits_4_10_1_sp3_mapping_inhibit_fail() {
         false,
         true, // initial_policy_mapping_inhibit
     );
-    assert!(result.is_err(), "4.10.1.3: policy_mapping_inhibit → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.1.3: policy_mapping_inhibit → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.2 Invalid Policy Mapping Test2 (Subpart 1)
@@ -805,7 +854,10 @@ fn pkits_4_10_2_sp1_mapping_invalid_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.2 sp1: no matching policy after mapping → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.2 sp1: no matching policy after mapping → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.2 Invalid Policy Mapping Test2 (Subpart 2)
@@ -819,7 +871,10 @@ fn pkits_4_10_2_sp2_mapping_inhibit_fail() {
         false,
         true,
     );
-    assert!(result.is_err(), "4.10.2 sp2: policy_mapping_inhibit → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.2 sp2: policy_mapping_inhibit → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.3 Valid Policy Mapping Test3 (Subpart 1)
@@ -838,7 +893,10 @@ fn pkits_4_10_3_sp1_multi_mapping_p1_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.3 sp1: P1 mapped away → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.3 sp1: P1 mapped away → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.3 Valid Policy Mapping Test3 (Subpart 2)
@@ -875,7 +933,10 @@ fn pkits_4_10_4_mapping_invalid_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.4: tree becomes NULL → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.4: tree becomes NULL → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.5 Valid Policy Mapping Test5 (Subpart 1)
@@ -911,7 +972,10 @@ fn pkits_4_10_5_sp2_one_to_many_p6_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.5 sp2: P6 not in mapping → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.5 sp2: P6 not in mapping → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.6 Valid Policy Mapping Test6 (Subpart 1)
@@ -947,7 +1011,10 @@ fn pkits_4_10_6_sp2_one_to_many_p6_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.6 sp2: P6 not in mapping → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.6 sp2: P6 not in mapping → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.7 Invalid Mapping From anyPolicy Test7
@@ -955,13 +1022,19 @@ fn pkits_4_10_6_sp2_one_to_many_p6_fail() {
 #[test]
 fn pkits_4_10_7_mapping_from_anypolicy_fail() {
     let result = pkits_policy_validate(
-        &["InvalidMappingFromanyPolicyTest7EE", "MappingFromanyPolicyCACert"],
+        &[
+            "InvalidMappingFromanyPolicyTest7EE",
+            "MappingFromanyPolicyCACert",
+        ],
         &[],
         false,
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.7: mapping from anyPolicy is forbidden → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.7: mapping from anyPolicy is forbidden → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.8 Invalid Mapping To anyPolicy Test8
@@ -969,13 +1042,19 @@ fn pkits_4_10_7_mapping_from_anypolicy_fail() {
 #[test]
 fn pkits_4_10_8_mapping_to_anypolicy_fail() {
     let result = pkits_policy_validate(
-        &["InvalidMappingToanyPolicyTest8EE", "MappingToanyPolicyCACert"],
+        &[
+            "InvalidMappingToanyPolicyTest8EE",
+            "MappingToanyPolicyCACert",
+        ],
         &[],
         false,
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.8: mapping to anyPolicy is forbidden → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.8: mapping to anyPolicy is forbidden → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.9 Valid Policy Mapping Test9
@@ -1007,7 +1086,10 @@ fn pkits_4_10_10_anypolicy_mapping_invalid_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.10: tree becomes NULL → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.10: tree becomes NULL → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.11 Valid Policy Mapping Test11
@@ -1095,7 +1177,10 @@ fn pkits_4_10_13_sp3_p2_set_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.10.13 sp3: P2 not directly accessible → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.10.13 sp3: P2 not directly accessible → should fail; got {result:?}"
+    );
 }
 
 /// 4.10.14 Valid Policy Mapping Test14
@@ -1131,7 +1216,10 @@ fn pkits_4_11_1_inhibit_policy_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.1: inhibitPolicyMapping=0 → mapping forbidden → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.1: inhibitPolicyMapping=0 → mapping forbidden → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.2 Valid inhibit Policy Mapping Test2
@@ -1168,7 +1256,10 @@ fn pkits_4_11_3_inhibit_policy_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.3: inhibitPolicyMapping counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.3: inhibitPolicyMapping counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.4 Valid inhibit Policy Mapping Test4
@@ -1205,7 +1296,10 @@ fn pkits_4_11_5_inhibit_policy_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.5: inhibitPolicyMapping counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.5: inhibitPolicyMapping counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.6 Invalid inhibit Policy Mapping Test6
@@ -1224,7 +1318,10 @@ fn pkits_4_11_6_inhibit_policy_mapping_clamped_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.6: clamp applies → mapping forbidden → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.6: clamp applies → mapping forbidden → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.7 Valid Self-Issued inhibit Policy Mapping Test7
@@ -1262,7 +1359,10 @@ fn pkits_4_11_8_self_issued_inhibit_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.8: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.8: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.9 Invalid Self-Issued inhibit Policy Mapping Test9
@@ -1281,7 +1381,10 @@ fn pkits_4_11_9_self_issued_inhibit_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.9: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.9: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.10 Invalid Self-Issued inhibit Policy Mapping Test10
@@ -1300,7 +1403,10 @@ fn pkits_4_11_10_self_issued_inhibit_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.10: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.10: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.11.11 Invalid Self-Issued inhibit Policy Mapping Test11
@@ -1319,7 +1425,10 @@ fn pkits_4_11_11_self_issued_inhibit_mapping_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.11.11: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.11.11: counter expires → should fail; got {result:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1337,7 +1446,10 @@ fn pkits_4_12_1_inhibit_any_policy_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.1: inhibitAnyPolicy=0 and leaf uses anyPolicy → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.1: inhibitAnyPolicy=0 and leaf uses anyPolicy → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.2 Valid inhibit anyPolicy Test2
@@ -1387,7 +1499,10 @@ fn pkits_4_12_3_sp2_initial_inhibit_any_fail() {
         true, // initial_any_policy_inhibit
         false,
     );
-    assert!(result.is_err(), "4.12.3 sp2: initial_any_policy_inhibit → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.3 sp2: initial_any_policy_inhibit → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.4 Invalid inhibit anyPolicy Test4
@@ -1405,7 +1520,10 @@ fn pkits_4_12_4_inhibit_any_policy_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.4: anyPolicy used beyond allowed depth → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.4: anyPolicy used beyond allowed depth → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.5 Invalid inhibit anyPolicy Test5
@@ -1423,7 +1541,10 @@ fn pkits_4_12_5_inhibit_any_policy_depth5_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.5: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.5: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.6 Invalid inhibit anyPolicy Test6
@@ -1441,7 +1562,10 @@ fn pkits_4_12_6_inhibit_any_policy_clamped_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.6: clamp from parent applies → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.6: clamp from parent applies → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.7 Valid Self-Issued inhibit anyPolicy Test7
@@ -1479,7 +1603,10 @@ fn pkits_4_12_8_self_issued_inhibit_any_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.8: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.8: counter expires → should fail; got {result:?}"
+    );
 }
 
 /// 4.12.9 Valid Self-Issued inhibit anyPolicy Test9
@@ -1517,6 +1644,8 @@ fn pkits_4_12_10_self_issued_inhibit_any_fail() {
         false,
         false,
     );
-    assert!(result.is_err(), "4.12.10: counter expires → should fail; got {result:?}");
+    assert!(
+        result.is_err(),
+        "4.12.10: counter expires → should fail; got {result:?}"
+    );
 }
-

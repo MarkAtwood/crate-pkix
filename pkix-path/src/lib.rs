@@ -125,6 +125,43 @@ pub enum Error {
     /// without inspecting the inner value; the specific `der::Error` variants
     /// are not part of the stable API contract.
     Der(der::Error),
+    /// A certificate's validity period (notAfter − notBefore) exceeds
+    /// [`ValidationPolicy::max_validity_secs`].
+    ///
+    /// This check fires for every certificate in the chain, not just the leaf.
+    ValidityPeriodExceedsMax {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
+    /// A certificate's signature algorithm OID is not in
+    /// [`ValidationPolicy::allowed_signature_algs`].
+    ///
+    /// The check fires before signature verification so the error is diagnostic
+    /// rather than a confusing `SignatureInvalid`.
+    AlgorithmNotAllowed {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
+    /// An RSA public key's modulus is smaller than
+    /// [`ValidationPolicy::min_rsa_key_bits`] bits.
+    ///
+    /// Non-RSA keys (EC, Ed25519, …) are not affected by this check.
+    KeyTooSmall {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
+    /// The leaf certificate (chain index 0) has no SubjectAltName extension,
+    /// or the extension is present but empty.
+    ///
+    /// Only checked when [`ValidationPolicy::require_subject_alt_name`] is `true`.
+    /// Intermediate CA certificates are not subject to this check.
+    MissingSan,
+    /// The leaf certificate (chain index 0) does not assert all OIDs required
+    /// by [`ValidationPolicy::required_leaf_eku`].
+    ///
+    /// `anyExtendedKeyUsage` (2.5.29.37.0) does not satisfy a specific OID
+    /// requirement — each required OID must be listed explicitly.
+    MissingEku,
 }
 
 impl core::fmt::Display for Error {
@@ -158,6 +195,22 @@ impl core::fmt::Display for Error {
                 write!(f, "certificate policy violation at chain index {index}")
             }
             Error::Der(e) => write!(f, "DER error: {e}"),
+            Error::ValidityPeriodExceedsMax { index } => {
+                write!(f, "validity period exceeds maximum at chain index {index}")
+            }
+            Error::AlgorithmNotAllowed { index } => {
+                write!(f, "signature algorithm not allowed at chain index {index}")
+            }
+            Error::KeyTooSmall { index } => {
+                write!(f, "RSA key too small at chain index {index}")
+            }
+            Error::MissingSan => write!(f, "leaf certificate is missing SubjectAltName"),
+            Error::MissingEku => {
+                write!(
+                    f,
+                    "leaf certificate is missing required ExtendedKeyUsage OID(s)"
+                )
+            }
         }
     }
 }
@@ -177,7 +230,12 @@ impl std::error::Error for Error {
             | Error::KeyUsageMissing { .. }
             | Error::UnhandledCriticalExtension { .. }
             | Error::NameConstraintViolation { .. }
-            | Error::PolicyViolation { .. } => None,
+            | Error::PolicyViolation { .. }
+            | Error::ValidityPeriodExceedsMax { .. }
+            | Error::AlgorithmNotAllowed { .. }
+            | Error::KeyTooSmall { .. }
+            | Error::MissingSan
+            | Error::MissingEku => None,
         }
     }
 }
@@ -380,6 +438,15 @@ impl TryFrom<Certificate> for TrustAnchor {
 /// `initial_explicit_policy`, `initial_any_policy_inhibit`,
 /// `initial_policy_mapping_inhibit`, and `initial_policy_set` fields to
 /// configure the initial policy state.
+///
+/// # Limitations
+///
+/// Path-building (RFC 4158 — cross-signed certificates, multiple candidate
+/// issuers) is **out of scope for v0.1**. The caller must supply the complete,
+/// ordered chain.
+///
+/// Revocation checking (CRL / OCSP) is out of scope for `pkix-path`; see
+/// `pkix-revocation` for that functionality.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
@@ -439,6 +506,46 @@ pub struct ValidationPolicy {
     /// Note: this is `pub` but clones the OID set, so prefer constructing once
     /// and reusing the `ValidationPolicy`.
     pub initial_policy_set: Vec<der::asn1::ObjectIdentifier>,
+
+    /// If `Some(n)`, reject any certificate whose (notAfter − notBefore) exceeds
+    /// `n` seconds. `None` means unconstrained (the default).
+    ///
+    /// Applied to every certificate in the chain, not just the leaf.
+    /// Violations produce [`Error::ValidityPeriodExceedsMax`].
+    pub max_validity_secs: Option<u64>,
+
+    /// If `Some(list)`, reject any certificate whose signature algorithm OID is
+    /// not in `list`. `None` means any algorithm is accepted (the default).
+    ///
+    /// Applied to every certificate in the chain. The check fires **before**
+    /// signature verification so the error is diagnostic rather than a confusing
+    /// [`Error::SignatureInvalid`].
+    /// Violations produce [`Error::AlgorithmNotAllowed`].
+    pub allowed_signature_algs: Option<Vec<der::asn1::ObjectIdentifier>>,
+
+    /// If `Some(bits)`, reject any certificate carrying an RSA public key whose
+    /// modulus is fewer than `bits` bits. Non-RSA keys are not affected.
+    /// `None` means unconstrained (the default).
+    ///
+    /// Applied to every certificate in the chain.
+    /// Violations produce [`Error::KeyTooSmall`].
+    pub min_rsa_key_bits: Option<u32>,
+
+    /// If `true`, the leaf certificate (chain index 0) must have a non-empty
+    /// SubjectAltName extension. `false` means no SAN requirement (the default).
+    ///
+    /// Intermediate CA certificates are not checked by this field.
+    /// Violations produce [`Error::MissingSan`].
+    pub require_subject_alt_name: bool,
+
+    /// If `Some(oids)`, the leaf certificate must explicitly assert every OID in
+    /// `oids` via its ExtendedKeyUsage extension. `None` means no EKU requirement
+    /// (the default).
+    ///
+    /// `anyExtendedKeyUsage` (2.5.29.37.0) does **not** satisfy a specific OID
+    /// check — each required OID must be listed in the cert's EKU extension.
+    /// Violations produce [`Error::MissingEku`].
+    pub required_leaf_eku: Option<Vec<der::asn1::ObjectIdentifier>>,
 }
 
 impl ValidationPolicy {
@@ -465,6 +572,13 @@ impl Default for ValidationPolicy {
             initial_any_policy_inhibit: false,
             initial_policy_mapping_inhibit: false,
             initial_policy_set: Vec::new(),
+            // New profile-enforcement fields: all disabled by default so that
+            // existing callers get unconstrained behavior (backward compatible).
+            max_validity_secs: None,
+            allowed_signature_algs: None,
+            min_rsa_key_bits: None,
+            require_subject_alt_name: false,
+            required_leaf_eku: None,
         }
     }
 }
@@ -783,7 +897,9 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
             if n.depth != prune_depth {
                 return true; // leave nodes at other depths untouched
             }
-            child_policies.iter().any(|cp| n.expected_policy_set.contains(cp))
+            child_policies
+                .iter()
+                .any(|cp| n.expected_policy_set.contains(cp))
         });
         d -= 1;
         // Continue upward even if prune_depth became empty — the level above
@@ -1471,6 +1587,63 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
 }
 
 // ---------------------------------------------------------------------------
+// RSA key size helper (PKIX-ken.1.5)
+// ---------------------------------------------------------------------------
+
+/// rsaEncryption OID: 1.2.840.113549.1.1.1 (RFC 3279 §2.3.1)
+const OID_RSA_ENCRYPTION: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
+
+/// Decode the RSA modulus from an SPKI and return its bit length.
+///
+/// Returns `None` when:
+/// - the key algorithm OID is not `rsaEncryption` (non-RSA key; check does not apply), or
+/// - the SPKI bytes cannot be decoded (malformed; signature verification will also fail).
+///
+/// Uses `der::SliceReader` and `der::asn1::UintRef` from the existing `der`
+/// dependency — no additional crate required.
+///
+/// `RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER }` (RFC 3279 §2.3.1).
+/// `UintRef::as_bytes()` strips the leading 0x00 sign byte from a DER unsigned INTEGER,
+/// returning only the magnitude. Bit length is derived as `magnitude_bytes * 8`, which
+/// over-counts by at most 7 bits for keys whose high magnitude byte has leading zero bits —
+/// this conservative rounding is acceptable for a minimum-floor check.
+fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
+    use der::{asn1::UintRef, Reader};
+
+    if spki.algorithm.oid != OID_RSA_ENCRYPTION {
+        return None; // Non-RSA key: check does not apply.
+    }
+    // BitString::as_bytes() returns None when unused_bits != 0.
+    // RSA SPKI subject_public_key is always octet-aligned (unused_bits = 0).
+    let raw = spki.subject_public_key.as_bytes()?;
+
+    // raw is a DER-encoded RSAPublicKey SEQUENCE.
+    // RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER }
+    //
+    // We decode the modulus INTEGER and then skip the publicExponent so the
+    // sequence reader does not complain about trailing data (der 0.7 requires
+    // the closure to consume the entire SEQUENCE content).
+    //
+    // Skip strategy: read the modulus, then call tlv_bytes() to consume the
+    // exponent TLV as a raw byte slice (no allocation, no decode required).
+    let modulus_byte_len: usize = der::SliceReader::new(raw)
+        .ok()?
+        .sequence(|r| {
+            // UintRef strips the leading 0x00 sign byte; as_bytes() returns magnitude only.
+            let modulus: UintRef<'_> = r.decode()?;
+            let modulus_len = modulus.as_bytes().len();
+            // Consume the publicExponent TLV so the nested reader has no trailing data.
+            let _ = r.tlv_bytes()?;
+            Ok(modulus_len)
+        })
+        .ok()?;
+
+    // saturating_mul guards against overflow on a hypothetical absurdly large modulus.
+    Some(modulus_byte_len.saturating_mul(8) as u32)
+}
+
+// ---------------------------------------------------------------------------
 // Chain walk loop — signature verification and name linkage (PKIX-vxf)
 // ---------------------------------------------------------------------------
 
@@ -1570,6 +1743,19 @@ fn chain_walk<V: SignatureVerifier>(
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
 
+        // (a0) Signature algorithm allowlist check.
+        //      Fires BEFORE signature verification to give a diagnostic error
+        //      (AlgorithmNotAllowed) rather than a confusing SignatureInvalid.
+        //      Uses the outer signatureAlgorithm field, which RFC 5280 §4.1.1.2
+        //      requires to be identical to the inner TBSCertificate.signature OID.
+        //      Applies to every cert in the chain (no i == 0 guard), matching
+        //      CA/B Forum profile intent.
+        if let Some(ref allowed) = policy.allowed_signature_algs {
+            if !allowed.contains(&cert.signature_algorithm.oid) {
+                return Err(Error::AlgorithmNotAllowed { index: i });
+            }
+        }
+
         // (a) Verify signature with the current issuer's SPKI.
         //     8 KiB covers typical TLS and code-signing certs (1–3 KiB), but
         //     NOT large government / HSM certs. Certificates exceeding this limit
@@ -1596,6 +1782,42 @@ fn chain_walk<V: SignatureVerifier>(
 
         // (c) Validity period.
         check_validity(cert, policy.current_time_unix, i)?;
+
+        // (c2) Max validity period length check.
+        //      saturating_sub avoids wrap on a malformed cert where notAfter < notBefore;
+        //      a duration of 0 trivially passes the > max_secs test (safe, not a bypass).
+        //      Applies to every cert in the chain per the epic intent.
+        if let Some(max_secs) = policy.max_validity_secs {
+            let not_before = cert
+                .tbs_certificate
+                .validity
+                .not_before
+                .to_unix_duration()
+                .as_secs();
+            let not_after = cert
+                .tbs_certificate
+                .validity
+                .not_after
+                .to_unix_duration()
+                .as_secs();
+            if not_after.saturating_sub(not_before) > max_secs {
+                return Err(Error::ValidityPeriodExceedsMax { index: i });
+            }
+        }
+
+        // (c3) Minimum RSA key size check.
+        //      Non-RSA keys produce None from rsa_public_key_bits and are silently skipped.
+        //      Applies to every cert in the chain per the epic intent.
+        if let Some(min_bits) = policy.min_rsa_key_bits {
+            if let Some(actual_bits) =
+                rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info)
+            {
+                if actual_bits < min_bits {
+                    return Err(Error::KeyTooSmall { index: i });
+                }
+            }
+            // Non-RSA keys: rsa_public_key_bits returns None → check silently skipped.
+        }
 
         // (d) Critical extension guard.
         check_critical_extensions(cert, i)?;
@@ -1663,8 +1885,7 @@ fn chain_walk<V: SignatureVerifier>(
                     // parent at depth i-1.
                     if !matched_via_i {
                         let has_any_parent = tree.iter().any(|parent| {
-                            parent.depth == cert_depth - 1
-                                && parent.valid_policy == OID_ANY_POLICY
+                            parent.depth == cert_depth - 1 && parent.valid_policy == OID_ANY_POLICY
                         });
                         if has_any_parent {
                             new_nodes.push(PolicyNode {
@@ -1685,8 +1906,7 @@ fn chain_walk<V: SignatureVerifier>(
                 // self-issued non-leaf), expand for each unmatched expected
                 // policy from parent nodes.
                 if let Some(ref ap_qualifiers) = any_policy_qualifiers {
-                    let may_expand =
-                        inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
+                    let may_expand = inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
                     if may_expand {
                         // Already-covered valid_policies at this depth.
                         let already_covered: Vec<der::asn1::ObjectIdentifier> =
@@ -1758,11 +1978,50 @@ fn chain_walk<V: SignatureVerifier>(
             }
             // §6.1.5(b): if PolicyConstraints requireExplicitPolicy == 0,
             // force explicit_policy to 0.
-            if let Some(pc) =
-                find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
-            {
+            if let Some(pc) = find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS) {
                 if pc.require_explicit_policy == Some(0) {
                     explicit_policy = 0;
+                }
+            }
+        }
+
+        // (e2) Require non-empty SubjectAltName on leaf cert.
+        //      Only when require_subject_alt_name is set; intermediate CA certs
+        //      are NOT checked (i == 0 guard). The `san` variable is decoded above
+        //      and is already available — no second extension scan needed.
+        if i == 0 && policy.require_subject_alt_name {
+            // san is None if the extension is absent; Some(v) where v.0 may be empty.
+            let san_is_nonempty = san.as_ref().map(|s| !s.0.is_empty()).unwrap_or(false);
+            if !san_is_nonempty {
+                return Err(Error::MissingSan);
+            }
+        }
+
+        // (e3) Required leaf EKU OID check.
+        //      Only when required_leaf_eku is Some; only on the leaf (i == 0).
+        //      Uses try_find_cert_ext (fail-closed): malformed EKU DER on the leaf
+        //      is mapped to MalformedCertificate rather than silently ignored.
+        //      anyExtendedKeyUsage (OID 2.5.29.37.0) does NOT satisfy a specific
+        //      OID requirement — only explicit listing in the cert's EKU counts.
+        if i == 0 {
+            if let Some(ref required_ekus) = policy.required_leaf_eku {
+                use x509_cert::ext::pkix::ExtendedKeyUsage;
+                match try_find_cert_ext::<ExtendedKeyUsage>(cert, OID_EXTENDED_KEY_USAGE)
+                    .map_err(|_| Error::MalformedCertificate { index: 0 })?
+                {
+                    None => {
+                        // EKU extension absent; any non-empty requirement fails.
+                        if !required_ekus.is_empty() {
+                            return Err(Error::MissingEku);
+                        }
+                    }
+                    Some(eku) => {
+                        for req_oid in required_ekus {
+                            if !eku.0.iter().any(|e| e == req_oid) {
+                                return Err(Error::MissingEku);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1801,91 +2060,80 @@ fn chain_walk<V: SignatureVerifier>(
             // (policy-b) Apply mappings to the tree or delete mapped nodes.
             // NOTE: Policy mappings use the current policy_mapping counter value
             // (before decrement); the decrement happens in §6.1.4(h) below.
-            if let Some(pm) =
-                find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS)
-            {
-                    // §6.1.4(a): reject anyPolicy as issuer or subject domain.
-                    for mapping in pm.0.iter() {
-                        if mapping.issuer_domain_policy == OID_ANY_POLICY
-                            || mapping.subject_domain_policy == OID_ANY_POLICY
-                        {
-                            return Err(Error::PolicyViolation { index: i });
-                        }
+            if let Some(pm) = find_cert_ext::<PolicyMappings>(cert, OID_POLICY_MAPPINGS) {
+                // §6.1.4(a): reject anyPolicy as issuer or subject domain.
+                for mapping in pm.0.iter() {
+                    if mapping.issuer_domain_policy == OID_ANY_POLICY
+                        || mapping.subject_domain_policy == OID_ANY_POLICY
+                    {
+                        return Err(Error::PolicyViolation { index: i });
                     }
+                }
 
-                    // §6.1.4(b)(1): if policy_mapping > 0, update expected_policy_set.
-                    // §6.1.4(b)(2): if policy_mapping == 0, delete mapped nodes.
-                    if let Some(ref mut tree) = policy_tree {
-                        if policy_mapping > 0 {
-                            // For each issuerDomainPolicy ID-P in the mappings,
-                            // update expected_policy_set of matching nodes.
-                            for mapping in pm.0.iter() {
-                                let idp = &mapping.issuer_domain_policy;
-                                let sdp = &mapping.subject_domain_policy;
-                                let mut found = false;
-                                for node in tree.iter_mut() {
-                                    if node.depth == cert_depth
-                                        && &node.valid_policy == idp
-                                    {
-                                        found = true;
-                                        node.expected_policy_set.retain(|p| p != idp);
-                                        if !node.expected_policy_set.contains(sdp) {
-                                            node.expected_policy_set.push(*sdp);
-                                        }
-                                    }
-                                }
-                                // If no node at cert_depth has valid_policy = ID-P
-                                // but there is an anyPolicy node, generate a new
-                                // child of the depth-(i-1) anyPolicy node.
-                                if !found {
-                                    let has_any = tree.iter().any(|nd| {
-                                        nd.depth == cert_depth
-                                            && nd.valid_policy == OID_ANY_POLICY
-                                    });
-                                    if has_any {
-                                        // Get qualifier from anyPolicy in cert.
-                                        // Use the already-decoded cert_cp to avoid
-                                        // a redundant extension parse (b5r.12).
-                                        let ap_q = cert_cp
-                                            .as_ref()
-                                            .and_then(|cp| {
-                                                cp.0.iter()
-                                                    .find(|pi| {
-                                                        pi.policy_identifier == OID_ANY_POLICY
-                                                    })
-                                                    .and_then(|pi| {
-                                                        pi.policy_qualifiers
-                                                            .as_deref()
-                                                            .map(|q| q.to_vec())
-                                                    })
-                                            })
-                                            .unwrap_or_default();
-                                        tree.push(PolicyNode {
-                                            depth: cert_depth,
-                                            valid_policy: *idp,
-                                            qualifier_set: ap_q,
-                                            expected_policy_set: vec![*sdp],
-                                        });
+                // §6.1.4(b)(1): if policy_mapping > 0, update expected_policy_set.
+                // §6.1.4(b)(2): if policy_mapping == 0, delete mapped nodes.
+                if let Some(ref mut tree) = policy_tree {
+                    if policy_mapping > 0 {
+                        // For each issuerDomainPolicy ID-P in the mappings,
+                        // update expected_policy_set of matching nodes.
+                        for mapping in pm.0.iter() {
+                            let idp = &mapping.issuer_domain_policy;
+                            let sdp = &mapping.subject_domain_policy;
+                            let mut found = false;
+                            for node in tree.iter_mut() {
+                                if node.depth == cert_depth && &node.valid_policy == idp {
+                                    found = true;
+                                    node.expected_policy_set.retain(|p| p != idp);
+                                    if !node.expected_policy_set.contains(sdp) {
+                                        node.expected_policy_set.push(*sdp);
                                     }
                                 }
                             }
-                        } else {
-                            // policy_mapping == 0: delete nodes whose valid_policy
-                            // is an issuer_domain_policy in a mapping.
-                            let mapped_policies: Vec<der::asn1::ObjectIdentifier> = pm
-                                .0
-                                .iter()
-                                .map(|m| m.issuer_domain_policy)
-                                .collect();
-                            tree.retain(|nd| {
-                                nd.depth != cert_depth
-                                    || !mapped_policies.contains(&nd.valid_policy)
-                            });
-                            if cert_depth > 0 {
-                                prune_policy_tree(tree, cert_depth);
+                            // If no node at cert_depth has valid_policy = ID-P
+                            // but there is an anyPolicy node, generate a new
+                            // child of the depth-(i-1) anyPolicy node.
+                            if !found {
+                                let has_any = tree.iter().any(|nd| {
+                                    nd.depth == cert_depth && nd.valid_policy == OID_ANY_POLICY
+                                });
+                                if has_any {
+                                    // Get qualifier from anyPolicy in cert.
+                                    // Use the already-decoded cert_cp to avoid
+                                    // a redundant extension parse (b5r.12).
+                                    let ap_q = cert_cp
+                                        .as_ref()
+                                        .and_then(|cp| {
+                                            cp.0.iter()
+                                                .find(|pi| pi.policy_identifier == OID_ANY_POLICY)
+                                                .and_then(|pi| {
+                                                    pi.policy_qualifiers
+                                                        .as_deref()
+                                                        .map(|q| q.to_vec())
+                                                })
+                                        })
+                                        .unwrap_or_default();
+                                    tree.push(PolicyNode {
+                                        depth: cert_depth,
+                                        valid_policy: *idp,
+                                        qualifier_set: ap_q,
+                                        expected_policy_set: vec![*sdp],
+                                    });
+                                }
                             }
                         }
+                    } else {
+                        // policy_mapping == 0: delete nodes whose valid_policy
+                        // is an issuer_domain_policy in a mapping.
+                        let mapped_policies: Vec<der::asn1::ObjectIdentifier> =
+                            pm.0.iter().map(|m| m.issuer_domain_policy).collect();
+                        tree.retain(|nd| {
+                            nd.depth != cert_depth || !mapped_policies.contains(&nd.valid_policy)
+                        });
+                        if cert_depth > 0 {
+                            prune_policy_tree(tree, cert_depth);
+                        }
                     }
+                }
             }
             // Check if tree became effectively NULL after mapping operations.
             if let Some(ref t) = policy_tree {
@@ -1906,9 +2154,7 @@ fn chain_walk<V: SignatureVerifier>(
 
             // (policy-i) PolicyConstraints (RFC 5280 §6.1.4(c)): clamp
             // explicit_policy and policy_mapping from the extension.
-            if let Some(pc) =
-                find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
-            {
+            if let Some(pc) = find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS) {
                 if let Some(req) = pc.require_explicit_policy {
                     explicit_policy = explicit_policy.min(req);
                 }
@@ -1918,9 +2164,7 @@ fn chain_walk<V: SignatureVerifier>(
             }
 
             // (policy-j) InhibitAnyPolicy (RFC 5280 §6.1.4(d)): clamp inhibit_any.
-            if let Some(iap) =
-                find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
-            {
+            if let Some(iap) = find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY) {
                 inhibit_any = inhibit_any.min(iap.0);
             }
 
@@ -2078,9 +2322,9 @@ fn chain_walk<V: SignatureVerifier>(
                 .enumerate()
                 .filter(|(_, nd)| {
                     nd.depth >= 1
-                        && tree.iter().any(|p| {
-                            p.depth == nd.depth - 1 && p.valid_policy == OID_ANY_POLICY
-                        })
+                        && tree
+                            .iter()
+                            .any(|p| p.depth == nd.depth - 1 && p.valid_policy == OID_ANY_POLICY)
                 })
                 .map(|(idx, _)| idx)
                 .collect();
@@ -2104,7 +2348,9 @@ fn chain_walk<V: SignatureVerifier>(
             if !to_delete_vpns.is_empty() {
                 // Delete the out-of-set vpns nodes.
                 tree.retain(|nd| {
-                    !to_delete_vpns.iter().any(|(d, vp)| nd.depth == *d && &nd.valid_policy == vp)
+                    !to_delete_vpns
+                        .iter()
+                        .any(|(d, vp)| nd.depth == *d && &nd.valid_policy == vp)
                 });
                 // Cascade deletion downward: remove any node that is no longer
                 // reachable from a living parent node.
@@ -2148,9 +2394,7 @@ fn chain_walk<V: SignatureVerifier>(
                 }
                 tree.extend(additions);
                 // Delete the leaf anyPolicy node.
-                tree.retain(|nd| {
-                    !(nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)
-                });
+                tree.retain(|nd| !(nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY));
             }
 
             // Step (iii)(4): prune childless ancestors.
@@ -2333,9 +2577,8 @@ fn check_name_constraints(
         } else {
             None
         };
-        let permitted_rfc822: Option<
-            &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
-        > = permitted_rfc822_storage.as_deref();
+        let permitted_rfc822: Option<&[x509_cert::ext::pkix::constraints::name::GeneralSubtree]> =
+            permitted_rfc822_storage.as_deref();
 
         for rdn in subject.0.iter() {
             for ava in rdn.0.iter() {
@@ -3105,5 +3348,724 @@ mod tests_chain_walk {
             ),
             "unknown critical ext must return UnhandledCriticalExtension {{ index: 0 }}"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests: ValidationPolicy profile-enforcement fields (PKIX-ken.1.9–1.13)
+// ---------------------------------------------------------------------------
+//
+// Fixtures: pkix-path/tests/fixtures/policy-checks/
+//   root-p256.der, int-p256.der — P-256 CA chain (ecdsa-sha256)
+//   leaf-p256-365d-san-eku.der  — 365-day leaf, SAN=DNS:test.example.com, EKU=serverAuth
+//   leaf-p256-400d-san-eku.der  — 400-day leaf, SAN, EKU=serverAuth
+//   leaf-p256-365d-no-san.der   — 365-day leaf, no SAN extension
+//   leaf-p256-365d-no-eku.der   — 365-day leaf, SAN, no EKU extension
+//   leaf-p256-365d-wrong-eku.der— 365-day leaf, SAN, EKU=emailProtection only
+//   root-rsa2048.der, int-rsa2048.der — RSA-2048 CA chain (sha256WithRSAEncryption)
+//   leaf-rsa2048-365d-san-eku.der — RSA-2048 leaf, SAN, EKU=serverAuth
+//   leaf-rsa1024-365d-san-eku.der — RSA-1024 leaf, SAN, EKU=serverAuth
+//
+// Oracle: pkix-path/tests/fixtures/policy-checks/gen.py (pyca/cryptography)
+// Chain verification: openssl verify passed for P-256 and RSA-2048 happy paths.
+// Time constant: PC_NOW = 2026-06-01T00:00:00Z = 1_780_272_000 (unix)
+//   All fixtures have NOT_BEFORE=2026-01-01, valid at PC_NOW.
+//
+// All tests require the p256 feature for P-256 chain tests, and rsa for RSA chain tests.
+//
+// The P-256 chain uses the module-level const directly; RSA chain tests live inside
+// a separate rsa-feature-gated block so clippy does not warn about unused imports.
+
+#[cfg(all(test, feature = "p256"))]
+mod tests_policy_fields {
+    use super::*;
+    use der::Decode;
+
+    // GRY_NOW is also the test time for these fixtures (2026-06-01T00:00:00Z).
+    const PC_NOW: u64 = 1_780_272_000;
+
+    // OID constants — values from const_oid spec, NOT derived from the code under test.
+    // ecdsa-with-SHA256: 1.2.840.10045.4.3.2  (RFC 5912 §6)
+    const ECDSA_SHA256_OID: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+    // sha256WithRSAEncryption: 1.2.840.113549.1.1.11  (RFC 5912 §2)
+    const RSA_SHA256_OID: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+    // id-kp-serverAuth: 1.3.6.1.5.5.7.3.1  (RFC 5280 §4.2.1.12)
+    const ID_KP_SERVER_AUTH: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+    // id-kp-emailProtection: 1.3.6.1.5.5.7.3.4  (RFC 5280 §4.2.1.12)
+    const ID_KP_EMAIL_PROTECTION: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
+
+    fn load(bytes: &[u8]) -> Certificate {
+        Certificate::from_der(bytes).expect("valid DER fixture")
+    }
+
+    // -----------------------------------------------------------------------
+    // max_validity_secs (PKIX-ken.1.9)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: all certs in the chain have validity ≤ 3652 days (10-year root/int,
+    /// 365-day leaf). A cap of 4000 days allows all of them through.
+    #[test]
+    fn max_validity_passes_when_cert_within_limit() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // 4000-day cap: root/int have ~3652 days, leaf has 365 days — all within limit.
+        policy.max_validity_secs = Some(4_000 * 86_400);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("all certs within 4000-day cap should validate");
+    }
+
+    /// Oracle: root-p256.der and int-p256.der each have ~3652-day validity
+    /// (NOT_BEFORE=2026-01-01, NOT_AFTER=2036-01-01 from gen.py).
+    /// A cap of 400 days forces `ValidityPeriodExceedsMax` on the root (checked first
+    /// by chain_walk which iterates from high index to low).
+    ///
+    /// Note: the check applies to every cert in the chain, not just the leaf.
+    /// The root cert (highest index) is checked first and produces the error.
+    #[test]
+    fn max_validity_fails_when_cert_exceeds_limit() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // 400-day cap: root/int have 3652-day validity → ValidityPeriodExceedsMax.
+        // Wildcard index because the root (highest-index cert) is checked first.
+        policy.max_validity_secs = Some(400 * 86_400);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::ValidityPeriodExceedsMax { .. })
+            ),
+            "certs with 3652-day validity over 400-day cap must return ValidityPeriodExceedsMax"
+        );
+    }
+
+    /// Isolates the leaf-only failure: use a 1-cert self-issued chain where
+    /// the cert acts as both leaf and anchor. The 400-day cert fails a 398-day cap.
+    ///
+    /// Oracle: leaf-p256-400d-san-eku.der has notAfter-notBefore = 400 days = 34,560,000 s.
+    /// 400 days > 398 days → ValidityPeriodExceedsMax { index: 0 }.
+    #[test]
+    fn max_validity_fails_at_leaf_index_zero() {
+        // Use a single self-signed cert as both chain[0] and anchor so there is only
+        // one cert in the chain, making index 0 the only possible failure point.
+        // leaf-p256-400d-san-eku.der is NOT self-signed, so we use a known self-signed
+        // cert from the existing fixture set (ec-p256-sha256.der) which has a long
+        // validity, then set max to 1 day to force failure at index 0.
+        let cert = Certificate::from_der(include_bytes!("../tests/fixtures/ec-p256-sha256.der"))
+            .expect("parse ec-p256-sha256.der");
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let mut policy = ValidationPolicy::new(1_780_272_000); // PC_NOW: 2026-06-01
+                                                               // 1-day cap: the cert has multi-year validity → fails at index 0.
+        policy.max_validity_secs = Some(86_400);
+        assert!(
+            matches!(
+                validate_path(&[cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::ValidityPeriodExceedsMax { index: 0 })
+            ),
+            "1-cert chain: long-validity cert with 1-day cap must return ValidityPeriodExceedsMax {{ index: 0 }}"
+        );
+    }
+
+    /// Oracle: None = unconstrained, any validity length is accepted.
+    #[test]
+    fn max_validity_none_is_unconstrained() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-400d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.max_validity_secs = None; // default, but explicit for documentation
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("None cap must accept any validity length");
+    }
+
+    // -----------------------------------------------------------------------
+    // allowed_signature_algs (PKIX-ken.1.10)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: P-256 chain uses ecdsa-with-SHA256; allowlist contains that OID.
+    #[test]
+    fn alg_allowlist_passes_when_oid_in_list() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.allowed_signature_algs = Some(vec![ECDSA_SHA256_OID]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("ECDSA-SHA256 chain with ECDSA-SHA256 allowlist should pass");
+    }
+
+    /// Oracle: P-256 chain uses ecdsa-sha256; allowlist contains only RSA-sha256.
+    /// chain_walk walks highest index first: leaf=[0], int=[1], root=[2].
+    /// For a 3-cert chain, the root-adjacent cert is at index 2 in the slice.
+    /// chain_walk iterates i from (chain.len()-1) down to 0, so i=2 (root) is checked
+    /// first and fails with AlgorithmNotAllowed { index: 2 }.
+    #[test]
+    fn alg_allowlist_fails_when_oid_not_in_list() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Only RSA allowed, but chain uses ECDSA.
+        policy.allowed_signature_algs = Some(vec![RSA_SHA256_OID]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::AlgorithmNotAllowed { .. })
+            ),
+            "ECDSA chain with RSA-only allowlist must return AlgorithmNotAllowed"
+        );
+    }
+
+    /// Oracle: None = unconstrained, any algorithm is accepted.
+    #[test]
+    fn alg_allowlist_none_is_unconstrained() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.allowed_signature_algs = None; // default
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("None allowlist must accept any algorithm");
+    }
+
+    // -----------------------------------------------------------------------
+    // require_subject_alt_name (PKIX-ken.1.12)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: leaf-p256-365d-san-eku.der has SAN=DNS:test.example.com.
+    #[test]
+    fn require_san_passes_when_san_present() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.require_subject_alt_name = true;
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("leaf with SAN must pass require_subject_alt_name=true");
+    }
+
+    /// Oracle: leaf-p256-365d-no-san.der has no SAN extension.
+    #[test]
+    fn require_san_fails_when_san_absent() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-no-san.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.require_subject_alt_name = true;
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::MissingSan)
+            ),
+            "leaf without SAN must return MissingSan when require_subject_alt_name=true"
+        );
+    }
+
+    /// Oracle: false = default = no SAN requirement; missing SAN is not an error.
+    #[test]
+    fn require_san_false_does_not_fail_on_missing_san() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-no-san.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.require_subject_alt_name = false; // default, explicit for documentation
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("require_subject_alt_name=false must not fail on missing SAN");
+    }
+
+    /// Regression guard for the i == 0 guard in chain_walk.
+    ///
+    /// int-p256.der has no SAN extension. With require_subject_alt_name=true,
+    /// the check MUST NOT fail on the intermediate (i == 1). Only the leaf
+    /// (i == 0) is checked.
+    ///
+    /// Oracle: openssl x509 -inform DER -in int-p256.der -text -noout | grep -i alt
+    /// → empty output; int-p256.der has no SAN. Confirmed during fixture generation.
+    #[test]
+    fn require_san_only_checks_leaf_not_intermediates() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        // The leaf HAS a SAN; the intermediate does NOT.
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.require_subject_alt_name = true;
+        let anchors = [TrustAnchor::from_cert(root)];
+        // Must pass: the SAN-less intermediate is not checked, only the leaf.
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("i==0 guard must ensure only the leaf is checked for SAN presence");
+    }
+
+    // -----------------------------------------------------------------------
+    // required_leaf_eku (PKIX-ken.1.13)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: leaf-p256-365d-san-eku.der has EKU=serverAuth (1.3.6.1.5.5.7.3.1).
+    #[test]
+    fn required_eku_passes_when_all_oids_present() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("leaf with serverAuth EKU must pass required_leaf_eku=[serverAuth]");
+    }
+
+    /// Oracle: leaf-p256-365d-no-eku.der has no EKU extension.
+    /// required_leaf_eku=Some([serverAuth]) with absent EKU → MissingEku.
+    #[test]
+    fn required_eku_fails_when_eku_extension_absent() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-no-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::MissingEku)
+            ),
+            "leaf without EKU extension must return MissingEku when an EKU OID is required"
+        );
+    }
+
+    /// Oracle: leaf-p256-365d-wrong-eku.der has EKU=emailProtection only, not serverAuth.
+    #[test]
+    fn required_eku_fails_when_required_oid_not_in_list() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-wrong-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Requires serverAuth; leaf only has emailProtection.
+        policy.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::MissingEku)
+            ),
+            "leaf with wrong EKU must return MissingEku when required OID is absent"
+        );
+    }
+
+    /// Oracle: None = no EKU requirement; missing EKU is not an error.
+    #[test]
+    fn required_eku_none_is_unconstrained() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-no-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.required_leaf_eku = None; // default
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("None required_leaf_eku must accept leaf with no EKU");
+    }
+
+    /// Oracle: Some([]) = require zero OIDs → trivially passes regardless of EKU content.
+    #[test]
+    fn required_eku_empty_vec_is_unconstrained() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-no-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Empty vec: Some([]) requires zero OIDs → always passes.
+        policy.required_leaf_eku = Some(vec![]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("Some([]) required_leaf_eku (empty) must accept any EKU configuration");
+    }
+
+    /// Verify that emailProtection in required_leaf_eku does NOT match serverAuth in the cert.
+    /// This guards against a hypothetical relaxed OID comparison bug.
+    #[test]
+    fn required_eku_emailprotection_does_not_match_serverauth() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Require emailProtection; leaf only has serverAuth.
+        policy.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier),
+                Err(Error::MissingEku)
+            ),
+            "OID comparison must be exact; emailProtection must not match serverAuth"
+        );
+    }
+}
+
+// RSA-specific policy field tests — gated on the rsa feature.
+#[cfg(all(test, feature = "p256", feature = "rsa"))]
+mod tests_policy_fields_rsa {
+    use super::*;
+    use der::Decode;
+
+    const PC_NOW: u64 = 1_780_272_000;
+
+    // sha256WithRSAEncryption: 1.2.840.113549.1.1.11  (RFC 5912 §2)
+    const RSA_SHA256_OID: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+    // ecdsa-with-SHA256: 1.2.840.10045.4.3.2  (RFC 5912 §6)
+    const ECDSA_SHA256_OID: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+    // id-kp-serverAuth: 1.3.6.1.5.5.7.3.1
+    const ID_KP_SERVER_AUTH: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+
+    fn load(bytes: &[u8]) -> Certificate {
+        Certificate::from_der(bytes).expect("valid DER fixture")
+    }
+
+    // -----------------------------------------------------------------------
+    // min_rsa_key_bits helper unit tests (PKIX-ken.1.11)
+    // -----------------------------------------------------------------------
+
+    /// Direct unit test of rsa_public_key_bits helper.
+    /// Oracle: openssl x509 -inform DER -in leaf-rsa2048.der -text -noout | grep 'Public-Key'
+    /// → Public-Key: (2048 bit)
+    #[test]
+    fn rsa_key_bits_correct_for_2048_key() {
+        let cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
+        ));
+        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        assert_eq!(
+            result,
+            Some(2048),
+            "RSA-2048 key must return Some(2048) from rsa_public_key_bits"
+        );
+    }
+
+    /// Direct unit test of rsa_public_key_bits helper.
+    /// Oracle: openssl x509 -inform DER -in leaf-rsa1024.der -text -noout | grep 'Public-Key'
+    /// → Public-Key: (1024 bit)
+    #[test]
+    fn rsa_key_bits_correct_for_1024_key() {
+        let cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa1024-365d-san-eku.der"
+        ));
+        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        assert_eq!(
+            result,
+            Some(1024),
+            "RSA-1024 key must return Some(1024) from rsa_public_key_bits"
+        );
+    }
+
+    /// Direct unit test of rsa_public_key_bits helper.
+    /// P-256 key is not RSA; must return None.
+    #[test]
+    fn rsa_key_bits_none_for_ec_key() {
+        let cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        assert_eq!(
+            result, None,
+            "EC key must return None from rsa_public_key_bits (not RSA)"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // min_rsa_key_bits validate_path tests (PKIX-ken.1.11)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: leaf-rsa2048-365d-san-eku.der has RSA-2048 leaf.
+    /// 2048 >= 2048 → passes.
+    #[test]
+    fn min_rsa_key_bits_passes_when_key_meets_limit() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.min_rsa_key_bits = Some(2048);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(
+            &[leaf, int_cert],
+            &anchors,
+            &policy,
+            &RsaPkcs1v15Sha256Verifier,
+        )
+        .expect("RSA-2048 leaf with min=2048 should pass");
+    }
+
+    /// Oracle: leaf-rsa1024-365d-san-eku.der has RSA-1024 leaf.
+    /// 1024 < 2048 → KeyTooSmall { index: 0 }.
+    #[test]
+    fn min_rsa_key_bits_fails_when_key_too_small() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa1024-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.min_rsa_key_bits = Some(2048);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(
+                    &[leaf, int_cert],
+                    &anchors,
+                    &policy,
+                    &RsaPkcs1v15Sha256Verifier
+                ),
+                Err(Error::KeyTooSmall { index: 0 })
+            ),
+            "RSA-1024 leaf with min=2048 must return KeyTooSmall {{ index: 0 }}"
+        );
+    }
+
+    /// Oracle: None = unconstrained; RSA-1024 leaf passes with no key size restriction.
+    #[test]
+    fn min_rsa_key_bits_none_is_unconstrained() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa1024-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.min_rsa_key_bits = None; // default
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(
+            &[leaf, int_cert],
+            &anchors,
+            &policy,
+            &RsaPkcs1v15Sha256Verifier,
+        )
+        .expect("None min_rsa_key_bits must accept RSA-1024 leaf");
+    }
+
+    /// EC key must not be affected by min_rsa_key_bits regardless of the value.
+    /// Oracle: P-256 key is not RSA; rsa_public_key_bits returns None → check skipped.
+    #[test]
+    fn min_rsa_key_bits_ec_key_passes_unconditionally() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Extremely high floor — would reject any RSA key, but P-256 is not RSA.
+        policy.min_rsa_key_bits = Some(16384);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("EC key must not be affected by min_rsa_key_bits");
+    }
+
+    // -----------------------------------------------------------------------
+    // allowed_signature_algs: RSA chain test (PKIX-ken.1.10)
+    // -----------------------------------------------------------------------
+
+    /// Oracle: RSA chain uses sha256WithRSAEncryption; ECDSA-only allowlist must reject it.
+    #[test]
+    fn alg_allowlist_fails_on_rsa_chain_when_only_ecdsa_allowed() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        // Only ECDSA allowed; RSA chain must fail.
+        policy.allowed_signature_algs = Some(vec![ECDSA_SHA256_OID]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        assert!(
+            matches!(
+                validate_path(
+                    &[leaf, int_cert],
+                    &anchors,
+                    &policy,
+                    &RsaPkcs1v15Sha256Verifier
+                ),
+                Err(Error::AlgorithmNotAllowed { .. })
+            ),
+            "RSA chain with ECDSA-only allowlist must return AlgorithmNotAllowed"
+        );
+    }
+
+    /// Oracle: RSA chain with RSA in allowlist must pass.
+    #[test]
+    fn alg_allowlist_passes_for_rsa_chain() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.allowed_signature_algs = Some(vec![RSA_SHA256_OID]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(
+            &[leaf, int_cert],
+            &anchors,
+            &policy,
+            &RsaPkcs1v15Sha256Verifier,
+        )
+        .expect("RSA chain with RSA-SHA256 in allowlist should pass");
+    }
+
+    /// EKU tests for RSA chain are structurally identical to P-256; spot-check one.
+    ///
+    /// Oracle: leaf-rsa2048-365d-san-eku.der has EKU=serverAuth.
+    #[test]
+    fn required_eku_passes_for_rsa_chain() {
+        let root = load(include_bytes!(
+            "../tests/fixtures/policy-checks/root-rsa2048.der"
+        ));
+        let int_cert = load(include_bytes!(
+            "../tests/fixtures/policy-checks/int-rsa2048.der"
+        ));
+        let leaf = load(include_bytes!(
+            "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
+        ));
+        let mut policy = ValidationPolicy::new(PC_NOW);
+        policy.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
+        let anchors = [TrustAnchor::from_cert(root)];
+        validate_path(
+            &[leaf, int_cert],
+            &anchors,
+            &policy,
+            &RsaPkcs1v15Sha256Verifier,
+        )
+        .expect("RSA leaf with serverAuth EKU must pass required_leaf_eku=[serverAuth]");
     }
 }
