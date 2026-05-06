@@ -324,34 +324,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     RFC 5280 §5.2.4: delta CRL entries take precedence over base entries.
         //     A removeFromCRL reason in the delta means the cert was un-held.
         let cert_serial = &cert.tbs_certificate.serial_number;
-
-        // Check delta CRL entries (they take precedence).
-        if let Some(delta_entry) = delta_entries
-            .iter()
-            .find(|e| &e.serial_number == cert_serial)
-        {
-            let reason = extract_reason_code(delta_entry);
-            if reason == Some(CrlReason::RemoveFromCRL) {
-                // certificateHold was lifted; cert is not revoked.
-                return Ok(());
-            }
-            return Err(Error::Revoked {
-                serial: cert_serial.clone(),
-                reason_code: reason,
-            });
-        }
-
-        // Check base CRL entries.
-        if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
-            if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
-                return Err(Error::Revoked {
-                    serial: cert_serial.clone(),
-                    reason_code: extract_reason_code(entry),
-                });
-            }
-        }
-
-        Ok(())
+        check_revocation_status(cert_serial, &delta_entries, &crl)
     }
 
     /// Check revocation for `cert` issued directly by a trust anchor.
@@ -434,32 +407,55 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (7) Search for the certificate's serial (delta entries take precedence).
         let cert_serial = &cert.tbs_certificate.serial_number;
+        check_revocation_status(cert_serial, &delta_entries, &crl)
+    }
+}
 
-        if let Some(delta_entry) = delta_entries
-            .iter()
-            .find(|e| &e.serial_number == cert_serial)
-        {
-            let reason = extract_reason_code(delta_entry);
-            if reason == Some(CrlReason::RemoveFromCRL) {
-                return Ok(());
-            }
+// ---------------------------------------------------------------------------
+// Revocation status helper
+// ---------------------------------------------------------------------------
+
+/// Search for `cert_serial` in `delta_entries` (higher priority) and then in
+/// the base `crl`, and return the appropriate revocation result.
+///
+/// RFC 5280 §5.2.4: delta CRL entries take precedence over base entries.
+/// - If found in `delta_entries` with reason `RemoveFromCRL`, the
+///   certificateHold was lifted and the certificate is not revoked → `Ok(())`.
+/// - If found in `delta_entries` for any other reason → `Err(Revoked)`.
+/// - If found in the base CRL → `Err(Revoked)`.
+/// - If not found in either → `Ok(())` (not revoked).
+fn check_revocation_status(
+    cert_serial: &x509_cert::serial_number::SerialNumber,
+    delta_entries: &[RevokedCert],
+    crl: &CertificateList,
+) -> crate::Result<()> {
+    // Check delta CRL entries first (they take precedence over base entries).
+    if let Some(delta_entry) = delta_entries
+        .iter()
+        .find(|e| &e.serial_number == cert_serial)
+    {
+        let reason = extract_reason_code(delta_entry);
+        if reason == Some(CrlReason::RemoveFromCRL) {
+            // certificateHold was lifted; cert is not revoked.
+            return Ok(());
+        }
+        return Err(Error::Revoked {
+            serial: cert_serial.clone(),
+            reason_code: reason,
+        });
+    }
+
+    // Check base CRL entries.
+    if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
+        if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
             return Err(Error::Revoked {
                 serial: cert_serial.clone(),
-                reason_code: reason,
+                reason_code: extract_reason_code(entry),
             });
         }
-
-        if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
-            if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
-                return Err(Error::Revoked {
-                    serial: cert_serial.clone(),
-                    reason_code: extract_reason_code(entry),
-                });
-            }
-        }
-
-        Ok(())
     }
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
