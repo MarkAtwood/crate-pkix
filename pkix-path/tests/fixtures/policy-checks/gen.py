@@ -244,6 +244,52 @@ leaf_rsa1024_365d_san_eku = make_leaf(
 )
 
 # ---------------------------------------------------------------------------
+# Self-signed 365-day cert for web_pki_policy conforming test
+#
+# web_pki_policy sets max_validity_secs = 398 days which applies to ALL certs
+# in the chain (including CA certs). The root/int fixtures above have 10-year
+# validity (3652 days) which exceeds 398 days. A 1-cert self-signed chain
+# sidesteps this by having only one cert that serves as both leaf and anchor.
+#
+# This cert has: 365-day validity, SAN=DNS:test.example.com, serverAuth EKU.
+# Oracle: self-signed P-256, openssl verify -CAfile <self> <self> → OK.
+# ---------------------------------------------------------------------------
+key_webpki_self = ec.generate_private_key(ec.SECP256R1())
+webpki_self_signed = (
+    x509.CertificateBuilder()
+    .subject_name(make_name("PKIX-webpki-self"))
+    .issuer_name(make_name("PKIX-webpki-self"))
+    .public_key(key_webpki_self.public_key())
+    .serial_number(next_serial())
+    .not_valid_before(NOT_BEFORE)
+    .not_valid_after(NOT_AFTER_365)
+    .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    .add_extension(
+        x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=True,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    .add_extension(
+        x509.SubjectAlternativeName([x509.DNSName("test.example.com")]),
+        critical=False,
+    )
+    .add_extension(
+        x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+        critical=False,
+    )
+    .sign(key_webpki_self, hashes.SHA256())
+)
+
+# ---------------------------------------------------------------------------
 # Write DER files
 # ---------------------------------------------------------------------------
 files = {
@@ -258,6 +304,7 @@ files = {
     "int-rsa2048.der": int_rsa2048,
     "leaf-rsa2048-365d-san-eku.der": leaf_rsa2048_365d_san_eku,
     "leaf-rsa1024-365d-san-eku.der": leaf_rsa1024_365d_san_eku,
+    "webpki-self-signed-365d.der": webpki_self_signed,
 }
 
 for name, cert in files.items():

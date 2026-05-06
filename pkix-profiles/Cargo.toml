@@ -11,6 +11,7 @@ keywords    = ["x509", "certificate", "pki", "cabforum", "tls"]
 categories  = ["cryptography"]
 
 [dependencies]
+der       = { workspace = true }
 pkix-path = { workspace = true }
 x509-cert = { workspace = true }
 
