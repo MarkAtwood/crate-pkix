@@ -275,38 +275,37 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     defense-in-depth: they guard against any future code path that bypasses
         //     the with_delta() constructor and against subtle cross-name mismatches.
         let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
+            // Parse the delta CRL once; all subsequent checks use the parsed value.
+            let delta_crl =
+                CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+
             // Extra check: delta CRL issuer must also match the base CRL issuer
             // (construction-time invariant, re-checked here for defense-in-depth).
-            // We parse once to get the issuer, then rely on the helper for the rest.
-            let delta_issuer = {
-                let delta_hdr =
-                    CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
-                if !names_match(&delta_hdr.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
-                    return Err(Error::CrlIssuerMismatch);
-                }
-                // Also verify against cert's issuer (transitively guaranteed above, explicit for clarity).
-                if !names_match(
-                    &delta_hdr.tbs_cert_list.issuer,
-                    &cert.tbs_certificate.issuer,
-                ) {
-                    return Err(Error::CrlIssuerMismatch);
-                }
-                delta_hdr.tbs_cert_list.issuer
-            };
-
-            // Verify the `issuer` Certificate's subject DN matches the delta CRL issuer.
-            // Mirrors step (2b) for the base CRL.
-            if !names_match(&issuer.tbs_certificate.subject, &delta_issuer) {
+            if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+            // Also verify against cert's issuer (transitively guaranteed above, explicit for clarity).
+            if !names_match(
+                &delta_crl.tbs_cert_list.issuer,
+                &cert.tbs_certificate.issuer,
+            ) {
                 return Err(Error::CrlIssuerMismatch);
             }
 
-            // cRLSign was already verified at line 218 for the base CRL issuer.
+            // Verify the `issuer` Certificate's subject DN matches the delta CRL issuer.
+            // Mirrors step (2b) for the base CRL.
+            if !names_match(
+                &issuer.tbs_certificate.subject,
+                &delta_crl.tbs_cert_list.issuer,
+            ) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+
+            // cRLSign was already verified above for the base CRL issuer.
             // The delta CRL uses the same `issuer` (confirmed by the name-match
             // checks above), so the cRLSign bit check is not repeated here.
-            // If a future extension introduces independent delta issuers, a
-            // separate issuer_has_crl_sign() call must be added at that point.
             verify_delta_crl_and_collect(
-                delta_der,
+                &delta_crl,
                 &self.verifier,
                 issuer
                     .tbs_certificate
@@ -401,20 +400,20 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (6) Delta CRL merge — if a delta CRL is present, verify issuer consistency
         //     and merge it.  Uses the anchor SPKI for the delta signature check.
         let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
+            // Parse the delta CRL once; all subsequent checks use the parsed value.
+            let delta_crl =
+                CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+
             // Cross-check: delta CRL issuer must match base CRL issuer and anchor subject.
             // Mirrors the three-way check performed in check_revocation for the cert-issuer path.
-            {
-                let delta_hdr =
-                    CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
-                if !names_match(&delta_hdr.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
-                    return Err(Error::CrlIssuerMismatch);
-                }
-                if !names_match(&delta_hdr.tbs_cert_list.issuer, &anchor.subject) {
-                    return Err(Error::CrlIssuerMismatch);
-                }
+            if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
+                return Err(Error::CrlIssuerMismatch);
+            }
+            if !names_match(&delta_crl.tbs_cert_list.issuer, &anchor.subject) {
+                return Err(Error::CrlIssuerMismatch);
             }
             verify_delta_crl_and_collect(
-                delta_der,
+                &delta_crl,
                 &self.verifier,
                 anchor.subject_public_key_info.owned_to_ref(),
                 &anchor.subject,
@@ -484,29 +483,22 @@ fn check_revocation_status(
 /// Verify a delta CRL and return its revoked-certificate entries.
 ///
 /// Performs (in order):
-/// 1. Parse the delta DER.
-/// 2. Check that the delta CRL issuer matches `expected_issuer_name`.
+/// 1. Check that the delta CRL issuer matches `expected_issuer_name`.
+/// 2. Check the delta validity window against `now_unix`.
 /// 3. Verify the delta signature using `issuer_spki`.
-/// 4. Check the delta validity window against `now_unix`.
-/// 5. Return the delta's revoked-certificates list (empty if absent).
+/// 4. Return the delta's revoked-certificates list (empty if absent).
 ///
-/// The caller is responsible for any additional issuer-name cross-checks
-/// needed by the calling context (e.g., checking the delta issuer against
-/// the base CRL issuer or the subject certificate's issuer).
+/// The caller is responsible for parsing the `CertificateList` and for any
+/// additional issuer-name cross-checks needed by the calling context (e.g.,
+/// checking the delta issuer against the base CRL issuer or the subject
+/// certificate's issuer).
 fn verify_delta_crl_and_collect<V: SignatureVerifier>(
-    delta_der: &[u8],
+    delta_crl: &CertificateList,
     verifier: &V,
     issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
     expected_issuer_name: &x509_cert::name::Name,
     now_unix: u64,
 ) -> crate::Result<Vec<RevokedCert>> {
-    // FIXME(tog.13): delta CRL DER is parsed twice — once in check_revocation /
-    // check_revocation_against_anchor for the issuer-name guard, and again here.
-    // Refactoring to accept an already-parsed `&CertificateList` would eliminate
-    // the redundant parse but requires changing this function's signature.
-    // Tracked for v0.3 along with the general parsed-CRL caching work.
-    let delta_crl = CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
-
     if !names_match(&delta_crl.tbs_cert_list.issuer, expected_issuer_name) {
         return Err(Error::CrlIssuerMismatch);
     }
@@ -546,6 +538,7 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     Ok(delta_crl
         .tbs_cert_list
         .revoked_certificates
+        .clone()
         .unwrap_or_default())
 }
 
