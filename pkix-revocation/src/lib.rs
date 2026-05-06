@@ -22,7 +22,7 @@ use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
 /// Errors returned by revocation checking.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate has been revoked.
@@ -179,10 +179,11 @@ pub trait RevocationChecker {
     ///
     /// # Errors
     ///
-    /// - [`Error::CertRevoked`] — the certificate's serial number appears in the
+    /// - [`Error::Revoked`] — the certificate's serial number appears in the
     ///   CRL's or OCSP response's revoked list.
-    /// - [`Error::CrlExpired`] / [`Error::OcspExpired`] — the revocation data has
-    ///   passed its `nextUpdate` timestamp.
+    /// - [`Error::CrlExpired`] — the CRL has passed its `nextUpdate` timestamp.
+    /// - [`Error::OcspMalformed`] — the OCSP response is structurally invalid or
+    ///   its validity window check failed.
     /// - Other [`Error`] variants for parse failures, signature verification
     ///   failures, or structural constraint violations.
     ///

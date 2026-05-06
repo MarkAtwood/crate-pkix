@@ -3165,6 +3165,28 @@ mod tests_validate_path {
         );
     }
 
+    /// absent_key_usage_intermediate_accepted: nku-int has NO KeyUsage extension at all.
+    ///
+    /// RFC 5280 §6.1.4(n): "If a KeyUsage extension is **present**, verify that the
+    /// keyCertSign bit is set." Absent KeyUsage must not be rejected by enforce_key_usage.
+    ///
+    /// Oracle: pyca/cryptography — nku-int has only BasicConstraints (OID 2.5.29.19),
+    /// no KeyUsage extension.
+    #[test]
+    fn absent_key_usage_intermediate_accepted() {
+        let root = load(include_bytes!("../tests/fixtures/nku-root.der"));
+        let int_cert = load(include_bytes!("../tests/fixtures/nku-int.der"));
+        let leaf = load(include_bytes!("../tests/fixtures/nku-leaf.der"));
+        let anchors = [TrustAnchor::from_cert(root)];
+        // Default policy has enforce_key_usage = true.
+        // nku-int has no KeyUsage — must NOT trigger KeyUsageMissing per RFC 5280 §6.1.4(n).
+        let now: u64 = 1_720_000_000; // 2024-07-03, within nku-int validity (2024-2030)
+        let mut policy = ValidationPolicy::default();
+        policy.current_time_unix = now;
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
+            .expect("intermediate with absent KeyUsage must be accepted when enforce_key_usage=true");
+    }
+
     /// Leaf with critical ExtendedKeyUsage → validate_path must accept it.
     ///
     /// EKU is in HANDLED_CRITICAL_OIDS; its value is not inspected.
