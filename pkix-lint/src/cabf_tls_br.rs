@@ -80,7 +80,7 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier =
 /// - 2027-03-15 to 2029-03-15: 100 days
 /// - 2029-03-15 onwards: 47 days
 ///
-/// The cap is evaluated at the certificate's `notBefore` (issuance time).
+/// The cap is evaluated at `now_unix` (the relying party's current time).
 ///
 /// Citation: CA/B Forum TLS BR §6.3.2 (SC-081)
 pub struct ValidityMaxLint;
@@ -106,7 +106,7 @@ impl Lint for ValidityMaxLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let tbs = &cert.tbs_certificate;
         let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
         let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
@@ -114,7 +114,7 @@ impl Lint for ValidityMaxLint {
         // Validity duration in seconds; saturate to avoid underflow on malformed certs.
         let duration_secs = not_after.saturating_sub(not_before);
 
-        let cap = pkix_profiles::sc081_validity_cap(not_before);
+        let cap = pkix_profiles::sc081_validity_cap(now_unix);
 
         if duration_secs > cap {
             LintResult::Error("leaf certificate validity period exceeds SC-081 cap")
@@ -158,7 +158,7 @@ impl Lint for Sha1ProhibitedLint {
         SubjectKind::Any
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let sig_alg = &cert.signature_algorithm.oid;
         if sig_alg == &SHA1_WITH_RSA || sig_alg == &ECDSA_WITH_SHA1 {
             LintResult::Error("certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3")
@@ -210,7 +210,7 @@ impl Lint for RsaMinKeySizeLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let spki = &cert.tbs_certificate.subject_public_key_info;
 
         // Only check RSA keys.
@@ -336,7 +336,7 @@ impl Lint for SanRequiredLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent"),
@@ -394,7 +394,7 @@ impl Lint for EkuServerAuthLint {
         SubjectKind::Leaf
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => return LintResult::Error("leaf certificate has no extensions; ExtendedKeyUsage absent"),
@@ -456,7 +456,7 @@ impl Lint for BcCaFlagLint {
         SubjectKind::IntermediateCa
     }
 
-    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, now_unix: u64) -> LintResult {
         let extensions = match &cert.tbs_certificate.extensions {
             Some(exts) => exts,
             None => {
@@ -554,9 +554,6 @@ impl LintProfile for CabfTlsBrProfile {
         LINTS.get_or_init(all_lints)
     }
 
-    /// Allocates a new [`LintRunner`] on each call. `LintRunner` is cheap to
-    /// construct, so this is acceptable for one-shot use. For repeated use,
-    /// cache the returned runner at the call site.
     fn lint_runner(&self) -> LintRunner {
         LintRunner::new(all_lints())
     }
