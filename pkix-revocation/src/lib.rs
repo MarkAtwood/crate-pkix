@@ -17,6 +17,16 @@
 //!
 //! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
 //! that perform network I/O are `std`-only and gated behind separate features.
+//!
+//! # Security: anchor-issued certificate revocation
+//!
+//! [`RevocationChecker::check_revocation_against_anchor`] has a default
+//! implementation that returns `Ok(())` (i.e., skips the check). Implementors
+//! that require **full-chain** revocation coverage — including the certificate
+//! issued directly by a trust anchor — **MUST** override this method. Failing
+//! to override it will silently leave the anchor-issued certificate unchecked
+//! with no compile error or runtime warning. See that method's documentation
+//! for details.
 
 use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
@@ -209,6 +219,19 @@ pub trait RevocationChecker {
     /// overall no-op behaviour. `CrlChecker` and `OcspChecker` both override
     /// this method: they verify the pre-loaded CRL or OCSP response against the
     /// anchor's subject DN and SPKI.
+    ///
+    /// # Security
+    ///
+    /// **The default implementation silently skips revocation checking for the
+    /// anchor-issued certificate.** If your threat model requires revocation
+    /// checking for every certificate in the chain — including the one issued
+    /// directly by the trust anchor — you MUST override this method. There is
+    /// no compile-time or runtime warning when the default is used; the skip
+    /// is intentional for environments (e.g., embedded, offline, short-lived
+    /// certificates) where anchor-level revocation data is unavailable.
+    ///
+    /// Failing to override this method in a context that requires full-chain
+    /// revocation coverage is a silent security gap.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,

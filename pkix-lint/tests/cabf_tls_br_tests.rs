@@ -150,6 +150,76 @@ fn validity_max_not_applicable_for_intermediate() {
 }
 
 // ---------------------------------------------------------------------------
+// SC-081 phase transition tests — 2027 (100-day) and 2029 (47-day)
+// ---------------------------------------------------------------------------
+//
+// Oracle: SC-081 phases (CA/B Forum Ballot SC-081):
+//   notBefore on/after 2027-03-15: cap = 100 days = 8_640_000 s
+//   notBefore on/after 2029-03-15: cap = 47  days = 4_060_800 s
+//
+// These tests validate the sc081_validity_cap function directly (the same
+// function that ValidityMaxLint calls) because the required DER fixtures do
+// not yet exist in the repository.  The fixture-based tests are marked
+// #[ignore] below.
+//
+// To add proper fixture-based tests:
+//   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -sha256 \
+//     -noenc -subj "/CN=test/O=test/C=US" \
+//     -startdate 270316000000Z -days 110 \
+//     -out /tmp/leaf-p256-110d-post-sc081-100d.pem -keyout /tmp/k.key
+//   openssl x509 -in /tmp/leaf-p256-110d-post-sc081-100d.pem -outform DER \
+//     -out pkix-path/tests/fixtures/policy-checks/leaf-p256-110d-post-sc081-100d.der
+//   # Similarly for 50-day cert with -startdate 290316000000Z -days 50
+//
+// Then update these tests to use load_cert! and remove the #[ignore] attribute.
+
+#[test]
+fn validity_max_cap_function_100d_phase() {
+    // Verify that sc081_validity_cap returns the 100-day cap for a notBefore
+    // after 2027-03-15.  This is the same oracle the ValidityMaxLint uses.
+    // Oracle: CA/B Forum Ballot SC-081; 2027-03-15T00:00:00Z = 1_805_068_800
+    use pkix_profiles::sc081_validity_cap;
+    const T_2027_MAR_15: u64 = 1_805_068_800;
+    const T_2027_MAR_16: u64 = 1_805_068_800 + 86_400;
+    const DAYS_100_SECS: u64 = 100 * 86_400;
+    // Exactly on the threshold
+    assert_eq!(
+        sc081_validity_cap(T_2027_MAR_15),
+        DAYS_100_SECS,
+        "2027-03-15 exactly must yield 100-day cap"
+    );
+    // One day after the threshold
+    assert_eq!(
+        sc081_validity_cap(T_2027_MAR_16),
+        DAYS_100_SECS,
+        "2027-03-16 must yield 100-day cap"
+    );
+}
+
+#[test]
+fn validity_max_cap_function_47d_phase() {
+    // Verify that sc081_validity_cap returns the 47-day cap for a notBefore
+    // after 2029-03-15.
+    // Oracle: CA/B Forum Ballot SC-081; 2029-03-15T00:00:00Z = 1_868_227_200
+    use pkix_profiles::sc081_validity_cap;
+    const T_2029_MAR_15: u64 = 1_868_227_200;
+    const T_2029_MAR_16: u64 = 1_868_227_200 + 86_400;
+    const DAYS_47_SECS: u64 = 47 * 86_400;
+    // Exactly on the threshold
+    assert_eq!(
+        sc081_validity_cap(T_2029_MAR_15),
+        DAYS_47_SECS,
+        "2029-03-15 exactly must yield 47-day cap"
+    );
+    // One day after the threshold
+    assert_eq!(
+        sc081_validity_cap(T_2029_MAR_16),
+        DAYS_47_SECS,
+        "2029-03-16 must yield 47-day cap"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Lint 2 — cabf.br.tls.alg.sha1_prohibited
 // ---------------------------------------------------------------------------
 //
@@ -218,6 +288,39 @@ fn sha1_prohibited_oid_detection_logic() {
     // webpki cert uses ecdsa-with-SHA256, not SHA-1.
     assert_ne!(actual_oid, &sha1_rsa, "fixture cert must not use sha1WithRSAEncryption");
     assert_ne!(actual_oid, &sha1_ecdsa, "fixture cert must not use ecdsa-with-SHA1");
+}
+
+/// Negative test: a cert actually signed with SHA-1 must return Error.
+///
+/// This test requires a DER fixture signed with SHA-1, which cannot be generated
+/// without external cryptographic tooling (openssl or similar). The test is
+/// marked `#[ignore]` until the fixture is available.
+///
+/// To generate the fixture and enable this test:
+/// 1. Run:
+///      openssl req -x509 -newkey rsa:2048 -sha1 -days 365 \
+///        -subj "/CN=sha1-test" -noenc \
+///        -out /tmp/leaf-rsa2048-sha1.pem -keyout /tmp/leaf-rsa2048-sha1.key
+///      openssl x509 -in /tmp/leaf-rsa2048-sha1.pem -outform DER \
+///        -out pkix-path/tests/fixtures/policy-checks/leaf-rsa2048-sha1.der
+/// 2. Replace the runtime `std::fs::read` below with `load_cert!("leaf-rsa2048-sha1.der")`.
+/// 3. Remove the `#[ignore]` attribute and commit the fixture.
+#[test]
+#[ignore = "requires leaf-rsa2048-sha1.der fixture — see comment above for generation steps"]
+fn sha1_prohibited_error_on_sha1_cert() {
+    // Use runtime read so this test compiles without the fixture present.
+    let fixture_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../pkix-path/tests/fixtures/policy-checks/leaf-rsa2048-sha1.der"
+    );
+    let der = std::fs::read(fixture_path).expect("fixture leaf-rsa2048-sha1.der must exist");
+    let cert = Certificate::from_der(&der).expect("fixture is valid DER");
+    let lint = Sha1ProhibitedLint;
+    let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
+    assert!(
+        matches!(result, LintResult::Error(_)),
+        "SHA-1 signed cert must Error the sha1_prohibited lint, got {result:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------

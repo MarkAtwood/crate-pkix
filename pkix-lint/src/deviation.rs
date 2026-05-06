@@ -59,6 +59,19 @@
 use crate::Severity;
 use x509_cert::Certificate;
 
+/// Serde deserializer helper for `&'static str` fields in this module.
+///
+/// See the identical function in `crate::de_static_str` for rationale.
+#[cfg(feature = "serde")]
+fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let s = String::deserialize(deserializer)?;
+    Ok(Box::leak(s.into_boxed_str()))
+}
+
 /// A scoped, time-bounded exception to a specific lint finding.
 ///
 /// See the module-level documentation for the design rationale and usage.
@@ -426,11 +439,14 @@ pub enum DeviationAction {
 /// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
 /// operators can navigate to the backing waiver document without a second lookup.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
     pub lint_id: &'static str,
     /// The citation for the lint that produced this finding.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
     pub citation: &'static str,
     /// The original lint result before the deviation was applied.
     pub original_result: crate::LintResult,

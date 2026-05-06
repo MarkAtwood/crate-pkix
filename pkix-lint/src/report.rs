@@ -25,8 +25,23 @@
 //!
 //! A full OSCAL export adapter is planned for the `pkix-lint-oscal` crate (v0.3).
 
+use std::borrow::Cow;
+
 use crate::deviation::DeviatedFinding;
 use crate::Finding;
+
+/// Serde deserializer helper for `Cow<'static, str>`.
+///
+/// Deserializes any string input as `String` and wraps it in `Cow::Owned`,
+/// since a `Cow<'static, str>` cannot borrow from a transient `'de` input.
+#[cfg(feature = "serde")]
+fn de_cow_static<'de, D>(deserializer: D) -> Result<Cow<'static, str>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    Ok(Cow::Owned(String::deserialize(deserializer)?))
+}
 
 /// The complete output of a lint evaluation run.
 ///
@@ -40,23 +55,27 @@ use crate::Finding;
 /// renamed without a semver-major bump. Consumers may safely parse them
 /// across minor version updates.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, Default)]
 pub struct EvaluationReport {
     /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
     ///
     /// Example: `"cabf.br.tls"`. Empty string if no profile was specified.
-    pub profile_id: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub profile_id: Cow<'static, str>,
 
     /// The profile version string (from [`crate::Profile::version`]).
     ///
     /// Example: `"SC-081"`. Empty string if no profile was specified.
-    pub profile_version: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub profile_version: Cow<'static, str>,
 
     /// The rule bundle version string (from [`crate::LintRunner::bundle_version`]).
     ///
     /// Example: `"pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
     /// Empty string if the runner was constructed without a bundle version.
-    pub rule_bundle_version: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub rule_bundle_version: Cow<'static, str>,
 
     /// The number of certificates in the evaluated chain.
     pub chain_length: usize,
@@ -99,18 +118,32 @@ fn severity_of(r: &crate::LintResult) -> Option<crate::Severity> {
 
 impl EvaluationReport {
     /// Create an empty report with the given metadata.
+    ///
+    /// All string parameters accept anything that converts to `Cow<'static, str>`,
+    /// so you can pass string literals (borrowed) or owned `String` values:
+    ///
+    /// ```rust,ignore
+    /// // Static string literal — zero allocation
+    /// EvaluationReport::new("cabf.br.tls", "SC-081", "v0.2.0", 2, now);
+    ///
+    /// // Runtime-constructed string — uses Cow::Owned
+    /// EvaluationReport::new(
+    ///     format!("bundle-{}", version).into(),
+    ///     ..
+    /// );
+    /// ```
     #[must_use]
     pub fn new(
-        profile_id: &'static str,
-        profile_version: &'static str,
-        rule_bundle_version: &'static str,
+        profile_id: impl Into<Cow<'static, str>>,
+        profile_version: impl Into<Cow<'static, str>>,
+        rule_bundle_version: impl Into<Cow<'static, str>>,
         chain_length: usize,
         evaluated_at_unix: u64,
     ) -> Self {
         Self {
-            profile_id,
-            profile_version,
-            rule_bundle_version,
+            profile_id: profile_id.into(),
+            profile_version: profile_version.into(),
+            rule_bundle_version: rule_bundle_version.into(),
             chain_length,
             evaluated_at_unix,
             findings: Vec::new(),

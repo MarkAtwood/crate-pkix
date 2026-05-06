@@ -182,13 +182,20 @@ impl Lint for Sha1ProhibitedLint {
 ///
 /// The RSA modulus byte length is read directly from the DER-encoded
 /// `RSAPublicKey` structure inside the `SubjectPublicKeyInfo` bit string.
-/// A modulus of `n` bytes satisfies the 2048-bit requirement iff `n >= 256`.
-/// This is correct: a leading zero byte is only present when the high bit of
-/// the first significant byte is set (DER unsigned integer encoding), so the
-/// minimum 2048-bit modulus is 256 bytes with no leading zero, and a 2047-bit
-/// modulus is 256 bytes with a leading zero — both ≥ 256 bytes, but the actual
-/// bit length of the latter is 2047.  The floor-byte comparison `n_bytes >= 256`
-/// is the conservative check used by most CA/B Forum linting tools.
+/// The check is `n_bytes >= 256`, where `n_bytes` is the length of the DER
+/// INTEGER value field for the modulus (including any leading 0x00 byte).
+///
+/// DER INTEGER encoding of unsigned values: a leading 0x00 byte is prepended
+/// when the high bit of the first content byte would be 1 (to distinguish it
+/// from a negative number). For a true 2048-bit modulus, bit 2047 (0-indexed)
+/// is set, which is bit 7 of the first byte — so DER prepends a 0x00, giving
+/// 257 bytes in the INTEGER value field. A 2047-bit modulus has its highest
+/// bit at position 2046, which is bit 6 of the first byte (bit 7 = 0), so
+/// no leading 0x00 is added — the value is 256 bytes.
+///
+/// Therefore `n_bytes >= 256` accepts both 2048-bit keys (257 bytes) and
+/// 2047-bit keys (256 bytes). This is the same floor-byte comparison used
+/// by most CA/B Forum linting tools and matches zlint's behavior.
 ///
 /// Citation: CA/B Forum TLS BR §6.1.5
 pub struct RsaMinKeySizeLint;
@@ -341,25 +348,21 @@ impl Lint for SanRequiredLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let extensions = match &cert.tbs_certificate.extensions {
-            Some(exts) => exts,
-            None => return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent"),
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent");
         };
 
-        let san_ext = extensions.iter().find(|e| e.extn_id == OID_SUBJECT_ALT_NAME);
+        let Some(san_ext) = extensions.iter().find(|e| e.extn_id == OID_SUBJECT_ALT_NAME) else {
+            return LintResult::Error("SubjectAltName extension absent from leaf certificate");
+        };
 
-        match san_ext {
-            None => LintResult::Error("SubjectAltName extension absent from leaf certificate"),
-            Some(ext) => {
-                // Decode SubjectAltName ::= GeneralNames ::= SEQUENCE OF GeneralName
-                match x509_cert::ext::pkix::SubjectAltName::from_der(ext.extn_value.as_bytes()) {
-                    Ok(san) if san.0.is_empty() => {
-                        LintResult::Error("SubjectAltName extension is present but contains no names")
-                    }
-                    Ok(_) => LintResult::Pass,
-                    Err(_) => LintResult::Error("SubjectAltName extension value is malformed DER"),
-                }
+        // Decode SubjectAltName ::= GeneralNames ::= SEQUENCE OF GeneralName
+        match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
+            Ok(san) if san.0.is_empty() => {
+                LintResult::Error("SubjectAltName extension is present but contains no names")
             }
+            Ok(_) => LintResult::Pass,
+            Err(_) => LintResult::Error("SubjectAltName extension value is malformed DER"),
         }
     }
 }
@@ -399,29 +402,25 @@ impl Lint for EkuServerAuthLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let extensions = match &cert.tbs_certificate.extensions {
-            Some(exts) => exts,
-            None => return LintResult::Error("leaf certificate has no extensions; ExtendedKeyUsage absent"),
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::Error("leaf certificate has no extensions; ExtendedKeyUsage absent");
         };
 
-        let eku_ext = extensions.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE);
+        let Some(eku_ext) = extensions.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE) else {
+            return LintResult::Error("ExtendedKeyUsage extension absent from leaf certificate");
+        };
 
-        match eku_ext {
-            None => LintResult::Error("ExtendedKeyUsage extension absent from leaf certificate"),
-            Some(ext) => {
-                match x509_cert::ext::pkix::ExtendedKeyUsage::from_der(ext.extn_value.as_bytes()) {
-                    Ok(eku) => {
-                        if eku.0.iter().any(|oid| oid == &ID_KP_SERVER_AUTH) {
-                            LintResult::Pass
-                        } else {
-                            LintResult::Error(
-                                "ExtendedKeyUsage does not include id-kp-serverAuth (1.3.6.1.5.5.7.3.1)",
-                            )
-                        }
-                    }
-                    Err(_) => LintResult::Error("ExtendedKeyUsage extension value is malformed DER"),
+        match x509_cert::ext::pkix::ExtendedKeyUsage::from_der(eku_ext.extn_value.as_bytes()) {
+            Ok(eku) => {
+                if eku.0.iter().any(|oid| oid == &ID_KP_SERVER_AUTH) {
+                    LintResult::Pass
+                } else {
+                    LintResult::Error(
+                        "ExtendedKeyUsage does not include id-kp-serverAuth (1.3.6.1.5.5.7.3.1)",
+                    )
                 }
             }
+            Err(_) => LintResult::Error("ExtendedKeyUsage extension value is malformed DER"),
         }
     }
 }
@@ -461,37 +460,27 @@ impl Lint for BcCaFlagLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let extensions = match &cert.tbs_certificate.extensions {
-            Some(exts) => exts,
-            None => {
-                return LintResult::Error(
-                    "intermediate CA certificate has no extensions; BasicConstraints absent",
-                )
-            }
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::Error(
+                "intermediate CA certificate has no extensions; BasicConstraints absent",
+            );
         };
 
-        let bc_ext = extensions.iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS);
-
-        match bc_ext {
-            None => LintResult::Error(
+        let Some(bc_ext) = extensions.iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS) else {
+            return LintResult::Error(
                 "BasicConstraints extension absent from intermediate CA certificate",
-            ),
-            Some(ext) => {
-                match x509_cert::ext::pkix::BasicConstraints::from_der(
-                    ext.extn_value.as_bytes(),
-                ) {
-                    Ok(bc) => {
-                        if bc.ca {
-                            LintResult::Pass
-                        } else {
-                            LintResult::Error(
-                                "BasicConstraints present but cA flag is not TRUE",
-                            )
-                        }
-                    }
-                    Err(_) => LintResult::Error("BasicConstraints extension value is malformed DER"),
+            );
+        };
+
+        match x509_cert::ext::pkix::BasicConstraints::from_der(bc_ext.extn_value.as_bytes()) {
+            Ok(bc) => {
+                if bc.ca {
+                    LintResult::Pass
+                } else {
+                    LintResult::Error("BasicConstraints present but cA flag is not TRUE")
                 }
             }
+            Err(_) => LintResult::Error("BasicConstraints extension value is malformed DER"),
         }
     }
 }
@@ -558,6 +547,11 @@ impl LintProfile for CabfTlsBrProfile {
         LINTS.get_or_init(all_lints)
     }
 
+    /// Allocates a fresh [`LintRunner`] on each call.
+    ///
+    /// For repeated use, prefer calling [`LintProfile::lints`] once and
+    /// constructing a [`LintRunner`] manually, or cache the returned
+    /// [`LintRunner`] at the call site.
     fn lint_runner(&self) -> LintRunner {
         LintRunner::new(all_lints())
     }

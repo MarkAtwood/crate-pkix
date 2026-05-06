@@ -38,13 +38,13 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///
 /// - The OCSP response is re-parsed from DER on every [`check_revocation`] call.
 ///   For chains with multiple certificates validated against the same response,
-///   this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
+///   this is O(N) redundant parsing. Tracked for v0.3 (cache the parsed
 ///   `BasicOcspResponse` in `new`).
 /// - Only issuer-signed (direct) OCSP responses are supported.
 ///   Delegated OCSP responders (responses signed by a separate responder
 ///   certificate, not by the issuer directly) will fail with
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
-///   the issuer's key. This is a v0.1 limitation tracked for v0.2.
+///   the issuer's key. This is a v0.1 limitation tracked for v0.3.
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
  /// - `SingleResponse` matching uses both serial number and the `CertID`
@@ -89,6 +89,19 @@ impl<V: SignatureVerifier> OcspChecker<V> {
 
 impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()> {
+        // (0) Verify that `issuer` is actually the issuer of `cert`.
+        //
+        // Defense-in-depth: a caller could pass a mismatched `issuer` certificate
+        // whose key happens to verify the OCSP response signature, but which did
+        // not actually issue `cert`. Rejecting early prevents the downstream
+        // signature and CertID hash checks from operating on the wrong identity.
+        if !names_match(
+            &issuer.tbs_certificate.subject,
+            &cert.tbs_certificate.issuer,
+        ) {
+            return Err(Error::OcspSignatureInvalid);
+        }
+
         // (1) Parse the outer OCSPResponse.
         let resp = OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
 
@@ -177,8 +190,11 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 
         // (8) Check validity windows.
         //
-        // producedAt must not be in the future: a future-dated response indicates
-        // clock skew or a response generated after "now"; reject as unknown.
+        // producedAt must not be in the future.  A future-dated `producedAt` is
+        // structurally suspicious — a legitimate responder cannot claim to have
+        // produced a response after "now".  This is not a case of the responder
+        // saying "unknown"; it is a malformed or tampered response, so we return
+        // `OcspMalformed` rather than `OcspStatusUnknown`.
         let produced_at = basic
             .tbs_response_data
             .produced_at
@@ -186,7 +202,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .to_unix_duration()
             .as_secs();
         if self.now_unix < produced_at {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspMalformed);
         }
         // thisUpdate ≤ now: the SingleResponse is not yet valid.
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
@@ -236,6 +252,14 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         cert: &Certificate,
         anchor: &TrustAnchor,
     ) -> crate::Result<()> {
+        // (0) Verify that the anchor is actually the issuer of `cert`.
+        //
+        // Defense-in-depth: guards against a caller passing an anchor whose SPKI
+        // happens to verify the OCSP response but which did not issue `cert`.
+        if !names_match(&anchor.subject, &cert.tbs_certificate.issuer) {
+            return Err(Error::OcspSignatureInvalid);
+        }
+
         // (1) Parse the outer OCSPResponse.
         let resp =
             OcspResponse::from_der(&self.response_der).map_err(Error::OcspParseError)?;
@@ -302,6 +326,12 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         }
 
         // (8) Check validity windows.
+        //
+        // producedAt must not be in the future.  A future-dated `producedAt` is
+        // structurally suspicious — a legitimate responder cannot claim to have
+        // produced a response after "now".  Return `OcspMalformed` rather than
+        // `OcspStatusUnknown` because this is not a responder-reported "unknown"
+        // status but a structurally invalid response.
         let produced_at = basic
             .tbs_response_data
             .produced_at
@@ -309,7 +339,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .to_unix_duration()
             .as_secs();
         if self.now_unix < produced_at {
-            return Err(Error::OcspStatusUnknown);
+            return Err(Error::OcspMalformed);
         }
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {

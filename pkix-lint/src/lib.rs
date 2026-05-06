@@ -103,6 +103,26 @@ use x509_cert::Certificate;
 // Re-export so callers only need to depend on pkix-lint, not pkix-path.
 pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 
+/// Serde deserializer helper for `&'static str` fields.
+///
+/// Deserializes any string input as an owned `String`, then leaks it to produce a
+/// `&'static str`.  This is intentional: `Finding` and related structs use
+/// `&'static str` for their ID/citation fields because those are always compile-time
+/// constants in normal usage.  When deserializing from JSON (e.g., loading a saved
+/// evidence pack), we accept the small allocation + leak to preserve the field type.
+///
+/// In practice this is only called when loading stored reports; the normal path
+/// constructs `Finding` from `&'static str` lint metadata without any allocation.
+#[cfg(feature = "serde")]
+fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let s = String::deserialize(deserializer)?;
+    Ok(Box::leak(s.into_boxed_str()))
+}
+
 pub mod cabf_tls_br;
 pub mod deviation;
 pub mod report;
@@ -200,6 +220,7 @@ impl SubjectKind {
 /// The variant names and associated `&'static str` detail fields are stable.
 /// Dynamic `String` detail is planned for v0.3 via `Cow<'static, str>`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LintResult {
@@ -216,11 +237,17 @@ pub enum LintResult {
     /// Advisory finding — the cert deviates from a SHOULD or best practice.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
-    Warn(&'static str),
+    Warn(
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
+        &'static str,
+    ),
     /// Error finding — the cert violates a MUST or REQUIRED requirement.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
-    Error(&'static str),
+    Error(
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
+        &'static str,
+    ),
     /// Fatal finding — further evaluation of this cert/path is not meaningful.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
@@ -239,7 +266,10 @@ pub enum LintResult {
     /// The only effect of `Fatal` within `pkix-lint` itself is to stop evaluating
     /// further lints for the current certificate or path — it does not propagate
     /// as a `Result::Err` or cause any panic.
-    Fatal(&'static str),
+    Fatal(
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
+        &'static str,
+    ),
 }
 
 impl LintResult {
@@ -414,14 +444,17 @@ pub trait Lint: Send + Sync {
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
     pub lint_id: &'static str,
     /// The normative citation for this lint (from [`Lint::citation`]).
     ///
     /// Included here so consumers of `Vec<Finding>` do not need to re-look up
     /// the lint to get the citation for report generation and evidence packs.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
     pub citation: &'static str,
     /// Version string of the rule bundle that produced this finding.
     ///
@@ -433,6 +466,7 @@ pub struct Finding {
     /// This field enables the "yellow today, green tomorrow because we updated the
     /// rule bundle from v1.3 to v1.4" explanation that prevents operators from
     /// treating a finding change as a tool defect.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
     pub rule_bundle_version: &'static str,
     /// The outcome of the lint evaluation.
     pub result: LintResult,

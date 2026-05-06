@@ -78,7 +78,7 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 ///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is v0.2.
 /// - Both the base CRL and the delta CRL (if present) are re-parsed from DER on
 ///   every [`check_revocation`] call. For long chains validated against the same
-///   CRL pair, this is O(N) redundant parsing. Tracked for v0.2 (cache the parsed
+///   CRL pair, this is O(N) redundant parsing. Tracked for v0.3 (cache the parsed
 ///   `CertificateList` in `new` / `with_delta`).
 /// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
 ///   For the certificate issued directly by a trust anchor, the CRL is verified
@@ -150,11 +150,20 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             return Err(Error::DeltaCrlBaseMismatch);
         }
 
-        // The delta MUST have a BaseCRLNumber extension (marks it as a delta CRL).
+        // The delta MUST have a deltaCRLIndicator extension (marks it as a delta CRL).
+        // Check presence by OID first to distinguish "absent" from "present but malformed":
+        //   - Extension absent           → not a delta CRL → DeltaCrlBaseMismatch
+        //   - Extension present, value malformed → CrlParseError (structural error)
+        if !has_delta_crl_indicator(&delta_crl) {
+            // No deltaCRLIndicator OID → this is not a delta CRL.
+            return Err(Error::DeltaCrlBaseMismatch);
+        }
         let delta_base_num = base_crl_number(&delta_crl);
         if delta_base_num.is_none() {
-            // No deltaCRLIndicator → this is not a delta CRL.
-            return Err(Error::DeltaCrlBaseMismatch);
+            // deltaCRLIndicator OID is present but its INTEGER value cannot be decoded.
+            return Err(Error::CrlParseError(der::Error::from(
+                der::ErrorKind::Failed,
+            )));
         }
 
         // The base CRL and delta CRL MUST have the same issuer.
