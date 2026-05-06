@@ -133,17 +133,17 @@ const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6
 /// The free-function alias [`web_pki_policy`] is equivalent to
 /// `WebPkiProfile.policy(now_unix)` and is provided for convenience.
 ///
-/// ## SC-081 validity reduction schedule
+/// ## SC-081 validity enforcement
 ///
-/// CA/B Forum Ballot SC-081 introduces a phased reduction of TLS certificate
-/// maximum validity:
-/// - 200 days → effective 2026-03-15
-/// - 100 days → effective 2027-03-15
-/// - 47 days  → effective 2029-03-15
+/// SC-081 validity cap enforcement is **not** performed via
+/// `ValidationPolicy::max_validity_secs`.  That field is a single blunt
+/// instrument that applies one cap to all certificates regardless of when they
+/// were issued.  SC-081 requires the cap in force **at issuance time**
+/// (`notBefore`) to govern a certificate for its lifetime.  A relying party's
+/// current time (`now_unix`) must not retroactively change which cap applies.
 ///
-/// The `policy()` method applies the cap valid at the supplied `now_unix`.
-/// Callers pinning to a fixed cap should set `max_validity_secs` after calling
-/// `policy()`. See PKIX-0k9 for full phased-cap implementation.
+/// SC-081 enforcement is delegated to `ValidityMaxLint` in `pkix-lint`, which
+/// correctly evaluates `sc081_validity_cap(notBefore)` for each certificate.
 #[derive(Clone, Debug)]
 pub struct WebPkiProfile;
 
@@ -160,11 +160,7 @@ impl Profile for WebPkiProfile {
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
-        // BR §6.3.2: SC-081 phased validity caps.
-        // 2026-03-15T00:00:00Z = 1_773_532_800
-        // 2027-03-15T00:00:00Z = 1_805_068_800
-        // 2029-03-15T00:00:00Z = 1_868_227_200
-        p.max_validity_secs = Some(sc081_validity_cap(now_unix));
+        // SC-081 validity cap enforcement is NOT set here; see struct-level doc.
         // BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_TLS_BR_ALLOWED_ALGS.to_vec());
         // BR §6.1.5: RSA keys must be at least 2048 bits.
@@ -310,7 +306,7 @@ impl Profile for Rfc5280Profile {
 // SC-081 phased validity cap helper
 // ---------------------------------------------------------------------------
 
-/// Return the maximum TLS certificate validity in seconds for the given point in time.
+/// Return the maximum TLS certificate validity in seconds for the given issuance time.
 ///
 /// CA/B Forum Ballot SC-081 (approved March 2024) introduces a phased reduction:
 /// - Certificates issued before 2026-03-15: 398 days
@@ -318,9 +314,14 @@ impl Profile for Rfc5280Profile {
 /// - On or after 2027-03-15: 100 days
 /// - On or after 2029-03-15:  47 days
 ///
-/// `now_unix` is the issuance time (or validation time for a relying party applying
-/// the policy retroactively). The relying party SHOULD apply the cap for the time of
-/// issuance, not the time of validation.
+/// The argument should be the certificate's `notBefore` (issuance time), **not** the
+/// relying party's current validation time.  SC-081 requires that the cap in force at
+/// issuance governs a certificate for its entire lifetime.  Passing a relying-party
+/// clock would incorrectly invalidate certificates issued under an earlier, more
+/// permissive cap.
+///
+/// Primary consumer: `ValidityMaxLint` in `pkix-lint`, which calls
+/// `sc081_validity_cap(notBefore)` for each certificate it audits.
 ///
 /// Epoch boundaries (UTC midnight on the effective date, seconds since Unix epoch):
 /// - 2026-03-15T00:00:00Z = 1_773_532_800
@@ -361,17 +362,24 @@ pub fn sc081_validity_cap(now_unix: u64) -> u64 {
 ///
 /// | Field | Value | Normative reference |
 /// |-------|-------|---------------------|
-/// | `max_validity_secs` | SC-081 phased cap | CA/B Forum TLS BR §6.3.2 |
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | TLS BR §7.1.3 |
 /// | `min_rsa_key_bits` | 2048 | TLS BR §6.1.5 |
 /// | `require_subject_alt_name` | true | TLS BR §7.1.4.2 |
 /// | `required_leaf_eku` | id-kp-serverAuth (1.3.6.1.5.5.7.3.1) | TLS BR §7.1.2.7.3 |
 /// | `max_path_len` | 2 | TLS BR §7.1.1 |
 ///
+/// # SC-081 validity enforcement
+///
+/// `max_validity_secs` is **not** set.  SC-081 validity cap enforcement is
+/// delegated to `ValidityMaxLint` in `pkix-lint`, which evaluates
+/// `sc081_validity_cap(notBefore)` per certificate at audit time.  See
+/// [`WebPkiProfile`] for the rationale.
+///
 /// # Limitations
 ///
 /// This function enforces the structural constraints listed above using
 /// `pkix-path`'s `ValidationPolicy`. It does not verify:
+/// - SC-081 validity caps (use `pkix-lint` `ValidityMaxLint`)
 /// - CAA DNS records (network check; out of scope for `pkix-path`)
 /// - CT log SCTs (separate verification step; use `pkix-ct`)
 /// - OCSP/CRL revocation (use `pkix-revocation`)
@@ -575,25 +583,15 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn web_pki_policy_max_validity_is_date_aware() {
-        // NOW = 2026-06-01 = 1_780_272_000, after 2026-03-15 (1_773_532_800) → 200-day cap.
+    fn web_pki_policy_max_validity_not_set() {
+        // SC-081 cap enforcement is delegated to ValidityMaxLint in pkix-lint,
+        // which uses notBefore for the phase lookup.  WebPkiProfile must NOT
+        // set max_validity_secs so that relying-party clock does not retroactively
+        // invalidate certs issued under a more permissive cap.
         let p = web_pki_policy(NOW);
-        assert_eq!(
-            p.max_validity_secs,
-            Some(200 * 86_400),
-            "web_pki_policy at NOW (2026-06-01) must apply SC-081 200-day cap"
-        );
-    }
-
-    #[test]
-    fn web_pki_policy_pre_sc081_is_398_days() {
-        // 2026-01-01T00:00:00Z = 1_767_225_600 — before 2026-03-15 (1_773_532_800).
-        let pre_sc081: u64 = 1_767_225_600;
-        let p = web_pki_policy(pre_sc081);
-        assert_eq!(
-            p.max_validity_secs,
-            Some(398 * 86_400),
-            "web_pki_policy before 2026-03-15 must apply pre-SC-081 398-day cap"
+        assert!(
+            p.max_validity_secs.is_none(),
+            "web_pki_policy must not set max_validity_secs (SC-081 enforcement is in pkix-lint)"
         );
     }
 

@@ -110,6 +110,11 @@ impl Lint for ValidityMaxLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        // SC-081: cap is determined by issuance time (notBefore), not validation time.
+        // `_now_unix` is intentionally ignored — it is the relying-party's current time,
+        // which must not affect whether a certificate's validity period was compliant at
+        // issuance.  A cert issued before 2026-03-15 under the 398-day cap remains valid
+        // even when a relying party validates it after 2026-03-15 (the 200-day epoch).
         let tbs = &cert.tbs_certificate;
         let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
         let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
@@ -117,7 +122,6 @@ impl Lint for ValidityMaxLint {
         // Validity duration in seconds; saturate to avoid underflow on malformed certs.
         let duration_secs = not_after.saturating_sub(not_before);
 
-        // Cap is determined by issuance time (notBefore), not validation time.
         let cap = pkix_profiles::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
