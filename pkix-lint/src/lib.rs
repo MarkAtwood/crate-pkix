@@ -976,7 +976,7 @@ mod tests {
         let anchor = TrustAnchor::from_cert(cert.clone());
         // 2026-01-01 = pre-SC-081, so 365-day cert passes the 398-day cap.
         let policy = ValidationPolicy::new(1_767_225_600);
-        let path = pkix_path::validate_path(&[cert.clone()], &[anchor], &policy, &EcdsaP256Verifier)
+        let path = pkix_path::validate_path(std::slice::from_ref(&cert), &[anchor], &policy, &EcdsaP256Verifier)
             .expect("fixture cert must validate");
         (vec![cert], path)
     }

@@ -43,7 +43,7 @@ fn test_build_path_two_cert_chain() {
     let mut pool = CertPool::new();
     pool.add(intermediate);
 
-    let path = build_path(&ee, &pool, &[anchor.clone()])
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
         .expect("build_path should succeed for PKITS §4.1.1 chain");
 
     // Chain must be leaf-first with at least [EE, GoodCACert].
@@ -73,7 +73,7 @@ fn test_build_path_shuffled_order() {
     let mut pool = CertPool::new();
     pool.add(intermediate);
 
-    let path = build_path(&ee, &pool, &[anchor.clone()])
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
         .expect("build_path should succeed regardless of pool insertion order");
 
     assert!(path.len() >= 2);
@@ -118,7 +118,7 @@ fn test_build_path_self_signed_non_anchor_in_pool() {
     pool.add(intermediate);
     pool.add(bad_ca); // self-signed, different CA, not the anchor
 
-    let path = build_path(&ee, &pool, &[anchor.clone()])
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
         .expect("build_path must find the correct path ignoring the self-signed non-anchor");
 
     // The built path must still validate end-to-end.
@@ -169,7 +169,7 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
     pool.add(intermediate.clone());
     pool.add(intermediate); // duplicate — different Vec slot, same SPKI
 
-    let path = build_path(&ee, &pool, &[anchor.clone()])
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
         .expect("build_path must find path even with duplicate certs in pool");
 
     // Validate the result to confirm it's a real path, not a loop.
