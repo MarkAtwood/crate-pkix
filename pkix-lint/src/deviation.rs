@@ -603,7 +603,7 @@ impl DeviationStore {
 /// Findings where a deviation was applied are moved from `findings` to `deviated`.
 /// Callers can use `findings` for normal compliance reporting and `deviated`
 /// for audit/transparency reporting.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct DeviationRunResult {
     /// Findings that were not affected by any deviation.
     ///
@@ -920,6 +920,49 @@ mod tests {
         let cert = load_cert();
         let scope = DeviationScope::IssuerDnContains("XYZ_NONEXISTENT_ISSUER_9999".to_string());
         assert!(!scope.matches(&cert));
+    }
+
+    /// Uppercase substring never matches — callers must pre-lowercase.
+    ///
+    /// `IssuerDnContains` stores the substring pre-lowercased. At match time,
+    /// only the cert's issuer string is lowercased; the stored substring is used
+    /// as-is. An uppercase stored substring will never match any cert because the
+    /// cert's issuer string (lowercased) cannot contain uppercase letters.
+    ///
+    /// This test documents the silent-no-match behavior so callers know they must
+    /// pre-lowercase the substring when constructing the scope.
+    #[test]
+    fn scope_issuer_dn_contains_uppercase_silently_fails() {
+        let cert = load_cert();
+        // Get a word from the issuer that we know is in the cert's DN.
+        let issuer = cert.tbs_certificate.issuer.to_string();
+        // Find a word that exists in lowercase in the cert issuer.
+        let word = issuer
+            .split(|c: char| !c.is_alphanumeric())
+            .find(|w| !w.is_empty())
+            .unwrap_or("test");
+        let lowercase_word = word.to_lowercase();
+
+        // Sanity: lowercase substring must match.
+        let scope_lower = DeviationScope::IssuerDnContains(lowercase_word.clone());
+        assert!(
+            scope_lower.matches(&cert),
+            "pre-lowercased substring must match"
+        );
+
+        // Uppercase substring never matches — callers must pre-lowercase.
+        // The uppercase version of a nonempty lowercase word differs from the
+        // lowercased cert issuer, so this must fail.
+        let uppercase_word = lowercase_word.to_uppercase();
+        if uppercase_word != lowercase_word {
+            // Only assert no-match when the word actually has uppercase form distinct from lowercase.
+            let scope_upper = DeviationScope::IssuerDnContains(uppercase_word);
+            assert!(
+                !scope_upper.matches(&cert),
+                "uppercase substring never matches — callers must pre-lowercase the substring \
+                 when constructing IssuerDnContains"
+            );
+        }
     }
 
     // -----------------------------------------------------------------------

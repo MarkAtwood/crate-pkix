@@ -211,13 +211,9 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         }
         // now ≤ nextUpdate: absent nextUpdate is treated as unknown (no expiry info
         // means we cannot trust the freshness of the status).
-        match &single.next_update {
-            Some(next_update) => {
-                if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
-                    return Err(Error::OcspStatusUnknown);
-                }
-            }
-            None => return Err(Error::OcspStatusUnknown),
+        let next_update = single.next_update.as_ref().ok_or(Error::OcspStatusUnknown)?;
+        if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
+            return Err(Error::OcspStatusUnknown);
         }
 
         // (9) Return based on certStatus.
@@ -345,13 +341,9 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         if self.now_unix < this_update {
             return Err(Error::OcspStatusUnknown);
         }
-        match &single.next_update {
-            Some(next_update) => {
-                if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
-                    return Err(Error::OcspStatusUnknown);
-                }
-            }
-            None => return Err(Error::OcspStatusUnknown),
+        let next_update = single.next_update.as_ref().ok_or(Error::OcspStatusUnknown)?;
+        if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
+            return Err(Error::OcspStatusUnknown);
         }
 
         // (9) Return based on certStatus.
