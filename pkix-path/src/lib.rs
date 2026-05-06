@@ -179,6 +179,20 @@ pub enum Error {
     /// `anyExtendedKeyUsage` (2.5.29.37.0) does not satisfy a specific OID
     /// requirement — each required OID must be listed explicitly.
     MissingEku,
+    /// Two certificates in the chain have identical SubjectPublicKeyInfo.
+    ///
+    /// A certificate appearing at two positions in the chain (or two distinct
+    /// certificates that share the same public key) indicates a likely error in
+    /// chain construction. Returned as a diagnostic rather than a confusing
+    /// [`Error::SignatureInvalid`] or [`Error::ChainBroken`].
+    ///
+    /// `first` and `second` are the zero-based chain indices of the two duplicates.
+    DuplicateCertificate {
+        /// First occurrence index.
+        first: usize,
+        /// Second occurrence index.
+        second: usize,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -232,6 +246,12 @@ impl core::fmt::Display for Error {
                     "leaf certificate is missing required ExtendedKeyUsage OID(s)"
                 )
             }
+            Self::DuplicateCertificate { first, second } => {
+                write!(
+                    f,
+                    "duplicate certificate SPKI at chain indices {first} and {second}"
+                )
+            }
         }
     }
 }
@@ -257,7 +277,8 @@ impl std::error::Error for Error {
             | Self::KeyTooSmall { .. }
             | Self::MissingSan
             | Self::MissingRfc822San
-            | Self::MissingEku => None,
+            | Self::MissingEku
+            | Self::DuplicateCertificate { .. } => None,
         }
     }
 }
@@ -756,10 +777,6 @@ pub struct ValidatedPath {
 /// # Limitations
 ///
 /// See crate-level documentation for v0.1 scope limits.
-///
-/// Duplicate certificates in `chain` (same cert appearing at two indices) are
-/// not detected. They will fail signature verification or name linkage with a
-/// `SignatureInvalid` or `ChainBroken` error rather than a dedicated diagnostic.
 #[must_use = "path validation result must be checked"]
 pub fn validate_path<V>(
     chain: &[Certificate],
@@ -848,6 +865,23 @@ fn spki_key_matches(
 fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
     if chain.is_empty() || anchors.is_empty() {
         return Err(Error::NoTrustedPath);
+    }
+    // Duplicate detection: check all pairs for SPKI identity.
+    // A cert appearing twice in the chain (or two certs sharing the same public key)
+    // indicates a chain construction error. Reporting DuplicateCertificate is cleaner
+    // than the confusing SignatureInvalid or ChainBroken that would otherwise result.
+    //
+    // O(n²) over chain.len() — acceptable for chains of typical length (2–5 certs).
+    // Using SPKI bytes (not subject DN) matches the path-builder cycle-detection
+    // approach and correctly handles key-rollover semantics.
+    for i in 0..chain.len() {
+        for j in (i + 1)..chain.len() {
+            if chain[i].tbs_certificate.subject_public_key_info
+                == chain[j].tbs_certificate.subject_public_key_info
+            {
+                return Err(Error::DuplicateCertificate { first: i, second: j });
+            }
+        }
     }
     Ok(())
 }
@@ -3181,6 +3215,34 @@ mod tests_validate_path {
                 Err(Error::NoTrustedPath)
             ),
             "empty chain must fail"
+        );
+    }
+
+    /// Duplicate certificate in chain returns DuplicateCertificate error.
+    ///
+    /// Oracle: RFC 5280 does not define behavior for duplicate certs; we reject
+    /// early with a diagnostic error rather than failing later with a confusing
+    /// SignatureInvalid or ChainBroken.
+    ///
+    /// Duplicate is detected by SPKI identity — the same cert appearing twice
+    /// has the same SPKI, regardless of how the chain was constructed.
+    #[test]
+    fn duplicate_cert_in_chain_returns_error() {
+        let cert = load(include_bytes!("../tests/fixtures/ec-p256-sha256.der"));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        // Chain [cert, cert]: same cert at index 0 and index 1 — same SPKI.
+        let result = validate_path(
+            &[cert.clone(), cert],
+            &anchors,
+            &policy_at(GRY_NOW),
+            &EcdsaP256Verifier,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(Error::DuplicateCertificate { first: 0, second: 1 })
+            ),
+            "duplicate cert must return DuplicateCertificate{{first:0, second:1}}, got {result:?}"
         );
     }
 
