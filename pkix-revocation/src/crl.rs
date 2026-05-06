@@ -301,6 +301,11 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 return Err(Error::CrlIssuerMismatch);
             }
 
+            // cRLSign was already verified at line 218 for the base CRL issuer.
+            // The delta CRL uses the same `issuer` (confirmed by the name-match
+            // checks above), so the cRLSign bit check is not repeated here.
+            // If a future extension introduces independent delta issuers, a
+            // separate issuer_has_crl_sign() call must be added at that point.
             verify_delta_crl_and_collect(
                 delta_der,
                 &self.verifier,
