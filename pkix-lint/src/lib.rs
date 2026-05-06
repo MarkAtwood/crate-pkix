@@ -15,8 +15,9 @@
 //!   citation, a severity, a scope (certificate vs. full chain path), and a
 //!   subject-kind filter (leaf, intermediate CA, etc.).
 //! - [`LintResult`] — `Pass | NotApplicable | Warn | Error | Fatal`. `Warn`
-//!   and `Error` carry a `&'static str` detail message. `Fatal` means "stop
-//!   evaluating this cert/path immediately".
+//!   and `Error` carry a `&'static str` detail message. `Fatal` within
+//!   `pkix-lint` means "stop evaluating further lints" — it is **not** a TLS
+//!   hard-fail. See the advisory-only contract below.
 //! - [`Finding`] — a lint ID paired with a [`LintResult`], optionally referencing
 //!   the chain index of the offending certificate.
 //! - [`LintRunner`] — evaluates a slice of `dyn Lint` objects against a certificate
@@ -32,6 +33,26 @@
 //! - `"cabf.br.tls.validity.max"`
 //! - `"cabf.smime.san.type"`
 //! - `"rfc5280.basic_constraints.ca_flag"`
+//!
+//! # Advisory-only contract
+//!
+//! **`pkix-lint` findings never cause a certificate to be rejected.** All runner
+//! methods return `Vec<Finding>` — they never return `Result::Err` and they never
+//! cause a TLS stack to abort a connection. Findings are advisory signals.
+//!
+//! Whether to act on a finding (reject a TLS connection, block a cert, alert an
+//! operator) is the caller's decision, configured per finding-ID at the integration
+//! layer (e.g., `pkix-chain` or a TLS stack binding). This design is intentional:
+//!
+//! - `pkix-lint` does not know whether you are in audit, monitoring, or enforcement
+//!   context. The caller does.
+//! - Spec ambiguity (CA/B Forum CPs, FPKI CPs, etc.) means some findings require
+//!   human judgment before enforcement. Hard-fail by default would cause outages.
+//! - The deviation/waiver mechanism (PKIX-jge) operates at this layer, not in
+//!   `pkix-lint` core.
+//!
+//! The only in-engine effect of [`LintResult::Fatal`] is stopping further lint
+//! evaluation for the current item — it does not escape as an error.
 //!
 //! # Design rationale
 //!
@@ -194,6 +215,19 @@ pub enum LintResult {
     /// The `&'static str` field is a human-readable explanation of the finding.
     /// The runner stops evaluating remaining lints for the current item when
     /// it encounters a `Fatal`.
+    ///
+    /// # `Fatal` is report-only
+    ///
+    /// **`Fatal` does NOT cause the TLS stack to reject the certificate.**
+    /// `pkix-lint` is an advisory layer only. All findings — including `Fatal` —
+    /// are reported in the `Vec<Finding>` returned by [`LintRunner`]. Whether to
+    /// act on a finding (e.g., reject a TLS connection, abort a certificate
+    /// issuance, or log a compliance event) is the caller's decision, made at the
+    /// integration boundary (e.g., `pkix-chain` or a TLS stack binding).
+    ///
+    /// The only effect of `Fatal` within `pkix-lint` itself is to stop evaluating
+    /// further lints for the current certificate or path — it does not propagate
+    /// as a `Result::Err` or cause any panic.
     Fatal(&'static str),
 }
 
@@ -338,11 +372,28 @@ impl Finding {
 ///
 /// The runner is stateless beyond the lint set — construct once, call many times.
 ///
+/// # Findings are advisory only
+///
+/// `LintRunner` methods return `Vec<Finding>` — they never return `Result::Err`
+/// and they never cause a certificate to be rejected by a TLS stack. Findings
+/// are an advisory layer. Whether to act on a finding (reject a connection,
+/// block a cert, page an operator) is the caller's responsibility, configured
+/// per finding-ID at the integration boundary.
+///
+/// This separation is intentional and must not be violated:
+/// - `pkix-lint` does not know whether you are in an audit context, a
+///   monitoring context, or an enforcement context. The caller does.
+/// - Hard-fail behavior per finding-ID is configured in the integration layer
+///   (e.g., `pkix-chain` or a TLS stack binding), not here.
+/// - `pkix-lint` will never introduce a code path that returns `Err` or
+///   panics based on lint findings.
+///
 /// # Evaluation order
 ///
 /// Lints are evaluated in the order they were supplied to [`LintRunner::new`].
 /// If a lint returns [`LintResult::Fatal`], the runner stops evaluating further
 /// lints for the current item (cert or path) and records the fatal finding.
+/// See [`LintResult::Fatal`] for the definition of "fatal within lint evaluation."
 ///
 /// # Thread safety
 ///
