@@ -572,21 +572,23 @@ fn pkits_4_14_10_valid_no_idp() {
         .expect("§4.14.10: no IDP, serial not revoked → must NOT be revoked");
 }
 
-/// §4.14.11: Invalid — onlyContainsUserCerts CRL applied to CA cert revocation check.
+/// §4.14.11: Invalid — onlyContainsUserCerts CRL applied to a CA cert.
 ///
 /// Oracle: PKITS §4.14.11 MUST NOT validate.
 ///
-/// The CA cert (issued by onlyContainsUserCerts CA) must be checked for revocation.
-/// The only available CRL for that CA has `onlyContainsUserCerts=TRUE` — so it does
-/// NOT cover CA certs. Our IDP check returns `Ok(())` (not covered by this CRL).
-/// A full path validator in hard-fail mode would treat "unchecked CA cert" as failure;
-/// our `CrlChecker` returns `Ok(())` and delegates the hard-fail policy to the caller.
+/// External oracle (OpenSSL `openssl x509 -text`): despite the "EE" suffix in
+/// `InvalidonlyContainsUserCertsTest11EE`, this fixture has
+/// `BasicConstraints: critical, CA:TRUE`. So checking it against an
+/// `onlyContainsUserCerts=TRUE` CRL is a scope mismatch:
+/// `only_contains_user_certs && cert_is_ca` → `Err(OutOfScope(CrlOnlyUserCerts))`.
 ///
-/// Note: The "CA cert" being checked here is the intermediate CA that issued the EE.
+/// A hard-fail path validator MUST surface this as failure (matches the PKITS
+/// "Invalid" verdict). This is exactly the dual-semantics gap PKIX-qwzx.11
+/// was filed to close.
 #[test]
 fn pkits_4_14_11_invalid_only_user_certs_crl_for_ca() {
-    // The CA cert is a CA cert (has BasicConstraints cA=TRUE).
-    // Checking it against onlyContainsUserCerts CRL → Ok() (not covered).
+    use pkix_revocation::{Error, OutOfScopeReason};
+
     let ca_der = pkits_cert("onlyContainsUserCertsCACert");
     let ee_der = pkits_cert("InvalidonlyContainsUserCertsTest11EE");
     let crl = pkits_crl("onlyContainsUserCertsCACRL");
@@ -597,12 +599,10 @@ fn pkits_4_14_11_invalid_only_user_certs_crl_for_ca() {
     let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
 
-    // Checking the EE cert (an end-entity) against a user-certs-only CRL:
-    // the EE is a user cert → covered → check normally. EE serial=1 not in revoked list.
-    let result = checker.check_revocation(&ee, &ca);
-    // The EE itself is not revoked in this CRL. Our checker returns Ok().
-    // The PKITS failure is at the path level (CA cert revocation undetermined).
-    result.expect("§4.14.11: EE (user cert) serial=1 not in onlyContainsUserCerts CRL");
+    let err = checker.check_revocation(&ee, &ca).expect_err(
+        "§4.14.11: CA cert (despite EE suffix) is out of scope for onlyContainsUserCerts CRL",
+    );
+    assert_eq!(err, Error::OutOfScope(OutOfScopeReason::CrlOnlyUserCerts));
 }
 
 /// §4.14.12: Invalid — onlyContainsCACerts CRL applied to EE cert check.
@@ -610,10 +610,13 @@ fn pkits_4_14_11_invalid_only_user_certs_crl_for_ca() {
 /// Oracle: PKITS §4.14.12 MUST NOT validate.
 ///
 /// The EE cert (serial=1) is being checked against a CRL with `onlyContainsCACerts=TRUE`.
-/// Our IDP check: EE is not a CA cert → not covered → `Ok(())`.
-/// A full path validator must enforce that an appropriate CRL covers each cert.
+/// Our IDP check: EE is not a CA cert → not covered →
+/// `Err(OutOfScope(CrlOnlyCaCerts))`. A hard-fail caller must surface this as
+/// a path-validation failure; soft-fail callers may match on the reason.
 #[test]
 fn pkits_4_14_12_invalid_only_ca_certs_for_ee() {
+    use pkix_revocation::{Error, OutOfScopeReason};
+
     let ca_der = pkits_cert("onlyContainsCACertsCACert");
     let ee_der = pkits_cert("InvalidonlyContainsCACertsTest12EE");
     let crl = pkits_crl("onlyContainsCACertsCACRL");
@@ -623,22 +626,32 @@ fn pkits_4_14_12_invalid_only_ca_certs_for_ee() {
 
     let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
-    // EE is not a CA cert → onlyContainsCACerts CRL does not cover it → Ok() (not covered).
-    let result = checker.check_revocation(&ee, &ca);
-    // Our IDP check returns Ok() because the CRL doesn't cover EE certs.
-    // This is the correct CrlChecker behaviour: coverage decision, not revocation decision.
-    // The path validator must treat "not covered" as a hard-fail in PKITS mode.
-    result.expect("§4.14.12: onlyContainsCACerts CRL does not cover EE cert → not covered → Ok()");
+    // EE is not a CA cert → onlyContainsCACerts CRL does not cover it →
+    // Err(OutOfScope(CrlOnlyCaCerts)).
+    let err = checker
+        .check_revocation(&ee, &ca)
+        .expect_err("§4.14.12: onlyContainsCACerts CRL does not cover EE cert → OutOfScope");
+    assert_eq!(
+        err,
+        Error::OutOfScope(OutOfScopeReason::CrlOnlyCaCerts),
+        "§4.14.12: must report the specific scope-mismatch reason"
+    );
 }
 
-/// §4.14.13: Valid — onlyContainsCACerts CRL applied to CA cert check.
+/// §4.14.13: Valid — onlyContainsCACerts CRL covers a CA cert.
 ///
 /// Oracle: PKITS §4.14.13 MUST validate.
 ///
-/// The EE cert (serial=2) is issued by onlyContainsCACerts CA. The CA cert IS a CA cert.
-/// The CRL has `onlyContainsCACerts=TRUE`. The EE itself is an end-entity, so checking
-/// it against this CRL returns `Ok()` (not covered). But the CA cert's revocation CRL
-/// correctly covers CA certs. Serial=2 (EE) is not in the revoked list.
+/// External oracle (OpenSSL `openssl x509 -text`): despite the "EE" suffix in
+/// `ValidonlyContainsCACertsTest13EE`, this fixture has
+/// `BasicConstraints: critical, CA:TRUE`. So an `onlyContainsCACerts=TRUE`
+/// CRL DOES cover this cert (`only_contains_ca_certs && !cert_is_ca` is
+/// false; cert_is_ca = true). The check falls through to the revoked-list
+/// search; the cert is not revoked → `Ok(())`.
+///
+/// This test confirms that under the OutOfScope variant introduced in
+/// PKIX-qwzx.11, a correctly-in-scope CA cert is still cleanly reported as
+/// not-revoked rather than misclassified as out-of-scope.
 #[test]
 fn pkits_4_14_13_valid_only_ca_certs_crl_for_ca() {
     let ca_der = pkits_cert("onlyContainsCACertsCACert");
@@ -650,21 +663,25 @@ fn pkits_4_14_13_valid_only_ca_certs_crl_for_ca() {
 
     let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
-    // The EE (serial=2) is not a CA cert → onlyContainsCACerts CRL doesn't cover it → Ok().
-    let result = checker.check_revocation(&ee, &ca);
-    result.expect("§4.14.13: serial=2 EE not covered by onlyContainsCACerts CRL → Ok()");
+    // The cert IS a CA (cert_is_ca=true) → onlyContainsCACerts CRL covers it →
+    // search revoked list → not in list → Ok(()).
+    checker
+        .check_revocation(&ee, &ca)
+        .expect("§4.14.13: CA cert (despite EE suffix) IS covered by onlyContainsCACerts CRL");
 }
 
 /// §4.14.14: Invalid — onlyContainsAttributeCerts CRL.
 ///
 /// Oracle: PKITS §4.14.14 MUST NOT validate.
 ///
-/// The CRL has `onlyContainsAttributeCerts=TRUE`. The IDP check returns `Ok()`
-/// (not covered) because attribute cert validation is out of scope for
-/// `pkix-revocation` (handled by `pkix-ac`, tracked for v0.2).
-/// A full path validator must treat "not covered" as a hard-fail.
+/// The CRL has `onlyContainsAttributeCerts=TRUE`. Our IDP check returns
+/// `Err(OutOfScope(CrlOnlyAttributeCerts))` because attribute cert validation
+/// is out of scope for `pkix-revocation` (handled by `pkix-ac`).
+/// A hard-fail path validator MUST treat this as failure.
 #[test]
 fn pkits_4_14_14_invalid_only_attribute_certs() {
+    use pkix_revocation::{Error, OutOfScopeReason};
+
     let ca_der = pkits_cert("onlyContainsAttributeCertsCACert");
     let ee_der = pkits_cert("InvalidonlyContainsAttributeCertsTest14EE");
     let crl = pkits_crl("onlyContainsAttributeCertsCACRL");
@@ -674,11 +691,13 @@ fn pkits_4_14_14_invalid_only_attribute_certs() {
 
     let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
-    // onlyContainsAttributeCerts=TRUE → our IDP check returns Ok() (not covered).
-    let result = checker.check_revocation(&ee, &ca);
-    result.expect(
-        "§4.14.14: onlyContainsAttributeCerts CRL → not covered → Ok() \
-         (path validator must hard-fail)",
+    // onlyContainsAttributeCerts=TRUE → out of scope for any public-key cert.
+    let err = checker
+        .check_revocation(&ee, &ca)
+        .expect_err("§4.14.14: onlyContainsAttributeCerts CRL → OutOfScope");
+    assert_eq!(
+        err,
+        Error::OutOfScope(OutOfScopeReason::CrlOnlyAttributeCerts)
     );
 }
 
