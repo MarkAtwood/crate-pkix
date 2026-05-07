@@ -83,8 +83,8 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
 ///   For the certificate issued directly by a trust anchor, the CRL is verified
 ///   using the anchor's subject DN and SPKI in place of the missing issuer
-///   `Certificate`.  The `cRLSign` KeyUsage check is omitted for trust anchors
-///   (anchors are trusted by construction; they carry no KeyUsage to inspect).
+///   `Certificate`.  The `cRLSign` `KeyUsage` check is omitted for trust anchors
+///   (anchors are trusted by construction; they carry no `KeyUsage` to inspect).
 ///   If the CRL's issuer name does not match the anchor, the method returns
 ///   [`Error::CrlIssuerMismatch`] rather than `Ok(())`.
 ///
@@ -131,6 +131,11 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// - Entries in the delta with reason `removeFromCRL` are removed from the
     ///   base.
     /// - The merged result is used for all subsequent `check_revocation` calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Error::CrlParseError)` if either the base or delta CRL DER
+    /// cannot be decoded.
     ///
     /// Returns `Err(Error::DeltaCrlBaseMismatch)` if:
     /// - The delta CRL's `BaseCRLNumber` is absent (not a delta CRL), or
@@ -332,7 +337,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     /// Check revocation for `cert` issued directly by a trust anchor.
     ///
     /// Uses the anchor's `subject` and `subject_public_key_info` in place of
-    /// an issuer `Certificate` to verify the CRL.  The `cRLSign` KeyUsage bit
+    /// an issuer `Certificate` to verify the CRL.  The `cRLSign` `KeyUsage` bit
     /// check is omitted because trust anchors do not carry a `Certificate` with
     /// extensions to inspect.
     ///
@@ -541,6 +546,15 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
         // Verifier returns an opaque error; no additional context available.
         .map_err(|_| Error::CrlSignatureInvalid)?;
 
+    // NOTE: The clone here is a structural requirement. Returning `&[RevokedCert]`
+    // (Option A) is not possible because `delta_crl` is a caller-local variable; a
+    // reference into it cannot outlive the `if let` block at both call sites without
+    // a significant lifetime refactor of `check_revocation` and
+    // `check_revocation_against_anchor`. A borrow-based design would require either
+    // pre-parsing the delta CRL into `self` at construction time (deferred to v0.3
+    // caching work) or passing the parsed `CertificateList` in from the caller and
+    // restructuring both call sites. Tracked as a structural limitation; the clone is
+    // bounded by the size of the revoked list and occurs at most once per call.
     Ok(delta_crl
         .tbs_cert_list
         .revoked_certificates
@@ -572,7 +586,7 @@ fn uint_to_u64(n: &der::asn1::Uint) -> Option<u64> {
 /// - `None` — `CRLNumber` extension absent (field is optional per RFC 5280 §5.2.3)
 /// - `Some(Ok(n))` — extension present and successfully decoded
 /// - `Some(Err(e))` — extension present but the INTEGER value is malformed or
-///   too large to fit in a `u64` (a CRLNumber > 2^64 is implausible in any
+///   too large to fit in a `u64` (a `CRLNumber` > 2^64 is implausible in any
 ///   deployed PKI but must not silently disable the staleness check)
 fn crl_number(crl: &CertificateList) -> Option<Result<u64, der::Error>> {
     let ext = crl

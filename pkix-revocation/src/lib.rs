@@ -119,7 +119,7 @@ pub enum Error {
     /// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
     OcspMalformed,
 
-    /// The CRL issuer certificate does not have the `cRLSign` bit set in KeyUsage
+    /// The CRL issuer certificate does not have the `cRLSign` bit set in `KeyUsage`
     /// (RFC 5280 §6.3.3(f)).
     CrlSignMissing,
 
@@ -206,8 +206,7 @@ fn crl_reason_name(r: CrlReason) -> &'static str {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::CrlParseError(e) => Some(e),
-            Error::OcspParseError(e) => Some(e),
+            Error::CrlParseError(e) | Error::OcspParseError(e) => Some(e),
             _ => None,
         }
     }
@@ -308,6 +307,11 @@ pub trait RevocationChecker {
     /// returns `Ok(())`. Any implementor that does not override this method
     /// silently skips revocation for the certificate directly issued by the
     /// trust anchor. Override this method to enable anchor-level revocation.
+    ///
+    /// # Errors
+    ///
+    /// The default implementation always returns `Ok(())`; override this method
+    /// to enable error-returning revocation checks.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,
