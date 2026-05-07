@@ -52,6 +52,9 @@ use x509_cert::Certificate;
 /// Re-exported for use with [`TrustAnchor::name_constraints`].
 pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
 
+/// Private shorthand for the `GeneralSubtrees` type used throughout NC processing.
+type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
+
 /// Errors returned by path validation.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -872,10 +875,11 @@ where
     P: Profile,
 {
     let mut policy = profile.policy(now_unix);
-    // Unconditionally enforce the contract: the evaluation time for validity
-    // checks must be the `now_unix` passed by the caller, not whatever the
-    // profile returned. This prevents a buggy Profile from silently using
-    // the wrong clock in release builds.
+    // Defense-in-depth: overwrite current_time_unix with the caller's value.
+    // A correct Profile implementation already sets this in policy(), but
+    // an incorrect implementation might use a stale or wrong clock. This
+    // overwrite is a belt-and-suspenders guard — it does not compensate for a
+    // known bug; no existing Profile impl is incorrect.
     policy.current_time_unix = now_unix;
     validate_path(chain, anchors, &policy, verifier)
 }
@@ -1081,11 +1085,10 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
     // Iteration: d starts at cert_depth, decrements to 1.  At each step we
     // prune depth d-1 against children at depth d, then continue upward.
     // We stop at d==1 because depth 0 is the root sentinel and is excluded.
+    // Invariant: callers pass cert_depth >= 2, so d starts at >= 2 and the
+    // prune_depth == 0 guard below is the only termination condition needed.
     let mut d = cert_depth;
     loop {
-        if d == 0 {
-            break; // depth-0 root sentinel — never prune it
-        }
         let prune_depth = d - 1; // depth to prune (children are at d)
         if prune_depth == 0 {
             break; // depth-0 root sentinel — never prune it
@@ -1507,6 +1510,10 @@ impl NcTypeMask {
     const DNS: NcTypeMask = NcTypeMask(1 << 1);
     const DIRECTORY_NAME: NcTypeMask = NcTypeMask(1 << 2);
     const URI: NcTypeMask = NcTypeMask(1 << 3);
+    /// `IP_ADDRESS` is used by `name_type_bit` and participates in `nc_constrained_types`
+    /// tracking. IpAddress names cannot appear in Subject DNs, so there is no
+    /// inline DN-path code for this type; SAN IpAddress entries are handled by the
+    /// generic SAN loop in `check_name_constraints` via `type_constrained(name)`.
     const IP_ADDRESS: NcTypeMask = NcTypeMask(1 << 4);
 
     /// Returns `true` if `self` and `other` share at least one bit (non-empty intersection).
@@ -1921,7 +1928,7 @@ fn chain_walk<V: SignatureVerifier>(
     let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {
         None => (
             None,
-            x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default(),
+            GeneralSubtrees::default(),
         ),
         Some(nc) => (
             // Clone necessary: nc_permitted and nc_excluded are mutated during the walk.
@@ -2106,20 +2113,18 @@ fn chain_walk<V: SignatureVerifier>(
                     // (d)(1)(i): for each parent at depth i-1 whose
                     // expected_policy_set contains p_oid, create a child.
                     // Track whether any parent matched to decide step (d)(1)(ii).
-                    let matched_via_i = tree
-                        .iter()
-                        .filter(|parent| {
-                            parent.depth == cert_depth - 1
-                                && parent.expected_policy_set.contains(p_oid)
-                        })
-                        .fold(false, |_, _parent| {
-                            new_nodes.push(PolicyNode {
-                                depth: cert_depth,
-                                valid_policy: *p_oid,
-                                expected_policy_set: vec![*p_oid],
-                            });
-                            true
+                    let mut matched_via_i = false;
+                    for _parent in tree.iter().filter(|parent| {
+                        parent.depth == cert_depth - 1
+                            && parent.expected_policy_set.contains(p_oid)
+                    }) {
+                        matched_via_i = true;
+                        new_nodes.push(PolicyNode {
+                            depth: cert_depth,
+                            valid_policy: *p_oid,
+                            expected_policy_set: vec![*p_oid],
                         });
+                    }
 
                     // (d)(1)(ii): if no match in (i), check for an anyPolicy
                     // parent at depth i-1.
@@ -2444,13 +2449,13 @@ fn chain_walk<V: SignatureVerifier>(
                             // (If neither is within the other the intersection for that
                             // type is empty — tracked via nc_constrained_types.)
                             let mut result =
-                                x509_cert::ext::pkix::constraints::name::GeneralSubtrees::default();
+                                GeneralSubtrees::default();
 
                             // For each new entry, pre-filter current entries of the
                             // same type to avoid calling same_nc_variant twice per
                             // pair (vjc.16: duplicated guard + containment check).
                             for n in new_permitted.iter() {
-                                let same_type_in_current: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+                                let same_type_in_current: GeneralSubtrees =
                                     current
                                         .iter()
                                         .filter(|c| same_nc_variant(&c.base, &n.base))
@@ -2470,7 +2475,7 @@ fn chain_walk<V: SignatureVerifier>(
                             }
 
                             for c in current.iter() {
-                                let same_type_in_new: x509_cert::ext::pkix::constraints::name::GeneralSubtrees =
+                                let same_type_in_new: GeneralSubtrees =
                                     new_permitted
                                         .iter()
                                         .filter(|n| same_nc_variant(&n.base, &c.base))
@@ -2628,6 +2633,12 @@ fn chain_walk<V: SignatureVerifier>(
                 });
                 // Cascade deletion downward: remove any node that is no longer
                 // reachable from a living parent node.
+                //
+                // Top-down order (shallowest to deepest) is required: the retain
+                // at depth d mutates the tree in-place, so the any_parent check
+                // at depth d+1 sees the post-deletion state of depth d parents.
+                // Bottom-up order would miss grandchildren whose parents survived
+                // but whose grandparent was deleted.
                 for d in 2..=leaf_depth {
                     let parent_depth = d - 1;
                     let reachable: Vec<der::asn1::ObjectIdentifier> = tree
@@ -2731,8 +2742,8 @@ enum CheckMode {
 fn check_name_constraints(
     cert: &x509_cert::Certificate,
     san: Option<&x509_cert::ext::pkix::SubjectAltName>,
-    nc_permitted: Option<&x509_cert::ext::pkix::constraints::name::GeneralSubtrees>,
-    nc_excluded: &x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
+    nc_permitted: Option<&GeneralSubtrees>,
+    nc_excluded: &GeneralSubtrees,
     nc_constrained_types: NcTypeMask,
     index: usize,
 ) -> crate::Result<()> {
@@ -2835,7 +2846,7 @@ fn check_name_constraints(
         // when the check is active; `Option` avoids a dummy assignment that
         // would trigger an unused-assignment warning.
         let permitted_rfc822_storage: Option<
-            x509_cert::ext::pkix::constraints::name::GeneralSubtrees,
+            GeneralSubtrees,
         > = if nc_constrained_types.intersects(NcTypeMask::RFC822) {
             Some(
                 nc_permitted
