@@ -92,6 +92,13 @@ pub enum Error {
     /// status. Callers MUST NOT treat this error as "try another responder".
     OcspCertIdMismatch,
 
+    /// The `issuer` argument passed to [`RevocationChecker::check_revocation`] is
+    /// not the issuer of `cert`.
+    ///
+    /// This is a caller-contract violation: the subject DN of `issuer` does not
+    /// match the issuer DN of `cert`. The OCSP response was not consulted.
+    OcspIssuerCertMismatch,
+
     /// The OCSP responder returned an `unknown` status (hard-fail mode).
     OcspStatusUnknown,
 
@@ -150,6 +157,9 @@ impl core::fmt::Display for Error {
             Error::OcspCertIdMismatch => {
                 f.write_str("OCSP CertID issuer hashes do not match the expected issuer")
             }
+            Error::OcspIssuerCertMismatch => f.write_str(
+                "issuer certificate subject DN does not match the certificate's issuer DN",
+            ),
             Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
             Error::OcspExpired => f.write_str("OCSP response is stale or has no nextUpdate"),
             Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),

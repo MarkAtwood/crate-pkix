@@ -99,7 +99,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             &issuer.tbs_certificate.subject,
             &cert.tbs_certificate.issuer,
         ) {
-            return Err(Error::OcspCertIdMismatch);
+            return Err(Error::OcspIssuerCertMismatch);
         }
 
         // (1)-(6) Parse and verify the BasicOCSPResponse.
@@ -224,7 +224,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // Defense-in-depth: guards against a caller passing an anchor whose SPKI
         // happens to verify the OCSP response but which did not issue `cert`.
         if !names_match(&anchor.subject, &cert.tbs_certificate.issuer) {
-            return Err(Error::OcspCertIdMismatch);
+            return Err(Error::OcspIssuerCertMismatch);
         }
 
         // (1)-(6) Parse and verify the BasicOCSPResponse.
@@ -360,6 +360,7 @@ fn parse_and_verify_basic_response<V: SignatureVerifier>(
             &tbs_bytes,
             basic.signature.raw_bytes(),
         )
+        // Verifier returns an opaque error; no additional context available.
         .map_err(|_| Error::OcspSignatureInvalid)?;
 
     Ok(basic)
