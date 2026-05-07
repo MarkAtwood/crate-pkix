@@ -160,7 +160,7 @@ impl EvaluationReport {
     /// original severity — the deviation has already been applied.
     #[must_use]
     pub fn has_findings(&self) -> bool {
-        self.findings.iter().any(|f| f.is_finding())
+        self.findings.iter().any(Finding::is_finding)
     }
 
     /// Return all findings at or above the given severity.

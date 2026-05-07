@@ -13,7 +13,7 @@
 //! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | TLS BR §6.1.5 | Error | Any |
 //! | [`cabf.br.tls.san.required`](SanRequiredLint) | TLS BR §7.1.4.2 | Error | Leaf |
 //! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | TLS BR §7.1.2.7.3 | Error | Leaf |
-//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.5 | Error | IntermediateCa |
+//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.5 | Error | `IntermediateCa` |
 //!
 //! # Using the profile
 //!
@@ -52,19 +52,19 @@ const ECDSA_WITH_SHA1: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.2.840.10045.4.1");
 
 /// RSA encryption SPKI algorithm OID — RFC 3279 §2.3.1.
-/// Used to detect RSA keys in SubjectPublicKeyInfo.
+/// Used to detect RSA keys in `SubjectPublicKeyInfo`.
 const RSA_ENCRYPTION: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
 
-/// SubjectAltName extension OID — RFC 5280 §4.2.1.6.
+/// `SubjectAltName` extension OID — RFC 5280 §4.2.1.6.
 const OID_SUBJECT_ALT_NAME: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.5.29.17");
 
-/// ExtendedKeyUsage extension OID — RFC 5280 §4.2.1.12.
+/// `ExtendedKeyUsage` extension OID — RFC 5280 §4.2.1.12.
 const OID_EXTENDED_KEY_USAGE: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.5.29.37");
 
-/// BasicConstraints extension OID — RFC 5280 §4.2.1.9.
+/// `BasicConstraints` extension OID — RFC 5280 §4.2.1.9.
 const OID_BASIC_CONSTRAINTS: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.5.29.19");
 
