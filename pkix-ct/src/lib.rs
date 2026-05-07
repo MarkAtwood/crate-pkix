@@ -45,6 +45,7 @@ pub struct CtLogList {
 
 impl CtLogList {
     /// Create an empty log list.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -85,6 +86,10 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Checks the `SignedCertificateTimestampList` extension (OID
 /// 1.3.6.1.4.1.11129.2.4.2). Returns `Ok(())` if at least one SCT verifies
 /// against a trusted log; returns [`Error::NoTrustedSct`] otherwise.
+///
+/// # Errors
+///
+/// Returns `Err(Error::NoTrustedSct)` unconditionally. This function is a stub.
 ///
 /// # Note
 ///

@@ -224,7 +224,7 @@ pub enum Scope {
 pub enum SubjectKind {
     /// End-entity (leaf) certificate — the subject of the chain.
     Leaf,
-    /// Intermediate CA certificate — has BasicConstraints cA=TRUE, not a trust anchor.
+    /// Intermediate CA certificate — has `BasicConstraints` cA=TRUE, not a trust anchor.
     IntermediateCa,
     /// Any certificate issued directly by a trust anchor (the top intermediate).
     AnchorIssued,
@@ -680,11 +680,13 @@ impl LintRunner {
     }
 
     /// Return a reference to the registered lints.
+    #[must_use]
     pub fn lints(&self) -> &[Box<dyn Lint>] {
         &self.lints
     }
 
     /// Return the bundle version string set on this runner.
+    #[must_use]
     pub fn bundle_version(&self) -> &str {
         &self.bundle_version
     }
@@ -778,7 +780,7 @@ impl LintRunner {
     /// `kinds` maps chain index to [`SubjectKind`]. If `kinds` is shorter than
     /// `chain`, remaining certs are treated as [`SubjectKind::IntermediateCa`].
     ///
-    /// Returns a flat `Vec<Finding>` with cert_index set for each.
+    /// Returns a flat `Vec<Finding>` with `cert_index` set for each.
     ///
     /// # Determining the `AnchorIssued` position
     ///

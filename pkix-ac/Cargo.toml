@@ -12,7 +12,7 @@ categories  = ["cryptography", "no-std"]
 
 [features]
 default = []
-std     = ["der/std", "x509-cert/std"]
+std     = ["der/std", "x509-cert/std", "pkix-path/std"]
 
 [dependencies]
 pkix-path = { workspace = true }

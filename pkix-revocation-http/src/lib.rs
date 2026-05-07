@@ -19,8 +19,8 @@
 //!
 //! # Spec references
 //!
-//! - RFC 5280 §4.2.1.13 — CRLDistributionPoints extension
-//! - RFC 5280 §4.2.2.1  — AuthorityInfoAccess extension
+//! - RFC 5280 §4.2.1.13 — `CRLDistributionPoints` extension
+//! - RFC 5280 §4.2.2.1  — `AuthorityInfoAccess` extension
 //! - RFC 5280 §6.3       — CRL validation algorithm
 //!
 //! # Limitations
@@ -31,12 +31,19 @@
 ///
 /// Implement this trait to supply your own HTTP client (reqwest, ureq, etc.).
 /// The fetcher is called with a URL extracted from the certificate's
-/// CRLDistributionPoints or AuthorityInfoAccess extension.
+/// `CRLDistributionPoints` or `AuthorityInfoAccess` extension.
 pub trait RevocationFetcher {
     /// Fetch the resource at `url` and return the raw response bytes.
     ///
     /// The caller will interpret the bytes as DER-encoded CRL or OCSP response
     /// depending on context.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FetchError::Transport`] on network or transport failure,
+    /// [`FetchError::HttpStatus`] on a non-2xx HTTP response, or
+    /// [`FetchError::TooLarge`] if the response body exceeds the configured
+    /// size limit.
     fn fetch(&self, url: &str) -> std::result::Result<Vec<u8>, FetchError>;
 }
 
@@ -73,11 +80,11 @@ impl std::error::Error for FetchError {
 
 /// A [`pkix_revocation::RevocationChecker`] that fetches CRLs on demand.
 ///
-/// Reads [`CRLDistributionPoints`][cdp] from each certificate, fetches the
+/// Reads `CRLDistributionPoints` from each certificate, fetches the
 /// CRL via the provided [`RevocationFetcher`], and delegates to
 /// [`pkix_revocation::CrlChecker`].
 ///
-/// [cdp]: https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.13
+/// See [RFC 5280 §4.2.1.13](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.13).
 ///
 /// # Limitations
 ///
@@ -102,11 +109,11 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
 
 /// A [`pkix_revocation::RevocationChecker`] that fetches OCSP responses on demand.
 ///
-/// Reads [`AuthorityInfoAccess`][aia] from each certificate, sends an OCSP
+/// Reads `AuthorityInfoAccess` from each certificate, sends an OCSP
 /// request via the provided [`RevocationFetcher`], and delegates to
 /// [`pkix_revocation::OcspChecker`].
 ///
-/// [aia]: https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1
+/// See [RFC 5280 §4.2.2.1](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1).
 ///
 /// # Limitations
 ///

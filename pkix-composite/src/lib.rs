@@ -61,6 +61,7 @@ pub struct CompositeVerifier<C, P> {
 
 impl<C, P> CompositeVerifier<C, P> {
     /// Create a new `CompositeVerifier` from a classical and a post-quantum component.
+    #[deprecated = "pkix-composite is not yet implemented"]
     pub fn new(classical: C, post_quantum: P) -> Self {
         Self {
             classical,
