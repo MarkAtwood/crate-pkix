@@ -175,8 +175,8 @@ impl Lint for Sha1ProhibitedLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let sig_alg = &cert.signature_algorithm.oid;
-        if sig_alg == &SHA1_WITH_RSA || sig_alg == &ECDSA_WITH_SHA1 {
+        let sig_alg = cert.signature_algorithm.oid;
+        if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1) {
             LintResult::Error("certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3")
         } else {
             LintResult::Pass

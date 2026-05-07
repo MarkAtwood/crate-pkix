@@ -851,7 +851,7 @@ where
 /// work with a `Profile` implementation rather than constructing a
 /// [`ValidationPolicy`] directly.
 ///
-/// The profile's [`Policy::policy`][Profile::policy] method is called with
+/// The profile's [`Profile::policy`] method is called with
 /// `now_unix` to produce the `ValidationPolicy`.  A `debug_assert!` enforces
 /// the `Profile` contract that the returned policy must have
 /// `current_time_unix == now_unix`; this fires in debug/test builds and is
@@ -1012,11 +1012,9 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
 fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
-    if let Some(exts) = cert.tbs_certificate.extensions.as_ref() {
-        for ext in exts {
-            if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
-                return Err(Error::UnhandledCriticalExtension { index });
-            }
+    for ext in cert.tbs_certificate.extensions.as_deref().unwrap_or(&[]) {
+        if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
+            return Err(Error::UnhandledCriticalExtension { index });
         }
     }
     Ok(())
