@@ -525,11 +525,11 @@ impl Lint for BcCaFlagLint {
 pub struct CabfTlsBrProfile;
 
 impl pkix_path::Profile for CabfTlsBrProfile {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         pkix_profiles::WebPkiProfile.id()
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         pkix_profiles::WebPkiProfile.version()
     }
 

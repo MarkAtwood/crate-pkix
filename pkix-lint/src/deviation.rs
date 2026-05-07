@@ -563,17 +563,17 @@ impl DeviationStore {
         // Normalize IssuerDnContains substrings to lowercase at insertion time
         // so that matching logic does not need to re-normalize on every call.
         // This prevents a silent no-match when callers pass mixed-case strings.
+        // Use make_ascii_lowercase (in-place, no allocation) consistent with
+        // the matching code in DeviationScope::matches.
         if let DeviationScope::IssuerDnContains(s) = &mut deviation.scope {
-            let lower = s.to_lowercase();
-            if *s != lower {
-                *s = lower;
-            }
+            s.make_ascii_lowercase();
         }
         self.deviations.push(deviation);
         Ok(())
     }
 
     /// Return all deviations in the store.
+    #[must_use]
     pub fn all(&self) -> &[Deviation] {
         &self.deviations
     }
@@ -587,6 +587,7 @@ impl DeviationStore {
     }
 
     /// Return all deviations targeting `lint_id` that are active at `now_unix`.
+    #[must_use = "iterator is lazy; collect or iterate to use results"]
     pub fn active_for_lint<'a>(
         &'a self,
         lint_id: &'a str,
@@ -711,11 +712,13 @@ impl DeviationRunner {
     }
 
     /// Return a reference to the inner [`crate::LintRunner`].
+    #[must_use]
     pub fn lint_runner(&self) -> &crate::LintRunner {
         &self.runner
     }
 
     /// Return a reference to the [`DeviationStore`].
+    #[must_use]
     pub fn deviation_store(&self) -> &DeviationStore {
         &self.store
     }
@@ -1037,6 +1040,7 @@ mod tests {
 
     #[test]
     fn scope_issuer_dn_exact_does_not_match_different_dn() {
+        use der::Decode as _;
         let cert = load_cert();
         // Use the cert's subject DN as the "issuer" — for a self-signed cert subject==issuer,
         // so use a different cert's issuer if available. Since we only have one fixture
@@ -1044,7 +1048,6 @@ mod tests {
         // an IssuerDnExact with a DIFFERENT cert's issuer.
         //
         // Load the smime fixture (different cert, different DN).
-        use der::Decode as _;
         let other_cert = Certificate::from_der(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
         ))
@@ -1137,8 +1140,8 @@ mod tests {
 
     #[test]
     fn scope_serial_range_wrong_issuer_no_match() {
-        let cert = load_cert();
         use der::Decode as _;
+        let cert = load_cert();
         let other_cert = Certificate::from_der(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
         ))
