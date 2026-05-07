@@ -199,6 +199,14 @@ impl Profile for WebPkiProfile {
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
 /// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
 ///
+/// [`ValidationPolicy::max_validity_secs`] applies to **every** certificate in
+/// the chain, not just the leaf. Typical S/MIME CA certificates have validity
+/// periods of 10–20 years (well over 1185 days). Callers using `SmimeProfile`
+/// with a standard S/MIME CA hierarchy will see validation failures on the
+/// intermediate or root CA certificates. To avoid this, use a custom policy
+/// that sets only the leaf validity cap, or construct the chain with CA
+/// certificates whose validity is within 1185 days.
+///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
 #[derive(Clone, Debug)]
 pub struct SmimeProfile;
@@ -246,6 +254,19 @@ impl Profile for SmimeProfile {
 ///
 /// The free-function alias [`code_signing_policy`] is equivalent to
 /// `CodeSigningProfile.policy(now_unix)`.
+///
+/// # Limitations
+///
+/// [`ValidationPolicy::max_validity_secs`] applies to **every** certificate in
+/// the chain, not just the leaf. Typical CS subordinate CA certificates have
+/// validity periods of 5–10 years (well over 460 days). Callers using
+/// `CodeSigningProfile` with a standard CS CA hierarchy will see validation
+/// failures on the intermediate CA certificates. To avoid this, use a custom
+/// policy that sets only the leaf validity cap, or construct the chain with CA
+/// certificates whose validity is within 460 days.
+///
+/// Timestamp authority verification is out of scope for `pkix-path`;
+/// use a dedicated timestamp verifier. Revocation is handled by `pkix-revocation`.
 #[derive(Clone, Debug)]
 pub struct CodeSigningProfile;
 
@@ -261,12 +282,8 @@ impl Profile for CodeSigningProfile {
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
-        // CS BR §6.3.2: certificates issued before 2026-03-01 may be valid
-        // for up to 39 months; 39 × 30.44 days/month ≈ 1185.2, so 1185 days
-        // is the standard day-count approximation used by major CAs. Certificates
-        // issued on or after 2026-03-01 are limited to 460 days (CS BR v3.8).
-        // This profile implements the pre-2026-03-01 rule (1185 days).
-        p.max_validity_secs = Some(1185 * 86_400);
+        // CS BR §6.3.2 (effective 2026-03-01): maximum 460 days for subscriber certificates.
+        p.max_validity_secs = Some(460 * 86_400);
         // CS BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_CS_BR_ALLOWED_ALGS.to_vec());
         // CS BR §6.1.5: RSA keys must be at least 3072 bits (raised from 2048 effective 2023-06-01).
@@ -421,6 +438,12 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
 /// Sponsor-validated, and Individual-validated profiles are planned for v0.3.
 ///
+/// `max_validity_secs` applies to **every** certificate in the chain, not just
+/// the leaf. Typical S/MIME CA certificates have validity periods of 10–20 years
+/// (well over 1185 days). Callers using this policy with a standard S/MIME CA
+/// hierarchy will see validation failures on intermediate or root CA certificates.
+/// Use a custom policy or chain with short-lived CA certificates to avoid this.
+///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
 #[must_use]
 pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
@@ -436,7 +459,7 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// | Field | Value | Normative reference |
 /// |-------|-------|---------------------|
-/// | `max_validity_secs` | 1185 days (~39 months) | CS BR §6.3.2 |
+/// | `max_validity_secs` | 460 days | CS BR §6.3.2 (effective 2026-03-01) |
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | CS BR §7.1.3 |
 /// | `min_rsa_key_bits` | 3072 | CS BR §6.1.5 (effective 2023-06-01) |
 /// | `require_subject_alt_name` | false | CS certs identify subjects by DN |
@@ -444,6 +467,12 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 /// | `max_path_len` | 1 | CS BR §7.1.1 |
 ///
 /// # Limitations
+///
+/// `max_validity_secs` applies to **every** certificate in the chain, not just
+/// the leaf. Typical CS subordinate CA certificates have validity periods of
+/// 5–10 years (well over 460 days). Callers using this policy with a standard
+/// CS CA hierarchy will see validation failures on intermediate CA certificates.
+/// Use a custom policy or chain with short-lived CA certificates to avoid this.
 ///
 /// Timestamp authority verification is out of scope for `pkix-path`;
 /// use a dedicated timestamp verifier. Revocation is handled by `pkix-revocation`.
@@ -864,12 +893,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn code_signing_policy_max_validity_is_1185_days() {
+    fn code_signing_policy_max_validity_is_460_days() {
+        // CS BR §6.3.2 (effective 2026-03-01): subscriber certificates limited to 460 days.
         let p = code_signing_policy(NOW);
         assert_eq!(
             p.max_validity_secs,
-            Some(1185 * 86_400),
-            "code_signing_policy: max_validity_secs must be 1185 days"
+            Some(460 * 86_400),
+            "code_signing_policy: max_validity_secs must be 460 days (CS BR §6.3.2)"
         );
     }
 
