@@ -46,7 +46,6 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
 ///   the issuer's key. This is a v0.1 limitation tracked for v0.3.
 ///
-///
 /// # Behavior
 ///
 /// - `SingleResponse` matching uses both serial number and the `CertID`
