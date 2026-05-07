@@ -95,7 +95,7 @@ pub struct EvaluationReport {
     /// Findings that had a deviation applied.
     ///
     /// Always included for auditability — never hidden. The operator UI should
-    /// display these as "DEVIATION APPLIED by <id>" with the justification and
+    /// display these as `DEVIATION APPLIED by <id>` with the justification and
     /// `evidence_uri` (when present) shown inline.
     pub deviated_findings: Vec<DeviatedFinding>,
 }
