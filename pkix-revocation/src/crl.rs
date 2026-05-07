@@ -274,26 +274,26 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
         //     (critical), check scope constraints against the certificate.
+        // Scope mismatches surface as Error::OutOfScope so callers can distinguish
+        // "verified not-revoked" (Ok(())) from "no determination made"
+        // (Err(OutOfScope(...))). Hard-fail revocation policies should treat
+        // OutOfScope as a failure.
         if let Some(idp) = parse_issuing_dp(crl)? {
             // onlyContainsAttributeCerts: attribute cert validation is out of scope
             // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
             if idp.only_contains_attribute_certs {
-                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
-                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
-                return Ok(());
+                return Err(Error::OutOfScope(
+                    crate::OutOfScopeReason::CrlOnlyAttributeCerts,
+                ));
             }
             let cert_is_ca = cert_is_ca_cert(cert)?;
             // onlyContainsUserCerts: CRL only covers end-entity (non-CA) certs.
             if idp.only_contains_user_certs && cert_is_ca {
-                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
-                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
-                return Ok(());
+                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyUserCerts));
             }
             // onlyContainsCACerts: CRL only covers CA certs.
             if idp.only_contains_ca_certs && !cert_is_ca {
-                // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
-                // Callers with hard-fail revocation requirements must verify CRL coverage separately.
-                return Ok(());
+                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
             }
         }
 
@@ -411,16 +411,20 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
         // (5) IssuingDistributionPoint scope check (same as check_revocation).
+        // Scope mismatches surface as Error::OutOfScope; see check_revocation
+        // for rationale.
         if let Some(idp) = parse_issuing_dp(crl)? {
             if idp.only_contains_attribute_certs {
-                return Ok(());
+                return Err(Error::OutOfScope(
+                    crate::OutOfScopeReason::CrlOnlyAttributeCerts,
+                ));
             }
             let cert_is_ca = cert_is_ca_cert(cert)?;
             if idp.only_contains_user_certs && cert_is_ca {
-                return Ok(());
+                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyUserCerts));
             }
             if idp.only_contains_ca_certs && !cert_is_ca {
-                return Ok(());
+                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
             }
         }
 

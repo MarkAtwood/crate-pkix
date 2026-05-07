@@ -55,12 +55,59 @@ impl std::error::Error for DerError {
     }
 }
 
+/// Reason a revocation check produced no determination.
+///
+/// Carried by [`Error::OutOfScope`] to identify which scope-mismatch case the
+/// checker hit. Distinct from `Crl*Error` (parse / signature / validity
+/// failures): an `OutOfScope` outcome is structurally well-formed but the
+/// revocation source's stated scope excludes the certificate being checked.
+///
+/// Hard-fail callers should treat any `OutOfScope` as a failure (no
+/// revocation determination was made). Soft-fail callers can match on the
+/// reason and decide which scopes to tolerate (for example, treating
+/// `CrlOnlyAttributeCerts` as "expected and tolerable" while still hard-failing
+/// on `CrlOnlyCaCerts` when checking a CA certificate).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OutOfScopeReason {
+    /// The CRL's `IssuingDistributionPoint` extension has
+    /// `onlyContainsAttributeCerts = true`. Attribute-certificate revocation
+    /// is out of scope for `pkix-revocation` (RFC 5755 attribute certificates
+    /// are handled by `pkix-ac`); the certificate being checked is a public-key
+    /// certificate, so the CRL cannot apply.
+    CrlOnlyAttributeCerts,
+    /// The CRL's `IssuingDistributionPoint` extension has
+    /// `onlyContainsUserCerts = true` but the certificate being checked is a
+    /// CA certificate (`BasicConstraints` `cA = TRUE`).
+    CrlOnlyUserCerts,
+    /// The CRL's `IssuingDistributionPoint` extension has
+    /// `onlyContainsCACerts = true` but the certificate being checked is not a
+    /// CA certificate.
+    CrlOnlyCaCerts,
+}
+
+impl core::fmt::Display for OutOfScopeReason {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::CrlOnlyAttributeCerts => f.write_str(
+                "CRL onlyContainsAttributeCerts=TRUE; subject is a public-key certificate",
+            ),
+            Self::CrlOnlyUserCerts => {
+                f.write_str("CRL onlyContainsUserCerts=TRUE; subject is a CA certificate")
+            }
+            Self::CrlOnlyCaCerts => {
+                f.write_str("CRL onlyContainsCACerts=TRUE; subject is an end-entity certificate")
+            }
+        }
+    }
+}
+
 /// Errors returned by revocation checking.
 ///
 /// # Variant naming convention
 ///
 /// Most variants carry a `Crl*` or `Ocsp*` prefix indicating which revocation
-/// source produced the failure. Three variants intentionally do not:
+/// source produced the failure. Four variants intentionally do not:
 ///
 /// - [`Error::Revoked`] applies to both CRL and OCSP outcomes; no prefix is
 ///   correct. This is what [`RevocationChecker::check_revocation`] returns
@@ -71,6 +118,11 @@ impl std::error::Error for DerError {
 ///   because the failure is scoped to the delta-CRL workflow — the prefix
 ///   reads as the noun phrase "delta CRL" rather than as a sub-namespace of
 ///   `Crl*`.
+/// - [`Error::OutOfScope`] applies whenever a revocation source's stated
+///   scope excludes the certificate being checked. Today only CRL `IDP`
+///   scope mismatches produce this; the variant is named generically so that
+///   future OCSP / SCT / OCSP-stapling scope-mismatch cases can reuse it
+///   without an additional rename.
 ///
 /// Renames are a semver break; do not "normalize" these without coordinating
 /// a major version.
@@ -191,6 +243,27 @@ pub enum Error {
     /// This is a fail-closed alternative to silently treating the cert as
     /// not-a-CA (which would let CA-scoped CRLs be skipped for an actual CA).
     MalformedCertificate,
+
+    /// The revocation source's stated scope excludes the certificate being
+    /// checked, so the checker made **no determination** about its revocation
+    /// status.
+    ///
+    /// This is distinct from "verified not-revoked" (the historic ambiguous
+    /// `Ok(())` return that this variant replaces). Hard-fail callers should
+    /// treat any `OutOfScope` as a failure; soft-fail callers can match on
+    /// the [`OutOfScopeReason`] and decide which scopes to tolerate.
+    ///
+    /// Currently produced by [`CrlChecker`] for the three
+    /// `IssuingDistributionPoint` scope-flag mismatches in RFC 5280 §5.2.5
+    /// (`onlyContainsAttributeCerts`, `onlyContainsUserCerts`, and
+    /// `onlyContainsCACerts`). [`OcspChecker`] does **not** produce this
+    /// variant: it returns [`Error::OcspStatusUnknown`] when no matching
+    /// `SingleResponse` is found, which is its analogue of "not covered" and
+    /// already fail-closed.
+    ///
+    /// [`CrlChecker`]: crate::CrlChecker
+    /// [`OcspChecker`]: crate::OcspChecker
+    OutOfScope(OutOfScopeReason),
 }
 
 impl core::fmt::Display for Error {
@@ -237,6 +310,9 @@ impl core::fmt::Display for Error {
             Self::MalformedCertificate => f.write_str(
                 "certificate BasicConstraints extension is present but cannot be decoded",
             ),
+            Self::OutOfScope(reason) => {
+                write!(f, "revocation source out of scope: {reason}")
+            }
         }
     }
 }
@@ -297,23 +373,18 @@ pub trait RevocationChecker {
     ///
     /// # Return value
     ///
-    /// `Ok(())` has **dual semantics** — it can mean either of:
+    /// `Ok(())` means **verified not-revoked**: the revocation source covers
+    /// this certificate and the serial number was not found in the revoked
+    /// list. This is an unambiguous "not revoked" determination.
     ///
-    /// 1. **Not revoked**: the revocation source covers this certificate and the
-    ///    serial number was not found in the revoked list.
-    /// 2. **Not covered**: the revocation source's scope does not apply to this
-    ///    certificate type (e.g., a CRL scoped to CA certificates when checking an
-    ///    end-entity, or an OCSP response with no matching `SingleResponse`).
-    ///
-    /// These two outcomes are **indistinguishable** from the `Ok(())` return alone.
-    /// Callers enforcing a hard-fail revocation policy must separately verify that
-    /// at least one revocation source actually covers the certificate in question.
-    /// Note that individual implementations may differ: [`CrlChecker`] returns
-    /// `Ok(())` for out-of-scope certificates, while [`OcspChecker`] returns
-    /// <code>Err([Error::OcspStatusUnknown])</code> when no matching `SingleResponse` is found.
-    ///
-    /// Returns `Err` if the certificate is confirmed revoked or if a required
-    /// revocation check fails (e.g., expired CRL, invalid signature).
+    /// "Not covered" — i.e., the revocation source's scope excludes the
+    /// certificate so no determination was made — surfaces as
+    /// <code>Err([Error::OutOfScope]([OutOfScopeReason]))</code> for CRL
+    /// scope-flag mismatches and as
+    /// <code>Err([Error::OcspStatusUnknown])</code> for OCSP responses with no
+    /// matching `SingleResponse`. Hard-fail callers should treat both as
+    /// failures; soft-fail callers can match on the specific variant /
+    /// reason and decide which non-determinations to tolerate.
     ///
     /// # Errors
     ///
@@ -322,6 +393,10 @@ pub trait RevocationChecker {
     /// - [`Error::CrlExpired`] — the CRL has passed its `nextUpdate` timestamp.
     /// - [`Error::OcspMalformed`] — the OCSP response is structurally invalid or
     ///   its validity window check failed.
+    /// - [`Error::OcspStatusUnknown`] — no matching `SingleResponse` covered
+    ///   the certificate (OCSP-side "not covered").
+    /// - [`Error::OutOfScope`] — a CRL `IssuingDistributionPoint` scope flag
+    ///   excludes the certificate being checked (CRL-side "not covered").
     /// - Other [`Error`] variants for parse failures, signature verification
     ///   failures, or structural constraint violations.
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
