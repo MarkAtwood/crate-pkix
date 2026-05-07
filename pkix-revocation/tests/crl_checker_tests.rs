@@ -274,6 +274,28 @@ fn delta_crl_with_delta_construction_ok() {
     assert!(result.is_ok(), "valid base+delta must construct Ok, got: {result:?}");
 }
 
+/// CrlChecker::with_delta rejects when base and delta CRLs are from different CAs.
+///
+/// Oracle: RFC 5280 §5.2.4 requires the delta CRL issuer to match the base CRL issuer.
+/// delta-crl-base.der (CN=Test Delta CRL CA) mixed with crl-empty.der
+/// (CN=Test CRL CA) must return DeltaCrlBaseMismatch.
+#[test]
+fn delta_crl_with_delta_rejects_cross_ca() {
+    // crl-empty.der is signed by CN=Test CRL CA (the non-delta CA).
+    // delta-crl-delta-add.der is signed by CN=Test Delta CRL CA.
+    // These are different CAs → issuer mismatch → DeltaCrlBaseMismatch.
+    let result = CrlChecker::with_delta(
+        fixture("crl-empty.der"),        // base from CA-A (crl-ca.der)
+        fixture("delta-crl-delta-add.der"), // delta from CA-B (delta-crl-ca.der)
+        NOW,
+        DefaultVerifier,
+    );
+    assert!(
+        matches!(result, Err(Error::DeltaCrlBaseMismatch)),
+        "delta from different CA than base must return DeltaCrlBaseMismatch, got: {result:?}"
+    );
+}
+
 /// CrlChecker::with_delta rejects when the second argument is not a delta CRL.
 ///
 /// Oracle: passing two base CRLs must return DeltaCrlBaseMismatch.

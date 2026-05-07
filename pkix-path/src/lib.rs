@@ -2105,19 +2105,20 @@ fn chain_walk<V: SignatureVerifier>(
 
                     // (d)(1)(i): for each parent at depth i-1 whose
                     // expected_policy_set contains p_oid, create a child.
-                    let mut matched_via_i = false;
-                    tree.iter()
+                    // Track whether any parent matched to decide step (d)(1)(ii).
+                    let matched_via_i = tree
+                        .iter()
                         .filter(|parent| {
                             parent.depth == cert_depth - 1
                                 && parent.expected_policy_set.contains(p_oid)
                         })
-                        .for_each(|_parent| {
-                            matched_via_i = true;
+                        .fold(false, |_, _parent| {
                             new_nodes.push(PolicyNode {
                                 depth: cert_depth,
                                 valid_policy: *p_oid,
                                 expected_policy_set: vec![*p_oid],
                             });
+                            true
                         });
 
                     // (d)(1)(ii): if no match in (i), check for an anyPolicy

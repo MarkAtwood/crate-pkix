@@ -10,3 +10,4 @@
 # Stray build artifacts in repo root
 *.rlib
 test_must_use*
+rust_out

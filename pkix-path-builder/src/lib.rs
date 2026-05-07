@@ -357,9 +357,16 @@ pub fn build_path(
         return Err(Error::BudgetExceeded);
     }
 
-    // No path found within MAX_DEPTH. Check if a path exists at MAX_DEPTH+1
-    // to distinguish "no path exists at all" from "path exists but too deep".
-    // The probe uses its own fresh budget so it is not affected by prior rounds.
+    // No round hit the budget, but no path found within MAX_DEPTH.
+    // Check if a path exists at MAX_DEPTH+1 to distinguish "no path exists
+    // at all" from "path exists but too deep". The probe uses its own fresh
+    // budget so it is not affected by prior rounds.
+    //
+    // Note: if the probe itself returns BudgetExceeded (pool is adversarially
+    // large at MAX_DEPTH+1), the `?` propagates it to the caller. This is a
+    // second, independent path to BudgetExceeded that does not use the
+    // any_round_budget_exceeded flag — both paths produce the same observable
+    // result (Err(BudgetExceeded)), but via different code paths.
     let mut probe_budget = DFS_BUDGET;
     let mut probe = alloc::vec![target.clone()];
     if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1, &mut probe_budget)? {

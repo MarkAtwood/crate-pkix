@@ -71,6 +71,13 @@ pub enum Error {
     ///
     /// Returned when the `byName` DN or `byKey` SHA-1 hash in the OCSP response
     /// does not match the issuer (or trust anchor) used for this check.
+    ///
+    /// - `byName`: the name in the `ResponderId` does not match the issuer's
+    ///   subject DN (RFC 4518 comparison).
+    /// - `byKey`: the hash in the `ResponderId` does not match SHA-1 of the
+    ///   issuer's `subjectPublicKey` bit string (raw bytes, with tag, length,
+    ///   and unused-bits prefix stripped — not SHA-1 of the full SPKI DER).
+    ///
     /// This is a distinct failure from [`Error::OcspSignatureInvalid`]: the
     /// response may be cryptographically valid, but it was produced by a
     /// different responder than expected.

@@ -496,6 +496,14 @@ pub trait Lint: Send + Sync {
 ///
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
+/// # Serde deserialization bound
+///
+/// When `serde` is enabled, deserializing `Finding` requires `'de: 'static`
+/// because `LintResult::Warn/Error/Fatal` detail fields are `&'static str`
+/// (deserialized via [`de_static_str`], which leaks the allocation). This
+/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`
+/// in v0.3. Until then, callers must deserialize from a `'static` source
+/// (e.g., `serde_json::from_str` on a `&'static str` or `Box::leak`'d string).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
