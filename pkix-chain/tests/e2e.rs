@@ -7,8 +7,8 @@
 //!
 //! Oracle: NIST PKITS §4.1.1 specifies this path MUST validate.
 //! Unix timestamps: PKITS certs valid 2010-01-01 08:30 to 2030-12-31 08:30 UTC.
-//!   PKITS_NOW  = 2020-01-01 00:00:00 UTC = 1 577 836 800
-//!   PKITS_PAST = 1970-01-01 00:00:00 UTC = 0  (before notBefore)
+//!   `PKITS_NOW`  = 2020-01-01 00:00:00 UTC = 1 577 836 800
+//!   `PKITS_PAST` = 1970-01-01 00:00:00 UTC = 0  (before notBefore)
 
 use pkix_chain::{
     verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker,
@@ -33,11 +33,11 @@ fn load(der: &[u8]) -> Certificate {
     Certificate::from_der(der).expect("parse cert")
 }
 
-/// PKITS §4.1.1 — verify_chain_default happy path.
+/// PKITS §4.1.1 — `verify_chain_default` happy path.
 ///
-/// Chain: [ValidCertificatePathTest1EE, GoodCACert]
-/// Anchor: TrustAnchorRootCertificate
-/// Oracle: PKITS §4.1.1 MUST validate; depth = 1 (one intermediate: GoodCACert).
+/// Chain: [`ValidCertificatePathTest1EE`, `GoodCACert`]
+/// Anchor: `TrustAnchorRootCertificate`
+/// Oracle: PKITS §4.1.1 MUST validate; depth = 1 (one intermediate: `GoodCACert`).
 #[test]
 fn e2e_verify_chain_default_pkits_4_1_1() {
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
@@ -50,10 +50,10 @@ fn e2e_verify_chain_default_pkits_4_1_1() {
     assert_eq!(vp.depth, 1, "one intermediate (GoodCACert)");
 }
 
-/// Same chain as §4.1.1 but with now_unix = 0 (before all certs' notBefore).
+/// Same chain as §4.1.1 but with `now_unix` = 0 (before all certs' notBefore).
 ///
 /// Oracle: PKITS certs have notBefore=2010-01-01; at Unix time 0 they are not yet valid.
-/// Expected: Err(pkix_chain::Error::Path(pkix_path::Error::ValidityPeriod { .. })).
+/// Expected: `Err(pkix_chain::Error::Path(pkix_path::Error::ValidityPeriod` { .. })).
 #[test]
 fn e2e_verify_chain_default_expired_returns_validity_error() {
     let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];

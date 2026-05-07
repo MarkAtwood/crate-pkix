@@ -1,4 +1,4 @@
-//! PKITS §4.14 (IssuingDistributionPoint) and §4.15 (delta CRL) tests for CrlChecker.
+//! PKITS §4.14 (`IssuingDistributionPoint`) and §4.15 (delta CRL) tests for `CrlChecker`.
 //!
 //! Fixtures come from the NIST PKITS corpus committed at
 //! `pkix-path/tests/pkits/{certs,crls}/`.
@@ -6,7 +6,7 @@
 //! External oracle: NIST PKITS 2011 document (SP 800-89 test vectors).
 //! Tests are fully offline.
 //!
-//! Validation time: 1_580_000_000 (2020-01-26T02:13:20Z), well within all
+//! Validation time: `1_580_000_000` (2020-01-26T02:13:20Z), well within all
 //! PKITS CRL windows (thisUpdate 2010, nextUpdate 2030).
 
 use der::Decode as _;
@@ -172,7 +172,7 @@ fn pkits_4_15_4_invalid_delta_cert_revoked_in_delta() {
 /// §4.15.5: Valid delta CRL Test5 — cert was revoked in base but un-held in delta.
 ///
 /// EE serial=4. CA1 base CRL has 04. CA1 delta CRL has 04(RemoveFromCRL).
-/// RemoveFromCRL in delta overrides base → cert is not revoked.
+/// `RemoveFromCRL` in delta overrides base → cert is not revoked.
 ///
 /// Oracle: PKITS §4.15.5 MUST validate.
 #[test]
@@ -219,10 +219,10 @@ fn pkits_4_15_6_invalid_delta_cert_revoked_in_both() {
     );
 }
 
-/// §4.15.7: Valid delta CRL Test7 — cert appears only in delta with RemoveFromCRL.
+/// §4.15.7: Valid delta CRL Test7 — cert appears only in delta with `RemoveFromCRL`.
 ///
 /// EE serial=6. CA1 base CRL does NOT have 06. CA1 delta CRL has 06(RemoveFromCRL).
-/// RemoveFromCRL in delta, cert not in base → cert is not revoked.
+/// `RemoveFromCRL` in delta, cert not in base → cert is not revoked.
 ///
 /// Oracle: PKITS §4.15.7 MUST validate.
 #[test]
@@ -294,7 +294,7 @@ fn pkits_4_15_9_invalid_only_delta_no_base_construction_fails() {
 
 /// §4.15.10: Invalid — only a delta CRL is available; no base CRL is present (CA3).
 ///
-/// Same scenario as §4.15.9. Uses InvaliddeltaCRLTest10EE (serial=1, CA3 issuer).
+/// Same scenario as §4.15.9. Uses `InvaliddeltaCRLTest10EE` (serial=1, CA3 issuer).
 /// See §4.15.9 note: path validator must enforce base presence.
 #[test]
 fn pkits_4_15_10_invalid_only_delta_no_base_ca3() {
@@ -381,7 +381,7 @@ fn pkits_4_14_2_invalid_cert_revoked() {
 /// EE serial=3, issuer=distributionPoint1 CA. Serial=3 is NOT in the CRL.
 /// PKITS says INVALID because the cert's CDP refers to a distribution point
 /// that the CRL's IDP does not cover. Our implementation does not check
-/// CDP name matching — we return Ok() for "not in revoked list".
+/// CDP name matching — we return `Ok()` for "not in revoked list".
 ///
 /// Oracle: PKITS §4.14.3 MUST NOT validate (CDP mismatch).
 /// Our checker: returns `Ok(())` because serial=3 is not revoked in this CRL.
@@ -501,7 +501,7 @@ fn pkits_4_14_7_valid_dp2_serial3_not_revoked() {
 /// EE serial=4, issuer=distributionPoint2 CA. Not in distributionPoint2CACRL.
 /// PKITS says INVALID because the cert's CDP and the CRL's IDP cover different
 /// reason sets / distribution points. Our implementation does not check CDP name
-/// matching (IDP name vs CDP name); we return Ok() here.
+/// matching (IDP name vs CDP name); we return `Ok()` here.
 ///
 /// Oracle: PKITS §4.14.8 MUST NOT validate.
 /// Our checker returns `Ok(())` — CDP/IDP name matching is a v0.2 item.
@@ -637,7 +637,7 @@ fn pkits_4_14_12_invalid_only_ca_certs_for_ee() {
 ///
 /// The EE cert (serial=2) is issued by onlyContainsCACerts CA. The CA cert IS a CA cert.
 /// The CRL has `onlyContainsCACerts=TRUE`. The EE itself is an end-entity, so checking
-/// it against this CRL returns Ok() (not covered). But the CA cert's revocation CRL
+/// it against this CRL returns `Ok()` (not covered). But the CA cert's revocation CRL
 /// correctly covers CA certs. Serial=2 (EE) is not in the revoked list.
 #[test]
 fn pkits_4_14_13_valid_only_ca_certs_crl_for_ca() {
@@ -684,7 +684,7 @@ fn pkits_4_14_14_invalid_only_attribute_certs() {
 
 /// Edge case: base CRL has no revoked entries, delta CRL has one revoked entry.
 ///
-/// Oracle: PKITS §4.15.3 — InvaliddeltaCRLTest3EE is revoked in the delta CRL.
+/// Oracle: PKITS §4.15.3 — `InvaliddeltaCRLTest3EE` is revoked in the delta CRL.
 /// The merge must find the revocation even though the base CRL is empty for
 /// this certificate.
 #[test]

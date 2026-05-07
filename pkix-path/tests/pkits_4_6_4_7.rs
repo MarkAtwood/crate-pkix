@@ -16,7 +16,7 @@ use x509_cert::Certificate;
 // ---------------------------------------------------------------------------
 
 /// §4.6.1 Invalid Missing basicConstraints Test1.
-/// Oracle: PKITS §4.6.1 MUST NOT validate (intermediate has no BasicConstraints).
+/// Oracle: PKITS §4.6.1 MUST NOT validate (intermediate has no `BasicConstraints`).
 #[test]
 fn pkits_4_6_1_missing_basic_constraints() {
     let result = pkits_validate(
@@ -32,7 +32,7 @@ fn pkits_4_6_1_missing_basic_constraints() {
     );
 }
 
-/// §4.6.2 Invalid cA False Test2 — BasicConstraints critical, cA=FALSE.
+/// §4.6.2 Invalid cA False Test2 — `BasicConstraints` critical, cA=FALSE.
 /// Oracle: PKITS §4.6.2 MUST NOT validate.
 #[test]
 fn pkits_4_6_2_ca_false_critical() {
@@ -49,7 +49,7 @@ fn pkits_4_6_2_ca_false_critical() {
     );
 }
 
-/// §4.6.3 Invalid cA False Test3 — BasicConstraints not critical, cA=FALSE.
+/// §4.6.3 Invalid cA False Test3 — `BasicConstraints` not critical, cA=FALSE.
 /// Oracle: PKITS §4.6.3 MUST NOT validate.
 #[test]
 fn pkits_4_6_3_ca_false_not_critical() {
@@ -67,7 +67,7 @@ fn pkits_4_6_3_ca_false_not_critical() {
 }
 
 /// §4.6.4 Valid basicConstraints Not Critical Test4 — cA=TRUE, extension not critical.
-/// Oracle: PKITS §4.6.4 MUST validate (BasicConstraints critical flag does not affect validity).
+/// Oracle: PKITS §4.6.4 MUST validate (`BasicConstraints` critical flag does not affect validity).
 #[test]
 fn pkits_4_6_4_basic_constraints_not_critical() {
     let result = pkits_validate(
@@ -118,7 +118,7 @@ fn pkits_4_6_6_invalid_path_len_constraint() {
 }
 
 /// §4.6.7 Valid pathLenConstraint Test7 — 1 intermediate, CA pathLen=0.
-/// Chain: [EE, CA(pathLen=0)], anchor = TrustAnchor → depth=1, CA allows 0 sub-CAs → PASS.
+/// Chain: [EE, CA(pathLen=0)], anchor = `TrustAnchor` → depth=1, CA allows 0 sub-CAs → PASS.
 /// Oracle: PKITS §4.6.7 MUST validate.
 #[test]
 fn pkits_4_6_7_valid_path_len_constraint() {
@@ -288,7 +288,7 @@ fn pkits_4_6_16_invalid_self_issued_path_len() {
     assert!(result.is_err(), "§4.6.16 must not validate");
 }
 
-/// Corrupt BasicConstraints DER — intermediate has the BasicConstraints OID present
+/// Corrupt `BasicConstraints` DER — intermediate has the `BasicConstraints` OID present
 /// (critical) but the extension value is not valid DER (`0xff 0xff`).
 ///
 /// Oracle: our fail-closed `try_find_cert_ext` path introduced in commit 64fd235b
@@ -353,7 +353,7 @@ fn pkits_4_6_17_valid_self_issued_path_len() {
 // ---------------------------------------------------------------------------
 
 /// §4.7.1 Invalid keyUsage Critical keyCertSign False Test1.
-/// Intermediate has KeyUsage critical with keyCertSign=False.
+/// Intermediate has `KeyUsage` critical with keyCertSign=False.
 /// Oracle: PKITS §4.7.1 MUST NOT validate.
 #[test]
 fn pkits_4_7_1_invalid_key_usage_critical_no_cert_sign() {
@@ -371,7 +371,7 @@ fn pkits_4_7_1_invalid_key_usage_critical_no_cert_sign() {
 }
 
 /// §4.7.2 Invalid keyUsage Not Critical keyCertSign False Test2.
-/// Intermediate has KeyUsage not-critical with keyCertSign=False.
+/// Intermediate has `KeyUsage` not-critical with keyCertSign=False.
 /// Oracle: PKITS §4.7.2 MUST NOT validate.
 #[test]
 fn pkits_4_7_2_invalid_key_usage_not_critical_no_cert_sign() {
@@ -389,7 +389,7 @@ fn pkits_4_7_2_invalid_key_usage_not_critical_no_cert_sign() {
 }
 
 /// §4.7.3 Valid keyUsage Not Critical Test3.
-/// Intermediate has KeyUsage not-critical with keyCertSign=True.
+/// Intermediate has `KeyUsage` not-critical with keyCertSign=True.
 /// Oracle: PKITS §4.7.3 MUST validate.
 #[test]
 fn pkits_4_7_3_valid_key_usage_not_critical() {
@@ -420,7 +420,7 @@ fn pkits_4_7_4_invalid_key_usage_no_crl_sign() {
 }
 
 /// §4.7.5 Invalid keyUsage Not Critical cRLSign False Test5.
-/// Same as Test4 with non-critical KeyUsage.
+/// Same as Test4 with non-critical `KeyUsage`.
 #[test]
 #[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign; tracked for v0.2)"]
 fn pkits_4_7_5_invalid_key_usage_no_crl_sign_not_critical() {

@@ -187,13 +187,13 @@ where
 mod tests {
     use super::*;
 
-    /// Confirm DefaultVerifier re-export is the same type as pkix_path::DefaultVerifier.
-    /// A function that accepts &DefaultVerifier (crate re-export) must also accept
-    /// &pkix_path::DefaultVerifier — the compiler will enforce type identity.
+    /// Confirm `DefaultVerifier` re-export is the same type as `pkix_path::DefaultVerifier`.
+    /// A function that accepts `DefaultVerifier` (crate re-export) must also accept
+    /// `pkix_path::DefaultVerifier` — the compiler will enforce type identity.
     #[test]
     fn default_verifier_reexport_type_identity() {
-        fn _accepts(_v: &DefaultVerifier) {}
-        let _v: &pkix_path::DefaultVerifier = &DefaultVerifier;
-        _accepts(_v);
+        fn accepts(_v: DefaultVerifier) {}
+        let v: pkix_path::DefaultVerifier = DefaultVerifier;
+        accepts(v);
     }
 }

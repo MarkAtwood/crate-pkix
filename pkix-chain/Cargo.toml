@@ -21,8 +21,6 @@ pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
 x509-cert       = { workspace = true }
 
-[dev-dependencies]
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

@@ -1405,9 +1405,9 @@ mod tests {
         assert_eq!(result.deviated[0].effective_severity(), None);
     }
 
-    /// evidence_uri flows from Deviation through to DeviatedFinding.
+    /// `evidence_uri` flows from Deviation through to `DeviatedFinding`.
     ///
-    /// Oracle: DeviatedFinding.evidence_uri must equal Deviation.evidence_uri.
+    /// Oracle: `DeviatedFinding.evidence_uri` must equal `Deviation.evidence_uri`.
     /// This is the field operators use to navigate to the waiver document.
     #[test]
     fn evidence_uri_flows_to_deviated_finding() {
@@ -1438,7 +1438,7 @@ mod tests {
         );
     }
 
-    /// When evidence_uri is None, DeviatedFinding.evidence_uri is None.
+    /// When `evidence_uri` is None, `DeviatedFinding.evidence_uri` is None.
     #[test]
     fn evidence_uri_none_when_deviation_has_no_uri() {
         let cert = load_cert();

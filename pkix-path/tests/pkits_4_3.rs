@@ -104,7 +104,7 @@ fn pkits_4_3_8_valid_optional_attribute_types() {
     result.expect("§4.3.8 must validate (optional attribute types)");
 }
 
-/// §4.3.9 Valid UTF8String Encoded Names Test9.
+/// §4.3.9 Valid `UTF8String` Encoded Names Test9.
 /// Oracle: PKITS §4.3.9 MUST validate.
 #[test]
 fn pkits_4_3_9_valid_utf8_encoded_names() {
@@ -118,7 +118,7 @@ fn pkits_4_3_9_valid_utf8_encoded_names() {
     result.expect("§4.3.9 must validate (UTF8String names)");
 }
 
-/// §4.3.10 Valid Rollover from PrintableString to UTF8String Test10.
+/// §4.3.10 Valid Rollover from `PrintableString` to `UTF8String` Test10.
 /// Oracle: PKITS §4.3.10 MUST validate (same string, different encoding).
 #[test]
 fn pkits_4_3_10_valid_printable_to_utf8_rollover() {
@@ -132,7 +132,7 @@ fn pkits_4_3_10_valid_printable_to_utf8_rollover() {
     result.expect("§4.3.10 must validate (PrintableString→UTF8String rollover)");
 }
 
-/// §4.3.11 Valid UTF8String Case Insensitive Match Test11.
+/// §4.3.11 Valid `UTF8String` Case Insensitive Match Test11.
 /// Oracle: PKITS §4.3.11 MUST validate.
 #[test]
 fn pkits_4_3_11_valid_utf8_case_insensitive() {

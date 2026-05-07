@@ -20,7 +20,5 @@ pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
 
-[dev-dependencies]
-
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

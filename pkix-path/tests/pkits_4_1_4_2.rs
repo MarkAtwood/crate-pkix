@@ -89,7 +89,7 @@ fn pkits_4_1_6_invalid_dsa_signature() {
 //   ValidGeneralizedTimenotAfterDateTest8EE: notAfter=2050-01-01
 // ---------------------------------------------------------------------------
 
-/// §4.2.1 Invalid CA notBefore Date Test1 — CA not yet valid at PKITS_NOW (2020).
+/// §4.2.1 Invalid CA notBefore Date Test1 — CA not yet valid at `PKITS_NOW` (2020).
 /// Oracle: PKITS §4.2.1 MUST NOT validate.
 #[test]
 fn pkits_4_2_1_invalid_ca_notbefore() {
@@ -103,7 +103,7 @@ fn pkits_4_2_1_invalid_ca_notbefore() {
     );
 }
 
-/// §4.2.2 Invalid EE notBefore Date Test2 — EE not yet valid at PKITS_NOW (2020).
+/// §4.2.2 Invalid EE notBefore Date Test2 — EE not yet valid at `PKITS_NOW` (2020).
 /// Oracle: PKITS §4.2.2 MUST NOT validate.
 #[test]
 fn pkits_4_2_2_invalid_ee_notbefore() {
@@ -115,8 +115,8 @@ fn pkits_4_2_2_invalid_ee_notbefore() {
 }
 
 /// §4.2.3 Valid pre-2000 UTC notBefore Date Test3.
-/// The cert has notBefore=1950-01-01 (pre-Unix-epoch UTCTime).
-/// The `der` crate cannot parse pre-1970 UTCTime values — tracked for v0.2.
+/// The cert has notBefore=1950-01-01 (pre-Unix-epoch `UTCTime`).
+/// The `der` crate cannot parse pre-1970 `UTCTime` values — tracked for v0.2.
 #[test]
 #[ignore = "pre-1970 UTCTime (1950-01-01) cannot be parsed by der crate (tracked for v0.2)"]
 fn pkits_4_2_3_valid_pre2000_utc_notbefore() {
@@ -127,7 +127,7 @@ fn pkits_4_2_3_valid_pre2000_utc_notbefore() {
     result.expect("§4.2.3 must validate");
 }
 
-/// §4.2.4 Valid GeneralizedTime notBefore Date Test4.
+/// §4.2.4 Valid `GeneralizedTime` notBefore Date Test4.
 /// Oracle: PKITS §4.2.4 MUST validate.
 #[test]
 fn pkits_4_2_4_valid_generalizedtime_notbefore() {
@@ -138,7 +138,7 @@ fn pkits_4_2_4_valid_generalizedtime_notbefore() {
     result.expect("§4.2.4 must validate");
 }
 
-/// §4.2.5 Invalid CA notAfter Date Test5 — CA expired at PKITS_NOW (2020).
+/// §4.2.5 Invalid CA notAfter Date Test5 — CA expired at `PKITS_NOW` (2020).
 /// Oracle: PKITS §4.2.5 MUST NOT validate (BadnotAfterDateCACert.notAfter=2011).
 #[test]
 fn pkits_4_2_5_invalid_ca_notafter() {
@@ -152,7 +152,7 @@ fn pkits_4_2_5_invalid_ca_notafter() {
     );
 }
 
-/// §4.2.6 Invalid EE notAfter Date Test6 — EE expired at PKITS_NOW (2020).
+/// §4.2.6 Invalid EE notAfter Date Test6 — EE expired at `PKITS_NOW` (2020).
 /// Oracle: PKITS §4.2.6 MUST NOT validate (EE.notAfter=2011).
 #[test]
 fn pkits_4_2_6_invalid_ee_notafter() {
@@ -164,7 +164,7 @@ fn pkits_4_2_6_invalid_ee_notafter() {
 }
 
 /// §4.2.7 Invalid pre-2000 UTC EE notAfter Date Test7.
-/// Oracle: PKITS §4.2.7 MUST NOT validate (UTCTime notAfter=1999 → expired).
+/// Oracle: PKITS §4.2.7 MUST NOT validate (`UTCTime` notAfter=1999 → expired).
 #[test]
 fn pkits_4_2_7_invalid_pre2000_utc_ee_notafter() {
     let result = pkits_validate(
@@ -177,8 +177,8 @@ fn pkits_4_2_7_invalid_pre2000_utc_ee_notafter() {
     );
 }
 
-/// §4.2.8 Valid GeneralizedTime notAfter Date Test8.
-/// Oracle: PKITS §4.2.8 MUST validate (notAfter=2050 > PKITS_NOW=2020).
+/// §4.2.8 Valid `GeneralizedTime` notAfter Date Test8.
+/// Oracle: PKITS §4.2.8 MUST validate (notAfter=2050 > `PKITS_NOW=2020`).
 #[test]
 fn pkits_4_2_8_valid_generalizedtime_notafter() {
     let result = pkits_validate(

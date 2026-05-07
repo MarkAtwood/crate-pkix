@@ -1,7 +1,7 @@
 //! PKITS §4.8–4.12: certificate policy validation tests.
 //!
-//! Tests the RFC 5280 §6.1 policy state machine: CertificatePolicies,
-//! PolicyMappings, PolicyConstraints, and InhibitAnyPolicy.
+//! Tests the RFC 5280 §6.1 policy state machine: `CertificatePolicies`,
+//! `PolicyMappings`, `PolicyConstraints`, and `InhibitAnyPolicy`.
 //!
 //! Test vectors from NIST PKITS (SP 800-89), parsed from
 //! `tests/pkits/vectors.json`.  The cert DER files are committed under
@@ -62,7 +62,7 @@ fn pkits_policy_validate(
 // ---------------------------------------------------------------------------
 
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 1)
-/// anyPolicy initial set, explicit_policy=true → valid (tree has P1)
+/// anyPolicy initial set, `explicit_policy=true` → valid (tree has P1)
 #[test]
 fn pkits_4_8_1_sp1_anypolicy_explicit() {
     pkits_policy_validate(
@@ -76,7 +76,7 @@ fn pkits_4_8_1_sp1_anypolicy_explicit() {
 }
 
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 2)
-/// P1 initial set, explicit_policy=true → valid
+/// P1 initial set, `explicit_policy=true` → valid
 #[test]
 fn pkits_4_8_1_sp2_p1_explicit() {
     pkits_policy_validate(
@@ -90,7 +90,7 @@ fn pkits_4_8_1_sp2_p1_explicit() {
 }
 
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 3)
-/// P2 initial set, explicit_policy=true → invalid (cert has P1 only)
+/// P2 initial set, `explicit_policy=true` → invalid (cert has P1 only)
 #[test]
 fn pkits_4_8_1_sp3_p2_explicit_fail() {
     let result = pkits_policy_validate(
@@ -107,7 +107,7 @@ fn pkits_4_8_1_sp3_p2_explicit_fail() {
 }
 
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 4)
-/// {P1, P2} initial set, explicit_policy=true → valid (P1 matches)
+/// {P1, P2} initial set, `explicit_policy=true` → valid (P1 matches)
 #[test]
 fn pkits_4_8_1_sp4_p1_p2_explicit() {
     pkits_policy_validate(
@@ -121,7 +121,7 @@ fn pkits_4_8_1_sp4_p1_p2_explicit() {
 }
 
 /// 4.8.2 All Certificates No Policies Test2 (Subpart 1)
-/// No explicit_policy → valid even with no policies
+/// No `explicit_policy` → valid even with no policies
 #[test]
 fn pkits_4_8_2_sp1_no_policies_ok() {
     pkits_policy_validate(
@@ -135,7 +135,7 @@ fn pkits_4_8_2_sp1_no_policies_ok() {
 }
 
 /// 4.8.2 All Certificates No Policies Test2 (Subpart 2)
-/// explicit_policy=true, no cert policies → invalid
+/// `explicit_policy=true`, no cert policies → invalid
 #[test]
 fn pkits_4_8_2_sp2_no_policies_explicit_fail() {
     let result = pkits_policy_validate(
@@ -152,7 +152,7 @@ fn pkits_4_8_2_sp2_no_policies_explicit_fail() {
 }
 
 /// 4.8.3 Different Policies Test3 (Subpart 1)
-/// No explicit_policy → valid even with empty intersection
+/// No `explicit_policy` → valid even with empty intersection
 #[test]
 fn pkits_4_8_3_sp1_different_policies_ok() {
     pkits_policy_validate(
@@ -170,7 +170,7 @@ fn pkits_4_8_3_sp1_different_policies_ok() {
 }
 
 /// 4.8.3 Different Policies Test3 (Subpart 2)
-/// explicit_policy=true, empty intersection → invalid
+/// `explicit_policy=true`, empty intersection → invalid
 #[test]
 fn pkits_4_8_3_sp2_different_policies_explicit_fail() {
     let result = pkits_policy_validate(
@@ -191,7 +191,7 @@ fn pkits_4_8_3_sp2_different_policies_explicit_fail() {
 }
 
 /// 4.8.3 Different Policies Test3 (Subpart 3)
-/// explicit_policy=true, {P1,P2} set, empty intersection → invalid
+/// `explicit_policy=true`, {P1,P2} set, empty intersection → invalid
 #[test]
 fn pkits_4_8_3_sp3_different_policies_p1_p2_fail() {
     let result = pkits_policy_validate(
@@ -493,7 +493,7 @@ fn pkits_4_8_13_sp3_same_policies_p3() {
     .expect("4.8.13 sp3: P3 in set → should validate");
 }
 
-/// 4.8.14 AnyPolicy Test14 (Subpart 1)
+/// 4.8.14 `AnyPolicy` Test14 (Subpart 1)
 /// anyPolicy CA, P1 initial set → valid
 #[test]
 fn pkits_4_8_14_sp1_anypolicy_p1_valid() {
@@ -507,7 +507,7 @@ fn pkits_4_8_14_sp1_anypolicy_p1_valid() {
     .expect("4.8.14 sp1: P1 in set → should validate");
 }
 
-/// 4.8.14 AnyPolicy Test14 (Subpart 2)
+/// 4.8.14 `AnyPolicy` Test14 (Subpart 2)
 /// anyPolicy CA, P2 in initial set.
 ///
 /// The PKITS vectors.json marks this as `ShouldValidate: false`, but per
@@ -515,19 +515,19 @@ fn pkits_4_8_14_sp1_anypolicy_p1_valid() {
 /// The anyPolicy in the CA causes the EE's P1 to appear in the tree (but not
 /// P2). After filtering by {P2} the tree becomes NULL. However, since
 /// `initial_explicit_policy = false` and no cert in the chain forces
-/// `explicit_policy = 0`, the final check "explicit_policy > 0 OR tree != NULL"
+/// `explicit_policy = 0`, the final check "`explicit_policy` > 0 OR tree != NULL"
 /// (RFC 5280 §6.1.6(b)) allows the path.
 ///
 /// This divergence between strict RFC 5280 §6.1.5/6.1.6 semantics and the PKITS
 /// expectation is a documented ambiguity in the NIST test suite:
 ///   - PKITS §4.8.14 comment: "The user-initial-policy-set is {P2}. Since P2 is
-///     not in the valid_policy_tree, the path should not validate." This reflects
+///     not in the `valid_policy_tree`, the path should not validate." This reflects
 ///     the user's desired semantics, but the RFC's formal check is on
-///     explicit_policy (the counter), not on tree membership alone.
+///     `explicit_policy` (the counter), not on tree membership alone.
 ///   - OpenSSL 3.x with `-policy P2` on this chain produces: "OK" (validates),
 ///     consistent with this implementation's behaviour.
-///   - RFC 5280 §6.1.6(b) is unambiguous: path is valid iff explicit_policy == 0
-///     implies tree != NULL. When explicit_policy > 0, the tree is irrelevant.
+///   - RFC 5280 §6.1.6(b) is unambiguous: path is valid iff `explicit_policy` == 0
+///     implies tree != NULL. When `explicit_policy` > 0, the tree is irrelevant.
 ///
 /// Our implementation follows the RFC 5280 text literally. If CA/B Forum or NIST
 /// publish an errata tightening this (e.g., "tree != NULL is always required"),
@@ -618,7 +618,7 @@ fn pkits_4_8_19_user_notice_qualifier_valid() {
 }
 
 /// 4.8.20 CPS Pointer Qualifier Test20
-/// P1 in set, explicit_policy=true → valid
+/// P1 in set, `explicit_policy=true` → valid
 #[test]
 fn pkits_4_8_20_cps_pointer_qualifier_valid() {
     pkits_policy_validate(
@@ -839,7 +839,7 @@ fn pkits_4_10_1_sp2_mapping_p2_fail() {
 }
 
 /// 4.10.1.3 Valid Policy Mapping Test1 (Subpart 3)
-/// policy_mapping_inhibit=true, anyPolicy set → invalid (mapping inhibited)
+/// `policy_mapping_inhibit=true`, anyPolicy set → invalid (mapping inhibited)
 #[test]
 fn pkits_4_10_1_sp3_mapping_inhibit_fail() {
     let result = pkits_policy_validate(
@@ -873,7 +873,7 @@ fn pkits_4_10_2_sp1_mapping_invalid_fail() {
 }
 
 /// 4.10.2 Invalid Policy Mapping Test2 (Subpart 2)
-/// policy_mapping_inhibit=true → invalid
+/// `policy_mapping_inhibit=true` → invalid
 #[test]
 fn pkits_4_10_2_sp2_mapping_inhibit_fail() {
     let result = pkits_policy_validate(
@@ -1084,7 +1084,7 @@ fn pkits_4_10_9_anypolicy_mapping_valid() {
 }
 
 /// 4.10.10 Invalid Policy Mapping Test10
-/// GoodsubCA has anyPolicy mapping P1→P2; EE has no policy → invalid
+/// `GoodsubCA` has anyPolicy mapping P1→P2; EE has no policy → invalid
 #[test]
 fn pkits_4_10_10_anypolicy_mapping_invalid_fail() {
     let result = pkits_policy_validate(
@@ -1105,7 +1105,7 @@ fn pkits_4_10_10_anypolicy_mapping_invalid_fail() {
 }
 
 /// 4.10.11 Valid Policy Mapping Test11
-/// GoodsubCA has anyPolicy mapping P1→P2; EE has P2 → valid
+/// `GoodsubCA` has anyPolicy mapping P1→P2; EE has P2 → valid
 #[test]
 fn pkits_4_10_11_anypolicy_mapping_valid() {
     pkits_policy_validate(
@@ -1337,7 +1337,7 @@ fn pkits_4_11_6_inhibit_policy_mapping_clamped_fail() {
 }
 
 /// 4.11.7 Valid Self-Issued inhibit Policy Mapping Test7
-/// Self-issued cert does not decrement policy_mapping counter → valid
+/// Self-issued cert does not decrement `policy_mapping` counter → valid
 #[test]
 fn pkits_4_11_7_self_issued_inhibit_mapping_valid() {
     pkits_policy_validate(
@@ -1497,7 +1497,7 @@ fn pkits_4_12_3_sp1_inhibit_any_policy_depth1_valid() {
 }
 
 /// 4.12.3.2 inhibit anyPolicy Test3 (Subpart 2)
-/// initial_any_policy_inhibit=true → invalid
+/// `initial_any_policy_inhibit=true` → invalid
 #[test]
 fn pkits_4_12_3_sp2_initial_inhibit_any_fail() {
     let result = pkits_policy_validate(
@@ -1581,7 +1581,7 @@ fn pkits_4_12_6_inhibit_any_policy_clamped_fail() {
 }
 
 /// 4.12.7 Valid Self-Issued inhibit anyPolicy Test7
-/// Self-issued cert does not decrement inhibit_any counter → valid
+/// Self-issued cert does not decrement `inhibit_any` counter → valid
 #[test]
 fn pkits_4_12_7_self_issued_inhibit_any_valid() {
     pkits_policy_validate(

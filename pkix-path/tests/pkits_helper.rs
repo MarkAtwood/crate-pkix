@@ -35,13 +35,22 @@ const PKITS_CERT_DIR: &str = "tests/pkits/certs";
 
 /// Load a PKITS DER certificate by its base name (without `.crt` extension).
 ///
-/// Panics with a descriptive message if the file is missing or fails to parse.
+/// # Panics
+///
+/// Panics with a descriptive message if the file at
+/// `tests/fixtures/pkits/<name>.crt` cannot be read or its contents fail to
+/// parse as a DER-encoded certificate. PKITS fixtures ship with the crate;
+/// these failures indicate a missing or corrupted test asset, not user error.
 pub fn pkits_cert(name: &str) -> Certificate {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join(PKITS_CERT_DIR)
         .join(format!("{name}.crt"));
-    let der = std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("failed to read PKITS cert '{name}': {e} (path: {path:?})"));
+    let der = std::fs::read(&path).unwrap_or_else(|e| {
+        panic!(
+            "failed to read PKITS cert '{name}': {e} (path: {})",
+            path.display()
+        )
+    });
     Certificate::from_der(&der)
         .unwrap_or_else(|e| panic!("failed to parse PKITS cert '{name}': {e}"))
 }
@@ -60,6 +69,12 @@ pub fn pkits_trust_anchor() -> TrustAnchor {
 ///
 /// Uses [`DefaultVerifier`] (RSA-PKCS1v15-SHA256 and ECDSA-P256-SHA256) and the
 /// standard PKITS trust anchor.
+///
+/// # Errors
+///
+/// Returns the [`pkix_path::Error`] from [`pkix_path::validate_path`] if the
+/// chain fails any RFC 5280 §6.1 check (signature, validity, name linkage,
+/// policy, name constraints, etc.).
 #[allow(dead_code)]
 pub fn pkits_validate(cert_names: &[&str], now_unix: u64) -> pkix_path::Result<ValidatedPath> {
     let chain: Vec<Certificate> = cert_names.iter().map(|n| pkits_cert(n)).collect();

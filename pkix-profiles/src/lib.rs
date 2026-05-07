@@ -697,11 +697,11 @@ mod tests {
     /// Oracle: webpki-self-signed-365d.der — 365 days, self-signed, SAN, serverAuth EKU.
     ///
     /// Using a 1-cert self-signed chain avoids the CA-cert validity check issue:
-    /// web_pki_policy applies max_validity_secs to ALL certs in the chain, and
+    /// `web_pki_policy` applies `max_validity_secs` to ALL certs in the chain, and
     /// the root/int fixtures have 10-year validity (well over 200 days). A single
     /// self-signed cert satisfies all constraints at once.
     ///
-    /// Oracle: openssl verify -CAfile <self> <self> → OK (self-signed).
+    /// Oracle: openssl verify -`CAfile` <self> <self> → OK (self-signed).
     #[test]
     fn web_pki_conforming_cert_passes() {
         let cert = load(include_bytes!(
@@ -855,7 +855,7 @@ mod tests {
         );
     }
 
-    /// Oracle: openssl verify -CAfile smime-self-signed-365d.pem smime-self-signed-365d.pem → OK
+    /// Oracle: openssl verify -`CAfile` smime-self-signed-365d.pem smime-self-signed-365d.pem → OK
     #[test]
     fn smime_conforming_cert_passes() {
         let cert = load(include_bytes!(
@@ -946,7 +946,7 @@ mod tests {
         );
     }
 
-    /// Oracle: openssl verify -CAfile codesign-self-signed-365d.pem codesign-self-signed-365d.pem → OK
+    /// Oracle: openssl verify -`CAfile` codesign-self-signed-365d.pem codesign-self-signed-365d.pem → OK
     #[test]
     fn code_signing_conforming_cert_passes() {
         let cert = load(include_bytes!(
@@ -986,7 +986,7 @@ mod tests {
         );
     }
 
-    /// Higher RSA floor than web_pki_policy: 3072 vs 2048.
+    /// Higher RSA floor than `web_pki_policy`: 3072 vs 2048.
     #[test]
     fn code_signing_policy_rsa_floor_higher_than_web_pki() {
         let web = web_pki_policy(NOW);
@@ -1076,7 +1076,7 @@ mod tests {
     //         webpki-self-signed-365d.der has SAN=dNSName:test.example.com only.
     // -----------------------------------------------------------------------
 
-    /// smime_policy sets require_rfc822_san = true.
+    /// `smime_policy` sets `require_rfc822_san` = true.
     #[test]
     fn smime_policy_requires_rfc822_san() {
         let p = smime_policy(NOW);
@@ -1086,7 +1086,7 @@ mod tests {
         );
     }
 
-    /// Cert with rfc822Name SAN passes smime_policy.
+    /// Cert with rfc822Name SAN passes `smime_policy`.
     ///
     /// Oracle: smime-self-signed-365d.der — SAN contains email:test@example.com
     /// (rfc822Name). Verified by openssl: X509v3 Subject Alternative Name: email:test@example.com
@@ -1100,17 +1100,17 @@ mod tests {
             .expect("cert with rfc822Name SAN must pass smime_policy");
     }
 
-    /// Cert with ONLY dNSName SAN fails smime_policy with MissingRfc822San.
+    /// Cert with ONLY dNSName SAN fails `smime_policy` with `MissingRfc822San`.
     ///
     /// Oracle: webpki-self-signed-365d.der has SAN=DNS:test.example.com (dNSName only).
     /// Verified by openssl: X509v3 Subject Alternative Name: DNS:test.example.com
-    /// smime_policy requires an rfc822Name entry; dNSName does not satisfy this.
+    /// `smime_policy` requires an rfc822Name entry; dNSName does not satisfy this.
     ///
-    /// The EKU check (e3) fires before the rfc822 SAN type check (e4) in chain_walk.
-    /// We override required_leaf_eku to serverAuth (which matches the cert) so that
-    /// EKU passes and MissingRfc822San is the error that fires.
+    /// The EKU check (e3) fires before the rfc822 SAN type check (e4) in `chain_walk`.
+    /// We override `required_leaf_eku` to serverAuth (which matches the cert) so that
+    /// EKU passes and `MissingRfc822San` is the error that fires.
     ///
-    /// Use pre-SC-081 time (1_767_225_600) so the validity cap does not fire.
+    /// Use pre-SC-081 time (`1_767_225_600`) so the validity cap does not fire.
     #[test]
     fn smime_dnsname_only_san_fails_with_missing_rfc822_san() {
         let cert = load(include_bytes!(
