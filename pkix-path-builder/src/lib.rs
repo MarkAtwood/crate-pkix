@@ -39,7 +39,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use x509_cert::Certificate;
 
-/// OID for BasicConstraints (2.5.29.19).
+/// OID for `BasicConstraints` (2.5.29.19).
 const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.19");
 
@@ -90,6 +90,11 @@ impl CertPool {
     /// Equivalent to `(&pool).into_iter()`.
     pub fn iter(&self) -> core::slice::Iter<'_, x509_cert::Certificate> {
         self.certs.iter()
+    }
+
+    /// Return the pool contents as a slice.
+    pub(crate) fn as_slice(&self) -> &[Certificate] {
+        &self.certs
     }
 }
 
@@ -144,7 +149,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// A missing extension or `cA = FALSE` both return `false`.
 /// A present extension whose DER cannot be decoded returns `false` (fail-open
 /// for the builder: a cert that cannot be decoded as a CA will simply not be
-/// selected as an intermediate, and validate_path will catch any structural
+/// selected as an intermediate, and `validate_path` will catch any structural
 /// problem on final verification).
 fn cert_is_ca(cert: &Certificate) -> bool {
     use der::Decode as _;
@@ -174,10 +179,9 @@ fn cert_is_ca(cert: &Certificate) -> bool {
 /// reaches zero the function returns `Err(())` without further exploration.
 /// The caller maps this to [`Error::BudgetExceeded`].
 ///
-/// The invariant `path` is never empty is established by `build_path` (which
+/// The invariant `path` is never empty is established by [`build_path`] (which
 /// pushes the target before calling `dfs`) and maintained by the push/pop
-/// discipline below. `debug_assert` catches violations in test builds without
-/// panicking in release builds.
+/// discipline below.
 fn dfs(
     path: &mut Vec<Certificate>,
     pool: &[Certificate],
@@ -193,14 +197,10 @@ fn dfs(
 
     // Extract the issuer DN by cloning so the immutable borrow on `path` is
     // released before the mutable push/pop below.
-    let current_issuer = match path.last() {
-        Some(c) => c.tbs_certificate.issuer.clone(),
-        None => {
-            // Invariant violated: path must never be empty when dfs is called.
-            debug_assert!(false, "dfs called with empty path — invariant violated");
-            return Ok(false);
-        }
+    let Some(c) = path.last() else {
+        unreachable!("dfs called with empty path — invariant violated");
     };
+    let current_issuer = c.tbs_certificate.issuer.clone();
 
     // Base case: does any trust anchor directly issue `current`?
     for anchor in anchors {
@@ -289,13 +289,13 @@ const DFS_BUDGET: usize = 10_000;
 ///
 /// Returns the ordered chain `[target, intermediate..., anchor-issued]` ready
 /// for [`pkix_path::validate_path`]. Signatures are **not** verified here;
-/// that is the responsibility of the caller via `validate_path`.
+/// that is the responsibility of the caller via [`pkix_path::validate_path`].
 ///
 /// # Algorithm
 ///
 /// Iterative-deepening DFS: tries maximum intermediate depths 1 through 10.
 /// Returns the shortest valid topology first. Cycles are detected and pruned
-/// by comparing SubjectPublicKeyInfo DER bytes of certificates already in the path.
+/// by comparing `SubjectPublicKeyInfo` DER bytes of certificates already in the path.
 ///
 /// Each round and the depth probe get a fresh budget of `DFS_BUDGET` node
 /// visits.  Resetting per-round prevents earlier rounds (which re-traverse all
@@ -318,7 +318,7 @@ const DFS_BUDGET: usize = 10_000;
 ///
 /// # Limitations
 ///
-/// Cycle detection is based on SubjectPublicKeyInfo DER identity rather than
+/// Cycle detection is based on `SubjectPublicKeyInfo` DER identity rather than
 /// subject DN. Two certificates with the same subject DN but different public
 /// keys (e.g., during a key rollover or in a bridge CA topology) are treated
 /// as distinct nodes and will not incorrectly prune valid paths.
@@ -336,7 +336,7 @@ pub fn build_path(
 ) -> Result<Vec<Certificate>> {
     const MAX_DEPTH: usize = 10;
 
-    let pool_slice = pool.certs.as_slice();
+    let pool_slice = pool.as_slice();
 
     // Track whether any round was terminated by the budget (not by exhausting
     // all candidates). If every round hits the budget limit, the pool is
