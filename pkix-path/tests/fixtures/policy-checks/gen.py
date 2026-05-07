@@ -221,6 +221,10 @@ key_root_rsa2048 = rsa.generate_private_key(public_exponent=65537, key_size=2048
 key_int_rsa2048 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 key_leaf_rsa2048 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 key_leaf_rsa1024 = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+# 2047-bit modulus: just below the CA/B Forum BR 2048-bit floor.
+# Used by RsaMinKeySizeLint strict-mode tests to verify the lint rejects
+# 2046-bit-or-fewer high-bit-cleared moduli that DER-encode in 256 bytes.
+key_leaf_rsa2047 = rsa.generate_private_key(public_exponent=65537, key_size=2047)
 
 root_rsa2048 = make_ca_cert(
     key_root_rsa2048,
@@ -249,6 +253,19 @@ leaf_rsa2048_365d_san_eku = make_leaf(
 leaf_rsa1024_365d_san_eku = make_leaf(
     key_leaf_rsa1024, int_rsa2048, key_int_rsa2048,
     "PKIX-policy-checks-leaf-rsa1024-365d-san-eku",
+    NOT_AFTER_365,
+    add_san=True,
+    eku_oids=[ExtendedKeyUsageOID.SERVER_AUTH],
+)
+
+# 2047-bit RSA leaf — for RsaMinKeySizeLint strict-floor tests.
+# Oracle: openssl x509 -in <pem> -text -noout reports "Public-Key: (2047 bit)".
+# The DER INTEGER value field for a 2047-bit modulus is exactly 256 bytes (no
+# leading 0x00 because the high bit of the first byte is 0). A floor-byte
+# comparison would accept this; a strict bit-length comparison must reject it.
+leaf_rsa2047_365d_san_eku = make_leaf(
+    key_leaf_rsa2047, int_rsa2048, key_int_rsa2048,
+    "PKIX-policy-checks-leaf-rsa2047-365d-san-eku",
     NOT_AFTER_365,
     add_san=True,
     eku_oids=[ExtendedKeyUsageOID.SERVER_AUTH],
@@ -400,6 +417,7 @@ files = {
     "int-rsa2048.der": int_rsa2048,
     "leaf-rsa2048-365d-san-eku.der": leaf_rsa2048_365d_san_eku,
     "leaf-rsa1024-365d-san-eku.der": leaf_rsa1024_365d_san_eku,
+    "leaf-rsa2047-365d-san-eku.der": leaf_rsa2047_365d_san_eku,
     "webpki-self-signed-365d.der": webpki_self_signed,
     "smime-self-signed-365d.der": smime_self_signed,
     "codesign-self-signed-365d.der": codesign_self_signed,

@@ -455,6 +455,24 @@ fn rsa_min_key_size_error_rsa1024() {
 }
 
 #[test]
+fn rsa_min_key_size_error_rsa2047() {
+    // 2047-bit modulus — DER-encodes as 256 bytes (no leading 0x00 because
+    // bit 2046 is the high set bit and bit 7 of the first byte is 0).
+    // A floor-byte comparison would erroneously Pass this; the bit-length
+    // comparison required by CA/B Forum BR §6.1.5 must Error.
+    //
+    // Oracle: openssl x509 -in leaf-rsa2047-365d-san-eku.der -inform DER
+    //   -text -noout reports `Public-Key: (2047 bit)`.
+    let cert = load_cert!("leaf-rsa2047-365d-san-eku.der");
+    let lint = RsaMinKeySizeLint;
+    let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
+    assert!(
+        matches!(result, LintResult::Error(_)),
+        "RSA-2047 key must Error the 2048-bit minimum, got {result:?}"
+    );
+}
+
+#[test]
 fn rsa_min_key_size_not_applicable_for_ecdsa() {
     // P-256 cert → NotApplicable (lint only checks RSA keys).
     let cert = load_cert!("webpki-self-signed-365d.der");

@@ -196,22 +196,27 @@ impl Lint for Sha1ProhibitedLint {
 ///
 /// Non-RSA keys (ECDSA, Ed25519, etc.) return `NotApplicable`.
 ///
-/// The RSA modulus byte length is read directly from the DER-encoded
-/// `RSAPublicKey` structure inside the `SubjectPublicKeyInfo` bit string.
-/// The check is `n_bytes >= 256`, where `n_bytes` is the length of the DER
-/// INTEGER value field for the modulus (including any leading 0x00 byte).
+/// The RSA modulus bit length is computed from the DER-encoded `RSAPublicKey`
+/// structure inside the `SubjectPublicKeyInfo` bit string and compared against
+/// the 2048-bit floor.
 ///
-/// DER INTEGER encoding of unsigned values: a leading 0x00 byte is prepended
-/// when the high bit of the first content byte would be 1 (to distinguish it
-/// from a negative number). For a true 2048-bit modulus, bit 2047 (0-indexed)
-/// is set, which is bit 7 of the first byte — so DER prepends a 0x00, giving
-/// 257 bytes in the INTEGER value field. A 2047-bit modulus has its highest
-/// bit at position 2046, which is bit 6 of the first byte (bit 7 = 0), so
-/// no leading 0x00 is added — the value is 256 bytes.
+/// # Why bit-length, not byte-length
 ///
-/// Therefore `n_bytes >= 256` accepts both 2048-bit keys (257 bytes) and
-/// 2047-bit keys (256 bytes). This matches zlint's floor-byte comparison
-/// behavior: 2047-bit keys with 256 bytes pass this check.
+/// DER INTEGER encoding of unsigned values prepends a leading 0x00 byte when
+/// the high bit of the first content byte would be 1 (to distinguish a
+/// non-negative integer from a negative one). For a true 2048-bit modulus,
+/// bit 2047 (0-indexed) is set — that is bit 7 of the first byte — so DER
+/// prepends a 0x00, yielding 257 bytes in the INTEGER value field. A 2047-bit
+/// modulus has its highest bit at position 2046 (bit 6 of the first byte,
+/// bit 7 = 0), so no leading 0x00 is added and the value is 256 bytes.
+///
+/// A naive `n_bytes >= 256` check therefore accepts 2047-bit keys, which
+/// violates the BR floor. This lint computes the actual bit length:
+///
+/// 1. Strip any leading 0x00 padding byte from the modulus INTEGER.
+/// 2. Compute `(remaining_byte_len - 1) * 8 + (8 - leading_zero_bits)`,
+///    i.e. the position (1-indexed) of the most-significant set bit.
+/// 3. Reject if the result is less than 2048.
 ///
 /// Citation: CA/B Forum TLS BR §6.1.5
 pub struct RsaMinKeySizeLint;
@@ -250,13 +255,9 @@ impl Lint for RsaMinKeySizeLint {
         //                                              publicExponent INTEGER }
         let key_bytes = spki.subject_public_key.raw_bytes();
 
-        // Decode RSAPublicKey SEQUENCE to get the modulus INTEGER bytes.
-        // We only need the first INTEGER (modulus); parse the outer SEQUENCE
-        // header manually to avoid pulling in the `rsa` crate.
-        match rsa_modulus_byte_len(key_bytes) {
-            Some(n_bytes) => {
-                // 256 bytes * 8 bits/byte = 2048 bits
-                if n_bytes >= 256 {
+        match rsa_modulus_bit_len(key_bytes) {
+            Some(n_bits) => {
+                if n_bits >= 2048 {
                     LintResult::Pass
                 } else {
                     LintResult::Error("RSA key modulus is less than 2048 bits")
@@ -268,16 +269,46 @@ impl Lint for RsaMinKeySizeLint {
 }
 
 /// Parse DER-encoded `RSAPublicKey ::= SEQUENCE { modulus INTEGER, ... }` and
-/// return the byte length of the modulus `INTEGER` value (including any leading
-/// zero padding byte).
+/// return the bit length of the modulus (i.e. the position of its
+/// most-significant set bit, counted from 1).
 ///
-/// Returns `None` if the structure is malformed.
-fn rsa_modulus_byte_len(der: &[u8]) -> Option<usize> {
+/// The DER encoding of a non-negative INTEGER prepends a 0x00 padding byte
+/// when the high bit of the first content byte would be set. This function
+/// strips the optional padding before measuring, then counts leading zero
+/// bits in the remaining first byte, so a 2047-bit modulus reports 2047
+/// and a 2048-bit modulus reports 2048.
+///
+/// Returns `None` if the structure is malformed or the modulus is zero.
+fn rsa_modulus_bit_len(der: &[u8]) -> Option<usize> {
     // Expect SEQUENCE tag 0x30.
     let (seq_content, _rest) = der_peel_tlv(der, 0x30)?;
     // First element inside SEQUENCE must be the modulus INTEGER (tag 0x02).
-    // der_tlv_value_len returns None on tag mismatch, so no separate peel needed.
-    der_tlv_value_len(seq_content, 0x02)
+    let (mut int_value, _rest) = der_peel_tlv(seq_content, 0x02)?;
+
+    // Strip a single leading 0x00 padding byte if it is purely a sign byte
+    // (i.e. the next byte has its high bit set). DER forbids extra padding
+    // bytes beyond this single sign byte.
+    if int_value.len() >= 2 && int_value[0] == 0x00 && int_value[1] & 0x80 != 0 {
+        int_value = &int_value[1..];
+    }
+
+    // Skip any all-zero leading bytes (they would indicate an over-encoded
+    // value; under strict DER this should not occur, but we guard against it
+    // rather than over-counting bits).
+    while let Some((&first, rest)) = int_value.split_first() {
+        if first == 0 {
+            int_value = rest;
+        } else {
+            break;
+        }
+    }
+
+    let (&high, _) = int_value.split_first()?;
+    if high == 0 {
+        return None; // modulus is zero — malformed
+    }
+    let leading_zeros = high.leading_zeros() as usize;
+    Some((int_value.len() - 1) * 8 + (8 - leading_zeros))
 }
 
 /// Strip a DER TLV wrapper with the given `expected_tag` and return
@@ -293,16 +324,6 @@ fn der_peel_tlv(input: &[u8], expected_tag: u8) -> Option<(&[u8], &[u8])> {
     }
     let (value, remaining) = rest.split_at(len);
     Some((value, remaining))
-}
-
-/// Return only the byte length of the value of the first TLV with `expected_tag`.
-fn der_tlv_value_len(input: &[u8], expected_tag: u8) -> Option<usize> {
-    let (tag, rest) = input.split_first()?;
-    if *tag != expected_tag {
-        return None;
-    }
-    let (len, _rest) = parse_der_length(rest)?;
-    Some(len)
 }
 
 /// Parse a DER length field, returning `(length_value, remaining_bytes)`.

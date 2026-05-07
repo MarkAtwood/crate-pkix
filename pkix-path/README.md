@@ -95,7 +95,7 @@ Per RFC 5280 §6.1, for each certificate in the chain:
   `requireExplicitPolicy`, and policy inhibit counters
 - **Policy mappings** — §6.1.3–6.1.5 mapping and constraint enforcement
 - **Name constraints** — §4.2.1.10 subtree checking for DNS names, RFC 822
-  addresses, URIs, and distinguished names
+  addresses, URIs, distinguished names, and IP addresses (IPv4/IPv6)
 - **Duplicate detection** — issuer+serial uniqueness across the chain
 
 ## Not validated (v0.2)

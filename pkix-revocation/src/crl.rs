@@ -270,7 +270,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 // Callers with hard-fail revocation requirements must verify CRL coverage separately.
                 return Ok(());
             }
-            let cert_is_ca = cert_is_ca_cert(cert);
+            let cert_is_ca = cert_is_ca_cert(cert)?;
             // onlyContainsUserCerts: CRL only covers end-entity (non-CA) certs.
             if idp.only_contains_user_certs && cert_is_ca {
                 // CRL does not cover this cert type — returning Ok(()) (not-covered, not not-revoked).
@@ -398,7 +398,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             if idp.only_contains_attribute_certs {
                 return Ok(());
             }
-            let cert_is_ca = cert_is_ca_cert(cert);
+            let cert_is_ca = cert_is_ca_cert(cert)?;
             if idp.only_contains_user_certs && cert_is_ca {
                 return Ok(());
             }
@@ -709,16 +709,28 @@ fn parse_issuing_dp(
     }
 }
 
-/// Returns `true` if `cert` is a CA certificate (`BasicConstraints` `cA = TRUE`).
-fn cert_is_ca_cert(cert: &Certificate) -> bool {
+/// Returns `Ok(true)` if `cert` is a CA certificate (`BasicConstraints`
+/// `cA = TRUE`), `Ok(false)` if the extension is absent or `cA = FALSE`,
+/// and [`Error::MalformedCertificate`] if the extension is present but
+/// undecodable.
+///
+/// Fail-closed: a malformed `BasicConstraints` is propagated so the IDP
+/// scope check cannot silently skip a CRL that should cover the certificate.
+fn cert_is_ca_cert(cert: &Certificate) -> crate::Result<bool> {
     use x509_cert::ext::pkix::BasicConstraints;
 
-    cert.tbs_certificate
+    let Some(ext) = cert
+        .tbs_certificate
         .extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
         .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
-        .and_then(|e| BasicConstraints::from_der(e.extn_value.as_bytes()).ok())
-        .is_some_and(|bc| bc.ca)
+    else {
+        return Ok(false);
+    };
+
+    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
+        .map_err(|_| Error::MalformedCertificate)?;
+    Ok(bc.ca)
 }
