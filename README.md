@@ -21,13 +21,14 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 
 | Crate | What it does | `no_std` | Status |
 |-------|-------------|----------|--------|
-| [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | v0.1 |
-| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only | v0.1 |
-| [`pkix-chain`] | Umbrella: combines path + revocation | — | v0.1 |
-| [`pkix-chain-simple`] | Opinionated single-call validator | — | v0.1 |
-| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | v0.1 |
+| [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | v0.2 |
+| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only | v0.2 |
+| [`pkix-chain`] | Umbrella: combines path + revocation | — | v0.2 |
+| [`pkix-chain-simple`] | Opinionated validator with extension whitelist | — | v0.2 |
+| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | v0.2 |
+| [`pkix-profiles`] | CA/B Forum and RFC profile policy pre-configurations | — | v0.2 |
+| [`pkix-lint`] | Advisory lint engine for CA/B Forum and RFC rules | — | v0.2 |
 | [`pkix-revocation-http`] | Online CRL/OCSP fetching from CDP/AIA | — | planned |
-| [`pkix-profiles`] | CA/B Forum policy pre-configurations | — | planned |
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
 | [`pkix-composite`] | Composite classical+PQC signature verifier | ✓ | planned |
 | [`pkix-ac`] | RFC 5755 attribute certificate validation | ✓ | planned |
@@ -38,7 +39,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-pkix-chain = "0.1"
+pkix-chain = "0.2"
 ```
 
 Verify a certificate chain:
@@ -70,7 +71,7 @@ println!("chain depth: {}", validated.chain.len());
 With CRL revocation checking:
 
 ```rust
-use pkix_chain::{verify_chain_default, CrlChecker};
+use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};
 
 let crl_checker = CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier);
 let validated = verify_chain_default(&chain, &anchors, &policy, &crl_checker)?;
@@ -88,7 +89,7 @@ let validated = verify_chain(&chain, &anchors, &policy, &my_fips_verifier, &NoRe
 ## Architecture
 
 ```
-pkix-chain-simple          (opinionated single-call API)
+pkix-chain-simple          (strict single-call API, extension whitelist)
 pkix-chain                 (umbrella: combines path + revocation)
        │                        │
        ▼                        ▼
@@ -111,26 +112,37 @@ pkix-chain                 (umbrella: combines path + revocation)
 The `SignatureVerifier` trait is the crypto seam. Swap it to change the
 entire cryptographic foundation without touching validation logic.
 
-## v0.1 scope
+Path building (turning an unordered bag of certificates into an ordered chain)
+is handled by `pkix-path-builder`. Profile-specific policy pre-configuration
+lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 
-Implemented:
-- Signature chain verification (RSA-PKCS1v15-SHA-256, ECDSA-P-256-SHA-256)
-- Validity period checks
-- Issuer/subject name linkage
-- `BasicConstraints` cA=true on intermediates
-- `pathLenConstraint` enforcement
-- `KeyUsage` keyCertSign enforcement
-- Unknown critical extension rejection
-- CRL revocation checking (offline, issuer-signed)
-- OCSP revocation checking (offline, direct responder)
+## What is validated (v0.2)
 
-Not yet implemented (v0.2+):
-- RFC 4518 DN string normalization — PKIX-pyc
+`pkix-path::validate_path` implements RFC 5280 §6.1:
 
-In progress for v0.1:
-- Policy validation (RFC 5280 §6.1 state machine) — PKIX-mi3
-- Path building from unordered certs (RFC 4158) — PKIX-y2j
-- Delta CRLs and CRL Distribution Points — PKIX-58m
+- **Signatures** — each certificate's signature is verified against the issuer's SPKI
+- **Validity period** — `notBefore ≤ now ≤ notAfter` for every certificate
+- **Name linkage** — `cert.issuer == issuer.subject` for each adjacent pair
+- **Trust anchor** — final issuer matches a provided trust anchor
+- **BasicConstraints** — intermediates must have `cA = TRUE`
+- **pathLenConstraint** — enforced if present on intermediate CA certificates
+- **KeyUsage** — `keyCertSign` bit enforced on CAs (configurable via policy)
+- **Critical extensions** — any unrecognised critical extension causes failure
+- **Certificate policies** — RFC 5280 §6.1 policy state machine
+- **Policy mappings** — RFC 5280 §6.1.3–6.1.5 mapping and constraint enforcement
+- **Name constraints** — RFC 5280 §4.2.1.10 (DNS, RFC 822, URI, DirectoryName)
+- **Duplicate certificate detection** — issuer+serial uniqueness in the chain
+
+`pkix-revocation` adds:
+- **CRL checking** — RFC 5280 §5 offline CRL with delta CRL support
+- **OCSP checking** — RFC 6960 offline OCSP response with CertID hash verification
+
+## Not yet implemented (v0.3+)
+
+- RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
+- CRL Distribution Points — caller supplies the CRL DER directly
+- Online CRL/OCSP fetching (`pkix-revocation-http`, planned)
+- Delegated OCSP responders
 
 ## Standards
 
@@ -141,10 +153,14 @@ In progress for v0.1:
 | [RFC 4158] | Internet X.509 PKI: Certification Path Building |
 | [RFC 4518] | LDAP: Internationalized String Preparation (DN normalization) |
 | [RFC 5755] | An Internet Attribute Certificate Profile for Authorization |
-| [FIPS 186-5] | Digital Signature Standard (ECDSA, EdDSA) |
+| [RFC 6962] | Certificate Transparency |
+| [RFC 9162] | Certificate Transparency Version 2.0 |
+| [FIPS 186-5] | Digital Signature Standard (ECDSA) |
 | [FIPS 204] | Module-Lattice-Based Digital Signature Standard (ML-DSA) |
-| [CA/B Forum BR] | Baseline Requirements for TLS Server Certificates |
-| [draft-ietf-lamps-dilithium-certificates] | X.509 Certificate Profile for ML-DSA |
+| [CA/B Forum TLS BR] | Baseline Requirements for TLS Server Certificates |
+| [CA/B Forum S/MIME BR] | Baseline Requirements for S/MIME Certificates |
+| [CA/B Forum CS BR] | Baseline Requirements for Code Signing |
+| [draft-ietf-lamps-pq-composite-sigs] | Composite Post-Quantum Signatures |
 
 Local copies of all referenced specifications are in [`specs/`](specs/).
 

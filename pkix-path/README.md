@@ -32,6 +32,7 @@ let anchors = vec![
     TrustAnchor {
         subject: root_cert.tbs_certificate.subject.clone(),
         subject_public_key_info: root_cert.tbs_certificate.subject_public_key_info.clone(),
+        name_constraints: None,
     }
 ];
 
@@ -90,19 +91,27 @@ Per RFC 5280 §6.1, for each certificate in the chain:
 - **pathLenConstraint** — enforced if present on intermediate CA certs
 - **KeyUsage** — `keyCertSign` bit enforced on CAs (configurable via policy)
 - **Critical extensions** — any unrecognised critical extension causes failure
+- **Certificate policies** — §6.1 policy state machine including anyPolicy,
+  `requireExplicitPolicy`, and policy inhibit counters
+- **Policy mappings** — §6.1.3–6.1.5 mapping and constraint enforcement
+- **Name constraints** — §4.2.1.10 subtree checking for DNS names, RFC 822
+  addresses, URIs, and distinguished names
+- **Duplicate detection** — issuer+serial uniqueness across the chain
 
-## What is not validated (v0.1)
+## Not validated (v0.2)
 
-- Name constraints (RFC 5280 §4.2.1.10)
-- Policy constraints and policy validation (§4.2.1.9, §6.1.5)
+- Path building — chain must be caller-ordered, leaf first;
+  use [`pkix-path-builder`] for unordered bags of certificates
 - CRL/OCSP revocation — use [`pkix-revocation`]
-- Path building — chain must be caller-ordered, leaf first
-- RFC 4518 DN normalization — name comparison is byte-exact
+- RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString
+  transcoding is deferred to v0.3)
 
 ## Standards
 
-- [RFC 5280] §6 — Path Validation Algorithm
 - [RFC 5280] §4.2 — Certificate Extensions
+- [RFC 5280] §6 — Path Validation Algorithm
+- [RFC 5280] §4.2.1.10 — Name Constraints
+- [RFC 5280] §4.2.1.9, §6.1.5 — Certificate Policies and Policy Constraints
 - [FIPS 186-5] — Digital Signature Standard (ECDSA)
 
 ## License

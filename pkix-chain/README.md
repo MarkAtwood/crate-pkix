@@ -32,16 +32,25 @@ let result = verify_chain_default(&chain, &anchors, &policy, &NoRevocation)?;
 ### With CRL revocation
 
 ```rust
-use pkix_chain::{verify_chain_default, CrlChecker};
+use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};
 
 let checker = CrlChecker::new(crl_der, unix_now(), DefaultVerifier);
+let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
+```
+
+### With delta CRL
+
+```rust
+use pkix_chain::CrlChecker;
+
+let checker = CrlChecker::with_delta(base_crl_der, delta_crl_der, unix_now(), DefaultVerifier)?;
 let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
 ```
 
 ### With OCSP revocation
 
 ```rust
-use pkix_chain::{verify_chain_default, OcspChecker};
+use pkix_chain::{verify_chain_default, OcspChecker, DefaultVerifier};
 
 let checker = OcspChecker::new(ocsp_response_der, unix_now(), DefaultVerifier);
 let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
@@ -62,19 +71,19 @@ let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation
 
 1. **Path validation** — calls `pkix_path::validate_path`, which verifies
    signatures, validity periods, name linkage, BasicConstraints, pathLen,
-   KeyUsage, and critical extensions per RFC 5280 §6.1.
+   KeyUsage, critical extensions, certificate policies, name constraints, and
+   duplicate detection per RFC 5280 §6.1.
 
 2. **Revocation checking** — calls `RevocationChecker::check_revocation` for
-   each certificate in the validated chain (leaf through issuer, excluding
-   the trust anchor itself).
+   each certificate in the validated chain (leaf through the certificate issued
+   directly by the trust anchor, excluding the anchor itself).
 
 If either step fails, an `Error` is returned wrapping the underlying error.
 
 ## Re-exports
 
-For convenience this crate re-exports the full public API of both component
-crates. You do not need to add `pkix-path` or `pkix-revocation` directly to
-your `Cargo.toml`:
+This crate re-exports the full public API of both component crates. You do not
+need to add `pkix-path` or `pkix-revocation` directly to your `Cargo.toml`:
 
 ```rust
 use pkix_chain::{
@@ -91,7 +100,7 @@ use pkix_chain::{
 
 | Feature | Enables |
 |---------|---------|
-| `crl` | `CrlChecker` (offline CRL validation) |
+| `crl` | `CrlChecker` (offline CRL validation, with delta CRL support) |
 | `ocsp` | `OcspChecker` (offline OCSP validation) |
 | `rsa` | RSA-PKCS1v15 backend in `DefaultVerifier` (default on) |
 | `p256` | ECDSA P-256 backend in `DefaultVerifier` (default on) |
@@ -104,6 +113,7 @@ This crate requires `std`. For `no_std` environments, use `pkix-path` and
 ## Standards
 
 - [RFC 5280] — Internet X.509 PKI Certificate and CRL Profile
+- [RFC 5280] §5.2.4 — Delta CRLs
 - [RFC 6960] — Online Certificate Status Protocol (OCSP)
 
 ## License

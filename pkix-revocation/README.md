@@ -44,13 +44,26 @@ let checker = CrlChecker::new(crl_der, now_unix, DefaultVerifier);
 checker.check_revocation(&leaf_cert, &issuer_cert)?;
 ```
 
+### CRL with delta CRL
+
+Delta CRLs (RFC 5280 §5.2.4) contain only the incremental changes since a
+base CRL was issued, reducing download size. Supply both:
+
+```rust
+use pkix_revocation::CrlChecker;
+use pkix_path::DefaultVerifier;
+
+let checker = CrlChecker::with_delta(base_crl_der, delta_crl_der, now_unix, DefaultVerifier)?;
+checker.check_revocation(&leaf_cert, &issuer_cert)?;
+```
+
 ### OCSP checking
 
 ```rust
 use pkix_revocation::{OcspChecker, RevocationChecker};
 use pkix_path::DefaultVerifier;
 
-let ocsp_response_der = fetch_ocsp_response(...);
+let ocsp_response_der = fetch_ocsp_response(/* ... */);
 let checker = OcspChecker::new(ocsp_response_der, now_unix, DefaultVerifier);
 checker.check_revocation(&leaf_cert, &issuer_cert)?;
 ```
@@ -79,37 +92,46 @@ impl RevocationChecker for MyRevocationChecker {
 
 `CrlChecker::check_revocation`:
 
-1. Parses the DER-encoded `CertificateList` (RFC 5280 §5).
-2. Verifies the CRL signature against the issuer's SPKI.
+1. Verifies that `issuer` is the actual issuer of `cert` (subject/issuer DN match).
+2. Parses the DER-encoded `CertificateList` (RFC 5280 §5).
 3. Checks the CRL's `issuer` field matches the certificate's `issuer`.
-4. Checks `thisUpdate ≤ now ≤ nextUpdate` (absent `nextUpdate` → fail).
-5. Searches `revokedCertificates` for the certificate's serial number.
-6. Returns `Err(Revoked { serial, reason_code })` if found, `Ok(())` if not.
+4. Verifies the CRL signature against the issuer's SPKI.
+5. Checks `thisUpdate ≤ now ≤ nextUpdate` (absent `nextUpdate` → fail).
+6. When a delta CRL is present (`with_delta`), verifies and merges the delta's
+   revoked entries with the base CRL's entries (RFC 5280 §5.2.4).
+7. Checks the `IssuingDistributionPoint` scope flags if present (onlyContainsUserCerts,
+   onlyContainsCACerts, onlyContainsAttributeCerts).
+8. Searches `revokedCertificates` for the certificate's serial number.
+9. Returns `Err(Revoked { serial, reason_code })` if found, `Ok(())` if not.
 
 ## How OCSP checking works
 
 `OcspChecker::check_revocation`:
 
-1. Parses the DER-encoded `OCSPResponse` (RFC 6960 §4.2).
-2. Requires `responseStatus == successful`.
-3. Verifies the signature on `BasicOCSPResponse` against the issuer's SPKI.
-4. Finds the `SingleResponse` matching the certificate's serial number.
-5. Checks `producedAt ≤ now`, `thisUpdate ≤ now`, `now ≤ nextUpdate`.
-6. Returns based on `certStatus`: `good → Ok(())`, `revoked → Err(Revoked)`,
+1. Verifies that `issuer` is the actual issuer of `cert` (subject/issuer DN match).
+2. Parses the DER-encoded `OCSPResponse` (RFC 6960 §4.2).
+3. Requires `responseStatus == successful`.
+4. Verifies the signature on `BasicOCSPResponse` against the issuer's SPKI.
+5. Verifies the `ResponderId` matches the issuer by DN (`byName`) or SHA-1 of
+   the issuer's SPKI public key bytes (`byKey`).
+6. Finds the `SingleResponse` matching the certificate's serial number.
+7. Verifies `issuerNameHash` and `issuerKeyHash` in the `CertID` against the
+   issuer's subject DN and SPKI key bytes.
+8. Checks `producedAt ≤ now`, `thisUpdate ≤ now ≤ nextUpdate`.
+9. Returns based on `certStatus`: `good → Ok(())`, `revoked → Err(Revoked)`,
    `unknown → Err(OcspStatusUnknown)`.
 
-## v0.1 limitations
+## v0.2 limitations
 
 - CRL checking does not follow CRL Distribution Points — caller supplies the CRL.
-- Delta CRLs are not supported.
 - OCSP checking only supports issuer-signed (direct) responses; delegated
-  responder certificates are not supported.
-- `SingleResponse` matching is by serial number only; `issuerNameHash` and
-  `issuerKeyHash` are not verified.
+  responder certificates (RFC 6960 §2.6) are not supported.
 
 ## Standards
 
 - [RFC 5280] §5 — CRL Profile
+- [RFC 5280] §5.2.4 — Delta CRLs
+- [RFC 5280] §5.2.5 — IssuingDistributionPoint
 - [RFC 5280] §4.2.1.13 — CRL Distribution Points
 - [RFC 6960] — Online Certificate Status Protocol (OCSP)
 

@@ -2,7 +2,7 @@
 
 Online CRL and OCSP fetching for `pkix-revocation`.
 
-**Status: planned (not yet implemented). See issue PKIX-58m.**
+**Status: planned (not yet implemented).**
 
 ## What this will do
 
