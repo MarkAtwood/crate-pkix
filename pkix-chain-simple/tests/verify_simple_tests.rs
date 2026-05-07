@@ -161,26 +161,22 @@ fn verify_simple_unknown_critical_extension_leaf() {
     );
 }
 
-/// Intermediate with CertificatePolicies extension (not in ALLOWED_INTERMEDIATE_EXTENSIONS).
+/// Intermediate with FreshestCRL extension (not in ALLOWED_INTERMEDIATE_EXTENSIONS).
 ///
-/// Oracle: PKITS GoodCACert.crt has CertificatePolicies; structural check fires before
-/// any signature verification, so using unrelated certs in the chain is safe here.
+/// Oracle: pyca/cryptography — ca-freshestcrl.der is a CA cert (cA=TRUE, keyCertSign)
+/// with a non-critical FreshestCRL (OID 2.5.29.46) extension.  That OID is not in
+/// ALLOWED_INTERMEDIATE_EXTENSIONS, so the structural check must fire before any
+/// signature verification.  Using unrelated certs in the chain is safe here.
 #[test]
 fn verify_simple_unexpected_extension_intermediate() {
-    use der::Decode as _;
-    let pkits_good_ca_der = std::fs::read(
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../pkix-path/tests/pkits/certs/GoodCACert.crt"),
-    )
-    .expect("read GoodCACert.crt");
-    let good_ca = Certificate::from_der(&pkits_good_ca_der).expect("parse GoodCACert");
+    let ca_with_freshest_crl = load("ca-freshestcrl.der");
 
     let leaf = load("gry-leaf.der");
     let root = load("gry-root.der");
-    let result = verify_simple(&[leaf, good_ca], &[anchor(root)], NOW);
+    let result = verify_simple(&[leaf, ca_with_freshest_crl], &[anchor(root)], NOW);
     assert!(
         matches!(result, Err(Error::UnexpectedExtension { index: 1 })),
-        "intermediate with CertificatePolicies must return UnexpectedExtension {{ index: 1 }}, got: {result:?}"
+        "intermediate with FreshestCRL must return UnexpectedExtension {{ index: 1 }}, got: {result:?}"
     );
 }
 
