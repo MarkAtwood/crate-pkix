@@ -71,7 +71,10 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
+//! ```rust,no_run
+//! // `cert` and `now_unix` are obtained from the calling context (e.g., loaded
+//! // from DER and current wall-clock time). They are not defined here so the
+//! // example cannot be run in a doctest harness without external fixtures.
 //! use pkix_lint::{Lint, LintResult, LintRunner, Scope, Severity, SubjectKind};
 //! use x509_cert::Certificate;
 //!
@@ -82,7 +85,7 @@
 //!     fn severity(&self) -> Severity { Severity::Warn }
 //!     fn scope(&self) -> Scope { Scope::Certificate }
 //!     fn applies_to(&self) -> SubjectKind { SubjectKind::Leaf }
-//!     fn check_cert(&self, cert: &Certificate, _now: u64) -> LintResult {
+//!     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
 //!         if cert.tbs_certificate.subject.to_string().is_empty() {
 //!             LintResult::Warn("empty Subject DN")
 //!         } else {
@@ -91,8 +94,10 @@
 //!     }
 //! }
 //!
+//! let cert: Certificate = unimplemented!("load from DER");
+//! let now_unix: u64 = unimplemented!("current Unix epoch seconds");
 //! let runner = LintRunner::new(vec![Box::new(MyLint)]);
-//! let findings = runner.run_cert(&cert, SubjectKind::Leaf, now_unix);
+//! let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, now_unix);
 //! for f in &findings {
 //!     println!("{}: {:?}", f.lint_id, f.result);
 //! }
@@ -647,7 +652,11 @@ impl LintRunner {
     /// Accepts any value that converts to `Cow<'static, str>`: string literals
     /// (zero-copy) or owned `String` values (for runtime-constructed versions):
     ///
-    /// ```rust,ignore
+    /// ```rust,no_run
+    /// use pkix_lint::LintRunner;
+    /// // `lints` is a Vec<Box<dyn pkix_lint::Lint>> from the calling context.
+    /// let lints: Vec<Box<dyn pkix_lint::Lint>> = vec![];
+    ///
     /// // Static literal — zero allocation
     /// let runner = LintRunner::with_bundle_version(
     ///     lints,
@@ -655,8 +664,9 @@ impl LintRunner {
     /// );
     ///
     /// // Runtime-constructed version — e.g., read from config
+    /// let lints2: Vec<Box<dyn pkix_lint::Lint>> = vec![];
     /// let ver = format!("my-bundle v{}", env!("CARGO_PKG_VERSION"));
-    /// let runner = LintRunner::with_bundle_version(lints, ver);
+    /// let runner2 = LintRunner::with_bundle_version(lints2, ver);
     /// ```
     #[must_use]
     pub fn with_bundle_version(
