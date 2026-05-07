@@ -71,7 +71,8 @@ let validated = verify_chain_default(&chain, &anchors, &policy, &NoRevocation)?;
 println!("chain depth: {}", validated.depth);
 ```
 
-With CRL revocation checking:
+With CRL revocation checking (requires the `crl` Cargo feature, e.g.
+`pkix-chain = { version = "0.2", features = ["crl"] }`):
 
 ```rust
 use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};

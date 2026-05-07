@@ -356,9 +356,9 @@ impl DeviationScope {
                 // only when stripped of leading-zero padding. We do a simple length-first
                 // comparison, which is correct for well-formed DER serial numbers.
                 let serial = cert.tbs_certificate.serial_number.as_bytes();
-                let serial_ge_start = serial_lex_ge(serial, start);
-                let serial_le_end = serial_lex_le(serial, end);
-                serial_ge_start && serial_le_end
+                let cmp_start = serial_cmp(serial, start);
+                let cmp_end = serial_cmp(serial, end);
+                cmp_start.is_ge() && cmp_end.is_le()
             }
         }
     }
@@ -403,28 +403,18 @@ impl serde::Serialize for DeviationScope {
     }
 }
 
-/// Returns `true` if `a >= b` using DER positive-integer lexicographic ordering.
+/// Compare two byte slices as DER positive-integer serial numbers.
 ///
 /// DER positive integers are big-endian with a leading 0x00 byte only when the
-/// high bit would otherwise be set (sign-bit convention). For serial-number
-/// comparison we strip leading zeros before comparing length and bytes.
-fn serial_lex_ge(a: &[u8], b: &[u8]) -> bool {
+/// high bit would otherwise be set (sign-bit convention). Leading zeros are
+/// stripped before comparing; longer (after stripping) is greater, equal length
+/// falls through to lexicographic byte comparison.
+///
+/// Call sites use `.is_ge()` / `.is_le()` for "in range" checks.
+fn serial_cmp(a: &[u8], b: &[u8]) -> core::cmp::Ordering {
     let a = strip_leading_zeros(a);
     let b = strip_leading_zeros(b);
-    if a.len() != b.len() {
-        return a.len() > b.len();
-    }
-    a >= b
-}
-
-/// Returns `true` if `a <= b` using DER positive-integer lexicographic ordering.
-fn serial_lex_le(a: &[u8], b: &[u8]) -> bool {
-    let a = strip_leading_zeros(a);
-    let b = strip_leading_zeros(b);
-    if a.len() != b.len() {
-        return a.len() < b.len();
-    }
-    a <= b
+    a.len().cmp(&b.len()).then_with(|| a.cmp(b))
 }
 
 fn strip_leading_zeros(bytes: &[u8]) -> &[u8] {
@@ -522,8 +512,10 @@ pub struct DeviationStore {
 impl DeviationStore {
     /// Create an empty store.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            deviations: Vec::new(),
+        }
     }
 
     /// Add a deviation to the store.
@@ -1058,35 +1050,43 @@ mod tests {
     // -----------------------------------------------------------------------
     // SerialRange scope tests
     //
-    // Oracle: serial_lex_ge and serial_lex_le implement DER positive integer
-    // comparison. Boundary conditions are tested independently of the cert fixture.
+    // Oracle: serial_cmp implements DER positive integer comparison.
+    // Boundary conditions are tested independently of the cert fixture.
     // -----------------------------------------------------------------------
 
     #[test]
-    fn serial_lex_ge_basic() {
-        // 0x02 >= 0x01
-        assert!(serial_lex_ge(&[0x02], &[0x01]));
-        // 0x01 is not >= 0x02
-        assert!(!serial_lex_ge(&[0x01], &[0x02]));
-        // equal
-        assert!(serial_lex_ge(&[0x05], &[0x05]));
+    fn serial_cmp_greater() {
+        use core::cmp::Ordering;
+        // 0x02 > 0x01
+        assert_eq!(serial_cmp(&[0x02], &[0x01]), Ordering::Greater);
         // longer byte sequence (more digits) is larger
-        assert!(serial_lex_ge(&[0x01, 0x00], &[0xFF]));
+        assert_eq!(serial_cmp(&[0x01, 0x00], &[0xFF]), Ordering::Greater);
     }
 
     #[test]
-    fn serial_lex_le_basic() {
-        assert!(serial_lex_le(&[0x01], &[0x02]));
-        assert!(!serial_lex_le(&[0x02], &[0x01]));
-        assert!(serial_lex_le(&[0x05], &[0x05]));
-        assert!(serial_lex_le(&[0xFF], &[0x01, 0x00]));
+    fn serial_cmp_less() {
+        use core::cmp::Ordering;
+        // 0x01 < 0x02
+        assert_eq!(serial_cmp(&[0x01], &[0x02]), Ordering::Less);
+        // shorter (after strip) is smaller
+        assert_eq!(serial_cmp(&[0xFF], &[0x01, 0x00]), Ordering::Less);
     }
 
     #[test]
-    fn serial_lex_leading_zeros_stripped() {
-        // 0x00 0x01 = 1, 0x01 = 1 — they should be equal.
-        assert!(serial_lex_ge(&[0x00, 0x01], &[0x01]));
-        assert!(serial_lex_le(&[0x00, 0x01], &[0x01]));
+    fn serial_cmp_equal() {
+        use core::cmp::Ordering;
+        // identical
+        assert_eq!(serial_cmp(&[0x05], &[0x05]), Ordering::Equal);
+    }
+
+    #[test]
+    fn serial_cmp_leading_zeros_stripped() {
+        use core::cmp::Ordering;
+        // 0x00 0x01 = 1, 0x01 = 1 — equal after stripping leading zero on a.
+        assert_eq!(serial_cmp(&[0x00, 0x01], &[0x01]), Ordering::Equal);
+        // is_ge / is_le on Equal are both true (matches old serial_lex_{ge,le} behavior).
+        assert!(serial_cmp(&[0x00, 0x01], &[0x01]).is_ge());
+        assert!(serial_cmp(&[0x00, 0x01], &[0x01]).is_le());
     }
 
     #[test]

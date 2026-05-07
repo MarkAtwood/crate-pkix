@@ -41,10 +41,6 @@ extern crate alloc;
 use alloc::vec::Vec;
 use x509_cert::Certificate;
 
-/// OID for `BasicConstraints` (2.5.29.19).
-const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.19");
-
 /// An unordered collection of certificates used as input to path building.
 ///
 /// Certificates are stored by DER bytes and decoded on demand. Add all
@@ -130,7 +126,8 @@ pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.
     NoPathFound,
     /// A topologically valid path exists but requires more intermediates than
-    /// the maximum depth (10) this builder supports.
+    /// the configured maximum (see [`PathBuilderConfig::max_depth`], default
+    /// [`DEFAULT_MAX_DEPTH`]).
     DepthExceeded,
     /// The internal DFS node-visit budget was exhausted in a single round.
     ///
@@ -152,7 +149,7 @@ impl core::fmt::Display for Error {
         match self {
             Self::NoPathFound => f.write_str("no certification path found to a trust anchor"),
             Self::DepthExceeded => f.write_str(
-                "maximum intermediate chain depth (10) exceeded; the chain may require a deeper path than this builder supports",
+                "configured maximum intermediate chain depth exceeded; the chain may require a deeper path than this builder is configured to attempt",
             ),
             Self::BudgetExceeded => f.write_str(
                 "DFS node-visit budget exceeded; pool may be adversarially large",
@@ -179,24 +176,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// as not-a-CA) avoids the situation where a topologically-valid path
 /// through a malformed-BC intermediate produces a misleading
 /// [`Error::NoPathFound`].
+///
+/// Thin wrapper over [`pkix_path::cert_is_ca`] that maps the opaque
+/// [`pkix_path::DerError`] to this crate's [`Error::MalformedIntermediate`].
 fn cert_is_ca(cert: &Certificate) -> Result<bool> {
-    use der::Decode as _;
-    use x509_cert::ext::pkix::BasicConstraints;
-
-    let Some(ext) = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
-        .iter()
-        .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
-    else {
-        return Ok(false);
-    };
-
-    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
-        .map_err(|_| Error::MalformedIntermediate)?;
-    Ok(bc.ca)
+    pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedIntermediate)
 }
 
 /// Inner DFS step.

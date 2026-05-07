@@ -25,6 +25,15 @@
 //! # Limitations
 //!
 //! Not yet implemented.
+//!
+//! # Versioning
+//!
+//! Published as a `0.0.x` placeholder for a forthcoming `0.1.0` implementation.
+//! While in `0.0.x`, the public API — including `Error` variant names — is
+//! considered unstable and may change between patch releases. The variants
+//! `AcParseError`, `AcSignatureInvalid`, and `AcExpired` were named
+//! `ParseError`, `SignatureInvalid`, and `ValidityPeriod` in the unimplemented
+//! `0.1.1` placeholder release.
 
 extern crate alloc;
 
@@ -124,7 +133,6 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Not yet implemented. Currently always returns
 /// <code>[Error::AaPathInvalid]([pkix_path::Error::NoTrustedPath])</code>
 /// until the RFC 5755 §5 validation algorithm is implemented.
-#[doc(hidden)]
 pub const fn validate_attribute_cert(
     _ac: &AttributeCertificate,
     _aa_anchors: &[pkix_path::TrustAnchor],

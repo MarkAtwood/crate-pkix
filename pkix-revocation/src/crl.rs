@@ -37,10 +37,6 @@ const OID_ISSUING_DISTRIBUTION_POINT: der::asn1::ObjectIdentifier =
 const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
 
-/// OID for `BasicConstraints` extension (RFC 5280 §4.2.1.9) — id-ce-basicConstraints: 2.5.29.19
-const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.19");
-
 /// Offline CRL-based revocation checker.
 ///
 /// Parses a DER-encoded [`CertificateList`][x509_cert::crl::CertificateList],
@@ -565,15 +561,14 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
         // Verifier returns an opaque error; no additional context available.
         .map_err(|_| Error::CrlSignatureInvalid)?;
 
-    // NOTE: The clone here is a structural requirement. Returning `&[RevokedCert]`
-    // (Option A) is not possible because `delta_crl` is a caller-local variable; a
-    // reference into it cannot outlive the `if let` block at both call sites without
-    // a significant lifetime refactor of `check_revocation` and
-    // `check_revocation_against_anchor`. A borrow-based design would require either
-    // pre-parsing the delta CRL into `self` at construction time (deferred to v0.3
-    // caching work) or passing the parsed `CertificateList` in from the caller and
-    // restructuring both call sites. Tracked as a structural limitation; the clone is
-    // bounded by the size of the revoked list and occurs at most once per call.
+    // NOTE: The clone produces an owned `Vec<RevokedCert>` to keep the function
+    // signature simple; both call sites currently consume the result by-value.
+    // After the parse-once cache landed (delta_crl is now borrowed from
+    // `self.delta_crl`), a borrow-based design returning `Option<&[RevokedCert]>`
+    // is feasible — it would require updating both call sites and `check_revocation`
+    // / `check_revocation_against_anchor` to consume the slice in-scope. Deferred
+    // as a low-priority perf cleanup; the clone is bounded by the size of the
+    // revoked list and occurs at most once per call.
     Ok(delta_crl
         .tbs_cert_list
         .revoked_certificates
@@ -710,22 +705,17 @@ fn parse_issuing_dp(
 ) -> crate::Result<Option<x509_cert::ext::pkix::crl::IssuingDistributionPoint>> {
     use x509_cert::ext::pkix::crl::IssuingDistributionPoint;
 
-    let ext = crl
-        .tbs_cert_list
+    crl.tbs_cert_list
         .crl_extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT);
-
-    match ext {
-        None => Ok(None),
-        Some(e) => {
-            let idp = IssuingDistributionPoint::from_der(e.extn_value.as_bytes())
-                .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
-            Ok(Some(idp))
-        }
-    }
+        .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT)
+        .map(|e| {
+            IssuingDistributionPoint::from_der(e.extn_value.as_bytes())
+                .map_err(|err| Error::CrlParseError(crate::DerError(err)))
+        })
+        .transpose()
 }
 
 /// Returns `Ok(true)` if `cert` is a CA certificate (`BasicConstraints`
@@ -735,21 +725,9 @@ fn parse_issuing_dp(
 ///
 /// Fail-closed: a malformed `BasicConstraints` is propagated so the IDP
 /// scope check cannot silently skip a CRL that should cover the certificate.
+///
+/// Thin wrapper over [`pkix_path::cert_is_ca`] that maps the opaque
+/// [`pkix_path::DerError`] to this crate's [`Error::MalformedCertificate`].
 fn cert_is_ca_cert(cert: &Certificate) -> crate::Result<bool> {
-    use x509_cert::ext::pkix::BasicConstraints;
-
-    let Some(ext) = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
-        .iter()
-        .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
-    else {
-        return Ok(false);
-    };
-
-    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
-        .map_err(|_| Error::MalformedCertificate)?;
-    Ok(bc.ca)
+    pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedCertificate)
 }
