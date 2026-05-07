@@ -10,7 +10,7 @@
 //! |----|----------|----------|-----------|
 //! | [`cabf.br.tls.validity.max`](ValidityMaxLint) | TLS BR §6.3.2 (SC-081) | Error | Leaf |
 //! | [`cabf.br.tls.alg.sha1_prohibited`](Sha1ProhibitedLint) | TLS BR §7.1.3 | Error | Any |
-//! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | TLS BR §6.1.5 | Error | Leaf |
+//! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | TLS BR §6.1.5 | Error | Any |
 //! | [`cabf.br.tls.san.required`](SanRequiredLint) | TLS BR §7.1.4.2 | Error | Leaf |
 //! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | TLS BR §7.1.2.7.3 | Error | Leaf |
 //! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.5 | Error | IntermediateCa |
@@ -192,7 +192,7 @@ impl Lint for Sha1ProhibitedLint {
 // Lint 3 — cabf.br.tls.rsa.min_key_size
 // ---------------------------------------------------------------------------
 
-/// RSA leaf certificates must have a modulus of at least 2048 bits.
+/// RSA certificates (leaf and intermediate CA) must have a modulus of at least 2048 bits.
 ///
 /// Non-RSA keys (ECDSA, Ed25519, etc.) return `NotApplicable`.
 ///
@@ -210,8 +210,8 @@ impl Lint for Sha1ProhibitedLint {
 /// no leading 0x00 is added — the value is 256 bytes.
 ///
 /// Therefore `n_bytes >= 256` accepts both 2048-bit keys (257 bytes) and
-/// 2047-bit keys (256 bytes). This is the same floor-byte comparison used
-/// by most CA/B Forum linting tools and matches zlint's behavior.
+/// 2047-bit keys (256 bytes). This matches zlint's floor-byte comparison
+/// behavior: 2047-bit keys with 256 bytes pass this check.
 ///
 /// Citation: CA/B Forum TLS BR §6.1.5
 pub struct RsaMinKeySizeLint;
@@ -234,7 +234,7 @@ impl Lint for RsaMinKeySizeLint {
     }
 
     fn applies_to(&self) -> SubjectKind {
-        SubjectKind::Leaf
+        SubjectKind::Any
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
@@ -546,6 +546,7 @@ impl pkix_path::Profile for CabfTlsBrProfile {
 ///
 /// Returns a fresh `Vec<Box<dyn Lint>>` on each call — the caller owns the lints.
 /// Use [`CabfTlsBrProfile::lint_runner`] for a ready-to-use [`LintRunner`].
+#[must_use]
 pub fn all_lints() -> Vec<Box<dyn Lint>> {
     vec![
         Box::new(ValidityMaxLint),
