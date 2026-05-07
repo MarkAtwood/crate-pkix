@@ -215,9 +215,10 @@ impl Profile for SmimeProfile {
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
-        // S/MIME BR §6.3.2: ~39 calendar months. Approximated as 1185 days;
-        // exact calendar-month enforcement requires notBefore date arithmetic
-        // not available in ValidationPolicy.
+        // S/MIME BR §6.3.2 (v1.0.0, table): Legacy generation maximum validity
+        // is 1185 days. The spec states this as an explicit day count, not a
+        // calendar-month approximation. (Strict/Multipurpose is 825 days;
+        // this profile targets the Legacy generation.)
         p.max_validity_secs = Some(1185 * 86_400);
         // S/MIME BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
@@ -260,7 +261,11 @@ impl Profile for CodeSigningProfile {
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
-        // CS BR §6.3.2: maximum validity ~39 months (1185 days).
+        // CS BR §6.3.2: certificates issued before 2026-03-01 may be valid
+        // for up to 39 months; 39 × 30.44 days/month ≈ 1185.2, so 1185 days
+        // is the standard day-count approximation used by major CAs. Certificates
+        // issued on or after 2026-03-01 are limited to 460 days (CS BR v3.8).
+        // This profile implements the pre-2026-03-01 rule (1185 days).
         p.max_validity_secs = Some(1185 * 86_400);
         // CS BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_CS_BR_ALLOWED_ALGS.to_vec());
