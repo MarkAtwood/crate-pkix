@@ -458,3 +458,63 @@ fn delta_crl_mixed_add_and_remove() {
         "serial=2 removed by delta must return Ok(()); got: {r2:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Default RevocationChecker::check_revocation_against_anchor behavior
+// ---------------------------------------------------------------------------
+
+/// A stub RevocationChecker that always returns Err from check_revocation
+/// but does NOT override check_revocation_against_anchor.
+///
+/// This is the independent oracle: the default trait impl must return Ok(())
+/// regardless of what check_revocation does.
+struct AlwaysRevokedChecker;
+
+impl pkix_revocation::RevocationChecker for AlwaysRevokedChecker {
+    fn check_revocation(
+        &self,
+        cert: &Certificate,
+        _issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        Err(pkix_revocation::Error::Revoked {
+            serial: cert.tbs_certificate.serial_number.clone(),
+            reason_code: None,
+        })
+    }
+    // check_revocation_against_anchor is intentionally NOT overridden here.
+    // The trait default must return Ok(()).
+}
+
+/// The default `check_revocation_against_anchor` impl must return `Ok(())`
+/// even when `check_revocation` returns `Err`.
+///
+/// Oracle: the RevocationChecker trait doc promises "Default implementation
+/// returns Ok(()) (skip)." This test verifies that promise is upheld and
+/// that a custom checker that does not override the method truly skips the
+/// anchor-issued cert check.
+#[test]
+fn check_revocation_against_anchor_default_returns_ok() {
+    use pkix_path::TrustAnchor;
+    use pkix_revocation::RevocationChecker as _;
+
+    // Use the CRL CA as both the certificate being checked and the trust
+    // anchor — all we need is a valid Certificate and TrustAnchor value.
+    let ca = load_cert("crl-ca.der");
+    let anchor = TrustAnchor::from_cert(ca.clone());
+    let checker = AlwaysRevokedChecker;
+
+    // Confirm check_revocation returns Err (so we know the default is not
+    // inherited from check_revocation).
+    let leaf = load_cert("crl-leaf-good.der");
+    assert!(
+        checker.check_revocation(&leaf, &ca).is_err(),
+        "AlwaysRevokedChecker::check_revocation must return Err"
+    );
+
+    // The default check_revocation_against_anchor must return Ok(()).
+    let result = checker.check_revocation_against_anchor(&ca, &anchor);
+    assert!(
+        result.is_ok(),
+        "default check_revocation_against_anchor must return Ok(()); got: {result:?}"
+    );
+}

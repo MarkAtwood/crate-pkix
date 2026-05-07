@@ -17,10 +17,14 @@
 //!
 //! # Using the profile
 //!
-//! ```rust,ignore
+//! ```rust,no_run
+//! // `cert` and `now_unix` are obtained from the calling context.
 //! use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
-//! use pkix_lint::LintProfile;
+//! use pkix_lint::{LintProfile, SubjectKind};
+//! use x509_cert::Certificate;
 //!
+//! let cert: Certificate = unimplemented!("load from DER");
+//! let now_unix: u64 = unimplemented!("current Unix epoch seconds");
 //! let profile = CabfTlsBrProfile;
 //! let runner = profile.lint_runner();
 //! let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, now_unix);
@@ -506,10 +510,14 @@ impl Lint for BcCaFlagLint {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```rust,no_run
+/// // `cert` and `now_unix` are obtained from the calling context.
 /// use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
 /// use pkix_lint::{LintProfile, SubjectKind};
+/// use x509_cert::Certificate;
 ///
+/// let cert: Certificate = unimplemented!("load from DER");
+/// let now_unix: u64 = unimplemented!("current Unix epoch seconds");
 /// let profile = CabfTlsBrProfile;
 /// let runner = profile.lint_runner();
 /// let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, now_unix);

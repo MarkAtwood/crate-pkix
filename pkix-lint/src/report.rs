@@ -52,7 +52,7 @@ use crate::de_cow_static;
 /// This constraint arises from internal `&'static str` fields in `Finding`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct EvaluationReport {
     /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
     ///
@@ -118,14 +118,21 @@ impl EvaluationReport {
     /// All string parameters accept anything that converts to `Cow<'static, str>`,
     /// so you can pass string literals (borrowed) or owned `String` values:
     ///
-    /// ```rust,ignore
+    /// ```rust,no_run
+    /// use pkix_lint::report::EvaluationReport;
+    ///
     /// // Static string literal — zero allocation
-    /// EvaluationReport::new("cabf.br.tls", "SC-081", "v0.2.0", 2, now);
+    /// let now: u64 = unimplemented!("current Unix epoch seconds");
+    /// let _report = EvaluationReport::new("cabf.br.tls", "SC-081", "v0.2.0", 2, now);
     ///
     /// // Runtime-constructed string — uses Cow::Owned
-    /// EvaluationReport::new(
-    ///     format!("bundle-{}", version).into(),
-    ///     ..
+    /// let version = "1.2.3";
+    /// let _report2 = EvaluationReport::new(
+    ///     format!("bundle-{}", version),
+    ///     "SC-081",
+    ///     "v0.2.0",
+    ///     2,
+    ///     0u64,
     /// );
     /// ```
     #[must_use]

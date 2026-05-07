@@ -35,7 +35,9 @@
 //!
 //! # Usage
 //!
-//! ```rust,ignore
+//! ```rust,no_run
+//! // This example requires an external certificate fixture; it compiles but
+//! // cannot run in the doctest harness without DER fixtures on disk.
 //! use pkix_lint::deviation::{Deviation, DeviationAction, DeviationScope, DeviationStore};
 //! use pkix_lint::Severity;
 //!
@@ -51,7 +53,7 @@
 //!     authorized_by: "agency-x-ciso@agency.gov".to_string(),
 //!     // Optional: URI to the backing document. git commit history is the audit trail.
 //!     evidence_uri: Some("https://pkipolicy.agency.gov/waivers/2025-11-03".to_string()),
-//! });
+//! }).unwrap();
 //!
 //! // Use a DeviationRunner (wraps LintRunner) to apply deviations automatically.
 //! ```
@@ -252,7 +254,12 @@ pub enum DeviationScope {
     ///
     /// Construct from a certificate you already have:
     ///
-    /// ```rust,ignore
+    /// ```rust,no_run
+    /// // `ca_cert` is a Certificate obtained from the calling context.
+    /// use pkix_lint::deviation::DeviationScope;
+    /// use x509_cert::Certificate;
+    ///
+    /// let ca_cert: Certificate = unimplemented!("load from DER");
     /// let scope = DeviationScope::IssuerDnExact(
     ///     ca_cert.tbs_certificate.subject.clone()
     /// );
@@ -279,8 +286,15 @@ pub enum DeviationScope {
     ///
     /// # Construction
     ///
-    /// ```rust,ignore
-    /// use der::Encode as _;
+    /// ```rust,no_run
+    /// // `start_cert`, `end_cert`, and `issuing_ca_cert` are Certificates from the
+    /// // calling context. They are not defined here so this cannot run in a doctest.
+    /// use pkix_lint::deviation::DeviationScope;
+    /// use x509_cert::Certificate;
+    ///
+    /// let start_cert: Certificate = unimplemented!("load from DER");
+    /// let end_cert: Certificate = unimplemented!("load from DER");
+    /// let issuing_ca_cert: Certificate = unimplemented!("load from DER");
     /// // Obtain the serial bytes from an example cert in the batch:
     /// let start_bytes = start_cert.tbs_certificate.serial_number.as_bytes().to_vec();
     /// let end_bytes   = end_cert.tbs_certificate.serial_number.as_bytes().to_vec();
@@ -308,15 +322,18 @@ impl DeviationScope {
             DeviationScope::Any => true,
 
             DeviationScope::IssuerDnContains(substring) => {
+                // Allocates one String per call to convert the Name to its display form.
+                // For high-frequency lint passes, prefer IssuerDnExact (uses RFC 4518
+                // normalized comparison without String allocation).
                 // `substring` is pre-lowercased by `DeviationStore::add`; no
                 // need to call `.to_lowercase()` on it again here.
                 // Use `make_ascii_lowercase` (in-place, single allocation) instead
                 // of `to_lowercase` (which allocates a new String for Unicode chars).
                 // CA DN strings are always ASCII in practice, so this is equivalent
                 // and avoids a second heap allocation.
-                let mut issuer_lower = cert.tbs_certificate.issuer.to_string();
-                issuer_lower.make_ascii_lowercase();
-                issuer_lower.contains(substring.as_str())
+                let mut issuer_str = cert.tbs_certificate.issuer.to_string();
+                issuer_str.make_ascii_lowercase();
+                issuer_str.contains(substring.as_str())
             }
 
             DeviationScope::IssuerDnExact(name) => {
@@ -657,10 +674,14 @@ pub struct DeviationRunResult {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
-/// use pkix_lint::deviation::{DeviationRunner, DeviationStore, Deviation, DeviationAction, DeviationScope};
-/// use pkix_lint::{LintRunner, Severity};
+/// ```rust,no_run
+/// // `cert` and `now_unix` are obtained from the calling context.
+/// use pkix_lint::deviation::{DeviationRunner, DeviationStore};
+/// use pkix_lint::{LintRunner, SubjectKind};
+/// use x509_cert::Certificate;
 ///
+/// let cert: Certificate = unimplemented!("load from DER");
+/// let now_unix: u64 = unimplemented!("current Unix epoch seconds");
 /// let store = DeviationStore::new(); // populate with operator deviations
 /// let runner = LintRunner::new(vec![/* your lints */]);
 /// let dev_runner = DeviationRunner::new(runner, store);
