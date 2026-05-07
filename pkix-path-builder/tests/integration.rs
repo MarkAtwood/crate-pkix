@@ -22,7 +22,7 @@ const PKITS_NOW: u64 = 1_580_000_000;
 fn pkits_cert(name: &str) -> Certificate {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../pkix-path/tests/pkits/certs")
-        .join(format!("{}.crt", name));
+        .join(format!("{name}.crt"));
     let der_bytes = std::fs::read(&path)
         .unwrap_or_else(|e| panic!("fixture not found at {}: {}", path.display(), e));
     Certificate::from_der(&der_bytes).unwrap_or_else(|e| panic!("failed to parse cert {name}: {e}"))
@@ -33,8 +33,8 @@ fn pkits_trust_anchor() -> TrustAnchor {
     TrustAnchor::from(&pkits_cert("TrustAnchorRootCertificate"))
 }
 
-/// Test that build_path succeeds on the PKITS §4.1.1 two-cert chain and that
-/// the result passes validate_path.
+/// Test that `build_path` succeeds on the PKITS §4.1.1 two-cert chain and that
+/// the result passes `validate_path`.
 #[test]
 fn test_build_path_two_cert_chain() {
     let ee = pkits_cert("ValidCertificatePathTest1EE");
@@ -60,7 +60,7 @@ fn test_build_path_two_cert_chain() {
         .expect("validate_path should succeed on the built chain");
 }
 
-/// Test that build_path works regardless of pool insertion order.
+/// Test that `build_path` works regardless of pool insertion order.
 /// With a single intermediate there is only one order, but this test
 /// documents the contract that pool order must not matter.
 #[test]
@@ -85,7 +85,7 @@ fn test_build_path_shuffled_order() {
         .expect("validate_path should succeed");
 }
 
-/// Test that build_path returns NoPathFound when the pool is empty.
+/// Test that `build_path` returns [`pkix_path_builder::Error::NoPathFound`] when the pool is empty.
 #[test]
 fn test_build_path_no_path() {
     let ee = pkits_cert("ValidCertificatePathTest1EE");
@@ -104,8 +104,8 @@ fn test_build_path_no_path() {
 
 /// Pool contains a self-signed cert that is NOT a trust anchor.
 ///
-/// build_path must NOT terminate at it — it must continue searching for the
-/// real anchor. The correct chain uses GoodCACert; the self-signed BadSignedCACert
+/// `build_path` must NOT terminate at it — it must continue searching for the
+/// real anchor. The correct chain uses `GoodCACert`; the self-signed `BadSignedCACert`
 /// (subject ≠ trust anchor subject) must be skipped.
 #[test]
 fn test_build_path_self_signed_non_anchor_in_pool() {
@@ -129,7 +129,7 @@ fn test_build_path_self_signed_non_anchor_in_pool() {
         .expect("validate_path should succeed on the built chain");
 }
 
-/// Test that build_path returns NoPathFound when the pool contains a cert
+/// Test that `build_path` returns `NoPathFound` when the pool contains a cert
 /// that does not link to the target's issuer.
 #[test]
 fn test_build_path_wrong_pool() {
@@ -156,8 +156,8 @@ fn test_build_path_wrong_pool() {
 /// must still find the correct path (the duplicate is pruned by SPKI identity).
 ///
 /// Oracle: the PKITS §4.1.1 chain is known-valid. If cycle detection incorrectly
-/// pruned a legitimate certificate (false positive), build_path would return
-/// NoPathFound. If it failed to prune duplicates (false negative), it might
+/// pruned a legitimate certificate (false positive), `build_path` would return
+/// `NoPathFound`. If it failed to prune duplicates (false negative), it might
 /// return duplicate entries in the chain or loop indefinitely.
 #[test]
 fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
@@ -227,24 +227,26 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
 /// accidental budget removal.
 #[test]
 fn test_build_path_adversarial_pool_budget_exceeded() {
-    let ee = pkits_cert("ValidCertificatePathTest1EE");
-    // Template CA: subject = target's issuer DN; has BasicConstraints cA=TRUE.
-    let template_ca = pkits_cert("GoodCACert");
-
-    // Use a trust anchor whose subject does NOT match any cert in the pool,
-    // so no path can succeed and the DFS exhausts all candidates.
-    // Use a cert whose subject is unrelated to GoodCACert's issuer chain so
-    // no path can terminate successfully and the DFS exhausts all candidates.
-    let fake_anchor = TrustAnchor::from(&pkits_cert("BadSignedCACert"));
-
     // Create 30 CA clones with the same subject/issuer but distinct SPKIs.
     //
     // NOTE: these mutations produce Rust-object-level modifications that are
     // inconsistent with the outer Certificate DER (the TBS fields no longer
-    // match the outer signature). That is intentional — build_path only does
+    // match the outer signature). That is intentional — `build_path` only does
     // name-matching and SPKI cycle detection, not signature verification.
-    // These certs must NOT be passed to pkix_path::validate_path.
+    // These certs must NOT be passed to `pkix_path::validate_path`.
     const N: usize = 30;
+    const _: () = assert!(N <= u8::MAX as usize, "N must fit in u8");
+
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    // Template CA: subject = target's issuer DN; has `BasicConstraints` cA=TRUE.
+    let template_ca = pkits_cert("GoodCACert");
+
+    // Use a trust anchor whose subject does NOT match any cert in the pool,
+    // so no path can succeed and the DFS exhausts all candidates.
+    // Use a cert whose subject is unrelated to `GoodCACert`'s issuer chain so
+    // no path can terminate successfully and the DFS exhausts all candidates.
+    let fake_anchor = TrustAnchor::from(&pkits_cert("BadSignedCACert"));
+
     let mut pool = CertPool::new();
     for i in 0..N {
         let mut ca = template_ca.clone();
@@ -254,7 +256,7 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
         // Unique SPKI defeats the cycle guard so all N clones are treated as
         // distinct DFS nodes.
         ca.tbs_certificate.subject_public_key_info.subject_public_key =
-            BitString::new(0, vec![i as u8; 32])
+            BitString::new(0, vec![u8::try_from(i).expect("loop bound N fits in u8"); 32])
                 .expect("BitString construction must succeed for valid parameters");
         pool.add(ca);
     }
