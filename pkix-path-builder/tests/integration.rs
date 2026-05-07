@@ -238,6 +238,12 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
     let fake_anchor = TrustAnchor::from(&pkits_cert("BadSignedCACert"));
 
     // Create 30 CA clones with the same subject/issuer but distinct SPKIs.
+    //
+    // NOTE: these mutations produce Rust-object-level modifications that are
+    // inconsistent with the outer Certificate DER (the TBS fields no longer
+    // match the outer signature). That is intentional — build_path only does
+    // name-matching and SPKI cycle detection, not signature verification.
+    // These certs must NOT be passed to pkix_path::validate_path.
     const N: usize = 30;
     let mut pool = CertPool::new();
     for i in 0..N {

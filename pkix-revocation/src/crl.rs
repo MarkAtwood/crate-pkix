@@ -106,6 +106,14 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// - `crl_der`  — DER-encoded `CertificateList` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix` — current time as seconds since the Unix epoch
     /// - `verifier` — signature verifier used to authenticate the CRL
+    ///
+    /// # Security
+    ///
+    /// **Do not pass a delta CRL** (a `CertificateList` containing a
+    /// `deltaCRLIndicator` extension) as the sole `crl_der` argument. Delta CRLs
+    /// contain only the changes since the last base CRL; using one alone silently
+    /// under-covers revocations. Pass it via [`CrlChecker::with_delta`] together
+    /// with the matching base CRL to get correct coverage.
     #[must_use]
     pub fn new(crl_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
         Self {
@@ -159,10 +167,12 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             return Err(Error::DeltaCrlBaseMismatch);
         }
         // deltaCRLIndicator OID is present (checked above) but its INTEGER value
-        // cannot be decoded → structural error.
-        let delta_base_num = base_crl_number(&delta_crl).ok_or_else(|| {
-            Error::CrlParseError(der::Error::from(der::ErrorKind::Failed))
-        })?;
+        // cannot be decoded → structural error. Propagate the real DER error.
+        // base_crl_number returns None only when the extension is absent, which
+        // cannot happen here since has_delta_crl_indicator already confirmed presence.
+        let delta_base_num = base_crl_number(&delta_crl)
+            .expect("deltaCRLIndicator OID confirmed present by has_delta_crl_indicator")
+            .map_err(Error::CrlParseError)?;
 
         // The base CRL and delta CRL MUST have the same issuer.
         if !names_match(
@@ -212,9 +222,9 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (3) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
         //     Check this before verifying the signature so we reject on the correct error
         //     (CrlSignMissing rather than CrlSignatureInvalid) when the key lacks cRLSign.
-        if !issuer_has_crl_sign(issuer) {
-            return Err(Error::CrlSignMissing);
-        }
+        //     A malformed KeyUsage extension returns CrlParseError (structural defect),
+        //     not CrlSignMissing (bit absent).
+        check_crl_sign(issuer)?;
 
         // (3b) Check CRL validity window before verifying the signature.
         //     Rejecting stale CRLs early avoids a potentially expensive signature
@@ -593,28 +603,34 @@ fn has_delta_crl_indicator(crl: &CertificateList) -> bool {
 /// INTEGER encoding the CRL number of the base CRL this delta updates.
 /// This extension MUST be critical (RFC 5280 §5.2.4).
 ///
-/// Returns `None` if the extension is absent (CRL is not a delta CRL),
-/// or the `u64` value if it is present.
-fn base_crl_number(crl: &CertificateList) -> Option<u64> {
-    crl.tbs_cert_list
+/// Returns:
+/// - `None` — extension absent (CRL is not a delta CRL)
+/// - `Some(Ok(n))` — extension present and successfully decoded
+/// - `Some(Err(e))` — extension present but the INTEGER value is malformed
+fn base_crl_number(crl: &CertificateList) -> Option<Result<u64, der::Error>> {
+    let ext = crl
+        .tbs_cert_list
         .crl_extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .find(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)
-        .and_then(|e| {
-            der::asn1::Uint::from_der(e.extn_value.as_bytes())
-                .ok()
-                .and_then(|n| uint_to_u64(&n))
-        })
+        .find(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)?;
+    let result = der::asn1::Uint::from_der(ext.extn_value.as_bytes())
+        .and_then(|n| uint_to_u64(&n).ok_or_else(|| der::Error::from(der::ErrorKind::Overflow)));
+    Some(result)
 }
 
-/// Returns `true` if the certificate has `cRLSign` set in its `KeyUsage` extension,
-/// OR if the `KeyUsage` extension is absent (no constraint).
+/// Checks that the CRL issuer certificate has `cRLSign` set in its `KeyUsage`
+/// extension, or that `KeyUsage` is absent entirely (no constraint).
 ///
 /// RFC 5280 §6.3.3(f): a CRL issuer that has a `KeyUsage` extension MUST assert
 /// the `cRLSign` bit. If `KeyUsage` is absent, there is no constraint.
-fn issuer_has_crl_sign(cert: &Certificate) -> bool {
+///
+/// # Errors
+///
+/// - `Err(CrlParseError)` — the `KeyUsage` extension value is structurally malformed.
+/// - `Err(CrlSignMissing)` — the extension is present but `cRLSign` bit is not set.
+fn check_crl_sign(cert: &Certificate) -> crate::Result<()> {
     use x509_cert::ext::pkix::KeyUsage;
 
     let Some(ku_ext) = cert
@@ -625,11 +641,15 @@ fn issuer_has_crl_sign(cert: &Certificate) -> bool {
         .iter()
         .find(|e| e.extn_id == OID_KEY_USAGE_CRL)
     else {
-        return true; // KeyUsage absent (or no extensions) → no constraint
+        return Ok(()); // KeyUsage absent (or no extensions) → no constraint
     };
-    KeyUsage::from_der(ku_ext.extn_value.as_bytes())
-        .map(|ku| ku.crl_sign())
-        .unwrap_or(false) // malformed KeyUsage → treat as missing the bit
+    let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
+        .map_err(Error::CrlParseError)?;
+    if ku.crl_sign() {
+        Ok(())
+    } else {
+        Err(Error::CrlSignMissing)
+    }
 }
 
 /// Extract the `CRLReason` code from a revoked cert entry's extensions, if present.

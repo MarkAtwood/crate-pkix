@@ -422,7 +422,7 @@ impl Lint for EkuServerAuthLint {
 
         match x509_cert::ext::pkix::ExtendedKeyUsage::from_der(eku_ext.extn_value.as_bytes()) {
             Ok(eku) => {
-                if eku.0.iter().any(|oid| oid == &ID_KP_SERVER_AUTH) {
+                if eku.0.contains(&ID_KP_SERVER_AUTH) {
                     LintResult::Pass
                 } else {
                     LintResult::Error(

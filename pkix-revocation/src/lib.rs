@@ -67,6 +67,15 @@ pub enum Error {
     /// An OCSP response signature did not verify against the responder's key.
     OcspSignatureInvalid,
 
+    /// The OCSP `ResponderId` does not match the expected issuer identity.
+    ///
+    /// Returned when the `byName` DN or `byKey` SHA-1 hash in the OCSP response
+    /// does not match the issuer (or trust anchor) used for this check.
+    /// This is a distinct failure from [`Error::OcspSignatureInvalid`]: the
+    /// response may be cryptographically valid, but it was produced by a
+    /// different responder than expected.
+    OcspResponderIdMismatch,
+
     /// The OCSP response's `CertID` issuer hashes do not match the expected issuer.
     ///
     /// The `issuerNameHash` or `issuerKeyHash` field in a `SingleResponse`
@@ -128,6 +137,9 @@ impl core::fmt::Display for Error {
             Error::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
             Error::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
             Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
+            Error::OcspResponderIdMismatch => {
+                f.write_str("OCSP ResponderId does not match the expected issuer identity")
+            }
             Error::OcspCertIdMismatch => {
                 f.write_str("OCSP CertID issuer hashes do not match the expected issuer")
             }
