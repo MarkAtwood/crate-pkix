@@ -86,13 +86,18 @@ impl From<pkix_revocation::Error> for Error {
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// Verify a certificate chain using the default RustCrypto signature backends.
+/// Verify a certificate chain using the default `RustCrypto` signature backends.
 ///
 /// Convenience wrapper around [`verify_chain`] that uses [`DefaultVerifier`]
 /// (RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256) so callers do not need to
 /// construct a `SignatureVerifier` manually for the common case.
 ///
 /// For a custom backend, call [`verify_chain`] directly.
+///
+/// # Errors
+///
+/// Returns `Err(Error)` for any validation failure. See [`Error`] in `pkix_path`
+/// and `pkix_revocation` for the full list of failure conditions.
 pub fn verify_chain_default<R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -116,7 +121,7 @@ where
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the subject cert
 /// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
 /// - `policy`     — validation policy (time, max depth, key usage enforcement)
-/// - `verifier`   — signature verification backend (RustCrypto default or custom)
+/// - `verifier`   — signature verification backend (`RustCrypto` default or custom)
 /// - `revocation` — revocation checker; use [`NoRevocation`] for offline/embedded
 ///
 /// # Errors

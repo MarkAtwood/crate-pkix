@@ -20,7 +20,7 @@
 //! Use `pkix_chain` (or [`pkix_path`] directly) when:
 //! - You are validating certs from a public CA (CA/B Forum TLS, code-signing)
 //!   that may carry extensions not in this crate's allowlist
-//! - You need NameConstraints, policy validation, or revocation checking
+//! - You need `NameConstraints`, policy validation, or revocation checking
 //! - You need a custom signature backend (FIPS, HSM, wolfCrypt)
 //! - You need to accept a broader set of algorithms or extension profiles
 //!
@@ -63,9 +63,9 @@
 //! # Limitations
 //!
 //! - No revocation checking (CRL / OCSP). Use `pkix-revocation` if required.
-//! - No NameConstraints or certificate policy validation.
+//! - No `NameConstraints` or certificate policy validation.
 //! - No cross-certificate path building (RFC 4158).
-//! - Signature backend is always RustCrypto; for a custom backend use `pkix_path` directly.
+//! - Signature backend is always `RustCrypto`; for a custom backend use `pkix_path` directly.
 
 use der::asn1::ObjectIdentifier;
 use der::Decode;
@@ -391,7 +391,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Verify a certificate chain using strict, simple validation rules.
 ///
 /// Applies the simplicity gate (see [crate-level docs](crate)) before
-/// delegating to [`pkix_path::validate_path`] with the built-in RustCrypto
+/// delegating to [`pkix_path::validate_path`] with the built-in `RustCrypto`
 /// signature backends (RSA-PKCS1v15-SHA-256, ECDSA-P-256-SHA-256) and no
 /// revocation checking.
 ///
@@ -468,7 +468,9 @@ pub fn verify_simple(
         "MAX_INTERMEDIATES must fit in u8"
     );
     let mut policy = ValidationPolicy::new(now_unix);
-    policy.max_path_len = MAX_INTERMEDIATES as u8;
+    #[allow(clippy::cast_possible_truncation)] // assert above guarantees this fits
+    let max_path_len = MAX_INTERMEDIATES as u8;
+    policy.max_path_len = max_path_len;
 
     pkix_path::validate_path(chain, anchors, &policy, &DefaultVerifier).map_err(Error::Path)
 }

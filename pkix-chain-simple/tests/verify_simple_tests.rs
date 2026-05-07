@@ -4,7 +4,7 @@
 //! the external oracle. They are committed to tests/fixtures/ and loaded
 //! at test time — no network access required.
 //!
-//! Validation time constant: 2026-06-01 = 1_780_272_000 UTC.
+//! Validation time constant: 2026-06-01 = `1_780_272_000` UTC.
 //! All fixtures have notBefore=2026-01-01 and notAfter ≥ 2030-01-01.
 
 use der::Decode as _;
@@ -63,7 +63,7 @@ fn verify_simple_one_intermediate_ok() {
     assert_eq!(vp.depth, 1);
 }
 
-/// Leaf + 2 intermediates (MAX_INTERMEDIATES = 2) with root as anchor.
+/// Leaf + 2 intermediates (`MAX_INTERMEDIATES` = 2) with root as anchor.
 ///
 /// chain = [dbl-leaf, dbl-int2, dbl-int1], anchor = dbl-root.
 /// Oracle: pyca chain; dbl-int1/dbl-int2 have only BC + KU → passes simplicity gate.
@@ -84,7 +84,7 @@ fn verify_simple_two_intermediates_ok() {
 // Shape errors
 // ---------------------------------------------------------------------------
 
-/// Empty chain → EmptyChain.
+/// Empty chain → `EmptyChain`.
 #[test]
 fn verify_simple_empty_chain_returns_error() {
     let root = load("gry-root.der");
@@ -95,7 +95,7 @@ fn verify_simple_empty_chain_returns_error() {
     );
 }
 
-/// Chain with 4 certs (3 intermediates) exceeds MAX_INTERMEDIATES=2.
+/// Chain with 4 certs (3 intermediates) exceeds `MAX_INTERMEDIATES`=2.
 ///
 /// Chain length check fires before signature verification; unrelated certs can be used.
 #[test]
@@ -112,7 +112,7 @@ fn verify_simple_chain_too_long_returns_error() {
     );
 }
 
-/// Empty anchors slice → NoTrustAnchors.
+/// Empty anchors slice → `NoTrustAnchors`.
 #[test]
 fn verify_simple_no_trust_anchors_returns_error() {
     let leaf = load("gry-leaf.der");
@@ -127,7 +127,7 @@ fn verify_simple_no_trust_anchors_returns_error() {
 // Algorithm errors
 // ---------------------------------------------------------------------------
 
-/// Cert using ECDSA-P384-SHA384 — not in ALLOWED_SIG_ALGS.
+/// Cert using ECDSA-P384-SHA384 — not in `ALLOWED_SIG_ALGS`.
 ///
 /// Oracle: pyca/cryptography — p384-leaf.der signed with SECP384R1/SHA384.
 #[test]
@@ -145,11 +145,11 @@ fn verify_simple_algorithm_not_allowed_p384() {
 // Extension errors
 // ---------------------------------------------------------------------------
 
-/// Leaf with an unknown **critical** extension (1.3.6.1.5.5.7.99.99) → UnhandledCriticalExtension.
+/// Leaf with an unknown **critical** extension (1.3.6.1.5.5.7.99.99) → `UnhandledCriticalExtension`.
 ///
 /// Oracle: pyca/cryptography — gry-leaf-unknown-crit.der has unknown critical OID.
 /// A critical extension that is not in the allowed-and-handleable set must be
-/// rejected as UnhandledCriticalExtension, not UnexpectedExtension.
+/// rejected as `UnhandledCriticalExtension`, not `UnexpectedExtension`.
 #[test]
 fn verify_simple_unknown_critical_extension_leaf() {
     let leaf = load("gry-leaf-unknown-crit.der");
@@ -161,11 +161,11 @@ fn verify_simple_unknown_critical_extension_leaf() {
     );
 }
 
-/// Intermediate with FreshestCRL extension (not in ALLOWED_INTERMEDIATE_EXTENSIONS).
+/// Intermediate with `FreshestCRL` extension (not in `ALLOWED_INTERMEDIATE_EXTENSIONS`).
 ///
 /// Oracle: pyca/cryptography — ca-freshestcrl.der is a CA cert (cA=TRUE, keyCertSign)
-/// with a non-critical FreshestCRL (OID 2.5.29.46) extension.  That OID is not in
-/// ALLOWED_INTERMEDIATE_EXTENSIONS, so the structural check must fire before any
+/// with a non-critical `FreshestCRL` (OID 2.5.29.46) extension.  That OID is not in
+/// `ALLOWED_INTERMEDIATE_EXTENSIONS`, so the structural check must fire before any
 /// signature verification.  Using unrelated certs in the chain is safe here.
 #[test]
 fn verify_simple_unexpected_extension_intermediate() {
@@ -180,10 +180,10 @@ fn verify_simple_unexpected_extension_intermediate() {
     );
 }
 
-/// Intermediate with no extensions at all → MissingRequiredExtension.
+/// Intermediate with no extensions at all → `MissingRequiredExtension`.
 ///
 /// Oracle: pyca/cryptography — nca-int.der has no extensions.
-/// check_extensions fires before validate_path.
+/// `check_extensions` fires before `validate_path`.
 #[test]
 fn verify_simple_missing_required_extension_no_bc() {
     let leaf = load("gry-leaf.der");
@@ -196,9 +196,9 @@ fn verify_simple_missing_required_extension_no_bc() {
     );
 }
 
-/// Leaf with BasicConstraints cA=TRUE → LeafIsCA.
+/// Leaf with `BasicConstraints` cA=TRUE → `LeafIsCA`.
 ///
-/// Oracle: pyca/cryptography — gry-root.der has BasicConstraints cA=TRUE.
+/// Oracle: pyca/cryptography — gry-root.der has `BasicConstraints` cA=TRUE.
 #[test]
 fn verify_simple_leaf_is_ca_returns_error() {
     let ca_as_leaf = load("gry-root.der");
@@ -214,12 +214,12 @@ fn verify_simple_leaf_is_ca_returns_error() {
 // Critical EKU
 // ---------------------------------------------------------------------------
 
-/// Leaf with critical ExtendedKeyUsage (serverAuth) → verify_simple must accept it.
+/// Leaf with critical `ExtendedKeyUsage` (`serverAuth`) → `verify_simple` must accept it.
 ///
 /// Oracle: pyca/cryptography — eku-leaf.der issued by eku-root.der;
-/// leaf has critical KeyUsage (digitalSignature) + critical EKU (serverAuth).
-/// Previously rejected with UnhandledCriticalExtension before EKU was added
-/// to CRITICAL_OK_LEAF_EXTENSIONS and HANDLED_CRITICAL_OIDS.
+/// leaf has critical `KeyUsage` (digitalSignature) + critical EKU (serverAuth).
+/// Previously rejected with `UnhandledCriticalExtension` before EKU was added
+/// to `CRITICAL_OK_LEAF_EXTENSIONS` and `HANDLED_CRITICAL_OIDS`.
 #[test]
 fn verify_simple_critical_eku_accepted() {
     let leaf = load("eku-leaf.der");
@@ -234,7 +234,7 @@ fn verify_simple_critical_eku_accepted() {
 // Path validation errors
 // ---------------------------------------------------------------------------
 
-/// Expired certificate → Error::Path(pkix_path::Error::ValidityPeriod).
+/// Expired certificate → `Error::Path(pkix_path::Error::ValidityPeriod)`.
 ///
 /// chain = [gry-leaf, gry-int], now = 0 (1970-01-01, before all cert notBefore).
 #[test]
