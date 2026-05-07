@@ -253,6 +253,13 @@ pub const CRITICAL_OK_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
 /// `MAX_INTERMEDIATES`. Pass a non-CA end-entity as `chain[0]`.
 pub const MAX_INTERMEDIATES: usize = 2;
 
+// Compile-time invariant: MAX_INTERMEDIATES must fit in u8 because we cast
+// it to ValidationPolicy::max_path_len (a u8) when delegating to pkix-path.
+const _: () = assert!(
+    MAX_INTERMEDIATES <= u8::MAX as usize,
+    "MAX_INTERMEDIATES must fit in u8"
+);
+
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------
@@ -463,12 +470,8 @@ pub fn verify_simple(
     }
 
     // --- Delegate to pkix-path ----------------------------------------------
-    const _: () = assert!(
-        MAX_INTERMEDIATES <= u8::MAX as usize,
-        "MAX_INTERMEDIATES must fit in u8"
-    );
     let mut policy = ValidationPolicy::new(now_unix);
-    #[allow(clippy::cast_possible_truncation)] // assert above guarantees this fits
+    #[allow(clippy::cast_possible_truncation)] // module-level assert guarantees this fits
     let max_path_len = MAX_INTERMEDIATES as u8;
     policy.max_path_len = max_path_len;
 

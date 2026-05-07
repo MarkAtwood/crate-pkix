@@ -11,7 +11,7 @@ use pkits_helper::{pkits_validate, PKITS_NOW};
 
 /// PKITS §4.1.1 — Valid Certificate Path Test 1.
 ///
-/// Chain: [ValidCertificatePathTest1EE, GoodCACert], anchor: TrustAnchorRootCertificate.
+/// Chain: [`ValidCertificatePathTest1EE`, `GoodCACert`], anchor: `TrustAnchorRootCertificate`.
 /// Oracle: PKITS §4.1.1 requires this path to be VALID.
 #[test]
 fn pkits_4_1_1_valid_cert_path() {
@@ -21,7 +21,7 @@ fn pkits_4_1_1_valid_cert_path() {
     assert_eq!(vp.depth, 1, "one intermediate (GoodCACert)");
 }
 
-/// Negative: same §4.1.1 chain but now_unix=0 (before notBefore=2010-01-01).
+/// Negative: same §4.1.1 chain but `now_unix=0` (before notBefore=2010-01-01).
 ///
 /// Oracle: all PKITS certs have notBefore=2010-01-01; at Unix time 0 they are not yet valid.
 #[test]
@@ -35,7 +35,7 @@ fn pkits_4_1_1_not_yet_valid_at_epoch() {
 
 /// PKITS §4.1.2 — No Certificates in Path (leaf only, leaf IS the trust anchor).
 ///
-/// Chain: [TrustAnchorRootCertificate], anchor: TrustAnchorRootCertificate (same cert).
+/// Chain: [`TrustAnchorRootCertificate`], anchor: `TrustAnchorRootCertificate` (same cert).
 /// Oracle: PKITS §4.1.2 specifies self-signed end-entity path — VALID.
 #[test]
 fn pkits_4_1_2_trust_anchor_root_only() {

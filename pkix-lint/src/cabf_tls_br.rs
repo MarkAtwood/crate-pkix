@@ -255,16 +255,16 @@ impl Lint for RsaMinKeySizeLint {
         //                                              publicExponent INTEGER }
         let key_bytes = spki.subject_public_key.raw_bytes();
 
-        match rsa_modulus_bit_len(key_bytes) {
-            Some(n_bits) => {
+        rsa_modulus_bit_len(key_bytes).map_or(
+            LintResult::Error("RSA public key structure is unparseable"),
+            |n_bits| {
                 if n_bits >= 2048 {
                     LintResult::Pass
                 } else {
                     LintResult::Error("RSA key modulus is less than 2048 bits")
                 }
-            }
-            None => LintResult::Error("RSA public key structure is unparseable"),
-        }
+            },
+        )
     }
 }
 
@@ -353,7 +353,7 @@ fn parse_der_length(input: &[u8]) -> Option<(usize, &[u8])> {
 // Lint 4 — cabf.br.tls.san.required
 // ---------------------------------------------------------------------------
 
-/// Leaf certificates must have a non-empty SubjectAltName extension.
+/// Leaf certificates must have a non-empty `SubjectAltName` extension.
 ///
 /// If the extension is absent the lint returns Error.
 /// If the extension is present but contains no general names, the lint returns Error.
@@ -406,7 +406,7 @@ impl Lint for SanRequiredLint {
 // Lint 5 — cabf.br.tls.eku.server_auth
 // ---------------------------------------------------------------------------
 
-/// Leaf certificates must assert id-kp-serverAuth in ExtendedKeyUsage.
+/// Leaf certificates must assert id-kp-serverAuth in `ExtendedKeyUsage`.
 ///
 /// If the EKU extension is absent the lint returns Error.
 /// If the extension is present but does not include `id-kp-serverAuth`
@@ -464,7 +464,7 @@ impl Lint for EkuServerAuthLint {
 // Lint 6 — cabf.br.tls.bc.ca_flag
 // ---------------------------------------------------------------------------
 
-/// Intermediate CA certificates must have BasicConstraints with cA=TRUE.
+/// Intermediate CA certificates must have `BasicConstraints` with cA=TRUE.
 ///
 /// Checks the `BasicConstraints` extension (OID 2.5.29.19).
 /// If the extension is absent the lint returns Error.
@@ -507,16 +507,16 @@ impl Lint for BcCaFlagLint {
             );
         };
 
-        match x509_cert::ext::pkix::BasicConstraints::from_der(bc_ext.extn_value.as_bytes()) {
-            Ok(bc) => {
+        x509_cert::ext::pkix::BasicConstraints::from_der(bc_ext.extn_value.as_bytes()).map_or(
+            LintResult::Error("BasicConstraints extension value is malformed DER"),
+            |bc| {
                 if bc.ca {
                     LintResult::Pass
                 } else {
                     LintResult::Error("BasicConstraints present but cA flag is not TRUE")
                 }
-            }
-            Err(_) => LintResult::Error("BasicConstraints extension value is malformed DER"),
-        }
+            },
+        )
     }
 }
 

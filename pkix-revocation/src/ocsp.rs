@@ -395,10 +395,10 @@ fn parse_basic_response(response_der: &[u8]) -> crate::Result<BasicOcspResponse>
         .map_err(|e| Error::OcspParseError(crate::DerError(e)))
 }
 
-/// Stack-allocated hash output for CertID hash comparisons.
+/// Stack-allocated hash output for `CertID` hash comparisons.
 ///
 /// Holds the digest bytes for one of the four hash algorithms recognised in
-/// CertID (RFC 6960 §4.1.1), without heap allocation.
+/// `CertID` (RFC 6960 §4.1.1), without heap allocation.
 enum HashOutput {
     Sha1([u8; 20]),
     Sha256([u8; 32]),
@@ -523,7 +523,7 @@ mod tests {
 
     /// SHA-384 of b"test".
     ///
-    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha384(b'test').digest()).decode())"
+    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha384(b'test').`digest()).decode()`)"
     /// → 768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9
     #[test]
     fn hash_certid_sha384() {
@@ -539,7 +539,7 @@ mod tests {
 
     /// SHA-512 of b"test".
     ///
-    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha512(b'test').digest()).decode())"
+    /// Oracle: python3 -c "import hashlib, binascii; print(binascii.hexlify(hashlib.sha512(b'test').`digest()).decode()`)"
     /// → ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff
     #[test]
     fn hash_certid_sha512() {
@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(result.as_slice(), expected, "SHA-512(\"test\") must match Python oracle");
     }
 
-    /// Unknown OID must return OcspMalformed.
+    /// Unknown OID must return `OcspMalformed`.
     #[test]
     fn hash_certid_unknown_oid_returns_malformed() {
         let unknown = der::asn1::ObjectIdentifier::new_unwrap("1.2.3.4.5");

@@ -210,14 +210,14 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
 ///
 /// Construction: take the PKITS `GoodCACert` as a template CA certificate
 /// (it has `BasicConstraints cA=TRUE`).  Clone it 30 times, each clone with:
-/// - `subject`  = "GoodCA" (same as template — so all clones are candidates
-///   whenever another cert's issuer is "GoodCA")
-/// - `issuer`   = "GoodCA" (same as `subject` — so at every DFS level the
+/// - `subject`  = "`GoodCA`" (same as template — so all clones are candidates
+///   whenever another cert's issuer is "`GoodCA`")
+/// - `issuer`   = "`GoodCA`" (same as `subject` — so at every DFS level the
 ///   algorithm searches the pool for a parent and finds all unvisited clones)
 /// - unique `subject_public_key` bytes — bypasses the SPKI cycle guard so
 ///   the same logical DN may be visited repeatedly via different key material
 ///
-/// The EE target has `issuer` = "GoodCA", so the DFS starts with 30 candidates
+/// The EE target has `issuer` = "`GoodCA`", so the DFS starts with 30 candidates
 /// at depth 1, 29 unvisited at depth 2 (for each of the 30), etc.
 /// Without the budget cap this would run in O(30!) time; the cap must fire
 /// well before 10 000 node visits and return `BudgetExceeded`.

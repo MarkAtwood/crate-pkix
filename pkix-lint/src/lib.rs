@@ -627,16 +627,17 @@ impl LintRunner {
     /// [`LintRunner::with_bundle_version`].
     #[must_use]
     pub fn new(lints: Vec<Box<dyn Lint>>) -> Self {
-        debug_assert!(
-            {
-                let mut ids: Vec<_> = lints.iter().map(|l| l.id()).collect();
-                let original_len = ids.len();
-                ids.sort_unstable();
-                ids.dedup();
-                ids.len() == original_len
-            },
-            "duplicate lint IDs will produce confusing deviation behavior"
-        );
+        #[cfg(debug_assertions)]
+        {
+            let mut ids: Vec<_> = lints.iter().map(|l| l.id()).collect();
+            let original_len = ids.len();
+            ids.sort_unstable();
+            ids.dedup();
+            assert!(
+                ids.len() == original_len,
+                "duplicate lint IDs will produce confusing deviation behavior"
+            );
+        }
         Self {
             lints,
             bundle_version: std::borrow::Cow::Borrowed(""),
@@ -1085,7 +1086,7 @@ mod tests {
         }
     }
 
-    /// A path-scope lint, used to verify run_path.
+    /// A path-scope lint, used to verify `run_path`.
     struct PathDepthLint;
     impl Lint for PathDepthLint {
         fn id(&self) -> &'static str {

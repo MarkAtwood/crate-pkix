@@ -683,6 +683,13 @@ impl ValidationPolicy {
 }
 
 impl Default for ValidationPolicy {
+    /// Returns a default policy with `current_time_unix = 0` (1970-01-01).
+    ///
+    /// This is **not** safe for production use because every certificate
+    /// issued after the Unix epoch will fail [`Error::ValidityPeriod`].
+    /// Prefer [`ValidationPolicy::new`] (which takes `now_unix` explicitly).
+    /// `Default` is provided only for `..Default::default()` ergonomics on
+    /// this `#[non_exhaustive]` struct.
     fn default() -> Self {
         Self {
             max_path_len: 10,
@@ -1343,9 +1350,9 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 /// `BMPString` and `UniversalString` attribute values are not yet normalized —
 /// matching falls back to raw DER byte comparison. `TeletexString` also uses
 /// raw DER comparison; T.61→Unicode mapping is deferred pending a clear
-/// interoperability target (see `any_to_str_bytes`). Certificates from legacy
-/// PKIs using these string types may fail name matching even when the names
-/// are semantically equivalent. Full normalization is future work.
+/// interoperability target. Certificates from legacy PKIs using these
+/// string types may fail name matching even when the names are
+/// semantically equivalent. Full normalization is future work.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
@@ -1584,7 +1591,7 @@ impl NcTypeMask {
     const URI: Self = Self(1 << 3);
     /// `IP_ADDRESS` is used by `name_type_bit` and participates in `nc_constrained_types`
     /// tracking. `IpAddress` names cannot appear in Subject DNs, so there is no
-    /// inline DN-path code for this type; SAN IpAddress entries are handled by the
+    /// inline DN-path code for this type; SAN `IpAddress` entries are handled by the
     /// generic SAN loop in `check_name_constraints` via `type_constrained(name)`.
     const IP_ADDRESS: Self = Self(1 << 4);
 
@@ -3225,7 +3232,7 @@ mod tests_normalized_iter {
 
     /// Trailing spaces are stripped.
     ///
-    /// Regression test: NormalizedIter must not emit a trailing space for
+    /// Regression test: `NormalizedIter` must not emit a trailing space for
     /// input that ends with a space sequence.
     #[test]
     fn trailing_spaces_stripped() {
@@ -3264,7 +3271,7 @@ mod tests_normalized_iter {
         assert!(!normalized_eq(b"ab", b"abc"));
     }
 
-    /// NormalizedIter: input ending with an internal space sequence followed by
+    /// `NormalizedIter`: input ending with an internal space sequence followed by
     /// trailing spaces must emit the space and then stop (no double space, no
     /// trailing space).
     #[test]
@@ -3302,7 +3309,7 @@ mod tests_validate_path {
 
     /// Happy-path 1-cert chain: self-signed cert is both chain and anchor.
     ///
-    /// Expected: Ok(ValidatedPath { anchor_index: 0, depth: 0 })
+    /// Expected: Ok(ValidatedPath { `anchor_index`: 0, depth: 0 })
     #[test]
     fn one_cert_chain_ok() {
         let cert = load(include_bytes!("../tests/fixtures/ec-p256-sha256.der"));
@@ -3315,8 +3322,8 @@ mod tests_validate_path {
 
     /// Happy-path 2-cert chain: leaf + intermediate, with root anchor.
     ///
-    /// Oracle: openssl verify -CAfile gry-root.pem -untrusted gry-int.pem gry-leaf.pem → OK
-    /// Expected: Ok(ValidatedPath { anchor_index: 0, depth: 1 })
+    /// Oracle: openssl verify -`CAfile` gry-root.pem -untrusted gry-int.pem gry-leaf.pem → OK
+    /// Expected: Ok(ValidatedPath { `anchor_index`: 0, depth: 1 })
     #[test]
     fn two_cert_chain_ok() {
         let root = load(include_bytes!("../tests/fixtures/gry-root.der"));
@@ -3336,7 +3343,7 @@ mod tests_validate_path {
 
     /// Multiple anchors: correct anchor is second in the slice.
     ///
-    /// Expected: Ok(ValidatedPath { anchor_index: 1, depth: 0 })
+    /// Expected: Ok(ValidatedPath { `anchor_index`: 1, depth: 0 })
     #[test]
     fn correct_anchor_index_when_multiple_anchors() {
         let p256 = load(include_bytes!("../tests/fixtures/ec-p256-sha256.der"));
@@ -3353,7 +3360,7 @@ mod tests_validate_path {
         assert_eq!(result.depth, 0);
     }
 
-    /// Empty chain returns NoTrustedPath.
+    /// Empty chain returns `NoTrustedPath`.
     #[test]
     fn empty_chain_returns_error() {
         let anchors = [TrustAnchor::from_cert(load(include_bytes!(
@@ -3368,11 +3375,11 @@ mod tests_validate_path {
         );
     }
 
-    /// Duplicate certificate in chain returns DuplicateCertificate error.
+    /// Duplicate certificate in chain returns `DuplicateCertificate` error.
     ///
     /// Oracle: RFC 5280 does not define behavior for duplicate certs; we reject
     /// early with a diagnostic error rather than failing later with a confusing
-    /// SignatureInvalid or ChainBroken.
+    /// `SignatureInvalid` or `ChainBroken`.
     ///
     /// Duplicate is detected by (issuer DN, serial number) identity per RFC 5280
     /// §4.1.2.2 — the same cert appearing twice has the same issuer+serial.
@@ -3398,9 +3405,9 @@ mod tests_validate_path {
         );
     }
 
-    /// path_too_long: vxf chain [leaf, int] with max_path_len = 0.
+    /// `path_too_long`: vxf chain [leaf, int] with `max_path_len` = 0.
     ///
-    /// chain.len()=2 → 1 intermediate. 1 > max_path_len(0) → PathTooLong.
+    /// chain.len()=2 → 1 intermediate. 1 > `max_path_len(0)` → `PathTooLong`.
     #[test]
     fn path_too_long_returns_error() {
         let root = load(include_bytes!("../tests/fixtures/vxf-root.der"));
@@ -3421,7 +3428,7 @@ mod tests_validate_path {
         );
     }
 
-    /// no_trusted_path: vxf chain presented to an unrelated anchor (gry-root).
+    /// `no_trusted_path`: vxf chain presented to an unrelated anchor (gry-root).
     ///
     /// vxf's last cert issuer name does not match gry-root's subject name.
     #[test]
@@ -3444,13 +3451,13 @@ mod tests_validate_path {
         );
     }
 
-    /// oid_mismatch: outer signatureAlgorithm OID differs from inner TBS signature OID.
+    /// `oid_mismatch`: outer signatureAlgorithm OID differs from inner TBS signature OID.
     ///
     /// Patch the SECOND occurrence of the ECDSA-with-SHA256 OID bytes in vxf-leaf.der
     /// to ECDSA-with-SHA384. The inner TBS.signature remains SHA256.
-    /// check_oid_consistency detects this → MalformedCertificate { index: 0 }.
+    /// `check_oid_consistency` detects this → `MalformedCertificate` { index: 0 }.
     ///
-    /// Oracle: RFC 5280 §4.1.1.2 requires outer and inner AlgorithmIdentifiers to be identical.
+    /// Oracle: RFC 5280 §4.1.1.2 requires outer and inner `AlgorithmIdentifiers` to be identical.
     #[test]
     fn oid_mismatch_outer_returns_malformed_certificate() {
         let mut leaf_der = include_bytes!("../tests/fixtures/vxf-leaf.der").to_vec();
@@ -3493,10 +3500,10 @@ mod tests_validate_path {
         );
     }
 
-    /// intermediate_not_ca: nca-int has no BasicConstraints extension.
+    /// `intermediate_not_ca`: nca-int has no `BasicConstraints` extension.
     ///
     /// Oracle: pyca/cryptography — nca-int built without any extensions.
-    /// cert_is_ca(nca-int) returns None → NotCA { index: 1 }.
+    /// cert_is_ca(nca-int) returns None → `NotCA` { index: 1 }.
     #[test]
     fn intermediate_not_ca_returns_not_ca() {
         let root = load(include_bytes!("../tests/fixtures/nca-root.der"));
@@ -3517,10 +3524,10 @@ mod tests_validate_path {
         );
     }
 
-    /// key_usage_missing_cert_sign: kuf-int has KeyUsage with digitalSignature only.
+    /// `key_usage_missing_cert_sign`: kuf-int has `KeyUsage` with digitalSignature only.
     ///
     /// Oracle: pyca/cryptography — kuf-int KeyUsage.keyCertSign = False.
-    /// Default policy has enforce_key_usage = true; chain_walk checks at i=1.
+    /// Default policy has `enforce_key_usage` = true; `chain_walk` checks at i=1.
     #[test]
     fn key_usage_missing_cert_sign_returns_error() {
         let root = load(include_bytes!("../tests/fixtures/kuf-root.der"));
@@ -3536,13 +3543,13 @@ mod tests_validate_path {
         );
     }
 
-    /// absent_key_usage_intermediate_accepted: nku-int has NO KeyUsage extension at all.
+    /// `absent_key_usage_intermediate_accepted`: nku-int has NO `KeyUsage` extension at all.
     ///
-    /// RFC 5280 §6.1.4(n): "If a KeyUsage extension is **present**, verify that the
-    /// keyCertSign bit is set." Absent KeyUsage must not be rejected by enforce_key_usage.
+    /// RFC 5280 §6.1.4(n): "If a `KeyUsage` extension is **present**, verify that the
+    /// keyCertSign bit is set." Absent `KeyUsage` must not be rejected by `enforce_key_usage`.
     ///
-    /// Oracle: pyca/cryptography — nku-int has only BasicConstraints (OID 2.5.29.19),
-    /// no KeyUsage extension.
+    /// Oracle: pyca/cryptography — nku-int has only `BasicConstraints` (OID 2.5.29.19),
+    /// no `KeyUsage` extension.
     #[test]
     fn absent_key_usage_intermediate_accepted() {
         let root = load(include_bytes!("../tests/fixtures/nku-root.der"));
@@ -3557,9 +3564,9 @@ mod tests_validate_path {
             .expect("intermediate with absent KeyUsage must be accepted when enforce_key_usage=true");
     }
 
-    /// Leaf with critical ExtendedKeyUsage → validate_path must accept it.
+    /// Leaf with critical `ExtendedKeyUsage` → `validate_path` must accept it.
     ///
-    /// EKU is in HANDLED_CRITICAL_OIDS; its value is not inspected.
+    /// EKU is in `HANDLED_CRITICAL_OIDS`; its value is not inspected.
     /// Oracle: pyca/cryptography — eku-critical-self-signed.der, critical=True, serverAuth.
     #[test]
     fn critical_eku_accepted() {
@@ -3575,7 +3582,7 @@ mod tests_validate_path {
     ///
     /// Guards against a name-collision attack: an attacker who creates a root cert
     /// with the same DN as a trusted anchor but a different key must not be accepted.
-    /// The self-issued SPKI guard in validate_path catches this.
+    /// The self-issued SPKI guard in `validate_path` catches this.
     #[test]
     fn forged_anchor_name_match_spki_mismatch_rejected() {
         use der::Decode as _;
@@ -3587,7 +3594,7 @@ mod tests_validate_path {
         // Forged anchor: P-256 cert's subject name + RSA cert's SPKI.
         let forged = TrustAnchor::new(
             p256.tbs_certificate.subject.clone(),
-            rsa.tbs_certificate.subject_public_key_info.clone(),
+            rsa.tbs_certificate.subject_public_key_info,
         );
         let anchors = [forged];
         assert!(
@@ -3599,10 +3606,10 @@ mod tests_validate_path {
         );
     }
 
-    /// Verify that validate_path handles large certs without Error::Der.
+    /// Verify that `validate_path` handles large certs without `Error::Der`.
     ///
-    /// The previous fixed 8 KiB stack buffer returned Error::Der for any cert
-    /// whose TBSCertificate DER exceeded 8 KiB. The heap-backed encoding path
+    /// The previous fixed 8 KiB stack buffer returned `Error::Der` for any cert
+    /// whose `TBSCertificate` DER exceeded 8 KiB. The heap-backed encoding path
     /// introduced in v0.2 removes that limit. This test verifies that a normally-
     /// sized cert (well under 8 KiB) still validates correctly, confirming the
     /// heap path is wired up correctly and not just a dead code path.
@@ -3624,9 +3631,9 @@ mod tests_validate_path {
         );
     }
 
-    /// Verify cert_has_san_identity returns false for normal certs (non-empty Subject).
+    /// Verify `cert_has_san_identity` returns false for normal certs (non-empty Subject).
     ///
-    /// Oracle: RFC 5280 §4.2.1.6 — cert_has_san_identity must return true only when
+    /// Oracle: RFC 5280 §4.2.1.6 — `cert_has_san_identity` must return true only when
     /// Subject is empty AND SAN is critical. Normal certs have non-empty Subject.
     #[test]
     fn cert_has_san_identity_false_for_normal_cert() {
@@ -3694,7 +3701,7 @@ mod tests_chain_walk {
 
     /// 2-cert chain (leaf + intermediate) with root as anchor.
     ///
-    /// Oracle: openssl verify -CAfile vxf-root.pem -untrusted vxf-int.pem vxf-leaf.pem → OK
+    /// Oracle: openssl verify -`CAfile` vxf-root.pem -untrusted vxf-int.pem vxf-leaf.pem → OK
     #[test]
     fn two_cert_chain_ok() {
         let root = load(include_bytes!("../tests/fixtures/vxf-root.der"));
@@ -3709,7 +3716,7 @@ mod tests_chain_walk {
     /// Leaf with corrupted signature — last byte flipped.
     ///
     /// The DER structure remains valid; only the BIT STRING content is wrong.
-    /// Expect SignatureInvalid at chain index 0.
+    /// Expect `SignatureInvalid` at chain index 0.
     #[test]
     fn corrupted_signature_returns_signature_invalid() {
         let mut leaf_der = include_bytes!("../tests/fixtures/vxf-leaf.der").to_vec();
@@ -3756,10 +3763,10 @@ mod tests_chain_walk {
 
     // --- PKIX-gry per-cert check tests ---
 
-    /// Expired leaf cert → ValidityPeriod at index 0.
+    /// Expired leaf cert → `ValidityPeriod` at index 0.
     ///
     /// Oracle: gry-leaf.der has notAfter=2027-01-01; GRY_EXPIRED=2028-01-02.
-    /// gry-int.der has notAfter=2036-01-01, which is still valid at GRY_EXPIRED.
+    /// gry-int.der has notAfter=2036-01-01, which is still valid at `GRY_EXPIRED`.
     /// Reverse walk: i=1 (gry-int) passes validity, then i=0 (gry-leaf) fails.
     #[test]
     fn expired_leaf_returns_validity_period() {
@@ -3777,9 +3784,9 @@ mod tests_chain_walk {
         );
     }
 
-    /// Not-yet-valid intermediate → ValidityPeriod at index 1.
+    /// Not-yet-valid intermediate → `ValidityPeriod` at index 1.
     ///
-    /// Oracle: gry-int.der has notBefore=2026-01-01; GRY_NOTYET=0 (1970-01-01).
+    /// Oracle: gry-int.der has notBefore=2026-01-01; `GRY_NOTYET=0` (1970-01-01).
     /// Reverse walk processes chain[1] (gry-int) first; it is not yet valid at time 0.
     #[test]
     fn notyet_valid_intermediate_returns_validity_period() {
@@ -3797,10 +3804,10 @@ mod tests_chain_walk {
         );
     }
 
-    /// Leaf with unknown critical extension → UnhandledCriticalExtension at index 0.
+    /// Leaf with unknown critical extension → `UnhandledCriticalExtension` at index 0.
     ///
     /// Oracle: gry-leaf-unknown-crit.der was generated with OID 1.3.6.1.5.5.7.99.99 critical=true
-    /// (not in HANDLED_CRITICAL_OIDS) using pyca/cryptography.
+    /// (not in `HANDLED_CRITICAL_OIDS`) using pyca/cryptography.
     #[test]
     fn unknown_critical_extension_returns_unhandled() {
         let root = load(include_bytes!("../tests/fixtures/gry-root.der"));
@@ -3899,7 +3906,7 @@ mod tests_policy_fields {
     /// Oracle: root-p256.der and int-p256.der each have ~3652-day validity
     /// (NOT_BEFORE=2026-01-01, NOT_AFTER=2036-01-01 from gen.py).
     /// A cap of 400 days forces `ValidityPeriodExceedsMax` on the root (checked first
-    /// by chain_walk which iterates from high index to low).
+    /// by `chain_walk` which iterates from high index to low).
     ///
     /// Note: the check applies to every cert in the chain, not just the leaf.
     /// The root cert (highest index) is checked first and produces the error.
@@ -3932,7 +3939,7 @@ mod tests_policy_fields {
     /// the cert acts as both leaf and anchor. The 400-day cert fails a 398-day cap.
     ///
     /// Oracle: leaf-p256-400d-san-eku.der has notAfter-notBefore = 400 days = 34,560,000 s.
-    /// 400 days > 398 days → ValidityPeriodExceedsMax { index: 0 }.
+    /// 400 days > 398 days → `ValidityPeriodExceedsMax` { index: 0 }.
     #[test]
     fn max_validity_fails_at_leaf_index_zero() {
         // Use a single self-signed cert as both chain[0] and anchor so there is only
@@ -3998,10 +4005,10 @@ mod tests_policy_fields {
     }
 
     /// Oracle: P-256 chain uses ecdsa-sha256; allowlist contains only RSA-sha256.
-    /// chain_walk walks highest index first: leaf=[0], int=[1], root=[2].
+    /// `chain_walk` walks highest index first: leaf=[0], int=[1], root=[2].
     /// For a 3-cert chain, the root-adjacent cert is at index 2 in the slice.
-    /// chain_walk iterates i from (chain.len()-1) down to 0, so i=2 (root) is checked
-    /// first and fails with AlgorithmNotAllowed { index: 2 }.
+    /// `chain_walk` iterates i from (chain.len()-1) down to 0, so i=2 (root) is checked
+    /// first and fails with `AlgorithmNotAllowed` { index: 2 }.
     #[test]
     fn alg_allowlist_fails_when_oid_not_in_list() {
         let root = load(include_bytes!(
@@ -4111,9 +4118,9 @@ mod tests_policy_fields {
             .expect("require_subject_alt_name=false must not fail on missing SAN");
     }
 
-    /// Regression guard for the i == 0 guard in chain_walk.
+    /// Regression guard for the i == 0 guard in `chain_walk`.
     ///
-    /// int-p256.der has no SAN extension. With require_subject_alt_name=true,
+    /// int-p256.der has no SAN extension. With `require_subject_alt_name=true`,
     /// the check MUST NOT fail on the intermediate (i == 1). Only the leaf
     /// (i == 0) is checked.
     ///
@@ -4163,7 +4170,7 @@ mod tests_policy_fields {
     }
 
     /// Oracle: leaf-p256-365d-no-eku.der has no EKU extension.
-    /// required_leaf_eku=Some([serverAuth]) with absent EKU → MissingEku.
+    /// `required_leaf_eku=Some`([serverAuth]) with absent EKU → `MissingEku`.
     #[test]
     fn required_eku_fails_when_eku_extension_absent() {
         let root = load(include_bytes!(
@@ -4251,7 +4258,7 @@ mod tests_policy_fields {
             .expect("Some([]) required_leaf_eku (empty) must accept any EKU configuration");
     }
 
-    /// Verify that emailProtection in required_leaf_eku does NOT match serverAuth in the cert.
+    /// Verify that emailProtection in `required_leaf_eku` does NOT match serverAuth in the cert.
     /// This guards against a hypothetical relaxed OID comparison bug.
     #[test]
     fn required_eku_emailprotection_does_not_match_serverauth() {
@@ -4304,7 +4311,7 @@ mod tests_policy_fields_rsa {
     // min_rsa_key_bits helper unit tests (PKIX-ken.1.11)
     // -----------------------------------------------------------------------
 
-    /// Direct unit test of rsa_public_key_bits helper.
+    /// Direct unit test of `rsa_public_key_bits` helper.
     /// Oracle: openssl x509 -inform DER -in leaf-rsa2048.der -text -noout | grep 'Public-Key'
     /// → Public-Key: (2048 bit)
     #[test]
@@ -4320,7 +4327,7 @@ mod tests_policy_fields_rsa {
         );
     }
 
-    /// Direct unit test of rsa_public_key_bits helper.
+    /// Direct unit test of `rsa_public_key_bits` helper.
     /// Oracle: openssl x509 -inform DER -in leaf-rsa1024.der -text -noout | grep 'Public-Key'
     /// → Public-Key: (1024 bit)
     #[test]
@@ -4336,7 +4343,7 @@ mod tests_policy_fields_rsa {
         );
     }
 
-    /// Direct unit test of rsa_public_key_bits helper.
+    /// Direct unit test of `rsa_public_key_bits` helper.
     /// P-256 key is not RSA; must return None.
     #[test]
     fn rsa_key_bits_none_for_ec_key() {
@@ -4380,7 +4387,7 @@ mod tests_policy_fields_rsa {
     }
 
     /// Oracle: leaf-rsa1024-365d-san-eku.der has RSA-1024 leaf.
-    /// 1024 < 2048 → KeyTooSmall { index: 0 }.
+    /// 1024 < 2048 → `KeyTooSmall` { index: 0 }.
     #[test]
     fn min_rsa_key_bits_fails_when_key_too_small() {
         let root = load(include_bytes!(
@@ -4433,8 +4440,8 @@ mod tests_policy_fields_rsa {
         .expect("None min_rsa_key_bits must accept RSA-1024 leaf");
     }
 
-    /// EC key must not be affected by min_rsa_key_bits regardless of the value.
-    /// Oracle: P-256 key is not RSA; rsa_public_key_bits returns None → check skipped.
+    /// EC key must not be affected by `min_rsa_key_bits` regardless of the value.
+    /// Oracle: P-256 key is not RSA; `rsa_public_key_bits` returns None → check skipped.
     #[test]
     fn min_rsa_key_bits_ec_key_passes_unconditionally() {
         let root = load(include_bytes!(

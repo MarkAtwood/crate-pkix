@@ -22,7 +22,7 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 | Crate | What it does | `no_std` | Status |
 |-------|-------------|----------|--------|
 | [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | v0.2 |
-| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only | v0.2 |
+| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only[^revocation-no-std] | v0.2 |
 | [`pkix-chain`] | Umbrella: combines path + revocation | — | v0.2 |
 | [`pkix-chain-simple`] | Opinionated validator with extension whitelist | — | v0.2 |
 | [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | v0.2 |
@@ -32,6 +32,11 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
 | [`pkix-composite`] | Composite classical+PQC signature verifier | ✓ | planned |
 | [`pkix-ac`] | RFC 5755 attribute certificate validation | ✓ | planned |
+
+[^revocation-no-std]: `pkix-revocation`'s core (`NoRevocation`, the
+    `RevocationChecker` trait, `Error` enum) is `no_std`. The `crl` and
+    `ocsp` features both require `std` (CRL/OCSP parsing pulls in
+    `x509-cert`/`x509-ocsp` types that need allocation).
 
 ## Quick start
 

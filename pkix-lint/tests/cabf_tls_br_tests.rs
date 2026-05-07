@@ -7,9 +7,9 @@
 //!
 //! Oracle sources:
 //! - SC-081 effective dates: CA/B Forum Ballot SC-081 (approved March 2024)
-//!   2026-03-15T00:00:00Z = 1_773_532_800  (python3: calendar.timegm((2026,3,15,0,0,0,0,0,0)))
-//!   2027-03-15T00:00:00Z = 1_805_068_800
-//!   2029-03-15T00:00:00Z = 1_868_227_200
+//!   2026-03-15T00:00:00Z = `1_773_532_800`  (python3: calendar.timegm((2026,3,15,0,0,0,0,0,0)))
+//!   2027-03-15T00:00:00Z = `1_805_068_800`
+//!   2029-03-15T00:00:00Z = `1_868_227_200`
 //! - Fixture cert properties verified with: openssl x509 -in <file> -inform DER -noout -text
 //!   webpki-self-signed-365d.der           : P-256, serverAuth EKU, DNS SAN, 365 days, notBefore=2026-01-01
 //!   webpki-self-signed-365d-post-sc081.der : P-256, serverAuth EKU, DNS SAN, 365 days, notBefore=2026-03-16
@@ -20,7 +20,7 @@
 //!   leaf-p256-400d-san-eku.der  : P-256, serverAuth EKU, DNS SAN, 400 days
 //!   leaf-rsa2048-365d-san-eku.der: RSA-2048, serverAuth EKU, DNS SAN, 365 days
 //!   leaf-rsa1024-365d-san-eku.der: RSA-1024, serverAuth EKU, DNS SAN, 365 days
-//!   int-p256.der                : P-256, CA:TRUE BasicConstraints, 10 years
+//!   int-p256.der                : P-256, CA:TRUE `BasicConstraints`, 10 years
 //!   smime-self-signed-365d.der  : P-256, emailProtection EKU, 365 days
 
 use der::Decode as _;

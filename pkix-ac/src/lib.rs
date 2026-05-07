@@ -57,6 +57,7 @@ pub struct Holder {
 
 /// Issuer name and serial number pair, used to identify a PKC.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct IssuerSerial {
     /// The issuer's distinguished name.
     pub issuer: Name,
@@ -112,11 +113,19 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// - Validity period against `now_unix`
 /// - Signature against the AA's SPKI (AA chain validated via `pkix-path`)
 ///
+/// # Errors
+///
+/// Returns one of the [`Error`] variants on validation failure:
+/// - [`Error::AcParseError`] — the attribute certificate DER is malformed.
+/// - [`Error::AcExpired`] — `now_unix` is outside the AC's validity window.
+/// - [`Error::AcSignatureInvalid`] — the AC signature did not verify.
+/// - [`Error::AaPathInvalid`] — the AA path validation failed.
+///
 /// # Limitations
 ///
-/// Not yet implemented (tracked for v0.2). Returns
-/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)` until
-/// the RFC 5755 §5 validation algorithm is implemented.
+/// Not yet implemented. Currently always returns
+/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)`
+/// until the RFC 5755 §5 validation algorithm is implemented.
 #[deprecated = "pkix-ac is not yet implemented; this function always returns AaPathInvalid"]
 pub const fn validate_attribute_cert(
     _ac: &AttributeCertificate,
