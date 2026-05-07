@@ -235,7 +235,13 @@ fn crl_check_revocation_against_anchor_revoked_cert() {
         .expect("fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation_against_anchor(&revoked, &anchor);
     assert!(
-        matches!(result, Err(Error::Revoked { reason_code: None, .. })),
+        matches!(
+            result,
+            Err(Error::Revoked {
+                reason_code: None,
+                ..
+            })
+        ),
         "revoked cert must return Revoked when checked via anchor, got: {result:?}"
     );
 }
@@ -307,7 +313,10 @@ fn delta_crl_with_delta_construction_ok() {
         NOW,
         DefaultVerifier,
     );
-    assert!(result.is_ok(), "valid base+delta must construct Ok, got: {result:?}");
+    assert!(
+        result.is_ok(),
+        "valid base+delta must construct Ok, got: {result:?}"
+    );
 }
 
 /// `CrlChecker::with_delta` rejects when base and delta CRLs are from different CAs.
@@ -321,7 +330,7 @@ fn delta_crl_with_delta_rejects_cross_ca() {
     // delta-crl-delta-add.der is signed by CN=Test Delta CRL CA.
     // These are different CAs → issuer mismatch → DeltaCrlBaseMismatch.
     let result = CrlChecker::with_delta(
-        fixture("crl-empty.der"),        // base from CA-A (crl-ca.der)
+        fixture("crl-empty.der"),           // base from CA-A (crl-ca.der)
         fixture("delta-crl-delta-add.der"), // delta from CA-B (delta-crl-ca.der)
         NOW,
         DefaultVerifier,
@@ -385,7 +394,10 @@ fn delta_crl_delta_entry_detected() {
     let base_only = CrlChecker::new(fixture("delta-crl-base.der"), NOW, DefaultVerifier)
         .expect("fixture is a valid DER-encoded CRL");
     let result = base_only.check_revocation(&leaf3, &ca);
-    assert!(result.is_ok(), "serial=3 not in base should be Ok; got: {result:?}");
+    assert!(
+        result.is_ok(),
+        "serial=3 not in base should be Ok; got: {result:?}"
+    );
 
     // With delta: serial=3 in delta → Revoked.
     let with_delta = CrlChecker::with_delta(

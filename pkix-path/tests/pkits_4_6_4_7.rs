@@ -319,12 +319,8 @@ fn basic_constraints_corrupt_der_returns_malformed_certificate() {
     // Validity window: fixtures use notBefore=2025-01-01; use 2026-06-01.
     let policy = ValidationPolicy::new(1_780_272_000_u64);
 
-    let result = pkix_path::validate_path(
-        &[leaf, intermediate],
-        &anchors,
-        &policy,
-        &DefaultVerifier,
-    );
+    let result =
+        pkix_path::validate_path(&[leaf, intermediate], &anchors, &policy, &DefaultVerifier);
     assert!(
         matches!(result, Err(pkix_path::Error::MalformedCertificate { .. })),
         "corrupt BasicConstraints DER must return MalformedCertificate, got: {result:?}"

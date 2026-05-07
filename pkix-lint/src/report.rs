@@ -174,7 +174,6 @@ impl EvaluationReport {
             .filter(|f| severity_of(&f.result).is_some_and(|s| s >= min_severity))
             .collect()
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -292,11 +291,23 @@ mod tests {
         // Serialize using serde_json (dev-dependency).
         let json = serde_json::to_string_pretty(&r).expect("serialization must succeed");
         // Verify it's valid JSON and contains expected fields.
-        assert!(json.contains("\"profile_id\""), "JSON must contain profile_id");
-        assert!(json.contains("\"cabf.br.tls\""), "JSON must contain profile id value");
+        assert!(
+            json.contains("\"profile_id\""),
+            "JSON must contain profile_id"
+        );
+        assert!(
+            json.contains("\"cabf.br.tls\""),
+            "JSON must contain profile id value"
+        );
         assert!(json.contains("\"lint_id\""), "JSON must contain lint_id");
-        assert!(json.contains("\"rule_bundle_version\""), "JSON must contain rule_bundle_version");
-        assert!(json.contains("\"evaluated_at_unix\""), "JSON must contain evaluated_at_unix");
+        assert!(
+            json.contains("\"rule_bundle_version\""),
+            "JSON must contain rule_bundle_version"
+        );
+        assert!(
+            json.contains("\"evaluated_at_unix\""),
+            "JSON must contain evaluated_at_unix"
+        );
 
         // Round-trip: deserialize back into EvaluationReport and verify key fields.
         // EvaluationReport requires 'de: 'static (due to &'static str fields like

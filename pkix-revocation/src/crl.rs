@@ -249,13 +249,20 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if self.now_unix < this_update {
             return Err(Error::CrlExpired);
         }
-        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        let next_update = crl
+            .tbs_cert_list
+            .next_update
+            .as_ref()
+            .ok_or(Error::CrlExpired)?;
         if self.now_unix > next_update.to_unix_duration().as_secs() {
             return Err(Error::CrlExpired);
         }
 
         // (4) Verify the CRL signature against the issuer's SPKI.
-        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        let tbs_bytes = crl
+            .tbs_cert_list
+            .to_der()
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
@@ -381,7 +388,11 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         if self.now_unix < this_update {
             return Err(Error::CrlExpired);
         }
-        let next_update = crl.tbs_cert_list.next_update.as_ref().ok_or(Error::CrlExpired)?;
+        let next_update = crl
+            .tbs_cert_list
+            .next_update
+            .as_ref()
+            .ok_or(Error::CrlExpired)?;
         if self.now_unix > next_update.to_unix_duration().as_secs() {
             return Err(Error::CrlExpired);
         }
@@ -389,7 +400,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (4) Verify the CRL signature against the anchor's SPKI.
         //     cRLSign KeyUsage check is skipped: trust anchors have no KeyUsage
         //     extension accessible to us (they are trusted by construction).
-        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        let tbs_bytes = crl
+            .tbs_cert_list
+            .to_der()
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),

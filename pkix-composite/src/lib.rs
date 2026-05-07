@@ -62,7 +62,13 @@ pub struct CompositeVerifier<C, P> {
 
 impl<C, P> CompositeVerifier<C, P> {
     /// Create a new `CompositeVerifier` from a classical and a post-quantum component.
-    #[deprecated = "pkix-composite is not yet implemented"]
+    ///
+    /// # Limitations
+    ///
+    /// `pkix-composite` is not yet implemented. The constructor is exposed for
+    /// API discovery, but [`SignatureVerifier::verify_signature`] currently
+    /// returns `Err(SignatureError::new())` unconditionally.
+    #[doc(hidden)]
     pub const fn new(classical: C, post_quantum: P) -> Self {
         Self {
             classical,

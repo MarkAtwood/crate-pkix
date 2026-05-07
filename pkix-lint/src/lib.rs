@@ -244,9 +244,7 @@ impl SubjectKind {
     pub fn matches(self, filter: Self) -> bool {
         match filter {
             Self::Any => true,
-            Self::IntermediateCa => {
-                self == Self::IntermediateCa || self == Self::AnchorIssued
-            }
+            Self::IntermediateCa => self == Self::IntermediateCa || self == Self::AnchorIssued,
             other => self == other,
         }
     }
@@ -288,17 +286,11 @@ pub enum LintResult {
     /// Advisory finding — the cert deviates from a SHOULD or best practice.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
-    Warn(
-        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-        &'static str,
-    ),
+    Warn(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
     /// Error finding — the cert violates a MUST or REQUIRED requirement.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
-    Error(
-        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-        &'static str,
-    ),
+    Error(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
     /// Fatal finding — further evaluation of this cert/path is not meaningful.
     ///
     /// The `&'static str` field is a human-readable explanation of the finding.
@@ -317,10 +309,7 @@ pub enum LintResult {
     /// The only effect of `Fatal` within `pkix-lint` itself is to stop evaluating
     /// further lints for the current certificate or path — it does not propagate
     /// as a `Result::Err` or cause any panic.
-    Fatal(
-        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-        &'static str,
-    ),
+    Fatal(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
 }
 
 impl LintResult {
@@ -333,10 +322,7 @@ impl LintResult {
     /// Returns `true` if this result represents a finding (Warn, Error, or Fatal).
     #[must_use]
     pub const fn is_finding(&self) -> bool {
-        matches!(
-            self,
-            Self::Warn(_) | Self::Error(_) | Self::Fatal(_)
-        )
+        matches!(self, Self::Warn(_) | Self::Error(_) | Self::Fatal(_))
     }
 
     /// Returns `true` if the runner should stop evaluating further lints for this item.
@@ -473,12 +459,7 @@ pub trait Lint: Send + Sync {
     /// Default: returns [`LintResult::NotApplicable`].
     /// Lints with `scope() == Scope::Path` MUST override this method.
     #[allow(unused_variables)]
-    fn check_path(
-        &self,
-        chain: &[Certificate],
-        path: &ValidatedPath,
-        now_unix: u64,
-    ) -> LintResult {
+    fn check_path(&self, chain: &[Certificate], path: &ValidatedPath, now_unix: u64) -> LintResult {
         LintResult::NotApplicable
     }
 }
@@ -633,8 +614,9 @@ impl LintRunner {
             let original_len = ids.len();
             ids.sort_unstable();
             ids.dedup();
-            assert!(
-                ids.len() == original_len,
+            assert_eq!(
+                ids.len(),
+                original_len,
                 "duplicate lint IDs will produce confusing deviation behavior"
             );
         }
@@ -1190,8 +1172,13 @@ mod tests {
         let anchor = TrustAnchor::from_cert(cert.clone());
         // 2026-01-01 = pre-SC-081, so 365-day cert passes the 398-day cap.
         let policy = ValidationPolicy::new(1_767_225_600);
-        let path = pkix_path::validate_path(std::slice::from_ref(&cert), &[anchor], &policy, &EcdsaP256Verifier)
-            .expect("fixture cert must validate");
+        let path = pkix_path::validate_path(
+            std::slice::from_ref(&cert),
+            &[anchor],
+            &policy,
+            &EcdsaP256Verifier,
+        )
+        .expect("fixture cert must validate");
         (vec![cert], path)
     }
 
@@ -1216,7 +1203,10 @@ mod tests {
         assert_eq!(findings[0].lint_id, "test.path_depth");
         // Self-signed chain: depth=0, not > 5 → Pass.
         assert_eq!(findings[0].result, LintResult::Pass);
-        assert_eq!(findings[0].cert_index, None, "path findings have no cert_index");
+        assert_eq!(
+            findings[0].cert_index, None,
+            "path findings have no cert_index"
+        );
     }
 
     #[test]
@@ -1266,8 +1256,14 @@ mod tests {
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 12345);
         assert_eq!(findings.len(), 1);
         // Citation must come from the lint's citation() method.
-        assert_eq!(findings[0].citation, "test", "citation must be threaded from Lint::citation()");
-        assert_eq!(findings[0].evaluated_at_unix, 12345, "evaluated_at_unix must be the passed now_unix");
+        assert_eq!(
+            findings[0].citation, "test",
+            "citation must be threaded from Lint::citation()"
+        );
+        assert_eq!(
+            findings[0].evaluated_at_unix, 12345,
+            "evaluated_at_unix must be the passed now_unix"
+        );
     }
 
     #[test]

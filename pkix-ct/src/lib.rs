@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
@@ -39,6 +40,7 @@ pub struct SignedCertificateTimestamp {
 /// Populate from the current CT log list (e.g. Chrome's
 /// <https://www.gstatic.com/ct/log_list/v3/log_list.json>) before verifying.
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct CtLogList {
     // log public keys indexed by log_id — not yet implemented (tracked for v0.2)
 }
@@ -52,7 +54,7 @@ impl CtLogList {
 }
 
 /// Errors returned by SCT verification.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate contains no SCT extension.
@@ -76,6 +78,7 @@ impl core::fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
 /// Result alias for this crate.
@@ -101,7 +104,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Not yet implemented (tracked for v0.2). Returns [`Error::NoTrustedSct`]
 /// until SCT parsing, log-list lookup, and Merkle proof verification are
 /// implemented.
-#[deprecated = "pkix-ct is not yet implemented; this function always returns NoTrustedSct"]
+#[doc(hidden)]
 pub const fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
     Err(Error::NoTrustedSct)
 }

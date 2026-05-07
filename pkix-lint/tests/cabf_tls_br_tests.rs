@@ -348,7 +348,11 @@ fn sha1_prohibited_pass_on_sha256_cert() {
     let cert = load_cert!("webpki-self-signed-365d.der");
     let lint = Sha1ProhibitedLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "ecdsa-with-SHA256 must Pass SHA-1 prohibition");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "ecdsa-with-SHA256 must Pass SHA-1 prohibition"
+    );
 }
 
 #[test]
@@ -358,7 +362,11 @@ fn sha1_prohibited_pass_on_rsa_sha256_cert() {
     let cert = load_cert!("leaf-rsa2048-365d-san-eku.der");
     let lint = Sha1ProhibitedLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "sha256WithRSAEncryption must Pass SHA-1 prohibition");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "sha256WithRSAEncryption must Pass SHA-1 prohibition"
+    );
 }
 
 #[test]
@@ -367,8 +375,14 @@ fn sha1_prohibited_applies_to_any_kind() {
     let cert = load_cert!("int-p256.der");
     let lint = Sha1ProhibitedLint;
     // int-p256.der uses ecdsa-with-SHA256 → Pass regardless of kind.
-    assert_eq!(lint.check_cert(&cert, SubjectKind::IntermediateCa, 0), LintResult::Pass);
-    assert_eq!(lint.check_cert(&cert, SubjectKind::Leaf, 0), LintResult::Pass);
+    assert_eq!(
+        lint.check_cert(&cert, SubjectKind::IntermediateCa, 0),
+        LintResult::Pass
+    );
+    assert_eq!(
+        lint.check_cert(&cert, SubjectKind::Leaf, 0),
+        LintResult::Pass
+    );
 }
 
 /// Verify the lint correctly identifies SHA-1 OIDs without needing a SHA-1 cert fixture.
@@ -397,8 +411,14 @@ fn sha1_prohibited_oid_detection_logic() {
     let cert = load_cert!("webpki-self-signed-365d.der");
     let actual_oid = &cert.signature_algorithm.oid;
     // webpki cert uses ecdsa-with-SHA256, not SHA-1.
-    assert_ne!(actual_oid, &sha1_rsa, "fixture cert must not use sha1WithRSAEncryption");
-    assert_ne!(actual_oid, &sha1_ecdsa, "fixture cert must not use ecdsa-with-SHA1");
+    assert_ne!(
+        actual_oid, &sha1_rsa,
+        "fixture cert must not use sha1WithRSAEncryption"
+    );
+    assert_ne!(
+        actual_oid, &sha1_ecdsa,
+        "fixture cert must not use ecdsa-with-SHA1"
+    );
 }
 
 /// Oracle: openssl req -x509 -newkey rsa:2048 -sha1 -days 365 -subj "/CN=sha1-test" -noenc
@@ -502,7 +522,11 @@ fn san_required_pass_with_san() {
     let cert = load_cert!("leaf-p256-365d-san-eku.der");
     let lint = SanRequiredLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "cert with SAN must Pass san.required");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "cert with SAN must Pass san.required"
+    );
 }
 
 #[test]
@@ -511,7 +535,11 @@ fn san_required_pass_webpki_self_signed() {
     let cert = load_cert!("webpki-self-signed-365d.der");
     let lint = SanRequiredLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "webpki cert with SAN must Pass san.required");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "webpki cert with SAN must Pass san.required"
+    );
 }
 
 #[test]
@@ -560,7 +588,11 @@ fn eku_server_auth_pass_with_server_auth() {
     let cert = load_cert!("leaf-p256-365d-san-eku.der");
     let lint = EkuServerAuthLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "cert with serverAuth EKU must Pass eku.server_auth");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "cert with serverAuth EKU must Pass eku.server_auth"
+    );
 }
 
 #[test]
@@ -568,7 +600,11 @@ fn eku_server_auth_pass_webpki_self_signed() {
     let cert = load_cert!("webpki-self-signed-365d.der");
     let lint = EkuServerAuthLint;
     let result = lint.check_cert(&cert, SubjectKind::Leaf, 0);
-    assert_eq!(result, LintResult::Pass, "webpki cert must Pass eku.server_auth");
+    assert_eq!(
+        result,
+        LintResult::Pass,
+        "webpki cert must Pass eku.server_auth"
+    );
 }
 
 #[test]
@@ -675,12 +711,30 @@ fn cabf_tls_br_profile_lint_runner_has_all_six_lints() {
     let profile = CabfTlsBrProfile;
     let runner = profile.lint_runner();
     let ids: Vec<&str> = runner.lints().iter().map(|l| l.id()).collect();
-    assert!(ids.contains(&"cabf.br.tls.validity.max"), "missing validity.max lint");
-    assert!(ids.contains(&"cabf.br.tls.alg.sha1_prohibited"), "missing sha1_prohibited lint");
-    assert!(ids.contains(&"cabf.br.tls.rsa.min_key_size"), "missing rsa.min_key_size lint");
-    assert!(ids.contains(&"cabf.br.tls.san.required"), "missing san.required lint");
-    assert!(ids.contains(&"cabf.br.tls.eku.server_auth"), "missing eku.server_auth lint");
-    assert!(ids.contains(&"cabf.br.tls.bc.ca_flag"), "missing bc.ca_flag lint");
+    assert!(
+        ids.contains(&"cabf.br.tls.validity.max"),
+        "missing validity.max lint"
+    );
+    assert!(
+        ids.contains(&"cabf.br.tls.alg.sha1_prohibited"),
+        "missing sha1_prohibited lint"
+    );
+    assert!(
+        ids.contains(&"cabf.br.tls.rsa.min_key_size"),
+        "missing rsa.min_key_size lint"
+    );
+    assert!(
+        ids.contains(&"cabf.br.tls.san.required"),
+        "missing san.required lint"
+    );
+    assert!(
+        ids.contains(&"cabf.br.tls.eku.server_auth"),
+        "missing eku.server_auth lint"
+    );
+    assert!(
+        ids.contains(&"cabf.br.tls.bc.ca_flag"),
+        "missing bc.ca_flag lint"
+    );
     assert_eq!(ids.len(), 6, "expected exactly 6 lints in CabfTlsBrProfile");
 }
 

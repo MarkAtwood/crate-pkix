@@ -66,15 +66,15 @@ pub struct IssuerSerial {
 }
 
 /// Errors returned by attribute certificate validation.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// DER parsing of the attribute certificate failed.
-    ParseError,
+    AcParseError,
     /// The attribute certificate's signature did not verify.
-    SignatureInvalid,
+    AcSignatureInvalid,
     /// The attribute certificate's validity period has expired or is not yet valid.
-    ValidityPeriod,
+    AcExpired,
     /// The Attribute Authority's PKC chain could not be validated.
     AaPathInvalid(pkix_path::Error),
 }
@@ -82,11 +82,9 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::ParseError => f.write_str("attribute certificate parse error"),
-            Self::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
-            Self::ValidityPeriod => {
-                f.write_str("attribute certificate validity period check failed")
-            }
+            Self::AcParseError => f.write_str("attribute certificate parse error"),
+            Self::AcSignatureInvalid => f.write_str("attribute certificate signature invalid"),
+            Self::AcExpired => f.write_str("attribute certificate validity period check failed"),
             Self::AaPathInvalid(e) => write!(f, "attribute authority path invalid: {e}"),
         }
     }
@@ -124,9 +122,9 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// # Limitations
 ///
 /// Not yet implemented. Currently always returns
-/// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)`
+/// <code>[Error::AaPathInvalid]([pkix_path::Error::NoTrustedPath])</code>
 /// until the RFC 5755 §5 validation algorithm is implemented.
-#[deprecated = "pkix-ac is not yet implemented; this function always returns AaPathInvalid"]
+#[doc(hidden)]
 pub const fn validate_attribute_cert(
     _ac: &AttributeCertificate,
     _aa_anchors: &[pkix_path::TrustAnchor],

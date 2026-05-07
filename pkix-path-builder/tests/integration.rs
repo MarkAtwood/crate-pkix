@@ -197,7 +197,7 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
         let mut seen = std::collections::HashSet::new();
         spkis.iter().filter(|s| seen.insert(*s)).count()
     };
-        assert_eq!(
+    assert_eq!(
         spkis.len(),
         deduped_len,
         "path must not contain duplicate SPKI entries"
@@ -255,9 +255,13 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
         ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
         // Unique SPKI defeats the cycle guard so all N clones are treated as
         // distinct DFS nodes.
-        ca.tbs_certificate.subject_public_key_info.subject_public_key =
-            BitString::new(0, vec![u8::try_from(i).expect("loop bound N fits in u8"); 32])
-                .expect("BitString construction must succeed for valid parameters");
+        ca.tbs_certificate
+            .subject_public_key_info
+            .subject_public_key = BitString::new(
+            0,
+            vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
+        )
+        .expect("BitString construction must succeed for valid parameters");
         pool.add(ca);
     }
 
