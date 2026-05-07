@@ -235,11 +235,20 @@ fn dfs(
         //   but different keys have different SPKIs and are distinct nodes in the
         //   path graph.
         //
-        // SubjectPublicKeyInfoOwned derives PartialEq, so no DER re-encoding is
-        // needed — the comparison is a direct field-by-field equality check.
+        // We do NOT use `==` / `PartialEq` on `SubjectPublicKeyInfoOwned` because
+        // `AlgorithmIdentifier::PartialEq` is a full field comparison that includes
+        // the optional `parameters` field. For RSA, one cert may encode
+        // `AlgorithmIdentifier { oid: rsaEncryption, params: NULL }` while another
+        // encodes `AlgorithmIdentifier { oid: rsaEncryption, params: absent }`.
+        // Both represent the same public key but compare as unequal under `PartialEq`,
+        // which would allow the cycle guard to miss a loop between such encoding variants.
+        // Instead we compare only the algorithm OID and the raw key bit-string, which
+        // is the same approach used by `pkix_path::spki_key_matches`.
         let candidate_spki = &candidate.tbs_certificate.subject_public_key_info;
         let already_in_path = path.iter().any(|in_path| {
-            &in_path.tbs_certificate.subject_public_key_info == candidate_spki
+            let s = &in_path.tbs_certificate.subject_public_key_info;
+            s.algorithm.oid == candidate_spki.algorithm.oid
+                && s.subject_public_key == candidate_spki.subject_public_key
         });
         if already_in_path {
             continue;
