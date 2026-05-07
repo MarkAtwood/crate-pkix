@@ -53,6 +53,11 @@
 //! - `KeyUsage` (must include `keyCertSign`) — required
 //! - `SubjectKeyIdentifier`
 //! - `AuthorityKeyIdentifier`
+//! - `CRLDistributionPoints` (informational; content not inspected)
+//! - `AuthorityInfoAccess` (informational; content not inspected)
+//! - `CertificatePolicies`, `PolicyMappings`, `NameConstraints`, `PolicyConstraints`,
+//!   `InhibitAnyPolicy`, `ExtendedKeyUsage`, `SubjectAltName`, `IssuerAltName`
+//!   (content not inspected by this crate)
 //! - No other extensions permitted (critical or non-critical)
 //!
 //! # Limitations
@@ -122,6 +127,25 @@ pub const OID_EXT_CRL_DISTRIBUTION_POINTS: ObjectIdentifier =
 pub const OID_EXT_AUTHORITY_INFO_ACCESS: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1");
 
+/// OID for the `CertificatePolicies` extension (RFC 5280 §4.2.1.4).
+pub const OID_EXT_CERTIFICATE_POLICIES: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.5.29.32");
+
+/// OID for the `PolicyMappings` extension (RFC 5280 §4.2.1.5).
+pub const OID_EXT_POLICY_MAPPINGS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.33");
+
+/// OID for the `NameConstraints` extension (RFC 5280 §4.2.1.10).
+pub const OID_EXT_NAME_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.30");
+
+/// OID for the `PolicyConstraints` extension (RFC 5280 §4.2.1.11).
+pub const OID_EXT_POLICY_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.36");
+
+/// OID for the `InhibitAnyPolicy` extension (RFC 5280 §4.2.1.14).
+pub const OID_EXT_INHIBIT_ANY_POLICY: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.54");
+
+/// OID for the `IssuerAltName` extension (RFC 5280 §4.2.1.7).
+pub const OID_EXT_ISSUER_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.18");
+
 /// Extensions permitted on the end-entity (leaf) certificate.
 ///
 /// Any extension OID not in this slice causes [`Error::UnexpectedExtension`].
@@ -140,11 +164,37 @@ pub const ALLOWED_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
 ///
 /// Any extension OID not in this slice causes [`Error::UnexpectedExtension`]
 /// (non-critical) or [`Error::UnhandledCriticalExtension`] (critical).
+///
+/// Permitted extensions:
+/// - `BasicConstraints` (cA MUST be TRUE) — required
+/// - `KeyUsage` (must include `keyCertSign`) — required
+/// - `SubjectKeyIdentifier`
+/// - `AuthorityKeyIdentifier`
+/// - `CRLDistributionPoints` (informational; content not inspected)
+/// - `AuthorityInfoAccess` (informational; content not inspected)
+/// - `CertificatePolicies` (content not inspected by this crate)
+/// - `PolicyMappings` (content not inspected by this crate)
+/// - `NameConstraints` (content not inspected by this crate)
+/// - `PolicyConstraints` (content not inspected by this crate)
+/// - `InhibitAnyPolicy` (content not inspected by this crate)
+/// - `ExtendedKeyUsage` (content not inspected by this crate)
+/// - `SubjectAltName` (content not inspected by this crate)
+/// - `IssuerAltName` (content not inspected by this crate)
 pub const ALLOWED_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
     OID_EXT_BASIC_CONSTRAINTS,
     OID_EXT_KEY_USAGE,
     OID_EXT_SUBJECT_KEY_ID,
     OID_EXT_AUTHORITY_KEY_ID,
+    OID_EXT_CRL_DISTRIBUTION_POINTS,
+    OID_EXT_AUTHORITY_INFO_ACCESS,
+    OID_EXT_CERTIFICATE_POLICIES,
+    OID_EXT_POLICY_MAPPINGS,
+    OID_EXT_NAME_CONSTRAINTS,
+    OID_EXT_POLICY_CONSTRAINTS,
+    OID_EXT_INHIBIT_ANY_POLICY,
+    OID_EXT_EXTENDED_KEY_USAGE,
+    OID_EXT_SUBJECT_ALT_NAME,
+    OID_EXT_ISSUER_ALT_NAME,
 ];
 
 /// Extension OIDs that may appear as **critical** on the end-entity (leaf) certificate.
@@ -399,6 +449,10 @@ pub fn verify_simple(
     }
 
     // --- Delegate to pkix-path ----------------------------------------------
+    const _: () = assert!(
+        MAX_INTERMEDIATES <= u8::MAX as usize,
+        "MAX_INTERMEDIATES must fit in u8"
+    );
     let mut policy = ValidationPolicy::new(now_unix);
     policy.max_path_len = MAX_INTERMEDIATES as u8;
 
@@ -453,17 +507,28 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
     // Whitelist check: every extension OID must be in the allowed set.
     // Critical extensions must additionally be in the critical-OK set (those
     // that pkix-path handles when the extension is marked critical).
-    for ext in extensions.iter() {
+    //
+    // Scan all extensions before reporting an error so that the most severe
+    // violation wins: an unhandled critical extension takes priority over a
+    // mere unexpected non-critical extension.
+    let mut unexpected = false;
+    let mut unhandled_critical = false;
+    for ext in extensions {
         if !allowed.contains(&ext.extn_id) {
             if ext.critical {
-                return Err(Error::UnhandledCriticalExtension { index });
+                unhandled_critical = true;
             } else {
-                return Err(Error::UnexpectedExtension { index });
+                unexpected = true;
             }
+        } else if ext.critical && !critical_ok.contains(&ext.extn_id) {
+            unhandled_critical = true;
         }
-        if ext.critical && !critical_ok.contains(&ext.extn_id) {
-            return Err(Error::UnhandledCriticalExtension { index });
-        }
+    }
+    if unhandled_critical {
+        return Err(Error::UnhandledCriticalExtension { index });
+    }
+    if unexpected {
+        return Err(Error::UnexpectedExtension { index });
     }
 
     if is_leaf {
