@@ -55,6 +55,9 @@ pub use pkix_path::{Profile, ValidationPolicy};
 
 use der::asn1::ObjectIdentifier;
 
+/// Seconds in one day (60 × 60 × 24).
+const SECS_PER_DAY: u64 = 86_400;
+
 // ---------------------------------------------------------------------------
 // Per-profile algorithm OID constants
 //
@@ -117,9 +120,12 @@ const CABF_CS_BR_ALLOWED_ALGS: &[ObjectIdentifier] = &[
 ];
 
 // EKU OIDs (RFC 5280 §4.2.1.12)
-const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
-const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
-const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
+pub(crate) const ID_KP_SERVER_AUTH: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+pub(crate) const ID_KP_EMAIL_PROTECTION: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
+pub(crate) const ID_KP_CODE_SIGNING: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
 
 // ---------------------------------------------------------------------------
 // Profile structs
@@ -148,12 +154,12 @@ const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6
 pub struct WebPkiProfile;
 
 impl Profile for WebPkiProfile {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         // Reverse-domain style: regime owner + regime abbreviation.
         "cabf.br.tls"
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         // SC-081 is the most recent ballot materially changing validity policy.
         // Note: this string identifies the normative document whose rules were last
         // incorporated into this profile.  SC-081 validity cap enforcement is
@@ -212,11 +218,11 @@ impl Profile for WebPkiProfile {
 pub struct SmimeProfile;
 
 impl Profile for SmimeProfile {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         "cabf.smime"
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         // S/MIME BR version 1.0 (first edition).
         "1.0"
     }
@@ -227,7 +233,7 @@ impl Profile for SmimeProfile {
         // is 1185 days. The spec states this as an explicit day count, not a
         // calendar-month approximation. (Strict/Multipurpose is 825 days;
         // this profile targets the Legacy generation.)
-        p.max_validity_secs = Some(1185 * 86_400);
+        p.max_validity_secs = Some(1185 * SECS_PER_DAY);
         // S/MIME BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
         // S/MIME BR §6.1.5: RSA keys must be at least 2048 bits.
@@ -271,11 +277,11 @@ impl Profile for SmimeProfile {
 pub struct CodeSigningProfile;
 
 impl Profile for CodeSigningProfile {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         "cabf.cs"
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         // CS BR version 3.0.
         "3.0"
     }
@@ -283,7 +289,7 @@ impl Profile for CodeSigningProfile {
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
         let mut p = ValidationPolicy::new(now_unix);
         // CS BR §6.3.2 (effective 2026-03-01): maximum 460 days for subscriber certificates.
-        p.max_validity_secs = Some(460 * 86_400);
+        p.max_validity_secs = Some(460 * SECS_PER_DAY);
         // CS BR §7.1.3: SHA-1 prohibited.
         p.allowed_signature_algs = Some(CABF_CS_BR_ALLOWED_ALGS.to_vec());
         // CS BR §6.1.5: RSA keys must be at least 3072 bits (raised from 2048 effective 2023-06-01).
@@ -312,11 +318,11 @@ impl Profile for CodeSigningProfile {
 pub struct Rfc5280Profile;
 
 impl Profile for Rfc5280Profile {
-    fn id(&self) -> &str {
+    fn id(&self) -> &'static str {
         "ietf.rfc5280"
     }
 
-    fn version(&self) -> &str {
+    fn version(&self) -> &'static str {
         "RFC 5280"
     }
 
@@ -352,9 +358,9 @@ impl Profile for Rfc5280Profile {
 /// `sc081_validity_cap(notBefore)` for each certificate it audits.
 ///
 /// Epoch boundaries (UTC midnight on the effective date, seconds since Unix epoch):
-/// - 2026-03-15T00:00:00Z = 1_773_532_800
-/// - 2027-03-15T00:00:00Z = 1_805_068_800
-/// - 2029-03-15T00:00:00Z = 1_868_227_200
+/// - 2026-03-15T00:00:00Z = `1_773_532_800`
+/// - 2027-03-15T00:00:00Z = `1_805_068_800`
+/// - 2029-03-15T00:00:00Z = `1_868_227_200`
 ///
 /// Verified via: `python3 -c "import calendar; print(calendar.timegm((YYYY,3,15,0,0,0,0,0,0)))"`
 #[must_use]
@@ -366,13 +372,13 @@ pub fn sc081_validity_cap(not_before_unix: u64) -> u64 {
     const SC081_47D_EPOCH: u64 = 1_868_227_200; // 2029-03-15T00:00:00Z
 
     if not_before_unix >= SC081_47D_EPOCH {
-        47 * 86_400
+        47 * SECS_PER_DAY
     } else if not_before_unix >= SC081_100D_EPOCH {
-        100 * 86_400
+        100 * SECS_PER_DAY
     } else if not_before_unix >= SC081_200D_EPOCH {
-        200 * 86_400
+        200 * SECS_PER_DAY
     } else {
-        398 * 86_400
+        398 * SECS_PER_DAY
     }
 }
 
@@ -428,7 +434,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `max_validity_secs` | 1185 days (~39 months) | S/MIME BR §6.3.2 |
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | S/MIME BR §7.1.3 |
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
-/// | `require_subject_alt_name` | true | non-empty SubjectAltName extension required |
+/// | `require_subject_alt_name` | true | non-empty `SubjectAltName` extension required |
 /// | `require_rfc822_san` | true | at least one `rfc822Name` entry required in SAN |
 /// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
 /// | `max_path_len` | 1 | S/MIME BR §7.2 |
@@ -656,11 +662,10 @@ mod tests {
 
     #[test]
     fn web_pki_policy_requires_server_auth_eku() {
-        let server_auth: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
         let p = web_pki_policy(NOW);
         let ekus = p.required_leaf_eku.as_deref().unwrap_or(&[]);
         assert!(
-            ekus.contains(&server_auth),
+            ekus.contains(&ID_KP_SERVER_AUTH),
             "web_pki_policy: required_leaf_eku must contain id-kp-serverAuth"
         );
     }
@@ -747,13 +752,12 @@ mod tests {
     /// Oracle: a cert with serverAuth passes, a cert with emailProtection (not serverAuth) fails.
     #[test]
     fn web_pki_missing_server_auth_eku_rejected() {
-        let server_auth: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
         let p = web_pki_policy(NOW);
         assert!(
             p.required_leaf_eku
                 .as_deref()
                 .unwrap_or(&[])
-                .contains(&server_auth),
+                .contains(&ID_KP_SERVER_AUTH),
             "web_pki_policy must set required_leaf_eku=[serverAuth]"
         );
 
@@ -768,13 +772,12 @@ mod tests {
 
         // Verify rejection: require emailProtection but cert has serverAuth.
         // Also use pre-sc081 so only the EKU check fires (not the validity cap).
-        let email_prot: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
         let cert2 = load(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
         ));
         let anchors2 = [TrustAnchor::from_cert(cert2.clone())];
         let mut strict_policy = web_pki_policy(pre_sc081);
-        strict_policy.required_leaf_eku = Some(vec![email_prot]);
+        strict_policy.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
         assert!(
             matches!(
                 pkix_path::validate_path(&[cert2], &anchors2, &strict_policy, &EcdsaP256Verifier),
@@ -796,8 +799,7 @@ mod tests {
         // the test exercises EKU rejection, not validity rejection.
         let pre_sc081: u64 = 1_767_225_600;
         let mut policy = web_pki_policy(pre_sc081);
-        let email_prot: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
-        policy.required_leaf_eku = Some(vec![email_prot]);
+        policy.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
         assert!(
             matches!(
                 pkix_path::validate_path(&[cert], &anchors, &policy, &EcdsaP256Verifier),
@@ -823,11 +825,10 @@ mod tests {
 
     #[test]
     fn smime_policy_requires_email_protection_eku() {
-        let email_prot: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
         let p = smime_policy(NOW);
         let ekus = p.required_leaf_eku.as_deref().unwrap_or(&[]);
         assert!(
-            ekus.contains(&email_prot),
+            ekus.contains(&ID_KP_EMAIL_PROTECTION),
             "smime_policy: required_leaf_eku must contain id-kp-emailProtection"
         );
     }
@@ -933,11 +934,10 @@ mod tests {
 
     #[test]
     fn code_signing_policy_requires_code_signing_eku() {
-        let code_sign: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
         let p = code_signing_policy(NOW);
         let ekus = p.required_leaf_eku.as_deref().unwrap_or(&[]);
         assert!(
-            ekus.contains(&code_sign),
+            ekus.contains(&ID_KP_CODE_SIGNING),
             "code_signing_policy: required_leaf_eku must contain id-kp-codeSigning"
         );
     }
@@ -1117,8 +1117,7 @@ mod tests {
         let mut policy = smime_policy(pre_sc081);
         // webpki-self-signed-365d has serverAuth EKU; override required EKU to serverAuth
         // so the EKU check passes and the rfc822Name SAN type check fires.
-        let server_auth: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
-        policy.required_leaf_eku = Some(vec![server_auth]);
+        policy.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
         assert!(
             matches!(
                 pkix_path::validate_path(&[cert], &anchors, &policy, &EcdsaP256Verifier),
