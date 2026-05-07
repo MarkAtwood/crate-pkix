@@ -157,10 +157,9 @@ where
 
     // Then: revocation checking on each cert in the validated chain.
     // chain[i] was issued by chain[i+1]; the last cert was issued by the trust anchor.
-    for i in 0..chain.len() {
-        let cert = &chain[i];
-        if let Some(issuer) = chain.get(i + 1) {
-            revocation.check_revocation(cert, issuer)?;
+    for (i, cert) in chain.iter().enumerate() {
+        if i + 1 < chain.len() {
+            revocation.check_revocation(cert, &chain[i + 1])?;
         } else {
             // Last cert: issued directly by the trust anchor.
             // CrlChecker/OcspChecker override this; NoRevocation inherits the

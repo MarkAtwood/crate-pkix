@@ -706,6 +706,5 @@ fn cert_is_ca_cert(cert: &Certificate) -> bool {
         .iter()
         .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
         .and_then(|e| BasicConstraints::from_der(e.extn_value.as_bytes()).ok())
-        .map(|bc| bc.ca)
-        .unwrap_or(false)
+        .is_some_and(|bc| bc.ca)
 }

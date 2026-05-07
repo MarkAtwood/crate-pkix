@@ -2328,13 +2328,12 @@ fn chain_walk<V: SignatureVerifier>(
             // keyCertSign is NOT set (== Some(false)).  Absent KeyUsage (None) is allowed.
             // has_key_cert_sign is fail-closed: a malformed critical KeyUsage returns
             // MalformedCertificate rather than being silently treated as absent (vjc.15).
-            if policy.enforce_key_usage {
-                match has_key_cert_sign(cert)
+            if policy.enforce_key_usage
+                && has_key_cert_sign(cert)
                     .map_err(|_| Error::MalformedCertificate { index: i })?
-                {
-                    Some(false) => return Err(Error::KeyUsageMissing { index: i }),
-                    Some(true) | None => {}
-                }
+                    == Some(false)
+            {
+                return Err(Error::KeyUsageMissing { index: i });
             }
 
             // (h) pathLenConstraint: count only non-self-issued intermediates below position i
