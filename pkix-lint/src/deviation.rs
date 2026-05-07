@@ -77,10 +77,10 @@ impl std::fmt::Display for DeviationAddError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DeviationAddError::DuplicateId(id) => {
-                write!(f, "deviation id '{}' already exists in the store", id)
+                write!(f, "deviation id '{id}' already exists in the store")
             }
             DeviationAddError::EmptyField(field) => {
-                write!(f, "deviation field '{}' must not be empty", field)
+                write!(f, "deviation field '{field}' must not be empty")
             }
         }
     }
@@ -245,6 +245,12 @@ pub enum DeviationScope {
     ///
     /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
     /// [`DeviationScope::IssuerDnExact`] when precise DN identity is required.
+    ///
+    /// **Warning**: case folding uses `make_ascii_lowercase()`, which only folds
+    /// ASCII characters. This may fail to match non-ASCII DN components (e.g.,
+    /// accented letters or CJK characters) because non-ASCII code points are left
+    /// unchanged. If the issuer DN contains non-ASCII characters, use
+    /// [`DeviationScope::IssuerDnExact`] instead.
     IssuerDnContains(String),
 
     /// The deviation applies to certs whose issuer DN matches exactly, using
@@ -573,6 +579,7 @@ impl DeviationStore {
     }
 
     /// Return all deviations that are active at `now_unix`.
+    #[must_use]
     pub fn active_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations
             .iter()
@@ -593,6 +600,7 @@ impl DeviationStore {
     /// Return all deviations that have expired as of `now_unix`.
     ///
     /// Used by corpus-reporting tools to surface deviations that need renewal.
+    #[must_use]
     pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations.iter().filter(move |d| {
             d.effective_end

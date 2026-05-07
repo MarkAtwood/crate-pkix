@@ -86,11 +86,17 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// 1.3.6.1.4.1.11129.2.4.2). Returns `Ok(())` if at least one SCT verifies
 /// against a trusted log; returns [`Error::NoTrustedSct`] otherwise.
 ///
+/// # Note
+///
+/// This is a stub. The function always returns `Err(Error::NoTrustedSct)`
+/// regardless of input. See the crate-level documentation.
+///
 /// # Limitations
 ///
 /// Not yet implemented (tracked for v0.2). Returns [`Error::NoTrustedSct`]
 /// until SCT parsing, log-list lookup, and Merkle proof verification are
 /// implemented.
+#[deprecated = "pkix-ct is not yet implemented; this function always returns NoTrustedSct"]
 pub fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
     Err(Error::NoTrustedSct)
 }
