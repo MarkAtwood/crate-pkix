@@ -92,10 +92,12 @@ const OID_BASIC_CONSTRAINTS: der::asn1::ObjectIdentifier =
 /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct CrlChecker<V> {
-    crl_der: Vec<u8>,
-    /// Optional delta CRL DER. When present, its entries are merged with the
-    /// base CRL in `check_revocation` (RFC 5280 §5.2.4).
-    delta_crl_der: Option<Vec<u8>>,
+    /// Pre-parsed base CRL. Decoded once at construction; reused on every
+    /// [`RevocationChecker::check_revocation`] call.
+    crl: CertificateList,
+    /// Optional pre-parsed delta CRL. When present, its entries are merged
+    /// with the base CRL in `check_revocation` (RFC 5280 §5.2.4).
+    delta_crl: Option<CertificateList>,
     now_unix: u64,
     verifier: V,
 }
@@ -103,9 +105,17 @@ pub struct CrlChecker<V> {
 impl<V: SignatureVerifier> CrlChecker<V> {
     /// Create a new `CrlChecker`.
     ///
-    /// - `crl_der`  — DER-encoded `CertificateList` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
+    /// - `crl_der`  — DER-encoded `CertificateList` (any `AsRef<[u8]>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix` — current time as seconds since the Unix epoch
     /// - `verifier` — signature verifier used to authenticate the CRL
+    ///
+    /// The DER is parsed once at construction time and the parsed
+    /// [`CertificateList`] is reused on every check, eliminating per-check
+    /// re-parse work.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::CrlParseError`] if `crl_der` cannot be DER-decoded.
     ///
     /// # Security
     ///
@@ -114,14 +124,15 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// contain only the changes since the last base CRL; using one alone silently
     /// under-covers revocations. Pass it via [`CrlChecker::with_delta`] together
     /// with the matching base CRL to get correct coverage.
-    #[must_use]
-    pub fn new(crl_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
-        Self {
-            crl_der: crl_der.into(),
-            delta_crl_der: None,
+    pub fn new(crl_der: impl AsRef<[u8]>, now_unix: u64, verifier: V) -> crate::Result<Self> {
+        let crl = CertificateList::from_der(crl_der.as_ref())
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        Ok(Self {
+            crl,
+            delta_crl: None,
             now_unix,
             verifier,
-        }
+        })
     }
 
     /// Create a `CrlChecker` with a base CRL and a delta CRL.
@@ -142,18 +153,16 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// - The delta's `BaseCRLNumber` is greater than the base CRL's `CRLNumber`
     ///   (the delta was produced against a newer base than the one supplied).
     pub fn with_delta(
-        base_der: impl Into<Vec<u8>>,
-        delta_der: impl Into<Vec<u8>>,
+        base_der: impl AsRef<[u8]>,
+        delta_der: impl AsRef<[u8]>,
         now_unix: u64,
         verifier: V,
     ) -> crate::Result<Self> {
-        let base_der = base_der.into();
-        let delta_der_bytes = delta_der.into();
-
         // Parse both to validate structure and extract CRL numbers.
-        let base_crl = CertificateList::from_der(&base_der).map_err(Error::CrlParseError)?;
-        let delta_crl =
-            CertificateList::from_der(&delta_der_bytes).map_err(Error::CrlParseError)?;
+        let base_crl = CertificateList::from_der(base_der.as_ref())
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        let delta_crl = CertificateList::from_der(delta_der.as_ref())
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
 
         // The base CRL MUST NOT itself be a delta CRL (RFC 5280 §5.2.4: only a
         // full CRL may serve as the base).  Detect by OID presence alone — do not
@@ -174,7 +183,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         // has_delta_crl_indicator confirmed OID presence above; None is unreachable.
         let delta_base_num = base_crl_number(&delta_crl)
             .ok_or(Error::DeltaCrlBaseMismatch)? // can only happen if code invariant broken
-            .map_err(Error::CrlParseError)?;
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
 
         // The base CRL and delta CRL MUST have the same issuer.
         if !names_match(
@@ -189,15 +198,15 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         // A malformed or overflowing base CRLNumber is treated as CrlParseError
         // rather than silently skipping the freshness check.
         if let Some(base_num_result) = crl_number(&base_crl) {
-            let base_num = base_num_result.map_err(Error::CrlParseError)?;
+            let base_num = base_num_result.map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
             if delta_base_num > base_num {
                 return Err(Error::CrlNumberMismatch);
             }
         }
 
         Ok(Self {
-            crl_der: base_der,
-            delta_crl_der: Some(delta_der_bytes),
+            crl: base_crl,
+            delta_crl: Some(delta_crl),
             now_unix,
             verifier,
         })
@@ -206,8 +215,8 @@ impl<V: SignatureVerifier> CrlChecker<V> {
 
 impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()> {
-        // (1) Parse the base CRL.
-        let crl = CertificateList::from_der(&self.crl_der).map_err(Error::CrlParseError)?;
+        // (1) Reuse the pre-parsed base CRL (parsed once at construction).
+        let crl = &self.crl;
 
         // (2) Verify the CRL issuer name matches the certificate's issuer.
         //     A CRL signed by a different CA does not convey revocation status for
@@ -246,7 +255,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         }
 
         // (4) Verify the CRL signature against the issuer's SPKI.
-        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
+        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
@@ -262,7 +271,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
         //     (critical), check scope constraints against the certificate.
-        if let Some(idp) = parse_issuing_dp(&crl)? {
+        if let Some(idp) = parse_issuing_dp(crl)? {
             // onlyContainsAttributeCerts: attribute cert validation is out of scope
             // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
             if idp.only_contains_attribute_certs {
@@ -290,10 +299,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     and the primary issuer-name check.  The extra checks below are
         //     defense-in-depth: they guard against any future code path that bypasses
         //     the with_delta() constructor and against subtle cross-name mismatches.
-        let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
-            // Parse the delta CRL once; all subsequent checks use the parsed value.
-            let delta_crl =
-                CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+        let delta_entries: Vec<RevokedCert> = if let Some(delta_crl) = &self.delta_crl {
+            // Reuse the pre-parsed delta CRL (parsed once at construction).
 
             // Extra check: delta CRL issuer must also match the base CRL issuer
             // (construction-time invariant, re-checked here for defense-in-depth).
@@ -314,7 +321,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             // verify_delta_crl_and_collect will re-verify the issuer-name match
             // against `expected_issuer_name` as its first step.
             verify_delta_crl_and_collect(
-                &delta_crl,
+                delta_crl,
                 &self.verifier,
                 issuer
                     .tbs_certificate
@@ -331,7 +338,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     RFC 5280 §5.2.4: delta CRL entries take precedence over base entries.
         //     A removeFromCRL reason in the delta means the cert was un-held.
         let cert_serial = &cert.tbs_certificate.serial_number;
-        check_revocation_status(cert_serial, &delta_entries, &crl)
+        check_revocation_status(cert_serial, &delta_entries, crl)
     }
 
     /// Check revocation for `cert` issued directly by a trust anchor.
@@ -353,8 +360,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         cert: &Certificate,
         anchor: &TrustAnchor,
     ) -> crate::Result<()> {
-        // (1) Parse the base CRL.
-        let crl = CertificateList::from_der(&self.crl_der).map_err(Error::CrlParseError)?;
+        // (1) Reuse the pre-parsed base CRL (parsed once at construction).
+        let crl = &self.crl;
 
         // (2) The CRL issuer must match the anchor's subject DN, and the
         // certificate being checked must also be issued by that anchor.
@@ -382,7 +389,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (4) Verify the CRL signature against the anchor's SPKI.
         //     cRLSign KeyUsage check is skipped: trust anchors have no KeyUsage
         //     extension accessible to us (they are trusted by construction).
-        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(Error::CrlParseError)?;
+        let tbs_bytes = crl.tbs_cert_list.to_der().map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
@@ -394,7 +401,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
         // (5) IssuingDistributionPoint scope check (same as check_revocation).
-        if let Some(idp) = parse_issuing_dp(&crl)? {
+        if let Some(idp) = parse_issuing_dp(crl)? {
             if idp.only_contains_attribute_certs {
                 return Ok(());
             }
@@ -409,10 +416,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (6) Delta CRL merge — if a delta CRL is present, verify issuer consistency
         //     and merge it.  Uses the anchor SPKI for the delta signature check.
-        let delta_entries: Vec<RevokedCert> = if let Some(delta_der) = &self.delta_crl_der {
-            // Parse the delta CRL once; all subsequent checks use the parsed value.
-            let delta_crl =
-                CertificateList::from_der(delta_der).map_err(Error::CrlParseError)?;
+        let delta_entries: Vec<RevokedCert> = if let Some(delta_crl) = &self.delta_crl {
+            // Reuse the pre-parsed delta CRL (parsed once at construction).
 
             // Cross-check: delta CRL issuer must match base CRL issuer and anchor subject.
             // Mirrors the three-way check performed in check_revocation for the cert-issuer path.
@@ -423,7 +428,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 return Err(Error::CrlIssuerMismatch);
             }
             verify_delta_crl_and_collect(
-                &delta_crl,
+                delta_crl,
                 &self.verifier,
                 anchor.subject_public_key_info.owned_to_ref(),
                 &anchor.subject,
@@ -435,7 +440,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (7) Search for the certificate's serial (delta entries take precedence).
         let cert_serial = &cert.tbs_certificate.serial_number;
-        check_revocation_status(cert_serial, &delta_entries, &crl)
+        check_revocation_status(cert_serial, &delta_entries, crl)
     }
 }
 
@@ -535,7 +540,7 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     let delta_tbs_bytes = delta_crl
         .tbs_cert_list
         .to_der()
-        .map_err(Error::CrlParseError)?;
+        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
     verifier
         .verify_signature(
             delta_crl.signature_algorithm.owned_to_ref(),
@@ -664,7 +669,7 @@ fn check_crl_sign(cert: &Certificate) -> crate::Result<()> {
         return Ok(()); // KeyUsage absent (or no extensions) → no constraint
     };
     let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
-        .map_err(Error::CrlParseError)?;
+        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
     if ku.crl_sign() {
         Ok(())
     } else {
@@ -703,7 +708,7 @@ fn parse_issuing_dp(
         None => Ok(None),
         Some(e) => {
             let idp = IssuingDistributionPoint::from_der(e.extn_value.as_bytes())
-                .map_err(Error::CrlParseError)?;
+                .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
             Ok(Some(idp))
         }
     }

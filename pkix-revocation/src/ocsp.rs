@@ -34,17 +34,14 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///
 /// Only available when the `ocsp` feature is enabled.
 ///
-/// # Limitations (v0.1)
+/// # Limitations
 ///
-/// - The OCSP response is re-parsed from DER on every [`check_revocation`] call.
-///   For chains with multiple certificates validated against the same response,
-///   this is O(N) redundant parsing. Tracked for v0.3 (cache the parsed
-///   `BasicOcspResponse` in `new`).
 /// - Only issuer-signed (direct) OCSP responses are supported.
 ///   Delegated OCSP responders (responses signed by a separate responder
 ///   certificate, not by the issuer directly) will fail with
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
-///   the issuer's key. This is a v0.1 limitation tracked for v0.3.
+///   the issuer's key. This is a current limitation; delegated responder
+///   support is future work.
 ///
 /// # Behavior
 ///
@@ -68,7 +65,12 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct OcspChecker<V> {
-    response_der: Vec<u8>,
+    /// Pre-parsed `BasicOCSPResponse`, decoded once at construction time and
+    /// reused on every check. Signature verification still happens per-call
+    /// because the issuer SPKI varies between
+    /// [`RevocationChecker::check_revocation`] (issuer cert) and
+    /// [`RevocationChecker::check_revocation_against_anchor`] (anchor SPKI).
+    basic: BasicOcspResponse,
     now_unix: u64,
     verifier: V,
 }
@@ -76,16 +78,27 @@ pub struct OcspChecker<V> {
 impl<V: SignatureVerifier> OcspChecker<V> {
     /// Create a new `OcspChecker`.
     ///
-    /// - `response_der` — DER-encoded `OCSPResponse` (any `Into<Vec<u8>>`, e.g. `Vec<u8>` or `&[u8]`)
+    /// - `response_der` — DER-encoded `OCSPResponse` (any `AsRef<[u8]>`, e.g. `Vec<u8>` or `&[u8]`)
     /// - `now_unix`     — current time as seconds since the Unix epoch
     /// - `verifier`     — signature verifier used to authenticate the OCSP response
-    #[must_use]
-    pub fn new(response_der: impl Into<Vec<u8>>, now_unix: u64, verifier: V) -> Self {
-        Self {
-            response_der: response_der.into(),
+    ///
+    /// The response is parsed once at construction time; subsequent
+    /// [`RevocationChecker::check_revocation`] calls reuse the cached
+    /// [`BasicOcspResponse`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::OcspParseError`] if `response_der` cannot be DER-decoded
+    /// or [`Error::OcspMalformed`] if the response status is non-`Successful`,
+    /// `responseBytes` is absent, or the inner `responseType` is not
+    /// `id-pkix-ocsp-basic`.
+    pub fn new(response_der: impl AsRef<[u8]>, now_unix: u64, verifier: V) -> crate::Result<Self> {
+        let basic = parse_basic_response(response_der.as_ref())?;
+        Ok(Self {
+            basic,
             now_unix,
             verifier,
-        }
+        })
     }
 }
 
@@ -104,9 +117,11 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspIssuerCertMismatch);
         }
 
-        // (1)-(6) Parse and verify the BasicOCSPResponse.
-        let basic = parse_and_verify_basic_response(
-            &self.response_der,
+        // (1)-(5) Reuse the pre-parsed BasicOCSPResponse and (6) verify the
+        // signature against the issuer's SPKI.
+        let basic = &self.basic;
+        parse_and_verify_basic_response(
+            basic,
             &self.verifier,
             issuer
                 .tbs_certificate
@@ -146,7 +161,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .tbs_certificate
             .subject
             .to_der()
-            .map_err(Error::OcspParseError)?;
+            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
         let key_raw = issuer
             .tbs_certificate
             .subject_public_key_info
@@ -210,7 +225,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
     /// `subject_public_key_info`) are used in place of the missing issuer
     /// `Certificate`.
     ///
-    /// # Limitations (v0.1)
+    /// # Limitations
     ///
     /// OCSP responder discovery via the Authority Information Access extension
     /// (RFC 6960 §3.1) is not implemented.  The response DER must be supplied
@@ -229,9 +244,11 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspIssuerCertMismatch);
         }
 
-        // (1)-(6) Parse and verify the BasicOCSPResponse.
-        let basic = parse_and_verify_basic_response(
-            &self.response_der,
+        // (1)-(5) Reuse the pre-parsed BasicOCSPResponse and (6) verify the
+        // signature against the anchor's SPKI.
+        let basic = &self.basic;
+        parse_and_verify_basic_response(
+            basic,
             &self.verifier,
             anchor.subject_public_key_info.owned_to_ref(),
         )?;
@@ -253,7 +270,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         let anchor_name_der = anchor
             .subject
             .to_der()
-            .map_err(Error::OcspParseError)?;
+            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
         let anchor_key_raw = anchor
             .subject_public_key_info
             .subject_public_key
@@ -321,12 +338,42 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 /// The caller is responsible for the `ResponderId` check (step 6b) and all
 /// subsequent steps, which differ between the two callers.
 fn parse_and_verify_basic_response<V: SignatureVerifier>(
-    response_der: &[u8],
+    basic: &BasicOcspResponse,
     verifier: &V,
     issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-) -> crate::Result<BasicOcspResponse> {
+) -> crate::Result<()> {
+    // (6) Verify the OCSP signature against the supplied SPKI.
+    //
+    // Current limitation: assumes the response is signed directly by the issuer.
+    // The signature covers the DER encoding of ResponseData (tbs_response_data).
+    let tbs_bytes = basic
+        .tbs_response_data
+        .to_der()
+        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+    verifier
+        .verify_signature(
+            basic.signature_algorithm.owned_to_ref(),
+            issuer_spki,
+            &tbs_bytes,
+            basic.signature.raw_bytes(),
+        )
+        // Verifier returns an opaque error; no additional context available.
+        .map_err(|_| Error::OcspSignatureInvalid)?;
+
+    Ok(())
+}
+
+/// Parse an `OCSPResponse` DER blob and extract its inner `BasicOCSPResponse`.
+///
+/// Performs steps (1)–(5) of the OCSP processing pipeline (decode outer
+/// `OCSPResponse`, require `Successful` status, extract `responseBytes`,
+/// verify `responseType`, decode inner `BasicOCSPResponse`). Signature
+/// verification is intentionally **not** performed here so the caller can
+/// supply the appropriate issuer SPKI per call.
+fn parse_basic_response(response_der: &[u8]) -> crate::Result<BasicOcspResponse> {
     // (1) Parse the outer OCSPResponse.
-    let resp = OcspResponse::from_der(response_der).map_err(Error::OcspParseError)?;
+    let resp = OcspResponse::from_der(response_der)
+        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
 
     // (2) Require responseStatus == successful; any other (TryLater,
     // InternalError, MalformedRequest, SigRequired, Unauthorized) → OcspMalformed.
@@ -344,28 +391,8 @@ fn parse_and_verify_basic_response<V: SignatureVerifier>(
     }
 
     // (5) Parse the BasicOCSPResponse.
-    let basic = BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
-        .map_err(Error::OcspParseError)?;
-
-    // (6) Verify the OCSP signature against the supplied SPKI.
-    //
-    // v0.1 limitation: assumes the response is signed directly by the issuer.
-    // The signature covers the DER encoding of ResponseData (tbs_response_data).
-    let tbs_bytes = basic
-        .tbs_response_data
-        .to_der()
-        .map_err(Error::OcspParseError)?;
-    verifier
-        .verify_signature(
-            basic.signature_algorithm.owned_to_ref(),
-            issuer_spki,
-            &tbs_bytes,
-            basic.signature.raw_bytes(),
-        )
-        // Verifier returns an opaque error; no additional context available.
-        .map_err(|_| Error::OcspSignatureInvalid)?;
-
-    Ok(basic)
+    BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
+        .map_err(|e| Error::OcspParseError(crate::DerError(e)))
 }
 
 /// Stack-allocated hash output for CertID hash comparisons.
@@ -380,7 +407,7 @@ enum HashOutput {
 }
 
 impl HashOutput {
-    fn as_slice(&self) -> &[u8] {
+    const fn as_slice(&self) -> &[u8] {
         match self {
             Self::Sha1(b) => b,
             Self::Sha256(b) => b,

@@ -26,15 +26,19 @@
 //!
 //! # Usage
 //!
-//! ```rust,ignore
-//! use pkix_profiles::{WebPkiProfile, Profile};
+//! ```rust,no_run
+//! use pkix_profiles::{Profile, WebPkiProfile};
+//!
+//! let now_unix = 1_700_000_000_u64;
 //!
 //! // Via the Profile trait (for generic code or registries):
 //! let profile = WebPkiProfile;
 //! let policy = profile.policy(now_unix);
+//! # let _ = policy;
 //!
 //! // Via free-function alias (for quick one-liners):
 //! let policy = pkix_profiles::web_pki_policy(now_unix);
+//! # let _ = policy;
 //! ```
 //!
 //! # `std` requirement
@@ -364,7 +368,7 @@ impl Profile for Rfc5280Profile {
 ///
 /// Verified via: `python3 -c "import calendar; print(calendar.timegm((YYYY,3,15,0,0,0,0,0,0)))"`
 #[must_use]
-pub fn sc081_validity_cap(not_before_unix: u64) -> u64 {
+pub const fn sc081_validity_cap(not_before_unix: u64) -> u64 {
     // Exact UTC midnight boundaries.
     // Computed: python3 -c "import calendar; print(calendar.timegm((2026,3,15,0,0,0,0,0,0)))"
     const SC081_200D_EPOCH: u64 = 1_773_532_800; // 2026-03-15T00:00:00Z

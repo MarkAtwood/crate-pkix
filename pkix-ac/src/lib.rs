@@ -81,12 +81,12 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::ParseError => f.write_str("attribute certificate parse error"),
-            Error::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
-            Error::ValidityPeriod => {
+            Self::ParseError => f.write_str("attribute certificate parse error"),
+            Self::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
+            Self::ValidityPeriod => {
                 f.write_str("attribute certificate validity period check failed")
             }
-            Error::AaPathInvalid(e) => write!(f, "attribute authority path invalid: {e}"),
+            Self::AaPathInvalid(e) => write!(f, "attribute authority path invalid: {e}"),
         }
     }
 }
@@ -95,7 +95,7 @@ impl core::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::AaPathInvalid(e) => Some(e),
+            Self::AaPathInvalid(e) => Some(e),
             _ => None,
         }
     }
@@ -118,7 +118,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)` until
 /// the RFC 5755 §5 validation algorithm is implemented.
 #[deprecated = "pkix-ac is not yet implemented; this function always returns AaPathInvalid"]
-pub fn validate_attribute_cert(
+pub const fn validate_attribute_cert(
     _ac: &AttributeCertificate,
     _aa_anchors: &[pkix_path::TrustAnchor],
     _now_unix: u64,

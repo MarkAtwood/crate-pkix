@@ -31,6 +31,30 @@
 use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
+/// Opaque wrapper around an underlying ASN.1 / DER error.
+///
+/// Carries a [`Display`] message identical to the wrapped `der::Error` so
+/// diagnostic output is preserved, but does not expose the underlying type
+/// in the public API. This insulates callers from semver-breaking changes
+/// in the `der` crate's error variants.
+///
+/// [`Display`]: core::fmt::Display
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DerError(der::Error);
+
+impl core::fmt::Display for DerError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 /// Errors returned by revocation checking.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -62,7 +86,7 @@ pub enum Error {
     CrlSignatureInvalid,
 
     /// DER decoding of a CRL failed.
-    CrlParseError(der::Error),
+    CrlParseError(DerError),
 
     /// An OCSP response signature did not verify against the responder's key.
     OcspSignatureInvalid,
@@ -110,7 +134,7 @@ pub enum Error {
     OcspExpired,
 
     /// DER decoding of an OCSP response failed.
-    OcspParseError(der::Error),
+    OcspParseError(DerError),
 
     /// The OCSP response is structurally invalid per RFC 6960 but DER-decodable.
     ///
@@ -154,7 +178,7 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Revoked {
+            Self::Revoked {
                 serial,
                 reason_code,
             } => match reason_code {
@@ -165,34 +189,34 @@ impl core::fmt::Display for Error {
                 ),
                 None => write!(f, "certificate {serial} is revoked"),
             },
-            Error::CrlExpired => f.write_str("CRL validity window check failed"),
-            Error::CrlIssuerMismatch => f.write_str("CRL issuer does not match certificate issuer"),
-            Error::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
-            Error::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
-            Error::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
-            Error::OcspResponderIdMismatch => {
+            Self::CrlExpired => f.write_str("CRL validity window check failed"),
+            Self::CrlIssuerMismatch => f.write_str("CRL issuer does not match certificate issuer"),
+            Self::CrlSignatureInvalid => f.write_str("CRL signature is invalid"),
+            Self::CrlParseError(e) => write!(f, "CRL parse error: {e}"),
+            Self::OcspSignatureInvalid => f.write_str("OCSP response signature is invalid"),
+            Self::OcspResponderIdMismatch => {
                 f.write_str("OCSP ResponderId does not match the expected issuer identity")
             }
-            Error::OcspCertIdMismatch => {
+            Self::OcspCertIdMismatch => {
                 f.write_str("OCSP CertID issuer hashes do not match the expected issuer")
             }
-            Error::OcspIssuerCertMismatch => f.write_str(
+            Self::OcspIssuerCertMismatch => f.write_str(
                 "issuer certificate subject DN does not match the certificate's issuer DN",
             ),
-            Error::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
-            Error::OcspExpired => f.write_str("OCSP response is stale or has no nextUpdate"),
-            Error::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
-            Error::OcspMalformed => {
+            Self::OcspStatusUnknown => f.write_str("OCSP responder returned unknown status"),
+            Self::OcspExpired => f.write_str("OCSP response is stale or has no nextUpdate"),
+            Self::OcspParseError(e) => write!(f, "OCSP response parse error: {e}"),
+            Self::OcspMalformed => {
                 f.write_str("OCSP response is structurally invalid (malformed per RFC 6960)")
             }
-            Error::CrlSignMissing => {
+            Self::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
             }
-            Error::DeltaCrlBaseMismatch => {
+            Self::DeltaCrlBaseMismatch => {
                 f.write_str("delta CRL BaseCRLNumber does not match the base CRL's CRLNumber")
             }
-            Error::CrlNumberMismatch => f.write_str("CRL number is lower than expected"),
-            Error::MalformedCertificate => f.write_str(
+            Self::CrlNumberMismatch => f.write_str("CRL number is lower than expected"),
+            Self::MalformedCertificate => f.write_str(
                 "certificate BasicConstraints extension is present but cannot be decoded",
             ),
         }
@@ -200,7 +224,7 @@ impl core::fmt::Display for Error {
 }
 
 /// Map a `CrlReason` variant to its RFC 5280 §5.3.1 camelCase name.
-fn crl_reason_name(r: CrlReason) -> &'static str {
+const fn crl_reason_name(r: CrlReason) -> &'static str {
     match r {
         CrlReason::Unspecified => "unspecified",
         CrlReason::KeyCompromise => "keyCompromise",
@@ -219,7 +243,7 @@ fn crl_reason_name(r: CrlReason) -> &'static str {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::CrlParseError(e) | Error::OcspParseError(e) => Some(e),
+            Self::CrlParseError(e) | Self::OcspParseError(e) => Some(e),
             _ => None,
         }
     }
@@ -361,9 +385,11 @@ impl RevocationChecker for NoRevocation {
 #[cfg(feature = "crl")]
 mod crl;
 #[cfg(feature = "crl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use crl::CrlChecker;
 
 #[cfg(feature = "ocsp")]
 mod ocsp;
 #[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use ocsp::OcspChecker;

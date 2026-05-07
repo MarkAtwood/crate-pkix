@@ -62,9 +62,9 @@ pub enum FetchError {
 impl core::fmt::Display for FetchError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            FetchError::Transport(e) => write!(f, "transport error: {e}"),
-            FetchError::HttpStatus(code) => write!(f, "HTTP {code}"),
-            FetchError::TooLarge => f.write_str("response too large"),
+            Self::Transport(e) => write!(f, "transport error: {e}"),
+            Self::HttpStatus(code) => write!(f, "HTTP {code}"),
+            Self::TooLarge => f.write_str("response too large"),
         }
     }
 }
@@ -72,7 +72,7 @@ impl core::fmt::Display for FetchError {
 impl std::error::Error for FetchError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            FetchError::Transport(e) => Some(e.as_ref()),
+            Self::Transport(e) => Some(e.as_ref()),
             _ => None,
         }
     }
@@ -90,6 +90,7 @@ impl std::error::Error for FetchError {
 ///
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "crl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 #[allow(dead_code)] // fields used once HttpCrlFetcher is implemented
 pub struct HttpCrlFetcher<F> {
     fetcher: F,
@@ -102,7 +103,7 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `now_unix`  — current time as seconds since the Unix epoch
-    pub fn new(fetcher: F, now_unix: u64) -> Self {
+    pub const fn new(fetcher: F, now_unix: u64) -> Self {
         Self { fetcher, now_unix }
     }
 }
@@ -119,6 +120,7 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
 ///
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[allow(dead_code)] // fields used once HttpOcspFetcher is implemented
 pub struct HttpOcspFetcher<F> {
     fetcher: F,
@@ -131,7 +133,7 @@ impl<F: RevocationFetcher> HttpOcspFetcher<F> {
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `now_unix`  — current time as seconds since the Unix epoch
-    pub fn new(fetcher: F, now_unix: u64) -> Self {
+    pub const fn new(fetcher: F, now_unix: u64) -> Self {
         Self { fetcher, now_unix }
     }
 }

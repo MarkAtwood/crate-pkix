@@ -241,11 +241,11 @@ impl SubjectKind {
     /// - `AnchorIssued` is a sub-category of `IntermediateCa`; a filter of
     ///   `IntermediateCa` also matches `AnchorIssued` certificates.
     #[must_use]
-    pub fn matches(self, filter: SubjectKind) -> bool {
+    pub fn matches(self, filter: Self) -> bool {
         match filter {
-            SubjectKind::Any => true,
-            SubjectKind::IntermediateCa => {
-                self == SubjectKind::IntermediateCa || self == SubjectKind::AnchorIssued
+            Self::Any => true,
+            Self::IntermediateCa => {
+                self == Self::IntermediateCa || self == Self::AnchorIssued
             }
             other => self == other,
         }
@@ -326,30 +326,30 @@ pub enum LintResult {
 impl LintResult {
     /// Returns `true` if this result represents a clean pass (no finding).
     #[must_use]
-    pub fn is_pass(&self) -> bool {
-        matches!(self, LintResult::Pass)
+    pub const fn is_pass(&self) -> bool {
+        matches!(self, Self::Pass)
     }
 
     /// Returns `true` if this result represents a finding (Warn, Error, or Fatal).
     #[must_use]
-    pub fn is_finding(&self) -> bool {
+    pub const fn is_finding(&self) -> bool {
         matches!(
             self,
-            LintResult::Warn(_) | LintResult::Error(_) | LintResult::Fatal(_)
+            Self::Warn(_) | Self::Error(_) | Self::Fatal(_)
         )
     }
 
     /// Returns `true` if the runner should stop evaluating further lints for this item.
     #[must_use]
-    pub fn is_fatal(&self) -> bool {
-        matches!(self, LintResult::Fatal(_))
+    pub const fn is_fatal(&self) -> bool {
+        matches!(self, Self::Fatal(_))
     }
 
     /// Returns the detail message for `Warn`, `Error`, or `Fatal`; `None` for `Pass`/`NotApplicable`.
     #[must_use]
-    pub fn detail(&self) -> Option<&'static str> {
+    pub const fn detail(&self) -> Option<&'static str> {
         match self {
-            LintResult::Warn(d) | LintResult::Error(d) | LintResult::Fatal(d) => Some(d),
+            Self::Warn(d) | Self::Error(d) | Self::Fatal(d) => Some(d),
             _ => None,
         }
     }
@@ -362,10 +362,10 @@ impl LintResult {
 impl core::fmt::Display for Severity {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Severity::Info => f.write_str("info"),
-            Severity::Warn => f.write_str("warn"),
-            Severity::Error => f.write_str("error"),
-            Severity::Fatal => f.write_str("fatal"),
+            Self::Info => f.write_str("info"),
+            Self::Warn => f.write_str("warn"),
+            Self::Error => f.write_str("error"),
+            Self::Fatal => f.write_str("fatal"),
         }
     }
 }
@@ -373,11 +373,11 @@ impl core::fmt::Display for Severity {
 impl core::fmt::Display for LintResult {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            LintResult::Pass => f.write_str("Pass"),
-            LintResult::NotApplicable => f.write_str("NotApplicable"),
-            LintResult::Warn(msg) => write!(f, "Warn: {msg}"),
-            LintResult::Error(msg) => write!(f, "Error: {msg}"),
-            LintResult::Fatal(msg) => write!(f, "Fatal: {msg}"),
+            Self::Pass => f.write_str("Pass"),
+            Self::NotApplicable => f.write_str("NotApplicable"),
+            Self::Warn(msg) => write!(f, "Warn: {msg}"),
+            Self::Error(msg) => write!(f, "Error: {msg}"),
+            Self::Fatal(msg) => write!(f, "Fatal: {msg}"),
         }
     }
 }
@@ -551,7 +551,7 @@ pub struct Finding {
 impl Finding {
     /// Returns `true` if this finding is actionable (Warn, Error, or Fatal).
     #[must_use]
-    pub fn is_finding(&self) -> bool {
+    pub const fn is_finding(&self) -> bool {
         self.result.is_finding()
     }
 }

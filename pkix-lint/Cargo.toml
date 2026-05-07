@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Lint engine for X.509 certificates — structured soft-fail and advisory results"
+keywords    = ["x509", "certificate", "pki", "lint", "cabforum"]
+categories  = ["cryptography"]
 
 [features]
 # Enable serde Serialize/Deserialize on Finding, DeviatedFinding, and EvaluationReport.
@@ -28,3 +30,7 @@ x509-cert     = { workspace = true }
 # serde_json is used by the json_round_trip test which requires --features serde.
 # Run with: cargo test -p pkix-lint --features serde
 serde_json    = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
