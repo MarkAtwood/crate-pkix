@@ -851,11 +851,11 @@ where
 /// work with a `Profile` implementation rather than constructing a
 /// [`ValidationPolicy`] directly.
 ///
-/// The profile's [`Profile::policy`] method is called with
-/// `now_unix` to produce the `ValidationPolicy`.  A `debug_assert!` enforces
-/// the `Profile` contract that the returned policy must have
-/// `current_time_unix == now_unix`; this fires in debug/test builds and is
-/// a no-op in release.
+/// The profile's [`Profile::policy`] method is called with `now_unix` to
+/// produce the `ValidationPolicy`.  The returned policy's `current_time_unix`
+/// is then unconditionally overwritten with `now_unix`, so that a buggy
+/// `Profile` implementation that returns the wrong clock value cannot silently
+/// cause validity checks to run against the wrong time.
 ///
 /// See [`validate_path`] for full documentation of the remaining parameters
 /// and error semantics.
@@ -871,11 +871,12 @@ where
     V: SignatureVerifier,
     P: Profile,
 {
-    let policy = profile.policy(now_unix);
-    debug_assert_eq!(
-        policy.current_time_unix, now_unix,
-        "Profile::policy() must set current_time_unix == now_unix"
-    );
+    let mut policy = profile.policy(now_unix);
+    // Unconditionally enforce the contract: the evaluation time for validity
+    // checks must be the `now_unix` passed by the caller, not whatever the
+    // profile returned. This prevents a buggy Profile from silently using
+    // the wrong clock in release builds.
+    policy.current_time_unix = now_unix;
     validate_path(chain, anchors, &policy, verifier)
 }
 
@@ -1089,7 +1090,10 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
         if prune_depth == 0 {
             break; // depth-0 root sentinel — never prune it
         }
-        // collect to release the shared borrow before tree.retain() takes &mut
+        // Collect child OIDs into a temporary Vec to release the shared borrow
+        // before tree.retain() takes &mut self. This allocates once per depth
+        // level per prune pass. In practice, chains are ≤ 10 deep and the policy
+        // tree is small (≤ 5 nodes), so the allocation cost is negligible.
         let child_policies: Vec<der::asn1::ObjectIdentifier> = tree
             .iter()
             .filter(|n| n.depth == d)
@@ -2102,22 +2106,19 @@ fn chain_walk<V: SignatureVerifier>(
                     // (d)(1)(i): for each parent at depth i-1 whose
                     // expected_policy_set contains p_oid, create a child.
                     let mut matched_via_i = false;
-                    let match_count = tree
-                        .iter()
+                    tree.iter()
                         .filter(|parent| {
                             parent.depth == cert_depth - 1
                                 && parent.expected_policy_set.contains(p_oid)
                         })
-                        .count();
-
-                    for _ in 0..match_count {
-                        matched_via_i = true;
-                        new_nodes.push(PolicyNode {
-                            depth: cert_depth,
-                            valid_policy: *p_oid,
-                            expected_policy_set: vec![*p_oid],
+                        .for_each(|_parent| {
+                            matched_via_i = true;
+                            new_nodes.push(PolicyNode {
+                                depth: cert_depth,
+                                valid_policy: *p_oid,
+                                expected_policy_set: vec![*p_oid],
+                            });
                         });
-                    }
 
                     // (d)(1)(ii): if no match in (i), check for an anyPolicy
                     // parent at depth i-1.

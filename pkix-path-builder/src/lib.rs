@@ -327,7 +327,12 @@ pub fn build_path(
 ) -> Result<Vec<Certificate>> {
     const MAX_DEPTH: usize = 10;
 
-    let pool_slice: &[Certificate] = &pool.certs;
+    let pool_slice = pool.certs.as_slice();
+
+    // Track whether any round was terminated by the budget (not by exhausting
+    // all candidates). If every round hits the budget limit, the pool is
+    // adversarially large and we return BudgetExceeded; otherwise NoPathFound.
+    let mut any_round_budget_exceeded = false;
 
     for max_depth in 1..=MAX_DEPTH {
         // Reset budget at the start of each round so that earlier rounds
@@ -335,9 +340,21 @@ pub fn build_path(
         // budget before deeper rounds get a chance to run.
         let mut budget = DFS_BUDGET;
         let mut path = alloc::vec![target.clone()];
-        if dfs(&mut path, pool_slice, anchors, max_depth, &mut budget)? {
-            return Ok(path);
+        match dfs(&mut path, pool_slice, anchors, max_depth, &mut budget) {
+            Ok(true) => return Ok(path),
+            Ok(false) => {}
+            Err(Error::BudgetExceeded) => {
+                // Budget exhausted at this depth does NOT mean there is no
+                // valid path at greater depth. Continue to the next round with
+                // a fresh budget rather than surfacing BudgetExceeded immediately.
+                any_round_budget_exceeded = true;
+            }
+            Err(e) => return Err(e),
         }
+    }
+
+    if any_round_budget_exceeded {
+        return Err(Error::BudgetExceeded);
     }
 
     // No path found within MAX_DEPTH. Check if a path exists at MAX_DEPTH+1

@@ -310,7 +310,12 @@ impl DeviationScope {
             DeviationScope::IssuerDnContains(substring) => {
                 // `substring` is pre-lowercased by `DeviationStore::add`; no
                 // need to call `.to_lowercase()` on it again here.
-                let issuer_lower = cert.tbs_certificate.issuer.to_string().to_lowercase();
+                // Use `make_ascii_lowercase` (in-place, single allocation) instead
+                // of `to_lowercase` (which allocates a new String for Unicode chars).
+                // CA DN strings are always ASCII in practice, so this is equivalent
+                // and avoids a second heap allocation.
+                let mut issuer_lower = cert.tbs_certificate.issuer.to_string();
+                issuer_lower.make_ascii_lowercase();
                 issuer_lower.contains(substring.as_str())
             }
 
@@ -607,6 +612,14 @@ impl DeviationStore {
 /// Findings where a deviation was applied are moved from `findings` to `deviated`.
 /// Callers can use `findings` for normal compliance reporting and `deviated`
 /// for audit/transparency reporting.
+///
+/// # Stability
+///
+/// This struct is `#[non_exhaustive]`: new fields may be added in future minor
+/// versions (e.g., a `suppressed` list for audit purposes). Do not construct
+/// `DeviationRunResult` directly with struct literal syntax; use
+/// [`DeviationRunResult::default()`] or obtain it from [`DeviationRunner`].
+#[non_exhaustive]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DeviationRunResult {
     /// Findings that were not affected by any deviation.

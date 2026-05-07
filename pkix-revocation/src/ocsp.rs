@@ -425,8 +425,7 @@ fn hash_certid_input(
 /// - `byKey`: the `KeyHash` must equal SHA-1 of the issuer's SPKI
 ///   `subjectPublicKey` bit string (raw bytes, tag/length/unused-bits stripped).
 ///
-/// Returns [`Error::OcspSignatureInvalid`] on mismatch, as a mismatch means
-/// the response was not produced by the expected issuer.
+/// Returns [`Error::OcspResponderIdMismatch`] on mismatch.
 fn verify_responder_id(id: &ResponderId, issuer: &Certificate) -> crate::Result<()> {
     verify_responder_id_impl(
         id,
@@ -459,6 +458,9 @@ fn verify_responder_id_anchor(id: &ResponderId, anchor: &TrustAnchor) -> crate::
 ///
 /// Checks that the OCSP `ResponderId` matches the expected identity
 /// (either a certificate subject or a trust anchor subject).
+///
+/// Returns [`Error::OcspResponderIdMismatch`] on mismatch (distinct from
+/// [`Error::OcspSignatureInvalid`], which indicates a cryptographic failure).
 fn verify_responder_id_impl(
     id: &ResponderId,
     subject: &x509_cert::name::Name,
@@ -467,14 +469,14 @@ fn verify_responder_id_impl(
     match id {
         ResponderId::ByName(name) => {
             if !names_match(name, subject) {
-                return Err(Error::OcspSignatureInvalid);
+                return Err(Error::OcspResponderIdMismatch);
             }
         }
         ResponderId::ByKey(key_hash) => {
             use sha1::Digest as _;
             let expected: [u8; 20] = sha1::Sha1::digest(spki_raw).into();
             if key_hash.as_bytes() != expected.as_ref() {
-                return Err(Error::OcspSignatureInvalid);
+                return Err(Error::OcspResponderIdMismatch);
             }
         }
     }

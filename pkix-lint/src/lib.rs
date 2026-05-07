@@ -111,13 +111,25 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 /// When deserializing from JSON (e.g., loading a saved evidence pack), we accept
 /// the small allocation + leak to preserve the field type.
 ///
-/// # Memory
+/// # Memory — important for long-running services
 ///
-/// This leaks one heap allocation per unique deserialized string, permanently.
-/// In short-lived processes (CLI tools, test runners), this is acceptable.
-/// In long-running services deserializing untrusted JSON, each unique string value
-/// grows process memory permanently. If this becomes a concern, replace with an
-/// interning cache with eviction.
+/// **This function leaks one heap allocation per unique deserialized string, permanently.**
+/// In short-lived processes (CLI tools, test runners, single-request lambdas), this
+/// is acceptable: the process exits before the leak matters.
+///
+/// **In long-running services** (e.g., a TLS policy daemon that continuously
+/// deserializes `Finding` or `EvaluationReport` values from a database or message
+/// queue), each unique `LintResult` detail string will permanently grow process
+/// memory with no bound. If you are in that scenario:
+///
+/// - Use a separate short-lived process or worker for deserialization and pass
+///   structured data across a process boundary.
+/// - Or file an issue to accelerate the v0.3 migration of `LintResult` detail
+///   fields from `&'static str` to `Cow<'static, str>`, which removes this
+///   constraint.
+///
+/// All other string fields in `Finding` and `EvaluationReport` already use
+/// `Cow<'static, str>` and do not leak.
 #[cfg(feature = "serde")]
 pub(crate) fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
 where
@@ -245,6 +257,14 @@ impl SubjectKind {
 ///
 /// The variant names and associated `&'static str` detail fields are stable.
 /// Dynamic `String` detail is planned for v0.3 via `Cow<'static, str>`.
+///
+/// # Serde memory note
+///
+/// When the `serde` feature is enabled, deserializing `LintResult::Warn`,
+/// `Error`, or `Fatal` variants leaks the detail string (one allocation per
+/// unique string, permanently). This is harmless in short-lived processes.
+/// See [`de_static_str`] for details and the mitigation path for long-running
+/// services.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -416,8 +436,15 @@ pub trait Lint: Send + Sync {
 
     /// Which certificate positions this lint applies to.
     ///
-    /// The runner uses this to skip `check_cert` for positions that don't match,
-    /// returning [`LintResult::NotApplicable`] automatically.
+    /// For [`Scope::Certificate`] lints, the runner uses this to skip
+    /// `check_cert` for positions that don't match, returning
+    /// [`LintResult::NotApplicable`] automatically.
+    ///
+    /// For [`Scope::Path`] lints, `applies_to()` is **not consulted** by the
+    /// runner — `check_path` is always called. Path-scope lints that need to
+    /// restrict themselves to certain chain configurations should implement
+    /// that logic inside `check_path` and return [`LintResult::NotApplicable`]
+    /// when the path does not qualify.
     fn applies_to(&self) -> SubjectKind;
 
     /// Evaluate the lint against a single certificate.
@@ -470,6 +497,7 @@ pub trait Lint: Send + Sync {
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
@@ -491,8 +519,8 @@ pub struct Finding {
     /// This field enables the "yellow today, green tomorrow because we updated the
     /// rule bundle from v1.3 to v1.4" explanation that prevents operators from
     /// treating a finding change as a tool defect.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))]
-    pub rule_bundle_version: &'static str,
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
+    pub rule_bundle_version: std::borrow::Cow<'static, str>,
     /// The outcome of the lint evaluation.
     pub result: LintResult,
     /// For certificate-scope lints, the zero-based chain index of the evaluated cert.
@@ -563,7 +591,7 @@ pub struct LintRunner {
     /// Version string stamped into every [`Finding`] produced by this runner.
     ///
     /// Set via [`LintRunner::with_bundle_version`]. Defaults to `""`.
-    bundle_version: &'static str,
+    bundle_version: std::borrow::Cow<'static, str>,
 }
 
 impl core::fmt::Debug for LintRunner {
@@ -589,14 +617,16 @@ impl LintRunner {
         debug_assert!(
             {
                 let mut ids: Vec<_> = lints.iter().map(|l| l.id()).collect();
+                let original_len = ids.len();
                 ids.sort_unstable();
-                ids.windows(2).all(|w| w[0] != w[1])
+                ids.dedup();
+                ids.len() == original_len
             },
             "duplicate lint IDs will produce confusing deviation behavior"
         );
         Self {
             lints,
-            bundle_version: "",
+            bundle_version: std::borrow::Cow::Borrowed(""),
         }
     }
 
@@ -606,19 +636,28 @@ impl LintRunner {
     /// as [`Finding::rule_bundle_version`]. Use this in production to record which
     /// version of the rule bundle was active when findings were generated.
     ///
-    /// # Example
+    /// Accepts any value that converts to `Cow<'static, str>`: string literals
+    /// (zero-copy) or owned `String` values (for runtime-constructed versions):
     ///
     /// ```rust,ignore
+    /// // Static literal — zero allocation
     /// let runner = LintRunner::with_bundle_version(
     ///     lints,
     ///     "pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081",
     /// );
+    ///
+    /// // Runtime-constructed version — e.g., read from config
+    /// let ver = format!("my-bundle v{}", env!("CARGO_PKG_VERSION"));
+    /// let runner = LintRunner::with_bundle_version(lints, ver);
     /// ```
     #[must_use]
-    pub fn with_bundle_version(lints: Vec<Box<dyn Lint>>, version: &'static str) -> Self {
+    pub fn with_bundle_version(
+        lints: Vec<Box<dyn Lint>>,
+        version: impl Into<std::borrow::Cow<'static, str>>,
+    ) -> Self {
         Self {
             lints,
-            bundle_version: version,
+            bundle_version: version.into(),
         }
     }
 
@@ -628,8 +667,8 @@ impl LintRunner {
     }
 
     /// Return the bundle version string set on this runner.
-    pub fn bundle_version(&self) -> &'static str {
-        self.bundle_version
+    pub fn bundle_version(&self) -> &str {
+        &self.bundle_version
     }
 
     /// Evaluate all certificate-scope lints against `cert`.
@@ -678,7 +717,7 @@ impl LintRunner {
             findings.push(Finding {
                 lint_id: std::borrow::Cow::Borrowed(lint.id()),
                 citation: std::borrow::Cow::Borrowed(lint.citation()),
-                rule_bundle_version: self.bundle_version,
+                rule_bundle_version: self.bundle_version.clone(),
                 result,
                 cert_index: Some(cert_index),
                 evaluated_at_unix: now_unix,
@@ -727,9 +766,15 @@ impl LintRunner {
     ///
     /// The `AnchorIssued` certificate is the one directly signed by the trust anchor —
     /// typically the last certificate in the chain before the anchor itself (i.e., the
-    /// highest-index intermediate). Callers are responsible for identifying this
-    /// position and passing [`SubjectKind::AnchorIssued`] in `kinds`. The runner has
-    /// no access to trust anchor information and cannot determine this automatically.
+    /// highest-index intermediate, `chain[chain.len() - 1]`).
+    ///
+    /// Callers are responsible for identifying this position and passing
+    /// [`SubjectKind::AnchorIssued`] in `kinds`. The runner has no access to trust
+    /// anchor information and cannot determine this automatically.
+    ///
+    /// To identify it: the anchor-issued cert is the one whose issuer DN matches a
+    /// trust anchor's subject. Check via `pkix_path::names_match(cert.tbs_certificate.issuer,
+    /// anchor.subject)` for each anchor in your trust store.
     ///
     /// # Fatal behavior across certificates
     ///
@@ -773,7 +818,7 @@ impl LintRunner {
             findings.push(Finding {
                 lint_id: std::borrow::Cow::Borrowed(lint.id()),
                 citation: std::borrow::Cow::Borrowed(lint.citation()),
-                rule_bundle_version: self.bundle_version,
+                rule_bundle_version: self.bundle_version.clone(),
                 result,
                 cert_index: None,
                 evaluated_at_unix: now_unix,
@@ -1176,7 +1221,7 @@ mod tests {
         let f_pass = Finding {
             lint_id: std::borrow::Cow::Borrowed("x"),
             citation: std::borrow::Cow::Borrowed("test"),
-            rule_bundle_version: "",
+            rule_bundle_version: std::borrow::Cow::Borrowed(""),
             result: LintResult::Pass,
             cert_index: None,
             evaluated_at_unix: 0,
@@ -1184,7 +1229,7 @@ mod tests {
         let f_warn = Finding {
             lint_id: std::borrow::Cow::Borrowed("x"),
             citation: std::borrow::Cow::Borrowed("test"),
-            rule_bundle_version: "",
+            rule_bundle_version: std::borrow::Cow::Borrowed(""),
             result: LintResult::Warn("w"),
             cert_index: None,
             evaluated_at_unix: 0,
@@ -1233,7 +1278,7 @@ mod tests {
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
         assert_eq!(findings.len(), 1);
         assert_eq!(
-            findings[0].rule_bundle_version,
+            findings[0].rule_bundle_version.as_ref(),
             "pkix-lint/cabf_tls_br v0.2.0",
             "rule_bundle_version must be stamped from runner into Finding"
         );
@@ -1244,6 +1289,6 @@ mod tests {
         let cert = load_fixture_cert();
         let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
-        assert_eq!(findings[0].rule_bundle_version, "");
+        assert_eq!(findings[0].rule_bundle_version.as_ref(), "");
     }
 }

@@ -30,18 +30,8 @@ use std::borrow::Cow;
 use crate::deviation::DeviatedFinding;
 use crate::Finding;
 
-/// Serde deserializer helper for `Cow<'static, str>`.
-///
-/// Deserializes any string input as `String` and wraps it in `Cow::Owned`,
-/// since a `Cow<'static, str>` cannot borrow from a transient `'de` input.
 #[cfg(feature = "serde")]
-fn de_cow_static<'de, D>(deserializer: D) -> Result<Cow<'static, str>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize as _;
-    Ok(Cow::Owned(String::deserialize(deserializer)?))
-}
+use crate::de_cow_static;
 
 /// The complete output of a lint evaluation run.
 ///
@@ -197,7 +187,7 @@ mod tests {
         Finding {
             lint_id: std::borrow::Cow::Borrowed("test.lint"),
             citation: std::borrow::Cow::Borrowed("test"),
-            rule_bundle_version: "v0.2.0",
+            rule_bundle_version: std::borrow::Cow::Borrowed("v0.2.0"),
             result: LintResult::Pass,
             cert_index: Some(0),
             evaluated_at_unix: 1_780_272_000,
