@@ -427,23 +427,13 @@ impl HashOutput {
 /// SHA-384 (OID 2.16.840.1.101.3.4.2.2), and SHA-512 (OID 2.16.840.1.101.3.4.2.3).
 /// Returns [`Error::OcspMalformed`] for any other OID.
 fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<HashOutput> {
+    // sha1 and sha2 both re-export `digest::Digest`; one import is sufficient.
+    use sha1::Digest as _;
     match *oid {
-        OID_SHA1 => {
-            use sha1::Digest as _;
-            Ok(HashOutput::Sha1(sha1::Sha1::digest(data).into()))
-        }
-        OID_SHA256 => {
-            use sha2::Digest as _;
-            Ok(HashOutput::Sha256(sha2::Sha256::digest(data).into()))
-        }
-        OID_SHA384 => {
-            use sha2::Digest as _;
-            Ok(HashOutput::Sha384(sha2::Sha384::digest(data).into()))
-        }
-        OID_SHA512 => {
-            use sha2::Digest as _;
-            Ok(HashOutput::Sha512(sha2::Sha512::digest(data).into()))
-        }
+        OID_SHA1 => Ok(HashOutput::Sha1(sha1::Sha1::digest(data).into())),
+        OID_SHA256 => Ok(HashOutput::Sha256(sha2::Sha256::digest(data).into())),
+        OID_SHA384 => Ok(HashOutput::Sha384(sha2::Sha384::digest(data).into())),
+        OID_SHA512 => Ok(HashOutput::Sha512(sha2::Sha512::digest(data).into())),
         _ => Err(Error::OcspMalformed),
     }
 }

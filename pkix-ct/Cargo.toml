@@ -8,11 +8,7 @@ license.workspace     = true
 repository.workspace  = true
 authors.workspace     = true
 keywords    = ["x509", "certificate", "pki", "transparency", "rfc6962"]
-categories  = ["cryptography", "no-std"]
-
-[features]
-default = []
-std     = ["der/std", "x509-cert/std", "pkix-path/std"]
+categories  = ["cryptography"]
 
 [dependencies]
 pkix-path = { workspace = true }

@@ -15,7 +15,6 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! # #![allow(deprecated)]
 //! use pkix_composite::CompositeVerifier;
 //! use pkix_path::DefaultVerifier;
 //!
@@ -68,7 +67,6 @@ impl<C, P> CompositeVerifier<C, P> {
     /// `pkix-composite` is not yet implemented. The constructor is exposed for
     /// API discovery, but [`SignatureVerifier::verify_signature`] currently
     /// returns `Err(SignatureError::new())` unconditionally.
-    #[doc(hidden)]
     pub const fn new(classical: C, post_quantum: P) -> Self {
         Self {
             classical,

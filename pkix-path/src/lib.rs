@@ -1397,6 +1397,43 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
     true
 }
 
+/// Returns `Ok(true)` if `cert` is a CA certificate per its `BasicConstraints`
+/// extension (RFC 5280 §4.2.1.9), `Ok(false)` if the extension is absent or
+/// `cA = FALSE`, and `Err(DerError)` if the extension is present but cannot be
+/// DER-decoded.
+///
+/// Propagating decode failure rather than treating a malformed extension as
+/// "not a CA" is a fail-closed defense-in-depth choice: silently skipping a
+/// malformed `BasicConstraints` could mask a topologically valid CA whose CRL
+/// scope or path-building should be honored.
+///
+/// This helper is shared by `pkix-path-builder` (path construction) and
+/// `pkix-revocation::crl` (IDP scope checking) to avoid maintaining two
+/// parallel implementations of the same RFC 5280 §4.2.1.9 decode.
+///
+/// # Errors
+///
+/// Returns [`DerError`] if the `BasicConstraints` extension is present but
+/// fails to DER-decode.
+pub fn cert_is_ca(cert: &Certificate) -> core::result::Result<bool, DerError> {
+    use der::Decode as _;
+    use x509_cert::ext::pkix::BasicConstraints;
+
+    let Some(ext) = cert
+        .tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
+    else {
+        return Ok(false);
+    };
+
+    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).map_err(DerError)?;
+    Ok(bc.ca)
+}
+
 /// RFC 5280 §3.3: a certificate is self-issued if subject == issuer and neither is empty.
 fn is_self_issued_cert(cert: &Certificate) -> bool {
     !cert.tbs_certificate.subject.is_empty()
