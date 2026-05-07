@@ -1331,7 +1331,7 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         //   finds CN=Alice for each a_ava, but the reverse pass finds no match for
         //   CN=Bob → returns false (correct).
         // The reverse pass is O(n²) on AVA count; n is 1–5 in practice.
-        for a_ava in a_avas.iter() {
+        for a_ava in a_avas {
             let found = b_avas.iter().any(|b_ava| {
                 b_ava.oid == a_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
             });
@@ -1339,7 +1339,7 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
                 return false;
             }
         }
-        for b_ava in b_avas.iter() {
+        for b_ava in b_avas {
             let found = a_avas.iter().any(|a_ava| {
                 a_ava.oid == b_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
             });
@@ -1488,7 +1488,7 @@ impl<'a> NormalizedIter<'a> {
     }
 }
 
-impl<'a> Iterator for NormalizedIter<'a> {
+impl Iterator for NormalizedIter<'_> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
         // Invariant: `pending_space = true` means we emitted a space on the previous
@@ -2147,7 +2147,7 @@ fn chain_walk<V: SignatureVerifier>(
                 let mut has_any_policy = false;
 
                 // Step (d)(1): process each specific policy P ≠ anyPolicy.
-                for policy_info in cp_ext.0.iter() {
+                for policy_info in &cp_ext.0 {
                     let p_oid = &policy_info.policy_identifier;
                     if p_oid == &OID_ANY_POLICY {
                         // Defer anyPolicy processing to step (d)(2).
@@ -2197,7 +2197,7 @@ fn chain_walk<V: SignatureVerifier>(
                         let already_covered: Vec<der::asn1::ObjectIdentifier> =
                             new_nodes.iter().map(|nd| nd.valid_policy).collect();
                         for parent in tree.iter().filter(|nd| nd.depth == cert_depth - 1) {
-                            for ep in parent.expected_policy_set.iter() {
+                            for ep in &parent.expected_policy_set {
                                 if !already_covered.contains(ep) {
                                     new_nodes.push(PolicyNode {
                                         depth: cert_depth,
@@ -2369,7 +2369,7 @@ fn chain_walk<V: SignatureVerifier>(
                 .map_err(|_| Error::MalformedCertificate { index: i })?
             {
                 // §6.1.4(a): reject anyPolicy as issuer or subject domain.
-                for mapping in pm.0.iter() {
+                for mapping in &pm.0 {
                     if mapping.issuer_domain_policy == OID_ANY_POLICY
                         || mapping.subject_domain_policy == OID_ANY_POLICY
                     {
@@ -2383,7 +2383,7 @@ fn chain_walk<V: SignatureVerifier>(
                     if policy_mapping > 0 {
                         // For each issuerDomainPolicy ID-P in the mappings,
                         // update expected_policy_set of matching nodes.
-                        for mapping in pm.0.iter() {
+                        for mapping in &pm.0 {
                             let idp = &mapping.issuer_domain_policy;
                             let sdp = &mapping.subject_domain_policy;
                             let mut found = false;
@@ -2478,7 +2478,7 @@ fn chain_walk<V: SignatureVerifier>(
                 // permittedSubtrees: intersect with current state.
                 if let Some(new_permitted) = nc.permitted_subtrees {
                     // Track which types this CA is constraining.
-                    for entry in new_permitted.iter() {
+                    for entry in &new_permitted {
                         nc_constrained_types |= name_type_bit(&entry.base);
                     }
                     match nc_permitted.as_mut() {
@@ -2506,7 +2506,7 @@ fn chain_walk<V: SignatureVerifier>(
                             // For each new entry, pre-filter current entries of the
                             // same type to avoid calling same_nc_variant twice per
                             // pair (vjc.16: duplicated guard + containment check).
-                            for n in new_permitted.iter() {
+                            for n in &new_permitted {
                                 let same_type_in_current: GeneralSubtrees =
                                     current
                                         .iter()
@@ -2564,7 +2564,7 @@ fn chain_walk<V: SignatureVerifier>(
                 // avoiding monotonic growth that would make per-cert NC checks O(chain²)
                 // when the same excluded subtrees are repeated across multiple CAs (vjc.12).
                 if let Some(new_excluded) = nc.excluded_subtrees {
-                    for new_entry in new_excluded.iter() {
+                    for new_entry in &new_excluded {
                         // Deduplication uses name_matches_subtree as a two-way equality
                         // check: two entries are considered the same subtree when each
                         // matches the other (i.e., they are semantically equivalent, not
@@ -2846,7 +2846,7 @@ fn check_name_constraints(
 
         // SAN entries.
         if let Some(san_ext) = san {
-            for name in san_ext.0.iter() {
+            for name in &san_ext.0 {
                 match mode {
                     CheckMode::Excluded => {
                         if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
@@ -2916,7 +2916,7 @@ fn check_name_constraints(
         let permitted_rfc822: Option<&[x509_cert::ext::pkix::constraints::name::GeneralSubtree]> =
             permitted_rfc822_storage.as_deref();
 
-        for rdn in subject.0.iter() {
+        for rdn in &subject.0 {
             for ava in rdn.0.iter() {
                 if ava.oid != OID_EMAIL_ADDRESS {
                     continue;
@@ -2926,7 +2926,7 @@ fn check_name_constraints(
                 };
                 let email_str = email_ia5.as_str();
                 // Excluded check — walk only Rfc822Name excluded entries.
-                for st in nc_excluded.iter() {
+                for st in nc_excluded {
                     if let GeneralName::Rfc822Name(constraint) = &st.base {
                         if matches_rfc822_name(email_str, constraint.as_str()) {
                             return Err(Error::NameConstraintViolation { index });
