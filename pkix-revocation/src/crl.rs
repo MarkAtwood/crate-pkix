@@ -531,7 +531,6 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     Ok(delta_crl
         .tbs_cert_list
         .revoked_certificates
-        .clone()
         .unwrap_or_default())
 }
 
