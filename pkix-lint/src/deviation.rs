@@ -579,7 +579,7 @@ impl DeviationStore {
     }
 
     /// Return all deviations that are active at `now_unix`.
-    #[must_use]
+    #[must_use = "iterator is lazy; collect or iterate to use results"]
     pub fn active_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations
             .iter()
@@ -600,7 +600,7 @@ impl DeviationStore {
     /// Return all deviations that have expired as of `now_unix`.
     ///
     /// Used by corpus-reporting tools to surface deviations that need renewal.
-    #[must_use]
+    #[must_use = "iterator is lazy; collect or iterate to use results"]
     pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
         self.deviations.iter().filter(move |d| {
             d.effective_end

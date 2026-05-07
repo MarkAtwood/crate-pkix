@@ -301,6 +301,13 @@ pub trait RevocationChecker {
     ///
     /// Failing to override this method in a context that requires full-chain
     /// revocation coverage is a silent security gap.
+    ///
+    /// # Note: default is a no-op
+    ///
+    /// The default implementation performs **no revocation check** and always
+    /// returns `Ok(())`. Any implementor that does not override this method
+    /// silently skips revocation for the certificate directly issued by the
+    /// trust anchor. Override this method to enable anchor-level revocation.
     #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,
