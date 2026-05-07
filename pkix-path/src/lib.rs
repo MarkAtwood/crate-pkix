@@ -12,7 +12,7 @@
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
 //! The default feature set (`rustcrypto`) wires in `RustCrypto` backends for
 //! RSA-PKCS1v15-SHA-256 (`rsa` feature) and ECDSA-P-256-SHA-256 (`p256` feature).
-//! P-384 and Ed25519 are planned for v0.2.
+//! P-384 and Ed25519 are planned for a future release.
 //! For FIPS-validated crypto, implement [`SignatureVerifier`] against
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
 //!
@@ -21,12 +21,14 @@
 //!
 //! # Limitations
 //!
-//! v0.1 does **not** implement:
-//! - Revocation (use `pkix-revocation`)
-//! - Cross-certificate path building (RFC 4158)
-//! - RFC 4518 full Unicode NFKC DN normalization (BMPString/UniversalString)
-//!
-//! These are tracked for v0.2+.
+//! The following are **not** implemented in v0.2:
+//! - **RFC 4518 full Unicode NFKC DN normalization** — only ASCII whitespace
+//!   collapsing is applied; BMPString/UniversalString/TeletexString in DN
+//!   attributes are compared after UTF-8 transcoding without NFKC.
+//! - **Online revocation** — revocation is handled by `pkix-revocation`
+//!   (CRL/OCSP); this crate is network-free by design.
+//! - **Path building** — converting an unordered bag of certificates into a
+//!   validated chain is handled by `pkix-path-builder`.
 
 // For no_std builds, pull in the alloc crate explicitly so `alloc::` paths
 // and the `vec!` macro resolve. `#[macro_use]` re-exports alloc macros
@@ -762,6 +764,15 @@ pub struct ValidatedPath {
     /// self-issued intermediates that RFC 5280 §4.2.1.9 excludes from the
     /// `pathLenConstraint` count. For chains with self-issued intermediates the
     /// `depth` field may be larger than the RFC 5280 path length.
+    ///
+    /// **Do not** compare `depth` directly against a certificate's
+    /// [`BasicConstraints`] `pathLenConstraint` value. RFC 5280 §4.2.1.9
+    /// defines `pathLenConstraint` as the number of non-self-issued
+    /// intermediates below the issuing CA, which differs from this field's
+    /// total certificate count. Use the RFC 5280 §6.1.4(b) accounting
+    /// performed by `chain_walk` instead.
+    ///
+    /// [`BasicConstraints`]: x509_cert::ext::pkix::BasicConstraints
     pub depth: usize,
 }
 
@@ -993,11 +1004,10 @@ const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
 ///
 /// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
-/// (e.g. TLS server certs) do not fail with `UnhandledCriticalExtension`. However,
-/// the SAN *value* is not inspected by path validation — name matching still uses the
-/// Subject DN. **v0.1 limitation**: a cert with an empty Subject and critical SAN
-/// will pass this check but fail name linkage since `names_match` compares against
-/// the empty Subject. This is tracked for v0.2 (RFC 5280 §4.2.1.6).
+/// (e.g. TLS server certs) do not fail with `UnhandledCriticalExtension`. In v0.2,
+/// a cert with an empty Subject and a critical SAN is handled correctly: the SAN is
+/// used as the cert's identity via `cert_has_san_identity` / `working_issuer_is_san_identity`
+/// (RFC 5280 §4.2.1.6), so name linkage no longer falls back to the empty Subject DN.
 ///
 /// `OID_EXTENDED_KEY_USAGE` is listed here so that certs with critical EKU
 /// (common in CA/B Forum TLS and code-signing certificates) do not fail with
@@ -1127,19 +1137,15 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
 /// Returns whether the `keyCertSign` bit is set in the `KeyUsage` extension.
 ///
 /// - `None`         — `KeyUsage` extension absent (no constraint)
-/// - `Some(true)`   — keyCertSign is set
-/// - `Some(false)`  — `KeyUsage` present, keyCertSign NOT set
-fn has_key_cert_sign(cert: &Certificate) -> Option<bool> {
-    use der::Decode;
+/// - `Ok(Some(true))`  — keyCertSign is set
+/// - `Ok(Some(false))` — `KeyUsage` present, keyCertSign NOT set
+/// - `Ok(None)`        — `KeyUsage` extension absent
+/// - `Err(_)`          — `KeyUsage` present but DER-malformed (fail-closed)
+fn has_key_cert_sign(cert: &Certificate) -> der::Result<Option<bool>> {
     use x509_cert::ext::pkix::KeyUsage;
 
-    cert.tbs_certificate
-        .extensions
-        .as_ref()?
-        .iter()
-        .find(|ext| ext.extn_id == OID_KEY_USAGE)
-        .and_then(|ext| KeyUsage::from_der(ext.extn_value.as_bytes()).ok())
-        .map(|ku| ku.key_cert_sign())
+    try_find_cert_ext::<KeyUsage>(cert, OID_KEY_USAGE)
+        .map(|opt| opt.map(|ku| ku.key_cert_sign()))
 }
 
 // ---------------------------------------------------------------------------
@@ -1197,8 +1203,18 @@ fn try_find_cert_ext<T: der::DecodeOwned>(
     }
 }
 
-fn cert_subject_alt_names(cert: &Certificate) -> Option<x509_cert::ext::pkix::SubjectAltName> {
-    find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
+/// Decode the `SubjectAltName` extension from `cert`.
+///
+/// **Fail-closed**: a present-but-malformed SAN returns `Err` rather than being
+/// silently treated as absent.  Treating a malformed SAN as absent during name
+/// constraint checking would allow a cert to bypass NC exclusion/permission
+/// constraints when the SAN extension is present but cannot be decoded (vjc.20).
+fn cert_subject_alt_names(
+    cert: &Certificate,
+    index: usize,
+) -> crate::Result<Option<x509_cert::ext::pkix::SubjectAltName>> {
+    try_find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
+        .map_err(|_| Error::MalformedCertificate { index })
 }
 
 /// Decode the `NameConstraints` extension from `cert`.
@@ -1433,6 +1449,14 @@ fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// Iterator that yields bytes after ASCII case-fold and whitespace normalization.
+///
+/// # Known limitation
+///
+/// Only U+0020 SPACE (byte `0x20`) is treated as insignificant whitespace.
+/// Tabs (`\t`, `0x09`), non-breaking spaces (`0xA0` in Latin-1), and other
+/// Unicode whitespace variants pass through unchanged. Full RFC 4518
+/// insignificant-space handling requires Unicode-aware processing deferred
+/// to a future release.
 struct NormalizedIter<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -1654,9 +1678,8 @@ fn matches_rfc822_name(subject: &str, constraint: &str) -> bool {
         return subject.eq_ignore_ascii_case(constraint);
     }
     // Constraint is a domain (or .domain); extract the domain part of subject.
-    let domain = match subject.split_once('@') {
-        Some((_, d)) => d,
-        None => return false, // malformed subject
+    let Some((_, domain)) = subject.split_once('@') else {
+        return false; // malformed subject
     };
     if let Some(suffix) = constraint.strip_prefix('.') {
         // Domain must end with .suffix.
@@ -1903,6 +1926,16 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
 /// RFC 5280 §4.2.1.9 note on pathLenConstraint: for the cert at position `i`
 /// (leaf at 0, root-adjacent at chain.len()-1), there are exactly `i-1`
 /// intermediate certs below it. The constraint requires `i-1 ≤ pathLenConstraint`.
+///
+/// # Implementation notes
+///
+/// This function is intentionally structured as a single loop over the certificate
+/// chain. The RFC 5280 §6.1 state machine has significant shared state (working
+/// SPKI, name constraints, policy tree, inhibit flags) that must be threaded
+/// through every step in a defined order. Decomposing the loop into smaller helpers
+/// would require passing this state through many function boundaries without clarity
+/// gain. The monolithic structure mirrors the RFC's sequential algorithm description
+/// and keeps all state-mutation sites visible in one place for audit.
 fn chain_walk<V: SignatureVerifier>(
     chain: &[Certificate],
     anchor: &TrustAnchor,
@@ -2091,8 +2124,12 @@ fn chain_walk<V: SignatureVerifier>(
         // Used in both step (d) (policy tree update) and step (a/b) (PolicyMappings
         // anyPolicy qualifier lookup).  Decoding here avoids a second parse inside
         // the mapping loop (b5r.12).
+        // try_find_cert_ext (fail-closed): a malformed CertificatePolicies must
+        // cause rejection rather than being silently treated as absent; silently
+        // dropping it would leave the policy tree in an incorrect state (vjc.21).
         let cert_cp: Option<x509_cert::ext::pkix::certpolicy::CertificatePolicies> =
-            find_cert_ext(cert, OID_CERTIFICATE_POLICIES);
+            try_find_cert_ext(cert, OID_CERTIFICATE_POLICIES)
+                .map_err(|_| Error::MalformedCertificate { index: i })?;
 
         // (policy-d) CertificatePolicies extension (RFC 5280 §6.1.3(d)).
         // Only processed when the policy tree is still alive.
@@ -2190,7 +2227,8 @@ fn chain_walk<V: SignatureVerifier>(
         // Decode SAN once per cert: used in both the NC name check (e) and
         // potentially cached for the NC state update (i). Avoids scanning the
         // extension list twice per cert when both checks are active (vjc.13).
-        let san = cert_subject_alt_names(cert);
+        // Fail-closed: a malformed SAN returns MalformedCertificate (vjc.20).
+        let san = cert_subject_alt_names(cert, i)?;
 
         // (e) NameConstraints: check this cert's names against accumulated state.
         // RFC 5280 §6.1.3(b): self-issued non-leaf certs are exempt from NC name checking.
@@ -2288,8 +2326,15 @@ fn chain_walk<V: SignatureVerifier>(
             // RFC 5280 §6.1.4(n): "If a KeyUsage extension is present, verify that the
             // keyCertSign bit is set."  Only reject when KeyUsage IS present (Some(_)) and
             // keyCertSign is NOT set (== Some(false)).  Absent KeyUsage (None) is allowed.
-            if policy.enforce_key_usage && has_key_cert_sign(cert) == Some(false) {
-                return Err(Error::KeyUsageMissing { index: i });
+            // has_key_cert_sign is fail-closed: a malformed critical KeyUsage returns
+            // MalformedCertificate rather than being silently treated as absent (vjc.15).
+            if policy.enforce_key_usage {
+                match has_key_cert_sign(cert)
+                    .map_err(|_| Error::MalformedCertificate { index: i })?
+                {
+                    Some(false) => return Err(Error::KeyUsageMissing { index: i }),
+                    Some(true) | None => {}
+                }
             }
 
             // (h) pathLenConstraint: count only non-self-issued intermediates below position i
