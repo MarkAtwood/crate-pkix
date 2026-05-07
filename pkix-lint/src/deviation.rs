@@ -181,12 +181,8 @@ impl Deviation {
     /// the second it reaches its end timestamp, not one second after.
     #[must_use]
     pub fn is_active_at(&self, now_unix: u64) -> bool {
-        let after_start = self
-            .effective_start
-            .map_or(true, |start| now_unix >= start);
-        let before_end = self
-            .effective_end
-            .map_or(true, |end| now_unix < end);
+        let after_start = self.effective_start.map_or(true, |start| now_unix >= start);
+        let before_end = self.effective_end.map_or(true, |end| now_unix < end);
         after_start && before_end
     }
 
@@ -348,11 +344,7 @@ impl DeviationScope {
                 pkix_path::names_match(name, &cert.tbs_certificate.issuer)
             }
 
-            Self::SerialRange {
-                issuer,
-                start,
-                end,
-            } => {
+            Self::SerialRange { issuer, start, end } => {
                 // Issuer DN must match.
                 if !pkix_path::names_match(issuer, &cert.tbs_certificate.issuer) {
                     return false;
@@ -389,15 +381,10 @@ impl serde::Serialize for DeviationScope {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStructVariant as _;
         match self {
-            Self::Any => {
-                serializer.serialize_unit_variant("DeviationScope", 0, "Any")
+            Self::Any => serializer.serialize_unit_variant("DeviationScope", 0, "Any"),
+            Self::IssuerDnContains(s) => {
+                serializer.serialize_newtype_variant("DeviationScope", 1, "IssuerDnContains", s)
             }
-            Self::IssuerDnContains(s) => serializer.serialize_newtype_variant(
-                "DeviationScope",
-                1,
-                "IssuerDnContains",
-                s,
-            ),
             Self::IssuerDnExact(name) => serializer.serialize_newtype_variant(
                 "DeviationScope",
                 2,
@@ -405,12 +392,8 @@ impl serde::Serialize for DeviationScope {
                 &name.to_string(),
             ),
             Self::SerialRange { issuer, start, end } => {
-                let mut sv = serializer.serialize_struct_variant(
-                    "DeviationScope",
-                    3,
-                    "SerialRange",
-                    3,
-                )?;
+                let mut sv =
+                    serializer.serialize_struct_variant("DeviationScope", 3, "SerialRange", 3)?;
                 sv.serialize_field("issuer", &issuer.to_string())?;
                 sv.serialize_field("start", start)?;
                 sv.serialize_field("end", end)?;
@@ -604,10 +587,9 @@ impl DeviationStore {
     /// Used by corpus-reporting tools to surface deviations that need renewal.
     #[must_use = "iterator is lazy; collect or iterate to use results"]
     pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation> {
-        self.deviations.iter().filter(move |d| {
-            d.effective_end
-                .is_some_and(|end| now_unix >= end)
-        })
+        self.deviations
+            .iter()
+            .filter(move |d| d.effective_end.is_some_and(|end| now_unix >= end))
     }
 
     /// Check whether a specific finding should be deviated.
@@ -647,7 +629,7 @@ impl DeviationStore {
 /// `DeviationRunResult` directly with struct literal syntax; use
 /// [`DeviationRunResult::default()`] or obtain it from [`DeviationRunner`].
 #[non_exhaustive]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DeviationRunResult {
     /// Findings that were not affected by any deviation.
     ///
@@ -832,10 +814,7 @@ impl DeviationRunner {
                 result.findings.push(finding);
                 continue;
             }
-            match self
-                .store
-                .find_deviation(&finding.lint_id, cert, now_unix)
-            {
+            match self.store.find_deviation(&finding.lint_id, cert, now_unix) {
                 None => {
                     result.findings.push(finding);
                 }
@@ -922,7 +901,10 @@ mod tests {
             ..make_deviation("d3", "test.lint")
         };
         assert!(d.is_active_at(199), "before end must be active");
-        assert!(!d.is_active_at(200), "at end must NOT be active (exclusive)");
+        assert!(
+            !d.is_active_at(200),
+            "at end must NOT be active (exclusive)"
+        );
         assert!(!d.is_active_at(201), "after end must not be active");
     }
 
@@ -966,7 +948,10 @@ mod tests {
         let scope_lower = DeviationScope::IssuerDnContains(word.to_lowercase());
         let scope_upper = DeviationScope::IssuerDnContains(word.to_uppercase().to_lowercase());
         assert!(scope_lower.matches(&cert), "lowercase match must succeed");
-        assert!(scope_upper.matches(&cert), "lowercased-at-construction match must succeed");
+        assert!(
+            scope_upper.matches(&cert),
+            "lowercased-at-construction match must succeed"
+        );
     }
 
     #[test]
@@ -1174,8 +1159,12 @@ mod tests {
     #[test]
     fn store_add_and_retrieve() {
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a")).expect("add should succeed");
-        store.add(make_deviation("d2", "test.lint.b")).expect("add should succeed");
+        store
+            .add(make_deviation("d1", "test.lint.a"))
+            .expect("add should succeed");
+        store
+            .add(make_deviation("d2", "test.lint.b"))
+            .expect("add should succeed");
         assert_eq!(store.all().len(), 2);
     }
 
@@ -1210,10 +1199,15 @@ mod tests {
     #[test]
     fn store_rejects_duplicate_id() {
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a")).expect("first add should succeed");
+        store
+            .add(make_deviation("d1", "test.lint.a"))
+            .expect("first add should succeed");
         let result = store.add(make_deviation("d1", "test.lint.b")); // same id → error
         assert!(result.is_err(), "duplicate id must return Err");
-        assert_eq!(result.unwrap_err(), DeviationAddError::DuplicateId("d1".to_string()));
+        assert_eq!(
+            result.unwrap_err(),
+            DeviationAddError::DuplicateId("d1".to_string())
+        );
     }
 
     #[test]
@@ -1221,11 +1215,13 @@ mod tests {
         let cert = load_cert();
         let now: u64 = 1_000_000;
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            effective_start: None,
-            effective_end: None,
-            ..make_deviation("d1", "test.lint.a")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_start: None,
+                effective_end: None,
+                ..make_deviation("d1", "test.lint.a")
+            })
+            .expect("add should succeed");
         let found = store.find_deviation("test.lint.a", &cert, now);
         assert!(found.is_some());
         assert_eq!(found.unwrap().id, "d1");
@@ -1236,7 +1232,9 @@ mod tests {
         let cert = load_cert();
         let now: u64 = 1_000_000;
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.lint.a")).expect("add should succeed");
+        store
+            .add(make_deviation("d1", "test.lint.a"))
+            .expect("add should succeed");
         assert!(store.find_deviation("test.lint.b", &cert, now).is_none());
     }
 
@@ -1245,10 +1243,12 @@ mod tests {
         let cert = load_cert();
         let now: u64 = 1_000;
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            effective_end: Some(500), // expired at 500
-            ..make_deviation("d1", "test.lint.a")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_end: Some(500), // expired at 500
+                ..make_deviation("d1", "test.lint.a")
+            })
+            .expect("add should succeed");
         // At now=1000, the deviation has expired.
         assert!(store.find_deviation("test.lint.a", &cert, now).is_none());
     }
@@ -1256,14 +1256,18 @@ mod tests {
     #[test]
     fn store_expired_at_reports_expired_deviations() {
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            effective_end: Some(500),
-            ..make_deviation("d1", "test.lint.a")
-        }).expect("add should succeed");
-        store.add(Deviation {
-            effective_end: None, // never expires
-            ..make_deviation("d2", "test.lint.b")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_end: Some(500),
+                ..make_deviation("d1", "test.lint.a")
+            })
+            .expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_end: None, // never expires
+                ..make_deviation("d2", "test.lint.b")
+            })
+            .expect("add should succeed");
         let expired: Vec<_> = store.expired_at(1000).collect();
         assert_eq!(expired.len(), 1);
         assert_eq!(expired[0].id, "d1");
@@ -1299,12 +1303,27 @@ mod tests {
     /// A lint that always returns Error — used to test deviation application.
     struct AlwaysError;
     impl crate::Lint for AlwaysError {
-        fn id(&self) -> &'static str { "test.always_error" }
-        fn citation(&self) -> &'static str { "test" }
-        fn severity(&self) -> crate::Severity { crate::Severity::Error }
-        fn scope(&self) -> crate::Scope { crate::Scope::Certificate }
-        fn applies_to(&self) -> crate::SubjectKind { crate::SubjectKind::Any }
-        fn check_cert(&self, _cert: &Certificate, _kind: crate::SubjectKind, _now: u64) -> crate::LintResult {
+        fn id(&self) -> &'static str {
+            "test.always_error"
+        }
+        fn citation(&self) -> &'static str {
+            "test"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Error
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Certificate
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Any
+        }
+        fn check_cert(
+            &self,
+            _cert: &Certificate,
+            _kind: crate::SubjectKind,
+            _now: u64,
+        ) -> crate::LintResult {
             crate::LintResult::Error("always errors")
         }
     }
@@ -1312,12 +1331,27 @@ mod tests {
     /// A lint that always passes — used to verify non-deviated findings stay in findings.
     struct AlwaysPass;
     impl crate::Lint for AlwaysPass {
-        fn id(&self) -> &'static str { "test.always_pass" }
-        fn citation(&self) -> &'static str { "test" }
-        fn severity(&self) -> crate::Severity { crate::Severity::Info }
-        fn scope(&self) -> crate::Scope { crate::Scope::Certificate }
-        fn applies_to(&self) -> crate::SubjectKind { crate::SubjectKind::Any }
-        fn check_cert(&self, _cert: &Certificate, _kind: crate::SubjectKind, _now: u64) -> crate::LintResult {
+        fn id(&self) -> &'static str {
+            "test.always_pass"
+        }
+        fn citation(&self) -> &'static str {
+            "test"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Info
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Certificate
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Any
+        }
+        fn check_cert(
+            &self,
+            _cert: &Certificate,
+            _kind: crate::SubjectKind,
+            _now: u64,
+        ) -> crate::LintResult {
             crate::LintResult::Pass
         }
     }
@@ -1328,22 +1362,34 @@ mod tests {
         let now: u64 = 1_000_000;
 
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            target_lint: "test.always_error".to_string(),
-            ..make_deviation("d1", "test.always_error")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                target_lint: "test.always_error".to_string(),
+                ..make_deviation("d1", "test.always_error")
+            })
+            .expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
         let result = dev_runner.run_cert(&cert, crate::SubjectKind::Leaf, 0, now);
 
         // The error finding must be deviated, not in normal findings.
-        assert!(result.findings.is_empty(), "deviated finding must not be in findings");
-        assert_eq!(result.deviated.len(), 1, "deviated finding must be in deviated");
+        assert!(
+            result.findings.is_empty(),
+            "deviated finding must not be in findings"
+        );
+        assert_eq!(
+            result.deviated.len(),
+            1,
+            "deviated finding must be in deviated"
+        );
         assert_eq!(result.deviated[0].lint_id, "test.always_error");
         assert_eq!(result.deviated[0].deviation_id, "d1");
         // Original result is preserved.
-        assert!(matches!(result.deviated[0].original_result, crate::LintResult::Error(_)));
+        assert!(matches!(
+            result.deviated[0].original_result,
+            crate::LintResult::Error(_)
+        ));
     }
 
     #[test]
@@ -1353,7 +1399,9 @@ mod tests {
 
         // Deviation targets a different lint than what we're running.
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.different_lint")).expect("add should succeed");
+        store
+            .add(make_deviation("d1", "test.different_lint"))
+            .expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysPass)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1370,10 +1418,12 @@ mod tests {
         let now: u64 = 2_000_000;
 
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            effective_end: Some(1_000_000), // expired before now
-            ..make_deviation("d1", "test.always_error")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                effective_end: Some(1_000_000), // expired before now
+                ..make_deviation("d1", "test.always_error")
+            })
+            .expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1390,10 +1440,12 @@ mod tests {
         let now: u64 = 1_000_000;
 
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            action: DeviationAction::Suppress,
-            ..make_deviation("d1", "test.always_error")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                action: DeviationAction::Suppress,
+                ..make_deviation("d1", "test.always_error")
+            })
+            .expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1416,10 +1468,12 @@ mod tests {
         let uri = "https://pkipolicy.agency.gov/waivers/2025-11-03";
 
         let mut store = DeviationStore::new();
-        store.add(Deviation {
-            evidence_uri: Some(uri.to_string()),
-            ..make_deviation("d1", "test.always_error")
-        }).expect("add should succeed");
+        store
+            .add(Deviation {
+                evidence_uri: Some(uri.to_string()),
+                ..make_deviation("d1", "test.always_error")
+            })
+            .expect("add should succeed");
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);
@@ -1432,10 +1486,7 @@ mod tests {
             "evidence_uri must flow from Deviation to DeviatedFinding"
         );
         // justification also flows through.
-        assert_eq!(
-            result.deviated[0].justification,
-            "test justification"
-        );
+        assert_eq!(result.deviated[0].justification, "test justification");
     }
 
     /// When `evidence_uri` is None, `DeviatedFinding.evidence_uri` is None.
@@ -1445,7 +1496,9 @@ mod tests {
         let now: u64 = 1_000_000;
 
         let mut store = DeviationStore::new();
-        store.add(make_deviation("d1", "test.always_error")).expect("add should succeed"); // evidence_uri: None
+        store
+            .add(make_deviation("d1", "test.always_error"))
+            .expect("add should succeed"); // evidence_uri: None
 
         let runner = crate::LintRunner::new(vec![Box::new(AlwaysError)]);
         let dev_runner = DeviationRunner::new(runner, store);

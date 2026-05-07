@@ -28,21 +28,13 @@ let chain = vec![
     Certificate::from_der(intermediate_der)?,
 ];
 
-let anchors = vec![
-    TrustAnchor {
-        subject: root_cert.tbs_certificate.subject.clone(),
-        subject_public_key_info: root_cert.tbs_certificate.subject_public_key_info.clone(),
-        name_constraints: None,
-    }
-];
+let root_cert = Certificate::from_der(root_der)?;
+let anchors = vec![TrustAnchor::from_cert(root_cert)];
 
-let policy = ValidationPolicy {
-    current_time_unix: 1_780_272_000,
-    ..Default::default()
-};
+let policy = ValidationPolicy::new(1_780_272_000);
 
 let validated = validate_path(&chain, &anchors, &policy, &DefaultVerifier)?;
-println!("trust anchor subject: {:?}", validated.trust_anchor.subject);
+println!("anchor index: {}", validated.anchor_index);
 ```
 
 ## Pluggable crypto

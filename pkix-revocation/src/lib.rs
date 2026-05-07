@@ -56,6 +56,24 @@ impl std::error::Error for DerError {
 }
 
 /// Errors returned by revocation checking.
+///
+/// # Variant naming convention
+///
+/// Most variants carry a `Crl*` or `Ocsp*` prefix indicating which revocation
+/// source produced the failure. Three variants intentionally do not:
+///
+/// - [`Error::Revoked`] applies to both CRL and OCSP outcomes; no prefix is
+///   correct. This is what [`RevocationChecker::check_revocation`] returns
+///   generically when a serial is found in either kind of response.
+/// - [`Error::MalformedCertificate`] fires on the *subject* certificate being
+///   checked (e.g., a missing serial number), not on the CRL or OCSP response.
+/// - [`Error::DeltaCrlBaseMismatch`] uses `DeltaCrl*` rather than `CrlDelta*`
+///   because the failure is scoped to the delta-CRL workflow — the prefix
+///   reads as the noun phrase "delta CRL" rather than as a sub-namespace of
+///   `Crl*`.
+///
+/// Renames are a semver break; do not "normalize" these without coordinating
+/// a major version.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -292,7 +310,7 @@ pub trait RevocationChecker {
     /// at least one revocation source actually covers the certificate in question.
     /// Note that individual implementations may differ: [`CrlChecker`] returns
     /// `Ok(())` for out-of-scope certificates, while [`OcspChecker`] returns
-    /// `Err(`[`Error::OcspStatusUnknown`]`)` when no matching `SingleResponse` is found.
+    /// <code>Err([Error::OcspStatusUnknown])</code> when no matching `SingleResponse` is found.
     ///
     /// Returns `Err` if the certificate is confirmed revoked or if a required
     /// revocation check fails (e.g., expired CRL, invalid signature).
@@ -306,7 +324,6 @@ pub trait RevocationChecker {
     ///   its validity window check failed.
     /// - Other [`Error`] variants for parse failures, signature verification
     ///   failures, or structural constraint violations.
-    #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;
 
     /// Check whether `cert` (issued directly by a trust anchor) has been revoked.
@@ -349,7 +366,6 @@ pub trait RevocationChecker {
     ///
     /// The default implementation always returns `Ok(())`; override this method
     /// to enable error-returning revocation checks.
-    #[must_use = "revocation check result must not be silently discarded"]
     fn check_revocation_against_anchor(
         &self,
         _cert: &Certificate,

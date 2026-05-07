@@ -43,34 +43,27 @@ use crate::{Lint, LintProfile, LintResult, LintRunner, Scope, Severity, SubjectK
 
 /// SHA-1 with RSA encryption — RFC 3279 §2.2.1, PKCS #1.
 /// Prohibited in TLS BR §7.1.3.
-const SHA1_WITH_RSA: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
+const SHA1_WITH_RSA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
 
 /// ECDSA with SHA-1 — RFC 3279 §2.2.3.
 /// Prohibited in TLS BR §7.1.3.
-const ECDSA_WITH_SHA1: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("1.2.840.10045.4.1");
+const ECDSA_WITH_SHA1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.1");
 
 /// RSA encryption SPKI algorithm OID — RFC 3279 §2.3.1.
 /// Used to detect RSA keys in `SubjectPublicKeyInfo`.
-const RSA_ENCRYPTION: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
+const RSA_ENCRYPTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
 
 /// `SubjectAltName` extension OID — RFC 5280 §4.2.1.6.
-const OID_SUBJECT_ALT_NAME: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.17");
+const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
 
 /// `ExtendedKeyUsage` extension OID — RFC 5280 §4.2.1.12.
-const OID_EXTENDED_KEY_USAGE: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.37");
+const OID_EXTENDED_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.37");
 
 /// `BasicConstraints` extension OID — RFC 5280 §4.2.1.9.
-const OID_BASIC_CONSTRAINTS: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("2.5.29.19");
+const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
 
 /// id-kp-serverAuth — RFC 5280 §4.2.1.12, TLS BR §7.1.2.7.3.
-const ID_KP_SERVER_AUTH: ObjectIdentifier =
-    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
 
 // ---------------------------------------------------------------------------
 // Lint 1 — cabf.br.tls.validity.max
@@ -90,6 +83,7 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier =
 /// cert for its lifetime.
 ///
 /// Citation: CA/B Forum TLS BR §6.3.2 (SC-081)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ValidityMaxLint;
 
 impl Lint for ValidityMaxLint {
@@ -155,6 +149,7 @@ impl Lint for ValidityMaxLint {
 /// (1.2.840.10045.4.1) are checked.
 ///
 /// Citation: CA/B Forum TLS BR §7.1.3
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Sha1ProhibitedLint;
 
 impl Lint for Sha1ProhibitedLint {
@@ -181,7 +176,9 @@ impl Lint for Sha1ProhibitedLint {
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let sig_alg = cert.signature_algorithm.oid;
         if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1) {
-            LintResult::Error("certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3")
+            LintResult::Error(
+                "certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3",
+            )
         } else {
             LintResult::Pass
         }
@@ -219,6 +216,7 @@ impl Lint for Sha1ProhibitedLint {
 /// 3. Reject if the result is less than 2048.
 ///
 /// Citation: CA/B Forum TLS BR §6.1.5
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RsaMinKeySizeLint;
 
 impl Lint for RsaMinKeySizeLint {
@@ -359,6 +357,7 @@ fn parse_der_length(input: &[u8]) -> Option<(usize, &[u8])> {
 /// If the extension is present but contains no general names, the lint returns Error.
 ///
 /// Citation: CA/B Forum TLS BR §7.1.4.2
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SanRequiredLint;
 
 impl Lint for SanRequiredLint {
@@ -387,7 +386,10 @@ impl Lint for SanRequiredLint {
             return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent");
         };
 
-        let Some(san_ext) = extensions.iter().find(|e| e.extn_id == OID_SUBJECT_ALT_NAME) else {
+        let Some(san_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
+        else {
             return LintResult::Error("SubjectAltName extension absent from leaf certificate");
         };
 
@@ -413,6 +415,7 @@ impl Lint for SanRequiredLint {
 /// (1.3.6.1.5.5.7.3.1) the lint returns Error.
 ///
 /// Citation: CA/B Forum TLS BR §7.1.2.7.3
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EkuServerAuthLint;
 
 impl Lint for EkuServerAuthLint {
@@ -438,10 +441,15 @@ impl Lint for EkuServerAuthLint {
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let Some(extensions) = &cert.tbs_certificate.extensions else {
-            return LintResult::Error("leaf certificate has no extensions; ExtendedKeyUsage absent");
+            return LintResult::Error(
+                "leaf certificate has no extensions; ExtendedKeyUsage absent",
+            );
         };
 
-        let Some(eku_ext) = extensions.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE) else {
+        let Some(eku_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
+        else {
             return LintResult::Error("ExtendedKeyUsage extension absent from leaf certificate");
         };
 
@@ -471,6 +479,7 @@ impl Lint for EkuServerAuthLint {
 /// If the extension is present but `cA` is not `true` the lint returns Error.
 ///
 /// Citation: CA/B Forum TLS BR §7.1.2.5
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BcCaFlagLint;
 
 impl Lint for BcCaFlagLint {
@@ -501,7 +510,10 @@ impl Lint for BcCaFlagLint {
             );
         };
 
-        let Some(bc_ext) = extensions.iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS) else {
+        let Some(bc_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
+        else {
             return LintResult::Error(
                 "BasicConstraints extension absent from intermediate CA certificate",
             );

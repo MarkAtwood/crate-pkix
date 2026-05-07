@@ -13,9 +13,10 @@
 //!
 //! The [`RevocationFetcher`] trait abstracts the HTTP transport so callers
 //! can supply `reqwest`, `ureq`, `hyper`, or any other client. The concrete
-//! fetchers ([`HttpCrlFetcher`], [`HttpOcspFetcher`]) implement
+//! fetchers ([`HttpCrlFetcher`], [`HttpOcspFetcher`]) will implement
 //! [`pkix_revocation::RevocationChecker`] by fetching on demand and
-//! delegating to the underlying `CrlChecker` / `OcspChecker`.
+//! delegating to the underlying `CrlChecker` / `OcspChecker` once the
+//! crate is implemented.
 //!
 //! # Spec references
 //!
@@ -48,6 +49,12 @@ pub trait RevocationFetcher {
 }
 
 /// Errors returned by [`RevocationFetcher::fetch`].
+///
+/// `Clone`, `PartialEq`, and `Eq` are intentionally not derived: the
+/// [`Transport`](FetchError::Transport) variant carries a
+/// `Box<dyn std::error::Error + Send + Sync>` which does not implement those
+/// traits. This is the documented exception to the workspace-wide error
+/// derive convention.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum FetchError {
@@ -78,7 +85,7 @@ impl std::error::Error for FetchError {
     }
 }
 
-/// A [`pkix_revocation::RevocationChecker`] that fetches CRLs on demand.
+/// Will implement [`pkix_revocation::RevocationChecker`] once fetching is wired up.
 ///
 /// Reads `CRLDistributionPoints` from each certificate, fetches the
 /// CRL via the provided [`RevocationFetcher`], and delegates to
@@ -91,6 +98,7 @@ impl std::error::Error for FetchError {
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
+#[derive(Clone, Debug)]
 #[allow(dead_code)] // fields used once HttpCrlFetcher is implemented
 pub struct HttpCrlFetcher<F> {
     fetcher: F,
@@ -108,7 +116,7 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
     }
 }
 
-/// A [`pkix_revocation::RevocationChecker`] that fetches OCSP responses on demand.
+/// Will implement [`pkix_revocation::RevocationChecker`] once fetching is wired up.
 ///
 /// Reads `AuthorityInfoAccess` from each certificate, sends an OCSP
 /// request via the provided [`RevocationFetcher`], and delegates to
@@ -121,6 +129,7 @@ impl<F: RevocationFetcher> HttpCrlFetcher<F> {
 /// Not yet implemented (PKIX-58m).
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
+#[derive(Clone, Debug)]
 #[allow(dead_code)] // fields used once HttpOcspFetcher is implemented
 pub struct HttpOcspFetcher<F> {
     fetcher: F,

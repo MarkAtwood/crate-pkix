@@ -7,8 +7,12 @@ rust-version.workspace = true
 license.workspace     = true
 repository.workspace  = true
 authors.workspace     = true
-keywords    = ["x509", "certificate", "transparency", "sct", "ct"]
-categories  = ["cryptography"]
+keywords    = ["x509", "certificate", "pki", "transparency", "rfc6962"]
+categories  = ["cryptography", "no-std"]
+
+[features]
+default = []
+std     = ["der/std", "x509-cert/std", "pkix-path/std"]
 
 [dependencies]
 pkix-path = { workspace = true }

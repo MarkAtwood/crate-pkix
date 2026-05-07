@@ -61,16 +61,14 @@ let chain: Vec<Certificate> = vec![
 ];
 
 // Configure trust anchors
-let anchors = vec![TrustAnchor::from_der(root_der)?];
+let root = Certificate::from_der(root_der)?;
+let anchors = vec![TrustAnchor::try_from(root)?];
 
-let policy = ValidationPolicy {
-    current_time_unix: 1_780_272_000, // seconds since Unix epoch
-    ..Default::default()
-};
+let policy = ValidationPolicy::new(1_780_272_000); // seconds since Unix epoch
 
 // Validate — no revocation checking
 let validated = verify_chain_default(&chain, &anchors, &policy, &NoRevocation)?;
-println!("chain depth: {}", validated.chain.len());
+println!("chain depth: {}", validated.depth);
 ```
 
 With CRL revocation checking:
@@ -78,7 +76,7 @@ With CRL revocation checking:
 ```rust
 use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};
 
-let crl_checker = CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier);
+let crl_checker = CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier)?;
 let validated = verify_chain_default(&chain, &anchors, &policy, &crl_checker)?;
 ```
 

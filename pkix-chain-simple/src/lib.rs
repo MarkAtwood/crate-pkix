@@ -30,7 +30,7 @@
 //!
 //! **Chain shape**
 //! - At least 1 certificate (the end-entity / leaf)
-//! - At most `1 + `[`MAX_INTERMEDIATES`]` ` certificates (leaf + intermediates;
+//! - At most <code>1 + [MAX_INTERMEDIATES]</code> certificates (leaf + intermediates;
 //!   the trust anchor is supplied separately and not counted)
 //!
 //! **Signature algorithms** — only [`ALLOWED_SIG_ALGS`]:
@@ -265,13 +265,13 @@ const _: () = assert!(
 // ---------------------------------------------------------------------------
 
 /// Errors returned by [`verify_simple`].
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// `chain` slice is empty; there is no certificate to validate.
     EmptyChain,
 
-    /// Chain has more certificates than `1 + `[`MAX_INTERMEDIATES`].
+    /// Chain has more certificates than <code>1 + [MAX_INTERMEDIATES]</code>.
     ///
     /// `len` is the number of certificates supplied (excluding the trust anchor).
     /// Use `pkix_chain` for longer chains.

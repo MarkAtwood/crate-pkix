@@ -18,10 +18,12 @@
 //!
 //! # Algorithm
 //!
-//! [`build_path`] uses iterative-deepening DFS (RFC 4158 §2.5): it tries
-//! increasing maximum path depths from 1 to 10, performing a full DFS at
-//! each depth. This guarantees that the shortest valid path is returned while
-//! bounding memory to O(depth) stack frames per attempt.
+//! [`build_path`] and [`build_path_with_config`] use iterative-deepening DFS
+//! (RFC 4158 §2.5): they try increasing maximum path depths from 1 up to
+//! [`PathBuilderConfig::max_depth`] (default [`DEFAULT_MAX_DEPTH`] = 10),
+//! performing a full DFS at each depth. This guarantees that the shortest
+//! valid path is returned while bounding memory to O(depth) stack frames
+//! per attempt.
 //!
 //! # Spec references
 //!
@@ -64,8 +66,8 @@ pub struct CertPool {
 impl CertPool {
     /// Create an empty pool.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self { certs: Vec::new() }
     }
 
     /// Add a certificate to the pool.
@@ -95,6 +97,20 @@ impl CertPool {
     /// Return the pool contents as a slice.
     pub(crate) fn as_slice(&self) -> &[Certificate] {
         &self.certs
+    }
+}
+
+impl FromIterator<Certificate> for CertPool {
+    fn from_iter<I: IntoIterator<Item = Certificate>>(iter: I) -> Self {
+        Self {
+            certs: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl Extend<Certificate> for CertPool {
+    fn extend<I: IntoIterator<Item = Certificate>>(&mut self, iter: I) {
+        self.certs.extend(iter);
     }
 }
 
@@ -349,7 +365,12 @@ impl Default for PathBuilderConfig {
 ///
 /// Iterative-deepening DFS: tries maximum intermediate depths 1 through 10.
 /// Returns the shortest valid topology first. Cycles are detected and pruned
-/// by comparing `SubjectPublicKeyInfo` DER bytes of certificates already in the path.
+/// by comparing each candidate's `SubjectPublicKeyInfo` algorithm OID and raw
+/// public-key bits against certificates already in the path. Algorithm
+/// parameters are deliberately excluded from the comparison to tolerate the
+/// RFC 8017 ambiguity between absent and explicit-NULL `parameters` in
+/// rsaEncryption SPKIs (see the inline comment at the cycle-detection site
+/// for rationale).
 ///
 /// Each round and the depth probe get a fresh budget of `DFS_BUDGET` node
 /// visits.  Resetting per-round prevents earlier rounds (which re-traverse all
@@ -372,10 +393,12 @@ impl Default for PathBuilderConfig {
 ///
 /// # Limitations
 ///
-/// Cycle detection is based on `SubjectPublicKeyInfo` DER identity rather than
-/// subject DN. Two certificates with the same subject DN but different public
-/// keys (e.g., during a key rollover or in a bridge CA topology) are treated
-/// as distinct nodes and will not incorrectly prune valid paths.
+/// Cycle detection is based on `SubjectPublicKeyInfo` algorithm OID + raw
+/// public-key bits (parameters intentionally excluded — see Algorithm above)
+/// rather than subject DN. Two certificates with the same subject DN but
+/// different public keys (e.g., during a key rollover or in a bridge CA
+/// topology) are treated as distinct nodes and will not incorrectly prune
+/// valid paths.
 ///
 /// **Anchor matching is by DN only.** When a candidate's issuer DN matches
 /// any anchor in `anchors`, path building terminates immediately with that
@@ -395,7 +418,6 @@ impl Default for PathBuilderConfig {
 /// Pool contents should be from a trusted source. `DFS_BUDGET` enforces a hard
 /// cap on search work per round to prevent denial-of-service via oversized or
 /// crafted pools.
-#[must_use = "path building result must be checked"]
 pub fn build_path(
     target: &Certificate,
     pool: &CertPool,
@@ -413,7 +435,6 @@ pub fn build_path(
 /// # Errors
 ///
 /// Same as [`build_path`].
-#[must_use = "path building result must be checked"]
 pub fn build_path_with_config(
     target: &Certificate,
     pool: &CertPool,

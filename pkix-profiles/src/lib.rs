@@ -154,7 +154,7 @@ pub(crate) const ID_KP_CODE_SIGNING: ObjectIdentifier =
 ///
 /// SC-081 enforcement is delegated to `ValidityMaxLint` in `pkix-lint`, which
 /// correctly evaluates `sc081_validity_cap(notBefore)` for each certificate.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct WebPkiProfile;
 
 impl Profile for WebPkiProfile {
@@ -218,7 +218,7 @@ impl Profile for WebPkiProfile {
 /// certificates whose validity is within 1185 days.
 ///
 /// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SmimeProfile;
 
 impl Profile for SmimeProfile {
@@ -277,7 +277,7 @@ impl Profile for SmimeProfile {
 ///
 /// Timestamp authority verification is out of scope for `pkix-path`;
 /// use a dedicated timestamp verifier. Revocation is handled by `pkix-revocation`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct CodeSigningProfile;
 
 impl Profile for CodeSigningProfile {
@@ -318,7 +318,7 @@ impl Profile for CodeSigningProfile {
 /// Useful as a starting point for custom profiles or as a baseline in testing.
 /// The free-function alias [`rfc5280_policy`] is equivalent to
 /// `Rfc5280Profile.policy(now_unix)`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc5280Profile;
 
 impl Profile for Rfc5280Profile {
@@ -551,19 +551,31 @@ mod tests {
         // This is a structural check only — not using one as the oracle for the other.
         let via_trait = WebPkiProfile.policy(NOW);
         let via_fn = web_pki_policy(NOW);
-        assert_eq!(via_trait, via_fn, "WebPkiProfile.policy and web_pki_policy must agree");
+        assert_eq!(
+            via_trait, via_fn,
+            "WebPkiProfile.policy and web_pki_policy must agree"
+        );
 
         let via_trait = SmimeProfile.policy(NOW);
         let via_fn = smime_policy(NOW);
-        assert_eq!(via_trait, via_fn, "SmimeProfile.policy and smime_policy must agree");
+        assert_eq!(
+            via_trait, via_fn,
+            "SmimeProfile.policy and smime_policy must agree"
+        );
 
         let via_trait = CodeSigningProfile.policy(NOW);
         let via_fn = code_signing_policy(NOW);
-        assert_eq!(via_trait, via_fn, "CodeSigningProfile.policy and code_signing_policy must agree");
+        assert_eq!(
+            via_trait, via_fn,
+            "CodeSigningProfile.policy and code_signing_policy must agree"
+        );
 
         let via_trait = Rfc5280Profile.policy(NOW);
         let via_fn = rfc5280_policy(NOW);
-        assert_eq!(via_trait, via_fn, "Rfc5280Profile.policy and rfc5280_policy must agree");
+        assert_eq!(
+            via_trait, via_fn,
+            "Rfc5280Profile.policy and rfc5280_policy must agree"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -710,10 +722,13 @@ mod tests {
         let anchors = [TrustAnchor::from_cert(cert.clone())];
         // Use pre-SC-081 time so 365 days is within the 398-day cap.
         let pre_sc081: u64 = 1_767_225_600; // 2026-01-01
-        pkix_path::validate_path(&[cert], &anchors, &web_pki_policy(pre_sc081), &EcdsaP256Verifier)
-            .expect(
-                "self-signed 365-day cert with SAN and serverAuth EKU must pass web_pki_policy",
-            );
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &web_pki_policy(pre_sc081),
+            &EcdsaP256Verifier,
+        )
+        .expect("self-signed 365-day cert with SAN and serverAuth EKU must pass web_pki_policy");
     }
 
     /// Oracle: webpki-self-signed-365d.der has 365-day validity (< 398) → passes pre-SC-081.
@@ -749,8 +764,13 @@ mod tests {
         ));
         let anchors = [TrustAnchor::from_cert(cert.clone())];
         let pre_sc081: u64 = 1_767_225_600;
-        pkix_path::validate_path(&[cert], &anchors, &web_pki_policy(pre_sc081), &EcdsaP256Verifier)
-            .expect("self-signed cert with SAN must pass web_pki_policy SAN check");
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &web_pki_policy(pre_sc081),
+            &EcdsaP256Verifier,
+        )
+        .expect("self-signed cert with SAN must pass web_pki_policy SAN check");
     }
 
     /// Oracle: a cert with serverAuth passes, a cert with emailProtection (not serverAuth) fails.
@@ -771,8 +791,13 @@ mod tests {
             "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
         ));
         let anchors = [TrustAnchor::from_cert(cert.clone())];
-        pkix_path::validate_path(&[cert], &anchors, &web_pki_policy(pre_sc081), &EcdsaP256Verifier)
-            .expect("cert with serverAuth must pass web_pki_policy EKU check");
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &web_pki_policy(pre_sc081),
+            &EcdsaP256Verifier,
+        )
+        .expect("cert with serverAuth must pass web_pki_policy EKU check");
 
         // Verify rejection: require emailProtection but cert has serverAuth.
         // Also use pre-sc081 so only the EKU check fires (not the validity cap).
@@ -959,9 +984,7 @@ mod tests {
             &code_signing_policy(NOW),
             &EcdsaP256Verifier,
         )
-        .expect(
-            "self-signed 365-day cert with codeSigning EKU must pass code_signing_policy",
-        );
+        .expect("self-signed 365-day cert with codeSigning EKU must pass code_signing_policy");
     }
 
     /// Verify that `code_signing_policy` requires `codeSigning` EKU and that a cert

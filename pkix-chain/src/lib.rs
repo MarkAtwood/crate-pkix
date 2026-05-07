@@ -51,7 +51,7 @@ use x509_cert::Certificate;
 ///
 /// Wraps both path validation errors ([`pkix_path::Error`]) and
 /// revocation checking errors ([`pkix_revocation::Error`]).
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// RFC 5280 path validation failed.

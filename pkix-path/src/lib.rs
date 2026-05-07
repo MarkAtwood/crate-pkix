@@ -68,7 +68,7 @@ type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 /// via [`Error::Der`] (and the [`From<der::Error>`] impl on [`Error`]).
 ///
 /// [`Display`]: core::fmt::Display
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DerError(der::Error);
 
 impl core::fmt::Display for DerError {
@@ -85,7 +85,7 @@ impl std::error::Error for DerError {
 }
 
 /// Errors returned by path validation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
     /// Certificate signature verification failed at the given chain index.
@@ -490,10 +490,14 @@ impl From<&Certificate> for TrustAnchor {
 
 /// Fail-closed construction from an owned certificate.
 ///
-/// Returns `Err(der::Error)` if the certificate contains a `NameConstraints`
+/// Returns `Err(`[`DerError`]`)` if the certificate contains a `NameConstraints`
 /// extension with malformed DER. Use this when building a trust store that
 /// must reject certificates with unparseable critical extensions per
 /// RFC 5280 §4.2.
+///
+/// The error type is the opaque [`DerError`] newtype rather than `der::Error`
+/// so that a future major-version bump in the `der` crate does not cascade
+/// into a semver break here.
 ///
 /// # Why only `TryFrom<Certificate>` and not `TryFrom<&Certificate>`
 ///
@@ -502,10 +506,10 @@ impl From<&Certificate> for TrustAnchor {
 /// `From<&Certificate>` is already implemented (and `From` implies `Into`).
 /// Use `TrustAnchor::try_from(cert.clone())` if you need to keep `cert`.
 impl TryFrom<Certificate> for TrustAnchor {
-    type Error = der::Error;
+    type Error = DerError;
 
     fn try_from(cert: Certificate) -> core::result::Result<Self, Self::Error> {
-        let name_constraints = try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS)?;
+        let name_constraints = try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS).map_err(DerError)?;
         Ok(Self {
             subject: cert.tbs_certificate.subject,
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
@@ -846,7 +850,6 @@ pub struct ValidatedPath {
 /// # Limitations
 ///
 /// See crate-level documentation for current scope limits.
-#[must_use = "path validation result must be checked"]
 pub fn validate_path<V>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -928,7 +931,6 @@ where
 /// # Errors
 ///
 /// Returns `Err(Error::...)` for each validation failure. See [`Error`] for the full list of failure conditions.
-#[must_use = "path validation result must be checked"]
 pub fn validate_path_with_profile<V, P>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -991,7 +993,10 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
             let a = &chain[i].tbs_certificate;
             let b = &chain[j].tbs_certificate;
             if names_match(&a.issuer, &b.issuer) && a.serial_number == b.serial_number {
-                return Err(Error::DuplicateCertificate { first: i, second: j });
+                return Err(Error::DuplicateCertificate {
+                    first: i,
+                    second: j,
+                });
             }
         }
     }
@@ -1199,8 +1204,7 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
 fn has_key_cert_sign(cert: &Certificate) -> der::Result<Option<bool>> {
     use x509_cert::ext::pkix::KeyUsage;
 
-    try_find_cert_ext::<KeyUsage>(cert, OID_KEY_USAGE)
-        .map(|opt| opt.map(|ku| ku.key_cert_sign()))
+    try_find_cert_ext::<KeyUsage>(cert, OID_KEY_USAGE).map(|opt| opt.map(|ku| ku.key_cert_sign()))
 }
 
 // ---------------------------------------------------------------------------
@@ -1245,17 +1249,13 @@ fn try_find_cert_ext<T: der::DecodeOwned>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
 ) -> der::Result<Option<T>> {
-    match cert
-        .tbs_certificate
+    cert.tbs_certificate
         .extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
         .find(|e| e.extn_id == oid)
-    {
-        None => Ok(None),
-        Some(e) => T::from_der(e.extn_value.as_bytes()).map(Some),
-    }
+        .map_or(Ok(None), |e| T::from_der(e.extn_value.as_bytes()).map(Some))
 }
 
 /// Decode the `SubjectAltName` extension from `cert`.
@@ -1268,8 +1268,7 @@ fn cert_subject_alt_names(
     cert: &Certificate,
     index: usize,
 ) -> crate::Result<Option<x509_cert::ext::pkix::SubjectAltName>> {
-    try_find_cert_ext(cert, OID_SUBJECT_ALT_NAME)
-        .map_err(|_| Error::MalformedCertificate { index })
+    try_find_cert_ext(cert, OID_SUBJECT_ALT_NAME).map_err(|_| Error::MalformedCertificate { index })
 }
 
 /// Decode the `NameConstraints` extension from `cert`.
@@ -1362,7 +1361,7 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         return false;
     }
 
-    for (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns.iter()) {
+    for (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns) {
         let a_avas = a_rdn.0.as_slice();
         let b_avas = b_rdn.0.as_slice();
         if a_avas.len() != b_avas.len() {
@@ -1827,7 +1826,7 @@ const OID_ECDSA_P256_SHA256: der::asn1::ObjectIdentifier =
 /// Feature-gated behind `p256`.
 #[cfg(feature = "p256")]
 #[cfg_attr(docsrs, doc(cfg(feature = "p256")))]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EcdsaP256Verifier;
 
 #[cfg(feature = "p256")]
@@ -1869,7 +1868,7 @@ const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
 /// Feature-gated behind `rsa`.
 #[cfg(feature = "rsa")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RsaPkcs1v15Sha256Verifier;
 
 #[cfg(feature = "rsa")]
@@ -2016,10 +2015,7 @@ fn chain_walk<V: SignatureVerifier>(
     // the chain (including intermediates), not just to leaves — the chain walk
     // enforces them from the first certificate onward.
     let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {
-        None => (
-            None,
-            GeneralSubtrees::default(),
-        ),
+        None => (None, GeneralSubtrees::default()),
         Some(nc) => (
             // Clone necessary: nc_permitted and nc_excluded are mutated during the walk.
             nc.permitted_subtrees.clone(),
@@ -2037,16 +2033,16 @@ fn chain_walk<V: SignatureVerifier>(
     // "is type constrained?" from nc_permitted contents alone — that would
     // silently allow names of a type whose permitted set was emptied by
     // conflicting CA constraints.
-    let mut nc_constrained_types: NcTypeMask = match &nc_permitted {
-        None => NcTypeMask::EMPTY,
-        Some(permitted) => {
-            let mut bits = NcTypeMask::EMPTY;
-            for st in permitted {
-                bits |= name_type_bit(&st.base);
-            }
-            bits
-        }
-    };
+    let mut nc_constrained_types: NcTypeMask =
+        nc_permitted
+            .as_ref()
+            .map_or(NcTypeMask::EMPTY, |permitted| {
+                let mut bits = NcTypeMask::EMPTY;
+                for st in permitted {
+                    bits |= name_type_bit(&st.base);
+                }
+                bits
+            });
 
     // RFC 5280 §6.1.2: initialise policy state variables (PKIX-mi3.3).
     //
@@ -2209,8 +2205,7 @@ fn chain_walk<V: SignatureVerifier>(
                     // Track whether any parent matched to decide step (d)(1)(ii).
                     let mut matched_via_i = false;
                     for _parent in tree.iter().filter(|parent| {
-                        parent.depth == cert_depth - 1
-                            && parent.expected_policy_set.contains(p_oid)
+                        parent.depth == cert_depth - 1 && parent.expected_policy_set.contains(p_oid)
                     }) {
                         matched_via_i = true;
                         new_nodes.push(PolicyNode {
@@ -2386,8 +2381,7 @@ fn chain_walk<V: SignatureVerifier>(
             // has_key_cert_sign is fail-closed: a malformed critical KeyUsage returns
             // MalformedCertificate rather than being silently treated as absent (vjc.15).
             if policy.enforce_key_usage
-                && has_key_cert_sign(cert)
-                    .map_err(|_| Error::MalformedCertificate { index: i })?
+                && has_key_cert_sign(cert).map_err(|_| Error::MalformedCertificate { index: i })?
                     == Some(false)
             {
                 return Err(Error::KeyUsageMissing { index: i });
@@ -2496,9 +2490,8 @@ fn chain_walk<V: SignatureVerifier>(
             // explicit_policy and policy_mapping from the extension.
             // try_find_cert_ext (fail-closed): malformed PolicyConstraints must reject;
             // silently ignoring it could allow explicit_policy bypass.
-            if let Some(pc) =
-                try_find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
-                    .map_err(|_| Error::MalformedCertificate { index: i })?
+            if let Some(pc) = try_find_cert_ext::<PolicyConstraints>(cert, OID_POLICY_CONSTRAINTS)
+                .map_err(|_| Error::MalformedCertificate { index: i })?
             {
                 if let Some(req) = pc.require_explicit_policy {
                     explicit_policy = explicit_policy.min(req);
@@ -2511,9 +2504,8 @@ fn chain_walk<V: SignatureVerifier>(
             // (policy-j) InhibitAnyPolicy (RFC 5280 §6.1.4(d)): clamp inhibit_any.
             // try_find_cert_ext (fail-closed): malformed InhibitAnyPolicy must reject;
             // silently ignoring it could allow anyPolicy through when it should be inhibited.
-            if let Some(iap) =
-                try_find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
-                    .map_err(|_| Error::MalformedCertificate { index: i })?
+            if let Some(iap) = try_find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
+                .map_err(|_| Error::MalformedCertificate { index: i })?
             {
                 inhibit_any = inhibit_any.min(iap.0);
             }
@@ -2549,19 +2541,17 @@ fn chain_walk<V: SignatureVerifier>(
                             //   2. current entries within (⊆) some same-type new entry.
                             // (If neither is within the other the intersection for that
                             // type is empty — tracked via nc_constrained_types.)
-                            let mut result =
-                                GeneralSubtrees::default();
+                            let mut result = GeneralSubtrees::default();
 
                             // For each new entry, pre-filter current entries of the
                             // same type to avoid calling same_nc_variant twice per
                             // pair (vjc.16: duplicated guard + containment check).
                             for n in &new_permitted {
-                                let same_type_in_current: GeneralSubtrees =
-                                    current
-                                        .iter()
-                                        .filter(|c| same_nc_variant(&c.base, &n.base))
-                                        .cloned()
-                                        .collect();
+                                let same_type_in_current: GeneralSubtrees = current
+                                    .iter()
+                                    .filter(|c| same_nc_variant(&c.base, &n.base))
+                                    .cloned()
+                                    .collect();
                                 if same_type_in_current.is_empty() {
                                     // Type not previously constrained → add directly.
                                     result.push(n.clone());
@@ -2576,12 +2566,11 @@ fn chain_walk<V: SignatureVerifier>(
                             }
 
                             for c in current.iter() {
-                                let same_type_in_new: GeneralSubtrees =
-                                    new_permitted
-                                        .iter()
-                                        .filter(|n| same_nc_variant(&n.base, &c.base))
-                                        .cloned()
-                                        .collect();
+                                let same_type_in_new: GeneralSubtrees = new_permitted
+                                    .iter()
+                                    .filter(|n| same_nc_variant(&n.base, &c.base))
+                                    .cloned()
+                                    .collect();
                                 if same_type_in_new.is_empty() {
                                     // Type not in new_permitted → keep unchanged.
                                     result.push(c.clone());
@@ -2662,9 +2651,8 @@ fn chain_walk<V: SignatureVerifier>(
         // force explicit_policy to 0.
         // try_find_cert_ext (fail-closed): consistent with per-loop treatment of
         // PolicyConstraints; a malformed extension on the leaf must also reject.
-        if let Some(pc) =
-            try_find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS)
-                .map_err(|_| Error::MalformedCertificate { index: 0 })?
+        if let Some(pc) = try_find_cert_ext::<PolicyConstraints>(leaf, OID_POLICY_CONSTRAINTS)
+            .map_err(|_| Error::MalformedCertificate { index: 0 })?
         {
             if let Some(req) = pc.require_explicit_policy {
                 explicit_policy = explicit_policy.min(req);
@@ -2946,22 +2934,21 @@ fn check_name_constraints(
         // `permitted_rfc822`. `permitted_rfc822_storage` holds the allocation
         // when the check is active; `Option` avoids a dummy assignment that
         // would trigger an unused-assignment warning.
-        let permitted_rfc822_storage: Option<
-            GeneralSubtrees,
-        > = if nc_constrained_types.intersects(NcTypeMask::RFC822) {
-            Some(
-                nc_permitted
-                    .map(|p| {
-                        p.iter()
-                            .filter(|st| matches!(st.base, GeneralName::Rfc822Name(_)))
-                            .cloned()
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            )
-        } else {
-            None
-        };
+        let permitted_rfc822_storage: Option<GeneralSubtrees> =
+            if nc_constrained_types.intersects(NcTypeMask::RFC822) {
+                Some(
+                    nc_permitted
+                        .map(|p| {
+                            p.iter()
+                                .filter(|st| matches!(st.base, GeneralName::Rfc822Name(_)))
+                                .cloned()
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                )
+            } else {
+                None
+            };
         let permitted_rfc822: Option<&[x509_cert::ext::pkix::constraints::name::GeneralSubtree]> =
             permitted_rfc822_storage.as_deref();
 
@@ -3019,7 +3006,7 @@ fn check_name_constraints(
 /// and dispatch your own OID table.
 #[cfg(any(feature = "p256", feature = "rsa"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "p256", feature = "rsa"))))]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DefaultVerifier;
 
 #[cfg(any(feature = "p256", feature = "rsa"))]
@@ -3399,7 +3386,10 @@ mod tests_validate_path {
         assert!(
             matches!(
                 result,
-                Err(Error::DuplicateCertificate { first: 0, second: 1 })
+                Err(Error::DuplicateCertificate {
+                    first: 0,
+                    second: 1
+                })
             ),
             "duplicate cert must return DuplicateCertificate{{first:0, second:1}}, got {result:?}"
         );
@@ -3559,9 +3549,13 @@ mod tests_validate_path {
         // Default policy has enforce_key_usage = true.
         // nku-int has no KeyUsage — must NOT trigger KeyUsageMissing per RFC 5280 §6.1.4(n).
         let now: u64 = 1_720_000_000; // 2024-07-03, within nku-int validity (2024-2030)
-        let policy = ValidationPolicy { current_time_unix: now, ..Default::default() };
-        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier)
-            .expect("intermediate with absent KeyUsage must be accepted when enforce_key_usage=true");
+        let policy = ValidationPolicy {
+            current_time_unix: now,
+            ..Default::default()
+        };
+        validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier).expect(
+            "intermediate with absent KeyUsage must be accepted when enforce_key_usage=true",
+        );
     }
 
     /// Leaf with critical `ExtendedKeyUsage` → `validate_path` must accept it.
