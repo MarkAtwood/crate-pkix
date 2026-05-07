@@ -297,6 +297,16 @@ fn ocsp_responder_id_byname_wrong_rejected() {
 /// it invalidates the signature, so signature verification fails before the
 /// ResponderId check is reached.
 ///
+/// # Coverage note
+///
+/// This test exercises the `OcspSignatureInvalid` path, not `OcspResponderIdMismatch`.
+/// To reach the `OcspResponderIdMismatch` byKey arm, a fixture would need a valid
+/// OCSP signature (signed with key A) but byKey=SHA1(key B). This requires custom
+/// ASN.1 construction that signs a specific tbs_response_data — pyca does not
+/// support signing with a key that differs from the responder cert's public key.
+/// The `byName` test (ocsp_responder_id_byname_wrong_rejected) exercises the same
+/// `verify_responder_id_impl` function via its `ByName` arm.
+///
 /// Oracle: pyca/cryptography (gen_responder_id_fixtures.py).
 /// Fixture: ocsp-rid-bad-bykey.der has byKey with first SHA-1 byte XOR 0xFF.
 #[test]
