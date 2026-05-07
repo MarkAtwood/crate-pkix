@@ -123,8 +123,17 @@ pub enum Error {
     /// (RFC 5280 §6.3.3(f)).
     CrlSignMissing,
 
-    /// A delta CRL was supplied but no base CRL is available, or the delta's
-    /// `BaseCRLNumber` does not match the base CRL's `CRLNumber`.
+    /// The base/delta CRL pair cannot be used together.
+    ///
+    /// Returned in any of these cases:
+    /// - The supplied "base" CRL is itself a delta CRL (has a `deltaCRLIndicator`
+    ///   extension) — RFC 5280 §5.2.4 requires a full CRL as the base.
+    /// - The supplied "delta" CRL has no `deltaCRLIndicator` extension and is
+    ///   therefore not a delta CRL at all.
+    /// - The base and delta CRL have different issuers.
+    ///
+    /// Note: when the delta's `BaseCRLNumber` exceeds the base CRL's `CRLNumber`
+    /// (a staleness mismatch), [`Error::CrlNumberMismatch`] is returned instead.
     DeltaCrlBaseMismatch,
 
     /// The CRL's CRL number is lower than expected (base CRL must have a number

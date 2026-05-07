@@ -47,23 +47,23 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///   the issuer's key. This is a v0.1 limitation tracked for v0.3.
 ///
 /// [`check_revocation`]: crate::RevocationChecker::check_revocation
- /// - `SingleResponse` matching uses both serial number and the `CertID`
- ///   `issuerNameHash`/`issuerKeyHash` fields (RFC 6960 §4.1.1). An OCSP
- ///   response from a different CA with the same serial number will be rejected
- ///   by the hash checks.
- /// - The `ResponderId` field is verified against the issuer identity per
- ///   RFC 6960 §2.2: `byName` is compared against the issuer's subject DN using
- ///   [`pkix_path::names_match`]; `byKey` is compared against SHA-1 of the
- ///   issuer's SPKI `subjectPublicKey` bit string.
- /// - If no `SingleResponse` matches the certificate's serial number,
- ///   `OcspStatusUnknown` is returned (hard-fail).
- /// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
- ///   For the certificate issued directly by a trust anchor, the checker
- ///   uses the anchor's subject DN and SPKI to verify the OCSP response.
-  ///   The response DER must be supplied at construction time; this method
-  ///   always attempts to verify it against the anchor.
- ///
- /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
+/// - `SingleResponse` matching uses both serial number and the `CertID`
+///   `issuerNameHash`/`issuerKeyHash` fields (RFC 6960 §4.1.1). An OCSP
+///   response from a different CA with the same serial number will be rejected
+///   by the hash checks.
+/// - The `ResponderId` field is verified against the issuer identity per
+///   RFC 6960 §2.2: `byName` is compared against the issuer's subject DN using
+///   [`pkix_path::names_match`]; `byKey` is compared against SHA-1 of the
+///   issuer's SPKI `subjectPublicKey` bit string.
+/// - If no `SingleResponse` matches the certificate's serial number,
+///   `OcspStatusUnknown` is returned (hard-fail).
+/// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
+///   For the certificate issued directly by a trust anchor, the checker
+///   uses the anchor's subject DN and SPKI to verify the OCSP response.
+///   The response DER must be supplied at construction time; this method
+///   always attempts to verify it against the anchor.
+///
+/// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct OcspChecker<V> {
     response_der: Vec<u8>,
