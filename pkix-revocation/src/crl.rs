@@ -184,7 +184,10 @@ impl<V: SignatureVerifier> CrlChecker<V> {
 
         // If the base CRL has a CRL number, the delta's BaseCRLNumber must be
         // ≤ it (we have a base that is at least as current as what the delta expects).
-        if let Some(base_num) = crl_number(&base_crl) {
+        // A malformed or overflowing base CRLNumber is treated as CrlParseError
+        // rather than silently skipping the freshness check.
+        if let Some(base_num_result) = crl_number(&base_crl) {
+            let base_num = base_num_result.map_err(Error::CrlParseError)?;
             if delta_base_num > base_num {
                 return Err(Error::CrlNumberMismatch);
             }
@@ -565,20 +568,23 @@ fn uint_to_u64(n: &der::asn1::Uint) -> Option<u64> {
 
 /// Extract the CRL number from a `CertificateList`'s extensions.
 ///
-/// Returns `None` if the `CRLNumber` extension is absent or cannot be decoded.
-/// `CRLNumber` is a non-negative INTEGER (RFC 5280 §5.2.3).
-fn crl_number(crl: &CertificateList) -> Option<u64> {
-    crl.tbs_cert_list
+/// Returns:
+/// - `None` — `CRLNumber` extension absent (field is optional per RFC 5280 §5.2.3)
+/// - `Some(Ok(n))` — extension present and successfully decoded
+/// - `Some(Err(e))` — extension present but the INTEGER value is malformed or
+///   too large to fit in a `u64` (a CRLNumber > 2^64 is implausible in any
+///   deployed PKI but must not silently disable the staleness check)
+fn crl_number(crl: &CertificateList) -> Option<Result<u64, der::Error>> {
+    let ext = crl
+        .tbs_cert_list
         .crl_extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .find(|e| e.extn_id == OID_CRL_NUMBER)
-        .and_then(|e| {
-            der::asn1::Uint::from_der(e.extn_value.as_bytes())
-                .ok()
-                .and_then(|n| uint_to_u64(&n))
-        })
+        .find(|e| e.extn_id == OID_CRL_NUMBER)?;
+    let result = der::asn1::Uint::from_der(ext.extn_value.as_bytes())
+        .and_then(|n| uint_to_u64(&n).ok_or_else(|| der::Error::from(der::ErrorKind::Overflow)));
+    Some(result)
 }
 
 /// Returns `true` if `crl` contains a `deltaCRLIndicator` extension (OID 2.5.29.27),

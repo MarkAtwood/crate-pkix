@@ -272,7 +272,7 @@ fn ocsp_responder_id_bykey_correct_accepted() {
     result.expect("byKey ResponderId matching issuer SPKI SHA-1 must return Ok(())");
 }
 
-/// Response with ResponderId=byName(CN=Wrong CA), signed with correct key → Err(OcspSignatureInvalid).
+/// Response with ResponderId=byName(CN=Wrong CA), signed with correct key → Err(OcspResponderIdMismatch).
 ///
 /// The signature verifies (correct key) but the ResponderId name does not match
 /// the issuer's subject DN (CN=Wrong CA ≠ CN=OCSP RID Test CA).
@@ -286,15 +286,16 @@ fn ocsp_responder_id_byname_wrong_rejected() {
     let checker = OcspChecker::new(fixture("ocsp-rid-bad-byname.der"), NOW, DefaultVerifier);
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
-        matches!(result, Err(Error::OcspSignatureInvalid)),
-        "byName ResponderId mismatch must return OcspSignatureInvalid, got: {result:?}"
+        matches!(result, Err(Error::OcspResponderIdMismatch)),
+        "byName ResponderId mismatch must return OcspResponderIdMismatch, got: {result:?}"
     );
 }
 
-/// Response with ResponderId=byKey(corrupted SHA-1), signed with correct key → Err(OcspSignatureInvalid).
+/// Response with ResponderId=byKey(corrupted SHA-1) → Err(OcspSignatureInvalid).
 ///
-/// The signature verifies (correct key) but the byKey hash has been corrupted
-/// so it no longer matches SHA-1(issuer SPKI bits).
+/// The byKey hash is inside tbs_response_data (the signed portion); corrupting
+/// it invalidates the signature, so signature verification fails before the
+/// ResponderId check is reached.
 ///
 /// Oracle: pyca/cryptography (gen_responder_id_fixtures.py).
 /// Fixture: ocsp-rid-bad-bykey.der has byKey with first SHA-1 byte XOR 0xFF.
@@ -306,7 +307,7 @@ fn ocsp_responder_id_bykey_wrong_rejected() {
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
         matches!(result, Err(Error::OcspSignatureInvalid)),
-        "byKey ResponderId mismatch must return OcspSignatureInvalid, got: {result:?}"
+        "corrupted byKey in tbs_response_data must invalidate signature → OcspSignatureInvalid, got: {result:?}"
     );
 }
 
@@ -334,6 +335,9 @@ fn ocsp_check_revocation_against_anchor_good() {
 
 /// check_revocation_against_anchor with a corrupted byKey response → Err(OcspSignatureInvalid).
 ///
+/// Same logic as `ocsp_responder_id_bykey_wrong_rejected`: the byKey hash is
+/// inside the signed data, so its corruption invalidates the signature.
+///
 /// The anchor's SPKI SHA-1 must not match the corrupted hash in ocsp-rid-bad-bykey.der.
 ///
 /// Oracle: pyca/cryptography (gen_responder_id_fixtures.py).
@@ -346,6 +350,6 @@ fn ocsp_check_revocation_against_anchor_bad_responder_id() {
     let result = checker.check_revocation_against_anchor(&leaf, &anchor);
     assert!(
         matches!(result, Err(Error::OcspSignatureInvalid)),
-        "corrupted byKey in anchor check must return OcspSignatureInvalid, got: {result:?}"
+        "corrupted byKey in tbs_response_data must invalidate signature → OcspSignatureInvalid, got: {result:?}"
     );
 }
