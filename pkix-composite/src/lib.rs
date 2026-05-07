@@ -14,13 +14,14 @@
 //!
 //! # Usage
 //!
-//! ```rust,ignore
+//! ```rust,no_run
+//! # #![allow(deprecated)]
 //! use pkix_composite::CompositeVerifier;
-//! use pkix_path::{DefaultVerifier, SignatureVerifier};
-//! // wolfcrypt_pkix::WolfCryptVerifier for the PQ component
+//! use pkix_path::DefaultVerifier;
 //!
+//! # let pq_verifier = DefaultVerifier;
 //! let verifier = CompositeVerifier::new(DefaultVerifier, pq_verifier);
-//! pkix_chain::verify_chain(&chain, &anchors, &policy, &verifier, &NoRevocation)?;
+//! # let _ = verifier;
 //! ```
 //!
 //! # Spec references
@@ -62,7 +63,7 @@ pub struct CompositeVerifier<C, P> {
 impl<C, P> CompositeVerifier<C, P> {
     /// Create a new `CompositeVerifier` from a classical and a post-quantum component.
     #[deprecated = "pkix-composite is not yet implemented"]
-    pub fn new(classical: C, post_quantum: P) -> Self {
+    pub const fn new(classical: C, post_quantum: P) -> Self {
         Self {
             classical,
             post_quantum,

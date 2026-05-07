@@ -66,6 +66,7 @@ use crate::de_cow_static;
 
 /// Error returned by [`DeviationStore::add`].
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum DeviationAddError {
     /// A deviation with the same `id` already exists in the store.
     DuplicateId(String),
@@ -76,10 +77,10 @@ pub enum DeviationAddError {
 impl std::fmt::Display for DeviationAddError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeviationAddError::DuplicateId(id) => {
+            Self::DuplicateId(id) => {
                 write!(f, "deviation id '{id}' already exists in the store")
             }
-            DeviationAddError::EmptyField(field) => {
+            Self::EmptyField(field) => {
                 write!(f, "deviation field '{field}' must not be empty")
             }
         }
@@ -325,9 +326,9 @@ impl DeviationScope {
     #[must_use]
     pub fn matches(&self, cert: &Certificate) -> bool {
         match self {
-            DeviationScope::Any => true,
+            Self::Any => true,
 
-            DeviationScope::IssuerDnContains(substring) => {
+            Self::IssuerDnContains(substring) => {
                 // Allocates one String per call to convert the Name to its display form.
                 // For high-frequency lint passes, prefer IssuerDnExact (uses RFC 4518
                 // normalized comparison without String allocation).
@@ -342,12 +343,12 @@ impl DeviationScope {
                 issuer_str.contains(substring.as_str())
             }
 
-            DeviationScope::IssuerDnExact(name) => {
+            Self::IssuerDnExact(name) => {
                 // Use pkix_path::names_match for RFC 4518-normalized comparison.
                 pkix_path::names_match(name, &cert.tbs_certificate.issuer)
             }
 
-            DeviationScope::SerialRange {
+            Self::SerialRange {
                 issuer,
                 start,
                 end,
@@ -388,22 +389,22 @@ impl serde::Serialize for DeviationScope {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStructVariant as _;
         match self {
-            DeviationScope::Any => {
+            Self::Any => {
                 serializer.serialize_unit_variant("DeviationScope", 0, "Any")
             }
-            DeviationScope::IssuerDnContains(s) => serializer.serialize_newtype_variant(
+            Self::IssuerDnContains(s) => serializer.serialize_newtype_variant(
                 "DeviationScope",
                 1,
                 "IssuerDnContains",
                 s,
             ),
-            DeviationScope::IssuerDnExact(name) => serializer.serialize_newtype_variant(
+            Self::IssuerDnExact(name) => serializer.serialize_newtype_variant(
                 "DeviationScope",
                 2,
                 "IssuerDnExact",
                 &name.to_string(),
             ),
-            DeviationScope::SerialRange { issuer, start, end } => {
+            Self::SerialRange { issuer, start, end } => {
                 let mut sv = serializer.serialize_struct_variant(
                     "DeviationScope",
                     3,
@@ -517,7 +518,7 @@ impl DeviatedFinding {
     /// - `DowngradeSeverityTo(s)` returns `s`.
     /// - `Suppress` returns `None` (the finding is suppressed from normal output).
     #[must_use]
-    pub fn effective_severity(&self) -> Option<Severity> {
+    pub const fn effective_severity(&self) -> Option<Severity> {
         match &self.action {
             DeviationAction::DowngradeSeverityTo(s) => Some(*s),
             DeviationAction::Suppress => None,
@@ -707,19 +708,19 @@ pub struct DeviationRunner {
 impl DeviationRunner {
     /// Create a new deviation runner from a lint runner and a deviation store.
     #[must_use]
-    pub fn new(runner: crate::LintRunner, store: DeviationStore) -> Self {
+    pub const fn new(runner: crate::LintRunner, store: DeviationStore) -> Self {
         Self { runner, store }
     }
 
     /// Return a reference to the inner [`crate::LintRunner`].
     #[must_use]
-    pub fn lint_runner(&self) -> &crate::LintRunner {
+    pub const fn lint_runner(&self) -> &crate::LintRunner {
         &self.runner
     }
 
     /// Return a reference to the [`DeviationStore`].
     #[must_use]
-    pub fn deviation_store(&self) -> &DeviationStore {
+    pub const fn deviation_store(&self) -> &DeviationStore {
         &self.store
     }
 

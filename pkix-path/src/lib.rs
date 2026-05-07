@@ -57,6 +57,33 @@ pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
 /// Private shorthand for the `GeneralSubtrees` type used throughout NC processing.
 type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 
+/// Opaque wrapper around an underlying ASN.1 / DER error.
+///
+/// Carries a [`Display`] message identical to the wrapped `der::Error` so
+/// diagnostic output is preserved, but does not expose the underlying type
+/// in the public API. This insulates callers from semver-breaking changes
+/// in the `der` crate's error variants.
+///
+/// Construction is crate-private. The only way to obtain a `DerError` is
+/// via [`Error::Der`] (and the [`From<der::Error>`] impl on [`Error`]).
+///
+/// [`Display`]: core::fmt::Display
+#[derive(Clone, Debug)]
+pub struct DerError(der::Error);
+
+impl core::fmt::Display for DerError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 /// Errors returned by path validation.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -137,10 +164,10 @@ pub enum Error {
     /// limit), so this error reflects a genuine DER encoding defect in the
     /// certificate, not an implementation size constraint.
     ///
-    /// Callers that want a stable match target should check for `Error::Der(_)`
-    /// without inspecting the inner value; the specific `der::Error` variants
-    /// are not part of the stable API contract.
-    Der(der::Error),
+    /// The inner [`DerError`] is an opaque newtype; the underlying `der::Error`
+    /// is intentionally not exposed so a future major-version bump in the
+    /// `der` crate cannot cascade into a semver break here.
+    Der(DerError),
     /// A certificate's validity period (notAfter − notBefore) exceeds
     /// [`ValidationPolicy::max_validity_secs`].
     ///
@@ -294,7 +321,7 @@ impl std::error::Error for Error {
 
 impl From<der::Error> for Error {
     fn from(e: der::Error) -> Self {
-        Self::Der(e)
+        Self::Der(DerError(e))
     }
 }
 
@@ -313,20 +340,24 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///
 /// # Implementing a custom backend
 ///
-/// ```rust,ignore
+/// ```rust,no_run
+/// use der::asn1::ObjectIdentifier;
+/// const MY_RSA_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+/// const MY_ECDSA_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+///
 /// struct MyVerifier;
 ///
 /// impl pkix_path::SignatureVerifier for MyVerifier {
 ///     fn verify_signature(
 ///         &self,
 ///         algorithm: spki::AlgorithmIdentifierRef<'_>,
-///         issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-///         message: &[u8],
-///         signature: &[u8],
+///         _issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+///         _message: &[u8],
+///         _signature: &[u8],
 ///     ) -> core::result::Result<(), signature::Error> {
 ///         match algorithm.oid {
-///             MY_RSA_OID => { /* ... */ }
-///             MY_ECDSA_OID => { /* ... */ }
+///             MY_RSA_OID => { Ok(()) /* RSA verification */ }
+///             MY_ECDSA_OID => { Ok(()) /* ECDSA verification */ }
 ///             _ => Err(signature::Error::new()),
 ///         }
 ///     }
@@ -406,7 +437,7 @@ pub struct TrustAnchor {
 impl TrustAnchor {
     /// Create a trust anchor from raw subject name and SPKI.
     #[must_use]
-    pub fn new(
+    pub const fn new(
         subject: x509_cert::name::Name,
         subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
     ) -> Self {
@@ -475,7 +506,7 @@ impl TryFrom<Certificate> for TrustAnchor {
 
     fn try_from(cert: Certificate) -> core::result::Result<Self, Self::Error> {
         let name_constraints = try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS)?;
-        Ok(TrustAnchor {
+        Ok(Self {
             subject: cert.tbs_certificate.subject,
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
             name_constraints,
@@ -511,6 +542,15 @@ impl TryFrom<Certificate> for TrustAnchor {
 ///
 /// Revocation checking (CRL / OCSP) is out of scope for `pkix-path`; see
 /// `pkix-revocation` for that functionality.
+// `clippy::struct_excessive_bools` would prefer enum-typed groupings here,
+// but the bools map directly to RFC 5280 §6.1.1 named inputs
+// (`initial-explicit-policy`, `initial-any-policy-inhibit`,
+// `initial-policy-mapping-inhibit`) and to the SAN-presence and
+// EKU-presence policy gates. Substituting an enum cluster would obscure the
+// 1:1 mapping to the spec text and force callers through a pattern-match
+// adapter for each field. The current shape is the most direct expression
+// of the spec inputs.
+#[allow(clippy::struct_excessive_bools)]
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationPolicy {
@@ -687,7 +727,7 @@ impl Default for ValidationPolicy {
 ///
 /// # Implementing `Profile`
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use pkix_path::{Profile, ValidationPolicy};
 ///
 /// struct MyCorpProfile;
@@ -1537,43 +1577,43 @@ impl Iterator for NormalizedIter<'_> {
 struct NcTypeMask(u32);
 
 impl NcTypeMask {
-    const EMPTY: NcTypeMask = NcTypeMask(0);
-    const RFC822: NcTypeMask = NcTypeMask(1 << 0);
-    const DNS: NcTypeMask = NcTypeMask(1 << 1);
-    const DIRECTORY_NAME: NcTypeMask = NcTypeMask(1 << 2);
-    const URI: NcTypeMask = NcTypeMask(1 << 3);
+    const EMPTY: Self = Self(0);
+    const RFC822: Self = Self(1 << 0);
+    const DNS: Self = Self(1 << 1);
+    const DIRECTORY_NAME: Self = Self(1 << 2);
+    const URI: Self = Self(1 << 3);
     /// `IP_ADDRESS` is used by `name_type_bit` and participates in `nc_constrained_types`
     /// tracking. `IpAddress` names cannot appear in Subject DNs, so there is no
     /// inline DN-path code for this type; SAN IpAddress entries are handled by the
     /// generic SAN loop in `check_name_constraints` via `type_constrained(name)`.
-    const IP_ADDRESS: NcTypeMask = NcTypeMask(1 << 4);
+    const IP_ADDRESS: Self = Self(1 << 4);
 
     /// Returns `true` if `self` and `other` share at least one bit (non-empty intersection).
     ///
     /// Named `intersects` rather than `contains` because this is a bitmask test,
     /// not a set-membership check — `a.intersects(b)` is symmetric, while `contains`
     /// implies `a ⊇ b`.
-    fn intersects(self, other: NcTypeMask) -> bool {
+    const fn intersects(self, other: Self) -> bool {
         self.0 & other.0 != 0
     }
 }
 
 impl core::ops::BitOr for NcTypeMask {
-    type Output = NcTypeMask;
-    fn bitor(self, rhs: NcTypeMask) -> NcTypeMask {
-        NcTypeMask(self.0 | rhs.0)
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
     }
 }
 
 impl core::ops::BitOrAssign for NcTypeMask {
-    fn bitor_assign(&mut self, rhs: NcTypeMask) {
+    fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
     }
 }
 
 /// Return the `NcTypeMask` bit for the name type of `name`, or `EMPTY` for
 /// unrecognized types.
-fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
+const fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
     use x509_cert::ext::pkix::name::GeneralName;
     match name {
         GeneralName::Rfc822Name(_) => NcTypeMask::RFC822,
@@ -1779,6 +1819,7 @@ const OID_ECDSA_P256_SHA256: der::asn1::ObjectIdentifier =
 /// Handles OID `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
 /// Feature-gated behind `p256`.
 #[cfg(feature = "p256")]
+#[cfg_attr(docsrs, doc(cfg(feature = "p256")))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EcdsaP256Verifier;
 
@@ -1820,6 +1861,7 @@ const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
 /// Handles OID `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
 /// Feature-gated behind `rsa`.
 #[cfg(feature = "rsa")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RsaPkcs1v15Sha256Verifier;
 
@@ -2056,7 +2098,7 @@ fn chain_walk<V: SignatureVerifier>(
             let mut buf = Vec::new();
             cert.tbs_certificate
                 .encode_to_vec(&mut buf)
-                .map_err(Error::Der)?;
+                .map_err(|e| Error::Der(DerError(e)))?;
             buf
         };
         let tbs_bytes: &[u8] = &tbs_bytes_owned;
@@ -2969,6 +3011,7 @@ fn check_name_constraints(
 /// To support additional algorithms, implement [`SignatureVerifier`] directly
 /// and dispatch your own OID table.
 #[cfg(any(feature = "p256", feature = "rsa"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "p256", feature = "rsa"))))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultVerifier;
 

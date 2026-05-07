@@ -326,42 +326,42 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::EmptyChain => write!(f, "chain is empty"),
-            Error::ChainTooLong { len } => {
+            Self::EmptyChain => write!(f, "chain is empty"),
+            Self::ChainTooLong { len } => {
                 write!(
                     f,
                     "chain has {len} certificates; maximum is {}",
                     1 + MAX_INTERMEDIATES
                 )
             }
-            Error::NoTrustAnchors => write!(f, "no trust anchors provided"),
-            Error::AlgorithmNotAllowed { index } => {
+            Self::NoTrustAnchors => write!(f, "no trust anchors provided"),
+            Self::AlgorithmNotAllowed { index } => {
                 write!(
                     f,
                     "certificate at index {index} uses a disallowed signature algorithm"
                 )
             }
-            Error::UnhandledCriticalExtension { index } => {
+            Self::UnhandledCriticalExtension { index } => {
                 write!(
                     f,
                     "certificate at index {index} has an unhandled critical extension"
                 )
             }
-            Error::UnexpectedExtension { index } => {
+            Self::UnexpectedExtension { index } => {
                 write!(
                     f,
                     "certificate at index {index} has an unexpected extension"
                 )
             }
-            Error::MissingRequiredExtension { index } => {
+            Self::MissingRequiredExtension { index } => {
                 write!(
                     f,
                     "intermediate at index {index} is missing a required extension \
                      (BasicConstraints cA=TRUE or KeyUsage keyCertSign)"
                 )
             }
-            Error::LeafIsCA => write!(f, "end-entity certificate has BasicConstraints cA=TRUE"),
-            Error::Path(e) => write!(f, "path validation: {e}"),
+            Self::LeafIsCA => write!(f, "end-entity certificate has BasicConstraints cA=TRUE"),
+            Self::Path(e) => write!(f, "path validation: {e}"),
         }
     }
 }
@@ -369,7 +369,7 @@ impl core::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Path(e) => Some(e),
+            Self::Path(e) => Some(e),
             _ => None,
         }
     }
@@ -377,7 +377,7 @@ impl std::error::Error for Error {
 
 impl From<PathError> for Error {
     fn from(e: PathError) -> Self {
-        Error::Path(e)
+        Self::Path(e)
     }
 }
 
@@ -554,7 +554,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
         {
             let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
-                .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+                .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
             if bc.ca {
                 return Err(Error::LeafIsCA);
             }
@@ -566,7 +566,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
             .ok_or(Error::MissingRequiredExtension { index })?;
         let bc = BasicConstraints::from_der(bc_ext.extn_value.as_bytes())
-            .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+            .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
         if !bc.ca {
             return Err(Error::MissingRequiredExtension { index });
         }
@@ -577,7 +577,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_KEY_USAGE)
             .ok_or(Error::MissingRequiredExtension { index })?;
         let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
-            .map_err(|e| Error::Path(pkix_path::Error::Der(e)))?;
+            .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
         if !ku.key_cert_sign() {
             return Err(Error::MissingRequiredExtension { index });
         }

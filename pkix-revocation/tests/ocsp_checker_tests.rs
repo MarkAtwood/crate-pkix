@@ -54,7 +54,7 @@ fn load_cert(name: &str) -> Certificate {
 }
 
 fn checker(response_name: &str) -> OcspChecker<DefaultVerifier> {
-    OcspChecker::new(fixture(response_name), NOW, DefaultVerifier)
+    OcspChecker::new(fixture(response_name), NOW, DefaultVerifier).expect("fixture is valid OCSP response")
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn ocsp_cross_ca_replay_rejected() {
     //
     // The test verifies the combined defence: at minimum, no Ok(()) is returned
     // when the wrong issuer is supplied.
-    let checker = OcspChecker::new(fixture("ocsp-ca-a-good.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-ca-a-good.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&ca_b_leaf, &ca_b);
     assert!(
         result.is_err(),
@@ -219,7 +219,7 @@ fn ocsp_cross_ca_replay_rejected() {
 fn ocsp_same_ca_issuer_hash_ok() {
     let ca_a = load_cert("ocsp-ca-a.der");
     let ca_a_leaf = load_cert("ocsp-ca-a-leaf.der");
-    let checker = OcspChecker::new(fixture("ocsp-ca-a-good.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-ca-a-good.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&ca_a_leaf, &ca_a);
     result.expect("CA-A's response for CA-A's own leaf must return Ok(())");
 }
@@ -231,11 +231,13 @@ fn ocsp_same_ca_issuer_hash_ok() {
 /// Truncated OCSP DER → Err(OcspParseError(_)).
 #[test]
 fn ocsp_parse_error_truncated_der() {
-    let ca = load_cert("ocsp-ca.der");
-    let good = load_cert("ocsp-leaf-good.der");
+    // Parse errors now surface at construction (the response is decoded once
+    // and cached), not at check_revocation. The `OcspParseError` variant is
+    // still the expected error, exactly as before.
+    let _ca = load_cert("ocsp-ca.der");
+    let _good = load_cert("ocsp-leaf-good.der");
     let truncated = vec![0x30, 0x82, 0x01, 0x00, 0xAA, 0xBB];
-    let checker = OcspChecker::new(truncated, NOW, DefaultVerifier);
-    let result = checker.check_revocation(&good, &ca);
+    let result = OcspChecker::new(truncated, NOW, DefaultVerifier);
     assert!(
         matches!(result, Err(Error::OcspParseError(_))),
         "truncated OCSP response must return OcspParseError, got: {result:?}"
@@ -254,7 +256,7 @@ fn ocsp_parse_error_truncated_der() {
 fn ocsp_responder_id_byname_correct_accepted() {
     let ca = load_cert("ocsp-rid-ca.der");
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-good-byname.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-good-byname.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&leaf, &ca);
     result.expect("byName ResponderId matching issuer subject must return Ok(())");
 }
@@ -267,7 +269,7 @@ fn ocsp_responder_id_byname_correct_accepted() {
 fn ocsp_responder_id_bykey_correct_accepted() {
     let ca = load_cert("ocsp-rid-ca.der");
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-good-bykey.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-good-bykey.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&leaf, &ca);
     result.expect("byKey ResponderId matching issuer SPKI SHA-1 must return Ok(())");
 }
@@ -283,7 +285,7 @@ fn ocsp_responder_id_bykey_correct_accepted() {
 fn ocsp_responder_id_byname_wrong_rejected() {
     let ca = load_cert("ocsp-rid-ca.der");
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-bad-byname.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-bad-byname.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
         matches!(result, Err(Error::OcspResponderIdMismatch)),
@@ -313,7 +315,7 @@ fn ocsp_responder_id_byname_wrong_rejected() {
 fn ocsp_responder_id_bykey_wrong_rejected() {
     let ca = load_cert("ocsp-rid-ca.der");
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-bad-bykey.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-bad-bykey.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
         matches!(result, Err(Error::OcspSignatureInvalid)),
@@ -338,7 +340,7 @@ fn ocsp_check_revocation_against_anchor_good() {
     let anchor_cert = load_cert("ocsp-rid-ca.der");
     let anchor = TrustAnchor::from(&anchor_cert);
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-good-byname.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-good-byname.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation_against_anchor(&leaf, &anchor);
     result.expect("valid OCSP response for anchor-issued cert must return Ok(())");
 }
@@ -356,7 +358,7 @@ fn ocsp_check_revocation_against_anchor_bad_responder_id() {
     let anchor_cert = load_cert("ocsp-rid-ca.der");
     let anchor = TrustAnchor::from(&anchor_cert);
     let leaf = load_cert("ocsp-rid-leaf-good.der");
-    let checker = OcspChecker::new(fixture("ocsp-rid-bad-bykey.der"), NOW, DefaultVerifier);
+    let checker = OcspChecker::new(fixture("ocsp-rid-bad-bykey.der"), NOW, DefaultVerifier).expect("fixture is valid OCSP response");
     let result = checker.check_revocation_against_anchor(&leaf, &anchor);
     assert!(
         matches!(result, Err(Error::OcspSignatureInvalid)),

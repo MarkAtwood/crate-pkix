@@ -288,22 +288,55 @@ fn dfs(
     Ok(false)
 }
 
-/// DFS node-visit budget for a single iterative-deepening round (or probe).
+/// Default DFS node-visit budget for a single iterative-deepening round.
 ///
-/// Each call to the inner `dfs()` function consumes one unit regardless of
-/// whether the node results in a match. When the counter reaches zero,
-/// [`build_path`] returns [`Error::BudgetExceeded`].
+/// Sufficient for legitimate chains (real-world PKI hierarchies have at most
+/// a handful of intermediates and small pools); prevents exponential blow-up
+/// against adversarially constructed pools of O(N) CA certificates with
+/// identical subject/issuer names.
+pub const DEFAULT_DFS_BUDGET: usize = 10_000;
+
+/// Default maximum number of intermediate certificates considered.
+pub const DEFAULT_MAX_DEPTH: usize = 10;
+
+/// Tunable parameters for path building.
 ///
-/// The budget is reset to this value at the start of each round of iterative
-/// deepening and for the depth-probe at `MAX_DEPTH + 1`. This prevents
-/// earlier rounds (which re-traverse all nodes from rounds 1..k-1) from
-/// exhausting the budget before depth k is explored.
+/// Use [`PathBuilderConfig::default`] (or [`PathBuilderConfig::new`]) for the
+/// production defaults. Embedded callers, callers with restricted compute,
+/// and callers handling adversarial pools can tighten these values.
 ///
-/// 10 000 visits is sufficient for legitimate chains (real-world PKI hierarchies
-/// have at most a handful of intermediates and small pools). It prevents
-/// exponential blow-up against adversarially constructed pools of O(N) CA
-/// certificates with identical subject/issuer names.
-const DFS_BUDGET: usize = 10_000;
+/// # Stability
+///
+/// Constructed via [`PathBuilderConfig::new`] / `Default`; the struct is
+/// `#[non_exhaustive]` so additional knobs can be added without breaking
+/// existing callers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub struct PathBuilderConfig {
+    /// Maximum number of intermediates to explore. The depth probe runs at
+    /// `max_depth + 1` to distinguish "no path exists" from "path exists
+    /// but too deep". Default: [`DEFAULT_MAX_DEPTH`].
+    pub max_depth: usize,
+    /// Per-round node-visit budget. Default: [`DEFAULT_DFS_BUDGET`].
+    pub dfs_budget: usize,
+}
+
+impl PathBuilderConfig {
+    /// Construct a config with all knobs set to their default values.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_depth: DEFAULT_MAX_DEPTH,
+            dfs_budget: DEFAULT_DFS_BUDGET,
+        }
+    }
+}
+
+impl Default for PathBuilderConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Build a certification path from `target` through certificates in `pool`
 /// to one of the provided trust anchors.
@@ -344,6 +377,19 @@ const DFS_BUDGET: usize = 10_000;
 /// keys (e.g., during a key rollover or in a bridge CA topology) are treated
 /// as distinct nodes and will not incorrectly prune valid paths.
 ///
+/// **Anchor matching is by DN only.** When a candidate's issuer DN matches
+/// any anchor in `anchors`, path building terminates immediately with that
+/// chain — the anchor's `SubjectPublicKeyInfo` is **not** verified against
+/// what the chain expects. In a key-rollover scenario where two anchors
+/// share a subject DN but hold different keys, this builder may return a
+/// chain whose top cert was actually signed by a different anchor than the
+/// one it is paired with for downstream validation. The downstream caller
+/// ([`pkix_path::validate_path`]) iterates all DN-matching anchors and
+/// returns success if any of them verify the signature, so correctness is
+/// preserved end-to-end. The caller-visible effect is a less informative
+/// error in genuinely unverifiable cases (`SignatureInvalid` from
+/// `validate_path` rather than `NoPathFound` here).
+///
 /// # Security
 ///
 /// Pool contents should be from a trusted source. `DFS_BUDGET` enforces a hard
@@ -355,8 +401,25 @@ pub fn build_path(
     pool: &CertPool,
     anchors: &[pkix_path::TrustAnchor],
 ) -> Result<Vec<Certificate>> {
-    const MAX_DEPTH: usize = 10;
+    build_path_with_config(target, pool, anchors, &PathBuilderConfig::new())
+}
 
+/// Build a certification path with caller-provided budget and depth tunables.
+///
+/// Behaves identically to [`build_path`] but uses the limits in `config`
+/// instead of the workspace defaults. See [`PathBuilderConfig`] for the
+/// individual knobs.
+///
+/// # Errors
+///
+/// Same as [`build_path`].
+#[must_use = "path building result must be checked"]
+pub fn build_path_with_config(
+    target: &Certificate,
+    pool: &CertPool,
+    anchors: &[pkix_path::TrustAnchor],
+    config: &PathBuilderConfig,
+) -> Result<Vec<Certificate>> {
     let pool_slice = pool.as_slice();
 
     // Track whether any round was terminated by the budget (not by exhausting
@@ -364,11 +427,11 @@ pub fn build_path(
     // adversarially large and we return BudgetExceeded; otherwise NoPathFound.
     let mut any_round_budget_exceeded = false;
 
-    for max_depth in 1..=MAX_DEPTH {
+    for max_depth in 1..=config.max_depth {
         // Reset budget at the start of each round so that earlier rounds
         // (which re-traverse the same shallower nodes) do not exhaust the
         // budget before deeper rounds get a chance to run.
-        let mut budget = DFS_BUDGET;
+        let mut budget = config.dfs_budget;
         let mut path = alloc::vec![target.clone()];
         match dfs(&mut path, pool_slice, anchors, max_depth, &mut budget) {
             Ok(true) => return Ok(path),
@@ -387,19 +450,25 @@ pub fn build_path(
         return Err(Error::BudgetExceeded);
     }
 
-    // No round hit the budget, but no path found within MAX_DEPTH.
-    // Check if a path exists at MAX_DEPTH+1 to distinguish "no path exists
+    // No round hit the budget, but no path found within max_depth.
+    // Check if a path exists at max_depth+1 to distinguish "no path exists
     // at all" from "path exists but too deep". The probe uses its own fresh
     // budget so it is not affected by prior rounds.
     //
     // Note: if the probe itself returns BudgetExceeded (pool is adversarially
-    // large at MAX_DEPTH+1), the `?` propagates it to the caller. This is a
+    // large at max_depth+1), the `?` propagates it to the caller. This is a
     // second, independent path to BudgetExceeded that does not use the
     // any_round_budget_exceeded flag — both paths produce the same observable
     // result (Err(BudgetExceeded)), but via different code paths.
-    let mut probe_budget = DFS_BUDGET;
+    let mut probe_budget = config.dfs_budget;
     let mut probe = alloc::vec![target.clone()];
-    if dfs(&mut probe, pool_slice, anchors, MAX_DEPTH + 1, &mut probe_budget)? {
+    if dfs(
+        &mut probe,
+        pool_slice,
+        anchors,
+        config.max_depth + 1,
+        &mut probe_budget,
+    )? {
         return Err(Error::DepthExceeded);
     }
 

@@ -78,7 +78,8 @@ fn pkits_4_15_1_invalid_delta_as_plain_crl_is_accepted_by_checker() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(delta_as_crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(delta_as_crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     // The delta CRL has no revoked entries; checker returns Ok.
     // Note: this does NOT mean the cert is truly valid — the path validator
     // must also verify a proper base CRL is present.
@@ -309,7 +310,8 @@ fn pkits_4_15_10_invalid_only_delta_no_base_ca3() {
     // Provide the delta CRL as a plain CRL — the checker accepts it but the delta
     // has an empty revoked list, so the cert passes at this level.
     let delta_as_base = pkits_crl("deltaCRLCA3deltaCRL");
-    let checker = CrlChecker::new(delta_as_base, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(delta_as_base, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     // The EE cert (serial=1) is not in the delta's (empty) revoked list → Ok().
     // Path-level validation would still fail because no proper base is provided,
     // but that invariant is enforced at construction time (see §4.15.9 test).
@@ -340,7 +342,8 @@ fn pkits_4_14_1_valid_distribution_point() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     checker
         .check_revocation(&ee, &ca)
         .expect("§4.14.1: serial=1 is not in CRL → must NOT be revoked");
@@ -364,7 +367,8 @@ fn pkits_4_14_2_invalid_cert_revoked() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
         matches!(result, Err(Error::Revoked { .. })),
@@ -392,7 +396,8 @@ fn pkits_4_14_3_invalid_cdp_name_mismatch() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     // Should fail due to CDP mismatch, but our checker returns Ok() (not in revoked list).
     // Ignored until CDP-IDP name matching is implemented.
@@ -418,7 +423,8 @@ fn pkits_4_14_4_valid_multiple_cdps() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     checker
         .check_revocation(&ee, &ca)
         .expect("§4.14.4: serial=4 is not in distributionPoint1CACRL → must NOT be revoked");
@@ -439,7 +445,8 @@ fn pkits_4_14_5_valid_dp2_cert_not_revoked() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     checker
         .check_revocation(&ee, &ca)
         .expect("§4.14.5: serial=1 is not in distributionPoint2CACRL → must NOT be revoked");
@@ -459,7 +466,8 @@ fn pkits_4_14_6_invalid_cert_revoked_in_dp2() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
         matches!(result, Err(Error::Revoked { .. })),
@@ -481,7 +489,8 @@ fn pkits_4_14_7_valid_dp2_serial3_not_revoked() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     checker
         .check_revocation(&ee, &ca)
         .expect("§4.14.7: serial=3 is not in distributionPoint2CACRL → must NOT be revoked");
@@ -506,7 +515,8 @@ fn pkits_4_14_8_invalid_cdp_idp_mismatch_dp2() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
         result.is_err(),
@@ -531,7 +541,8 @@ fn pkits_4_14_9_invalid_cdp_idp_mismatch_dp2_serial5() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
         result.is_err(),
@@ -554,7 +565,8 @@ fn pkits_4_14_10_valid_no_idp() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     checker
         .check_revocation(&ee, &ca)
         .expect("§4.14.10: no IDP, serial not revoked → must NOT be revoked");
@@ -582,7 +594,8 @@ fn pkits_4_14_11_invalid_only_user_certs_crl_for_ca() {
     let ee = load_cert(&ee_der);
     let ca = load_cert(&ca_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
 
     // Checking the EE cert (an end-entity) against a user-certs-only CRL:
     // the EE is a user cert → covered → check normally. EE serial=1 not in revoked list.
@@ -608,7 +621,8 @@ fn pkits_4_14_12_invalid_only_ca_certs_for_ee() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     // EE is not a CA cert → onlyContainsCACerts CRL does not cover it → Ok() (not covered).
     let result = checker.check_revocation(&ee, &ca);
     // Our IDP check returns Ok() because the CRL doesn't cover EE certs.
@@ -634,7 +648,8 @@ fn pkits_4_14_13_valid_only_ca_certs_crl_for_ca() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     // The EE (serial=2) is not a CA cert → onlyContainsCACerts CRL doesn't cover it → Ok().
     let result = checker.check_revocation(&ee, &ca);
     result.expect("§4.14.13: serial=2 EE not covered by onlyContainsCACerts CRL → Ok()");
@@ -657,7 +672,8 @@ fn pkits_4_14_14_invalid_only_attribute_certs() {
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier);
+    let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
+        .expect("PKITS fixture is a valid DER-encoded CRL");
     // onlyContainsAttributeCerts=TRUE → our IDP check returns Ok() (not covered).
     let result = checker.check_revocation(&ee, &ca);
     result.expect(

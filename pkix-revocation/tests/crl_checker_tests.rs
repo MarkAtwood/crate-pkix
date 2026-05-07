@@ -51,6 +51,7 @@ fn load_cert(name: &str) -> Certificate {
 
 fn checker(crl_name: &str) -> CrlChecker<DefaultVerifier> {
     CrlChecker::new(fixture(crl_name), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL")
 }
 
 // ---------------------------------------------------------------------------
@@ -160,11 +161,13 @@ fn crl_bad_signature_returns_error() {
 /// Truncated CRL DER → Err(CrlParseError(_)).
 #[test]
 fn crl_parse_error_truncated_der() {
-    let ca = load_cert("crl-ca.der");
-    let good = load_cert("crl-leaf-good.der");
+    // Parse errors now surface at construction (the CRL is decoded once and
+    // cached), not at check_revocation. The `CrlParseError` variant is still
+    // the expected error, exactly as before.
+    let _ca = load_cert("crl-ca.der");
+    let _good = load_cert("crl-leaf-good.der");
     let truncated = vec![0x30, 0x82, 0x01, 0x00, 0xAA, 0xBB]; // garbage
-    let checker = CrlChecker::new(truncated, NOW, DefaultVerifier);
-    let result = checker.check_revocation(&good, &ca);
+    let result = CrlChecker::new(truncated, NOW, DefaultVerifier);
     assert!(
         matches!(result, Err(Error::CrlParseError(_))),
         "truncated CRL must return CrlParseError, got: {result:?}"
@@ -187,7 +190,8 @@ fn crl_parse_error_truncated_der() {
 fn malformed_issuing_distribution_point_returns_error() {
     let ca = load_cert("crl-malformed-idp-ca.der");
     let leaf = load_cert("crl-malformed-idp-leaf.der");
-    let checker = CrlChecker::new(fixture("crl-malformed-idp.der"), NOW, DefaultVerifier);
+    let checker = CrlChecker::new(fixture("crl-malformed-idp.der"), NOW, DefaultVerifier)
+        .expect("outer CRL is valid; only the inner IDP extension is malformed");
     let result = checker.check_revocation(&leaf, &ca);
     assert!(
         matches!(result, Err(Error::CrlParseError(_))),
@@ -211,7 +215,8 @@ fn crl_check_revocation_against_anchor_good_cert_empty_crl() {
     let anchor_cert = load_cert("crl-ca.der");
     let anchor = TrustAnchor::from(&anchor_cert);
     let leaf = load_cert("crl-leaf-good.der");
-    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier);
+    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation_against_anchor(&leaf, &anchor);
     result.expect("cert not in CRL issued by anchor must return Ok(())");
 }
@@ -226,7 +231,8 @@ fn crl_check_revocation_against_anchor_revoked_cert() {
     let anchor_cert = load_cert("crl-ca.der");
     let anchor = TrustAnchor::from(&anchor_cert);
     let revoked = load_cert("crl-leaf-revoked.der");
-    let checker = CrlChecker::new(fixture("crl-with-revocation.der"), NOW, DefaultVerifier);
+    let checker = CrlChecker::new(fixture("crl-with-revocation.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation_against_anchor(&revoked, &anchor);
     assert!(
         matches!(result, Err(Error::Revoked { reason_code: None, .. })),
@@ -248,7 +254,8 @@ fn crl_check_revocation_against_anchor_issuer_mismatch() {
     let leaf_cert = load_cert("crl-leaf-good.der");
     let wrong_anchor = TrustAnchor::from(&leaf_cert);
     let checked_cert = load_cert("crl-leaf-good.der");
-    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier);
+    let checker = CrlChecker::new(fixture("crl-empty.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation_against_anchor(&checked_cert, &wrong_anchor);
     assert!(
         matches!(result, Err(Error::CrlIssuerMismatch)),
@@ -266,7 +273,8 @@ fn crl_check_revocation_against_anchor_expired_crl() {
     let anchor_cert = load_cert("crl-ca.der");
     let anchor = TrustAnchor::from(&anchor_cert);
     let good = load_cert("crl-leaf-good.der");
-    let checker = CrlChecker::new(fixture("crl-expired.der"), NOW, DefaultVerifier);
+    let checker = CrlChecker::new(fixture("crl-expired.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation_against_anchor(&good, &anchor);
     assert!(
         matches!(result, Err(Error::CrlExpired)),
@@ -374,7 +382,8 @@ fn delta_crl_delta_entry_detected() {
     let leaf3 = load_cert("delta-crl-leaf-3.der");
 
     // Without delta: serial=3 not in base → Ok(()).
-    let base_only = CrlChecker::new(fixture("delta-crl-base.der"), NOW, DefaultVerifier);
+    let base_only = CrlChecker::new(fixture("delta-crl-base.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let result = base_only.check_revocation(&leaf3, &ca);
     assert!(result.is_ok(), "serial=3 not in base should be Ok; got: {result:?}");
 
@@ -404,7 +413,8 @@ fn delta_crl_remove_from_crl_unrevokes() {
     let leaf2 = load_cert("delta-crl-leaf-2.der");
 
     // Base only: serial=2 revoked.
-    let base_only = CrlChecker::new(fixture("delta-crl-base.der"), NOW, DefaultVerifier);
+    let base_only = CrlChecker::new(fixture("delta-crl-base.der"), NOW, DefaultVerifier)
+        .expect("fixture is a valid DER-encoded CRL");
     let base_result = base_only.check_revocation(&leaf2, &ca);
     assert!(
         matches!(base_result, Err(Error::Revoked { .. })),

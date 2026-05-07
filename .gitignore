@@ -10,4 +10,8 @@
 # Stray build artifacts in repo root
 *.rlib
 test_must_use*
-rust_out
+/rust_out*
+
+# Review-loop transient artifacts (phase markers, coordinator logs).
+# Permitted permanent planning lives in <crate>/PLAN.md only.
+/audit/

@@ -68,10 +68,10 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::NoScts => f.write_str("certificate contains no SCTs"),
-            Error::NoTrustedSct => f.write_str("no SCT from a trusted log found"),
-            Error::InvalidSignature => f.write_str("SCT signature invalid"),
-            Error::ParseError => f.write_str("SCT list parse error"),
+            Self::NoScts => f.write_str("certificate contains no SCTs"),
+            Self::NoTrustedSct => f.write_str("no SCT from a trusted log found"),
+            Self::InvalidSignature => f.write_str("SCT signature invalid"),
+            Self::ParseError => f.write_str("SCT list parse error"),
         }
     }
 }
@@ -102,6 +102,6 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// until SCT parsing, log-list lookup, and Merkle proof verification are
 /// implemented.
 #[deprecated = "pkix-ct is not yet implemented; this function always returns NoTrustedSct"]
-pub fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
+pub const fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
     Err(Error::NoTrustedSct)
 }

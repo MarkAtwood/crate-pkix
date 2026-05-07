@@ -38,8 +38,10 @@ pub use pkix_path::{
     self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
 };
 #[cfg(feature = "crl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use pkix_revocation::CrlChecker;
 #[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use pkix_revocation::OcspChecker;
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
@@ -61,8 +63,8 @@ pub enum Error {
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Path(e) => write!(f, "path validation: {e}"),
-            Error::Revocation(e) => write!(f, "revocation: {e}"),
+            Self::Path(e) => write!(f, "path validation: {e}"),
+            Self::Revocation(e) => write!(f, "revocation: {e}"),
         }
     }
 }
@@ -70,21 +72,21 @@ impl core::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Path(e) => Some(e),
-            Error::Revocation(e) => Some(e),
+            Self::Path(e) => Some(e),
+            Self::Revocation(e) => Some(e),
         }
     }
 }
 
 impl From<pkix_path::Error> for Error {
     fn from(e: pkix_path::Error) -> Self {
-        Error::Path(e)
+        Self::Path(e)
     }
 }
 
 impl From<pkix_revocation::Error> for Error {
     fn from(e: pkix_revocation::Error) -> Self {
-        Error::Revocation(e)
+        Self::Revocation(e)
     }
 }
 

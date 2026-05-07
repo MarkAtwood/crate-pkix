@@ -52,7 +52,7 @@ use crate::de_cow_static;
 /// This constraint arises from internal `&'static str` fields in `Finding`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EvaluationReport {
     /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
     ///
@@ -103,7 +103,7 @@ pub struct EvaluationReport {
 /// Extract the [`crate::Severity`] from a [`crate::LintResult`], if any.
 ///
 /// `Pass` and `NotApplicable` carry no severity and return `None`.
-fn severity_of(r: &crate::LintResult) -> Option<crate::Severity> {
+const fn severity_of(r: &crate::LintResult) -> Option<crate::Severity> {
     match r {
         crate::LintResult::Warn(_) => Some(crate::Severity::Warn),
         crate::LintResult::Error(_) => Some(crate::Severity::Error),
