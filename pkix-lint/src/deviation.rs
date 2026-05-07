@@ -96,7 +96,7 @@ impl std::error::Error for DeviationAddError {}
 pub struct Deviation {
     /// Unique identifier for this deviation within the operator's store.
     ///
-    /// Appears verbatim in finding output as "DEVIATION APPLIED by <id>".
+    /// Appears verbatim in finding output as `DEVIATION APPLIED by <id>`.
     /// Must be unique within the [`DeviationStore`] that contains it.
     pub id: String,
 

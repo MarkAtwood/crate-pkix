@@ -15,18 +15,23 @@
 //!
 //! # Quick start
 //!
-//! ```rust,ignore
-//! use pkix_chain::{verify_chain, NoRevocation, ValidationPolicy, TrustAnchor};
+//! ```rust,no_run
+//! use pkix_chain::{verify_chain, DefaultVerifier, NoRevocation, TrustAnchor, ValidationPolicy};
+//! use x509_cert::Certificate;
 //!
-//! let policy = ValidationPolicy::new(now_unix_timestamp);
+//! # fn demo(chain: Vec<Certificate>, anchors: Vec<TrustAnchor>) -> Result<(), pkix_chain::Error> {
+//! let policy = ValidationPolicy::new(1_700_000_000);
 //!
 //! let result = verify_chain(
-//!     &chain,          // &[Certificate], leaf first
-//!     &anchors,        // &[TrustAnchor]
+//!     &chain,             // &[Certificate], leaf first
+//!     &anchors,           // &[TrustAnchor]
 //!     &policy,
-//!     &my_verifier,    // impl SignatureVerifier
-//!     &NoRevocation,   // or a CrlChecker / OcspChecker
+//!     &DefaultVerifier,   // impl SignatureVerifier
+//!     &NoRevocation,      // or a CrlChecker / OcspChecker
 //! )?;
+//! # let _ = result;
+//! # Ok(())
+//! # }
 //! ```
 
 pub use pkix_path::{

@@ -506,8 +506,8 @@ impl TryFrom<Certificate> for TrustAnchor {
 /// # Limitations
 ///
 /// Path-building (RFC 4158 — cross-signed certificates, multiple candidate
-/// issuers) is **out of scope for v0.1**. The caller must supply the complete,
-/// ordered chain.
+/// issuers) is **out of scope** for this crate. The caller must supply the
+/// complete, ordered chain (see `pkix-path-builder` for path discovery).
 ///
 /// Revocation checking (CRL / OCSP) is out of scope for `pkix-path`; see
 /// `pkix-revocation` for that functionality.
@@ -749,11 +749,11 @@ pub trait Profile {
 ///
 /// # Copy stability
 ///
-/// `ValidatedPath` derives `Copy` and is committed to remain `Copy` in all v0.1.x
-/// releases. Any future field additions that are non-`Copy` will be added in a new
-/// minor version (v0.2+) with an explicit removal of the `Copy` derive, constituting
-/// a breaking change per semantic versioning. Callers may depend on `Copy` within
-/// the v0.1 series.
+/// `ValidatedPath` derives `Copy` and is committed to remain `Copy` within the
+/// current major version. Any future field additions that are non-`Copy` will
+/// require an explicit removal of the `Copy` derive, constituting a breaking
+/// change per semantic versioning. Callers may depend on `Copy` within the
+/// 0.x series at the corresponding minor version pin.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ValidatedPath {
@@ -798,7 +798,7 @@ pub struct ValidatedPath {
 ///
 /// # Limitations
 ///
-/// See crate-level documentation for v0.1 scope limits.
+/// See crate-level documentation for current scope limits.
 #[must_use = "path validation result must be checked"]
 pub fn validate_path<V>(
     chain: &[Certificate],
@@ -1012,10 +1012,10 @@ const OID_EMAIL_ADDRESS: der::asn1::ObjectIdentifier =
 /// OIDs of extensions that this implementation handles; all others, if critical, cause rejection.
 ///
 /// `OID_SUBJECT_ALT_NAME` is listed here so that certs with critical SAN extensions
-/// (e.g. TLS server certs) do not fail with `UnhandledCriticalExtension`. In v0.2,
-/// a cert with an empty Subject and a critical SAN is handled correctly: the SAN is
+/// (e.g. TLS server certs) do not fail with `UnhandledCriticalExtension`. A cert
+/// with an empty Subject and a critical SAN is handled correctly: the SAN is
 /// used as the cert's identity via `cert_has_san_identity` / `working_issuer_is_san_identity`
-/// (RFC 5280 §4.2.1.6), so name linkage no longer falls back to the empty Subject DN.
+/// (RFC 5280 §4.2.1.6), so name linkage does not fall back to the empty Subject DN.
 ///
 /// `OID_EXTENDED_KEY_USAGE` is listed here so that certs with critical EKU
 /// (common in CA/B Forum TLS and code-signing certificates) do not fail with
@@ -1054,11 +1054,11 @@ fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
 /// to the d-th certificate from the trust-anchor end (depth 1 = CA adjacent
 /// to trust anchor, depth n = leaf).
 ///
-/// # Limitations (v0.1)
+/// # Limitations
 ///
 /// Policy qualifiers (`qualifier_set` per RFC 5280 §6.1.2(a)) are not stored
 /// or enforced. They are discarded on ingestion. Application-specific qualifier
-/// processing is deferred to v0.2.
+/// processing is future work.
 #[derive(Clone, Debug)]
 struct PolicyNode {
     /// Certificate depth at which this node was added (0 = root sentinel).
@@ -1286,8 +1286,8 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 
 /// Compare two distinguished names per RFC 4518 string prep rules.
 ///
-/// For v0.1: implements case-fold and whitespace normalization for ASCII
-/// characters. Full Unicode NFKD normalization is deferred to v0.2.
+/// Currently implements case-fold and whitespace normalization for ASCII
+/// characters. Full Unicode NFKD normalization is future work.
 ///
 /// Returns `true` if the names are equivalent.
 ///
@@ -1305,7 +1305,7 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 /// raw DER comparison; T.61→Unicode mapping is deferred pending a clear
 /// interoperability target (see `any_to_str_bytes`). Certificates from legacy
 /// PKIs using these string types may fail name matching even when the names
-/// are semantically equivalent. Full normalization is deferred to v0.2.
+/// are semantically equivalent. Full normalization is future work.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
@@ -1387,7 +1387,7 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     match (a_str, b_str) {
         (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
         // Both values are non-string types (e.g. OID, INTEGER) or unhandled string
-        // types (TeletexString, BMPString, UniversalString — deferred to v0.2):
+        // types (TeletexString, BMPString, UniversalString — deferred):
         // compare tag AND content bytes (raw DER). Tag comparison ensures two
         // different string encodings of the same text are not considered equal.
         (None, None) => a.tag() == b.tag() && a.value() == b.value(),
@@ -1405,14 +1405,14 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 ///
 /// # Normalization strategy by string type
 ///
-/// **Currently handled (v0.1 partial normalization):**
+/// **Currently handled (partial normalization):**
 /// `UTF8String`, `PrintableString`, `IA5String`, `VisibleString` — raw
 /// content bytes are passed directly to `NormalizedIter`, which applies
 /// ASCII case-folding and insignificant-space handling (RFC 4518 §2.4 step
-/// 6 subset). Full Unicode NFKC normalization (RFC 4518 §2.3) is deferred
-/// to v0.2 along with the types below.
+/// 6 subset). Full Unicode NFKC normalization (RFC 4518 §2.3) is future
+/// work along with the types below.
 ///
-/// **v0.2 planned — decode then normalize:**
+/// **Future work — decode then normalize:**
 /// - `BMPString` (UCS-2 BE, BMP only): decode UTF-16BE → apply full RFC
 ///   4518 six-step preparation (Map → NFKC → Prohibit → `CheckBidi` →
 ///   insignificant-space). RFC 4518 §2.1 classifies `BMPString` as "a subset
@@ -1420,7 +1420,7 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// - `UniversalString` (UCS-4 BE): decode UCS-4 BE → apply the same RFC
 ///   4518 six-step preparation as `BMPString`.
 ///
-/// v0.2 will also upgrade the currently-handled types to full RFC 4518
+/// The currently-handled types will also be upgraded to full RFC 4518
 /// six-step normalization (adding NFKC). All types except `TeletexString`
 /// will be normalized identically.
 ///
@@ -1449,7 +1449,7 @@ fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
 /// Rules applied (per RFC 4518 §2):
 /// 1. ASCII letters (0x41–0x5A): case-fold to lowercase. Non-ASCII bytes are
 ///    passed through unchanged; full Unicode case-folding (NFKC + case-fold)
-///    is deferred to v0.2.
+///    is future work.
 /// 2. Leading/trailing spaces: ignored
 /// 3. Internal multiple spaces: collapsed to single space
 fn normalized_eq(a: &[u8], b: &[u8]) -> bool {

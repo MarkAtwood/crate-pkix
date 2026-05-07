@@ -268,7 +268,7 @@ impl SubjectKind {
 /// When the `serde` feature is enabled, deserializing `LintResult::Warn`,
 /// `Error`, or `Fatal` variants leaks the detail string (one allocation per
 /// unique string, permanently). This is harmless in short-lived processes.
-/// See [`de_static_str`] for details and the mitigation path for long-running
+/// See `de_static_str` for details and the mitigation path for long-running
 /// services.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
@@ -505,7 +505,7 @@ pub trait Lint: Send + Sync {
 ///
 /// When `serde` is enabled, deserializing `Finding` requires `'de: 'static`
 /// because `LintResult::Warn/Error/Fatal` detail fields are `&'static str`
-/// (deserialized via [`de_static_str`], which leaks the allocation). This
+/// (deserialized via `de_static_str`, which leaks the allocation). This
 /// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`
 /// in v0.3. Until then, callers must deserialize from a `'static` source
 /// (e.g., `serde_json::from_str` on a `&'static str` or `Box::leak`'d string).
