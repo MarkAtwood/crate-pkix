@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ac"
-version = "0.1.1"
+version = "0.0.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-composite"
-version = "0.1.1"
+version = "0.0.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.1.1"
+version = "0.0.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation-http"
-version = "0.1.1"
+version = "0.0.0"
 dependencies = [
  "der",
  "pkix-path",

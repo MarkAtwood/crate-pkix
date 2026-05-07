@@ -130,7 +130,7 @@ lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 - **Critical extensions** — any unrecognised critical extension causes failure
 - **Certificate policies** — RFC 5280 §6.1 policy state machine
 - **Policy mappings** — RFC 5280 §6.1.3–6.1.5 mapping and constraint enforcement
-- **Name constraints** — RFC 5280 §4.2.1.10 (DNS, RFC 822, URI, DirectoryName)
+- **Name constraints** — RFC 5280 §4.2.1.10 (DNS, RFC 822, URI, DirectoryName, IP address)
 - **Duplicate certificate detection** — issuer+serial uniqueness in the chain
 
 `pkix-revocation` adds:

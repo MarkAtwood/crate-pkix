@@ -122,6 +122,13 @@ pub enum Error {
     /// cause exponential search time. Each iterative-deepening round and the
     /// depth probe start with a fresh budget of `DFS_BUDGET` node visits.
     BudgetExceeded,
+    /// A candidate intermediate's `BasicConstraints` extension was present but
+    /// could not be DER-decoded.
+    ///
+    /// Returning this rather than silently rejecting the candidate avoids the
+    /// situation where a malformed-but-topologically-correct intermediate
+    /// causes a misleading [`Error::NoPathFound`].
+    MalformedIntermediate,
 }
 
 impl core::fmt::Display for Error {
@@ -134,6 +141,9 @@ impl core::fmt::Display for Error {
             Self::BudgetExceeded => f.write_str(
                 "DFS node-visit budget exceeded; pool may be adversarially large",
             ),
+            Self::MalformedIntermediate => f.write_str(
+                "a candidate intermediate's BasicConstraints extension is present but cannot be decoded",
+            ),
         }
     }
 }
@@ -144,25 +154,33 @@ impl std::error::Error for Error {}
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// Returns `true` if `cert` has `BasicConstraints` with `cA = TRUE`.
+/// Returns `Ok(true)` if `cert` has `BasicConstraints` with `cA = TRUE`,
+/// `Ok(false)` if the extension is absent or has `cA = FALSE`, and
+/// [`Error::MalformedIntermediate`] if the extension is present but
+/// cannot be DER-decoded.
 ///
-/// A missing extension or `cA = FALSE` both return `false`.
-/// A present extension whose DER cannot be decoded returns `false` (fail-open
-/// for the builder: a cert that cannot be decoded as a CA will simply not be
-/// selected as an intermediate, and `validate_path` will catch any structural
-/// problem on final verification).
-fn cert_is_ca(cert: &Certificate) -> bool {
+/// Propagating decode failure (rather than silently rejecting the cert
+/// as not-a-CA) avoids the situation where a topologically-valid path
+/// through a malformed-BC intermediate produces a misleading
+/// [`Error::NoPathFound`].
+fn cert_is_ca(cert: &Certificate) -> Result<bool> {
     use der::Decode as _;
     use x509_cert::ext::pkix::BasicConstraints;
 
-    cert.tbs_certificate
+    let Some(ext) = cert
+        .tbs_certificate
         .extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
         .find(|ext| ext.extn_id == OID_BASIC_CONSTRAINTS)
-        .and_then(|ext| BasicConstraints::from_der(ext.extn_value.as_bytes()).ok())
-        .is_some_and(|bc| bc.ca)
+    else {
+        return Ok(false);
+    };
+
+    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
+        .map_err(|_| Error::MalformedIntermediate)?;
+    Ok(bc.ca)
 }
 
 /// Inner DFS step.
@@ -173,11 +191,13 @@ fn cert_is_ca(cert: &Certificate) -> bool {
 /// Returns:
 /// - `Ok(true)`  — complete path found; `path` holds the result.
 /// - `Ok(false)` — no path at this depth; `path` is restored to its entry state.
-/// - `Err(())`   — budget exhausted; propagate up to `build_path` immediately.
+/// - `Err(Error::BudgetExceeded)` — node-visit budget exhausted in this round.
+/// - `Err(Error::MalformedIntermediate)` — a candidate intermediate's
+///   `BasicConstraints` is present but undecodable.
 ///
 /// `budget` is decremented on every call (one visit = one DFS node). When it
-/// reaches zero the function returns `Err(())` without further exploration.
-/// The caller maps this to [`Error::BudgetExceeded`].
+/// reaches zero the function returns [`Error::BudgetExceeded`] without further
+/// exploration.
 ///
 /// The invariant `path` is never empty is established by [`build_path`] (which
 /// pushes the target before calling `dfs`) and maintained by the push/pop
@@ -220,8 +240,9 @@ fn dfs(
             continue;
         }
 
-        // Candidate must be a CA (BasicConstraints cA=TRUE).
-        if !cert_is_ca(candidate) {
+        // Candidate must be a CA (BasicConstraints cA=TRUE). A malformed BC
+        // is propagated rather than silently rejected — see `cert_is_ca`.
+        if !cert_is_ca(candidate)? {
             continue;
         }
 

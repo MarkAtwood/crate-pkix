@@ -139,6 +139,16 @@ pub enum Error {
     /// The CRL's CRL number is lower than expected (base CRL must have a number
     /// ≥ the delta's `BaseCRLNumber`).
     CrlNumberMismatch,
+
+    /// A subject certificate's `BasicConstraints` extension is present but
+    /// could not be DER-decoded.
+    ///
+    /// Returned when the IDP scope check (`onlyContainsCACerts` /
+    /// `onlyContainsUserCerts`) cannot determine whether a CRL applies to
+    /// `cert` because `cert`'s own `BasicConstraints` is malformed.
+    /// This is a fail-closed alternative to silently treating the cert as
+    /// not-a-CA (which would let CA-scoped CRLs be skipped for an actual CA).
+    MalformedCertificate,
 }
 
 impl core::fmt::Display for Error {
@@ -182,6 +192,9 @@ impl core::fmt::Display for Error {
                 f.write_str("delta CRL BaseCRLNumber does not match the base CRL's CRLNumber")
             }
             Error::CrlNumberMismatch => f.write_str("CRL number is lower than expected"),
+            Error::MalformedCertificate => f.write_str(
+                "certificate BasicConstraints extension is present but cannot be decoded",
+            ),
         }
     }
 }
