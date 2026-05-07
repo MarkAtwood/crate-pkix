@@ -46,7 +46,9 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///   [`Error::OcspSignatureInvalid`] because the signature is verified against
 ///   the issuer's key. This is a v0.1 limitation tracked for v0.3.
 ///
-/// [`check_revocation`]: crate::RevocationChecker::check_revocation
+///
+/// # Behavior
+///
 /// - `SingleResponse` matching uses both serial number and the `CertID`
 ///   `issuerNameHash`/`issuerKeyHash` fields (RFC 6960 §4.1.1). An OCSP
 ///   response from a different CA with the same serial number will be rejected
@@ -63,6 +65,7 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///   The response DER must be supplied at construction time; this method
 ///   always attempts to verify it against the anchor.
 ///
+/// [`check_revocation`]: crate::RevocationChecker::check_revocation
 /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
 pub struct OcspChecker<V> {

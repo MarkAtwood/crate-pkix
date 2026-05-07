@@ -134,12 +134,13 @@ where
 ///   [`RevocationChecker::check_revocation_against_anchor`].
 ///
 /// The **default implementation** of `check_revocation_against_anchor` returns
-/// `Ok(())` (skip). `NoRevocation`, `CrlChecker`, and `OcspChecker` all inherit
-/// this default, so the last cert is not actively checked unless you override the
-/// method. For full-chain revocation coverage, provide a custom
-/// [`RevocationChecker`] that overrides `check_revocation_against_anchor`, or
-/// include the issuing CA certificate as the last element of `chain` so it is
-/// covered by `check_revocation` as a normal intermediate.
+/// `Ok(())` (skip). `NoRevocation` inherits this default and skips the check.
+/// `CrlChecker` and `OcspChecker` both **override** this method and actively
+/// verify the pre-loaded CRL or OCSP response against the anchor's identity.
+/// For full-chain revocation coverage with a custom checker, override
+/// `check_revocation_against_anchor`, or include the issuing CA certificate as
+/// the last element of `chain` so it is covered by `check_revocation` as a
+/// normal intermediate.
 pub fn verify_chain<V, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -162,7 +163,8 @@ where
             revocation.check_revocation(cert, issuer)?;
         } else {
             // Last cert: issued directly by the trust anchor.
-            // The default impl returns Ok(()); override to enforce CRL/OCSP here.
+            // CrlChecker/OcspChecker override this; NoRevocation inherits the
+            // default Ok(()) skip.
             revocation.check_revocation_against_anchor(cert, &anchors[validated.anchor_index])?;
         }
     }
