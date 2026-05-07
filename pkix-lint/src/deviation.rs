@@ -308,8 +308,10 @@ impl DeviationScope {
             DeviationScope::Any => true,
 
             DeviationScope::IssuerDnContains(substring) => {
+                // `substring` is pre-lowercased by `DeviationStore::add`; no
+                // need to call `.to_lowercase()` on it again here.
                 let issuer_lower = cert.tbs_certificate.issuer.to_string().to_lowercase();
-                issuer_lower.contains(substring.to_lowercase().as_str())
+                issuer_lower.contains(substring.as_str())
             }
 
             DeviationScope::IssuerDnExact(name) => {

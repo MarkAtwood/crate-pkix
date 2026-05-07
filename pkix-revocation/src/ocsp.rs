@@ -60,8 +60,8 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
  /// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
  ///   For the certificate issued directly by a trust anchor, the checker
  ///   uses the anchor's subject DN and SPKI to verify the OCSP response.
- ///   If the certificate has no OCSP URL (not supported in v0.1), the method
- ///   returns `Ok(())` (not-covered; same semantics as no OCSP source available).
+  ///   The response DER must be supplied at construction time; this method
+  ///   always attempts to verify it against the anchor.
  ///
  /// [`RevocationChecker::check_revocation_against_anchor`]: crate::RevocationChecker::check_revocation_against_anchor
 #[derive(Clone, Debug)]
@@ -176,10 +176,12 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         if self.now_unix < produced_at {
             return Err(Error::OcspMalformed);
         }
-        // thisUpdate ≤ now: the SingleResponse is not yet valid.
+        // thisUpdate ≤ now: the SingleResponse is not yet valid (stale clock or
+        // pre-dated response).  This is the same freshness failure as a past-due
+        // nextUpdate, so return `OcspExpired` for consistent caller semantics.
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {
-            return Err(Error::OcspMalformed);
+            return Err(Error::OcspExpired);
         }
         // now ≤ nextUpdate: absent nextUpdate is treated as stale (no freshness
         // guarantee means we cannot rely on the response).
@@ -210,11 +212,8 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
     ///
     /// OCSP responder discovery via the Authority Information Access extension
     /// (RFC 6960 §3.1) is not implemented.  The response DER must be supplied
-    /// at construction time.  If the certificate has no OCSP URL, this method
-    /// returns `Ok(())` (not-covered), matching the behaviour of
-    /// [`check_revocation`] when no OCSP source is available.
-    ///
-    /// [`check_revocation`]: crate::RevocationChecker::check_revocation
+    /// at construction time and is always verified.  If the serial number is
+    /// not found in the response, [`Error::OcspStatusUnknown`] is returned.
     fn check_revocation_against_anchor(
         &self,
         cert: &Certificate,
@@ -283,9 +282,10 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         if self.now_unix < produced_at {
             return Err(Error::OcspMalformed);
         }
+        // thisUpdate ≤ now: same freshness failure as nextUpdate expired.
         let this_update = single.this_update.as_ref().to_unix_duration().as_secs();
         if self.now_unix < this_update {
-            return Err(Error::OcspMalformed);
+            return Err(Error::OcspExpired);
         }
         let next_update = single.next_update.as_ref().ok_or(Error::OcspExpired)?;
         if self.now_unix > next_update.as_ref().to_unix_duration().as_secs() {
