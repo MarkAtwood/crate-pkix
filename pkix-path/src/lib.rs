@@ -343,6 +343,10 @@ pub trait SignatureVerifier {
     /// Returns `Ok(())` on success or `Err(signature::Error)` on failure.
     /// The caller ([`validate_path`]) maps the error to [`Error::SignatureInvalid`]
     /// with the correct chain index — the verifier does not need to know it.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(signature::Error)` if the signature does not verify against the given public key and data.
     fn verify_signature(
         &self,
         algorithm: AlgorithmIdentifierRef<'_>,
@@ -689,8 +693,8 @@ impl Default for ValidationPolicy {
 /// struct MyCorpProfile;
 ///
 /// impl Profile for MyCorpProfile {
-///     fn id(&self) -> &str { "example.corp.internal" }
-///     fn version(&self) -> &str { "2024-01" }
+///     fn id(&self) -> &'static str { "example.corp.internal" }
+///     fn version(&self) -> &'static str { "2024-01" }
 ///     fn policy(&self, now_unix: u64) -> ValidationPolicy {
 ///         let mut p = ValidationPolicy::new(now_unix);
 ///         p.max_validity_secs = Some(365 * 86_400);
@@ -710,14 +714,14 @@ pub trait Profile {
     /// - `"fpki.common-policy"` — US Federal PKI Common Policy
     ///
     /// Lint engines use this ID as a namespace prefix for finding IDs.
-    fn id(&self) -> &str;
+    fn id(&self) -> &'static str;
 
     /// Human-readable version string for this profile.
     ///
     /// Typically the ballot or specification version that last changed the
     /// policy rules, e.g., `"SC-081"`, `"2024-01"`, or `"v2.0.1"`.
     /// Used for diagnostic messages and audit logs; not parsed by the engine.
-    fn version(&self) -> &str;
+    fn version(&self) -> &'static str;
 
     /// Produce the [`ValidationPolicy`] for the given point in time.
     ///
@@ -873,6 +877,10 @@ where
 ///
 /// See [`validate_path`] for full documentation of the remaining parameters
 /// and error semantics.
+///
+/// # Errors
+///
+/// Returns `Err(Error::...)` for each validation failure. See [`Error`] for the full list of failure conditions.
 #[must_use = "path validation result must be checked"]
 pub fn validate_path_with_profile<V, P>(
     chain: &[Certificate],
@@ -1535,7 +1543,7 @@ impl NcTypeMask {
     const DIRECTORY_NAME: NcTypeMask = NcTypeMask(1 << 2);
     const URI: NcTypeMask = NcTypeMask(1 << 3);
     /// `IP_ADDRESS` is used by `name_type_bit` and participates in `nc_constrained_types`
-    /// tracking. IpAddress names cannot appear in Subject DNs, so there is no
+    /// tracking. `IpAddress` names cannot appear in Subject DNs, so there is no
     /// inline DN-path code for this type; SAN IpAddress entries are handled by the
     /// generic SAN loop in `check_name_constraints` via `type_constrained(name)`.
     const IP_ADDRESS: NcTypeMask = NcTypeMask(1 << 4);
@@ -3004,15 +3012,15 @@ mod tests_ecdsa_p256 {
     /// Oracle: `openssl verify -CAfile ec.pem ec.pem` returns OK.
     #[test]
     fn verify_p256_self_signed() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/ec-p256-sha256.der");
         let cert = Certificate::from_der(der).expect("parse cert");
 
-        use der::Encode as _;
         let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
         let sig_bytes = cert.signature.raw_bytes();
 
         // Self-signed cert: signer SPKI is the cert's own SPKI.
-        use spki::der::referenced::OwnedToRef as _;
         let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
 
         let verifier = EcdsaP256Verifier;
@@ -3039,15 +3047,15 @@ mod tests_rsa {
     /// Oracle: `openssl verify -CAfile rsa.pem rsa.pem` returns OK.
     #[test]
     fn verify_rsa_pkcs1v15_sha256_self_signed() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
         let cert = Certificate::from_der(der).expect("parse cert");
 
-        use der::Encode as _;
         let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
         let sig_bytes = cert.signature.raw_bytes();
 
         // Self-signed cert: signer SPKI is the cert's own SPKI.
-        use spki::der::referenced::OwnedToRef as _;
         let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
 
         let verifier = RsaPkcs1v15Sha256Verifier;
