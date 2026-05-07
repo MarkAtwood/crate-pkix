@@ -219,8 +219,22 @@ pub const CRITICAL_OK_LEAF_EXTENSIONS: &[ObjectIdentifier] = &[
 ///
 /// Strict subset of [`ALLOWED_INTERMEDIATE_EXTENSIONS`]; same rationale as
 /// [`CRITICAL_OK_LEAF_EXTENSIONS`].
-pub const CRITICAL_OK_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] =
-    &[OID_EXT_BASIC_CONSTRAINTS, OID_EXT_KEY_USAGE];
+///
+/// Several entries are required here because RFC 5280 mandates critical marking:
+/// - `NameConstraints` — RFC 5280 §4.2.1.10: **MUST** be critical
+/// - `PolicyConstraints` — RFC 5280 §4.2.1.11: SHOULD be critical
+/// - `InhibitAnyPolicy` — RFC 5280 §4.2.1.14: **MUST** be critical
+pub const CRITICAL_OK_INTERMEDIATE_EXTENSIONS: &[ObjectIdentifier] = &[
+    OID_EXT_BASIC_CONSTRAINTS,
+    OID_EXT_KEY_USAGE,
+    OID_EXT_CERTIFICATE_POLICIES,
+    OID_EXT_NAME_CONSTRAINTS,
+    OID_EXT_POLICY_CONSTRAINTS,
+    OID_EXT_INHIBIT_ANY_POLICY,
+    OID_EXT_POLICY_MAPPINGS,
+    OID_EXT_EXTENDED_KEY_USAGE,
+    OID_EXT_SUBJECT_ALT_NAME,
+];
 
 // ---------------------------------------------------------------------------
 // Chain shape limit
