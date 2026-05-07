@@ -166,12 +166,9 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             // No deltaCRLIndicator OID → this is not a delta CRL.
             return Err(Error::DeltaCrlBaseMismatch);
         }
-        // deltaCRLIndicator OID is present (checked above) but its INTEGER value
-        // cannot be decoded → structural error. Propagate the real DER error.
-        // base_crl_number returns None only when the extension is absent, which
-        // cannot happen here since has_delta_crl_indicator already confirmed presence.
+        // has_delta_crl_indicator confirmed OID presence above; None is unreachable.
         let delta_base_num = base_crl_number(&delta_crl)
-            .expect("deltaCRLIndicator OID confirmed present by has_delta_crl_indicator")
+            .ok_or(Error::DeltaCrlBaseMismatch)? // can only happen if code invariant broken
             .map_err(Error::CrlParseError)?;
 
         // The base CRL and delta CRL MUST have the same issuer.
@@ -255,11 +252,12 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 &tbs_bytes,
                 crl.signature.raw_bytes(),
             )
+            // Verifier returns an opaque error; no additional context available.
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
         // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
         //     (critical), check scope constraints against the certificate.
-        if let Some(idp) = parse_issuing_dp(&crl) {
+        if let Some(idp) = parse_issuing_dp(&crl)? {
             // onlyContainsAttributeCerts: attribute cert validation is out of scope
             // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
             if idp.only_contains_attribute_certs {
@@ -387,10 +385,11 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 &tbs_bytes,
                 crl.signature.raw_bytes(),
             )
+            // Verifier returns an opaque error; no additional context available.
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
         // (5) IssuingDistributionPoint scope check (same as check_revocation).
-        if let Some(idp) = parse_issuing_dp(&crl) {
+        if let Some(idp) = parse_issuing_dp(&crl)? {
             if idp.only_contains_attribute_certs {
                 return Ok(());
             }
@@ -539,6 +538,7 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
             &delta_tbs_bytes,
             delta_crl.signature.raw_bytes(),
         )
+        // Verifier returns an opaque error; no additional context available.
         .map_err(|_| Error::CrlSignatureInvalid)?;
 
     Ok(delta_crl
@@ -674,16 +674,25 @@ fn extract_reason_code(entry: &RevokedCert) -> Option<CrlReason> {
 /// this type (it maps to `SubjectInfoAccess` instead of 2.5.29.28).
 fn parse_issuing_dp(
     crl: &CertificateList,
-) -> Option<x509_cert::ext::pkix::crl::IssuingDistributionPoint> {
+) -> crate::Result<Option<x509_cert::ext::pkix::crl::IssuingDistributionPoint>> {
     use x509_cert::ext::pkix::crl::IssuingDistributionPoint;
 
-    crl.tbs_cert_list
+    let ext = crl
+        .tbs_cert_list
         .crl_extensions
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT)
-        .and_then(|e| IssuingDistributionPoint::from_der(e.extn_value.as_bytes()).ok())
+        .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT);
+
+    match ext {
+        None => Ok(None),
+        Some(e) => {
+            let idp = IssuingDistributionPoint::from_der(e.extn_value.as_bytes())
+                .map_err(Error::CrlParseError)?;
+            Ok(Some(idp))
+        }
+    }
 }
 
 /// Returns `true` if `cert` is a CA certificate (`BasicConstraints` `cA = TRUE`).
