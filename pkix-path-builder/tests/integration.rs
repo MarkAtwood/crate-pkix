@@ -279,3 +279,122 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
         "build_path took {elapsed:?}; budget enforcement must prevent exponential blowup"
     );
 }
+
+/// Encode a cert's `SubjectPublicKeyInfo` to DER bytes for SPKI-based equality
+/// comparison in tests. The tests below identify "which intermediate did the
+/// builder pick" by SPKI, not by re-running the builder logic.
+fn encode_spki(cert: &Certificate) -> Vec<u8> {
+    use der::Encode as _;
+    let mut buf = Vec::new();
+    cert.tbs_certificate
+        .subject_public_key_info
+        .encode_to_vec(&mut buf)
+        .expect("SubjectPublicKeyInfo must encode");
+    buf
+}
+
+/// AKI-based candidate selection (PKIX-yn3e).
+///
+/// Bridge-CA disambiguation: pool contains two CA certs with the **same
+/// subject DN** ("Basic Self-Issued Old Key CA") but **different SPKIs**.
+/// The target's `AuthorityKeyIdentifier.keyIdentifier` matches exactly one
+/// of them (`BasicSelfIssuedOldKeyCACert.SKI`); the other
+/// (`BasicSelfIssuedOldKeyNewWithOldCACert`) is a self-issued rollover
+/// bridge with a different SPKI/SKI.
+///
+/// **AKI/SKI binding** (verified independently via `openssl x509 -text`,
+/// see the unit-test hex constants in lib.rs):
+/// - Test4EE.AKI.keyIdentifier == OldKeyCACert.SKI    (DD:0D:75:…:AF)
+/// - Test4EE.AKI.keyIdentifier != bridge_ca.SKI       (88:5F:BE:…:2A)
+///
+/// **Pool insertion order** is `[bridge, oldkey]`. Without AKI ranking the
+/// DFS would try the bridge first (pool order), recurse through it, and
+/// return a topologically valid chain `[Test4EE, bridge, oldkey, anchor]`
+/// that fails `validate_path` with `SignatureInvalid` (Test4EE was actually
+/// signed by oldkey directly, not via the bridge).
+///
+/// **Independent oracle**: end-to-end `validate_path` succeeds on the
+/// returned chain iff the chosen intermediate's pubkey actually verifies
+/// Test4EE's signature. This is what we assert.
+#[test]
+fn test_build_path_aki_ranking_disambiguates_same_dn_different_spki() {
+    let ee = pkits_cert("ValidBasicSelfIssuedNewWithOldTest4EE");
+
+    // Both CAs share the subject DN "Basic Self-Issued Old Key CA".
+    let oldkey_ca = pkits_cert("BasicSelfIssuedOldKeyCACert");
+    let bridge_ca = pkits_cert("BasicSelfIssuedOldKeyNewWithOldCACert");
+    let anchor = pkits_trust_anchor();
+
+    // Insert bridge first so DN-only ordering would pick it.
+    let mut pool = CertPool::new();
+    pool.add(bridge_ca.clone());
+    pool.add(oldkey_ca.clone());
+
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
+        .expect("build_path must succeed");
+
+    // The intermediate at path[1] must be OldKeyCACert (whose SKI matches
+    // Test4EE's AKI), not the bridge cert that has a different SKI.
+    let selected = encode_spki(&path[1]);
+    let expected = encode_spki(&oldkey_ca);
+    let unexpected = encode_spki(&bridge_ca);
+    assert_eq!(
+        selected, expected,
+        "AKI ranking must select OldKeyCACert (SKI matches Test4EE.AKI), \
+         not the same-DN bridge cert"
+    );
+    assert_ne!(selected, unexpected);
+
+    // End-to-end validation: this is the independent oracle. If AKI
+    // ranking picked the wrong intermediate, validate_path would fail
+    // with SignatureInvalid because the bridge's pubkey does not verify
+    // Test4EE's signature. Disable key-usage enforcement (PKITS §4.5
+    // self-issued certs may not carry digitalSignature on the EE).
+    let mut policy = ValidationPolicy::new(PKITS_NOW);
+    policy.enforce_key_usage = false;
+    pkix_path::validate_path(&path, &[anchor], &policy, &DefaultVerifier)
+        .expect("validate_path must succeed on the AKI-disambiguated chain");
+}
+
+/// Regression: when the target has no AKI, candidate selection falls back
+/// to DN-only ordering with stable iteration of pool insertion order. This
+/// is the contract the existing tests assume, and we assert it explicitly
+/// here for one synthetic shape so the contract has a named owner.
+///
+/// Construction: GoodCACert is a normal PKITS intermediate. Its EE
+/// (`ValidCertificatePathTest1EE`) has an AKI extension, but only one CA
+/// in the pool can match the EE's issuer DN. The AKI heuristic picks that
+/// same single candidate; with or without ranking, the result is the same.
+/// What this test pins down is that adding an *unrelated* CA cert to the
+/// pool does not perturb the selection — proving the tier-1 ordering
+/// preserves pool insertion order for non-matching candidates.
+#[test]
+fn test_build_path_aki_ranking_unrelated_pool_cert_does_not_perturb_selection() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let good_ca = pkits_cert("GoodCACert");
+    // Unrelated CA from §4.5 family — different subject DN; cannot match
+    // GoodCA's issuer chain. Tests that tier-1 ordering doesn't accidentally
+    // promote it via spurious AKI matches.
+    let unrelated = pkits_cert("BasicSelfIssuedNewKeyCACert");
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(unrelated.clone());
+    pool.add(good_ca.clone());
+
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
+        .expect("build_path must succeed");
+
+    // The selected intermediate must be GoodCACert (only DN-matching cand.).
+    let selected = encode_spki(&path[1]);
+    let expected = encode_spki(&good_ca);
+    assert_eq!(
+        selected, expected,
+        "GoodCACert must be selected; unrelated pool cert must not be chosen"
+    );
+
+    // End-to-end validation as independent oracle.
+    let policy = ValidationPolicy::new(PKITS_NOW);
+    pkix_path::validate_path(&path, &[anchor], &policy, &DefaultVerifier)
+        .expect("validate_path must succeed");
+}
