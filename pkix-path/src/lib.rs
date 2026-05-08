@@ -22,9 +22,20 @@
 //! # Limitations
 //!
 //! The following are **not** implemented in v0.2:
-//! - **RFC 4518 full Unicode NFKC DN normalization** — only ASCII whitespace
-//!   collapsing is applied; BMPString/UniversalString/TeletexString in DN
-//!   attributes are compared after UTF-8 transcoding without NFKC.
+//! - **RFC 4518 full Unicode NFKC DN normalization** — ASCII case-folding
+//!   plus insignificant-whitespace collapsing is applied. `BMPString` AVA
+//!   values are transcoded UCS-2-BE → UTF-8 and then compared via the same
+//!   ASCII-only normalization pipeline, so two AVAs that share Unicode
+//!   code points but differ only in DER string-type (e.g. `BMPString`
+//!   "Foo Co" vs `UTF8String` "Foo Co") compare equal. Full RFC 4518 prep
+//!   (NFKC, non-ASCII Unicode case fold, prohibit/bidi steps) is future
+//!   work; until it lands, two `BMPString` values that contain the same
+//!   Unicode code points but differ in canonical decomposition (e.g.
+//!   precomposed U+00E9 'é' vs decomposed U+0065 U+0301 'e'+ combining
+//!   acute) compare unequal. `UniversalString` AVA values are rejected by
+//!   the `der` crate at parse time (tag 0x1C is not in `der::Tag` in 0.7)
+//!   and never reach the path validator. `TeletexString` AVAs fall through
+//!   to raw DER byte comparison only — see `any_to_str_bytes` rustdoc.
 //! - **Online revocation** — revocation is handled by `pkix-revocation`
 //!   (CRL/OCSP); this crate is network-free by design.
 //! - **Path building** — converting an unordered bag of certificates into a
@@ -45,6 +56,14 @@ extern crate alloc;
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::vec::Vec;
+
+// Unified Cow import: same cfg-gate pattern as Vec. `Cow` is owned by
+// `alloc` but `std` re-exports it; we can't write `alloc::borrow::Cow`
+// unconditionally because `extern crate alloc` is gated to no_std mode.
+#[cfg(not(feature = "std"))]
+use alloc::borrow::Cow;
+#[cfg(feature = "std")]
+use std::borrow::Cow;
 
 use der::Tagged;
 use signature::Error as SignatureError;
@@ -1332,8 +1351,12 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 
 /// Compare two distinguished names per RFC 4518 string prep rules.
 ///
-/// Currently implements case-fold and whitespace normalization for ASCII
-/// characters. Full Unicode NFKD normalization is future work.
+/// Currently implements ASCII case-fold and insignificant-whitespace
+/// collapsing. `BMPString`-tagged AVAs are transcoded UCS-2-BE → UTF-8
+/// before normalization, so a `BMPString` AVA and a `UTF8String` (or
+/// `PrintableString`/`IA5String`/`VisibleString`) AVA that share Unicode
+/// code points compare equal. Full Unicode NFKC normalization is future
+/// work.
 ///
 /// Returns `true` if the names are equivalent.
 ///
@@ -1346,12 +1369,22 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 ///
 /// # Limitations
 ///
-/// `BMPString` and `UniversalString` attribute values are not yet normalized —
-/// matching falls back to raw DER byte comparison. `TeletexString` also uses
-/// raw DER comparison; T.61→Unicode mapping is deferred pending a clear
-/// interoperability target. Certificates from legacy PKIs using these
-/// string types may fail name matching even when the names are
-/// semantically equivalent. Full normalization is future work.
+/// - **No NFKC / non-ASCII case fold.** Two AVA values that contain the
+///   same Unicode characters but differ in canonical decomposition
+///   (precomposed vs combining, e.g. U+00E9 vs U+0065 U+0301) compare
+///   unequal even though RFC 4518 says they should match. Non-Latin
+///   case differences (e.g. Greek lowercase σ vs final σ) are also not
+///   folded.
+/// - **`UniversalString` is parser-rejected upstream.** `der` 0.7 omits
+///   tag 0x1C from `Tag::try_from`, so any cert with a `UniversalString`
+///   AVA fails to parse before reaching this comparator. This is an
+///   upstream limitation; the same `BMPString` transcoding applied here
+///   would generalize to `UniversalString` (UCS-4-BE → UTF-8) once the
+///   parser accepts it.
+/// - **`TeletexString` (T61String) uses raw DER byte comparison.**
+///   T.61→Unicode mapping is deferred pending a clear interoperability
+///   target. Certificates from legacy PKIs using `TeletexString` may
+///   fail name matching even when the names are semantically equivalent.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
@@ -1468,9 +1501,11 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     let b_str = any_to_str_bytes(b);
 
     match (a_str, b_str) {
-        (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes, b_bytes),
+        (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes.as_ref(), b_bytes.as_ref()),
         // Both values are non-string types (e.g. OID, INTEGER) or unhandled string
-        // types (TeletexString, BMPString, UniversalString — deferred):
+        // types (TeletexString, UniversalString — UniversalString is parser-rejected
+        // upstream by `der` 0.7's `Tag::try_from`, so this branch in practice covers
+        // TeletexString and non-string types only):
         // compare tag AND content bytes (raw DER). Tag comparison ensures two
         // different string encodings of the same text are not considered equal.
         (None, None) => a.tag() == b.tag() && a.value() == b.value(),
@@ -1486,26 +1521,40 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// returning `None` for types that require special pre-processing before
 /// normalization (see `ava_values_match` for the dispatch logic).
 ///
+/// The return type is `Cow<'_, [u8]>` because some string types
+/// (currently `BMPString`) must be transcoded into a heap-allocated UTF-8
+/// buffer before normalization, while others (`UTF8String`,
+/// `PrintableString`, `IA5String`, `VisibleString`) can be borrowed
+/// directly from the `der::Any` value's content bytes.
+///
 /// # Normalization strategy by string type
 ///
-/// **Currently handled (partial normalization):**
-/// `UTF8String`, `PrintableString`, `IA5String`, `VisibleString` — raw
-/// content bytes are passed directly to `NormalizedIter`, which applies
-/// ASCII case-folding and insignificant-space handling (RFC 4518 §2.4 step
-/// 6 subset). Full Unicode NFKC normalization (RFC 4518 §2.3) is future
-/// work along with the types below.
+/// **Borrowed (zero-copy) — bytes already comparable as UTF-8/ASCII:**
+/// `UTF8String`, `PrintableString`, `IA5String`, `VisibleString`. These
+/// types are encoded as ASCII (or UTF-8 in the case of `UTF8String`) at
+/// the DER level. The borrowed slice is fed directly to `NormalizedIter`
+/// which applies ASCII case-folding and insignificant-space handling
+/// (RFC 4518 §2.4 step 6 subset).
 ///
-/// **Future work — decode then normalize:**
-/// - `BMPString` (UCS-2 BE, BMP only): decode UTF-16BE → apply full RFC
-///   4518 six-step preparation (Map → NFKC → Prohibit → `CheckBidi` →
-///   insignificant-space). RFC 4518 §2.1 classifies `BMPString` as "a subset
-///   of Unicode" — no custom transcoding required.
-/// - `UniversalString` (UCS-4 BE): decode UCS-4 BE → apply the same RFC
-///   4518 six-step preparation as `BMPString`.
+/// **Owned (transcoded) — UCS-2-BE → UTF-8:**
+/// `BMPString`. RFC 4518 §2.1 treats `BMPString` as "a subset of Unicode"
+/// — every two-byte big-endian unit is a Unicode code point in the BMP.
+/// We transcode to UTF-8 so the same normalization pipeline used for
+/// `UTF8String` applies to the result. ASCII-range code points in the BMP
+/// (U+0000..=U+007F) round-trip to single-byte UTF-8, so a BMPString-encoded
+/// "Foo Co" compares equal to a UTF8String-encoded "Foo Co" after this
+/// step. Malformed `BMPString` content (odd-length bytes, or values in
+/// the surrogate range U+D800..=U+DFFF which are not valid Unicode scalar
+/// values) returns `None` (fail-closed): a malformed value will not match
+/// anything via `ava_values_match`.
 ///
-/// The currently-handled types will also be upgraded to full RFC 4518
-/// six-step normalization (adding NFKC). All types except `TeletexString`
-/// will be normalized identically.
+/// **Rejected at parse time — UniversalString:**
+/// `der` 0.7 omits tag 0x1C (`UniversalString`) from `Tag::try_from`,
+/// causing any cert with a `UniversalString` AVA to fail
+/// `Certificate::from_der` upstream. This dispatch therefore never sees
+/// `UniversalString`-tagged values. Documented for completeness; a future
+/// upstream fix in `der` (or our own pre-decode shim) is required before
+/// `UniversalString` becomes reachable here.
 ///
 /// **Deferred — `TeletexString` (T61String):**
 /// Raw DER byte comparison only. RFC 4518 §2.1 states: "As there is no
@@ -1517,14 +1566,69 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// or reject chains those validators accept. Support is deferred until a
 /// clear interoperability target exists (e.g., alignment with OpenSSL's
 /// table). Tracked in PKIX-19l.
-fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]> {
+///
+/// # Future work
+///
+/// Full RFC 4518 six-step preparation (Map → NFKC → Prohibit → `CheckBidi`
+/// → insignificant-space) for non-ASCII Unicode code points is tracked
+/// separately. Until that lands, two `BMPString` values that contain the
+/// same Unicode code points but differ in canonical decomposition (e.g.
+/// precomposed U+00E9 'é' vs decomposed U+0065 U+0301 'e'+ combining
+/// acute) compare unequal even though RFC 4518 says they should match.
+fn any_to_str_bytes(a: &der::Any) -> Option<Cow<'_, [u8]>> {
     use der::Tag;
     match a.tag() {
         Tag::Utf8String | Tag::PrintableString | Tag::Ia5String | Tag::VisibleString => {
-            Some(a.value())
+            Some(Cow::Borrowed(a.value()))
         }
+        Tag::BmpString => bmp_string_to_utf8(a.value()).map(Cow::Owned),
         _ => None,
     }
+}
+
+/// Decode a `BMPString` content byte slice (UCS-2 big-endian, BMP-only
+/// Unicode code points per X.680 / RFC 4518 §2.1) into a UTF-8 byte
+/// vector.
+///
+/// Returns `None` if the input is malformed, specifically:
+/// - odd byte length (UCS-2 units are 16 bits = 2 bytes each), or
+/// - any 16-bit unit falls in the UTF-16 surrogate range
+///   (U+D800..=U+DFFF). Surrogates are *reserved* by Unicode and do not
+///   represent characters; they appear in UTF-16 only as paired
+///   surrogates encoding supplementary-plane code points (which are
+///   forbidden in `BMPString` by definition — `BMP` = Basic Multilingual
+///   Plane, U+0000..=U+FFFF).
+///
+/// On a well-formed input the return value is a UTF-8 encoding of the
+/// same Unicode code points, suitable for byte-level comparison against
+/// other UTF-8 string types via [`normalized_eq`].
+///
+/// No `unsafe`. No new dependencies — uses only `core::char::from_u32`
+/// and `char::encode_utf8`.
+fn bmp_string_to_utf8(bytes: &[u8]) -> Option<Vec<u8>> {
+    if bytes.len() % 2 != 0 {
+        // RFC 4518 §2.1 requires `BMPString` to be a sequence of Unicode
+        // code points; the underlying DER encoding is UCS-2-BE which is
+        // exactly two bytes per unit. An odd-length content octet string
+        // is malformed and we fail-closed by returning None.
+        return None;
+    }
+    // Capacity hint: each UCS-2 unit (2 bytes) becomes at most 3 UTF-8
+    // bytes (BMP code points U+0800..=U+FFFF take 3 bytes; below that
+    // they take 1 or 2). Worst-case sizing avoids reallocation in the
+    // common all-CJK case.
+    let mut out = Vec::with_capacity((bytes.len() / 2) * 3);
+    let mut buf = [0u8; 4];
+    for chunk in bytes.chunks_exact(2) {
+        let cp = u16::from_be_bytes([chunk[0], chunk[1]]);
+        // `char::from_u32` rejects surrogates (U+D800..=U+DFFF) by
+        // returning None. Any other u16 in 0..=0xFFFF is a valid Unicode
+        // scalar value in the Basic Multilingual Plane.
+        let ch = char::from_u32(u32::from(cp))?;
+        let s = ch.encode_utf8(&mut buf);
+        out.extend_from_slice(s.as_bytes());
+    }
+    Some(out)
 }
 
 /// Compare two byte slices after RFC 4518 whitespace normalization and case-folding.
@@ -3308,6 +3412,192 @@ mod tests_normalized_iter {
             normalized_eq(b"ab  cd  ", b"ab cd"),
             "internal double-space collapses; trailing spaces stripped"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PKIX-l63j.1: BMPString transcoding tests
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests_bmp_string {
+    use super::Vec;
+    use super::{ava_values_match, bmp_string_to_utf8};
+    use der::asn1::Any;
+    use der::Tag;
+
+    /// Construct UCS-2-BE bytes for an ASCII-only string.
+    ///
+    /// Each ASCII byte `b` becomes the two-byte sequence `[0x00, b]` since
+    /// ASCII code points are in the range U+0000..=U+007F and the
+    /// big-endian UCS-2 encoding of U+00XX is `0x00, 0xXX`.
+    ///
+    /// Independent oracle: this construction matches the literal
+    /// description in X.680 Annex B and ITU-T X.690 §8.6 ("BMPString
+    /// is encoded as a sequence of two-octet code units in big-endian
+    /// order, with each unit representing one Unicode code point").
+    fn ucs2_be_ascii(s: &str) -> Vec<u8> {
+        let mut v = Vec::with_capacity(s.len() * 2);
+        for b in s.bytes() {
+            assert!(
+                b.is_ascii(),
+                "ucs2_be_ascii test helper only supports ASCII input"
+            );
+            v.push(0x00);
+            v.push(b);
+        }
+        v
+    }
+
+    /// `bmp_string_to_utf8` round-trip for ASCII-only input.
+    ///
+    /// Independent oracle: ASCII Unicode code points (U+0000..=U+007F)
+    /// are encoded identically as a single byte in UTF-8 and as a
+    /// two-byte big-endian unit `[0x00, X]` in UCS-2. Decoding the
+    /// UCS-2 form must yield bytes byte-equal to the original ASCII.
+    #[test]
+    fn ascii_round_trip() {
+        let src = "Foo Co";
+        let ucs2 = ucs2_be_ascii(src);
+        let utf8 = bmp_string_to_utf8(&ucs2).expect("well-formed UCS-2 ASCII");
+        assert_eq!(utf8, src.as_bytes());
+    }
+
+    /// `bmp_string_to_utf8` for a non-ASCII BMP code point.
+    ///
+    /// Independent oracle: the Hiragana letter A (U+3042) has well-known
+    /// encodings — UTF-8: `0xE3 0x81 0x82`; UCS-2-BE: `0x30 0x42`. Both
+    /// are tabulated in the Unicode Character Database. Citing the
+    /// Unicode codepoint is the external oracle here, not our own code.
+    #[test]
+    fn non_ascii_bmp_code_point() {
+        // U+3042 (HIRAGANA LETTER A): UCS-2-BE bytes 0x30 0x42.
+        let ucs2 = vec![0x30, 0x42];
+        let utf8 = bmp_string_to_utf8(&ucs2).expect("U+3042 is a valid BMP code point");
+        // U+3042 in UTF-8 is the well-known three-byte sequence E3 81 82.
+        assert_eq!(utf8, vec![0xE3, 0x81, 0x82]);
+    }
+
+    /// Odd-length UCS-2 input is malformed (each unit must be 2 bytes).
+    /// Fail-closed: return None.
+    #[test]
+    fn odd_length_returns_none() {
+        let malformed = vec![0x00, 0x46, 0x00]; // 3 bytes, not a multiple of 2
+        assert_eq!(bmp_string_to_utf8(&malformed), None);
+    }
+
+    /// UTF-16 surrogate values (U+D800..=U+DFFF) are not valid Unicode
+    /// scalar values and must not appear in `BMPString`. Fail-closed:
+    /// return None.
+    ///
+    /// Independent oracle: Unicode Standard §3.8 explicitly defines
+    /// surrogates as non-scalar; `core::char::from_u32(0xD800..=0xDFFF)`
+    /// returns None.
+    #[test]
+    fn surrogate_returns_none() {
+        // U+D800 (high surrogate, first surrogate code point).
+        assert_eq!(bmp_string_to_utf8(&[0xD8, 0x00]), None);
+        // U+DC00 (low surrogate).
+        assert_eq!(bmp_string_to_utf8(&[0xDC, 0x00]), None);
+        // U+DFFF (last surrogate code point).
+        assert_eq!(bmp_string_to_utf8(&[0xDF, 0xFF]), None);
+    }
+
+    /// Empty BMPString content is well-formed (zero code points) and
+    /// transcodes to an empty UTF-8 byte vector.
+    #[test]
+    fn empty_input_round_trip() {
+        let utf8 = bmp_string_to_utf8(&[]).expect("empty UCS-2 is well-formed (zero units)");
+        assert!(utf8.is_empty());
+    }
+
+    /// `ava_values_match`: a BMPString-encoded "Foo Co" must compare
+    /// equal to a UTF8String-encoded "Foo Co".
+    ///
+    /// This is the core PKIX-l63j.1 invariant: same Unicode code points
+    /// in different DER string types compare equal under DN matching.
+    #[test]
+    fn bmp_matches_utf8_same_text() {
+        let bmp = Any::new(Tag::BmpString, ucs2_be_ascii("Foo Co")).unwrap();
+        let utf8 = Any::new(Tag::Utf8String, b"Foo Co".to_vec()).unwrap();
+        assert!(ava_values_match(&bmp, &utf8));
+        // Symmetry: order of arguments must not matter.
+        assert!(ava_values_match(&utf8, &bmp));
+    }
+
+    /// `ava_values_match`: BMPString and PrintableString comparisons
+    /// must succeed for ASCII content with the same Unicode code points.
+    #[test]
+    fn bmp_matches_printable_same_text() {
+        let bmp = Any::new(Tag::BmpString, ucs2_be_ascii("Acme CA")).unwrap();
+        let printable = Any::new(Tag::PrintableString, b"Acme CA".to_vec()).unwrap();
+        assert!(ava_values_match(&bmp, &printable));
+        assert!(ava_values_match(&printable, &bmp));
+    }
+
+    /// `ava_values_match`: ASCII case-folding still applies to
+    /// BMPString-derived UTF-8 bytes after transcoding (since BMP code
+    /// points U+0041..=U+005A round-trip to ASCII bytes 0x41..=0x5A).
+    #[test]
+    fn bmp_matches_utf8_case_insensitive_ascii() {
+        let bmp_upper = Any::new(Tag::BmpString, ucs2_be_ascii("FOO CO")).unwrap();
+        let utf8_lower = Any::new(Tag::Utf8String, b"foo co".to_vec()).unwrap();
+        assert!(ava_values_match(&bmp_upper, &utf8_lower));
+    }
+
+    /// `ava_values_match`: whitespace collapsing still applies to
+    /// BMPString-derived UTF-8 bytes (BMP space U+0020 → byte 0x20).
+    #[test]
+    fn bmp_matches_utf8_whitespace_collapsed() {
+        let bmp = Any::new(Tag::BmpString, ucs2_be_ascii("  Foo   Co  ")).unwrap();
+        let utf8 = Any::new(Tag::Utf8String, b"foo co".to_vec()).unwrap();
+        assert!(ava_values_match(&bmp, &utf8));
+    }
+
+    /// `ava_values_match`: different Unicode content must NOT match
+    /// across encodings.
+    #[test]
+    fn bmp_does_not_match_utf8_different_text() {
+        let bmp = Any::new(Tag::BmpString, ucs2_be_ascii("Foo Co")).unwrap();
+        let utf8 = Any::new(Tag::Utf8String, b"Bar Co".to_vec()).unwrap();
+        assert!(!ava_values_match(&bmp, &utf8));
+    }
+
+    /// `ava_values_match`: malformed BMPString (odd length) is treated
+    /// as a non-string type by the dispatcher (`any_to_str_bytes` returns
+    /// None). It must therefore NOT match a well-formed UTF8String of
+    /// any content. Fail-closed.
+    #[test]
+    fn malformed_bmp_does_not_match_well_formed_utf8() {
+        // 3-byte content: malformed UCS-2.
+        let malformed_bmp = Any::new(Tag::BmpString, vec![0x00, 0x46, 0x00]).unwrap();
+        let utf8 = Any::new(Tag::Utf8String, b"F".to_vec()).unwrap();
+        assert!(!ava_values_match(&malformed_bmp, &utf8));
+        assert!(!ava_values_match(&utf8, &malformed_bmp));
+    }
+
+    /// `ava_values_match`: non-ASCII Unicode code points compare equal
+    /// when both AVAs encode the same code points (BMPString vs
+    /// UTF8String).
+    ///
+    /// Independent oracle: the UCS-2-BE bytes for U+3042 are 0x30 0x42
+    /// and the UTF-8 bytes are 0xE3 0x81 0x82, both per the Unicode
+    /// Standard.
+    #[test]
+    fn bmp_matches_utf8_non_ascii() {
+        // U+3042 HIRAGANA LETTER A.
+        let bmp = Any::new(Tag::BmpString, vec![0x30, 0x42]).unwrap();
+        let utf8 = Any::new(Tag::Utf8String, vec![0xE3, 0x81, 0x82]).unwrap();
+        assert!(ava_values_match(&bmp, &utf8));
+    }
+
+    /// Sanity: two BMPString-encoded values with the same Unicode code
+    /// points compare equal (this exercises the BMPString-on-both-sides
+    /// path through `any_to_str_bytes`, where both sides allocate).
+    #[test]
+    fn bmp_matches_bmp_same_text() {
+        let a = Any::new(Tag::BmpString, ucs2_be_ascii("Acme")).unwrap();
+        let b = Any::new(Tag::BmpString, ucs2_be_ascii("acme")).unwrap();
+        assert!(ava_values_match(&a, &b));
     }
 }
 

@@ -6,6 +6,42 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path` — `BMPString` AVA values are now compared after UCS-2-BE → UTF-8 transcoding
+
+#### Changed (non-breaking)
+
+- `names_match` (and the underlying `ava_values_match`) now decodes
+  `BMPString`-tagged `AttributeTypeAndValue` content from UCS-2 big-endian
+  to UTF-8 before applying the existing ASCII case-fold and
+  insignificant-whitespace normalization. As a result, two AVAs that
+  encode the same Unicode code points using different DER string types
+  (`BMPString` vs `UTF8String`/`PrintableString`/`IA5String`/`VisibleString`)
+  now compare equal where they previously fell through to raw DER byte
+  comparison and compared unequal.
+
+  Behaviour change for adversarial / malformed input: a `BMPString` with
+  odd-length content bytes or 16-bit units in the UTF-16 surrogate range
+  (U+D800..=U+DFFF) is now rejected by `any_to_str_bytes` (returns
+  `None`); the dispatcher in `ava_values_match` then returns `false` for
+  any comparison involving the malformed value (fail-closed). Previously
+  malformed `BMPString` values fell through to raw DER byte comparison,
+  so two byte-identical malformed values would have compared equal.
+  Real-world certificates with malformed `BMPString` content do not
+  exist in the PKITS corpus or any other in-tree fixture; the change is
+  cosmetic for non-adversarial input.
+
+  `UniversalString` AVAs continue to be parser-rejected upstream by
+  `der` 0.7 (tag 0x1C is absent from `der::Tag::try_from`) and never
+  reach this comparator. `TeletexString` continues to fall through to
+  raw DER byte comparison (deferred pending a clear interoperability
+  target — see PKIX-l63j.3).
+
+  No new dependencies. `no_std` preserved. `pkix-path` stays at 0.2.x.
+
+  Tracked as PKIX-l63j.1 (subset of the PKIX-l63j RFC 4518 epic) in the
+  project beads. NFKC and full RFC 4518 prep for non-ASCII Unicode is
+  tracked separately as PKIX-l63j.2.
+
 ### `pkix-path-builder` — skip-not-fail on malformed `BasicConstraints`
 
 #### Changed (non-breaking)
