@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-chain"
 description = "High-level X.509 certificate chain verification (pkix-path + pkix-revocation)"
-version.workspace     = true
+version               = "0.3.0"  # transitively breaking via pkix-revocation 0.3.0; see CHANGELOG.md
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
