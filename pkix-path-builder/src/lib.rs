@@ -39,6 +39,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+use der::Decode as _;
 use x509_cert::Certificate;
 
 /// An unordered collection of certificates used as input to path building.
@@ -183,6 +184,62 @@ fn cert_is_ca(cert: &Certificate) -> Result<bool> {
     pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedIntermediate)
 }
 
+/// OID `id-ce-authorityKeyIdentifier` (RFC 5280 §4.2.1.1).
+const OID_AUTHORITY_KEY_IDENTIFIER: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.35");
+
+/// OID `id-ce-subjectKeyIdentifier` (RFC 5280 §4.2.1.2).
+const OID_SUBJECT_KEY_IDENTIFIER: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.14");
+
+/// Return the bytes of `cert`'s `AuthorityKeyIdentifier::keyIdentifier`
+/// extension, or `None` if the extension is absent, the `keyIdentifier`
+/// field is absent, or the extension cannot be DER-decoded.
+///
+/// **Fail-soft semantics**: a malformed AKI is treated as if absent rather
+/// than propagated as an error. The AKI keyIdentifier is used purely as
+/// an *ordering heuristic* for candidate selection; it is not a security
+/// gate (the actual signature check happens downstream in
+/// [`pkix_path::validate_path`]). A malformed AKI on the target should
+/// degrade builder selection to DN-only ranking, not abort path building.
+///
+/// RFC 5280 §4.2.1.1: AKI's `keyIdentifier` is normally the SHA-1 hash of
+/// the issuer's `subjectPublicKey` BIT STRING (method 1). This is compared
+/// byte-for-byte against candidate certs' `SubjectKeyIdentifier`; we do
+/// not recompute hashes here — only opaque-byte equality matters.
+fn cert_aki_key_id(cert: &Certificate) -> Option<Vec<u8>> {
+    use x509_cert::ext::pkix::AuthorityKeyIdentifier;
+
+    let extns = cert.tbs_certificate.extensions.as_deref()?;
+    let extn = extns
+        .iter()
+        .find(|e| e.extn_id == OID_AUTHORITY_KEY_IDENTIFIER)?;
+    let aki = AuthorityKeyIdentifier::from_der(extn.extn_value.as_bytes()).ok()?;
+    aki.key_identifier.map(|oct| oct.as_bytes().to_vec())
+}
+
+/// Return the bytes of `cert`'s `SubjectKeyIdentifier` extension, or
+/// `None` if the extension is absent or cannot be DER-decoded.
+///
+/// **Fail-soft semantics**: see [`cert_aki_key_id`] for rationale. A cert
+/// without a parseable SKI ranks below SKI-bearing candidates in the
+/// AKI-matching tier but is still considered for the DN-only fallback
+/// tier.
+///
+/// RFC 5280 §4.2.1.2: SKI is conventionally the SHA-1 hash of the cert's
+/// own `subjectPublicKey` BIT STRING; we do not recompute, we only return
+/// the bytes the cert claims.
+fn cert_ski_key_id(cert: &Certificate) -> Option<Vec<u8>> {
+    use x509_cert::ext::pkix::SubjectKeyIdentifier;
+
+    let extns = cert.tbs_certificate.extensions.as_deref()?;
+    let extn = extns
+        .iter()
+        .find(|e| e.extn_id == OID_SUBJECT_KEY_IDENTIFIER)?;
+    let ski = SubjectKeyIdentifier::from_der(extn.extn_value.as_bytes()).ok()?;
+    Some(ski.0.as_bytes().to_vec())
+}
+
 /// Inner DFS step.
 ///
 /// `path` is the current (partial) chain, leaf-first. On success it contains
@@ -233,12 +290,52 @@ fn dfs(
         return Ok(false);
     }
 
-    // Recursive step: find pool certs that could issue `current`.
-    for candidate in pool {
-        // Candidate subject must match current issuer.
+    // Recursive step: find pool certs that could issue `current`, ordered
+    // by AKI/SKI matching tier (RFC 5280 §4.2.1.1, RFC 4158 §3.2).
+    //
+    // Tier 0: candidate's SubjectKeyIdentifier matches the target's
+    //         AuthorityKeyIdentifier `keyIdentifier` field. This is the
+    //         RFC 5280 §4.2.1.1 method-1 disambiguator: in bridge-CA and
+    //         key-rollover topologies, multiple CA certs share an issuer
+    //         DN; AKI/SKI is the only deterministic way to pick the cert
+    //         that actually signed `current`.
+    // Tier 1: any DN-matching candidate. Used when target has no AKI,
+    //         no candidate SKI matches, or AKI/SKI parsing failed
+    //         (fail-soft — see `cert_aki_key_id`/`cert_ski_key_id`).
+    //
+    // Stable sort within each tier preserves pool insertion order, which
+    // is the documented contract for the no-AKI-signal case.
+    //
+    // Note: the (issuer, serial) AKI fields (RFC 5280 §4.2.1.1's optional
+    // `authorityCertIssuer` + `authorityCertSerialNumber`) are not used
+    // for tier ranking. They are rare in practice and parsing GeneralNames
+    // for that signal is more work than the marginal disambiguation
+    // benefit justifies. Documented as a deferred enhancement.
+    //
+    // Allocation: one Vec<(u8, usize)> per DFS frame, capped at pool size.
+    // For realistic CMS / S/MIME pools (≤ tens of certs) this is well
+    // bounded; against the adversarial-pool budget test (30 same-DN
+    // candidates) it adds ~30 × log(30) compares + 30 SKI parses per
+    // frame, which fits comfortably under the round budget.
+    let target_aki_kid = cert_aki_key_id(c);
+    let mut ranked: Vec<(u8, usize)> = Vec::with_capacity(pool.len());
+    for (idx, candidate) in pool.iter().enumerate() {
         if !pkix_path::names_match(&candidate.tbs_certificate.subject, &current_issuer) {
             continue;
         }
+        let tier: u8 = match (
+            target_aki_kid.as_deref(),
+            cert_ski_key_id(candidate).as_deref(),
+        ) {
+            (Some(aki), Some(ski)) if aki == ski => 0,
+            _ => 1,
+        };
+        ranked.push((tier, idx));
+    }
+    ranked.sort_by_key(|&(tier, _)| tier);
+
+    for (_tier, idx) in ranked {
+        let candidate = &pool[idx];
 
         // Candidate must be a CA (BasicConstraints cA=TRUE). A malformed BC
         // is propagated rather than silently rejected — see `cert_is_ca`.
@@ -384,6 +481,28 @@ impl Default for PathBuilderConfig {
 /// topology) are treated as distinct nodes and will not incorrectly prune
 /// valid paths.
 ///
+/// **Candidate selection uses AKI/SKI as an ordering heuristic, not a
+/// security gate.** When the cert seeking an issuer carries an
+/// `AuthorityKeyIdentifier` extension with a `keyIdentifier` field
+/// (RFC 5280 §4.2.1.1), pool candidates whose `SubjectKeyIdentifier`
+/// (§4.2.1.2) matches are tried before DN-only matches. This is
+/// best-effort disambiguation for bridge-CA and key-rollover topologies
+/// where multiple CA certs share an issuer DN. The signature itself is
+/// **not** verified by this crate — that happens downstream in
+/// [`pkix_path::validate_path`]. Consequences:
+///
+/// - When the AKI heuristic picks the wrong candidate (e.g., AKI is
+///   absent or malformed, multiple candidates share the same SKI, or
+///   the AKI/SKI binding is wrong), the returned chain may fail
+///   `validate_path` with `SignatureInvalid` rather than
+///   [`Error::NoPathFound`] here.
+/// - Malformed AKI or SKI extensions are treated as if absent (fail-soft).
+///   They do not cause path building to abort; they simply degrade
+///   selection to DN-only ranking for that cert.
+/// - The AKI `authorityCertIssuer` + `authorityCertSerialNumber` fields
+///   (the rare alternative to `keyIdentifier`) are not currently used for
+///   ranking. Only the `keyIdentifier` field participates.
+///
 /// **Anchor matching is by DN only.** When a candidate's issuer DN matches
 /// any anchor in `anchors`, path building terminates immediately with that
 /// chain — the anchor's `SubjectPublicKeyInfo` is **not** verified against
@@ -478,4 +597,99 @@ pub fn build_path_with_config(
     }
 
     Err(Error::NoPathFound)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the private AKI/SKI extraction helpers.
+    //!
+    //! Independent oracle: byte values were derived by running
+    //! `openssl x509 -text` on the PKITS DER fixtures and pasting the
+    //! displayed `Authority Key Identifier` / `Subject Key Identifier`
+    //! hex bytes into the test expectations. The helpers are *not* used
+    //! to compute the expected values — they are checked against the
+    //! external openssl-derived ground truth.
+    extern crate std;
+
+    use super::{cert_aki_key_id, cert_ski_key_id};
+    use der::Decode as _;
+    use std::path::PathBuf;
+    use x509_cert::Certificate;
+
+    fn pkits_cert(name: &str) -> Certificate {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../pkix-path/tests/pkits/certs")
+            .join(std::format!("{name}.crt"));
+        let bytes = std::fs::read(&path)
+            .unwrap_or_else(|e| std::panic!("fixture not found at {}: {}", path.display(), e));
+        Certificate::from_der(&bytes)
+            .unwrap_or_else(|e| std::panic!("failed to parse {name}: {e}"))
+    }
+
+    #[test]
+    fn cert_aki_key_id_test4ee_matches_oldkey_ski() {
+        // Test4EE.AKI.keyIdentifier (per `openssl x509 -text` on the fixture):
+        //   DD:0D:75:8D:53:68:12:C4:CB:15:40:C0:14:86:14:16:30:A1:BE:AF
+        const EXPECTED: [u8; 20] = [
+            0xdd, 0x0d, 0x75, 0x8d, 0x53, 0x68, 0x12, 0xc4, 0xcb, 0x15, 0x40, 0xc0, 0x14, 0x86,
+            0x14, 0x16, 0x30, 0xa1, 0xbe, 0xaf,
+        ];
+        let ee = pkits_cert("ValidBasicSelfIssuedNewWithOldTest4EE");
+        let aki = cert_aki_key_id(&ee).expect("Test4EE has an AKI extension");
+        assert_eq!(aki.as_slice(), &EXPECTED);
+    }
+
+    #[test]
+    fn cert_ski_key_id_oldkey_matches_test4ee_aki() {
+        // BasicSelfIssuedOldKeyCACert.SKI must equal Test4EE.AKI.keyIdentifier.
+        // Same hex bytes as the AKI test above; parsed independently from a
+        // different DER file via a different code path.
+        const EXPECTED: [u8; 20] = [
+            0xdd, 0x0d, 0x75, 0x8d, 0x53, 0x68, 0x12, 0xc4, 0xcb, 0x15, 0x40, 0xc0, 0x14, 0x86,
+            0x14, 0x16, 0x30, 0xa1, 0xbe, 0xaf,
+        ];
+        let oldkey = pkits_cert("BasicSelfIssuedOldKeyCACert");
+        let ski = cert_ski_key_id(&oldkey).expect("OldKeyCACert has an SKI extension");
+        assert_eq!(ski.as_slice(), &EXPECTED);
+    }
+
+    #[test]
+    fn cert_ski_key_id_bridge_ca_differs_from_oldkey() {
+        // BasicSelfIssuedOldKeyNewWithOldCACert shares a subject DN with
+        // OldKeyCACert but has a distinct SPKI and SKI:
+        //   88:5F:BE:3F:35:39:66:9A:EB:4D:C2:26:1B:26:B1:2A:27:B5:08:2A
+        // This is the disambiguation signal AKI ranking exploits.
+        const EXPECTED: [u8; 20] = [
+            0x88, 0x5f, 0xbe, 0x3f, 0x35, 0x39, 0x66, 0x9a, 0xeb, 0x4d, 0xc2, 0x26, 0x1b, 0x26,
+            0xb1, 0x2a, 0x27, 0xb5, 0x08, 0x2a,
+        ];
+        let bridge = pkits_cert("BasicSelfIssuedOldKeyNewWithOldCACert");
+        let ski = cert_ski_key_id(&bridge).expect("bridge cert has an SKI extension");
+        assert_eq!(ski.as_slice(), &EXPECTED);
+    }
+
+    #[test]
+    fn cert_aki_key_id_returns_none_when_aki_absent() {
+        // The PKITS trust anchor cert is self-signed and (per its DER) has
+        // NO AuthorityKeyIdentifier extension — only a SubjectKeyIdentifier.
+        // The helper must return None, exercising the early-return branch
+        // in cert_aki_key_id.
+        let anchor = pkits_cert("TrustAnchorRootCertificate");
+        assert!(cert_aki_key_id(&anchor).is_none());
+    }
+
+    #[test]
+    fn cert_ski_key_id_present_on_trust_anchor() {
+        // Trust anchor's SKI per `openssl x509 -text`:
+        //   E4:7D:5F:D1:5C:95:86:08:2C:05:AE:BE:75:B6:65:A7:D9:5D:A8:66
+        // Round-trips the same bytes that downstream certs reference via
+        // their AKI.keyIdentifier (AKI/SKI binding cross-check).
+        const EXPECTED: [u8; 20] = [
+            0xe4, 0x7d, 0x5f, 0xd1, 0x5c, 0x95, 0x86, 0x08, 0x2c, 0x05, 0xae, 0xbe, 0x75, 0xb6,
+            0x65, 0xa7, 0xd9, 0x5d, 0xa8, 0x66,
+        ];
+        let anchor = pkits_cert("TrustAnchorRootCertificate");
+        let ski = cert_ski_key_id(&anchor).expect("trust anchor has an SKI");
+        assert_eq!(ski.as_slice(), &EXPECTED);
+    }
 }
