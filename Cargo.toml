@@ -12,6 +12,7 @@ members = [
     "pkix-ct",
     "pkix-composite",
     "pkix-ac",
+    "pkix-difftest",
 ]
 
 [workspace.package]
