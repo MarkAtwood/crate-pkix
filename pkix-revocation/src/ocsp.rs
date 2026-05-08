@@ -23,6 +23,14 @@ const OID_SHA384: der::asn1::ObjectIdentifier =
 const OID_SHA512: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.2.3");
 
+// OID 2.5.29.37 — id-ce-extKeyUsage (RFC 5280 §4.2.1.12)
+const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.37");
+
+// OID 1.3.6.1.5.5.7.3.9 — id-kp-OCSPSigning (RFC 6960 §4.2.2.2)
+const OID_KP_OCSP_SIGNING: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.9");
+
 /// Offline OCSP-based revocation checker.
 ///
 /// Parses a pre-fetched DER-encoded OCSP response, verifies its signature
@@ -34,14 +42,35 @@ const OID_SHA512: der::asn1::ObjectIdentifier =
 ///
 /// Only available when the `ocsp` feature is enabled.
 ///
+/// # Supported responder shapes
+///
+/// - **Direct** (RFC 6960 §4.2.2.2): the response is signed by the cert's
+///   issuer CA. `ResponderId` matches the issuer's name or SHA-1(SPKI);
+///   the response signature verifies against the issuer's SPKI.
+/// - **CA Designated Responder** (RFC 6960 §4.2.2.2, "delegated"): the
+///   response is signed by a separate responder certificate embedded in
+///   the response's `certs` field. The responder cert MUST be issued
+///   directly by the same CA, MUST carry `id-kp-OCSPSigning` Extended Key
+///   Usage, MUST have a validity period containing the response's
+///   `producedAt`, and the issuer's signature on it MUST verify against
+///   the issuer's SPKI. Failures map to distinct error variants
+///   ([`Error::OcspResponderEkuMissing`],
+///   [`Error::OcspResponderEkuMalformed`],
+///   [`Error::OcspResponderCertNotIssuedByCa`],
+///   [`Error::OcspResponderCertExpired`],
+///   [`Error::OcspResponderCertSigInvalid`]).
+/// - The `id-pkix-ocsp-nocheck` extension on a delegate cert (RFC 6960
+///   §4.2.2.2.1) is **not** parsed by this crate: the checker is
+///   single-shot and never recurses into the delegate's revocation
+///   regardless of the extension. Callers wrapping this checker in a
+///   chain validator MUST honor `ocsp-nocheck` themselves to prevent
+///   infinite recursion.
+///
 /// # Limitations
 ///
-/// - Only issuer-signed (direct) OCSP responses are supported (RFC 6960
-///   §4.2.2.2). Delegated OCSP responders — responses signed by a separate
-///   responder certificate carrying the `id-kp-OCSPSigning` EKU rather than
-///   by the issuer directly — will fail with [`Error::OcspSignatureInvalid`]
-///   because the signature is verified against the issuer's key. Delegated
-///   responder support is future work.
+/// - **Trusted Responder** (third RFC 6960 case — a responder whose key
+///   the requester trusts out-of-band) is not modeled. Callers needing
+///   it can supply the trusted responder cert as the `issuer` argument.
 /// - No OCSP request generation. The response DER must be supplied at
 ///   construction time; the checker is offline. The OCSP `nonce` extension
 ///   is therefore not generated or checked.
@@ -124,25 +153,41 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspIssuerCertMismatch);
         }
 
-        // (1)-(5) Reuse the pre-parsed BasicOCSPResponse and (6) verify the
-        // signature against the issuer's SPKI.
+        // (1)-(5) parsing was performed in `new()`; reuse the cached
+        // `BasicOcspResponse`.
         let basic = &self.basic;
-        parse_and_verify_basic_response(
+
+        // (6) RFC 6960 §4.2.2.2: resolve which key signs this response —
+        // either the issuer (direct) or a CA Designated Responder cert
+        // embedded in `basic.certs` (delegated). The resolver also
+        // performs the ResponderId match (step 6b in the legacy flow)
+        // because for delegated responses the ResponderId must match the
+        // delegate, not the issuer.
+        let issuer_subject = &issuer.tbs_certificate.subject;
+        let issuer_spki_owned = &issuer.tbs_certificate.subject_public_key_info;
+        let issuer_spki_raw = issuer_spki_owned.subject_public_key.raw_bytes();
+        let signing_spki = resolve_signing_key_for_response(
             basic,
+            issuer_subject,
+            issuer_spki_owned.owned_to_ref(),
+            issuer_spki_raw,
             &self.verifier,
-            issuer
-                .tbs_certificate
-                .subject_public_key_info
-                .owned_to_ref(),
+            produced_at_unix_secs(basic),
         )?;
 
-        // (6b) RFC 6960 §2.2: verify ResponderId against the issuer identity.
-        //
-        // The ResponderId in the response must match the issuer whose SPKI was
-        // used to verify the signature above.  A rogue responder for a different
-        // CA could still produce a validly structured response — this check
-        // ensures the response explicitly asserts the correct issuer identity.
-        verify_responder_id(&basic.tbs_response_data.responder_id, issuer)?;
+        // (6 cont.) Verify the response signature using the resolved key.
+        let tbs_bytes = basic
+            .tbs_response_data
+            .to_der()
+            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+        self.verifier
+            .verify_signature(
+                basic.signature_algorithm.owned_to_ref(),
+                signing_spki,
+                &tbs_bytes,
+                basic.signature.raw_bytes(),
+            )
+            .map_err(|_| Error::OcspSignatureInvalid)?;
 
         // (7) Find the SingleResponse for this certificate (match by serial number).
         let cert_serial = &cert.tbs_certificate.serial_number;
@@ -248,17 +293,36 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             return Err(Error::OcspIssuerCertMismatch);
         }
 
-        // (1)-(5) Reuse the pre-parsed BasicOCSPResponse and (6) verify the
-        // signature against the anchor's SPKI.
+        // (1)-(5) parsing was performed in `new()`; reuse the cached
+        // `BasicOcspResponse`.
         let basic = &self.basic;
-        parse_and_verify_basic_response(
+
+        // (6) Resolve signing key (direct vs delegated) and verify the
+        // response signature. See `check_revocation` above for the full
+        // commentary on the two paths.
+        let anchor_subject = &anchor.subject;
+        let anchor_spki_raw = anchor.subject_public_key_info.subject_public_key.raw_bytes();
+        let signing_spki = resolve_signing_key_for_response(
             basic,
-            &self.verifier,
+            anchor_subject,
             anchor.subject_public_key_info.owned_to_ref(),
+            anchor_spki_raw,
+            &self.verifier,
+            produced_at_unix_secs(basic),
         )?;
 
-        // (6b) Verify ResponderId against the anchor's identity.
-        verify_responder_id_anchor(&basic.tbs_response_data.responder_id, anchor)?;
+        let tbs_bytes = basic
+            .tbs_response_data
+            .to_der()
+            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+        self.verifier
+            .verify_signature(
+                basic.signature_algorithm.owned_to_ref(),
+                signing_spki,
+                &tbs_bytes,
+                basic.signature.raw_bytes(),
+            )
+            .map_err(|_| Error::OcspSignatureInvalid)?;
 
         // (7) Find the SingleResponse for this certificate.
         let cert_serial = &cert.tbs_certificate.serial_number;
@@ -325,46 +389,6 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             CertStatus::Unknown(_) => Err(Error::OcspStatusUnknown),
         }
     }
-}
-
-/// Parse a DER-encoded `OCSPResponse`, verify its structure, and return the
-/// verified [`BasicOcspResponse`].
-///
-/// Performs steps 1-6 common to both `check_revocation` and
-/// `check_revocation_against_anchor`:
-/// 1. Parse the outer `OcspResponse` from DER.
-/// 2. Require `response_status == Successful` (others return `OcspMalformed`).
-/// 3. Extract `response_bytes` (error if absent).
-/// 4. Verify `response_type == id-pkix-ocsp-basic`.
-/// 5. Parse the `BasicOcspResponse`.
-/// 6. Verify the signature over `tbs_response_data` using `issuer_spki`.
-///
-/// The caller is responsible for the `ResponderId` check (step 6b) and all
-/// subsequent steps, which differ between the two callers.
-fn parse_and_verify_basic_response<V: SignatureVerifier>(
-    basic: &BasicOcspResponse,
-    verifier: &V,
-    issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-) -> crate::Result<()> {
-    // (6) Verify the OCSP signature against the supplied SPKI.
-    //
-    // Current limitation: assumes the response is signed directly by the issuer.
-    // The signature covers the DER encoding of ResponseData (tbs_response_data).
-    let tbs_bytes = basic
-        .tbs_response_data
-        .to_der()
-        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
-    verifier
-        .verify_signature(
-            basic.signature_algorithm.owned_to_ref(),
-            issuer_spki,
-            &tbs_bytes,
-            basic.signature.raw_bytes(),
-        )
-        // Verifier returns an opaque error; no additional context available.
-        .map_err(|_| Error::OcspSignatureInvalid)?;
-
-    Ok(())
 }
 
 /// Parse an `OCSPResponse` DER blob and extract its inner `BasicOCSPResponse`.
@@ -438,70 +462,234 @@ fn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::R
     }
 }
 
-/// Verify that a `ResponderId` matches the identity of an issuer `Certificate`.
+/// Bool-returning core of `ResponderId` matching.
 ///
-/// RFC 6960 §2.2 defines two cases:
-/// - `byName`: the Name must equal the issuer's subject DN (RFC 4518 comparison
+/// RFC 6960 §2.2 defines two `ResponderId` shapes:
+/// - `byName`: the contained Name must equal `subject` (RFC 4518 comparison
 ///   via [`pkix_path::names_match`]).
-/// - `byKey`: the `KeyHash` must equal SHA-1 of the issuer's SPKI
-///   `subjectPublicKey` bit string (raw bytes, tag/length/unused-bits stripped).
+/// - `byKey`: the contained `KeyHash` must equal SHA-1 of `spki_raw` (the
+///   raw `subjectPublicKey` BIT STRING contents — no tag, length, or unused-
+///   bits prefix).
 ///
-/// Returns [`Error::OcspResponderIdMismatch`] on mismatch.
-fn verify_responder_id(id: &ResponderId, issuer: &Certificate) -> crate::Result<()> {
-    verify_responder_id_impl(
-        id,
-        &issuer.tbs_certificate.subject,
-        issuer
-            .tbs_certificate
-            .subject_public_key_info
-            .subject_public_key
-            .raw_bytes(),
-    )
-}
-
-/// Same as [`verify_responder_id`] but uses a [`TrustAnchor`]'s identity instead
-/// of a full `Certificate`.
-///
-/// Used by [`OcspChecker::check_revocation_against_anchor`] where only the
-/// anchor's subject DN and SPKI are available.
-fn verify_responder_id_anchor(id: &ResponderId, anchor: &TrustAnchor) -> crate::Result<()> {
-    verify_responder_id_impl(
-        id,
-        &anchor.subject,
-        anchor
-            .subject_public_key_info
-            .subject_public_key
-            .raw_bytes(),
-    )
-}
-
-/// Common implementation for [`verify_responder_id`] and [`verify_responder_id_anchor`].
-///
-/// Checks that the OCSP `ResponderId` matches the expected identity
-/// (either a certificate subject or a trust anchor subject).
-///
-/// Returns [`Error::OcspResponderIdMismatch`] on mismatch (distinct from
-/// [`Error::OcspSignatureInvalid`], which indicates a cryptographic failure).
-fn verify_responder_id_impl(
+/// Returns `true` iff the supplied identity matches the response's
+/// `ResponderId`. Used both directly (delegated OCSP, where one ResponderId
+/// is checked against many candidate identities and "no match" is not an
+/// error) and via [`verify_responder_id_impl`] (direct OCSP, where mismatch
+/// is fatal).
+fn responder_id_matches(
     id: &ResponderId,
     subject: &x509_cert::name::Name,
     spki_raw: &[u8],
-) -> crate::Result<()> {
+) -> bool {
     match id {
-        ResponderId::ByName(name) => {
-            if !names_match(name, subject) {
-                return Err(Error::OcspResponderIdMismatch);
-            }
-        }
+        ResponderId::ByName(name) => names_match(name, subject),
         ResponderId::ByKey(key_hash) => {
             use sha1::Digest as _;
             let expected: [u8; 20] = sha1::Sha1::digest(spki_raw).into();
-            if key_hash.as_bytes() != expected.as_ref() {
-                return Err(Error::OcspResponderIdMismatch);
-            }
+            key_hash.as_bytes() == expected.as_ref()
         }
     }
+}
+
+/// Check whether `cert` carries the `id-kp-OCSPSigning` Extended Key Usage
+/// (RFC 6960 §4.2.2.2 — required on a "CA Designated Responder" certificate).
+///
+/// - `Ok(true)`: EKU extension present and contains `id-kp-OCSPSigning`.
+/// - `Ok(false)`: EKU absent, or present but does not contain that OID.
+/// - `Err(`[`Error::OcspResponderEkuMalformed`]`)`: EKU present but cannot
+///   be DER-decoded. Fail-closed: a malformed EKU on a candidate responder
+///   cert rejects the response rather than silently treating the cert as
+///   if the OCSPSigning purpose were absent.
+///
+/// Mirrors the fail-closed pattern in `pkix-path` (`try_find_cert_ext` ->
+/// `MalformedCertificate` on parse error). Re-implemented locally because
+/// `try_find_cert_ext` is private to `pkix-path`; promoting it would widen
+/// the trait surface for one use site.
+fn cert_has_ocsp_signing_eku(cert: &Certificate) -> crate::Result<bool> {
+    use x509_cert::ext::pkix::ExtendedKeyUsage;
+
+    let extns = match cert.tbs_certificate.extensions.as_deref() {
+        Some(e) => e,
+        None => return Ok(false),
+    };
+    let extn = match extns.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE) {
+        Some(e) => e,
+        None => return Ok(false),
+    };
+    let eku = ExtendedKeyUsage::from_der(extn.extn_value.as_bytes())
+        .map_err(|_| Error::OcspResponderEkuMalformed)?;
+    Ok(eku.0.contains(&OID_KP_OCSP_SIGNING))
+}
+
+/// Validate a delegated OCSP responder cert against its supposed issuer.
+///
+/// RFC 6960 §4.2.2.2 — for a "CA Designated Responder" cert to be trusted:
+///
+/// 1. It must be issued directly by the CA whose certs the responder
+///    asserts status for (not by some unrelated CA with the OCSPSigning
+///    EKU).
+/// 2. It must carry `id-kp-OCSPSigning` in its `ExtendedKeyUsage`.
+/// 3. Its validity period must include the time the response was
+///    generated (the response's `producedAt`).
+/// 4. The CA's signature on its TBS must verify against the issuer's SPKI.
+///
+/// Each requirement maps to a distinct error variant for diagnostic
+/// clarity; failures short-circuit (no later check runs after an earlier
+/// one fails).
+///
+/// **Note on `id-pkix-ocsp-nocheck`**: per RFC 6960 §4.2.2.2.1 a delegate
+/// cert MAY carry the `id-pkix-ocsp-nocheck` extension to signal that
+/// callers MUST NOT recursively check the delegate's own revocation
+/// status. This crate is a single-shot offline checker — it never
+/// recurses into the delegate's revocation regardless of the extension —
+/// so we neither parse nor enforce that extension. Documentation only.
+fn validate_delegate_responder_cert<V: SignatureVerifier>(
+    delegate: &Certificate,
+    issuer_subject: &x509_cert::name::Name,
+    issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+    verifier: &V,
+    produced_at_unix: u64,
+) -> crate::Result<()> {
+    // (a) Issued by the same CA that issued the cert under check.
+    if !names_match(&delegate.tbs_certificate.issuer, issuer_subject) {
+        return Err(Error::OcspResponderCertNotIssuedByCa);
+    }
+
+    // (b) Carries id-kp-OCSPSigning EKU.
+    match cert_has_ocsp_signing_eku(delegate)? {
+        true => {}
+        false => return Err(Error::OcspResponderEkuMissing),
+    }
+
+    // (c) Validity window includes the response's producedAt time.
+    //     Using producedAt (not now_unix) means we reject responses
+    //     produced after the responder cert expired even if the rest of
+    //     the response window is still fresh — the signing key was no
+    //     longer authoritative when the response claims to have been
+    //     generated.
+    let nb = delegate
+        .tbs_certificate
+        .validity
+        .not_before
+        .to_unix_duration()
+        .as_secs();
+    let na = delegate
+        .tbs_certificate
+        .validity
+        .not_after
+        .to_unix_duration()
+        .as_secs();
+    if produced_at_unix < nb || produced_at_unix > na {
+        return Err(Error::OcspResponderCertExpired);
+    }
+
+    // (d) Issuer's signature on the delegate cert verifies. This is a
+    //     SEPARATE signature from the OCSP response signature — distinct
+    //     error variant for diagnostics. The TBS bytes are re-encoded
+    //     here rather than spliced from the original DER because we only
+    //     have the parsed `Certificate` value; for the typical responder-
+    //     cert size this is microseconds.
+    let tbs_bytes = delegate
+        .tbs_certificate
+        .to_der()
+        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+    verifier
+        .verify_signature(
+            delegate.signature_algorithm.owned_to_ref(),
+            issuer_spki,
+            &tbs_bytes,
+            delegate.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::OcspResponderCertSigInvalid)?;
+
     Ok(())
+}
+
+/// Resolve which key signs the OCSP response. Returns the SPKI to use for
+/// the response signature check, plus a borrow lifetime tied to either
+/// the issuer reference or the embedded responder cert (whichever path
+/// applies).
+///
+/// RFC 6960 §4.2.2.2 — three signing-key cases:
+/// 1. **Direct**: the response is signed by the CA itself. `ResponderId`
+///    matches the issuer's name or SHA-1(SPKI). Use the issuer's SPKI.
+/// 2. **CA Designated Responder (delegated)**: the response is signed by
+///    a separate cert with the OCSPSigning EKU, embedded in the response's
+///    `certs` field. Find the cert matching `ResponderId`, validate it as
+///    a designated responder, and use its SPKI.
+/// 3. **Trusted Responder** (out of scope for this crate): a responder
+///    whose key the caller already trusts out-of-band. Not supported here;
+///    callers needing this can supply the trusted responder cert as the
+///    `issuer` argument when the cert under check has been issued by it.
+///
+/// The returned reference borrows from one of `basic` or `issuer`,
+/// constrained to the same lifetime via `'a`. The caller drops the SPKI
+/// ref before any further mutation of either source.
+fn resolve_signing_key_for_response<'a, V: SignatureVerifier>(
+    basic: &'a BasicOcspResponse,
+    issuer_subject: &'a x509_cert::name::Name,
+    issuer_spki: spki::SubjectPublicKeyInfoRef<'a>,
+    issuer_spki_raw: &[u8],
+    verifier: &V,
+    produced_at_unix: u64,
+) -> crate::Result<spki::SubjectPublicKeyInfoRef<'a>> {
+    let rid = &basic.tbs_response_data.responder_id;
+
+    // Direct path: ResponderId matches the issuer.
+    if responder_id_matches(rid, issuer_subject, issuer_spki_raw) {
+        return Ok(issuer_spki);
+    }
+
+    // Delegated path: scan `basic.certs` for a cert whose identity matches
+    // ResponderId, then validate it as a CA Designated Responder.
+    let certs: &[Certificate] = match basic.certs.as_deref() {
+        Some(c) => c,
+        None => &[],
+    };
+    for delegate in certs {
+        let d_subject = &delegate.tbs_certificate.subject;
+        let d_spki_raw = delegate
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes();
+        if !responder_id_matches(rid, d_subject, d_spki_raw) {
+            continue;
+        }
+
+        // Found a candidate. Validate it strictly — any failure is a
+        // distinct error variant; we do NOT fall through to "try the
+        // next candidate" because RFC 6960 §4.2.2.2 only contemplates
+        // one signing key per response, and silently skipping a
+        // candidate after partial validation would obscure attacks.
+        validate_delegate_responder_cert(
+            delegate,
+            issuer_subject,
+            issuer_spki,
+            verifier,
+            produced_at_unix,
+        )?;
+
+        return Ok(delegate
+            .tbs_certificate
+            .subject_public_key_info
+            .owned_to_ref());
+    }
+
+    // ResponderId matches neither the issuer nor any embedded cert.
+    Err(Error::OcspResponderIdMismatch)
+}
+
+/// Extract the `producedAt` time from a [`BasicOcspResponse`] as a Unix
+/// timestamp. Used by the delegated-responder validity check; declared
+/// here rather than inline to keep the call sites tight.
+fn produced_at_unix_secs(basic: &BasicOcspResponse) -> u64 {
+    basic
+        .tbs_response_data
+        .produced_at
+        .as_ref()
+        .to_unix_duration()
+        .as_secs()
 }
 
 // ---------------------------------------------------------------------------

@@ -213,6 +213,45 @@ pub enum Error {
     /// - `responseType` is not `id-pkix-ocsp-basic` (unrecognized response format)
     OcspMalformed,
 
+    /// A delegated OCSP responder cert in the response's `certs` field
+    /// lacks the `id-kp-OCSPSigning` Extended Key Usage (RFC 6960
+    /// §4.2.2.2). Without this EKU the cert cannot legitimately sign OCSP
+    /// responses, so the response is rejected.
+    OcspResponderEkuMissing,
+
+    /// A delegated OCSP responder cert's `ExtendedKeyUsage` extension is
+    /// present but cannot be DER-decoded.
+    ///
+    /// Fail-closed: a malformed EKU on a candidate responder cert rejects
+    /// the response rather than silently treating the cert as if it lacked
+    /// the OCSPSigning purpose.
+    OcspResponderEkuMalformed,
+
+    /// A delegated OCSP responder cert was found whose ResponderId
+    /// matches, but it was issued by a different CA than the certificate
+    /// being checked.
+    ///
+    /// RFC 6960 §4.2.2.2 requires a "CA Designated Responder" cert to be
+    /// issued directly by the CA whose certificates the responder asserts
+    /// status for. A responder cert with the OCSPSigning EKU obtained
+    /// from another CA could otherwise be used to forge revocation
+    /// status claims on certs from a different CA.
+    OcspResponderCertNotIssuedByCa,
+
+    /// A delegated OCSP responder cert's validity period does not include
+    /// the response's `producedAt` timestamp. The signing key was not
+    /// authoritative when the response was generated.
+    OcspResponderCertExpired,
+
+    /// The CA-supplied signature on a delegated OCSP responder cert
+    /// failed to verify against the issuer's SPKI.
+    ///
+    /// Distinct from [`Error::OcspSignatureInvalid`] (which is the
+    /// response's own signature failing): this is the issuer-of-cert's
+    /// signature on the responder cert's TBS, validated to confirm the
+    /// responder cert was actually issued by the expected CA.
+    OcspResponderCertSigInvalid,
+
     /// The CRL issuer certificate does not have the `cRLSign` bit set in `KeyUsage`
     /// (RFC 5280 §6.3.3(f)).
     CrlSignMissing,
@@ -300,6 +339,21 @@ impl core::fmt::Display for Error {
             Self::OcspMalformed => {
                 f.write_str("OCSP response is structurally invalid (malformed per RFC 6960)")
             }
+            Self::OcspResponderEkuMissing => f.write_str(
+                "delegated OCSP responder cert lacks id-kp-OCSPSigning Extended Key Usage",
+            ),
+            Self::OcspResponderEkuMalformed => f.write_str(
+                "delegated OCSP responder cert ExtendedKeyUsage extension is malformed",
+            ),
+            Self::OcspResponderCertNotIssuedByCa => f.write_str(
+                "delegated OCSP responder cert was not issued by the certificate's CA",
+            ),
+            Self::OcspResponderCertExpired => f.write_str(
+                "delegated OCSP responder cert validity does not include the response's producedAt",
+            ),
+            Self::OcspResponderCertSigInvalid => f.write_str(
+                "CA signature on delegated OCSP responder cert is invalid",
+            ),
             Self::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
             }
