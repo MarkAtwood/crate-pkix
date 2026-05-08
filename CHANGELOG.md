@@ -6,6 +6,54 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-revocation` — CDP/IDP `distributionPoint` matching (RFC 5280 §6.3.3(b)(1))
+
+#### Added
+
+- `OutOfScopeReason::CrlIdpDistributionPointMismatch` variant. Returned by
+  `CrlChecker::check_revocation` and `check_revocation_against_anchor` when
+  the CRL's `IssuingDistributionPoint.distributionPoint` does not match (or
+  is incompatible with) any of the certificate's `cRLDistributionPoints`
+  extension entries. `Error` and `OutOfScopeReason` are both
+  `#[non_exhaustive]`, so adding this variant is **non-breaking** for
+  callers using `match` arms.
+
+#### Changed (non-breaking)
+
+- `CrlChecker` now performs RFC 5280 §6.3.3(b)(1) distribution-point name
+  matching as part of the existing IssuingDistributionPoint scope check.
+  Both `DistributionPointName::FullName` and
+  `DistributionPointName::NameRelativeToCRLIssuer` forms are supported,
+  with `NameRelativeToCRLIssuer` resolved by appending the relative RDN to
+  the appropriate base DN (the certificate's issuer for the cert's CDP,
+  the CRL signer's subject for the CRL's IDP). Cross-form matching works:
+  a cert whose CDP uses `NameRelativeToCRLIssuer` matches a CRL whose IDP
+  uses `FullName` when both resolve to the same DN.
+
+  `GeneralName::DirectoryName` entries compare via `pkix_path::names_match`
+  (proper RFC 4518 DN equivalence including the new BMPString support).
+  Other `GeneralName` variants (URI, dNSName, rfc822Name, IP address, OID,
+  etc.) compare via byte-exact DER encoding equality.
+
+  PKITS §4.14.3, §4.14.8, and §4.14.9 — the three `#[ignore]`d tests for
+  CDP/IDP name matching — now pass with assertions tightened to expect
+  `Err(OutOfScope(CrlIdpDistributionPointMismatch))` specifically. PKITS
+  §4.14.4 (cross-form match: cert `NameRelativeToCRLIssuer`, CRL
+  `FullName`) continues to pass.
+
+  Limitations:
+  - The per-`DistributionPoint` `cRLIssuer` field is not honored when
+    resolving the cert's CDP base DN; the certificate's own issuer is
+    always used. This is correct for the common case (RFC 5280 §4.2.1.13
+    requires conforming CAs to omit `cRLIssuer` when the cert issuer also
+    issues the CRL) and is sufficient for all PKITS §4.14 fixtures.
+  - The reasons-subset check (`onlySomeReasons` on IDP must cover the
+    reasons the cert's CDP asks to be checked) is not implemented. PKITS
+    §4.14 fixtures do not exercise it. Tracked as future work; a separate
+    `OutOfScopeReason` variant will be added at that time.
+
+  Tracked as PKIX-zg9y in the project beads.
+
 ### `pkix-path` — `BMPString` AVA values are now compared after UCS-2-BE → UTF-8 transcoding
 
 #### Changed (non-breaking)

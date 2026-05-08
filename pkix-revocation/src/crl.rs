@@ -32,6 +32,12 @@ const OID_DELTA_CRL_INDICATOR: der::asn1::ObjectIdentifier =
 const OID_ISSUING_DISTRIBUTION_POINT: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.28");
 
+/// OID for cRLDistributionPoints extension (RFC 5280 §4.2.1.13) — 2.5.29.31.
+/// Used to extract the certificate's distribution-point claim for matching
+/// against a CRL's `IssuingDistributionPoint`.
+const OID_CRL_DISTRIBUTION_POINTS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.31");
+
 /// OID for `KeyUsage` extension (RFC 5280 §4.2.1.3) — id-ce-keyUsage: 2.5.29.15
 /// Used to check the `cRLSign` bit on the CRL issuer.
 const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
@@ -86,10 +92,34 @@ const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
 ///
 /// # Limitations
 ///
-/// - CRL Distribution Point name matching (CDP vs IDP name) is not implemented.
-///   The checker does enforce `onlyContainsUserCerts`, `onlyContainsCACerts`, and
-///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is
-///   future work.
+/// - **CRL distribution-point name matching** (CDP vs IDP `distributionPoint`)
+///   is implemented for both forms (`fullName` and `nameRelativeToCRLIssuer`),
+///   with `nameRelativeToCRLIssuer` resolved by appending the relative RDN to
+///   the appropriate base DN (the certificate's issuer for the cert's CDP, the
+///   CRL's issuer for the CRL's IDP). Same-form direct comparison and
+///   cross-form resolved comparison both work, so a cert whose CDP uses
+///   `nameRelativeToCRLIssuer` matches a CRL whose IDP uses `fullName` (and
+///   vice versa) when both resolve to the same DN.
+///   `GeneralName::DirectoryName` entries compare via
+///   [`pkix_path::names_match`] (proper DN equivalence); other variants
+///   (URI, dNSName, rfc822Name, IP address, etc.) compare via byte-exact DER
+///   encoding equality.
+///   The per-DP `cRLIssuer` field on a `DistributionPoint` entry is **not**
+///   currently honored when resolving the cert's CDP base DN; the
+///   certificate's issuer is always used. This is correct for the common
+///   case (RFC 5280 §4.2.1.13: "If the certificate issuer is also the CRL
+///   issuer, then conforming CAs MUST omit the cRLIssuer field"). Indirect
+///   CRLs with a non-issuer cRLIssuer that also use `nameRelativeToCRLIssuer`
+///   on the cert's CDP would resolve against the wrong base; that scenario
+///   has no PKITS coverage and is deferred.
+/// - **Reasons-subset check** (`onlySomeReasons` on the IDP must cover the
+///   reasons the cert's CDP asks to be checked, RFC 5280 §6.3.3(b)(1)) is
+///   not implemented. PKITS §4.14 fixtures do not exercise this. Tracked
+///   as future work; a separate `OutOfScopeReason` variant will be added at
+///   that time.
+/// - The checker enforces `onlyContainsUserCerts`, `onlyContainsCACerts`,
+///   and `onlyContainsAttributeCerts` scope flags directly; see
+///   `OutOfScopeReason` for the surfaced variants.
 /// - The cRLIssuer's chain is NOT validated by this crate — callers must
 ///   present an already-validated cRLIssuer cert. Composing this with
 ///   `pkix-path` to validate the cRLIssuer chain in-process is the umbrella
@@ -324,7 +354,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         match (&self.crl_issuer_cert, crl_declares_indirect) {
             (Some(crl_issuer), true) => {
                 signer_subject = &crl_issuer.tbs_certificate.subject;
-                signer_spki = crl_issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_spki = crl_issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
             }
             (Some(_), false) => {
@@ -337,7 +370,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             }
             (None, false) => {
                 signer_subject = &issuer.tbs_certificate.subject;
-                signer_spki = issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_spki = issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref();
                 signer_for_crlsign_check = Some(issuer);
             }
         }
@@ -358,7 +394,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //      require that the supplied `issuer` cert match cert.issuer
         //      as a defense-in-depth check on the caller-supplied
         //      issuer-of-cert identity.
-        if !names_match(&issuer.tbs_certificate.subject, &cert.tbs_certificate.issuer) {
+        if !names_match(
+            &issuer.tbs_certificate.subject,
+            &cert.tbs_certificate.issuer,
+        ) {
             return Err(Error::CrlIssuerMismatch);
         }
         // For direct CRLs only: the cert's issuer must also match the
@@ -437,6 +476,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             if idp.only_contains_ca_certs && !cert_is_ca {
                 return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
             }
+            // RFC 5280 §6.3.3(b)(1): IDP distributionPoint must match the
+            // cert's CDP (cross-form `nameRelativeToCRLIssuer` ↔ `fullName`
+            // resolution is performed by `dpn_to_general_names`).
+            check_idp_dp_scope(cert, idp, &cert.tbs_certificate.issuer, signer_subject)?;
         }
 
         // (6) §5.2.4 delta CRL merge: if a delta CRL is present, verify and collect
@@ -523,7 +566,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         match (&self.crl_issuer_cert, crl_declares_indirect) {
             (Some(crl_issuer), true) => {
                 signer_subject = &crl_issuer.tbs_certificate.subject;
-                signer_spki = crl_issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_spki = crl_issuer
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
             }
             (Some(_), false) => return Err(Error::IndirectCrlIssuerUnexpected),
@@ -602,6 +648,12 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             if idp.only_contains_ca_certs && !cert_is_ca {
                 return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
             }
+            // RFC 5280 §6.3.3(b)(1): IDP distributionPoint must match the
+            // cert's CDP. The cert's CDP base DN for resolving
+            // `nameRelativeToCRLIssuer` is the cert's issuer; the CRL's IDP
+            // base DN is the CRL signer's subject (anchor's subject in the
+            // direct anchor flow, cRLIssuer's subject in the indirect flow).
+            check_idp_dp_scope(cert, idp, &cert.tbs_certificate.issuer, signer_subject)?;
         }
 
         // (7) Delta CRL merge.
@@ -752,9 +804,7 @@ fn find_matching_entry<'a>(
 /// extracting the first `directoryName` GeneralName. Returns
 /// `Err(CrlParseError)` if the extension cannot be DER-decoded or if no
 /// `directoryName` is present (the only GeneralName form supported here).
-fn parse_certificate_issuer_dn(
-    ext_value_der: &[u8],
-) -> crate::Result<x509_cert::name::Name> {
+fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert::name::Name> {
     use x509_cert::ext::pkix::name::{GeneralName, GeneralNames};
 
     let general_names = GeneralNames::from_der(ext_value_der)
@@ -769,9 +819,10 @@ fn parse_certificate_issuer_dn(
     // use the directoryName because that is what the cert's `issuer`
     // field carries. A cert-issuer-extension carrying only non-DN
     // GeneralNames is unusable for our (issuer, serial) match.
-    Err(Error::CrlParseError(crate::DerError(
-        der::Error::new(der::ErrorKind::Failed, der::Length::ZERO),
-    )))
+    Err(Error::CrlParseError(crate::DerError(der::Error::new(
+        der::ErrorKind::Failed,
+        der::Length::ZERO,
+    ))))
 }
 
 // ---------------------------------------------------------------------------
@@ -989,6 +1040,179 @@ fn parse_issuing_dp(
                 .map_err(|err| Error::CrlParseError(crate::DerError(err)))
         })
         .transpose()
+}
+
+/// Extract the `cRLDistributionPoints` extension from `cert`, if present.
+///
+/// Returns `Ok(None)` if the extension is absent — that means the cert
+/// does not constrain which CRL(s) determine its revocation status.
+/// Returns `Err(CrlParseError)` if the extension is present but cannot
+/// be DER-decoded (fail-closed: a malformed CDP is a structural defect
+/// in the cert, not a "no constraint" condition).
+fn cert_crl_distribution_points(
+    cert: &Certificate,
+) -> crate::Result<Option<x509_cert::ext::pkix::CrlDistributionPoints>> {
+    use x509_cert::ext::pkix::CrlDistributionPoints;
+
+    cert.tbs_certificate
+        .extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
+        .map(|e| {
+            CrlDistributionPoints::from_der(e.extn_value.as_bytes())
+                .map_err(|err| Error::CrlParseError(crate::DerError(err)))
+        })
+        .transpose()
+}
+
+/// Resolve a `DistributionPointName` to its canonical list of
+/// `GeneralName`s.
+///
+/// `FullName(names)` is returned as-is (borrowed). `NameRelativeToCRLIssuer(rdn)`
+/// is materialized: the relative RDN is appended to `base_dn` to produce a
+/// full DN, and the result is wrapped in a one-element `GeneralNames` list
+/// containing a single `DirectoryName`. RFC 5280 §4.2.1.13: "the relative
+/// distinguished name … is the relative distinguished name of the CRL
+/// distribution point with respect to the issuer of the CRL".
+///
+/// `base_dn` is the certificate issuer's DN when resolving a
+/// `cRLDistributionPoints` entry, and the CRL signer's subject DN when
+/// resolving an `IssuingDistributionPoint`. Per the RFC, in the common case
+/// where the certificate issuer also signs the CRL these two base DNs are
+/// equal, and a cert that uses `NameRelativeToCRLIssuer` for its CDP can
+/// match a CRL that uses `FullName` for its IDP (or vice versa).
+///
+/// This function lives in the `crl` feature path which requires `std`; it
+/// therefore uses `std`-prelude `Vec` and `vec!` macros directly rather
+/// than going through `alloc::*` (the latter would require an
+/// `extern crate alloc;` declaration that the crate currently does not
+/// have, since all heap-using paths are gated behind `std`).
+fn dpn_to_general_names<'a>(
+    dpn: &'a x509_cert::ext::pkix::name::DistributionPointName,
+    base_dn: &x509_cert::name::Name,
+) -> crate::Result<std::borrow::Cow<'a, [x509_cert::ext::pkix::name::GeneralName]>> {
+    use std::borrow::Cow;
+    use x509_cert::ext::pkix::name::{DistributionPointName, GeneralName};
+
+    match dpn {
+        DistributionPointName::FullName(names) => Ok(Cow::Borrowed(names.as_slice())),
+        DistributionPointName::NameRelativeToCRLIssuer(rdn) => {
+            // Append the RDN onto the base DN. `Name = RdnSequence(Vec<RDN>)`.
+            // Cloning here is unavoidable because the resolved DN is a new
+            // value; cert/CRL DNs are typically <10 RDNs each so this is cheap.
+            let mut full_name = base_dn.clone();
+            full_name.0.push(rdn.clone());
+            Ok(Cow::Owned(vec![GeneralName::DirectoryName(full_name)]))
+        }
+    }
+}
+
+/// Compare two `GeneralName`s for equivalence.
+///
+/// `DirectoryName` uses [`pkix_path::names_match`] (RFC 4518-style DN
+/// equivalence). Other variants compare by byte-exact DER encoding, which
+/// is correct for `Rfc822Name`, `DnsName`, `UniformResourceIdentifier`,
+/// `IpAddress`, `RegisteredId`, and `OtherName` because their values are
+/// either ASCII subsets, IP address bytes, OIDs, or opaque DER (no
+/// canonicalization ambiguity).
+///
+/// `EdiPartyName` and `X400Address` also fall into the byte-equal bucket;
+/// they have no canonicalization specified for IDP/CDP matching purposes
+/// and are extremely rare in modern PKI.
+///
+/// Mismatched variants always return `false` (no cross-variant matching).
+fn general_name_matches(
+    a: &x509_cert::ext::pkix::name::GeneralName,
+    b: &x509_cert::ext::pkix::name::GeneralName,
+) -> bool {
+    use x509_cert::ext::pkix::name::GeneralName as GN;
+
+    match (a, b) {
+        (GN::DirectoryName(a_dn), GN::DirectoryName(b_dn)) => names_match(a_dn, b_dn),
+        // Same variant on both sides, non-DN: byte-exact DER comparison.
+        // Different variants: to_der() will succeed on both but produce
+        // different bytes (different context-specific tags), so this also
+        // correctly fails for cross-variant pairs.
+        _ => match (a.to_der(), b.to_der()) {
+            (Ok(a_der), Ok(b_der)) => a_der == b_der,
+            // If either side fails to encode, fail-closed.
+            _ => false,
+        },
+    }
+}
+
+/// Returns `true` if the two `GeneralNames` lists share at least one
+/// equivalent name (RFC 5280 §6.3.3(b)(1) "matches").
+fn general_names_intersect(
+    a: &[x509_cert::ext::pkix::name::GeneralName],
+    b: &[x509_cert::ext::pkix::name::GeneralName],
+) -> bool {
+    a.iter()
+        .any(|ga| b.iter().any(|gb| general_name_matches(ga, gb)))
+}
+
+/// Check that the CRL's `IssuingDistributionPoint.distributionPoint`
+/// matches the certificate's `cRLDistributionPoints` per RFC 5280 §6.3.3(b)(1).
+///
+/// Returns `Err(Error::OutOfScope(CrlIdpDistributionPointMismatch))` if
+/// the CRL is structurally well-formed but does not cover the certificate's
+/// distribution point claim.
+///
+/// Algorithm:
+///
+/// | cert CDP | CRL IDP DP | Outcome |
+/// |---|---|---|
+/// | absent   | absent     | match (no DP scoping either side) |
+/// | absent   | present    | mismatch (CRL is scoped, cert isn't) |
+/// | present  | absent     | match (IDP doesn't constrain DP) |
+/// | present  | present    | at least one CDP entry's resolved name must intersect IDP's resolved name |
+///
+/// `cert_issuer` is the certificate's issuer DN (used as the base when the
+/// cert's CDP uses `NameRelativeToCRLIssuer`). `crl_signer_subject` is the
+/// CRL signer's subject DN (used as the base when the CRL's IDP uses
+/// `NameRelativeToCRLIssuer`).
+fn check_idp_dp_scope(
+    cert: &Certificate,
+    idp: &x509_cert::ext::pkix::crl::IssuingDistributionPoint,
+    cert_issuer: &x509_cert::name::Name,
+    crl_signer_subject: &x509_cert::name::Name,
+) -> crate::Result<()> {
+    let cert_cdps = cert_crl_distribution_points(cert)?;
+
+    match (cert_cdps.as_ref(), idp.distribution_point.as_ref()) {
+        (None, None) | (Some(_), None) => Ok(()),
+        (None, Some(_)) => Err(Error::OutOfScope(
+            crate::OutOfScopeReason::CrlIdpDistributionPointMismatch,
+        )),
+        (Some(cert_cdps), Some(idp_dpn)) => {
+            let idp_names = dpn_to_general_names(idp_dpn, crl_signer_subject)?;
+            // At least one cert CDP entry must have a distributionPoint that
+            // intersects the IDP's. CDP entries with no distributionPoint
+            // (RFC 5280 §4.2.1.13: "If the distributionPoint field is omitted,
+            // the cRL distribution point must not include cRLIssuer that
+            // …") cannot constrain to a specific name, so they cannot match
+            // a non-empty IDP DPName here.
+            let matched = cert_cdps.0.iter().any(|dp| {
+                let Some(cdp_dpn) = &dp.distribution_point else {
+                    return false;
+                };
+                let cdp_names = match dpn_to_general_names(cdp_dpn, cert_issuer) {
+                    Ok(n) => n,
+                    Err(_) => return false,
+                };
+                general_names_intersect(&cdp_names, &idp_names)
+            });
+            if matched {
+                Ok(())
+            } else {
+                Err(Error::OutOfScope(
+                    crate::OutOfScopeReason::CrlIdpDistributionPointMismatch,
+                ))
+            }
+        }
+    }
 }
 
 /// Returns `Ok(true)` if `cert` is a CA certificate (`BasicConstraints`

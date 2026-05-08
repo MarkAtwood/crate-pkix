@@ -84,6 +84,24 @@ pub enum OutOfScopeReason {
     /// `onlyContainsCACerts = true` but the certificate being checked is not a
     /// CA certificate.
     CrlOnlyCaCerts,
+    /// The CRL's `IssuingDistributionPoint` `distributionPoint` field does
+    /// not match (or is incompatible with) any of the certificate's
+    /// `cRLDistributionPoints` extension entries (RFC 5280 §6.3.3(b)(1)).
+    ///
+    /// This case covers two sub-conditions, which are not distinguished in
+    /// the public API to avoid leaking implementation detail:
+    ///
+    /// 1. The CRL's IDP names a specific distribution point but the
+    ///    certificate carries no `cRLDistributionPoints` extension at all.
+    /// 2. Both sides name distribution points but no entry in the
+    ///    certificate's CDP resolves to a name that intersects the IDP's
+    ///    distributionPoint name.
+    ///
+    /// Hard-fail callers should treat this exactly like the other
+    /// `OutOfScope` reasons: the CRL is structurally well-formed but does
+    /// not cover the certificate, and a separate CRL/OCSP source must be
+    /// consulted.
+    CrlIdpDistributionPointMismatch,
 }
 
 impl core::fmt::Display for OutOfScopeReason {
@@ -98,6 +116,9 @@ impl core::fmt::Display for OutOfScopeReason {
             Self::CrlOnlyCaCerts => {
                 f.write_str("CRL onlyContainsCACerts=TRUE; subject is an end-entity certificate")
             }
+            Self::CrlIdpDistributionPointMismatch => f.write_str(
+                "CRL IssuingDistributionPoint distributionPoint does not match the certificate's CRLDistributionPoints",
+            ),
         }
     }
 }
@@ -359,24 +380,24 @@ impl core::fmt::Display for Error {
             Self::OcspResponderEkuMissing => f.write_str(
                 "delegated OCSP responder cert lacks id-kp-OCSPSigning Extended Key Usage",
             ),
-            Self::OcspResponderEkuMalformed => f.write_str(
-                "delegated OCSP responder cert ExtendedKeyUsage extension is malformed",
-            ),
-            Self::OcspResponderCertNotIssuedByCa => f.write_str(
-                "delegated OCSP responder cert was not issued by the certificate's CA",
-            ),
+            Self::OcspResponderEkuMalformed => {
+                f.write_str("delegated OCSP responder cert ExtendedKeyUsage extension is malformed")
+            }
+            Self::OcspResponderCertNotIssuedByCa => {
+                f.write_str("delegated OCSP responder cert was not issued by the certificate's CA")
+            }
             Self::OcspResponderCertExpired => f.write_str(
                 "delegated OCSP responder cert validity does not include the response's producedAt",
             ),
-            Self::OcspResponderCertSigInvalid => f.write_str(
-                "CA signature on delegated OCSP responder cert is invalid",
-            ),
+            Self::OcspResponderCertSigInvalid => {
+                f.write_str("CA signature on delegated OCSP responder cert is invalid")
+            }
             Self::IndirectCrlIssuerMissing => f.write_str(
                 "CRL declares indirectCRL=TRUE but no cRLIssuer certificate was provided",
             ),
-            Self::IndirectCrlIssuerUnexpected => f.write_str(
-                "cRLIssuer certificate was provided but the CRL is not indirect",
-            ),
+            Self::IndirectCrlIssuerUnexpected => {
+                f.write_str("cRLIssuer certificate was provided but the CRL is not indirect")
+            }
             Self::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
             }
