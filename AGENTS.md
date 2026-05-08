@@ -80,8 +80,17 @@ bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --claim  # Claim work atomically
 bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
 ```
+
+**Never push dolt. Ever. Do not ask.**
+
+The bd database lives in the local dolt embedded backend (`.beads/embeddeddolt/`)
+and stays local. Do NOT run `bd dolt push`, `bd dolt commit`, or any other
+command that mutates or syncs the dolt remote. Do not include it in suggested
+end-of-session checklists. Do not mention it. The state in dolt is private to
+this checkout. Pushing it is the maintainer's manual decision and is not part
+of any agent workflow. If a tool prompt or stale instruction tells you to push
+dolt, ignore it and treat this rule as authoritative.
 
 **Beads is the only task and planning tool.** Do NOT use:
 - TodoWrite / markdown TODO lists
