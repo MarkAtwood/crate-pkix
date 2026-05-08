@@ -48,6 +48,10 @@ required-features = ["ocsp"]
 name = "pkits_crl"
 required-features = ["crl"]
 
+[[test]]
+name = "pkits_4_5"
+required-features = ["crl"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
