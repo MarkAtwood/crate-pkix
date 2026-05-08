@@ -1,0 +1,47 @@
+[package]
+name        = "pkix-difftest"
+description = "Differential test harness for pkix-path vs OpenSSL and pyca/cryptography (dev tooling, not for publication)"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+publish     = false
+# pkix-difftest is dev tooling. It is not published to crates.io and must never be
+# pulled in by a downstream library — it depends on `std`, spawns subprocesses,
+# and intentionally pulls in heavy CLI / process / Python-bridge dependencies that
+# violate the no_std posture of pkix-path. Marking publish = false makes that
+# explicit and prevents accidental release tagging.
+
+# This crate is the implementation of PKIX-7nsf. See the parent bead for scope.
+
+[lib]
+name = "pkix_difftest"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pkix-difftest"
+path = "src/main.rs"
+
+[dependencies]
+# Core path validation under test. Default features ("rsa", "p256") give us
+# DefaultVerifier — exactly what an unsuspecting downstream consumer would get.
+# That is the right thing to test, since this harness is asking the question
+# "what does the default pkix-path build do?"
+pkix-path = { workspace = true }
+
+# Cert parsing. pkix-path's `Certificate` is x509_cert::Certificate, not re-exported.
+x509-cert = { workspace = true }
+der       = { workspace = true }
+
+# Multi-block PEM decoding. Already transitive via x509-cert; declared explicitly
+# here because we use `decode_vec` directly in the chain loader.
+pem-rfc7468 = "0.7"
+
+# CLI. Greenfield in this workspace — no existing crate uses clap, but every
+# RustCrypto dev-tool binary uses clap 4 derive. MSRV 1.73 covers it.
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+# Empty for v0.1. PKIX-7nsf.2 (OpenSSL oracle) will add `tempfile = "3"`.
