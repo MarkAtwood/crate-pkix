@@ -43,5 +43,10 @@ pem-rfc7468 = "0.7"
 # RustCrypto dev-tool binary uses clap 4 derive. MSRV 1.73 covers it.
 clap = { version = "4", features = ["derive"] }
 
+# Tempdir for OpenSSL oracle (one-call temp files written to disk because
+# `openssl verify` reads its CA / intermediates / leaf from filesystem paths,
+# not stdin). MSRV-clean.
+tempfile = "3"
+
 [dev-dependencies]
-# Empty for v0.1. PKIX-7nsf.2 (OpenSSL oracle) will add `tempfile = "3"`.
+# Tests reuse the runtime deps; nothing else is needed at this stage.

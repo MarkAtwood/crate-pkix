@@ -42,7 +42,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// Run the pkix-path oracle on a single concatenated-PEM chain.
+    /// Run one or more oracles on a single concatenated-PEM chain.
     ///
     /// The chain must be in concatenated-PEM form (multiple
     /// -----BEGIN CERTIFICATE----- blocks). Ordering is auto-detected.
@@ -50,13 +50,18 @@ enum Cmd {
     Single {
         /// Path to chain.pem.
         chain: PathBuf,
+        /// Comma-separated oracles to run, e.g. `pkix-path,openssl`.
+        /// Default: `pkix-path`. Available: `pkix-path`, `openssl`.
+        /// (`pyca` lands in PKIX-7nsf.3.)
+        #[arg(long, default_value = "pkix-path")]
+        oracle: String,
     },
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(&cli) {
-        Ok(verdict) => match verdict {
+        Ok(worst) => match worst {
             Verdict::Pass => ExitCode::SUCCESS,
             Verdict::Fail { .. } => ExitCode::from(1),
         },
@@ -69,14 +74,56 @@ fn main() -> ExitCode {
 
 fn run(cli: &Cli) -> std::io::Result<Verdict> {
     match &cli.cmd {
-        Cmd::Single { chain: path } => {
+        Cmd::Single {
+            chain: path,
+            oracle,
+        } => {
             let chain = Chain::from_pem_file(path)?;
-            let verdict = oracles::pkix_path::verify(&chain)?;
-            // Stdout: one line per oracle, "<oracle>: <verdict>".
-            // PKIX-7nsf.5 will replace this with a structured report; for
-            // now, single-oracle single-chain humans expect one line.
-            println!("{}: {verdict}", OracleName::PkixPath);
-            Ok(verdict)
+            let names = parse_oracle_list(oracle)?;
+            // Track the worst verdict for the exit code (Fail > Pass). Errors
+            // short-circuit out of `run` because they are harness failures
+            // distinct from a verdict.
+            let mut worst = Verdict::Pass;
+            for name in names {
+                let verdict = run_oracle(name, &chain)?;
+                println!("{name}: {verdict}");
+                if matches!(verdict, Verdict::Fail { .. }) {
+                    worst = verdict;
+                }
+            }
+            Ok(worst)
         }
+    }
+}
+
+fn run_oracle(name: OracleName, chain: &Chain) -> std::io::Result<Verdict> {
+    match name {
+        OracleName::PkixPath => oracles::pkix_path::verify(chain),
+        OracleName::OpenSsl => oracles::openssl::verify(chain),
+        // PKIX-7nsf.3 will fill this in.
+        OracleName::Pyca => Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "pyca oracle not yet implemented (PKIX-7nsf.3)",
+        )),
+    }
+}
+
+fn parse_oracle_list(s: &str) -> std::io::Result<Vec<OracleName>> {
+    s.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(parse_oracle_name)
+        .collect()
+}
+
+fn parse_oracle_name(s: &str) -> std::io::Result<OracleName> {
+    match s {
+        "pkix-path" => Ok(OracleName::PkixPath),
+        "openssl" => Ok(OracleName::OpenSsl),
+        "pyca" => Ok(OracleName::Pyca),
+        other => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("unknown oracle: {other:?} (try pkix-path, openssl, pyca)"),
+        )),
     }
 }
