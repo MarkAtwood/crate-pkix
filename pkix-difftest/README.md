@@ -142,6 +142,66 @@ change that affects any verdict, re-run the harness, then `git diff`
 the `.json` to see exactly which chains moved between classes. Update
 `baseline-pkits-analysis.md` to reflect the new state.
 
+## Demo: running the entire x509-limbo corpus
+
+[x509-limbo](https://github.com/C2SP/x509-limbo) is the curated 9,773-
+testcase chain-validation corpus that pyca/cryptography's verifier tests
+run against. It is the corpus the parent epic PKIX-7nsf originally
+called "Tier 2: pyca corpus" (see `baseline-pyca.md` for the discovery
+that pyca's `tests/x509/` is parser-shaped, not chain-shaped).
+
+The structurally-correct integration — a `LimboCorpus` loader with
+per-testcase `validation_time` threading through every oracle — is
+tracked under [PKIX-g9vc](../.beads/). Until that lands, you can
+exercise the existing PEM-tree corpus loader over the entire limbo
+corpus by running the bundled converter:
+
+```sh
+# 1. Clone x509-limbo (~88MB, one-time):
+git clone --depth=1 https://github.com/C2SP/x509-limbo.git ~/GIT/x509-limbo
+
+# 2. Convert testcases into a chain.pem tree (stdlib-only, ~10s):
+python3 pkix-difftest/python/limbo-to-pem-tree.py \
+  ~/GIT/x509-limbo/limbo.json /tmp/limbo-pem-tree
+
+# 3. Run the harness (full corpus is ~15 min with all three oracles):
+cargo run --release -p pkix-difftest -- run pem-tree /tmp/limbo-pem-tree \
+  --oracles pkix-path,openssl,pyca \
+  --output-md /tmp/limbo-baseline.md \
+  --output-json /tmp/limbo-baseline.json \
+  --title "x509-limbo demo (pkix-path vs openssl vs pyca)" \
+  --sample-size 30
+```
+
+Each converted testcase lives at `<output_dir>/<safe_id>/` with a
+`chain.pem` (consumed by the harness) and a sibling `meta.json`
+capturing the limbo metadata (`expected_result`, `validation_kind`,
+`validation_time`, features) for cross-reference against the harness
+report.
+
+### Demo-path limitations
+
+This is a **demo path**, not a substitute for the real LimboCorpus
+integration:
+
+* **`validation_time` is ignored** — the harness uses the system
+  clock for every chain. Testcases whose chain was valid only at a
+  specific past time will appear expired and pile up in
+  `Agreement(Fail)`.
+* **`expected_result` is not threaded through** — the harness's
+  PEM-tree loader yields `expected: None`. Cross-reference manually
+  via `<output_dir>/<id>/meta.json` and the JSON report.
+* **`has-crl` testcases are filtered** at conversion time (CRL
+  revocation is out of v0.1 harness scope).
+* **Non-self-signed trust anchors** (~2.5% of testcases by sample)
+  fail the chain auto-detection heuristic and surface as per-chain
+  harness errors in the report. Limbo's schema permits them; the
+  harness's `Chain::from_pem_bytes` requires a self-signed last
+  cert.
+
+These are exactly the gaps PKIX-g9vc closes; until then, this is the
+fastest way to see the harness exercise a large real-world corpus.
+
 ## Limitations (v0.1)
 
 * The harness requires the trust anchor to be the **last** cert in
