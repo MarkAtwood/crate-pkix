@@ -17,11 +17,15 @@ members = [
 
 [workspace.package]
 # Most workspace crates are at 0.2.1 (additive: cert_is_ca helper, PathBuilderConfig,
-# stub-crate hygiene, idiom polish). Three crates with breaking changes pin their
-# version explicitly: pkix-revocation 0.3.0 (Error::OutOfScope variant changes
-# Ok(()) → Err(OutOfScope(_)) at 6 IDP scope-mismatch sites), pkix-chain 0.3.0
-# (re-exports pkix-revocation::Error), pkix-chain-simple 0.3.0 (re-exports
-# pkix-chain). pkix-lint at 0.2.0 (first publish). Stubs at 0.0.0 (not published).
+# stub-crate hygiene, idiom polish). Four crates with breaking changes pin their
+# version explicitly:
+#   - pkix-path        0.3.0  (ValidatedPath loses Copy; new owned-data fields for
+#                              §6.1.5 wrap-up outputs and policy qualifiers)
+#   - pkix-revocation  0.3.0  (Error::OutOfScope variant — Ok(()) → Err(OutOfScope(_))
+#                              at 6 IDP scope-mismatch sites)
+#   - pkix-chain       0.3.0  (re-exports pkix-revocation::Error)
+#   - pkix-chain-simple 0.3.0 (re-exports pkix-chain)
+# pkix-lint at 0.2.0 (first publish). Stubs at 0.0.0 (not published).
 version      = "0.2.1"
 edition      = "2021"
 rust-version = "1.73"
@@ -31,7 +35,7 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 
 [workspace.dependencies]
 # Internal crates
-pkix-path             = { path = "pkix-path",             version = "0.2.1" }
+pkix-path             = { path = "pkix-path",             version = "0.3.0" }
 pkix-revocation       = { path = "pkix-revocation",       version = "0.3.0" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.2.1" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
