@@ -19,3 +19,8 @@ test_must_use*
 # pkix-difftest pyca/cryptography venv (bootstrapped by setup-venv.sh).
 # pip output is large and OS/python-version-specific; never commit.
 /pkix-difftest/python/.venv/
+
+# Per-session brain-dump file. AGENTS.md prohibits MEMORY.md-style knowledge
+# stores in the repo; durable insights belong in `bd remember` instead.
+# Listed here so accidental `git add .` does not commit it.
+/MINDSTATE.md
