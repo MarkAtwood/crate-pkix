@@ -6,6 +6,122 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Coordinated 0.3 follow-up wave (May 2026)
+
+The `pkix-path 0.3.0` release on git is the centerpiece of a coordinated
+follow-up to the May-2026 0.3 wave already published on crates.io. Five
+crates ship together to keep the dep graph consistent across crates.io
+once published:
+
+| Crate | Old (crates.io) | New (this release) | Type |
+|---|---|---|---|
+| `pkix-path` | 0.2.1 | **0.3.0** | BREAKING (`ValidatedPath` loses `Copy` / `Hash`; new owned-data fields) |
+| `pkix-revocation` | 0.3.0 | **0.3.1** | additive (CDP/IDP variant + dep on pkix-path 0.3) |
+| `pkix-chain` | 0.3.0 | **0.4.0** | TRANSITIVELY BREAKING (re-exports `pkix-path::ValidatedPath`) |
+| `pkix-chain-simple` | 0.3.0 | **0.4.0** | TRANSITIVELY BREAKING (same rationale) |
+| `pkix-path-builder` | 0.2.1 | **0.3.0** | BREAKING (dep major bump + skip-not-fail behavior change) |
+
+Why a follow-up release: `pkix-revocation 0.3.0` was published on
+crates.io on 2026-05-08 with a frozen `pkix-path = "^0.2.1"` dep. With
+`pkix-path 0.3.0` on git, the published `pkix-revocation 0.3.0` cannot
+depend on it (Cargo pre-1.0 SemVer treats 0.2.x and 0.3.x as
+incompatible). The 0.3.1 / 0.4.0 / 0.3.0 bumps below restore a clean
+dep graph on crates.io once the wave is published.
+
+Publish order (dependency-graph-respecting):
+1. `pkix-path 0.3.0`
+2. `pkix-revocation 0.3.1`
+3. `pkix-path-builder 0.3.0`
+4. `pkix-chain 0.4.0`
+5. `pkix-chain-simple 0.4.0`
+
+`pkix-profiles`, `pkix-lint`, `pkix-difftest` are NOT bumped in this
+wave — they have low download counts on crates.io, no urgent consumer
+need, and can ride a future 0.3.x wave when they actually change.
+Consumers who pull these crates from crates.io will continue to get
+their existing 0.2.x versions (which depend on `pkix-path 0.2.x` from
+crates.io); a fresh project that wants `pkix-path 0.3.0` features
+should consume `pkix-path` directly rather than transitively via these
+secondary crates until they ship updates.
+
+### `pkix-revocation 0.3.1`
+
+#### Added
+
+- `OutOfScopeReason::CrlIdpDistributionPointMismatch` variant. Returned
+  by `CrlChecker::check_revocation` and `check_revocation_against_anchor`
+  when the CRL's `IssuingDistributionPoint.distributionPoint` does not
+  match (or is incompatible with) any of the certificate's
+  `cRLDistributionPoints` extension entries (RFC 5280 §6.3.3(b)(1)).
+  `OutOfScopeReason` is `#[non_exhaustive]`, so adding the variant is
+  non-breaking.
+
+  See the existing 0.3.0 entry below for the surrounding `Error::OutOfScope`
+  contract that this variant participates in.
+
+#### Changed (non-breaking)
+
+- `CrlChecker` now performs RFC 5280 §6.3.3(b)(1) distribution-point
+  name matching as part of the existing IDP scope check. Both
+  `DistributionPointName::FullName` and
+  `DistributionPointName::NameRelativeToCRLIssuer` forms are supported
+  with cross-form resolution. PKITS §4.14.3, §4.14.8, §4.14.9
+  (previously `#[ignore]`'d) now pass.
+
+  See `pkix-revocation/src/crl.rs` rustdoc for the algorithm and
+  documented limitations (per-DP `cRLIssuer` field not honored when
+  resolving the cert's CDP base DN; reasons-subset check on
+  `onlySomeReasons` not yet implemented).
+
+  Tracked as PKIX-zg9y in the project beads.
+
+#### Migration
+
+- Dep bump: `pkix-revocation = "0.3.1"` and `pkix-path = "0.3"`.
+  Callers that match on `Error::OutOfScope(_)` should add an arm for
+  `OutOfScopeReason::CrlIdpDistributionPointMismatch` (or use a
+  catch-all `_` arm) to be ready for future variants.
+
+### `pkix-chain 0.4.0` — TRANSITIVELY BREAKING
+
+#### Migration
+
+- Bump `pkix-chain = "0.3"` to `pkix-chain = "0.4"` in your
+  `Cargo.toml`.
+- The re-exported `pkix_path::ValidatedPath` no longer derives `Copy`
+  or `Hash`. If you relied on bit-copy semantics, add `.clone()` calls
+  or pass `&ValidatedPath` instead. See `pkix-path 0.3.0` migration
+  for full details.
+- Transitively picks up `pkix-revocation 0.3.1`'s
+  `CrlIdpDistributionPointMismatch` variant on `Error::OutOfScope`.
+
+#### No surface changes
+
+`pkix-chain`'s own public API (the `verify_chain` function family) is
+unchanged. The break is purely the `ValidatedPath` re-export shape
+change and the `Error` re-export's new variant.
+
+### `pkix-chain-simple 0.4.0` — TRANSITIVELY BREAKING
+
+Same migration and rationale as `pkix-chain 0.4.0` above.
+
+### `pkix-path-builder 0.3.0` — BREAKING
+
+#### Migration
+
+- Bump `pkix-path-builder = "0.2"` to `pkix-path-builder = "0.3"` in
+  your `Cargo.toml`.
+- Behavior change: `build_path`, `build_path_with_config`, and the
+  `PathCandidates` iterator now silently **skip** candidate
+  intermediates whose `BasicConstraints` extension is present but
+  cannot be DER-decoded, rather than aborting the search with
+  `Error::MalformedIntermediate`. See the previous unreleased section
+  for the full skip-not-fail rationale.
+- Dep major bump on `pkix-path` (0.2 → 0.3); the `pkix-path-builder`
+  public API is otherwise unchanged.
+
+  Tracked as PKIX-qgw1 in the project beads.
+
 ### `pkix-path 0.3.0` — BREAKING
 
 #### Added — RFC 5280 §6.1.2(a) policy qualifier processing
