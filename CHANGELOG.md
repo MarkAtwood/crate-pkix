@@ -8,6 +8,42 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### `pkix-path 0.3.0` — BREAKING
 
+#### Added — RFC 5280 §6.1.2(a) policy qualifier processing
+
+- `ValidatedPath::valid_policy_tree: Option<Vec<PolicyTreeNode>>` — the
+  final §6.1.5 valid_policy_tree, or `None` if reduced to NULL during
+  validation. Each node carries the policy qualifiers attached to it at
+  creation time, sourced per RFC 5280:
+  - §6.1.3(d)(1)(i)/(ii): from the cert's per-policy `policy_qualifiers`.
+  - §6.1.3(d)(2) (anyPolicy expansion): from the cert's anyPolicy entry.
+  - §6.1.4(b)(1) (PolicyMappings synthesis): from the cert's anyPolicy
+    entry per RFC §6.1.4(b)(1)(ii).
+  - §6.1.5(g)(iii)(3) (initial-policy-set materialization): inherited
+    from the leaf anyPolicy node about to be deleted.
+
+- `pub struct PolicyTreeNode` — public mirror of the internal
+  `PolicyNode`. `#[non_exhaustive]`. Fields: `depth`, `valid_policy`,
+  `expected_policy_set`, `qualifiers`. Qualifiers are exposed as the
+  upstream `x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo` raw
+  (a `(qualifier_id_oid, raw_any_value)` pair); decoding the `Any`
+  content to `CpsUri`/`UserNotice` is left to the caller because
+  x509-cert 0.2.5 has a typo on `UserNotice.notice_ref` (declared
+  `Option<GeneralizedTime>` instead of `Option<NoticeReference>`) and
+  upstream-side decoding would silently mishandle real-world
+  UserNotice qualifiers.
+
+- `ValidatedPath::policy_qualifiers()` — convenience iterator yielding
+  `(&policy_oid, &PolicyQualifierInfo)` pairs across every tree node.
+  Returns an empty iterator when the tree is `None`.
+
+  Path validation does NOT gate on qualifier validity — RFC 5280 §6.1.2(a)
+  explicitly says qualifier processing is application-specific. The new
+  fields are pure read-side outputs.
+
+  Tracked as PKIX-an8h in the project beads. Decoding the `Any` content
+  side of `PolicyQualifierInfo` is deferred until x509-cert ships a fix
+  for `UserNotice.notice_ref`.
+
 #### Changed (breaking)
 
 - **`ValidatedPath` no longer derives `Copy`.** Four new heap-backed fields

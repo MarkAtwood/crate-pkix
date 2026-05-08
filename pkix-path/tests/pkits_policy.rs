@@ -35,6 +35,12 @@ const P3: der::asn1::ObjectIdentifier =
 const P6: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.16.840.1.101.3.2.1.48.6");
 
+// RFC 5280 §4.2.1.4 policy qualifier IDs.
+const OID_QT_CPS: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.2.1");
+const OID_QT_UNOTICE: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.2.2");
+
 /// Validate a PKITS certificate path with explicit policy parameters.
 ///
 /// `cert_names` is **leaf-first**, without the trust anchor.
@@ -629,6 +635,124 @@ fn pkits_4_8_20_cps_pointer_qualifier_valid() {
         false,
     )
     .expect("4.8.20: CPS pointer qualifier, explicit_policy → should validate");
+}
+
+// ---------------------------------------------------------------------------
+// PKIX-an8h: post-validation policy-qualifier extraction
+//
+// These tests exercise `ValidatedPath::policy_qualifiers()` and the
+// `valid_policy_tree` field. They use PKITS §4.8.17 and §4.8.20 fixtures
+// because their filenames make the qualifier kind explicit ("UserNotice"
+// vs "CPSPointer") — no need to crack the cert's CertificatePolicies
+// extension to know which qualifier ID to look for.
+//
+// Independent oracle: the PKITS fixture filename + RFC 5280 §4.2.1.4
+// qualifier-ID OID assignments. We do NOT decode the qualifier `Any`
+// content (CPSuri text or UserNotice structure); see PolicyTreeNode
+// rustdoc for why pass-through is safer than upstream-side decoding.
+// ---------------------------------------------------------------------------
+
+/// 4.8.17: a UserNotice qualifier in the chain must surface on
+/// `ValidatedPath::policy_qualifiers()` with `policy_qualifier_id == id-qt-unotice`.
+#[test]
+fn pkits_4_8_17_user_notice_qualifier_extracted() {
+    let path = pkits_policy_validate(
+        &["UserNoticeQualifierTest17EE", "GoodCACert"],
+        &[],
+        false,
+        false,
+        false,
+    )
+    .expect("4.8.17 must validate (existing pass test pkits_4_8_17_user_notice_qualifier_valid)");
+
+    // The tree must be live (not None): the §6.1.5 outputs require a
+    // non-NULL tree for there to BE qualifiers to extract. If the tree
+    // were None we'd legitimately have no qualifiers, but for §4.8.17
+    // the cert asserts NIST-test-policy-1 with a UserNotice qualifier,
+    // so the tree carries that node.
+    let tree = path
+        .valid_policy_tree
+        .as_ref()
+        .expect("4.8.17: tree must be live for a chain that asserted a policy with qualifiers");
+    assert!(
+        !tree.is_empty(),
+        "4.8.17: live tree must contain at least the depth-0 root node"
+    );
+
+    // Walk all (policy, qualifier) pairs and look for a UserNotice ID.
+    // The fixture's UserNoticeQualifierTest17EE certificate carries
+    // exactly one PolicyInformation entry (NIST-test-policy-1) with one
+    // UserNotice qualifier — but with depth-1 qualifiers also potentially
+    // present from GoodCACert, "at least one matches" is the right shape.
+    let has_user_notice = path
+        .policy_qualifiers()
+        .any(|(_oid, q)| q.policy_qualifier_id == OID_QT_UNOTICE);
+    assert!(
+        has_user_notice,
+        "4.8.17: ValidatedPath::policy_qualifiers() must surface a UserNotice qualifier"
+    );
+}
+
+/// 4.8.20: a CPS pointer qualifier in the chain must surface on
+/// `ValidatedPath::policy_qualifiers()` with `policy_qualifier_id == id-qt-cps`.
+#[test]
+fn pkits_4_8_20_cps_pointer_qualifier_extracted() {
+    let path = pkits_policy_validate(
+        &["CPSPointerQualifierTest20EE", "GoodCACert"],
+        &[P1],
+        true,
+        false,
+        false,
+    )
+    .expect("4.8.20 must validate (existing pass test pkits_4_8_20_cps_pointer_qualifier_valid)");
+
+    let tree = path
+        .valid_policy_tree
+        .as_ref()
+        .expect("4.8.20: tree must be live for an explicit_policy chain that validated");
+    assert!(!tree.is_empty(), "4.8.20: live tree must be non-empty");
+
+    let has_cps = path
+        .policy_qualifiers()
+        .any(|(_oid, q)| q.policy_qualifier_id == OID_QT_CPS);
+    assert!(
+        has_cps,
+        "4.8.20: ValidatedPath::policy_qualifiers() must surface a CPS pointer qualifier"
+    );
+}
+
+/// A chain whose cert has no qualifiers (only a bare policy OID) must
+/// surface an empty `policy_qualifiers()` iterator. Uses 4.8.1 fixture
+/// (`ValidCertificatePathTest1EE` + `GoodCACert`) which carries
+/// NIST-test-policy-1 without qualifier attachments.
+///
+/// Independent oracle: openssl x509 -text -in
+/// `pkix-path/tests/pkits/certs/ValidCertificatePathTest1EE.crt` shows
+/// `Policy: 2.16.840.1.101.3.2.1.48.1` with no qualifier subblock.
+#[test]
+fn pkits_no_qualifiers_yields_empty_iterator() {
+    let path = pkits_policy_validate(
+        &["ValidCertificatePathTest1EE", "GoodCACert"],
+        &[P1],
+        true,
+        false,
+        false,
+    )
+    .expect("4.8.1 sp2 must validate");
+
+    // The tree is live and non-empty (P1 is present), but no node
+    // carries qualifiers because the fixture certs don't attach any.
+    let tree = path
+        .valid_policy_tree
+        .as_ref()
+        .expect("explicit_policy=true with P1 matching → tree must be live");
+    assert!(!tree.is_empty());
+    let qualifier_count = path.policy_qualifiers().count();
+    assert_eq!(
+        qualifier_count, 0,
+        "4.8.1: cert has no qualifiers → policy_qualifiers() must be empty; got {} qualifiers",
+        qualifier_count
+    );
 }
 
 // ---------------------------------------------------------------------------
