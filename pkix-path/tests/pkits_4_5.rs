@@ -1,20 +1,25 @@
-//! PKITS §4.5 Verifying Paths with Self-Issued Certificates — `pkix-path` PASS subset.
+//! PKITS §4.5 Verifying Paths with Self-Issued Certificates — `pkix-path` subset.
 //!
-//! All cert names and expected outcomes come from the NIST PKITS `vectors.json`.
+//! All cert names and expected outcomes come from the NIST PKITS `vectors.json`,
+//! cross-referenced with the PKITS specification §4.5 narrative.
 //! Oracle: NIST PKITS (SP 800-89) §4.5.
 //!
-//! # Why only the PASS cases live here
+//! # Which §4.5 cases live here
 //!
-//! PKITS §4.5 contains 8 test cases. The 4 PASS cases (4.5.1, 4.5.3, 4.5.4, 4.5.6)
-//! exercise self-issued-cert exemptions in RFC 5280 §6.1 path validation:
+//! PKITS §4.5 contains 8 test cases. Five exercise structural path validation and
+//! live in this file:
 //!
-//! - §6.1.4(h) — `explicit_policy` / `policy_mapping` / `inhibit_any_policy` counter
-//!   decrements skip self-issued certs.
-//! - §6.1.4(m) — `pathLenConstraint` counts only non-self-issued certs.
+//! - 4.5.1, 4.5.3, 4.5.4, 4.5.6 — PASS. Exercise self-issued-cert exemptions in
+//!   RFC 5280 §6.1: §6.1.4(h) (counter-decrement skip on self-issued) and
+//!   §6.1.4(m) (`pathLenConstraint` counts only non-self-issued certs).
+//! - 4.5.8 — FAIL. The EE was signed by the self-issued CRL-signing cert
+//!   (verified via X.509 `AuthorityKeyIdentifier`). That cert lacks
+//!   `BasicConstraints`/`keyCertSign` and so cannot legitimately issue an EE;
+//!   §6.1.4(k) rejects it with `Error::NotCA`.
 //!
-//! The 4 FAIL cases (4.5.2, 4.5.5, 4.5.7, 4.5.8) all fail because the EE is revoked
-//! on a self-issued-signed CRL. `pkix-path` is `no_std` and does not perform
-//! revocation; the FAIL cases would *wrongly* pass here. They live in
+//! Three (4.5.2, 4.5.5, 4.5.7) fail because the EE is revoked on a CRL signed
+//! by a self-issued cert. `pkix-path` is `no_std` and does not perform
+//! revocation; those FAIL cases would *wrongly* pass here. They live in
 //! `pkix-revocation/tests/pkits_4_5.rs` instead.
 //!
 //! # Regression role
@@ -152,4 +157,41 @@ fn pkits_4_5_6_valid_basic_self_issued_crl_signing_key_test6() {
         PKITS_NOW,
     );
     result.expect("§4.5.6 must validate");
+}
+
+/// §4.5.8 Invalid Basic Self-Issued CRL Signing Key Test8.
+///
+/// Chain (leaf → root): `Test8EE` → `BasicSelfIssuedCRLSigningKeyCRLCert` →
+/// `BasicSelfIssuedCRLSigningKeyCACert` → TrustAnchor.
+///
+/// PKITS §4.5.8 narrative: "The end entity's certificate was signed using the CRL
+/// signing key." Test8EE's `AuthorityKeyIdentifier` matches `CRLCert.SKI` (the
+/// self-issued cRL-signing cert), confirming the CA used the CRL-signing key —
+/// not the certificate-signing key — to sign the EE.
+///
+/// `CRLCert` has no `BasicConstraints` extension (it's only meant to sign CRLs,
+/// not certificates). When chain validation reaches `CRLCert` as an intermediate,
+/// RFC 5280 §6.1.4(k) rejects it: a non-self-signed cert acting as an issuer
+/// must have `BasicConstraints` with `cA=TRUE`. The validator returns
+/// `Error::NotCA`. (`KeyUsageMissing` for keyCertSign would also be a valid
+/// outcome under §6.1.4(n); pkix-path checks BC first.)
+///
+/// Oracle: PKITS §4.5.8 MUST NOT validate (the EE's issuer is not a valid CA).
+#[test]
+fn pkits_4_5_8_invalid_basic_self_issued_crl_signing_key_test8() {
+    let result = pkits_validate(
+        &[
+            "InvalidBasicSelfIssuedCRLSigningKeyTest8EE",
+            "BasicSelfIssuedCRLSigningKeyCRLCert",
+            "BasicSelfIssuedCRLSigningKeyCACert",
+        ],
+        PKITS_NOW,
+    );
+    assert!(
+        matches!(
+            result,
+            Err(pkix_path::Error::NotCA { .. } | pkix_path::Error::KeyUsageMissing { .. })
+        ),
+        "§4.5.8 must fail with NotCA or KeyUsageMissing, got: {result:?}"
+    );
 }
