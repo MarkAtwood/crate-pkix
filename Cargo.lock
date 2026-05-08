@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "pkix-path",
  "pkix-revocation",
@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain-simple"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "der",
  "p256",
@@ -395,7 +395,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path-builder"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -413,7 +413,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "der",
  "pkix-path",

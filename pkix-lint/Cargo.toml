@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version.workspace = true
+version           = "0.2.0"  # first publish
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
