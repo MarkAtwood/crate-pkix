@@ -383,11 +383,16 @@ fn pkits_4_14_2_invalid_cert_revoked() {
 /// that the CRL's IDP does not cover. Our implementation does not check
 /// CDP name matching — we return `Ok()` for "not in revoked list".
 ///
-/// Oracle: PKITS §4.14.3 MUST NOT validate (CDP mismatch).
-/// Our checker: returns `Ok(())` because serial=3 is not revoked in this CRL.
-/// A full path validator must enforce that the CRL's IDP matches the cert's CDP.
+/// Oracle: PKITS §4.14.3 MUST NOT validate (CDP/IDP name mismatch).
+///
+/// Cert `InvaliddistributionPointTest3EE.crt` has CDP fullName
+/// `DirectoryName{...CN=CRLx of distributionPoint1 CA}` (note CN="CRLx",
+/// deliberately wrong). CRL `distributionPoint1CACRL.crl` has IDP fullName
+/// `DirectoryName{...CN=CRL1 of distributionPoint1 CA}` (correct CN="CRL1").
+/// The DNs differ in the CN component, so DN matching returns false; no
+/// `GeneralName` in the cert's CDP intersects the IDP's, and the CRL is
+/// out of scope for this cert.
 #[test]
-#[ignore = "requires CDP name matching against IDP (not implemented in v0.1)"]
 fn pkits_4_14_3_invalid_cdp_name_mismatch() {
     let ca_der = pkits_cert("distributionPoint1CACert");
     let ee_der = pkits_cert("InvaliddistributionPointTest3EE");
@@ -399,11 +404,14 @@ fn pkits_4_14_3_invalid_cdp_name_mismatch() {
     let checker = CrlChecker::new(crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
-    // Should fail due to CDP mismatch, but our checker returns Ok() (not in revoked list).
-    // Ignored until CDP-IDP name matching is implemented.
     assert!(
-        result.is_err(),
-        "§4.14.3: CDP name mismatch → must fail; got: {result:?}"
+        matches!(
+            result,
+            Err(Error::OutOfScope(
+                pkix_revocation::OutOfScopeReason::CrlIdpDistributionPointMismatch
+            ))
+        ),
+        "§4.14.3: CDP name mismatch → expected OutOfScope(CrlIdpDistributionPointMismatch); got: {result:?}"
     );
 }
 
@@ -496,17 +504,19 @@ fn pkits_4_14_7_valid_dp2_serial3_not_revoked() {
         .expect("§4.14.7: serial=3 is not in distributionPoint2CACRL → must NOT be revoked");
 }
 
-/// §4.14.8: Invalid distributionPoint Test8 — CDP name mismatch (onlySomeReasons).
+/// §4.14.8: Invalid distributionPoint Test8 — CDP/IDP name mismatch.
 ///
-/// EE serial=4, issuer=distributionPoint2 CA. Not in distributionPoint2CACRL.
-/// PKITS says INVALID because the cert's CDP and the CRL's IDP cover different
-/// reason sets / distribution points. Our implementation does not check CDP name
-/// matching (IDP name vs CDP name); we return `Ok()` here.
+/// EE serial=4, issuer=distributionPoint2 CA. Cert CDP uses
+/// `fullName = DirectoryName{...OU=distributionPoint2 CA}` (no CN component).
+/// CRL `distributionPoint2CACRL` IDP uses
+/// `nameRelativeToCRLIssuer = "CN=CRL1 of distributionPoint2 CA"`, which
+/// resolves against the CRL signer's subject (`...OU=distributionPoint2 CA`)
+/// to the full DN `...OU=distributionPoint2 CA, CN=CRL1 of distributionPoint2 CA`.
+/// The cert's CDP DN is missing the CN component, so neither same-form nor
+/// cross-form matching succeeds.
 ///
-/// Oracle: PKITS §4.14.8 MUST NOT validate.
-/// Our checker returns `Ok(())` — CDP/IDP name matching is a v0.2 item.
+/// Oracle: PKITS §4.14.8 MUST NOT validate (CDP/IDP name mismatch).
 #[test]
-#[ignore = "requires CDP/IDP name matching against distribution point names (not implemented in v0.1)"]
 fn pkits_4_14_8_invalid_cdp_idp_mismatch_dp2() {
     let ca_der = pkits_cert("distributionPoint2CACert");
     let ee_der = pkits_cert("InvaliddistributionPointTest8EE");
@@ -519,20 +529,23 @@ fn pkits_4_14_8_invalid_cdp_idp_mismatch_dp2() {
         .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
-        result.is_err(),
-        "§4.14.8: CDP/IDP name mismatch → must fail; got: {result:?}"
+        matches!(
+            result,
+            Err(Error::OutOfScope(
+                pkix_revocation::OutOfScopeReason::CrlIdpDistributionPointMismatch
+            ))
+        ),
+        "§4.14.8: CDP/IDP name mismatch → expected OutOfScope(CrlIdpDistributionPointMismatch); got: {result:?}"
     );
 }
 
-/// §4.14.9: Invalid distributionPoint Test9 — CDP name mismatch (onlySomeReasons).
+/// §4.14.9: Invalid distributionPoint Test9 — CDP/IDP name mismatch.
 ///
-/// EE serial=5, issuer=distributionPoint2 CA. Not in distributionPoint2CACRL.
-/// Same scenario as §4.14.8.
+/// Same fixture pattern as §4.14.8 but with EE serial=5. CDP/IDP names
+/// differ identically and matching fails.
 ///
 /// Oracle: PKITS §4.14.9 MUST NOT validate.
-/// Our checker returns `Ok(())` — CDP/IDP name matching is a v0.2 item.
 #[test]
-#[ignore = "requires CDP/IDP name matching against distribution point names (not implemented in v0.1)"]
 fn pkits_4_14_9_invalid_cdp_idp_mismatch_dp2_serial5() {
     let ca_der = pkits_cert("distributionPoint2CACert");
     let ee_der = pkits_cert("InvaliddistributionPointTest9EE");
@@ -545,8 +558,13 @@ fn pkits_4_14_9_invalid_cdp_idp_mismatch_dp2_serial5() {
         .expect("PKITS fixture is a valid DER-encoded CRL");
     let result = checker.check_revocation(&ee, &ca);
     assert!(
-        result.is_err(),
-        "§4.14.9: CDP/IDP name mismatch → must fail; got: {result:?}"
+        matches!(
+            result,
+            Err(Error::OutOfScope(
+                pkix_revocation::OutOfScopeReason::CrlIdpDistributionPointMismatch
+            ))
+        ),
+        "§4.14.9: CDP/IDP name mismatch → expected OutOfScope(CrlIdpDistributionPointMismatch); got: {result:?}"
     );
 }
 
