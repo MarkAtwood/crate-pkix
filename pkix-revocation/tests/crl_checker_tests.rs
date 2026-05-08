@@ -540,3 +540,200 @@ fn check_revocation_against_anchor_default_returns_ok() {
         "default check_revocation_against_anchor must return Ok(()); got: {result:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Indirect CRL support (PKIX-8zxm — RFC 5280 §5.2.6)
+// ---------------------------------------------------------------------------
+
+/// PKITS §4.14 fixture loader. Reuses the on-disk PKITS corpus that the
+/// pkix-path crate already vendors; pkix-revocation does not duplicate
+/// these fixtures.
+fn pkits_cert(name: &str) -> Certificate {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../pkix-path/tests/pkits/certs")
+        .join(format!("{name}.crt"));
+    let der = std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("PKITS fixture {name} not found: {e}"));
+    Certificate::from_der(&der).unwrap_or_else(|e| panic!("parse PKITS {name}: {e}"))
+}
+
+fn pkits_crl_bytes(name: &str) -> Vec<u8> {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../pkix-path/tests/pkits/crls")
+        .join(format!("{name}.crl"));
+    std::fs::read(&path)
+        .unwrap_or_else(|e| panic!("PKITS CRL fixture {name} not found: {e}"))
+}
+
+/// PKITS validity window: 2010-01-01 .. 2030-12-31. Use 2020-01-26 = `1_580_000_000`
+/// (the same anchor as `pkits_4_5.rs` and friends).
+const PKITS_NOW: u64 = 1_580_000_000;
+
+/// PKITS §4.14 ValidIDPwithindirectCRLTest22 — happy path for indirect CRL.
+///
+/// Topology:
+///   Trust Anchor → indirectCRLCA1 → ValidIDPwithindirectCRLTest22EE
+///   indirectCRLCA1 issues indirectCRLCA1CRL itself (it is *both* the
+///   cert issuer AND the cRLIssuer); the CRL declares `indirectCRL=TRUE`
+///   so it can also carry entries for other CAs via per-entry
+///   `certificateIssuer` extensions.
+///
+/// Test22EE has serial=1; the CRL revokes only serial=2. The leaf is
+/// therefore not revoked. The test asserts that the indirect-CRL
+/// machinery (IDP flag + signature verification against the cRLIssuer
+/// cert + entry walk) all behave correctly.
+///
+/// Independent oracle: PKITS NIST conformance corpus.
+#[test]
+fn pkix_8zxm_indirect_crl_pkits_4_14_22_valid() {
+    let leaf = pkits_cert("ValidIDPwithindirectCRLTest22EE");
+    let ca = pkits_cert("indirectCRLCA1Cert");
+    // CA1 acts as both the cert issuer AND the cRLIssuer.
+    let crl_issuer = pkits_cert("indirectCRLCA1Cert");
+    let crl_der = pkits_crl_bytes("indirectCRLCA1CRL");
+
+    let checker = CrlChecker::new_with_crl_issuer(crl_der, crl_issuer, PKITS_NOW, DefaultVerifier)
+        .expect("indirect CRL DER is well-formed");
+    let result = checker.check_revocation(&leaf, &ca);
+    result.expect("Test22EE (serial=1) is not revoked by the indirect CRL (serial=2 revoked)");
+}
+
+/// Passing an indirect CRL to the direct constructor `new()` produces
+/// `IndirectCrlIssuerMissing` with a specific diagnostic, rather than a
+/// confusing `CrlSignatureInvalid` (the legacy v0.2 behaviour).
+#[test]
+fn pkix_8zxm_indirect_crl_passed_to_direct_constructor_rejected() {
+    let leaf = pkits_cert("ValidIDPwithindirectCRLTest22EE");
+    let ca = pkits_cert("indirectCRLCA1Cert");
+    let crl_der = pkits_crl_bytes("indirectCRLCA1CRL");
+
+    let checker =
+        CrlChecker::new(crl_der, PKITS_NOW, DefaultVerifier).expect("CRL DER is well-formed");
+    let result = checker.check_revocation(&leaf, &ca);
+    assert!(
+        matches!(result, Err(Error::IndirectCrlIssuerMissing)),
+        "indirect CRL given to new() must be rejected with IndirectCrlIssuerMissing, \
+         got: {result:?}"
+    );
+}
+
+/// Inverse error: passing a direct (non-indirect) CRL to
+/// `new_with_crl_issuer` produces `IndirectCrlIssuerUnexpected`.
+///
+/// Construction: reuse the long-standing `crl-empty.der` fixture (a
+/// direct CRL signed by `crl-ca.der`). Pass `crl-ca.der` itself as the
+/// supposed cRLIssuer cert. The IDP flag check must fire before any
+/// signature work.
+#[test]
+fn pkix_8zxm_direct_crl_passed_to_indirect_constructor_rejected() {
+    let leaf = load_cert("crl-leaf-good.der");
+    let ca = load_cert("crl-ca.der");
+    // The "cRLIssuer cert" is just `crl-ca.der`; doesn't matter what it
+    // is — the rejection should fire before its identity is checked.
+    let bogus_crl_issuer = ca.clone();
+
+    let checker = CrlChecker::new_with_crl_issuer(
+        fixture("crl-empty.der"),
+        bogus_crl_issuer,
+        NOW,
+        DefaultVerifier,
+    )
+    .expect("CRL DER is well-formed");
+    let result = checker.check_revocation(&leaf, &ca);
+    assert!(
+        matches!(result, Err(Error::IndirectCrlIssuerUnexpected)),
+        "direct CRL given to new_with_crl_issuer must be rejected with \
+         IndirectCrlIssuerUnexpected, got: {result:?}"
+    );
+}
+
+/// Indirect-CRL flow with a wrong cRLIssuer cert (different DN than the
+/// CRL claims to be issued by) must be rejected with `CrlIssuerMismatch`
+/// — the (CRL.issuer == cRLIssuer.subject) cross-check fires before the
+/// signature work.
+#[test]
+fn pkix_8zxm_indirect_crl_wrong_crl_issuer_cert_rejected() {
+    let leaf = pkits_cert("ValidIDPwithindirectCRLTest22EE");
+    let ca = pkits_cert("indirectCRLCA1Cert");
+    // Pass indirectCRLCA3Cert as the cRLIssuer — it has a different
+    // subject DN than indirectCRLCA1 (which is what the CRL claims to be
+    // issued by).
+    let wrong_crl_issuer = pkits_cert("indirectCRLCA3Cert");
+    let crl_der = pkits_crl_bytes("indirectCRLCA1CRL");
+
+    let checker =
+        CrlChecker::new_with_crl_issuer(crl_der, wrong_crl_issuer, PKITS_NOW, DefaultVerifier)
+            .expect("CRL DER is well-formed");
+    let result = checker.check_revocation(&leaf, &ca);
+    assert!(
+        matches!(result, Err(Error::CrlIssuerMismatch)),
+        "wrong cRLIssuer cert must be rejected with CrlIssuerMismatch, got: {result:?}"
+    );
+}
+
+/// `check_revocation_against_anchor` with an indirect CRL also works.
+/// Treat indirectCRLCA1Cert as a trust anchor and check the EE cert
+/// (issued directly by CA1 = the anchor) against the indirect CRL.
+#[test]
+fn pkix_8zxm_indirect_crl_check_against_anchor() {
+    let leaf = pkits_cert("ValidIDPwithindirectCRLTest22EE");
+    let ca = pkits_cert("indirectCRLCA1Cert");
+    let anchor = TrustAnchor::from(&ca);
+    let crl_issuer = pkits_cert("indirectCRLCA1Cert");
+    let crl_der = pkits_crl_bytes("indirectCRLCA1CRL");
+
+    let checker = CrlChecker::new_with_crl_issuer(crl_der, crl_issuer, PKITS_NOW, DefaultVerifier)
+        .expect("indirect CRL DER is well-formed");
+    let result = checker.check_revocation_against_anchor(&leaf, &anchor);
+    result.expect("Test22EE must not be revoked when checked against the anchor");
+}
+
+/// Per-entry `certificateIssuer` extension (RFC 5280 §5.3.3): an indirect
+/// CRL has revoked entries from multiple CAs, distinguished by per-entry
+/// `certificateIssuer` extensions. The leaf under CA-B (with serial=2)
+/// must be reported as revoked because the CRL's second entry has
+/// `certificateIssuer` extension pointing at CA-B and matches the leaf's
+/// (issuer, serial).
+///
+/// The leaf under CA-A (serial=1) is NOT in the CRL's first entry (which
+/// has serial=99 and no certificateIssuer extension — its effective issuer
+/// defaults to cRLIssuer.subject, not CA-A.subject). So leaf_a is reported
+/// not-revoked.
+///
+/// Independent oracle: pyca/cryptography
+/// (`gen_indirect_crl_per_entry_fixture.py`).
+#[test]
+fn pkix_8zxm_indirect_crl_per_entry_certificate_issuer() {
+    let ca_a = load_cert("indirect-per-entry-ca-a.der");
+    let ca_b = load_cert("indirect-per-entry-ca-b.der");
+    let crl_issuer = load_cert("indirect-per-entry-crl-issuer.der");
+    let leaf_a = load_cert("indirect-per-entry-leaf-a.der");
+    let leaf_b = load_cert("indirect-per-entry-leaf-b.der");
+    let crl_der = fixture("indirect-per-entry-crl.der");
+
+    // Same checker handles both queries (the CRL covers both CAs).
+    let checker_a = CrlChecker::new_with_crl_issuer(
+        crl_der.clone(),
+        crl_issuer.clone(),
+        NOW,
+        DefaultVerifier,
+    )
+    .expect("indirect CRL DER is well-formed");
+    let checker_b =
+        CrlChecker::new_with_crl_issuer(crl_der, crl_issuer, NOW, DefaultVerifier)
+            .expect("indirect CRL DER is well-formed");
+
+    // Leaf under CA-A: serial=1, not in any entry whose effective issuer
+    // matches CA-A. Expected: not revoked.
+    let result_a = checker_a.check_revocation(&leaf_a, &ca_a);
+    result_a.expect("CA-A leaf must not be revoked by this CRL");
+
+    // Leaf under CA-B: serial=2, matched by the entry with
+    // certificateIssuer=CA-B. Expected: revoked.
+    let result_b = checker_b.check_revocation(&leaf_b, &ca_b);
+    assert!(
+        matches!(result_b, Err(Error::Revoked { .. })),
+        "CA-B leaf must be revoked via per-entry certificateIssuer extension, \
+         got: {result_b:?}"
+    );
+}

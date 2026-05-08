@@ -37,6 +37,14 @@ const OID_ISSUING_DISTRIBUTION_POINT: der::asn1::ObjectIdentifier =
 const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
 
+/// OID for the `certificateIssuer` CRL entry extension (RFC 5280 §5.3.3).
+///
+/// Critical extension that, in indirect CRLs, identifies the actual issuer
+/// of the cert that an entry refers to (which may differ from the CRL's own
+/// issuer). Per §5.3.3 this extension MUST be marked critical.
+const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.29");
+
 /// Offline CRL-based revocation checker.
 ///
 /// Parses a DER-encoded [`CertificateList`][x509_cert::crl::CertificateList],
@@ -65,17 +73,30 @@ const OID_KEY_USAGE_CRL: der::asn1::ObjectIdentifier =
 /// that at least one CRL or OCSP response actually covers the certificate
 /// in question; receiving `Ok(())` alone is not sufficient.
 ///
-/// # Limitations (v0.1)
+/// # Indirect CRLs (RFC 5280 §5.2.6)
 ///
-/// - The CRL must be signed directly by the certificate issuer
-///   (indirect CRLs are not supported; deferred to v0.2).
+/// When the CRL is signed by a separate `cRLIssuer` certificate (rather
+/// than by the cert's own issuer), construct the checker with
+/// [`CrlChecker::new_with_crl_issuer`] / [`CrlChecker::with_delta_and_crl_issuer`].
+/// The CRL's `IssuingDistributionPoint.indirectCRL` flag must be `TRUE`,
+/// and per-entry `certificateIssuer` extensions (RFC 5280 §5.3.3) are
+/// honored to identify the actual issuer of each revoked entry. The
+/// caller is responsible for having pre-validated the cRLIssuer's chain
+/// back to a trusted anchor.
+///
+/// # Limitations
+///
 /// - CRL Distribution Point name matching (CDP vs IDP name) is not implemented.
 ///   The checker does enforce `onlyContainsUserCerts`, `onlyContainsCACerts`, and
-///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is v0.2.
-/// - Both the base CRL and the delta CRL (if present) are re-parsed from DER on
-///   every [`check_revocation`] call. For long chains validated against the same
-///   CRL pair, this is O(N) redundant parsing. Tracked for v0.3 (cache the parsed
-///   `CertificateList` in `new` / `with_delta`).
+///   `onlyContainsAttributeCerts` scope flags; full CDP/IDP name matching is
+///   future work.
+/// - The cRLIssuer's chain is NOT validated by this crate — callers must
+///   present an already-validated cRLIssuer cert. Composing this with
+///   `pkix-path` to validate the cRLIssuer chain in-process is the umbrella
+///   crate's responsibility (`pkix-chain`).
+/// - The `certificateIssuer` extension's `issuerAltName` form (a non-DN
+///   GeneralName) is not currently used for entry-issuer lookup; only the
+///   `directoryName` form is. Real-world indirect CRLs use directoryName.
 /// - [`RevocationChecker::check_revocation_against_anchor`] is overridden.
 ///   For the certificate issued directly by a trust anchor, the CRL is verified
 ///   using the anchor's subject DN and SPKI in place of the missing issuer
@@ -94,6 +115,13 @@ pub struct CrlChecker<V> {
     /// Optional pre-parsed delta CRL. When present, its entries are merged
     /// with the base CRL in `check_revocation` (RFC 5280 §5.2.4).
     delta_crl: Option<CertificateList>,
+    /// Optional cRLIssuer cert when the CRL is indirect (RFC 5280 §5.2.6).
+    /// `Some` ⇔ this is an indirect-CRL checker; the cert's SPKI is used
+    /// for the CRL signature check, its KeyUsage for the cRLSign bit check,
+    /// and its subject DN for the CRL-issuer-identity match. The cert MUST
+    /// have been chain-validated by the caller before being passed in.
+    /// `None` ⇔ direct CRL: the `issuer` argument's identity is used.
+    crl_issuer_cert: Option<Certificate>,
     now_unix: u64,
     verifier: V,
 }
@@ -126,6 +154,39 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         Ok(Self {
             crl,
             delta_crl: None,
+            crl_issuer_cert: None,
+            now_unix,
+            verifier,
+        })
+    }
+
+    /// Create a `CrlChecker` for an indirect CRL (RFC 5280 §5.2.6).
+    ///
+    /// `crl_issuer_cert` is the certificate that signed the CRL. It MUST
+    /// have its chain pre-validated by the caller back to a trusted
+    /// anchor — this crate verifies only the cRLIssuer-cert-to-CRL
+    /// relationship, not the cRLIssuer-cert-to-anchor chain.
+    ///
+    /// The supplied CRL must declare itself indirect via its
+    /// `IssuingDistributionPoint.indirectCRL` flag (RFC 5280 §5.2.5);
+    /// otherwise [`Error::IndirectCrlIssuerUnexpected`] is returned at
+    /// `check_revocation` time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::CrlParseError`] if `crl_der` cannot be DER-decoded.
+    pub fn new_with_crl_issuer(
+        crl_der: impl AsRef<[u8]>,
+        crl_issuer_cert: Certificate,
+        now_unix: u64,
+        verifier: V,
+    ) -> crate::Result<Self> {
+        let crl = CertificateList::from_der(crl_der.as_ref())
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        Ok(Self {
+            crl,
+            delta_crl: None,
+            crl_issuer_cert: Some(crl_issuer_cert),
             now_unix,
             verifier,
         })
@@ -203,9 +264,35 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         Ok(Self {
             crl: base_crl,
             delta_crl: Some(delta_crl),
+            crl_issuer_cert: None,
             now_unix,
             verifier,
         })
+    }
+
+    /// Same as [`CrlChecker::new_with_crl_issuer`] plus a delta CRL.
+    ///
+    /// The delta CRL must be signed by the same cRLIssuer cert and be
+    /// declared indirect via its own `IssuingDistributionPoint.indirectCRL`
+    /// flag (verified at `check_revocation` time).
+    ///
+    /// # Errors
+    ///
+    /// Same as [`CrlChecker::with_delta`], plus the indirect-CRL gates
+    /// described in [`CrlChecker::new_with_crl_issuer`].
+    pub fn with_delta_and_crl_issuer(
+        base_der: impl AsRef<[u8]>,
+        delta_der: impl AsRef<[u8]>,
+        crl_issuer_cert: Certificate,
+        now_unix: u64,
+        verifier: V,
+    ) -> crate::Result<Self> {
+        // Reuse the with_delta path for the structural cross-checks
+        // (issuer match, CRL number ordering, delta-base relationship),
+        // then attach the cRLIssuer cert.
+        let mut checker = Self::with_delta(base_der, delta_der, now_unix, verifier)?;
+        checker.crl_issuer_cert = Some(crl_issuer_cert);
+        Ok(checker)
     }
 }
 
@@ -214,27 +301,82 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (1) Reuse the pre-parsed base CRL (parsed once at construction).
         let crl = &self.crl;
 
-        // (2) Verify the CRL issuer name matches the certificate's issuer.
-        //     A CRL signed by a different CA does not convey revocation status for
-        //     certificates issued by this CA.
-        if !names_match(&crl.tbs_cert_list.issuer, &cert.tbs_certificate.issuer) {
+        // (2) Determine the effective CRL signer: either the cert's
+        //     issuer (direct CRL) or a separate cRLIssuer cert (indirect
+        //     CRL, RFC 5280 §5.2.6). The selection is decided at
+        //     construction time:
+        //     - new() / with_delta()                        → direct
+        //     - new_with_crl_issuer() / _with_delta_…()    → indirect
+        //
+        //     Cross-check the construction choice against the CRL's own
+        //     IDP.indirectCRL flag: mismatches are rejected with a
+        //     specific error so the caller learns they used the wrong
+        //     constructor (rather than being told "signature invalid"
+        //     after the wrong key is used to verify).
+        let parsed_idp = parse_issuing_dp(crl)?;
+        let crl_declares_indirect = parsed_idp
+            .as_ref()
+            .map(|idp| idp.indirect_crl)
+            .unwrap_or(false);
+        let signer_subject: &x509_cert::name::Name;
+        let signer_spki: spki::SubjectPublicKeyInfoRef<'_>;
+        let signer_for_crlsign_check: Option<&Certificate>;
+        match (&self.crl_issuer_cert, crl_declares_indirect) {
+            (Some(crl_issuer), true) => {
+                signer_subject = &crl_issuer.tbs_certificate.subject;
+                signer_spki = crl_issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_for_crlsign_check = Some(crl_issuer);
+            }
+            (Some(_), false) => {
+                // Caller asserted indirect; CRL says direct. Reject.
+                return Err(Error::IndirectCrlIssuerUnexpected);
+            }
+            (None, true) => {
+                // CRL says indirect; caller did not supply cRLIssuer cert.
+                return Err(Error::IndirectCrlIssuerMissing);
+            }
+            (None, false) => {
+                signer_subject = &issuer.tbs_certificate.subject;
+                signer_spki = issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_for_crlsign_check = Some(issuer);
+            }
+        }
+
+        // (2a) The CRL issuer name must match the effective signer's
+        //      subject DN. This guards against a caller passing a
+        //      cRLIssuer cert with a different DN than the CRL claims to
+        //      have come from.
+        if !names_match(&crl.tbs_cert_list.issuer, signer_subject) {
             return Err(Error::CrlIssuerMismatch);
         }
-        // (2b) Verify the `issuer` Certificate's subject DN matches the CRL issuer.
-        //      This guards against a caller passing a mismatched issuer certificate
-        //      (e.g., a cert from a different CA whose name happens to appear in a
-        //      CRL distribution point). Without this check, the cRLSign and SPKI
-        //      checks below would operate on the wrong certificate.
-        if !names_match(&issuer.tbs_certificate.subject, &crl.tbs_cert_list.issuer) {
+        // (2b) The cert under check must be issued by a CA in the
+        //      domain this CRL covers. For direct CRLs, that is exactly
+        //      the CRL issuer (cert.issuer == CRL.issuer). For indirect
+        //      CRLs, cert.issuer may differ from CRL.issuer (the
+        //      cRLIssuer's subject); the per-entry effective-issuer
+        //      check below handles the actual matching. We still
+        //      require that the supplied `issuer` cert match cert.issuer
+        //      as a defense-in-depth check on the caller-supplied
+        //      issuer-of-cert identity.
+        if !names_match(&issuer.tbs_certificate.subject, &cert.tbs_certificate.issuer) {
+            return Err(Error::CrlIssuerMismatch);
+        }
+        // For direct CRLs only: the cert's issuer must also match the
+        // CRL issuer (this is the legacy invariant). For indirect CRLs
+        // this check is intentionally skipped — the whole point of
+        // §5.2.6 is that they may differ.
+        if self.crl_issuer_cert.is_none()
+            && !names_match(&cert.tbs_certificate.issuer, &crl.tbs_cert_list.issuer)
+        {
             return Err(Error::CrlIssuerMismatch);
         }
 
-        // (3) RFC 5280 §6.3.3(f): the CRL issuer must have cRLSign in KeyUsage when present.
-        //     Check this before verifying the signature so we reject on the correct error
-        //     (CrlSignMissing rather than CrlSignatureInvalid) when the key lacks cRLSign.
-        //     A malformed KeyUsage extension returns CrlParseError (structural defect),
-        //     not CrlSignMissing (bit absent).
-        check_crl_sign(issuer)?;
+        // (3) RFC 5280 §6.3.3(f): the CRL signer must have cRLSign in KeyUsage when present.
+        //     For indirect CRLs this check runs on the cRLIssuer cert, NOT the
+        //     cert's own issuer (that's the whole point of separation of duty).
+        if let Some(signer_cert) = signer_for_crlsign_check {
+            check_crl_sign(signer_cert)?;
+        }
 
         // (3b) Check CRL validity window before verifying the signature.
         //     Rejecting stale CRLs early avoids a potentially expensive signature
@@ -254,7 +396,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             return Err(Error::CrlExpired);
         }
 
-        // (4) Verify the CRL signature against the issuer's SPKI.
+        // (4) Verify the CRL signature against the effective signer's SPKI
+        //     (issuer for direct CRLs, cRLIssuer cert for indirect CRLs).
+        //     Clone the SPKI ref so the delta path below (if it runs) can
+        //     consume the original — the spki ref-struct is small.
         let tbs_bytes = crl
             .tbs_cert_list
             .to_der()
@@ -262,10 +407,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
-                issuer
-                    .tbs_certificate
-                    .subject_public_key_info
-                    .owned_to_ref(),
+                signer_spki.clone(),
                 &tbs_bytes,
                 crl.signature.raw_bytes(),
             )
@@ -278,7 +420,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // "verified not-revoked" (Ok(())) from "no determination made"
         // (Err(OutOfScope(...))). Hard-fail revocation policies should treat
         // OutOfScope as a failure.
-        if let Some(idp) = parse_issuing_dp(crl)? {
+        if let Some(idp) = &parsed_idp {
             // onlyContainsAttributeCerts: attribute cert validation is out of scope
             // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
             if idp.only_contains_attribute_certs {
@@ -310,38 +452,40 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
                 return Err(Error::CrlIssuerMismatch);
             }
-            // Also verify against cert's issuer (transitively guaranteed above, explicit for clarity).
-            if !names_match(
-                &delta_crl.tbs_cert_list.issuer,
-                &cert.tbs_certificate.issuer,
-            ) {
-                return Err(Error::CrlIssuerMismatch);
-            }
-
-            // cRLSign was already verified above for the base CRL issuer.
-            // The delta CRL uses the same `issuer` (confirmed by the name-match
-            // checks above), so the cRLSign bit check is not repeated here.
-            // verify_delta_crl_and_collect will re-verify the issuer-name match
-            // against `expected_issuer_name` as its first step.
+            // The delta CRL must be signed by the same effective signer as the base.
+            // This is guaranteed by issuer DN match plus the cRLIssuer-vs-issuer
+            // selection above, but verify_delta_crl_and_collect will recheck.
             verify_delta_crl_and_collect(
                 delta_crl,
                 &self.verifier,
-                issuer
-                    .tbs_certificate
-                    .subject_public_key_info
-                    .owned_to_ref(),
-                &issuer.tbs_certificate.subject,
+                signer_spki,
+                signer_subject,
                 self.now_unix,
             )?
         } else {
             Vec::new()
         };
 
-        // (7) Search for the certificate's serial number, delta entries first.
-        //     RFC 5280 §5.2.4: delta CRL entries take precedence over base entries.
-        //     A removeFromCRL reason in the delta means the cert was un-held.
+        // (7) Search for the certificate's (issuer, serial) in the delta and base
+        //     CRL entries. Delta CRL entries take precedence (RFC 5280 §5.2.4);
+        //     a removeFromCRL reason in the delta un-revokes a cert.
+        //
+        //     For indirect CRLs the per-entry `certificateIssuer` extension may
+        //     change the effective issuer of subsequent entries (RFC 5280 §5.3.3);
+        //     entries inherit the previous extension's value, defaulting to the
+        //     CRL's own issuer for the first entry.
+        let cert_issuer = &cert.tbs_certificate.issuer;
         let cert_serial = &cert.tbs_certificate.serial_number;
-        check_revocation_status(cert_serial, &delta_entries, crl)
+        let crl_default_issuer = &crl.tbs_cert_list.issuer;
+        let is_indirect = self.crl_issuer_cert.is_some();
+        check_revocation_status_indirect(
+            cert_issuer,
+            cert_serial,
+            &delta_entries,
+            crl,
+            crl_default_issuer,
+            is_indirect,
+        )
     }
 
     /// Check revocation for `cert` issued directly by a trust anchor.
@@ -366,19 +510,54 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // (1) Reuse the pre-parsed base CRL (parsed once at construction).
         let crl = &self.crl;
 
-        // (2) The CRL issuer must match the anchor's subject DN, and the
-        // certificate being checked must also be issued by that anchor.
-        // Without the second check a caller can supply an anchor for CA-A and
-        // a cert issued by CA-B and get Ok(()) (cert not found in CA-A's CRL)
-        // when it should get CrlIssuerMismatch.
-        if !names_match(&crl.tbs_cert_list.issuer, &anchor.subject) {
+        // (2) Determine the effective CRL signer as in check_revocation.
+        //     For the anchor flow, the "issuer" identity is the anchor itself.
+        let parsed_idp = parse_issuing_dp(crl)?;
+        let crl_declares_indirect = parsed_idp
+            .as_ref()
+            .map(|idp| idp.indirect_crl)
+            .unwrap_or(false);
+        let signer_subject: &x509_cert::name::Name;
+        let signer_spki: spki::SubjectPublicKeyInfoRef<'_>;
+        let signer_for_crlsign_check: Option<&Certificate>;
+        match (&self.crl_issuer_cert, crl_declares_indirect) {
+            (Some(crl_issuer), true) => {
+                signer_subject = &crl_issuer.tbs_certificate.subject;
+                signer_spki = crl_issuer.tbs_certificate.subject_public_key_info.owned_to_ref();
+                signer_for_crlsign_check = Some(crl_issuer);
+            }
+            (Some(_), false) => return Err(Error::IndirectCrlIssuerUnexpected),
+            (None, true) => return Err(Error::IndirectCrlIssuerMissing),
+            (None, false) => {
+                signer_subject = &anchor.subject;
+                signer_spki = anchor.subject_public_key_info.owned_to_ref();
+                // Trust anchors have no KeyUsage extension accessible; the
+                // cRLSign check is skipped — anchors are trusted by construction.
+                signer_for_crlsign_check = None;
+            }
+        }
+
+        // (2a) The CRL issuer must match the effective signer's subject DN.
+        if !names_match(&crl.tbs_cert_list.issuer, signer_subject) {
             return Err(Error::CrlIssuerMismatch);
         }
+        // (2b) The cert under check must be issued by the anchor for the
+        //      anchor flow regardless of indirect-vs-direct: the anchor
+        //      is the cert's *issuer*, even when the CRL is signed by a
+        //      separate cRLIssuer.
         if !names_match(&cert.tbs_certificate.issuer, &anchor.subject) {
             return Err(Error::CrlIssuerMismatch);
         }
 
-        // (3) Check CRL validity window before verifying the signature.
+        // (3) cRLSign check on the cRLIssuer cert in the indirect case;
+        //     skipped for the anchor itself in the direct case (anchors
+        //     are trusted by construction; see signer_for_crlsign_check
+        //     above).
+        if let Some(signer_cert) = signer_for_crlsign_check {
+            check_crl_sign(signer_cert)?;
+        }
+
+        // (4) Check CRL validity window before verifying the signature.
         //     Same rationale as check_revocation: reject stale CRLs early.
         let this_update = crl.tbs_cert_list.this_update.to_unix_duration().as_secs();
         if self.now_unix < this_update {
@@ -393,9 +572,9 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             return Err(Error::CrlExpired);
         }
 
-        // (4) Verify the CRL signature against the anchor's SPKI.
-        //     cRLSign KeyUsage check is skipped: trust anchors have no KeyUsage
-        //     extension accessible to us (they are trusted by construction).
+        // (5) Verify the CRL signature against the effective signer's SPKI.
+        //     Clone for the same reason as in check_revocation: the delta
+        //     path below may consume the original.
         let tbs_bytes = crl
             .tbs_cert_list
             .to_der()
@@ -403,17 +582,14 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
-                anchor.subject_public_key_info.owned_to_ref(),
+                signer_spki.clone(),
                 &tbs_bytes,
                 crl.signature.raw_bytes(),
             )
-            // Verifier returns an opaque error; no additional context available.
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
-        // (5) IssuingDistributionPoint scope check (same as check_revocation).
-        // Scope mismatches surface as Error::OutOfScope; see check_revocation
-        // for rationale.
-        if let Some(idp) = parse_issuing_dp(crl)? {
+        // (6) IssuingDistributionPoint scope check.
+        if let Some(idp) = &parsed_idp {
             if idp.only_contains_attribute_certs {
                 return Err(Error::OutOfScope(
                     crate::OutOfScopeReason::CrlOnlyAttributeCerts,
@@ -428,60 +604,79 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             }
         }
 
-        // (6) Delta CRL merge — if a delta CRL is present, verify issuer consistency
-        //     and merge it.  Uses the anchor SPKI for the delta signature check.
+        // (7) Delta CRL merge.
         let delta_entries: Vec<RevokedCert> = if let Some(delta_crl) = &self.delta_crl {
-            // Reuse the pre-parsed delta CRL (parsed once at construction).
-
-            // Cross-check: delta CRL issuer must match base CRL issuer and anchor subject.
-            // Mirrors the three-way check performed in check_revocation for the cert-issuer path.
             if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
-                return Err(Error::CrlIssuerMismatch);
-            }
-            if !names_match(&delta_crl.tbs_cert_list.issuer, &anchor.subject) {
                 return Err(Error::CrlIssuerMismatch);
             }
             verify_delta_crl_and_collect(
                 delta_crl,
                 &self.verifier,
-                anchor.subject_public_key_info.owned_to_ref(),
-                &anchor.subject,
+                signer_spki,
+                signer_subject,
                 self.now_unix,
             )?
         } else {
             Vec::new()
         };
 
-        // (7) Search for the certificate's serial (delta entries take precedence).
+        // (8) Look up the cert's (issuer, serial) in delta then base entries,
+        //     honoring per-entry certificateIssuer for indirect CRLs.
+        let cert_issuer = &cert.tbs_certificate.issuer;
         let cert_serial = &cert.tbs_certificate.serial_number;
-        check_revocation_status(cert_serial, &delta_entries, crl)
+        let crl_default_issuer = &crl.tbs_cert_list.issuer;
+        let is_indirect = self.crl_issuer_cert.is_some();
+        check_revocation_status_indirect(
+            cert_issuer,
+            cert_serial,
+            &delta_entries,
+            crl,
+            crl_default_issuer,
+            is_indirect,
+        )
     }
 }
 
 // ---------------------------------------------------------------------------
-// Revocation status helper
+// Revocation status helper (with indirect-CRL per-entry issuer tracking)
 // ---------------------------------------------------------------------------
 
-/// Search for `cert_serial` in `delta_entries` (higher priority) and then in
-/// the base `crl`, and return the appropriate revocation result.
+/// Search for the cert's `(issuer, serial)` in the delta entries (higher
+/// priority) and then in the base `crl`, returning the appropriate
+/// revocation result.
 ///
 /// RFC 5280 §5.2.4: delta CRL entries take precedence over base entries.
-/// - If found in `delta_entries` with reason `RemoveFromCRL`, the
-///   certificateHold was lifted and the certificate is not revoked → `Ok(())`.
+/// RFC 5280 §5.3.3: in indirect CRLs, the per-entry `certificateIssuer`
+/// extension identifies the actual issuer of each entry. Entries inherit
+/// the previous entry's effective issuer; the first entry defaults to the
+/// CRL's own issuer.
+///
+/// - If found in `delta_entries` with reason `RemoveFromCRL` → `Ok(())`.
 /// - If found in `delta_entries` for any other reason → `Err(Revoked)`.
 /// - If found in the base CRL → `Err(Revoked)`.
-/// - If not found in either → `Ok(())` (not revoked).
-fn check_revocation_status(
+/// - If not found in either → `Ok(())` (not revoked according to this CRL).
+///
+/// When `is_indirect = false` the per-entry `certificateIssuer` extension
+/// is ignored and lookup degenerates to serial-only matching against
+/// `crl_default_issuer` (the CRL's own issuer). This preserves the legacy
+/// direct-CRL behaviour bit-for-bit.
+fn check_revocation_status_indirect(
+    cert_issuer: &x509_cert::name::Name,
     cert_serial: &x509_cert::serial_number::SerialNumber,
     delta_entries: &[RevokedCert],
     crl: &CertificateList,
+    crl_default_issuer: &x509_cert::name::Name,
+    is_indirect: bool,
 ) -> crate::Result<()> {
-    // Check delta CRL entries first (they take precedence over base entries).
-    if let Some(delta_entry) = delta_entries
-        .iter()
-        .find(|e| &e.serial_number == cert_serial)
-    {
-        let reason = extract_reason_code(delta_entry);
+    // Delta entries take precedence (RFC 5280 §5.2.4).
+    if let Some(entry) = find_matching_entry(
+        cert_issuer,
+        cert_serial,
+        delta_entries,
+        crl_default_issuer,
+        is_indirect,
+    )? {
+        let reason = extract_reason_code(entry);
         if reason == Some(CrlReason::RemoveFromCRL) {
             // certificateHold was lifted; cert is not revoked.
             return Ok(());
@@ -492,17 +687,91 @@ fn check_revocation_status(
         });
     }
 
-    // Check base CRL entries.
-    if let Some(revoked) = &crl.tbs_cert_list.revoked_certificates {
-        if let Some(entry) = revoked.iter().find(|e| &e.serial_number == cert_serial) {
-            return Err(Error::Revoked {
-                serial: cert_serial.clone(),
-                reason_code: extract_reason_code(entry),
-            });
-        }
+    // Fall through to base entries.
+    let base_entries: &[RevokedCert] = crl
+        .tbs_cert_list
+        .revoked_certificates
+        .as_deref()
+        .unwrap_or(&[]);
+    if let Some(entry) = find_matching_entry(
+        cert_issuer,
+        cert_serial,
+        base_entries,
+        crl_default_issuer,
+        is_indirect,
+    )? {
+        return Err(Error::Revoked {
+            serial: cert_serial.clone(),
+            reason_code: extract_reason_code(entry),
+        });
     }
 
     Ok(())
+}
+
+/// Walk `entries` in DER order, tracking the effective issuer per RFC 5280
+/// §5.3.3, and return the first entry whose `(effective_issuer, serial)`
+/// matches `(cert_issuer, cert_serial)`. The `is_indirect` flag gates
+/// whether `certificateIssuer` extensions are honored — for direct CRLs
+/// the effective issuer is always `crl_default_issuer`.
+///
+/// Errors out (`CrlParseError`) if a `certificateIssuer` extension is
+/// present but cannot be parsed; this is the fail-closed treatment for a
+/// critical entry extension we recognize.
+fn find_matching_entry<'a>(
+    cert_issuer: &x509_cert::name::Name,
+    cert_serial: &x509_cert::serial_number::SerialNumber,
+    entries: &'a [RevokedCert],
+    crl_default_issuer: &x509_cert::name::Name,
+    is_indirect: bool,
+) -> crate::Result<Option<&'a RevokedCert>> {
+    use x509_cert::name::Name;
+
+    let mut effective: Name = crl_default_issuer.clone();
+    for entry in entries {
+        // Only honor certificateIssuer in indirect CRLs (where it has
+        // defined semantics per RFC 5280 §5.2.5/§5.3.3). Direct CRLs
+        // should not contain this extension; if one does, ignoring it
+        // here matches the conservative interpretation used by major
+        // verifiers.
+        if is_indirect {
+            if let Some(exts) = entry.crl_entry_extensions.as_deref() {
+                if let Some(ce_ext) = exts.iter().find(|e| e.extn_id == OID_CERTIFICATE_ISSUER) {
+                    effective = parse_certificate_issuer_dn(ce_ext.extn_value.as_bytes())?;
+                }
+            }
+        }
+        if &entry.serial_number == cert_serial && names_match(&effective, cert_issuer) {
+            return Ok(Some(entry));
+        }
+    }
+    Ok(None)
+}
+
+/// Parse the `certificateIssuer` CRL entry extension (RFC 5280 §5.3.3),
+/// extracting the first `directoryName` GeneralName. Returns
+/// `Err(CrlParseError)` if the extension cannot be DER-decoded or if no
+/// `directoryName` is present (the only GeneralName form supported here).
+fn parse_certificate_issuer_dn(
+    ext_value_der: &[u8],
+) -> crate::Result<x509_cert::name::Name> {
+    use x509_cert::ext::pkix::name::{GeneralName, GeneralNames};
+
+    let general_names = GeneralNames::from_der(ext_value_der)
+        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+    for gn in general_names {
+        if let GeneralName::DirectoryName(name) = gn {
+            return Ok(name);
+        }
+    }
+    // RFC 5280 §5.3.3 allows multiple GeneralName forms (including
+    // issuerAltName entries); for chain-validation-style lookup we only
+    // use the directoryName because that is what the cert's `issuer`
+    // field carries. A cert-issuer-extension carrying only non-DN
+    // GeneralNames is unusable for our (issuer, serial) match.
+    Err(Error::CrlParseError(crate::DerError(
+        der::Error::new(der::ErrorKind::Failed, der::Length::ZERO),
+    )))
 }
 
 // ---------------------------------------------------------------------------
