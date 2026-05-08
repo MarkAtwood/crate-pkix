@@ -17,14 +17,20 @@ members = [
 
 [workspace.package]
 # Most workspace crates are at 0.2.1 (additive: cert_is_ca helper, PathBuilderConfig,
-# stub-crate hygiene, idiom polish). Four crates with breaking changes pin their
-# version explicitly:
-#   - pkix-path        0.3.0  (ValidatedPath loses Copy; new owned-data fields for
-#                              §6.1.5 wrap-up outputs and policy qualifiers)
-#   - pkix-revocation  0.3.0  (Error::OutOfScope variant — Ok(()) → Err(OutOfScope(_))
-#                              at 6 IDP scope-mismatch sites)
-#   - pkix-chain       0.3.0  (re-exports pkix-revocation::Error)
-#   - pkix-chain-simple 0.3.0 (re-exports pkix-chain)
+# stub-crate hygiene, idiom polish). Five crates with version overrides pin their
+# version explicitly per the May-2026 0.3 follow-up release wave:
+#   - pkix-path         0.3.0  BREAKING. ValidatedPath loses Copy/Hash; new owned-data
+#                              fields for §6.1.5 wrap-up outputs and policy qualifiers.
+#   - pkix-revocation   0.3.1  Additive. CrlIdpDistributionPointMismatch variant on
+#                              OutOfScopeReason (#[non_exhaustive]); dep bump to
+#                              pkix-path 0.3.
+#   - pkix-chain        0.4.0  TRANSITIVELY BREAKING. Re-exports pkix-path::ValidatedPath
+#                              which lost Copy/Hash in 0.3.0; downstream cargo update
+#                              must explicitly bump to 0.4.
+#   - pkix-chain-simple 0.4.0  TRANSITIVELY BREAKING. Same rationale as pkix-chain 0.4.
+#   - pkix-path-builder 0.3.0  BREAKING. Dep major bump on pkix-path; skip-not-fail
+#                              behavior change for malformed BasicConstraints
+#                              candidates (PKIX-qgw1, no longer aborts the search).
 # pkix-lint at 0.2.0 (first publish). Stubs at 0.0.0 (not published).
 version      = "0.2.1"
 edition      = "2021"
@@ -36,8 +42,8 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 [workspace.dependencies]
 # Internal crates
 pkix-path             = { path = "pkix-path",             version = "0.3.0" }
-pkix-revocation       = { path = "pkix-revocation",       version = "0.3.0" }
-pkix-path-builder     = { path = "pkix-path-builder",     version = "0.2.1" }
+pkix-revocation       = { path = "pkix-revocation",       version = "0.3.1" }
+pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.0" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.2.1" }
 pkix-lint             = { path = "pkix-lint",             version = "0.2.0" }

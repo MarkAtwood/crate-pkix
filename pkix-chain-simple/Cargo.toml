@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-chain-simple"
 description = "Strict, opinionated X.509 chain verifier for the common happy-path case"
-version               = "0.3.0"  # transitively breaking via pkix-chain 0.3.0; see CHANGELOG.md
+version               = "0.4.0"  # transitively breaking: pkix-path 0.3 ValidatedPath re-export; see CHANGELOG.md
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
