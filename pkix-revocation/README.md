@@ -121,11 +121,19 @@ impl RevocationChecker for MyRevocationChecker {
 9. Returns based on `certStatus`: `good → Ok(())`, `revoked → Err(Revoked)`,
    `unknown → Err(OcspStatusUnknown)`.
 
-## v0.2 limitations
+## v0.3 limitations
 
 - CRL checking does not follow CRL Distribution Points — caller supplies the CRL.
-- OCSP checking only supports issuer-signed (direct) responses; delegated
-  responder certificates (RFC 6960 §2.6) are not supported.
+- Indirect CRLs (RFC 5280 §5.2.6) are not yet supported (tracked).
+- OCSP checking supports both issuer-signed (direct) responses and CA
+  Designated Responder (delegated) responses (RFC 6960 §4.2.2.2). The
+  third RFC 6960 case — a Trusted Responder whose key the requester
+  trusts out-of-band — is not separately modeled (callers can pass that
+  responder cert as the `issuer` argument).
+- The `id-pkix-ocsp-nocheck` extension on delegate certs (RFC 6960
+  §4.2.2.2.1) is documented but not enforced — this crate is a
+  single-shot offline checker and never recurses into delegate
+  revocation regardless of the extension.
 
 ## Standards
 
