@@ -50,9 +50,9 @@ enum Cmd {
     Single {
         /// Path to chain.pem.
         chain: PathBuf,
-        /// Comma-separated oracles to run, e.g. `pkix-path,openssl`.
-        /// Default: `pkix-path`. Available: `pkix-path`, `openssl`.
-        /// (`pyca` lands in PKIX-7nsf.3.)
+        /// Comma-separated oracles to run, e.g. `pkix-path,openssl,pyca`.
+        /// Default: `pkix-path`. Available: `pkix-path`, `openssl`, `pyca`.
+        /// (pyca requires `pkix-difftest/python/setup-venv.sh` first.)
         #[arg(long, default_value = "pkix-path")]
         oracle: String,
     },
@@ -100,11 +100,7 @@ fn run_oracle(name: OracleName, chain: &Chain) -> std::io::Result<Verdict> {
     match name {
         OracleName::PkixPath => oracles::pkix_path::verify(chain),
         OracleName::OpenSsl => oracles::openssl::verify(chain),
-        // PKIX-7nsf.3 will fill this in.
-        OracleName::Pyca => Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "pyca oracle not yet implemented (PKIX-7nsf.3)",
-        )),
+        OracleName::Pyca => oracles::pyca::verify(chain),
     }
 }
 

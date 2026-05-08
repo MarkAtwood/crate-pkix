@@ -15,3 +15,7 @@ test_must_use*
 # Review-loop transient artifacts (phase markers, coordinator logs).
 # Permitted permanent planning lives in <crate>/PLAN.md only.
 /audit/
+
+# pkix-difftest pyca/cryptography venv (bootstrapped by setup-venv.sh).
+# pip output is large and OS/python-version-specific; never commit.
+/pkix-difftest/python/.venv/
