@@ -48,5 +48,11 @@ clap = { version = "4", features = ["derive"] }
 # not stdin). MSRV-clean.
 tempfile = "3"
 
+# JSON deserialisation for PKITS vectors.json (the canonical NIST test vector
+# manifest). Both crates are workspace-pinned via the [workspace.dependencies]
+# table; we just bring them in here.
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
 [dev-dependencies]
 # Tests reuse the runtime deps; nothing else is needed at this stage.

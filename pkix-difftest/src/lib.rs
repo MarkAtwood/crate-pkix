@@ -27,6 +27,7 @@ use std::path::Path;
 use der::{Decode, Encode};
 use x509_cert::Certificate;
 
+pub mod corpus;
 pub mod oracles;
 
 // ---------------------------------------------------------------------------
