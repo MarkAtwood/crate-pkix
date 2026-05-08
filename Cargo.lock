@@ -600,6 +600,8 @@ dependencies = [
  "der",
  "pem-rfc7468",
  "pkix-path",
+ "serde",
+ "serde_json",
  "tempfile",
  "x509-cert",
 ]
