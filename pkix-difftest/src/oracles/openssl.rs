@@ -94,32 +94,36 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
     }
 
     let dir = TempDir::new()?;
-    write_chain_to_tempdir(chain, dir.path())?;
+    let has_intermediates = write_chain_to_tempdir(chain, dir.path())?;
 
-    let output = Command::new(bin)
-        .arg("verify")
+    let mut cmd = Command::new(bin);
+    cmd.arg("verify")
         .arg("-CAfile")
-        .arg(dir.path().join("root.pem"))
-        .arg("-untrusted")
-        .arg(dir.path().join("intermediates.pem"))
-        .arg(dir.path().join("leaf.pem"))
-        .output()
-        .map_err(|e| {
-            // Most useful failure: NotFound → "binary not on PATH". Pass
-            // through other kinds (Permission, etc.) verbatim. We preserve
-            // ErrorKind::NotFound because the caller (and tests) keys on it.
-            if e.kind() == io::ErrorKind::NotFound {
-                io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!(
-                        "openssl binary not found: tried `{bin}` \
+        .arg(dir.path().join("root.pem"));
+    // Only pass `-untrusted` when we actually have intermediates. OpenSSL 3.0
+    // errors on `-untrusted <empty-file>` ("Could not read any untrusted
+    // certificates from ..."), surfaced via PKITS 4.16.1 / 4.8.15 / 4.8.19
+    // (the 2-cert chains: root + leaf, no intermediates).
+    if has_intermediates {
+        cmd.arg("-untrusted")
+            .arg(dir.path().join("intermediates.pem"));
+    }
+    let output = cmd.arg(dir.path().join("leaf.pem")).output().map_err(|e| {
+        // Most useful failure: NotFound → "binary not on PATH". Pass
+        // through other kinds (Permission, etc.) verbatim. We preserve
+        // ErrorKind::NotFound because the caller (and tests) keys on it.
+        if e.kind() == io::ErrorKind::NotFound {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "openssl binary not found: tried `{bin}` \
                          (set {OPENSSL_BIN_ENV} to override)"
-                    ),
-                )
-            } else {
-                e
-            }
-        })?;
+                ),
+            )
+        } else {
+            e
+        }
+    })?;
 
     if output.status.success() {
         return Ok(Verdict::Pass);
@@ -132,12 +136,14 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
     })
 }
 
-/// Write the chain into the tempdir as three files:
-/// `root.pem`, `intermediates.pem`, `leaf.pem`.
+/// Write the chain into the tempdir as up to three files:
+/// `root.pem`, `intermediates.pem` (skipped when empty), `leaf.pem`.
 ///
-/// `intermediates.pem` is the concatenation of certs `[1..len-1]` (zero or more
-/// PEM blocks). `root.pem` is the last cert. `leaf.pem` is the first cert.
-fn write_chain_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<()> {
+/// Returns `true` when at least one intermediate exists and was written.
+/// Callers use that to decide whether to pass `-untrusted` to `openssl
+/// verify` — OpenSSL 3.0 rejects `-untrusted <empty-file>` with "Could not
+/// read any untrusted certificates from ...".
+fn write_chain_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<bool> {
     let n = chain.certs_der.len();
     debug_assert!(n >= 2, "checked by caller");
 
@@ -147,15 +153,16 @@ fn write_chain_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<()> {
     let root = der_to_pem(&chain.certs_der[n - 1])?;
     std::fs::write(dir.join("root.pem"), root)?;
 
+    let intermediate_count = n.saturating_sub(2);
+    if intermediate_count == 0 {
+        return Ok(false);
+    }
     let mut intermediates = String::new();
     for der in &chain.certs_der[1..n - 1] {
         intermediates.push_str(&der_to_pem(der)?);
     }
-    // Even with zero intermediates we write the file, because `openssl verify
-    // -untrusted /nonexistent` errors out; an empty file is the right empty.
     std::fs::write(dir.join("intermediates.pem"), intermediates)?;
-
-    Ok(())
+    Ok(true)
 }
 
 fn der_to_pem(der: &[u8]) -> io::Result<String> {
