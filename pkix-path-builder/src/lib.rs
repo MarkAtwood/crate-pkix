@@ -136,12 +136,20 @@ pub enum Error {
     /// cause exponential search time. Each iterative-deepening round and the
     /// depth probe start with a fresh budget of `DFS_BUDGET` node visits.
     BudgetExceeded,
-    /// A candidate intermediate's `BasicConstraints` extension was present but
-    /// could not be DER-decoded.
+    /// **Reserved for future diagnostic use.** Path building no longer
+    /// surfaces this variant: a candidate whose `BasicConstraints` extension
+    /// is present but cannot be DER-decoded is silently skipped, just like
+    /// candidates with `cA = FALSE` or no `BasicConstraints` extension at
+    /// all. This skip-not-fail behaviour is required so that a single
+    /// malformed certificate in a CMS `SignedData.certificates` bag (or any
+    /// other unsolicited-cert pool) cannot poison verification of an
+    /// otherwise-valid chain.
     ///
-    /// Returning this rather than silently rejecting the candidate avoids the
-    /// situation where a malformed-but-topologically-correct intermediate
-    /// causes a misleading [`Error::NoPathFound`].
+    /// The variant is retained because [`Error`] is `#[non_exhaustive]` and
+    /// a future diagnostic mode may want to surface decode failures
+    /// explicitly. Build_path itself returns [`Error::NoPathFound`] when no
+    /// chain can be built — including when the only available intermediates
+    /// have a malformed `BasicConstraints` extension.
     MalformedIntermediate,
 }
 
@@ -173,13 +181,17 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// [`Error::MalformedIntermediate`] if the extension is present but
 /// cannot be DER-decoded.
 ///
-/// Propagating decode failure (rather than silently rejecting the cert
-/// as not-a-CA) avoids the situation where a topologically-valid path
-/// through a malformed-BC intermediate produces a misleading
-/// [`Error::NoPathFound`].
-///
 /// Thin wrapper over [`pkix_path::cert_is_ca`] that maps the opaque
 /// [`pkix_path::DerError`] to this crate's [`Error::MalformedIntermediate`].
+///
+/// **Caller responsibility for skip-not-fail.** The single in-crate caller
+/// (the candidate-evaluation loop in [`PathCandidates::next`]) treats
+/// `Err(_)` identically to `Ok(false)`: skip the candidate and keep
+/// searching. The wrapper preserves the explicit
+/// [`Error::MalformedIntermediate`] mapping so that a future diagnostic
+/// mode can distinguish "wasn't a CA" from "couldn't tell whether it was
+/// a CA". See the variant doc for the rationale behind not surfacing
+/// this error from `build_path`.
 fn cert_is_ca(cert: &Certificate) -> Result<bool> {
     pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedIntermediate)
 }
@@ -551,10 +563,7 @@ impl<'a> Iterator for PathCandidates<'a> {
                     return Some(Err(Error::BudgetExceeded));
                 }
                 self.budget -= 1;
-                self.frames
-                    .last_mut()
-                    .expect("non-empty")
-                    .anchor_checked = true;
+                self.frames.last_mut().expect("non-empty").anchor_checked = true;
 
                 // Read the issuer DN of the cert at the top of the path
                 // — that is the cert this frame is seeking an issuer
@@ -571,10 +580,7 @@ impl<'a> Iterator for PathCandidates<'a> {
                     .iter()
                     .any(|a| pkix_path::names_match(&a.subject, cur_issuer));
                 if matched {
-                    self.frames
-                        .last_mut()
-                        .expect("non-empty")
-                        .anchor_yielded = true;
+                    self.frames.last_mut().expect("non-empty").anchor_yielded = true;
                     return Some(Ok(self.path.clone()));
                 }
             }
@@ -614,19 +620,26 @@ impl<'a> Iterator for PathCandidates<'a> {
 
             let candidate = &self.pool[idx];
 
-            // CA check (BasicConstraints cA=TRUE). A malformed BC is
-            // propagated as an error, mirroring the legacy `dfs`. The
-            // iterator becomes terminal after returning an error so the
-            // caller does not see further chains.
+            // CA check (BasicConstraints cA=TRUE). Skip-not-fail: a
+            // candidate whose `BasicConstraints` is absent, has
+            // `cA = FALSE`, or fails to DER-decode is treated as
+            // "not a CA" and silently skipped. This keeps DFS alive
+            // when the certificate pool carries unsolicited or corrupt
+            // certs — e.g. CMS `SignedData.certificates` bags routinely
+            // include certs the verifier did not solicit (other
+            // recipients in a multi-recipient message, intermediates
+            // from unrelated CAs that rode along, expired or corrupt
+            // certs from someone's pipeline). One bad cert in the bag
+            // must not poison verification of an otherwise-valid chain.
             //
-            // (PKIX-qgw1 will switch this to skip-not-fail; both build
-            // paths will move together when that lands.)
+            // The error itself is not lost: when no path can be built
+            // and skipping malformed candidates is what prevented one,
+            // `build_path` returns `Error::NoPathFound`, indistinguishable
+            // from any other no-path case. Callers that want diagnostic
+            // detail ("why didn't this path build?") need a future
+            // diagnostic mode; that is out of scope for skip-not-fail.
             match cert_is_ca(candidate) {
-                Err(e) => {
-                    self.done = true;
-                    return Some(Err(e));
-                }
-                Ok(false) => continue,
+                Err(_) | Ok(false) => continue,
                 Ok(true) => {}
             }
 
@@ -840,8 +853,7 @@ mod tests {
             .join(std::format!("{name}.crt"));
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|e| std::panic!("fixture not found at {}: {}", path.display(), e));
-        Certificate::from_der(&bytes)
-            .unwrap_or_else(|e| std::panic!("failed to parse {name}: {e}"))
+        Certificate::from_der(&bytes).unwrap_or_else(|e| std::panic!("failed to parse {name}: {e}"))
     }
 
     #[test]
