@@ -148,6 +148,25 @@ lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 - Online CRL/OCSP fetching (`pkix-revocation-http`, planned)
 - Delegated OCSP responders
 
+## Interoperability
+
+`pkix-path`'s verdict behaviour is differential-tested against
+[OpenSSL](https://www.openssl.org/) and
+[pyca/cryptography](https://cryptography.io/) on the
+[NIST PKITS](https://csrc.nist.gov/projects/pki-testing) corpus via
+the [`pkix-difftest`](pkix-difftest/) harness. The PKITS baseline
+is committed at
+[`pkix-difftest/baseline-pkits.json`](pkix-difftest/baseline-pkits.json)
+(machine-readable source of truth) and
+[`pkix-difftest/baseline-pkits-analysis.md`](pkix-difftest/baseline-pkits-analysis.md)
+(human-readable bucket analysis).
+
+Concrete real-world divergences from the major implementations,
+along with our reasoning for each, are documented in
+[**INTEROP.md**](INTEROP.md). If `pkix-path`'s verdict on your chain
+disagrees with another validator, that document is the first place to
+look.
+
 ## Standards
 
 | Document | Title |
