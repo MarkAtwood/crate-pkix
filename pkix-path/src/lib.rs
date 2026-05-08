@@ -817,14 +817,36 @@ pub trait Profile {
 /// exhaustively, preserving the ability to add fields in future minor versions
 /// without a breaking change.
 ///
-/// # Copy stability
+/// # `Copy` removal in 0.3.0
 ///
-/// `ValidatedPath` derives `Copy` and is committed to remain `Copy` within the
-/// current major version. Any future field additions that are non-`Copy` will
-/// require an explicit removal of the `Copy` derive, constituting a breaking
-/// change per semantic versioning. Callers may depend on `Copy` within the
-/// 0.x series at the corresponding minor version pin.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// `ValidatedPath` is no longer `Copy`. The struct now carries owned
+/// heap-backed fields exposing RFC 5280 §6.1.5 wrap-up outputs (the leaf's
+/// subject DN, issuer DN, serial number, and SubjectPublicKeyInfo) so
+/// consumers can read the validated leaf identity without re-parsing
+/// `chain[0]`. These fields cannot satisfy the `Copy` bound; pre-0.3
+/// callers that relied on bit-copy semantics need to add `.clone()` or
+/// pass `&ValidatedPath` instead.
+///
+/// # §6.1.5 wrap-up outputs
+///
+/// RFC 5280 §6.1.5 specifies that successful path validation produces
+/// several outputs identifying the validated leaf certificate. The four
+/// leaf-intrinsic outputs (subject, issuer, serial, SPKI) are surfaced
+/// here as convenience accessors; consumers no longer need to re-parse
+/// `chain[0]` to obtain them.
+///
+/// Other §6.1.5 outputs that depend on validation state (the final
+/// `working_public_key_parameters`, the `valid_policy_tree`) are not yet
+/// surfaced. Future minor versions may add them; callers should pattern
+/// match with `..` rest patterns on this `#[non_exhaustive]` struct.
+///
+/// `Hash` is no longer derived because none of the new field types
+/// (`x509_cert::name::Name`, `x509_cert::serial_number::SerialNumber`,
+/// `spki::SubjectPublicKeyInfoOwned`) implement `Hash` upstream. No
+/// in-tree consumer used `ValidatedPath` as a `HashMap`/`HashSet` key,
+/// so dropping the derive is observable but should not require code
+/// changes for any existing user.
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
@@ -848,6 +870,50 @@ pub struct ValidatedPath {
     ///
     /// [`BasicConstraints`]: x509_cert::ext::pkix::BasicConstraints
     pub depth: usize,
+
+    /// Subject DN of the validated leaf certificate (`chain[0].subject`).
+    ///
+    /// RFC 5280 §6.1.5 names this output indirectly: a successful path
+    /// validation produces the leaf's identity (subject + serial uniquely
+    /// identify a certificate). This field is a convenience accessor —
+    /// callers could equivalently read `chain[0].tbs_certificate.subject`,
+    /// but threading the chain to every consumer that needs the leaf's DN
+    /// is awkward. The clone is owned to free the validated value from any
+    /// lifetime tie to the input chain.
+    pub leaf_subject: x509_cert::name::Name,
+
+    /// Issuer DN of the validated leaf certificate (`chain[0].issuer`).
+    ///
+    /// This is the §6.1.5(f) `working_issuer_name` output as observed at
+    /// the leaf cert (which is the first cert processed by the §6.1
+    /// algorithm, so the leaf's `issuer` is the initial value of
+    /// `working_issuer_name` before iteration begins; for a successfully
+    /// validated chain it identifies the directly-signing CA).
+    pub leaf_issuer: x509_cert::name::Name,
+
+    /// Serial number of the validated leaf certificate
+    /// (`chain[0].serial_number`).
+    ///
+    /// Together with [`Self::leaf_issuer`] this forms the RFC 5280
+    /// §4.1.2.2 unique certificate identifier (`{ issuer, serial }`),
+    /// which downstream code commonly needs for revocation lookups,
+    /// audit logging, or de-duplication.
+    pub leaf_serial: x509_cert::serial_number::SerialNumber,
+
+    /// `SubjectPublicKeyInfo` of the validated leaf certificate.
+    ///
+    /// This is the §6.1.5(c)(d)(e) `working_public_key` /
+    /// `working_public_key_algorithm` / `working_public_key_parameters`
+    /// outputs, bundled into the canonical SPKI form. Downstream code
+    /// (e.g. application-layer signature verification using the validated
+    /// leaf as a trust delegate) needs the full SPKI rather than only the
+    /// algorithm identifier or only the public-key bits.
+    ///
+    /// Note: this field reflects the leaf's *encoded* SPKI as it appeared
+    /// in the certificate, not a normalized/canonicalized form. PSS
+    /// parameters, RSA `parameters: NULL` vs `parameters: absent`
+    /// ambiguities, etc. are preserved verbatim.
+    pub leaf_spki: spki::SubjectPublicKeyInfoOwned,
 }
 
 /// Validate a certificate chain from subject to a trust anchor.
@@ -921,9 +987,20 @@ where
         }
         match chain_walk(chain, anchor, policy, verifier) {
             Ok(()) => {
+                // §6.1.5 leaf-intrinsic outputs. `chain[0]` is guaranteed
+                // non-empty by `check_inputs` at the top of this function.
+                // The four fields below are direct clones of the leaf's
+                // `tbs_certificate` fields; populating them from `chain[0]`
+                // (rather than threading them out of `chain_walk`) avoids
+                // changing the internal walker's `Result<()>` return type.
+                let leaf_tbs = &chain[0].tbs_certificate;
                 return Ok(ValidatedPath {
                     anchor_index,
                     depth: chain.len().saturating_sub(1),
+                    leaf_subject: leaf_tbs.subject.clone(),
+                    leaf_issuer: leaf_tbs.issuer.clone(),
+                    leaf_serial: leaf_tbs.serial_number.clone(),
+                    leaf_spki: leaf_tbs.subject_public_key_info.clone(),
                 });
             }
             Err(e) => last_err = e,
@@ -3653,6 +3730,99 @@ mod tests_validate_path {
         .expect("2-cert chain must validate");
         assert_eq!(result.anchor_index, 0);
         assert_eq!(result.depth, 1);
+    }
+
+    /// §6.1.5 leaf-intrinsic outputs are populated correctly from `chain[0]`.
+    ///
+    /// Independent oracle: parse the leaf fixture a second time via
+    /// `Certificate::from_der` (a different code path from `validate_path`'s
+    /// chain[0] access). Compare each `ValidatedPath` accessor field against
+    /// the independently-parsed leaf's `tbs_certificate` field. Catches:
+    /// - Field swaps (e.g. `leaf_subject` accidentally populated from `issuer`).
+    /// - Wrong cert in chain (e.g. `chain[1].subject` instead of `chain[0]`).
+    /// - Forgotten field assignments.
+    ///
+    /// Does NOT validate x509-cert's parser correctness (that's tested
+    /// upstream); it validates the wiring between `validate_path` and
+    /// `ValidatedPath`.
+    #[test]
+    fn validated_path_exposes_leaf_subject_issuer_serial_spki() {
+        let root = load(include_bytes!("../tests/fixtures/gry-root.der"));
+        let int_cert = load(include_bytes!("../tests/fixtures/gry-int.der"));
+        let leaf_bytes = include_bytes!("../tests/fixtures/gry-leaf.der");
+        let leaf = load(leaf_bytes);
+
+        // Independent oracle: re-parse the leaf via Certificate::from_der.
+        // x509-cert's parser is the upstream oracle for the field values.
+        let oracle_leaf =
+            Certificate::from_der(leaf_bytes).expect("oracle: leaf fixture must parse");
+
+        let anchors = [TrustAnchor::from_cert(root)];
+        let result = validate_path(
+            &[leaf, int_cert],
+            &anchors,
+            &policy_at(GRY_NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect("2-cert chain must validate");
+
+        // The four §6.1.5 leaf-intrinsic outputs must match the
+        // independently-parsed leaf's corresponding tbs_certificate fields.
+        assert_eq!(
+            result.leaf_subject, oracle_leaf.tbs_certificate.subject,
+            "ValidatedPath.leaf_subject must equal chain[0].tbs_certificate.subject"
+        );
+        assert_eq!(
+            result.leaf_issuer, oracle_leaf.tbs_certificate.issuer,
+            "ValidatedPath.leaf_issuer must equal chain[0].tbs_certificate.issuer"
+        );
+        assert_eq!(
+            result.leaf_serial, oracle_leaf.tbs_certificate.serial_number,
+            "ValidatedPath.leaf_serial must equal chain[0].tbs_certificate.serial_number"
+        );
+        assert_eq!(
+            result.leaf_spki, oracle_leaf.tbs_certificate.subject_public_key_info,
+            "ValidatedPath.leaf_spki must equal chain[0].tbs_certificate.subject_public_key_info"
+        );
+
+        // Sanity: leaf_subject != leaf_issuer for a real (non-self-signed)
+        // leaf. This catches the swap-subject-with-issuer regression: a
+        // subject-issuer copy bug would leave both fields equal to whichever
+        // one was used.
+        assert_ne!(
+            result.leaf_subject, result.leaf_issuer,
+            "non-self-signed leaf must have distinct subject and issuer DNs (regression: swap)"
+        );
+    }
+
+    /// §6.1.5 outputs for a 1-cert (self-signed) chain.
+    ///
+    /// Self-signed certs have `subject == issuer`. This documents that
+    /// `leaf_subject` and `leaf_issuer` ARE expected to be equal in this
+    /// case — the previous test's `assert_ne!` is for non-self-signed
+    /// chains only.
+    #[test]
+    fn validated_path_outputs_for_self_signed_chain() {
+        let cert_bytes = include_bytes!("../tests/fixtures/ec-p256-sha256.der");
+        let cert = load(cert_bytes);
+        let oracle = Certificate::from_der(cert_bytes).expect("oracle: cert must parse");
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+
+        let result = validate_path(&[cert], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier)
+            .expect("1-cert self-signed chain must validate");
+
+        assert_eq!(result.leaf_subject, oracle.tbs_certificate.subject);
+        assert_eq!(result.leaf_issuer, oracle.tbs_certificate.issuer);
+        assert_eq!(result.leaf_serial, oracle.tbs_certificate.serial_number);
+        assert_eq!(
+            result.leaf_spki,
+            oracle.tbs_certificate.subject_public_key_info
+        );
+        // Self-signed: subject == issuer by definition.
+        assert_eq!(
+            result.leaf_subject, result.leaf_issuer,
+            "self-signed cert must have equal subject and issuer DNs"
+        );
     }
 
     /// Multiple anchors: correct anchor is second in the slice.

@@ -6,6 +6,50 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path 0.3.0` — BREAKING
+
+#### Changed (breaking)
+
+- **`ValidatedPath` no longer derives `Copy`.** Four new heap-backed fields
+  surface the §6.1.5 leaf-intrinsic outputs (`leaf_subject`, `leaf_issuer`,
+  `leaf_serial`, `leaf_spki`); none of the field types
+  (`x509_cert::name::Name`, `x509_cert::serial_number::SerialNumber`,
+  `spki::SubjectPublicKeyInfoOwned`) implement `Copy` upstream, so the
+  derive must be removed.
+
+  **Migration**: callers that relied on bit-copy semantics (passing
+  `ValidatedPath` by value to multiple consumers without `.clone()`) need
+  to either insert an explicit `.clone()` or pass `&ValidatedPath` instead.
+  No in-tree workspace consumer relied on this; downstream impact is
+  expected to be minimal.
+
+- **`ValidatedPath` no longer derives `Hash`.** None of the new field
+  types implement `Hash` upstream. Existing usage of `ValidatedPath` as
+  a `HashMap`/`HashSet` key — none observed in this workspace — is no
+  longer possible. Callers needing hashable identity for a validated path
+  can hash any of the new fields (`leaf_serial`, `leaf_spki`'s DER
+  encoding) directly.
+
+#### Added
+
+- `ValidatedPath::leaf_subject: x509_cert::name::Name` — RFC 5280 §6.1.5
+  output: subject DN of the validated leaf certificate (`chain[0]`).
+- `ValidatedPath::leaf_issuer: x509_cert::name::Name` — issuer DN of the
+  validated leaf certificate.
+- `ValidatedPath::leaf_serial: x509_cert::serial_number::SerialNumber` —
+  serial number of the validated leaf certificate.
+- `ValidatedPath::leaf_spki: spki::SubjectPublicKeyInfoOwned` —
+  `SubjectPublicKeyInfo` of the validated leaf certificate (carries
+  algorithm OID, parameters, and public-key bits).
+
+  These four fields let downstream code read the validated leaf's
+  identity without re-parsing `chain[0]`. Common uses include revocation
+  lookups (need `{ issuer, serial }`), application-layer signature
+  verification using the validated leaf as a trust delegate (needs SPKI),
+  and audit logging (needs subject DN).
+
+  Tracked as PKIX-qzmr in the project beads.
+
 ### `pkix-revocation` — CDP/IDP `distributionPoint` matching (RFC 5280 §6.3.3(b)(1))
 
 #### Added
