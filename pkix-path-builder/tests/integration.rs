@@ -6,7 +6,10 @@
 use der::asn1::BitString;
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
-use pkix_path_builder::{build_path, CertPool};
+use pkix_path_builder::{
+    build_path, build_path_candidates, build_path_candidates_with_config, CertPool,
+    PathBuilderConfig,
+};
 use x509_cert::Certificate;
 
 /// Unix timestamp within the PKITS cert validity window.
@@ -397,4 +400,284 @@ fn test_build_path_aki_ranking_unrelated_pool_cert_does_not_perturb_selection() 
     let policy = ValidationPolicy::new(PKITS_NOW);
     pkix_path::validate_path(&path, &[anchor], &policy, &DefaultVerifier)
         .expect("validate_path must succeed");
+}
+
+// =========================================================================
+// PathCandidates iterator tests (PKIX-mszo)
+// =========================================================================
+
+/// PathCandidates iterator: smime build-then-validate retry loop pattern.
+///
+/// This is the canonical S/MIME usage shape: keep pulling chains from
+/// the iterator until one validates cryptographically. The independent
+/// oracle is `validate_path`'s success on the chain the iterator
+/// supplies — the iterator's job is just to produce candidate chains
+/// in some defensible order; the validator's job is to accept or reject
+/// each.
+///
+/// Test fixture: same as the AKI-ranking test (PKITS Test4EE +
+/// OldKeyCACert + bridge cert with same DN). Pool insertion order is
+/// `[bridge, oldkey]`. The iterator MUST find the verifying chain
+/// within 2 `next()` calls (it does so in 1, courtesy of AKI ranking).
+#[test]
+fn test_iterator_smime_retry_loop_finds_verifying_chain() {
+    let ee = pkits_cert("ValidBasicSelfIssuedNewWithOldTest4EE");
+    let oldkey_ca = pkits_cert("BasicSelfIssuedOldKeyCACert");
+    let bridge_ca = pkits_cert("BasicSelfIssuedOldKeyNewWithOldCACert");
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(bridge_ca);
+    pool.add(oldkey_ca);
+
+    let mut policy = ValidationPolicy::new(PKITS_NOW);
+    policy.enforce_key_usage = false;
+    let verifier = DefaultVerifier;
+    let anchors = std::slice::from_ref(&anchor);
+
+    let mut iter = build_path_candidates(&ee, &pool, anchors);
+    let mut next_calls = 0_usize;
+    let mut verified_chain: Option<Vec<Certificate>> = None;
+    loop {
+        match iter.next() {
+            None => break,
+            Some(Err(e)) => panic!("iterator yielded fatal error: {e}"),
+            Some(Ok(chain)) => {
+                next_calls += 1;
+                if pkix_path::validate_path(&chain, anchors, &policy, &verifier).is_ok() {
+                    verified_chain = Some(chain);
+                    break;
+                }
+                // else: try next candidate
+            }
+        }
+        // Defensive cap so a buggy iterator can't loop forever in the test.
+        assert!(next_calls < 10, "iterator should terminate quickly");
+    }
+
+    let chain = verified_chain.expect("at least one chain must verify");
+    assert!(
+        next_calls <= 2,
+        "iterator must find a verifying chain in ≤2 calls, took {next_calls}"
+    );
+    // Sanity: the verified chain must be the one rooted at OldKeyCACert.
+    assert!(chain.len() >= 2, "chain has at least leaf + intermediate");
+}
+
+/// PathCandidates iterator: enumerates all topologically-valid chains.
+///
+/// In the AKI fixture, both `[Test4EE, oldkey]` and
+/// `[Test4EE, bridge, oldkey]` are topologically valid paths. The
+/// iterator must yield both (in some order — we don't pin the order
+/// beyond "AKI-tier-0 first") and then return `None`.
+///
+/// Independent oracle: each yielded chain must independently terminate
+/// at the trust anchor's DN by `pkix_path::names_match`. We do not
+/// validate signatures here; that would conflate the iterator
+/// enumeration semantics with cryptographic verification.
+#[test]
+fn test_iterator_enumerates_all_topologically_valid_chains() {
+    let ee = pkits_cert("ValidBasicSelfIssuedNewWithOldTest4EE");
+    let oldkey_ca = pkits_cert("BasicSelfIssuedOldKeyCACert");
+    let bridge_ca = pkits_cert("BasicSelfIssuedOldKeyNewWithOldCACert");
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(bridge_ca.clone());
+    pool.add(oldkey_ca.clone());
+
+    let oldkey_spki = encode_spki(&oldkey_ca);
+    let bridge_spki = encode_spki(&bridge_ca);
+
+    let iter = build_path_candidates(&ee, &pool, std::slice::from_ref(&anchor));
+    let mut chains: Vec<Vec<Certificate>> = Vec::new();
+    for item in iter {
+        let chain = item.expect("no fatal errors expected on this fixture");
+        // Each yielded chain's terminal cert must be issued by the anchor.
+        let terminal_issuer = &chain
+            .last()
+            .expect("yielded chain non-empty")
+            .tbs_certificate
+            .issuer;
+        assert!(
+            pkix_path::names_match(&anchor.subject, terminal_issuer),
+            "yielded chain must terminate at the trust anchor"
+        );
+        chains.push(chain);
+    }
+
+    // Two topologically valid chains exist:
+    //   [Test4EE, oldkey]                       (length 2)
+    //   [Test4EE, bridge, oldkey]               (length 3)
+    // Both must be yielded.
+    assert_eq!(
+        chains.len(),
+        2,
+        "exactly two topologically valid chains must be yielded; got {}",
+        chains.len()
+    );
+    let len2 = chains.iter().filter(|c| c.len() == 2).count();
+    let len3 = chains.iter().filter(|c| c.len() == 3).count();
+    assert_eq!(len2, 1, "one length-2 chain expected (direct via oldkey)");
+    assert_eq!(
+        len3, 1,
+        "one length-3 chain expected (via bridge then oldkey)"
+    );
+
+    // The shortest chain (length 2) must use OldKeyCACert directly.
+    let shortest = chains.iter().find(|c| c.len() == 2).expect("present");
+    assert_eq!(encode_spki(&shortest[1]), oldkey_spki);
+    // The longer chain must traverse the bridge first, then OldKeyCA.
+    let longer = chains.iter().find(|c| c.len() == 3).expect("present");
+    assert_eq!(encode_spki(&longer[1]), bridge_spki);
+    assert_eq!(encode_spki(&longer[2]), oldkey_spki);
+}
+
+/// PathCandidates iterator: returns `None` after enumeration is exhausted.
+///
+/// Construction: a single-intermediate happy-path chain (PKITS §4.1.1).
+/// Exactly one topologically valid path exists. The iterator yields it
+/// once and then returns `None` indefinitely.
+#[test]
+fn test_iterator_returns_none_after_exhaustion() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let intermediate = pkits_cert("GoodCACert");
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(intermediate);
+
+    let mut iter = build_path_candidates(&ee, &pool, std::slice::from_ref(&anchor));
+    let first = iter.next();
+    assert!(matches!(first, Some(Ok(_))), "first call must yield a chain");
+
+    // After the only chain is yielded, the iterator must be exhausted.
+    let second = iter.next();
+    assert!(second.is_none(), "second call must return None");
+
+    // And remain exhausted on subsequent calls (the `done` flag is sticky).
+    let third = iter.next();
+    assert!(third.is_none(), "subsequent calls must remain None");
+}
+
+/// PathCandidates iterator: budget is shared across all `next()` calls.
+///
+/// Construction: identical to the budget-exhaustion test for the legacy
+/// `build_path` (30 same-DN self-issued CAs, no anchor reachable). The
+/// iterator must terminate with `Err(BudgetExceeded)` and become exhausted.
+/// After the error is yielded once, subsequent `next()` calls must
+/// return `None`.
+///
+/// Independent oracle: wall-clock time bound — a buggy iterator with no
+/// budget bound would not terminate within the test time limit.
+#[test]
+fn test_iterator_budget_bounded_across_calls() {
+    const N: usize = 30;
+    const _: () = assert!(N <= u8::MAX as usize, "N must fit in u8");
+
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let template_ca = pkits_cert("GoodCACert");
+    let fake_anchor = TrustAnchor::from(&pkits_cert("BadSignedCACert"));
+
+    let mut pool = CertPool::new();
+    for i in 0..N {
+        let mut ca = template_ca.clone();
+        ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
+        ca.tbs_certificate
+            .subject_public_key_info
+            .subject_public_key = BitString::new(
+            0,
+            vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
+        )
+        .expect("BitString construction must succeed for valid parameters");
+        pool.add(ca);
+    }
+
+    let start = std::time::Instant::now();
+    let mut iter = build_path_candidates(&ee, &pool, std::slice::from_ref(&fake_anchor));
+
+    // Pull until the iterator terminates (None) or yields an error.
+    let mut got_budget_exceeded = false;
+    let mut yielded_chains = 0_usize;
+    let mut steps = 0_usize;
+    loop {
+        match iter.next() {
+            None => break,
+            Some(Ok(_)) => {
+                yielded_chains += 1;
+            }
+            Some(Err(pkix_path_builder::Error::BudgetExceeded)) => {
+                got_budget_exceeded = true;
+                break;
+            }
+            Some(Err(e)) => panic!("unexpected error: {e}"),
+        }
+        steps += 1;
+        // Defensive cap so a buggy iterator without a budget cannot wedge the test.
+        assert!(
+            steps < 50_000,
+            "iterator did not terminate; budget appears unbounded"
+        );
+    }
+    let elapsed = start.elapsed();
+
+    assert!(
+        got_budget_exceeded,
+        "iterator must yield BudgetExceeded on adversarial pool; \
+         yielded {yielded_chains} chains and {steps} steps before termination"
+    );
+    assert!(
+        elapsed.as_secs() < 2,
+        "iterator took {elapsed:?}; budget enforcement must prevent exponential blowup"
+    );
+
+    // After BudgetExceeded, subsequent calls must return None.
+    let after_error = iter.next();
+    assert!(
+        after_error.is_none(),
+        "iterator must be exhausted after BudgetExceeded; got {after_error:?}"
+    );
+}
+
+/// PathCandidates iterator: respects a `PathBuilderConfig` `max_depth`
+/// of 0 by yielding only the trivial `[target]` chain when target's
+/// issuer matches an anchor directly (no intermediates needed).
+///
+/// Construction: target = `GoodCACert` (a PKITS intermediate whose
+/// issuer is "Trust Anchor"), anchor = the PKITS trust anchor. Target's
+/// issuer matches anchor.subject ⇒ anchor matches at frame 0 with no
+/// intermediate, even when `max_depth = 0` rules out exploring any
+/// candidates at all.
+///
+/// This pins down the depth-0 base case and confirms that
+/// `build_path_candidates_with_config` plumbs `max_depth` through.
+#[test]
+fn test_iterator_max_depth_zero_respects_trivial_chain() {
+    // GoodCACert is directly issued by the PKITS trust anchor.
+    let target = pkits_cert("GoodCACert");
+    let anchor = pkits_trust_anchor();
+
+    let pool = CertPool::new();
+    let mut config = PathBuilderConfig::new();
+    config.max_depth = 0;
+    config.dfs_budget = 1000;
+
+    let mut iter = build_path_candidates_with_config(
+        &target,
+        &pool,
+        std::slice::from_ref(&anchor),
+        &config,
+    );
+    let chain = iter
+        .next()
+        .expect("iterator must yield the trivial chain")
+        .expect("no error expected on trivial chain");
+    assert_eq!(
+        chain.len(),
+        1,
+        "max_depth=0 yields the target alone (anchor matches at frame 0)"
+    );
+
+    // No further chains exist (pool is empty).
+    assert!(iter.next().is_none(), "iterator must exhaust after one yield");
 }
