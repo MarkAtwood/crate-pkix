@@ -252,6 +252,23 @@ pub enum Error {
     /// responder cert was actually issued by the expected CA.
     OcspResponderCertSigInvalid,
 
+    /// The CRL declares itself an indirect CRL (RFC 5280 §5.2.6:
+    /// `IssuingDistributionPoint.indirectCRL = TRUE`) but the checker
+    /// was constructed without a `cRLIssuer` certificate.
+    ///
+    /// Use [`crate::CrlChecker::new_with_crl_issuer`] (or its delta
+    /// sibling) and supply the cert that actually signed the CRL.
+    IndirectCrlIssuerMissing,
+
+    /// The CRL does NOT declare itself an indirect CRL but the checker
+    /// was constructed with a `cRLIssuer` certificate.
+    ///
+    /// This rejects the inverse of [`Error::IndirectCrlIssuerMissing`]:
+    /// a caller asserting a separate CRL signer for what is actually a
+    /// direct CRL signed by the cert's own issuer. Direct CRLs should
+    /// be loaded via [`crate::CrlChecker::new`] / `with_delta`.
+    IndirectCrlIssuerUnexpected,
+
     /// The CRL issuer certificate does not have the `cRLSign` bit set in `KeyUsage`
     /// (RFC 5280 §6.3.3(f)).
     CrlSignMissing,
@@ -353,6 +370,12 @@ impl core::fmt::Display for Error {
             ),
             Self::OcspResponderCertSigInvalid => f.write_str(
                 "CA signature on delegated OCSP responder cert is invalid",
+            ),
+            Self::IndirectCrlIssuerMissing => f.write_str(
+                "CRL declares indirectCRL=TRUE but no cRLIssuer certificate was provided",
+            ),
+            Self::IndirectCrlIssuerUnexpected => f.write_str(
+                "cRLIssuer certificate was provided but the CRL is not indirect",
             ),
             Self::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
