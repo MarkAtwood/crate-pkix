@@ -6,6 +6,31 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path-builder` — skip-not-fail on malformed `BasicConstraints`
+
+#### Changed (non-breaking)
+
+- `build_path`, `build_path_with_config`, and the `PathCandidates` iterator
+  now silently **skip** candidate intermediates whose `BasicConstraints`
+  extension is present but cannot be DER-decoded, rather than aborting the
+  search with `Error::MalformedIntermediate`. This matches the existing
+  treatment of candidates with `cA = FALSE` or no `BasicConstraints` at all.
+
+  Rationale: real-world certificate pools (notably CMS
+  `SignedData.certificates` bags) routinely include unsolicited or corrupt
+  certs the verifier did not request — for other recipients in a
+  multi-recipient encrypted message, intermediates from unrelated CAs that
+  rode along, or expired/corrupt artefacts from someone's pipeline. One bad
+  cert in the bag must not poison verification of an otherwise-valid chain.
+
+  When skipping all malformed candidates would leave no path to a trust
+  anchor, `build_path` returns `Error::NoPathFound` (as it would for any
+  other no-path scenario). The `Error::MalformedIntermediate` variant is
+  retained because `Error` is `#[non_exhaustive]` and may be repurposed by
+  a future diagnostic mode.
+
+  Tracked as PKIX-qgw1 in the project beads.
+
 ## [0.3.0 / 0.2.1] — 2026-05-07
 
 This release groups three concurrent crate versions:

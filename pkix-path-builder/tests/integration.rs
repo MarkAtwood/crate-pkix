@@ -3,7 +3,7 @@
 //! Uses PKITS (NIST SP 800-89) certificate fixtures from the pkix-path crate.
 //! All tests are fully offline; no network access is performed.
 
-use der::asn1::BitString;
+use der::asn1::{BitString, ObjectIdentifier, OctetString};
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
 use pkix_path_builder::{
@@ -34,6 +34,39 @@ fn pkits_cert(name: &str) -> Certificate {
 /// Build a trust anchor from the PKITS root certificate.
 fn pkits_trust_anchor() -> TrustAnchor {
     TrustAnchor::from(&pkits_cert("TrustAnchorRootCertificate"))
+}
+
+/// OID `id-ce-basicConstraints` (RFC 5280 §4.2.1.9).
+///
+/// Inlined here rather than importing — `pkix_path_builder::OID_BASIC_CONSTRAINTS`
+/// is a private constant in the path-builder crate.
+const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
+
+/// Take a cert with a real `BasicConstraints` extension and corrupt the
+/// extension's `extn_value` to bytes that cannot DER-decode as
+/// `BasicConstraints`.
+///
+/// The chosen payload (`0xff 0xff`) is not valid DER — the leading
+/// 0xFF byte is not a valid identifier octet. This is the same technique
+/// used in `pkix-path/tests/anchor_nc.rs` for `NameConstraints` corruption.
+///
+/// The outer DER (`Certificate` SEQUENCE) and the cert's signature both
+/// become invalid after this surgery, but path-building does not verify
+/// signatures — it only walks the topology and inspects `BasicConstraints`.
+/// That makes this helper sufficient for testing the skip-not-fail
+/// behaviour of [`pkix_path_builder::build_path`] in isolation.
+fn corrupt_basic_constraints(mut cert: Certificate) -> Certificate {
+    let exts = cert
+        .tbs_certificate
+        .extensions
+        .as_mut()
+        .expect("template cert must have extensions");
+    let bc = exts
+        .iter_mut()
+        .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
+        .expect("template cert must carry BasicConstraints");
+    bc.extn_value = OctetString::new(b"\xff\xff".to_vec()).expect("OctetString::new");
+    cert
 }
 
 /// Test that `build_path` succeeds on the PKITS §4.1.1 two-cert chain and that
@@ -333,8 +366,8 @@ fn test_build_path_aki_ranking_disambiguates_same_dn_different_spki() {
     pool.add(bridge_ca.clone());
     pool.add(oldkey_ca.clone());
 
-    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
-        .expect("build_path must succeed");
+    let path =
+        build_path(&ee, &pool, std::slice::from_ref(&anchor)).expect("build_path must succeed");
 
     // The intermediate at path[1] must be OldKeyCACert (whose SKI matches
     // Test4EE's AKI), not the bridge cert that has a different SKI.
@@ -385,8 +418,8 @@ fn test_build_path_aki_ranking_unrelated_pool_cert_does_not_perturb_selection() 
     pool.add(unrelated.clone());
     pool.add(good_ca.clone());
 
-    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
-        .expect("build_path must succeed");
+    let path =
+        build_path(&ee, &pool, std::slice::from_ref(&anchor)).expect("build_path must succeed");
 
     // The selected intermediate must be GoodCACert (only DN-matching cand.).
     let selected = encode_spki(&path[1]);
@@ -549,7 +582,10 @@ fn test_iterator_returns_none_after_exhaustion() {
 
     let mut iter = build_path_candidates(&ee, &pool, std::slice::from_ref(&anchor));
     let first = iter.next();
-    assert!(matches!(first, Some(Ok(_))), "first call must yield a chain");
+    assert!(
+        matches!(first, Some(Ok(_))),
+        "first call must yield a chain"
+    );
 
     // After the only chain is yielded, the iterator must be exhausted.
     let second = iter.next();
@@ -662,12 +698,8 @@ fn test_iterator_max_depth_zero_respects_trivial_chain() {
     config.max_depth = 0;
     config.dfs_budget = 1000;
 
-    let mut iter = build_path_candidates_with_config(
-        &target,
-        &pool,
-        std::slice::from_ref(&anchor),
-        &config,
-    );
+    let mut iter =
+        build_path_candidates_with_config(&target, &pool, std::slice::from_ref(&anchor), &config);
     let chain = iter
         .next()
         .expect("iterator must yield the trivial chain")
@@ -679,5 +711,105 @@ fn test_iterator_max_depth_zero_respects_trivial_chain() {
     );
 
     // No further chains exist (pool is empty).
-    assert!(iter.next().is_none(), "iterator must exhaust after one yield");
+    assert!(
+        iter.next().is_none(),
+        "iterator must exhaust after one yield"
+    );
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// PKIX-qgw1: skip-not-fail on MalformedIntermediate
+//
+// A candidate intermediate whose `BasicConstraints` extension is present
+// but cannot be DER-decoded must be silently skipped rather than poison
+// the whole search. CMS `SignedData.certificates` bags routinely include
+// unsolicited / corrupt certs; one bad cert in the bag must not abort
+// verification of an otherwise-valid chain.
+// ──────────────────────────────────────────────────────────────────────
+
+/// Pool contains a malformed-`BasicConstraints` cert AND a valid
+/// intermediate. `build_path` must skip the malformed cert and return
+/// the chain through the valid intermediate.
+///
+/// Independent oracle: `pkix_path::validate_path` succeeds on the
+/// returned chain. Because the malformed cert's outer signature bytes
+/// would not verify (the corruption breaks the TBS encoding the
+/// signature was computed over), `validate_path` succeeding is proof
+/// that the well-formed `GoodCACert` clone was selected.
+#[test]
+fn test_build_path_skips_malformed_bc_when_valid_alternative_exists() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let valid_intermediate = pkits_cert("GoodCACert");
+    let malformed = corrupt_basic_constraints(pkits_cert("GoodCACert"));
+    let anchor = pkits_trust_anchor();
+
+    // Insert the malformed cert FIRST so it shows up earlier in the
+    // candidate ranking. Both candidates share the same subject DN, so
+    // they fall in the same AKI tier and pool insertion order
+    // determines which one is tried first. The skip-not-fail change
+    // means the malformed cert is skipped even though it is tried
+    // before the valid one.
+    let mut pool = CertPool::new();
+    pool.add(malformed);
+    pool.add(valid_intermediate);
+
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
+        .expect("skip-not-fail: malformed BC must be skipped, valid intermediate selected");
+
+    // Independent oracle: end-to-end cryptographic validation.
+    let policy = ValidationPolicy::new(PKITS_NOW);
+    let verifier = DefaultVerifier;
+    pkix_path::validate_path(&path, &[anchor], &policy, &verifier)
+        .expect("validate_path must succeed; this proves the well-formed GoodCACert was selected");
+}
+
+/// Pool contains ONLY a malformed-`BasicConstraints` intermediate.
+/// `build_path` must return [`pkix_path_builder::Error::NoPathFound`],
+/// not [`pkix_path_builder::Error::MalformedIntermediate`].
+///
+/// This is the negative half of the contract: skip-not-fail must
+/// produce a chain-not-found verdict, not a structural-error verdict,
+/// when the corrupt cert was the only available bridge.
+#[test]
+fn test_build_path_no_path_found_when_only_intermediate_has_malformed_bc() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let malformed = corrupt_basic_constraints(pkits_cert("GoodCACert"));
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(malformed);
+
+    let err = build_path(&ee, &pool, std::slice::from_ref(&anchor))
+        .expect_err("with only a malformed-BC intermediate, no path can be built");
+
+    assert!(
+        matches!(err, pkix_path_builder::Error::NoPathFound),
+        "expected NoPathFound (skip-not-fail semantics); got {err}"
+    );
+}
+
+/// Belt-and-braces: insertion order reversed from the first test.
+/// Valid intermediate first, malformed second. Build must still
+/// succeed; the malformed cert never gets reached because the valid
+/// one wins. This documents that pool order doesn't matter for the
+/// "alternative exists" case, only for proving skip-not-fail (the
+/// first test does that).
+#[test]
+fn test_build_path_skips_malformed_bc_independent_of_pool_order() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let valid_intermediate = pkits_cert("GoodCACert");
+    let malformed = corrupt_basic_constraints(pkits_cert("GoodCACert"));
+    let anchor = pkits_trust_anchor();
+
+    let mut pool = CertPool::new();
+    pool.add(valid_intermediate);
+    pool.add(malformed);
+
+    let path = build_path(&ee, &pool, std::slice::from_ref(&anchor))
+        .expect("build_path must succeed regardless of which cert is first in the pool");
+
+    let policy = ValidationPolicy::new(PKITS_NOW);
+    let verifier = DefaultVerifier;
+    pkix_path::validate_path(&path, &[anchor], &policy, &verifier)
+        .expect("validate_path must succeed on the built chain");
 }
