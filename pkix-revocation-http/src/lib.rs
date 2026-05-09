@@ -37,6 +37,7 @@
 //! wiring). Until then the structs hold their fields but do not yet
 //! implement [`pkix_revocation::RevocationChecker`].
 
+pub mod clients;
 #[cfg(feature = "crl")]
 mod crl;
 mod extract;
