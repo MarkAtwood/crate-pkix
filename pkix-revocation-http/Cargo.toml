@@ -44,6 +44,9 @@ ureq = { workspace = true, optional = true }
 # DefaultVerifier (rsa + p256 OID dispatch) is needed by the CrlChecker
 # / OcspChecker delegation tests. std needed for std::error::Error.
 pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
+# Mock HTTP server for the integration-test suite (PKIX-a1yc.9). MSRV
+# 1.70, comfortably within the workspace's 1.73 MSRV.
+mockito = "1.7"
 
 [package.metadata.docs.rs]
 all-features = true
