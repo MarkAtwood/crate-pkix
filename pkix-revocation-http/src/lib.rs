@@ -37,6 +37,8 @@
 //! wiring). Until then the structs hold their fields but do not yet
 //! implement [`pkix_revocation::RevocationChecker`].
 
+#[cfg(feature = "crl")]
+mod crl;
 mod extract;
 #[cfg(feature = "ocsp")]
 mod ocsp_request;
@@ -228,11 +230,10 @@ impl std::error::Error for FetchError {
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // fields wired to RevocationChecker impl in PKIX-a1yc.5
 pub struct HttpCrlFetcher<F, V> {
-    fetcher: F,
-    verifier: V,
-    now_unix: u64,
+    pub(crate) fetcher: F,
+    pub(crate) verifier: V,
+    pub(crate) now_unix: u64,
 }
 
 #[cfg(feature = "crl")]

@@ -341,6 +341,45 @@ pub enum Error {
     /// [`CrlChecker`]: crate::CrlChecker
     /// [`OcspChecker`]: crate::OcspChecker
     OutOfScope(OutOfScopeReason),
+
+    /// All known sources for revocation data failed to produce a usable
+    /// response.
+    ///
+    /// Returned by network-fetching adapters (`pkix-revocation-http`'s
+    /// `HttpCrlFetcher` / `HttpOcspFetcher`, future LDAP / out-of-band
+    /// adapters) when every URL extracted from the certificate failed
+    /// either at the transport layer (network, TLS, HTTP error) or at
+    /// the response layer (DER parse, signature, validity). The variant
+    /// is intentionally generic so that revocation sources beyond HTTP
+    /// can reuse it.
+    ///
+    /// Distinct from:
+    /// - [`Error::Revoked`] — source reached and reports revoked
+    /// - [`Error::OcspStatusUnknown`] — responder reached, reports unknown
+    /// - [`Error::OutOfScope`] — structurally-valid response that does
+    ///   not cover the certificate
+    ///
+    /// Hard-fail callers MUST reject the chain on this variant.
+    /// Soft-fail callers MAY treat it permissively.
+    ///
+    /// `description` is a human-readable summary suitable for logs; it
+    /// includes per-URL transport / status hints from the adapter. The
+    /// shape is deliberately a `String` rather than structured data so
+    /// the variant remains `Clone + PartialEq + Eq` (matching the rest
+    /// of `Error`) without leaking adapter-specific types into the
+    /// trait surface. Adapters surface structured failure information
+    /// through their own APIs.
+    ///
+    /// The variant is feature-gated behind `std` because `String` is
+    /// not available in the bare `no_std` build path. Network-fetching
+    /// adapters all require `std` anyway, so no-std consumers never
+    /// need to construct or match this variant.
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    RevocationFetchFailed {
+        /// Human-readable summary of the failures, one URL per line.
+        description: String,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -410,6 +449,10 @@ impl core::fmt::Display for Error {
             ),
             Self::OutOfScope(reason) => {
                 write!(f, "revocation source out of scope: {reason}")
+            }
+            #[cfg(feature = "std")]
+            Self::RevocationFetchFailed { description } => {
+                write!(f, "revocation data fetch failed: {description}")
             }
         }
     }
