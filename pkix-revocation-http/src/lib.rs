@@ -38,8 +38,13 @@
 //! implement [`pkix_revocation::RevocationChecker`].
 
 mod extract;
+#[cfg(feature = "ocsp")]
+mod ocsp_request;
 
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
+#[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
+pub use ocsp_request::{build_ocsp_request, BuildError, OcspHashAlg, OcspRequestBytes};
 
 /// Errors returned by the URL-extraction helpers
 /// ([`extract_cdp_http_urls`], [`extract_aia_http_urls`]).

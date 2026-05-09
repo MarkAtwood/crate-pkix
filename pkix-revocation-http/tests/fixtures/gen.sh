@@ -44,5 +44,33 @@ openssl req -new -x509 -key k.pem -days 36500 \
   -subj "/CN=Test No Extensions" \
   -outform DER -out "$DIR/cert-no-extensions.der"
 
+# Fixtures 4-7 — CA + leaf for OCSP request encoding (PKIX-a1yc.4).
+# We build a minimal CA-signs-leaf pair and let openssl ocsp -reqout produce
+# reference OCSPRequest DER bytes for SHA-1 and SHA-256 CertID variants.
+# These reference files are the independent oracle for build_ocsp_request.
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out "$TMP/ca.key" >/dev/null 2>&1
+openssl req -new -x509 -key "$TMP/ca.key" -days 36500 \
+  -subj "/CN=Test OCSP CA" \
+  -outform DER -out "$DIR/ca.der"
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+  -out "$TMP/leaf.key" >/dev/null 2>&1
+openssl req -new -key "$TMP/leaf.key" -subj "/CN=Test OCSP Leaf" \
+  -out "$TMP/leaf.csr"
+openssl x509 -req -in "$TMP/leaf.csr" \
+  -CAform DER -CA "$DIR/ca.der" -CAkey "$TMP/ca.key" -CAcreateserial \
+  -days 36500 -outform DER -out "$DIR/leaf.der"
+
+# openssl ocsp -reqout needs PEM input.
+openssl x509 -in "$DIR/ca.der"   -inform DER -out "$TMP/ca.pem"
+openssl x509 -in "$DIR/leaf.der" -inform DER -out "$TMP/leaf.pem"
+
+# -no_nonce is critical: byte-stable output that build_ocsp_request can
+# match exactly. The default request includes a random nonce extension.
+openssl ocsp -no_nonce -issuer "$TMP/ca.pem" -cert "$TMP/leaf.pem" \
+  -reqout "$DIR/req-sha1.der"
+openssl ocsp -no_nonce -issuer "$TMP/ca.pem" -sha256 -cert "$TMP/leaf.pem" \
+  -reqout "$DIR/req-sha256.der"
+
 echo "wrote:"
 ls -la "$DIR"/*.der
