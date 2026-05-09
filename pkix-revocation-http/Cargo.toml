@@ -13,13 +13,26 @@ categories  = ["cryptography"]
 [features]
 default = []
 crl  = ["pkix-revocation/crl"]
-ocsp = ["pkix-revocation/ocsp"]
+ocsp = [
+    "pkix-revocation/ocsp",
+    "dep:x509-ocsp",
+    "dep:sha1",
+    "dep:sha2",
+]
 
 [dependencies]
 pkix-path       = { workspace = true }
 pkix-revocation = { workspace = true }
 der             = { workspace = true }
 x509-cert       = { workspace = true }
+
+# OCSP request building (PKIX-a1yc.4). Pulled in only when the `ocsp`
+# feature is enabled. x509-ocsp's `builder` sub-feature gives us
+# Request::from_cert::<D>(...), and sha1 / sha2 supply the Digest impls
+# whose AssociatedOid the builder consumes for the CertID hashAlgorithm.
+x509-ocsp = { workspace = true, optional = true, features = ["builder"] }
+sha1      = { workspace = true, optional = true }
+sha2      = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 all-features = true
