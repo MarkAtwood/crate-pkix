@@ -41,6 +41,8 @@
 mod crl;
 mod extract;
 #[cfg(feature = "ocsp")]
+mod ocsp;
+#[cfg(feature = "ocsp")]
 mod ocsp_request;
 
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
@@ -272,11 +274,11 @@ impl<F, V> HttpCrlFetcher<F, V> {
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[derive(Clone, Debug)]
-#[allow(dead_code)] // fields wired to RevocationChecker impl in PKIX-a1yc.6
 pub struct HttpOcspFetcher<F, V> {
-    fetcher: F,
-    verifier: V,
-    now_unix: u64,
+    pub(crate) fetcher: F,
+    pub(crate) verifier: V,
+    pub(crate) now_unix: u64,
+    pub(crate) hash_alg: OcspHashAlg,
 }
 
 #[cfg(feature = "ocsp")]
@@ -287,8 +289,29 @@ impl<F, V> HttpOcspFetcher<F, V> {
     /// - `verifier`  — signature verifier passed to each on-demand
     ///   [`pkix_revocation::OcspChecker`]
     /// - `now_unix`  — current time as seconds since the Unix epoch
+    ///
+    /// The `CertID.hashAlgorithm` defaults to [`OcspHashAlg::Sha256`];
+    /// override via [`HttpOcspFetcher::with_hash_alg`].
+    #[must_use]
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
-        Self { fetcher, verifier, now_unix }
+        Self {
+            fetcher,
+            verifier,
+            now_unix,
+            hash_alg: OcspHashAlg::Sha256,
+        }
+    }
+
+    /// Override the OCSP `CertID.hashAlgorithm`.
+    ///
+    /// Default is SHA-256 because nearly all responders deployed today
+    /// support it. Use SHA-1 only for compatibility with very old
+    /// responders that have not been updated to RFC 6960's
+    /// SHA-2-family permission.
+    #[must_use]
+    pub const fn with_hash_alg(mut self, alg: OcspHashAlg) -> Self {
+        self.hash_alg = alg;
+        self
     }
 }
 
