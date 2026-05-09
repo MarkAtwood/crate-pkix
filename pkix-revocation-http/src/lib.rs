@@ -37,6 +37,46 @@
 //! wiring). Until then the structs hold their fields but do not yet
 //! implement [`pkix_revocation::RevocationChecker`].
 
+mod extract;
+
+pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
+
+/// Errors returned by the URL-extraction helpers
+/// ([`extract_cdp_http_urls`], [`extract_aia_http_urls`]).
+///
+/// Lives at the crate root so future helpers (e.g., the OCSP request
+/// builder in PKIX-a1yc.4) can share the same error type without forcing
+/// callers to import a sub-module.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ExtractError {
+    /// The certificate had the requested extension but its value did not
+    /// decode as the expected ASN.1 structure.
+    Der(der::Error),
+}
+
+impl core::fmt::Display for ExtractError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Der(e) => write!(f, "extension DER decode error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ExtractError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Der(e) => Some(e),
+        }
+    }
+}
+
+impl From<der::Error> for ExtractError {
+    fn from(e: der::Error) -> Self {
+        Self::Der(e)
+    }
+}
+
 /// HTTP transport for fetching revocation data.
 ///
 /// Implement this trait to plug in your own HTTP client (`reqwest` blocking,
