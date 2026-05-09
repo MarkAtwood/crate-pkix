@@ -19,6 +19,9 @@ ocsp = [
     "dep:sha1",
     "dep:sha2",
 ]
+# Reference HTTP transport using ureq (PKIX-a1yc.8). Optional; enabling
+# this feature pulls in rustls for HTTPS support.
+client-ureq = ["dep:ureq"]
 
 [dependencies]
 pkix-path       = { workspace = true }
@@ -33,6 +36,9 @@ x509-cert       = { workspace = true }
 x509-ocsp = { workspace = true, optional = true, features = ["builder"] }
 sha1      = { workspace = true, optional = true }
 sha2      = { workspace = true, optional = true }
+
+# Reference HTTP client (PKIX-a1yc.8). See `clients::ureq` module.
+ureq = { workspace = true, optional = true }
 
 [dev-dependencies]
 # DefaultVerifier (rsa + p256 OID dispatch) is needed by the CrlChecker
