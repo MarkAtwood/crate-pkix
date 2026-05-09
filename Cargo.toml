@@ -21,9 +21,10 @@ members = [
 # version explicitly per the May-2026 0.3 follow-up release wave:
 #   - pkix-path         0.3.0  BREAKING. ValidatedPath loses Copy/Hash; new owned-data
 #                              fields for §6.1.5 wrap-up outputs and policy qualifiers.
-#   - pkix-revocation   0.3.1  Additive. CrlIdpDistributionPointMismatch variant on
-#                              OutOfScopeReason (#[non_exhaustive]); dep bump to
-#                              pkix-path 0.3.
+#   - pkix-revocation   0.3.2  Additive. RevocationFetchFailed variant on Error
+#                              (#[non_exhaustive]) for pkix-revocation-http
+#                              network-fetcher adapters. Earlier 0.3.1 added
+#                              CrlIdpDistributionPointMismatch on OutOfScopeReason.
 #   - pkix-chain        0.4.0  TRANSITIVELY BREAKING. Re-exports pkix-path::ValidatedPath
 #                              which lost Copy/Hash in 0.3.0; downstream cargo update
 #                              must explicitly bump to 0.4.
@@ -42,7 +43,7 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 [workspace.dependencies]
 # Internal crates
 pkix-path             = { path = "pkix-path",             version = "0.3.0" }
-pkix-revocation       = { path = "pkix-revocation",       version = "0.3.1" }
+pkix-revocation       = { path = "pkix-revocation",       version = "0.3.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.0" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.2.1" }

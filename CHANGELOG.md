@@ -16,7 +16,7 @@ once published:
 | Crate | Old (crates.io) | New (this release) | Type |
 |---|---|---|---|
 | `pkix-path` | 0.2.1 | **0.3.0** | BREAKING (`ValidatedPath` loses `Copy` / `Hash`; new owned-data fields) |
-| `pkix-revocation` | 0.3.0 | **0.3.1** | additive (CDP/IDP variant + dep on pkix-path 0.3) |
+| `pkix-revocation` | 0.3.0 | **0.3.2** | additive (CDP/IDP variant + RevocationFetchFailed variant + dep on pkix-path 0.3) |
 | `pkix-chain` | 0.3.0 | **0.4.0** | TRANSITIVELY BREAKING (re-exports `pkix-path::ValidatedPath`) |
 | `pkix-chain-simple` | 0.3.0 | **0.4.0** | TRANSITIVELY BREAKING (same rationale) |
 | `pkix-path-builder` | 0.2.1 | **0.3.0** | BREAKING (dep major bump + skip-not-fail behavior change) |
@@ -30,7 +30,7 @@ dep graph on crates.io once the wave is published.
 
 Publish order (dependency-graph-respecting):
 1. `pkix-path 0.3.0`
-2. `pkix-revocation 0.3.1`
+2. `pkix-revocation 0.3.2`
 3. `pkix-path-builder 0.3.0`
 4. `pkix-chain 0.4.0`
 5. `pkix-chain-simple 0.4.0`
@@ -43,6 +43,25 @@ their existing 0.2.x versions (which depend on `pkix-path 0.2.x` from
 crates.io); a fresh project that wants `pkix-path 0.3.0` features
 should consume `pkix-path` directly rather than transitively via these
 secondary crates until they ship updates.
+
+### `pkix-revocation 0.3.2`
+
+#### Added
+
+- `Error::RevocationFetchFailed { description: String }` variant.
+  Returned by network-fetching adapters (`pkix-revocation-http`'s
+  `HttpCrlFetcher` / `HttpOcspFetcher`, future LDAP / out-of-band
+  adapters) when every URL extracted from the certificate failed
+  either at the transport layer (network, TLS, HTTP error) or at the
+  response layer (DER parse, signature, validity). Distinct from
+  `Revoked`, `OcspStatusUnknown`, and `OutOfScope`. Hard-fail callers
+  MUST reject the chain on this variant; soft-fail callers MAY treat
+  it permissively.
+
+  `Error` is `#[non_exhaustive]`, so adding the variant is
+  non-breaking. Callers that exhaustively match on `Error` should add
+  an arm (or use `_`) to be forward-compatible. Tracked as PKIX-a1yc.5
+  in the project beads.
 
 ### `pkix-revocation 0.3.1`
 

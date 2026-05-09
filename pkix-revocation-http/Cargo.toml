@@ -34,6 +34,11 @@ x509-ocsp = { workspace = true, optional = true, features = ["builder"] }
 sha1      = { workspace = true, optional = true }
 sha2      = { workspace = true, optional = true }
 
+[dev-dependencies]
+# DefaultVerifier (rsa + p256 OID dispatch) is needed by the CrlChecker
+# / OcspChecker delegation tests. std needed for std::error::Error.
+pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

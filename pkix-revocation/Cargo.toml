@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-revocation"
 description = "Certificate revocation checking (CRL, OCSP) for pkix-path"
-version               = "0.3.1"  # additive: CrlIdpDistributionPointMismatch + pkix-path 0.3 dep; see CHANGELOG.md
+version               = "0.3.2"  # additive: RevocationFetchFailed variant for pkix-revocation-http; see CHANGELOG.md
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
