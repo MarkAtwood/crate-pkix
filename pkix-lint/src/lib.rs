@@ -1336,6 +1336,76 @@ pub trait LintProfile: Profile {
 }
 
 // ---------------------------------------------------------------------------
+// check_shape — single-cert convenience over the lint engine
+// ---------------------------------------------------------------------------
+
+/// Run the certificate-scope lints of `profile` against `cert` and report
+/// pass/fail without walking a chain or verifying signatures.
+///
+/// This is a fast single-cert convenience over the lint engine. It sits
+/// between [`pkix_path::validate_path`] (the path-validation gate) and
+/// [`crate::oscal::emit::assessment_results`] (compliance assertion).
+///
+/// # Layered semantics
+///
+/// | Layer | Use case | Cost |
+/// |-------|----------|------|
+/// | `check_shape` (this fn) | Single cert, structural sanity. \"Is this a sanely-shaped X cert?\" | O(number of lints), microseconds |
+/// | [`pkix_path::validate_path`] | Full chain, RFC 5280 §6 path validation including signature checks | O(chain length × verifier cost), milliseconds |
+/// | [`crate::oscal::emit::assessment_results`] | OSCAL Assessment Results JSON for compliance audit | Per-finding serialisation cost |
+///
+/// # Contract
+///
+/// * Returns `Ok(())` when no [`LintResult::Error`] or [`LintResult::Fatal`]
+///   findings are produced.
+/// * Returns `Err(findings)` with the **complete** `Vec<Finding>` from
+///   [`LintRunner::run_cert`] otherwise. The returned list may include
+///   [`LintResult::Warn`], [`LintResult::Pass`], and
+///   [`LintResult::NotApplicable`] findings alongside the failing ones —
+///   callers can filter as they need.
+///
+/// Findings on `Warn`-only certs are silently discarded by `check_shape`
+/// (the `Ok` variant carries no findings). Callers that need access to
+/// `Warn`-level findings even on pass should call [`LintRunner::run_cert`]
+/// directly via `profile.lint_runner()`.
+///
+/// # Parameters
+///
+/// * `cert` — the parsed certificate under scrutiny.
+/// * `kind` — the certificate's role ([`SubjectKind::Leaf`] for an end-entity
+///   shape check; [`SubjectKind::IntermediateCa`] for an intermediate). Lints
+///   whose [`Lint::applies_to`] does not match record
+///   [`LintResult::NotApplicable`] (not a failure).
+/// * `now_unix` — evaluation time, seconds since the Unix epoch. Lints with
+///   effective dates (e.g., phased validity caps) use this; pass the
+///   current time for operational-mode evaluation, or the cert's
+///   `not_before` for audit-mode evaluation.
+/// * `profile` — any [`LintProfile`] implementor.
+///
+/// # I/O and side effects
+///
+/// None. No chain walk, no signature verification, no file or network access.
+/// Allocates one [`LintRunner`] and one `Vec<Finding>`.
+#[must_use = "the returned Result reports whether the cert passed all Error/Fatal lints"]
+pub fn check_shape(
+    cert: &Certificate,
+    kind: SubjectKind,
+    now_unix: u64,
+    profile: &dyn LintProfile,
+) -> Result<(), Vec<Finding>> {
+    let runner = profile.lint_runner();
+    let findings = runner.run_cert(cert, kind, 0, now_unix);
+    let failed = findings
+        .iter()
+        .any(|f| matches!(f.result, LintResult::Error(_) | LintResult::Fatal(_)));
+    if failed {
+        Err(findings)
+    } else {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1925,5 +1995,180 @@ mod tests {
         let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
         assert_eq!(findings[0].rule_bundle_version.as_ref(), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // check_shape tests
+    //
+    // Oracle: the per-lint behaviour of AlwaysPass / AlwaysWarn / AlwaysError /
+    // AlwaysFatal is fixed by their own check_cert implementations above. The
+    // tests assert check_shape's Result projection: Ok when no Error / Fatal
+    // findings, Err with the full Vec<Finding> otherwise.
+    // -----------------------------------------------------------------------
+
+    /// A lint that always returns Error, used to drive check_shape's Err
+    /// branch without triggering the runner's Fatal early-exit (which would
+    /// truncate the findings list).
+    struct AlwaysError;
+    impl Lint for AlwaysError {
+        fn id(&self) -> &'static str {
+            "test.always_error"
+        }
+        fn citation(&self) -> &'static str {
+            "test"
+        }
+        fn severity(&self) -> Severity {
+            Severity::Error
+        }
+        fn scope(&self) -> Scope {
+            Scope::Certificate
+        }
+        fn applies_to(&self) -> SubjectKind {
+            SubjectKind::Any
+        }
+        fn check_cert(&self, _cert: &Certificate, _kind: SubjectKind, _now: u64) -> LintResult {
+            LintResult::error("always errors")
+        }
+    }
+
+    /// Test-side [`LintProfile`] that bundles an arbitrary lint set behind a
+    /// minimal [`pkix_path::Profile`] facade. The Profile half is a no-op
+    /// stub; `check_shape` only touches the lints.
+    ///
+    /// The `build_runner` field is a fn-pointer factory because
+    /// [`LintProfile::lint_runner`] returns a fresh [`LintRunner`] by
+    /// value, but [`Box<dyn Lint>`] is not [`Clone`] and the profile must
+    /// be able to hand out a runner via an immutable `&self`. The
+    /// alternatives (shared `Arc<dyn Lint>`, `OnceLock<LintRunner>`)
+    /// add complexity that buys nothing in tests — a fn pointer is
+    /// trivially [`Copy`] and lets each test wire a specific runner
+    /// builder.
+    struct TestLintProfile {
+        lints: Vec<Box<dyn Lint>>,
+        build_runner: fn() -> LintRunner,
+    }
+
+    impl pkix_path::Profile for TestLintProfile {
+        fn id(&self) -> &'static str {
+            "test.profile"
+        }
+        fn version(&self) -> &'static str {
+            "0.0.0"
+        }
+        fn policy(&self, _now_unix: u64) -> ValidationPolicy {
+            ValidationPolicy::default()
+        }
+        fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier] {
+            &[]
+        }
+    }
+
+    impl LintProfile for TestLintProfile {
+        fn lints(&self) -> &[Box<dyn Lint>] {
+            &self.lints
+        }
+        fn lint_runner(&self) -> LintRunner {
+            (self.build_runner)()
+        }
+    }
+
+    impl TestLintProfile {
+        fn new(lints: Vec<Box<dyn Lint>>, build_runner: fn() -> LintRunner) -> Self {
+            Self {
+                lints,
+                build_runner,
+            }
+        }
+    }
+
+    fn build_always_pass_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysPass)])
+    }
+
+    fn build_always_warn_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysWarn)])
+    }
+
+    fn build_always_error_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysError)])
+    }
+
+    fn build_always_fatal_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysFatal)])
+    }
+
+    fn build_pass_plus_warn_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysPass), Box::new(AlwaysWarn)])
+    }
+
+    fn build_pass_plus_error_runner() -> LintRunner {
+        LintRunner::new(vec![Box::new(AlwaysPass), Box::new(AlwaysError)])
+    }
+
+    #[test]
+    fn check_shape_ok_when_all_lints_pass() {
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(vec![Box::new(AlwaysPass)], build_always_pass_runner);
+        assert!(check_shape(&cert, SubjectKind::Leaf, 0, &profile).is_ok());
+    }
+
+    #[test]
+    fn check_shape_ok_when_only_warn_findings() {
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(vec![Box::new(AlwaysWarn)], build_always_warn_runner);
+        // Warn-only must produce Ok per the contract: Warn is informational,
+        // not a hard rejection. The Warn detail is silently dropped from the
+        // Ok variant — callers needing it call run_cert directly.
+        assert!(check_shape(&cert, SubjectKind::Leaf, 0, &profile).is_ok());
+    }
+
+    #[test]
+    fn check_shape_err_on_error_finding() {
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(vec![Box::new(AlwaysError)], build_always_error_runner);
+        let result = check_shape(&cert, SubjectKind::Leaf, 0, &profile);
+        let findings = result.expect_err("AlwaysError must produce Err");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].lint_id, "test.always_error");
+        assert!(matches!(findings[0].result, LintResult::Error(_)));
+    }
+
+    #[test]
+    fn check_shape_err_on_fatal_finding() {
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(vec![Box::new(AlwaysFatal)], build_always_fatal_runner);
+        let result = check_shape(&cert, SubjectKind::Leaf, 0, &profile);
+        let findings = result.expect_err("AlwaysFatal must produce Err");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].lint_id, "test.always_fatal");
+        assert!(findings[0].result.is_fatal());
+    }
+
+    #[test]
+    fn check_shape_err_carries_all_findings_including_pass() {
+        // Two lints: one Pass, one Error. Err variant must carry both
+        // findings (not just the failing one) so callers can audit the full
+        // evaluation result.
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(
+            vec![Box::new(AlwaysPass), Box::new(AlwaysError)],
+            build_pass_plus_error_runner,
+        );
+        let result = check_shape(&cert, SubjectKind::Leaf, 0, &profile);
+        let findings = result.expect_err("any Error must produce Err");
+        assert_eq!(findings.len(), 2, "Err carries the full Vec<Finding>");
+        assert!(findings.iter().any(|f| f.lint_id == "test.always_pass"));
+        assert!(findings.iter().any(|f| f.lint_id == "test.always_error"));
+    }
+
+    #[test]
+    fn check_shape_ok_when_pass_plus_warn_no_error() {
+        // Pass + Warn (no Error / Fatal) → Ok per the contract.
+        let cert = load_fixture_cert();
+        let profile = TestLintProfile::new(
+            vec![Box::new(AlwaysPass), Box::new(AlwaysWarn)],
+            build_pass_plus_warn_runner,
+        );
+        assert!(check_shape(&cert, SubjectKind::Leaf, 0, &profile).is_ok());
     }
 }
