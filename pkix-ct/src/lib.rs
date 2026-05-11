@@ -24,11 +24,14 @@
 //! `ocsp` feature) `sct_list_from_ocsp_response`. CT log list management
 //! is implemented behind the `log-list` and `log-list-json` features;
 //! see [`CtLog`], [`CtLogList`], and `CtLogList::from_google_log_list_json`.
-//! SCT signature verification for the `x509_entry` log entry type is
-//! implemented; see [`SctVerifier`]. Pre-cert (`precert_entry`)
-//! signature verification and Merkle inclusion proof verification are
-//! not yet implemented; see the project tracker (PKIX-baac children)
-//! for status.
+//! SCT signature verification for both the `x509_entry` and
+//! `precert_entry` log entry types is implemented; see
+//! [`SctVerifier::verify_sct_for_cert`] (used when SCTs are delivered
+//! via OCSP or the TLS handshake) and
+//! [`SctVerifier::verify_sct_for_precert`] (used when SCTs are
+//! embedded directly in the issued certificate via the SCT-list
+//! extension). Merkle inclusion proof verification is not yet
+//! implemented; see the project tracker (PKIX-baac.5) for status.
 
 extern crate alloc;
 
@@ -111,10 +114,25 @@ pub enum Error {
     SctTimestampOutsideLogWindow,
     /// Encountered a `precert_entry` SCT but signature verification for
     /// the pre-cert flow is not yet implemented (tracked as PKIX-baac.4).
+    ///
+    /// Retained for source compatibility with earlier pkix-ct releases
+    /// where `precert_entry` verification was a stub. The PKIX-baac.4
+    /// implementation does not return this variant; callers wishing
+    /// to detect pre-cert SCT support should call
+    /// [`SctVerifier::verify_sct_for_precert`] directly.
     PrecertEntryNotImplemented,
     /// The supplied certificate DER exceeds the 2^24 - 1 octet limit of
-    /// the RFC 6962 §3.2 `ASN.1Cert` opaque-length-prefixed field.
+    /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate`)
+    /// opaque-length-prefixed field.
     CertDerTooLong,
+    /// The final leaf certificate passed to
+    /// [`SctVerifier::verify_sct_for_precert`] does not contain an
+    /// SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2). Verifying a
+    /// `precert_entry` SCT against a cert that never carried the
+    /// embedded list is nonsensical — the SCT must have come from a
+    /// different delivery channel (OCSP / TLS handshake), for which
+    /// callers should use [`SctVerifier::verify_sct_for_cert`].
+    LeafMissingSctList,
 }
 
 impl core::fmt::Display for Error {
@@ -151,6 +169,9 @@ impl core::fmt::Display for Error {
             }
             Self::CertDerTooLong => {
                 f.write_str("certificate DER exceeds the 2^24 - 1 octet ASN.1Cert limit")
+            }
+            Self::LeafMissingSctList => {
+                f.write_str("leaf certificate does not contain the SCT-list extension")
             }
         }
     }

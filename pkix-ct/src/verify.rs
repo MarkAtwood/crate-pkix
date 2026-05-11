@@ -25,9 +25,12 @@
 //! } signed_input;
 //! ```
 //!
-//! This module implements the `x509_entry` branch. The `precert_entry`
-//! branch is stubbed with [`Error::PrecertEntryNotImplemented`] (tracked
-//! as PKIX-baac.4).
+//! This module implements both the `x509_entry` and `precert_entry`
+//! branches. See [`SctVerifier::verify_sct_for_cert`] (x509_entry, used
+//! by SCTs delivered via OCSP or the TLS handshake) and
+//! [`SctVerifier::verify_sct_for_precert`] (precert_entry, used by SCTs
+//! embedded directly in the issued certificate via the SCT-list
+//! extension).
 //!
 //! # Algorithm mapping
 //!
@@ -53,8 +56,10 @@
 
 use alloc::vec::Vec;
 use der::asn1::ObjectIdentifier;
-use der::Decode as _;
+use der::{Decode as _, Encode as _};
+use sha2::{Digest, Sha256};
 use x509_cert::spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
+use x509_cert::Certificate;
 
 use pkix_path::SignatureVerifier;
 
@@ -63,13 +68,18 @@ use crate::{CtLog, CtLogList, Error, Result};
 
 /// `LogEntryType::x509_entry` — RFC 6962 §3.1.
 const ENTRY_TYPE_X509: u16 = 0;
-// `LogEntryType::precert_entry` (= 1) is defined by RFC 6962 §3.1 but
-// is not used in this module yet — the precert_entry branch is
-// PKIX-baac.4. The constant will return when that branch lands.
+/// `LogEntryType::precert_entry` — RFC 6962 §3.1.
+const ENTRY_TYPE_PRECERT: u16 = 1;
 /// `SignatureType::certificate_timestamp` — RFC 6962 §3.2.
 const SIG_TYPE_CERTIFICATE_TIMESTAMP: u8 = 0;
 /// `Version::v1` — RFC 6962 §3.2.
 const SCT_VERSION_V1: u8 = 0;
+
+/// RFC 6962 §3.3 SCT-list certificate extension OID
+/// (`google.experimental.ct.sct`). The verifier strips this extension
+/// from the final cert's TBS when reconstructing the bytes the log
+/// signed over for a `precert_entry` SCT.
+const OID_SCT_LIST: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.11129.2.4.2");
 
 // X.509 signature-algorithm OIDs. Duplicated here (rather than re-exported
 // from pkix-path) because pkix-path's copies are private and feature-gated;
@@ -227,6 +237,109 @@ impl<V: SignatureVerifier> SctVerifier<V> {
 
         Ok(log)
     }
+
+    /// Verify one SCT against a pre-cert (RFC 6962 `precert_entry`).
+    ///
+    /// SCTs embedded in an issued ("final") certificate via the
+    /// SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2) are
+    /// `precert_entry` SCTs: the log signed them over a structure
+    /// derived from the pre-certificate the CA submitted, not over the
+    /// final cert. To verify, the caller supplies:
+    ///
+    /// - `leaf_cert_der`: the DER of the **final** (issued)
+    ///   certificate carrying the SCT-list extension. The verifier
+    ///   strips that extension from the leaf's `TBSCertificate` to
+    ///   reconstruct the TBS bytes the log signed over.
+    /// - `issuer_cert_der`: the DER of the certificate that signed the
+    ///   pre-cert submission and that signs the final cert. The
+    ///   verifier hashes its `SubjectPublicKeyInfo` to produce the
+    ///   `issuer_key_hash` field of the RFC 6962 §3.2 `PreCert`
+    ///   structure.
+    ///
+    /// On success the matching [`CtLog`] is returned.
+    ///
+    /// # Caveats
+    ///
+    /// - This entry point assumes the issuer cert IS the cert whose
+    ///   SubjectPublicKeyInfo the log committed to via
+    ///   `issuer_key_hash`. RFC 6962 §3.1 also allows "Precertificate
+    ///   Signing Certificates" (an intermediate with the CT EKU
+    ///   delegated to sign pre-cert submissions). When such an
+    ///   intermediate is in play, the caller must pass the Precert
+    ///   Signing Certificate's issuer, not the immediate signer.
+    ///   Detecting the delegated case is the caller's responsibility.
+    /// - The verifier does NOT validate that `issuer_cert_der`
+    ///   actually issued `leaf_cert_der`. Callers wanting that
+    ///   guarantee compose this with `pkix-path` chain validation
+    ///   first (or use `pkix-chain`).
+    /// - The leaf's TBS is re-encoded after extension removal via
+    ///   [`der::Encode`]. This is bit-exact for canonically-encoded
+    ///   certs (the case for all real CT-logged certs), which is what
+    ///   `pkix-path` itself relies on for chain-signature verification
+    ///   (see the equivalent re-encoding at `pkix-path::lib::verify_cert_signature`).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::UnsupportedVersion`] — SCT version is not 0 (v1).
+    /// - [`Error::UnknownLog`] — `sct.log_id` is not present in the log list.
+    /// - [`Error::SctTimestampOutsideLogWindow`] — `sct.timestamp_ms` is
+    ///   outside `[log.usable_from_ms, log.retired_at_ms]`.
+    /// - [`Error::UnsupportedSignatureAlgorithm`] — `(hash_alg, sig_alg)`
+    ///   is not a recognised combination.
+    /// - [`Error::LogKeyMalformed`] — the log's `key_der` does not parse
+    ///   as a valid `SubjectPublicKeyInfo`.
+    /// - [`Error::ParseError`] — `leaf_cert_der` or `issuer_cert_der`
+    ///   could not be parsed as an X.509 certificate.
+    /// - [`Error::LeafMissingSctList`] — `leaf_cert_der` does not
+    ///   contain an SCT-list extension; verifying a `precert_entry`
+    ///   SCT against such a cert is meaningless (the caller likely
+    ///   wants `verify_sct_for_cert` instead).
+    /// - [`Error::CertDerTooLong`] — the reconstructed TBS exceeds the
+    ///   2^24 - 1 octet limit of the RFC 6962 `TBSCertificate`
+    ///   opaque-length-prefixed field.
+    /// - [`Error::InvalidSignature`] — the underlying verifier rejected
+    ///   the signature.
+    pub fn verify_sct_for_precert(
+        &self,
+        sct: &SignedCertificateTimestamp,
+        leaf_cert_der: &[u8],
+        issuer_cert_der: &[u8],
+    ) -> Result<&CtLog> {
+        if sct.version != SCT_VERSION_V1 {
+            return Err(Error::UnsupportedVersion(sct.version));
+        }
+
+        let log = self.logs.get(&sct.log_id).ok_or(Error::UnknownLog)?;
+
+        if !log_window_contains(log, sct.timestamp_ms) {
+            return Err(Error::SctTimestampOutsideLogWindow);
+        }
+
+        let oid = tls_alg_to_x509_oid(sct.hash_alg, sct.sig_alg).ok_or(
+            Error::UnsupportedSignatureAlgorithm {
+                hash_alg: sct.hash_alg,
+                sig_alg: sct.sig_alg,
+            },
+        )?;
+
+        let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
+        let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
+        let signed_input = build_signed_input_precert_entry(sct, &issuer_key_hash, &tbs_no_sct)?;
+
+        let spki =
+            SubjectPublicKeyInfoRef::from_der(&log.key_der).map_err(|_| Error::LogKeyMalformed)?;
+
+        let alg_id = AlgorithmIdentifierRef {
+            oid,
+            parameters: None,
+        };
+
+        self.verifier
+            .verify_signature(alg_id, spki, &signed_input, &sct.signature)
+            .map_err(|_| Error::InvalidSignature)?;
+
+        Ok(log)
+    }
 }
 
 /// Check whether `timestamp_ms` falls inside the log's usable window.
@@ -290,6 +403,124 @@ fn build_signed_input_x509_entry(
     out.extend_from_slice(cert_der);
     out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
     out.extend_from_slice(&sct.extensions);
+    Ok(out)
+}
+
+/// Reconstruct the RFC 6962 §3.2 `digitally-signed` input for a
+/// `precert_entry` SCT.
+///
+/// Layout (all multi-byte fields are network byte order):
+///
+/// ```text
+/// u8       version              (0)
+/// u8       signature_type       (0 = certificate_timestamp)
+/// u64      timestamp_ms
+/// u16      entry_type           (1 = precert_entry)
+/// 32B      issuer_key_hash
+/// u24, len tbs_no_sct           (TBSCertificate with SCT-list extension
+///                                removed, opaque<1..2^24-1>)
+/// u16, len extensions
+/// ```
+fn build_signed_input_precert_entry(
+    sct: &SignedCertificateTimestamp,
+    issuer_key_hash: &[u8; 32],
+    tbs_no_sct: &[u8],
+) -> Result<Vec<u8>> {
+    if tbs_no_sct.len() > 0x00FF_FFFF {
+        return Err(Error::CertDerTooLong);
+    }
+    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+
+    let tbs_len = tbs_no_sct.len();
+    let cap = 1 + 1 + 8 + 2 + 32 + 3 + tbs_len + 2 + sct.extensions.len();
+    let mut out = Vec::with_capacity(cap);
+    out.push(SCT_VERSION_V1);
+    out.push(SIG_TYPE_CERTIFICATE_TIMESTAMP);
+    out.extend_from_slice(&sct.timestamp_ms.to_be_bytes());
+    out.extend_from_slice(&ENTRY_TYPE_PRECERT.to_be_bytes());
+    out.extend_from_slice(issuer_key_hash);
+    out.push(((tbs_len >> 16) & 0xFF) as u8);
+    out.extend_from_slice(&(tbs_len as u16).to_be_bytes());
+    out.extend_from_slice(tbs_no_sct);
+    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&sct.extensions);
+    Ok(out)
+}
+
+/// Parse `leaf_cert_der`, remove the SCT-list extension (OID
+/// 1.3.6.1.4.1.11129.2.4.2) from its TBSCertificate, and re-encode the
+/// resulting TBS as DER.
+///
+/// Returns [`Error::LeafMissingSctList`] if no such extension is
+/// present, [`Error::ParseError`] if the cert fails to parse, and
+/// [`Error::CertDerTooLong`] if the re-encoded TBS bytes do not fit in
+/// the RFC 6962 §3.2 u24 length prefix. The re-encoding goes through
+/// `x509-cert`'s [`der::Encode`] implementation; the same path used by
+/// `pkix-path` for cert-signature verification.
+///
+/// Round-trip correctness assumption: a canonically-encoded TBS
+/// re-emitted by `x509-cert` matches the original byte-for-byte aside
+/// from the removed extension and its surrounding length fields. This
+/// holds for every real-world CT-logged certificate because the
+/// canonical form is what real CAs emit and what every X.509 toolchain
+/// in production accepts. The independent oracle in
+/// `pkix-ct/tests/fixtures/sct-oracle/gen_precert_entry_sct.py`
+/// asserts the same property by stripping the extension at the byte
+/// level in Python and verifying the Rust re-encoding produces
+/// identical bytes.
+fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
+    let mut cert = Certificate::from_der(leaf_cert_der).map_err(|_| Error::ParseError)?;
+    let exts = cert
+        .tbs_certificate
+        .extensions
+        .as_mut()
+        .ok_or(Error::LeafMissingSctList)?;
+    let before = exts.len();
+    exts.retain(|ext| ext.extn_id != OID_SCT_LIST);
+    if exts.len() == before {
+        return Err(Error::LeafMissingSctList);
+    }
+    // If all extensions were removed (the SCT-list was the only one),
+    // RFC 5280 §4.1.2.9 requires the [3] EXPLICIT Extensions field to
+    // be absent rather than encoded as an empty SEQUENCE. Drop the
+    // Option to match.
+    if exts.is_empty() {
+        cert.tbs_certificate.extensions = None;
+    }
+    let mut buf = Vec::new();
+    cert.tbs_certificate
+        .encode_to_vec(&mut buf)
+        .map_err(|_| Error::ParseError)?;
+    if buf.len() > 0x00FF_FFFF {
+        return Err(Error::CertDerTooLong);
+    }
+    Ok(buf)
+}
+
+/// Parse `issuer_cert_der` and return SHA-256 of its
+/// `SubjectPublicKeyInfo` DER bytes.
+///
+/// This is the `issuer_key_hash` field of the RFC 6962 §3.2 `PreCert`
+/// structure. The hash is computed over the canonical DER encoding of
+/// the issuer's `SubjectPublicKeyInfo` (the same form used by every
+/// X.509 verifier when working with the issuer's public key). For
+/// every real-world CT-logged issuer cert this matches the bytes a CT
+/// log would have hashed at submission time, because real issuer
+/// certs use canonical DER for their SPKI.
+///
+/// Returns [`Error::ParseError`] if the cert or its SPKI cannot be
+/// parsed.
+fn issuer_key_hash_from_cert(issuer_cert_der: &[u8]) -> Result<[u8; 32]> {
+    let issuer = Certificate::from_der(issuer_cert_der).map_err(|_| Error::ParseError)?;
+    let mut spki_buf = Vec::new();
+    issuer
+        .tbs_certificate
+        .subject_public_key_info
+        .encode_to_vec(&mut spki_buf)
+        .map_err(|_| Error::ParseError)?;
+    let digest = Sha256::digest(&spki_buf);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
     Ok(out)
 }
 
@@ -429,5 +660,114 @@ mod tests {
             build_signed_input_x509_entry(&sct, &huge),
             Err(Error::CertDerTooLong)
         );
+    }
+
+    /// Independent oracle for the precert_entry signed-input layout:
+    /// byte-for-byte hand-decoded values against RFC 6962 §3.2.
+    #[test]
+    fn precert_signed_input_layout() {
+        let mut sct = empty_sct(4, 3);
+        sct.timestamp_ms = 0x0123_4567_89AB_CDEF;
+        sct.extensions = vec![0xAA, 0xBB];
+        let issuer_key_hash = [0x11u8; 32];
+        let tbs = b"hello";
+        let out = build_signed_input_precert_entry(&sct, &issuer_key_hash, tbs).unwrap();
+        // Expected bytes:
+        //   00                          version = 0
+        //   00                          signature_type = certificate_timestamp
+        //   01 23 45 67 89 AB CD EF     timestamp_ms (BE)
+        //   00 01                       entry_type = precert_entry
+        //   11 * 32                     issuer_key_hash
+        //   00 00 05                    u24 tbs_len = 5
+        //   68 65 6C 6C 6F              "hello"
+        //   00 02                       ext_len = 2
+        //   AA BB                       extensions
+        let mut expected = Vec::with_capacity(1 + 1 + 8 + 2 + 32 + 3 + 5 + 2 + 2);
+        expected.extend_from_slice(&[0x00, 0x00]);
+        expected.extend_from_slice(&[0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF]);
+        expected.extend_from_slice(&[0x00, 0x01]);
+        expected.extend_from_slice(&[0x11; 32]);
+        expected.extend_from_slice(&[0x00, 0x00, 0x05]);
+        expected.extend_from_slice(b"hello");
+        expected.extend_from_slice(&[0x00, 0x02, 0xAA, 0xBB]);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn precert_signed_input_rejects_oversize_tbs() {
+        let sct = empty_sct(4, 3);
+        let issuer_key_hash = [0u8; 32];
+        let huge = vec![0u8; 0x0100_0000];
+        assert_eq!(
+            build_signed_input_precert_entry(&sct, &issuer_key_hash, &huge),
+            Err(Error::CertDerTooLong)
+        );
+    }
+
+    /// Acceptance criterion 2 (PKIX-baac.4): the bytes produced by
+    /// [`tbs_without_sct_list`] for the precert-oracle fixture's
+    /// `precert-leaf-final.der` must match the oracle's committed
+    /// `precert-tbs-no-sct.bin` (the TBS bytes the log signed over)
+    /// byte-for-byte.
+    ///
+    /// The oracle generates `precert-tbs-no-sct.bin` independently of
+    /// pkix-ct: it builds two cert objects via cryptography's
+    /// `CertificateBuilder` (one with the SCT-list extension, one
+    /// without) and takes the without-extension cert's
+    /// `tbs_certificate_bytes` as the canonical "what the log signed"
+    /// blob. The script's own self-test (in
+    /// gen_precert_entry_sct.py) cross-checks this by ALSO running a
+    /// hand-rolled DER walker that strips the SCT-list extension from
+    /// the with-extension cert's TBS and asserts the result equals
+    /// the without-extension cert's TBS.
+    ///
+    /// This test then asserts pkix-ct's reconstruction matches the
+    /// oracle bytes, completing the bit-exactness chain:
+    /// pkix-ct ↔ cryptography ↔ hand-rolled DER walker.
+    ///
+    /// Gated on `std` because it reads fixture files from disk; the
+    /// integration test in `tests/verify_precert.rs` exercises the
+    /// same path end-to-end for `no_std` builds via cargo's normal
+    /// `std`-only integration-test machinery.
+    #[cfg(feature = "std")]
+    #[test]
+    fn tbs_without_sct_list_matches_oracle_bytes() {
+        let leaf_der = std::fs::read("tests/fixtures/sct-oracle/precert-leaf-final.der")
+            .expect("read precert-leaf-final.der");
+        let expected = std::fs::read("tests/fixtures/sct-oracle/precert-tbs-no-sct.bin")
+            .expect("read precert-tbs-no-sct.bin");
+        let actual = tbs_without_sct_list(&leaf_der).expect("strip SCT-list");
+        assert_eq!(
+            actual.len(),
+            expected.len(),
+            "reconstructed TBS length {} != oracle length {}",
+            actual.len(),
+            expected.len(),
+        );
+        assert_eq!(
+            actual, expected,
+            "reconstructed TBS bytes do not match the oracle's \
+             precert-tbs-no-sct.bin; x509-cert's re-encoder may have \
+             canonicalized something the cryptography emitter did \
+             differently. Compare with `xxd` to diagnose.",
+        );
+    }
+
+    /// Mirror test for `issuer_key_hash_from_cert`: the SHA-256 of
+    /// the issuer cert's SubjectPublicKeyInfo DER must match the
+    /// oracle's committed `precert-issuer-key-hash.bin`.
+    ///
+    /// `std`-gated for the same reason as
+    /// [`tbs_without_sct_list_matches_oracle_bytes`].
+    #[cfg(feature = "std")]
+    #[test]
+    fn issuer_key_hash_matches_oracle_bytes() {
+        let issuer_der = std::fs::read("tests/fixtures/sct-oracle/precert-issuer.der")
+            .expect("read precert-issuer.der");
+        let expected = std::fs::read("tests/fixtures/sct-oracle/precert-issuer-key-hash.bin")
+            .expect("read precert-issuer-key-hash.bin");
+        let actual = issuer_key_hash_from_cert(&issuer_der).expect("hash issuer SPKI");
+        assert_eq!(actual.len(), expected.len(), "32-byte sha-256 mismatch");
+        assert_eq!(&actual[..], expected.as_slice());
     }
 }
