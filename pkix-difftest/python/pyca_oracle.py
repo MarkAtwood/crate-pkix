@@ -6,7 +6,8 @@
 #     "leaf": "<PEM string>",                      # one cert
 #     "intermediates": ["<PEM>", "<PEM>", ...],    # zero or more
 #     "roots": ["<PEM>", ...],                     # one or more trust anchors
-#     "validation_time_unix": <int>                # optional; unix seconds
+#     "validation_time_unix": <int>,               # optional; unix seconds
+#     "crls": ["<base64 DER>", ...]                # optional; zero or more
 #   }
 #
 # Writes a verdict on stdout as JSON:
@@ -20,6 +21,42 @@
 #   exit 2 — pyca cryptography too old (no verification module)
 #
 # Stays self-contained (only depends on cryptography).
+#
+# # CRL revocation (PKIX-emf1.4)
+#
+# pyca's PolicyBuilder does NOT support CRL-aware verification as of
+# cryptography 48.0.0 — there is no .crls() method on PolicyBuilder and no
+# integrated revocation check on the verifier. To keep pyca an independent
+# CRL oracle alongside OpenSSL and pkix-path, we hand-roll a minimal
+# RFC 5280 §6.3 baseline check using cryptography's CRL parser:
+#
+#   1. Parse each base64-DER CRL via x509.load_der_x509_crl.
+#   2. Drop CRLs whose next_update is in the past (validity window check).
+#   3. For each cert in the chain except the trust anchor (matches the
+#      pkix-path oracle's iteration over validation_chain), find CRLs whose
+#      `issuer` equals the cert's `issuer`. For each match, look up the
+#      cert's serial number in the CRL's revoked list.
+#   4. If found in any matching CRL: verdict = fail, reason =
+#      'pyca: certificate <serial> revoked by CRL'.
+#
+# Scope: matches RFC 5280 §6.3 baseline only. Indirect / delta / scoped
+# CRLs are NOT handled here — they require RFC 5280 §6.3.3 machinery
+# (issuingDistributionPoint, freshestCRL chase, distribution-point
+# matching) that pkix-revocation implements in Rust but is out of scope
+# for the diff oracle. The classifier will surface any divergence between
+# pyca's baseline check and pkix-path's full CRL implementation as
+# DiagnosticDivergence (verdicts agree on Pass/Fail but reason strings
+# differ) or as Stricter/Looser (verdicts disagree) — which is the signal
+# the harness exists to surface.
+#
+# CRL signature verification: NOT performed. The harness assumes the CRL
+# was supplied as a trusted input. pkix-revocation's CrlChecker performs
+# full signature verification; if a chain's CRL has a bad signature,
+# pkix-path will Fail and the pyca oracle will Pass, and the classifier
+# will flag the divergence. Adding pyca-side CRL signature verification
+# would require running cryptography's hazmat backend to verify against
+# the issuer cert's public key — straightforward but not needed for the
+# §6.3 baseline test surface today.
 #
 # # Why ClientVerifier and not ServerVerifier?
 #
@@ -54,6 +91,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import datetime
 import json
 import sys
@@ -99,14 +138,17 @@ def main() -> None:
     intermediates_pem = spec.get("intermediates", [])
     roots_pem = spec.get("roots", [])
     validation_time_unix = spec.get("validation_time_unix")
+    crls_b64 = spec.get("crls", [])
     if (
         not isinstance(leaf_pem, str)
         or not isinstance(intermediates_pem, list)
         or not isinstance(roots_pem, list)
+        or not isinstance(crls_b64, list)
     ):
         fail(
             1,
-            "stdin JSON shape: {leaf:str, intermediates:[str], roots:[str]}",
+            "stdin JSON shape: {leaf:str, intermediates:[str], roots:[str], "
+            "crls:[str]}",
         )
     if validation_time_unix is not None and not isinstance(
         validation_time_unix, int
@@ -115,6 +157,9 @@ def main() -> None:
             1,
             "validation_time_unix must be an integer (unix seconds) or omitted",
         )
+    for entry in crls_b64:
+        if not isinstance(entry, str):
+            fail(1, "every entry of crls must be a base64-encoded DER string")
 
     # 3. Parse certs. Failures here are harness errors (exit 1), not Verdicts.
     try:
@@ -180,8 +225,111 @@ def main() -> None:
             "verdict": "fail",
             "reason": f"{type(e).__name__}: {e}",
         }
+
+    # 5. RFC 5280 §6.3 baseline CRL check. Only applied when the path-walk
+    # verdict was Pass — a chain that failed path validation does not also
+    # get a revocation reason layered on top (matches the pkix-path oracle's
+    # behaviour in src/oracles/pkix_path.rs, which short-circuits revocation
+    # on path-validation failure).
+    if verdict["verdict"] == "pass" and crls_b64:
+        rev_reason = _crl_revocation_reason(
+            x509,
+            crls_b64,
+            leaf,
+            intermediates,
+            pinned_time,
+        )
+        if rev_reason is not None:
+            verdict = {"verdict": "fail", "reason": rev_reason}
+
     json.dump(verdict, sys.stdout)
     sys.stdout.write("\n")
+
+
+def _crl_revocation_reason(
+    x509_mod,
+    crls_b64,
+    leaf,
+    intermediates,
+    pinned_time,
+):
+    """RFC 5280 §6.3 baseline CRL check.
+
+    Returns a string reason if any cert in (leaf + intermediates) is revoked
+    by a matching, in-window CRL. Returns None otherwise.
+
+    Independence note: this is a hand-rolled check that uses pyca's CRL DER
+    parser (x509.load_der_x509_crl) and CRL field accessors (issuer,
+    next_update_utc, get_revoked_certificate_by_serial_number) but does NOT
+    use any pyca verification module — those don't support CRLs. The lookup
+    logic (issuer DN equality, serial match, validity window) is implemented
+    here, parallel to the equivalent Rust logic in pkix_revocation::CrlChecker
+    but with an independent code path so the two can act as differential
+    oracles for each other.
+
+    Scope: RFC 5280 §6.3 baseline only. No indirect/delta/scoped CRLs, no
+    CRL signature verification (see module-level rustdoc for rationale).
+    """
+    # Parse CRLs, dropping malformed ones with a soft skip rather than
+    # exiting the harness. A malformed CRL is data the diff classifier
+    # should surface as a divergence (some oracles would accept it, others
+    # not). We treat "could not parse" as "this CRL doesn't apply" to keep
+    # the verdict semantics aligned with pkix-revocation's
+    # CrlChecker::new failure → "ignore this CRL" treatment in
+    # pkix_path.rs::check_revocation.
+    crls = []
+    for entry in crls_b64:
+        try:
+            der = base64.b64decode(entry, validate=True)
+        except (binascii.Error, ValueError):
+            continue
+        try:
+            crl = x509_mod.load_der_x509_crl(der)
+        except Exception:  # noqa: BLE001
+            continue
+        # Validity window: drop CRLs whose nextUpdate is in the past.
+        # x509.CertificateRevocationList exposes next_update_utc (aware UTC)
+        # in cryptography 42+; older releases exposed only `next_update`
+        # (naive UTC). We try aware first and fall back to naive-as-UTC.
+        next_update = getattr(crl, "next_update_utc", None)
+        if next_update is None:
+            naive = getattr(crl, "next_update", None)
+            if naive is not None:
+                next_update = naive.replace(tzinfo=datetime.timezone.utc)
+        if next_update is not None and next_update < pinned_time:
+            continue
+        crls.append(crl)
+
+    if not crls:
+        return None
+
+    # Walk every cert except the trust anchor. The trust anchor is not in
+    # `intermediates` (PolicyBuilder consumes it from Store(roots)) and is
+    # by definition not subject to revocation by RFC 5280 §6.1 — anchors
+    # are trusted by deployment, not by certificate-status check.
+    chain_to_check = [leaf] + list(intermediates)
+    for cert in chain_to_check:
+        for crl in crls:
+            # Issuer DN equality. cryptography's Name.__eq__ implements
+            # byte-for-byte equality on the underlying DER RDN sequence,
+            # which matches RFC 5280's name-matching baseline at the §6.3
+            # layer (full RFC 4518 string prep is overkill here — the test
+            # surface compares Name objects from the same parser).
+            if crl.issuer != cert.issuer:
+                continue
+            revoked = crl.get_revoked_certificate_by_serial_number(
+                cert.serial_number
+            )
+            if revoked is not None:
+                # Format the serial as hex to match the way OpenSSL and
+                # pkix-revocation render it in their reason strings; the
+                # classifier compares verdicts not reason strings, but a
+                # consistent format keeps the diff easier to scan.
+                return (
+                    f"pyca: certificate 0x{cert.serial_number:x} "
+                    f"revoked by CRL"
+                )
+    return None
 
 
 if __name__ == "__main__":
