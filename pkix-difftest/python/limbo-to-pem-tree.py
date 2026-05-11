@@ -14,6 +14,9 @@ Output layout:
     <output_dir>/
     ├── <safe_id_1>/
     │   ├── chain.pem      # leaf + intermediates + first trust anchor
+    │   ├── crls/          # present when the testcase ships CRLs
+    │   │   ├── 0.pem
+    │   │   └── ...
     │   └── meta.json      # id, expected_result, validation_kind, validation_time, features
     ├── <safe_id_2>/
     │   └── ...
@@ -21,9 +24,10 @@ Output layout:
 
 Filtering:
 
-* Testcases whose `features` list contains anything in SKIP_FEATURES
-  (currently just `has-crl`, since CRL revocation is out of harness
-  scope) are skipped at conversion time and counted in the summary.
+* Testcases tagged with features in SKIP_FEATURES are skipped at
+  conversion time. After PKIX-emf1.6 the set is empty: `has-crl`
+  testcases now ride into the harness with their CRLs written into the
+  per-case `crls/` directory and read by the harness's PEM-tree loader.
 * Testcases with no `trusted_certs` are skipped (the harness needs a
   trust anchor in the chain).
 * Multi-root testcases use only `trusted_certs[0]` (the harness expects
@@ -65,10 +69,12 @@ from typing import Any
 # Limbo features that the harness cannot meaningfully process. Testcases
 # tagged with any of these are skipped at conversion. See the limbo schema
 # at https://github.com/C2SP/x509-limbo for the full feature taxonomy.
-SKIP_FEATURES = {
-    # CRL revocation is out of pkix-difftest scope (tracked as PKIX-emf1).
-    "has-crl",
-}
+#
+# `has-crl` was removed in PKIX-emf1.6: limbo CRLs are now written into the
+# per-case `crls/` directory and consumed by the PEM-tree corpus loader.
+# If a future limbo feature genuinely cannot run end-to-end through the
+# harness, add it here and document the reason.
+SKIP_FEATURES: set[str] = set()
 
 # Filename-safe-character pattern for the per-testcase directory name.
 # Limbo IDs use `::` as a separator (e.g. `rfc5280::serial::zero`); we
@@ -185,6 +191,22 @@ def main() -> int:
         (case_dir / "meta.json").write_text(
             json.dumps(build_metadata(tc), indent=2), encoding="utf-8"
         )
+
+        # Per-case CRL bundle. Limbo's `crls` field is a list of
+        # PEM-encoded `X509 CRL` blocks (one per entry). The harness's
+        # PEM-tree loader picks them up from `crls/` if present.
+        crls = tc.get("crls", [])
+        if crls:
+            crls_dir = case_dir / "crls"
+            crls_dir.mkdir(exist_ok=True)
+            for i, crl_pem in enumerate(crls):
+                # Filenames lex-sort so the harness sees CRLs in a
+                # deterministic order across runs (matters when a chain
+                # is covered by multiple CRLs and the oracle reports a
+                # reason from "the first match wins").
+                s = crl_pem if crl_pem.endswith("\n") else crl_pem + "\n"
+                (crls_dir / f"{i:03d}.pem").write_text(s, encoding="utf-8")
+
         written += 1
 
     sys.stderr.write(f"Total testcases in manifest: {len(testcases)}\n")
