@@ -554,6 +554,68 @@ pub trait Lint: Send + Sync {
     /// when the path does not qualify.
     fn applies_to(&self) -> SubjectKind;
 
+    // -- OSCAL Control metadata (PKIX-9vnx.6.1) ----------------------------
+    //
+    // The next four methods carry OSCAL-Control-grade metadata that lets a
+    // serializer emit each `Lint` impl as an OSCAL Catalog `Control`. They
+    // are default-provided so existing impls keep compiling, but every
+    // shipped lint should override at least `title` and one citation field
+    // for a usable Catalog. See `pkix-lint`'s OSCAL emit module for the
+    // mapping.
+
+    /// Short human-readable title — the OSCAL `Control.title` field.
+    ///
+    /// Default: returns [`id`](Self::id) verbatim. Override when the lint id
+    /// is a slug (e.g., `"cabf.br.tls.validity.max"`) and the title needs to
+    /// be a sentence (e.g., `"Leaf certificate validity must not exceed
+    /// SC-081 cap"`).
+    fn title(&self) -> &str {
+        self.id()
+    }
+
+    /// Long-form description — the OSCAL `Control.description` (or
+    /// statement-prop). Optional because not every lint has more to say
+    /// than its title and citation.
+    ///
+    /// Default: `None`.
+    fn description(&self) -> Option<&str> {
+        None
+    }
+
+    /// Standards-body section identifier in OSCAL Control-id shape.
+    ///
+    /// Despite the name `rfc_section_id` (kept for compatibility with the
+    /// PKIX-9vnx.6 design discussion), the slot accepts any standards-body
+    /// section identifier — IETF RFC, ITU-T X.509, CA/B Forum Baseline
+    /// Requirements, NIST SP, etc. Format is `<source>-<section>`:
+    ///
+    /// * `"rfc5280-4.2.1.9"` — RFC 5280 §4.2.1.9.
+    /// * `"cabf-tls-br-6.3.2"` — CA/B Forum TLS BR §6.3.2.
+    /// * `"x509-ed4-section-8"` — ITU-T X.509 Edition 4 §8.
+    ///
+    /// Used by OSCAL Catalog emitters as the `Control.id` (or a stable
+    /// `Control.prop`). When this returns `Some`, [`rfc_url`](Self::rfc_url)
+    /// should also return a permanent URL where one exists.
+    ///
+    /// Default: `None`.
+    fn rfc_section_id(&self) -> Option<&str> {
+        None
+    }
+
+    /// Permanent URL to the standards-body section referenced by
+    /// [`rfc_section_id`](Self::rfc_section_id).
+    ///
+    /// For IETF RFCs the canonical form is
+    /// `"https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9"`. CA/B
+    /// Forum has no stable per-section anchor URL (BR documents are
+    /// versioned and re-published frequently); leave this `None` and let
+    /// the citation carry the §-reference.
+    ///
+    /// Default: `None`.
+    fn rfc_url(&self) -> Option<&str> {
+        None
+    }
+
     /// Evaluate the lint against a single certificate.
     ///
     /// `kind` is the role of this certificate in the chain (leaf, intermediate CA, etc.).

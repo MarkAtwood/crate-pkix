@@ -770,3 +770,122 @@ fn cabf_tls_br_profile_run_chain_webpki_cert_all_pass() {
         "webpki cert at pre-SC-081 time must produce no error findings; got: {errors:?}"
     );
 }
+
+// ===========================================================================
+// OSCAL Control metadata (PKIX-9vnx.6.1)
+// ===========================================================================
+//
+// These tests pin the OSCAL-Control-grade metadata each CABF TLS BR lint
+// exposes via the new default-method extension to `Lint`. The independent
+// oracle is the CA/B Forum TLS Baseline Requirements (v2.0.0+) document
+// itself — the section numbers below match the BR text and the lint
+// citation strings; the OSCAL Control-id-shaped strings
+// (`cabf-tls-br-<section>`) follow the project's `<source>-<section>`
+// convention documented on `Lint::rfc_section_id`.
+
+#[test]
+fn metadata_validity_max() {
+    let lint = ValidityMaxLint;
+    assert_eq!(lint.id(), "cabf.br.tls.validity.max");
+    assert_eq!(
+        lint.title(),
+        "Leaf certificate validity must not exceed SC-081 cap"
+    );
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-6.3.2"));
+    // CA/B Forum BR has no stable per-section URL; left as None per
+    // the trait rustdoc.
+    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.description(), None);
+}
+
+#[test]
+fn metadata_sha1_prohibited() {
+    let lint = Sha1ProhibitedLint;
+    assert_eq!(lint.id(), "cabf.br.tls.alg.sha1_prohibited");
+    assert_eq!(lint.title(), "SHA-1 signature algorithm prohibited");
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.3"));
+    assert_eq!(lint.rfc_url(), None);
+}
+
+#[test]
+fn metadata_rsa_min_key_size() {
+    let lint = RsaMinKeySizeLint;
+    assert_eq!(lint.id(), "cabf.br.tls.rsa.min_key_size");
+    assert_eq!(lint.title(), "RSA modulus must be at least 2048 bits");
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-6.1.5"));
+    assert_eq!(lint.rfc_url(), None);
+}
+
+#[test]
+fn metadata_san_required() {
+    let lint = SanRequiredLint;
+    assert_eq!(lint.id(), "cabf.br.tls.san.required");
+    assert_eq!(lint.title(), "Leaf certificate must include subjectAltName");
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.4.2"));
+    assert_eq!(lint.rfc_url(), None);
+}
+
+#[test]
+fn metadata_eku_server_auth() {
+    let lint = EkuServerAuthLint;
+    assert_eq!(lint.id(), "cabf.br.tls.eku.server_auth");
+    assert_eq!(
+        lint.title(),
+        "Leaf certificate must include id-kp-serverAuth EKU"
+    );
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.2.7.3"));
+    assert_eq!(lint.rfc_url(), None);
+}
+
+#[test]
+fn metadata_bc_ca_flag() {
+    let lint = BcCaFlagLint;
+    assert_eq!(lint.id(), "cabf.br.tls.bc.ca_flag");
+    assert_eq!(
+        lint.title(),
+        "CA certificates must set BasicConstraints.cA=TRUE"
+    );
+    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.2.5"));
+    assert_eq!(lint.rfc_url(), None);
+}
+
+#[test]
+fn metadata_title_defaults_to_id_when_not_overridden() {
+    // Independent oracle test: a synthetic Lint that does not override
+    // `title` must return its `id()` verbatim. This pins the documented
+    // default behavior on the trait.
+    use pkix_lint::{Lint, LintResult, Scope, Severity, SubjectKind};
+
+    struct MinimalLint;
+    impl Lint for MinimalLint {
+        fn id(&self) -> &'static str {
+            "test.minimal.no-overrides"
+        }
+        fn citation(&self) -> &'static str {
+            "synthetic"
+        }
+        fn severity(&self) -> Severity {
+            Severity::Warn
+        }
+        fn scope(&self) -> Scope {
+            Scope::Certificate
+        }
+        fn applies_to(&self) -> SubjectKind {
+            SubjectKind::Any
+        }
+        fn check_cert(
+            &self,
+            _cert: &x509_cert::Certificate,
+            _kind: SubjectKind,
+            _now_unix: u64,
+        ) -> LintResult {
+            LintResult::Pass
+        }
+    }
+
+    let l = MinimalLint;
+    assert_eq!(l.title(), l.id(), "default title() must equal id()");
+    assert_eq!(l.description(), None);
+    assert_eq!(l.rfc_section_id(), None);
+    assert_eq!(l.rfc_url(), None);
+}

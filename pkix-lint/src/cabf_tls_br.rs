@@ -107,6 +107,14 @@ impl Lint for ValidityMaxLint {
         SubjectKind::Leaf
     }
 
+    fn title(&self) -> &str {
+        "Leaf certificate validity must not exceed SC-081 cap"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-6.3.2")
+    }
+
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         // SC-081: cap is determined by issuance time (notBefore), not validation time.
         // `_now_unix` is intentionally ignored — it is the relying-party's current time,
@@ -182,6 +190,14 @@ impl Lint for Sha1ProhibitedLint {
         SubjectKind::Any
     }
 
+    fn title(&self) -> &str {
+        "SHA-1 signature algorithm prohibited"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-7.1.3")
+    }
+
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let sig_alg = cert.signature_algorithm.oid;
         if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1) {
@@ -247,6 +263,14 @@ impl Lint for RsaMinKeySizeLint {
 
     fn applies_to(&self) -> SubjectKind {
         SubjectKind::Any
+    }
+
+    fn title(&self) -> &str {
+        "RSA modulus must be at least 2048 bits"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-6.1.5")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
@@ -390,6 +414,14 @@ impl Lint for SanRequiredLint {
         SubjectKind::Leaf
     }
 
+    fn title(&self) -> &str {
+        "Leaf certificate must include subjectAltName"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-7.1.4.2")
+    }
+
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let Some(extensions) = &cert.tbs_certificate.extensions else {
             return LintResult::error("leaf certificate has no extensions; SubjectAltName absent");
@@ -446,6 +478,14 @@ impl Lint for EkuServerAuthLint {
 
     fn applies_to(&self) -> SubjectKind {
         SubjectKind::Leaf
+    }
+
+    fn title(&self) -> &str {
+        "Leaf certificate must include id-kp-serverAuth EKU"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-7.1.2.7.3")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
@@ -510,6 +550,14 @@ impl Lint for BcCaFlagLint {
 
     fn applies_to(&self) -> SubjectKind {
         SubjectKind::IntermediateCa
+    }
+
+    fn title(&self) -> &str {
+        "CA certificates must set BasicConstraints.cA=TRUE"
+    }
+
+    fn rfc_section_id(&self) -> Option<&str> {
+        Some("cabf-tls-br-7.1.2.5")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {

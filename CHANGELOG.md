@@ -6,6 +6,37 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.4.0`: `Lint` trait grows OSCAL-Control metadata methods (2026-05-11)
+
+**Additive.** Four new default-provided methods on the `Lint` trait
+(PKIX-9vnx.6.1 — first step toward emitting each `Lint` impl as an OSCAL
+Catalog `Control`):
+
+```rust
+fn title(&self) -> &str { self.id() }
+fn description(&self) -> Option<&str> { None }
+fn rfc_section_id(&self) -> Option<&str> { None }
+fn rfc_url(&self) -> Option<&str> { None }
+```
+
+`title` defaults to `id()`; the other three default to `None`. All
+existing `Lint` impls keep compiling unchanged. The six CABF TLS BR
+lints in `cabf_tls_br.rs` override `title` and `rfc_section_id` with
+human-readable titles and OSCAL Control-id-shaped strings
+(`cabf-tls-br-<section>`). `rfc_url` stays `None` for CABF lints
+because the CA/B Forum publishes BR documents as versioned PDFs without
+stable per-section anchors.
+
+`rfc_section_id` accepts any standards-body section identifier in
+`<source>-<section>` shape — IETF RFC (`rfc5280-4.2.1.9`), CA/B Forum
+(`cabf-tls-br-6.3.2`), ITU-T X.509, NIST SP, etc. The method name is
+kept as-spec'd by PKIX-9vnx.6's design discussion; the rustdoc
+documents the generic semantics.
+
+Seven new tests in `tests/cabf_tls_br_tests.rs` pin the metadata for
+each CABF lint plus the default behavior of an override-less `Lint`
+impl.
+
 ### `pkix-lint 0.4.0`: `DeviationScope` refactor to open-ended kind + props bag (2026-05-11)
 
 **BREAKING.** Replaces `pub enum DeviationScope { Any, IssuerDnContains(String),
