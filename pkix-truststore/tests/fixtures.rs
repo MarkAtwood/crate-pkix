@@ -1,12 +1,34 @@
 //! Integration tests against on-disk fixtures.
 //!
-//! Fixtures (committed under `tests/fixtures/`):
+//! Real-world distro CA bundles committed under `tests/fixtures/`:
 //!
-//! * `debian-ca-certificates.crt` — the real-world Debian `/etc/ssl/certs/
-//!   ca-certificates.crt` bundle copied at fixture-creation time. Used to
-//!   exercise multi-cert PEM bundles, real CA encodings, and to compare the
-//!   loaded-anchor count against an independent oracle (`grep -c "BEGIN
-//!   CERTIFICATE"`).
+//! * `debian-ca-certificates.crt` — the Debian `/etc/ssl/certs/
+//!   ca-certificates.crt` bundle, copied at fixture-creation time from a
+//!   Debian system.
+//! * `alpine-ca-certificates.crt` — the Alpine `/etc/ssl/certs/
+//!   ca-certificates.crt` bundle, extracted on 2026-05-10 from the
+//!   `docker.io/library/alpine:latest` OCI image with linux/amd64 manifest
+//!   digest `sha256:4d889c14e7d5a73929ab00be2ef8ff22437e7cbc545931e52554a7b00e123d8b`
+//!   (Alpine 3.23.4). The bundle is supplied by the
+//!   `ca-certificates-bundle-20260413-r0` apk package.
+//! * `fedora-ca-bundle.crt` — the Fedora `/etc/pki/tls/certs/ca-bundle.crt`
+//!   bundle, extracted on 2026-05-10 from the
+//!   `docker.io/library/fedora:latest` OCI image with linux/amd64 manifest
+//!   digest `sha256:f717d3f59ea0dc45d3c024c9477e786bab7d418d26636920d17b48016f1e69ca`
+//!   (Fedora 44 Container Image). The bundle is supplied by the
+//!   `ca-certificates-2025.2.80_v9.0.304-6.fc44` rpm package. The minimal
+//!   container image strips the `/etc/pki/tls/certs/ca-bundle.crt` symlink
+//!   but keeps its target `/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem`;
+//!   the file copied here is that target byte-for-byte.
+//!
+//! These three bundles are used to exercise multi-cert PEM parsing against
+//! the real encodings each distro ships, and to compare the loaded-anchor
+//! count against an independent oracle (`grep -c "BEGIN CERTIFICATE"`) at
+//! fixture-creation time.
+//!
+//! Single-cert and DER smoke-test fixtures (all derived from the Debian
+//! bundle to keep dependencies minimal):
+//!
 //! * `cert1.pem`, `cert2.pem` — the first two certificates extracted from
 //!   the Debian bundle. Single-cert PEM smoke tests use these.
 //! * `cert1.der` — `cert1.pem` converted to DER with
@@ -23,6 +45,8 @@
 use pkix_truststore::{from_der, from_der_file, from_der_iter, from_pem, from_pem_file, Error};
 
 const DEBIAN_BUNDLE_PATH: &str = "tests/fixtures/debian-ca-certificates.crt";
+const ALPINE_BUNDLE_PATH: &str = "tests/fixtures/alpine-ca-certificates.crt";
+const FEDORA_BUNDLE_PATH: &str = "tests/fixtures/fedora-ca-bundle.crt";
 const CERT1_PEM_PATH: &str = "tests/fixtures/cert1.pem";
 const CERT2_PEM_PATH: &str = "tests/fixtures/cert2.pem";
 const CERT1_DER_PATH: &str = "tests/fixtures/cert1.der";
@@ -33,6 +57,17 @@ const CERT1_DER_PATH: &str = "tests/fixtures/cert1.der";
 /// integration tests so a fixture refresh that changes the count fails
 /// loudly here, not in a misleading "anchor parse failed" assertion.
 const DEBIAN_BUNDLE_CERT_COUNT: usize = 147;
+
+/// Independent oracle: `grep -c "-----BEGIN CERTIFICATE-----"
+/// alpine-ca-certificates.crt` on the fixture at the time it was committed
+/// (Alpine 3.23.4, `ca-certificates-bundle-20260413-r0`) reported this count.
+const ALPINE_BUNDLE_CERT_COUNT: usize = 145;
+
+/// Independent oracle: `grep -c "-----BEGIN CERTIFICATE-----"
+/// fedora-ca-bundle.crt` on the fixture at the time it was committed
+/// (Fedora 44, `ca-certificates-2025.2.80_v9.0.304-6.fc44`) reported this
+/// count.
+const FEDORA_BUNDLE_CERT_COUNT: usize = 146;
 
 /// Re-derive the cert count from the bundle bytes by counting BEGIN
 /// boundaries. This is the in-process replay of the external `grep`
@@ -61,6 +96,44 @@ fn debian_bundle_loads() {
 fn debian_bundle_loads_via_file_helper() {
     let anchors = from_pem_file(DEBIAN_BUNDLE_PATH).expect("Debian bundle should parse");
     assert_eq!(anchors.len(), DEBIAN_BUNDLE_CERT_COUNT);
+}
+
+#[test]
+fn alpine_bundle_loads() {
+    let bytes = std::fs::read(ALPINE_BUNDLE_PATH).expect("fixture missing");
+    // Sanity-check the oracle constant against the bytes on disk.
+    assert_eq!(
+        count_begin_boundaries(&bytes),
+        ALPINE_BUNDLE_CERT_COUNT,
+        "fixture refresh changed cert count; update ALPINE_BUNDLE_CERT_COUNT",
+    );
+    let anchors = from_pem(&bytes).expect("Alpine bundle should parse");
+    assert_eq!(anchors.len(), ALPINE_BUNDLE_CERT_COUNT);
+}
+
+#[test]
+fn alpine_bundle_loads_via_file_helper() {
+    let anchors = from_pem_file(ALPINE_BUNDLE_PATH).expect("Alpine bundle should parse");
+    assert_eq!(anchors.len(), ALPINE_BUNDLE_CERT_COUNT);
+}
+
+#[test]
+fn fedora_bundle_loads() {
+    let bytes = std::fs::read(FEDORA_BUNDLE_PATH).expect("fixture missing");
+    // Sanity-check the oracle constant against the bytes on disk.
+    assert_eq!(
+        count_begin_boundaries(&bytes),
+        FEDORA_BUNDLE_CERT_COUNT,
+        "fixture refresh changed cert count; update FEDORA_BUNDLE_CERT_COUNT",
+    );
+    let anchors = from_pem(&bytes).expect("Fedora bundle should parse");
+    assert_eq!(anchors.len(), FEDORA_BUNDLE_CERT_COUNT);
+}
+
+#[test]
+fn fedora_bundle_loads_via_file_helper() {
+    let anchors = from_pem_file(FEDORA_BUNDLE_PATH).expect("Fedora bundle should parse");
+    assert_eq!(anchors.len(), FEDORA_BUNDLE_CERT_COUNT);
 }
 
 #[test]
