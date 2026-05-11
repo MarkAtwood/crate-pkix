@@ -10,11 +10,26 @@ authors.workspace     = true
 keywords    = ["x509", "certificate", "pki", "transparency", "rfc6962"]
 categories  = ["cryptography"]
 
+[features]
+default = []
+
+# Enable `std::error::Error` impl on the `Error` type. The crate's core
+# parser is `no_std` + `alloc`; this feature gates only the std-only
+# trait impl plus propagates the std feature to transitive deps so they
+# can use std::io etc. when wired into a std-only consumer.
+std = ["der/std", "x509-cert/std", "signature/std"]
+
 [dependencies]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
 signature  = { workspace = true }
+
+[dev-dependencies]
+# Integration tests load PEM/DER certs and walk extensions; x509-cert with
+# `pem` enabled provides Certificate::from_pem. The crate itself does not
+# depend on PEM parsing.
+x509-cert = { workspace = true, features = ["pem", "std"] }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -429,6 +429,44 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
 
   Tracked as PKIX-qgw1 in the project beads.
 
+### `pkix-ct` — SCT binary-format parser (RFC 6962 §3.2 / §3.3)
+
+#### Added
+
+- `SignedCertificateTimestamp` and `SctList` now carry parsed values
+  rather than placeholder fields. `SignedCertificateTimestamp` exposes
+  `version`, `log_id` (32 bytes), `timestamp_ms` (u64 BE), `extensions`
+  (Vec<u8>), `hash_alg`, `sig_alg`, and `signature` (raw bytes).
+- `SignedCertificateTimestamp::from_bytes` parses a single SCT.
+- `SctList::from_extension_value` parses the value of a cert's SCT-list
+  extension (OID 1.3.6.1.4.1.11129.2.4.2). It peels the inner DER
+  OCTET STRING that RFC 6962 §3.3 wraps the `SignedCertificateTimestampList`
+  in. The outer extension OCTET STRING is assumed to be already stripped
+  by the extension framework (e.g. via `x509_cert::ext::Extension::extn_value.as_bytes()`).
+- `SctList::from_serialized_list` parses bare `SerializedSCTList` bytes
+  for callers handling TLS-handshake-extension or OCSP-extension delivery
+  (the OCSP and TLS forms are not double-wrapped).
+- New `Error` variants `UnsupportedVersion(u8)` and `TruncatedOrTrailing`
+  (`Error` is `#[non_exhaustive]`; adding variants is non-breaking).
+
+#### Changed
+
+- The crate is now `no_std` + `alloc` by default (default features is
+  the empty set). A new `std` feature gates the `std::error::Error` impl
+  on `Error` and propagates `std` to `der`, `x509-cert`, and `signature`.
+  Consumers wanting std-only behaviour add `features = ["std"]`. No
+  consumer code is currently broken: the previous default included
+  `std::error::Error`; the new default does not, so a consumer that
+  relied on `Error: std::error::Error` will need to enable the feature.
+  pkix-ct is at `0.0.0` and not published, so the impact is contained
+  to in-tree consumers.
+
+- The `Limitations` rustdoc section is updated to describe what's
+  implemented (parsing) vs what is not (log lists, signature verification,
+  pre-cert handling, Merkle inclusion proofs).
+
+  Tracked as PKIX-baac.1 in the project beads.
+
 ## [0.3.0 / 0.2.1] — 2026-05-07
 
 This release groups three concurrent crate versions:
