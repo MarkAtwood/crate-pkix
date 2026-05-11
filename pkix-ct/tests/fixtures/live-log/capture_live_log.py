@@ -434,6 +434,13 @@ def get_proof_by_hash(log_url: str, leaf_hash_b64: str, tree_size: int) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture a live-log SCT+proof+STH triple.")
     parser.add_argument("--site", default="cloudflare.com")
+    parser.add_argument(
+        "--no-rust-check",
+        action="store_true",
+        help="Skip the post-capture cargo-test cross-check against "
+        "pkix_ct::merkle_tree_leaf_for_precert (PKIX-yzb6). Useful when "
+        "cargo is not available in the capture environment.",
+    )
     parser.add_argument("--log-key-substring", default="Nimbus2026",
                         help="Substring to match against log description.")
     parser.add_argument("--out-dir", default=str(FIXTURE_DIR))
@@ -592,6 +599,42 @@ def main() -> int:
 
     print(f"      wrote: leaf.der issuer.der sct.bin leaf-hash.bin "
           f"audit-path.bin sth.bin log-spki.der log-id.bin meta.json")
+
+    # PKIX-yzb6 cross-check: run the Rust live-log integration tests
+    # against the freshly-captured fixture. This validates that the
+    # pkix-ct::merkle_tree_leaf_for_precert helper produces a leaf
+    # hash byte-equal to the one this script just wrote — a strong
+    # two-way agreement between the Python wire-format implementation
+    # and the Rust public API. Skipped if cargo is unavailable or the
+    # cross-check is opted out (--no-rust-check).
+    if not getattr(args, "no_rust_check", False):
+        print(f"[8/8] Cross-checking against pkix-ct Rust helper ...")
+        # Locate workspace root: capture_live_log.py lives at
+        # pkix-ct/tests/fixtures/live-log/capture_live_log.py, so the
+        # workspace root is four parents up.
+        workspace_root = FIXTURE_DIR.parents[3]
+        if not (workspace_root / "Cargo.toml").is_file():
+            print(f"      workspace root not found at {workspace_root}; skipping")
+        else:
+            try:
+                subprocess.run(
+                    [
+                        "cargo", "test", "-p", "pkix-ct", "--all-features",
+                        "--test", "live_log",
+                        "merkle_tree_leaf_for_precert_matches_captured_leaf_hash",
+                    ],
+                    cwd=workspace_root,
+                    check=True,
+                )
+                print(f"      Rust cross-check OK")
+            except FileNotFoundError:
+                print(f"      cargo not on PATH; skipping cross-check")
+            except subprocess.CalledProcessError as e:
+                print(f"      Rust cross-check FAILED (exit {e.returncode}); "
+                      f"the captured fixture disagrees with merkle_tree_leaf_for_precert. "
+                      f"Aborting before commit.")
+                return 1
+
     print(f"done.")
     return 0
 

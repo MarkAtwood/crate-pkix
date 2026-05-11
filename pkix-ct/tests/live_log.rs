@@ -65,8 +65,8 @@
 use std::fs;
 
 use pkix_ct::{
-    CtLog, CtLogList, MerkleAuditPath, SctList, SctVerifier, SignedCertificateTimestamp,
-    SignedTreeHead,
+    merkle_leaf_hash, merkle_tree_leaf_for_precert, CtLog, CtLogList, MerkleAuditPath, SctList,
+    SctVerifier, SignedCertificateTimestamp, SignedTreeHead,
 };
 use pkix_path::DefaultVerifier;
 
@@ -210,4 +210,59 @@ fn live_log_triple_verifies_end_to_end() {
     );
     v.verify_inclusion(&leaf_hash, &proof, &sth.root_hash)
         .expect("inclusion proof reconstructs the STH root");
+}
+
+/// PKIX-yzb6 acceptance: the public `merkle_tree_leaf_for_precert`
+/// helper produces a MerkleTreeLeaf byte string whose leaf hash
+/// matches the one captured by the Python fixture-capture script.
+///
+/// Independent oracle: `leaf-hash.bin` is the value the
+/// `capture_live_log.py` script computed from RFC 6962 §3.4 text in
+/// Python; the CT log's `get-proof-by-hash` endpoint accepted that
+/// value (meaning the log itself agreed it was a leaf in its tree).
+/// So Python + CT-log-side both vouch for the bytes the Rust helper
+/// must reproduce.
+#[test]
+fn merkle_tree_leaf_for_precert_matches_captured_leaf_hash() {
+    let sct = captured_sct();
+    let leaf_der = fixture("leaf.der");
+    let issuer_der = fixture("issuer.der");
+
+    let mtl = merkle_tree_leaf_for_precert(&sct, &leaf_der, &issuer_der)
+        .expect("Rust MerkleTreeLeaf builder succeeds on real fixture");
+    let derived_leaf_hash = merkle_leaf_hash(&mtl);
+
+    let captured_leaf_hash: [u8; 32] = fixture("leaf-hash.bin")
+        .as_slice()
+        .try_into()
+        .expect("leaf-hash.bin is 32 bytes");
+
+    assert_eq!(
+        derived_leaf_hash, captured_leaf_hash,
+        "Rust-derived leaf hash must match the Python-captured one"
+    );
+}
+
+/// PKIX-yzb6 follow-up: the leaf hash derived via the new helper
+/// works as input to `verify_inclusion` against the captured STH —
+/// end-to-end test that downstream consumers can do the full
+/// "parse SCT → build MerkleTreeLeaf → hash → verify inclusion"
+/// pipeline through pkix-ct's public API alone.
+#[test]
+fn merkle_tree_leaf_for_precert_feeds_verify_inclusion_end_to_end() {
+    let logs = captured_log_list();
+    let v = SctVerifier::new(logs, DefaultVerifier);
+    let sct = captured_sct();
+    let leaf_der = fixture("leaf.der");
+    let issuer_der = fixture("issuer.der");
+
+    let mtl = merkle_tree_leaf_for_precert(&sct, &leaf_der, &issuer_der)
+        .expect("MerkleTreeLeaf builder succeeds");
+    let derived_leaf_hash = merkle_leaf_hash(&mtl);
+
+    let (_captured_leaf_hash, proof) = captured_audit_path();
+    let (_log_id, sth) = captured_sth();
+
+    v.verify_inclusion(&derived_leaf_hash, &proof, &sth.root_hash)
+        .expect("inclusion proof verifies against the derived leaf hash");
 }
