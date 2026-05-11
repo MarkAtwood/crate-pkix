@@ -1,0 +1,6 @@
+# Throwaway artifacts from re-running the openssl triangulation that
+# proved the fixtures are wire-format-correct (see this directory's
+# gen_x509_entry_sct.py docstring). They are not test inputs and are
+# regenerated on demand.
+sig.bin
+log-pub.pem

@@ -52,7 +52,7 @@ use crate::{Error, Result};
 /// `sig_alg` are the raw 1-byte tags from RFC 5246 §7.4.1.4.1 rather than
 /// typed enums, so future TLS revisions adding new algorithms do not
 /// require changes here. Signature interpretation lives one layer up
-/// (see [`crate::verify_scts`] and PKIX-baac.3).
+/// (see [`crate::SctVerifier`]).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SignedCertificateTimestamp {
     /// SCT version. Always 0 for the v1 protocol defined in RFC 6962. v2
