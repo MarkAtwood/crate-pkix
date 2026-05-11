@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version           = "0.3.0"  # 0.3 — Cow<'static, str> migration (PKIX-ua6q)
+version           = "0.3.0"  # 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q)
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -21,6 +21,12 @@ pkix-profiles = { workspace = true }
 x509-cert     = { workspace = true }
 der           = { workspace = true }
 serde         = { workspace = true, optional = true }
+# SHA-256 for Finding.cert_sha256 (PKIX-a86q). Already transitively pulled in
+# by x509-cert; declaring it explicitly here so the dependency is visible and
+# does not silently break if x509-cert's tree changes. `default-features = false`
+# matches the workspace pin and keeps pkix-lint compatible with hypothetical
+# downstream no_std forks even though pkix-lint itself uses std.
+sha2          = { workspace = true }
 
 [dev-dependencies]
 pkix-path     = { workspace = true, features = ["p256", "std"] }

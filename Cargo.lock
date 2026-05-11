@@ -1203,6 +1203,7 @@ dependencies = [
  "pkix-profiles",
  "serde",
  "serde_json",
+ "sha2",
  "x509-cert",
 ]
 
