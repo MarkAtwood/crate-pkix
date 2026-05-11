@@ -1,0 +1,20 @@
+[package]
+name        = "pkix-truststore"
+description = "PEM/DER trust anchor loading for pkix-path (no baked-in trust data, no baked-in trust source)"
+version               = "0.0.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "pki", "truststore", "ca"]
+categories  = ["cryptography"]
+
+[dependencies]
+pkix-path = { workspace = true }
+der        = { workspace = true, features = ["pem"] }
+x509-cert  = { workspace = true, features = ["pem"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

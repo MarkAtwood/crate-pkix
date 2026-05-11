@@ -1269,6 +1269,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-truststore"
+version = "0.0.0"
+dependencies = [
+ "der",
+ "pkix-path",
+ "x509-cert",
+]
+
+[[package]]
 name = "potential_utf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

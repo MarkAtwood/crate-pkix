@@ -37,6 +37,25 @@ The RustCrypto upstream gap is tracked at RustCrypto/formats#838 (open since 202
 - `BasicConstraints` cA=TRUE is mandatory on every intermediate; keyCertSign in KeyUsage must be checked.
 - PKITS (NIST) test corpus is the integration test bar.
 
+## Trust anchor loading: `pkix-truststore`
+
+`pkix-truststore` is a small Tier 1 crate that turns PEM/DER bytes (or files)
+into `Vec<TrustAnchor>`. It also exposes `from_der_iter(...)` as the
+canonical adapter entry point for non-file sources.
+
+**Project stance (binding): no baked-in trust data, no baked-in trust source.**
+No compiled-in Mozilla CA bundle (rejects the `webpki-roots` model). No
+built-in knowledge of any platform trust store. Trust data is deployment
+configuration, not library content. Platform / HSM / cloud KMS sources are
+out-of-tree adapter crates (`pkix-truststore-system`, `pkix-truststore-pkcs11`,
+…) that fetch DER bytes from a source-specific API and feed them into
+`pkix_truststore::from_der_iter(...)`.
+
+Do not add a `webpki-roots`-style trust-data dependency to any crate in this
+workspace without explicit human approval. Do not add platform-specific FFI
+or `[target.<platform>.dependencies]` to `pkix-truststore` itself; that
+belongs in an adapter crate.
+
 ## v0.1 deliverable
 
 RSA-PKCS1v15 + P-256 signing, no NameConstraints, no revocation, configurable max depth.

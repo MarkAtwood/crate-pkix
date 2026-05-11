@@ -432,6 +432,21 @@ deviation tracking, OSCAL-style reports.
 - `serial_lex_ge` / `serial_lex_le` consolidated into `serial_cmp` returning
   `core::cmp::Ordering`. Internal change; not on the public API surface.
 
+### New workspace member: `pkix-truststore`
+
+Tier 1 trust anchor loading. Bytes-in (PEM or DER), `Vec<TrustAnchor>`-out.
+File-reading convenience wrappers and a `from_der_iter` entry point that
+adapter crates (system stores, HSMs, cloud KMS) feed.
+
+Binding project stance recorded in `AGENTS.md`: no compiled-in CA bundle,
+no baked-in trust source. Platform / HSM / cloud trust stores are
+out-of-tree adapter crates (`pkix-truststore-system` (PKIX-8h87),
+`pkix-truststore-pkcs11` (PKIX-p8vz), etc.) that fetch DER bytes from a
+source-specific API and feed them into `pkix_truststore::from_der_iter(...)`.
+
+Initial version `0.0.0` per the workspace stub-crate convention; bumped
+to `0.1.0` on first publish.
+
 ### Stub crates
 
 The following crates remain at `0.0.0` placeholder versions and are NOT
@@ -441,6 +456,8 @@ published in this release:
 - `pkix-ct` (Certificate Transparency SCT verification — not yet implemented)
 - `pkix-composite` (composite classical+PQC signatures — not yet implemented)
 - `pkix-ac` (RFC 5755 attribute certificates — not yet implemented)
+- `pkix-truststore` (PEM/DER trust anchor loading — implemented, unpublished
+  pending first crates.io release decision)
 
 The 0.1.1 versions of these stubs on crates.io are placeholder releases that
 predate the 0.0.0 reset; consumers should not depend on them.

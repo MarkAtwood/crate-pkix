@@ -13,6 +13,7 @@ members = [
     "pkix-composite",
     "pkix-ac",
     "pkix-difftest",
+    "pkix-truststore",
 ]
 
 [workspace.package]
@@ -51,6 +52,7 @@ pkix-lint             = { path = "pkix-lint",             version = "0.2.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }
+pkix-truststore       = { path = "pkix-truststore",       version = "0.0.0" }
 
 # RustCrypto core
 der       = "0.7"
