@@ -45,7 +45,7 @@
 //! store.add(Deviation {
 //!     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
 //!     target_lint: "fpki.common.6.1.5".to_string(),
-//!     scope: DeviationScope::IssuerDnContains("agency x issuing ca".to_string()),
+//!     scope: DeviationScope::issuer_dn_contains("agency x issuing ca"),
 //!     effective_start: None,
 //!     effective_end: Some(1_767_225_600), // 2026-01-01
 //!     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
@@ -111,7 +111,7 @@ pub struct Deviation {
     /// Which certificates this deviation applies to.
     ///
     /// Only certs that match the scope will have the deviation applied.
-    /// Use [`DeviationScope::Any`] only for internal CAs or test environments
+    /// Use [`DeviationScope::any()`] only for internal CAs or test environments
     /// where the profile itself is being applied informally.
     pub scope: DeviationScope,
 
@@ -198,209 +198,348 @@ impl Deviation {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DeviationScope: open-ended kind + props bag
+//
+// PKIX-9vnx.11: replaces the closed enum with a `kind: String` discriminator
+// plus a `props: Vec<(String, ScopePropValue)>` typed bag, mirroring the
+// OSCAL Subject shape. Constructors retain ergonomic, type-safe construction
+// of the four canonical kinds; future scope axes (PKIX-8mzp's
+// `SubjectDnContains`, `PolicyOid`, etc.) are expressible via new `kind`
+// strings + props without growing the public enum surface.
+// ---------------------------------------------------------------------------
+
+/// Canonical kind discriminator: deviation applies to all certificates.
+///
+/// Used as the value of [`DeviationScope::kind`]. Has no props.
+pub const SCOPE_KIND_ANY: &str = "pkix-lint.scope.any";
+
+/// Canonical kind discriminator: deviation applies to certs whose issuer DN
+/// (RFC 4514 string form) contains a substring (case-insensitive).
+///
+/// Carries one prop: [`PROP_ISSUER_DN_SUBSTRING`] (a `Text` prop).
+pub const SCOPE_KIND_ISSUER_DN_CONTAINS: &str = "pkix-lint.scope.issuer-dn-contains";
+
+/// Canonical kind discriminator: deviation applies to certs whose issuer DN
+/// matches exactly (RFC 4518 normalized comparison via
+/// `pkix_path::names_match`).
+///
+/// Carries one prop: [`PROP_ISSUER_DN_DER`] (a `Bytes` prop holding the DER
+/// encoding of the issuer `Name`).
+pub const SCOPE_KIND_ISSUER_DN_EXACT: &str = "pkix-lint.scope.issuer-dn-exact";
+
+/// Canonical kind discriminator: deviation applies to certs issued by a
+/// specific CA within a serial number range (inclusive on both ends).
+///
+/// Carries three props: [`PROP_ISSUER_DN_DER`] (Bytes, DER of issuer),
+/// [`PROP_SERIAL_START`] (Bytes), [`PROP_SERIAL_END`] (Bytes).
+pub const SCOPE_KIND_SERIAL_RANGE: &str = "pkix-lint.scope.serial-range";
+
+/// Prop name: the substring used by [`SCOPE_KIND_ISSUER_DN_CONTAINS`].
+///
+/// Value is a [`ScopePropValue::Text`] (pre-lowercased by
+/// [`DeviationStore::add`]).
+pub const PROP_ISSUER_DN_SUBSTRING: &str = "pkix-lint.issuer-dn-substring";
+
+/// Prop name: the DER encoding of an issuer `Name`, used by
+/// [`SCOPE_KIND_ISSUER_DN_EXACT`] and [`SCOPE_KIND_SERIAL_RANGE`].
+///
+/// Value is a [`ScopePropValue::Bytes`].
+pub const PROP_ISSUER_DN_DER: &str = "pkix-lint.issuer-dn-der";
+
+/// Prop name: the inclusive lower bound of the serial-range, used by
+/// [`SCOPE_KIND_SERIAL_RANGE`].
+///
+/// Value is a [`ScopePropValue::Bytes`].
+pub const PROP_SERIAL_START: &str = "pkix-lint.serial-start";
+
+/// Prop name: the inclusive upper bound of the serial-range, used by
+/// [`SCOPE_KIND_SERIAL_RANGE`].
+///
+/// Value is a [`ScopePropValue::Bytes`].
+pub const PROP_SERIAL_END: &str = "pkix-lint.serial-end";
+
+/// A typed value in a [`DeviationScope`] props bag.
+///
+/// The two current variants cover the four canonical scope kinds:
+/// - [`ScopePropValue::Text`] for human-readable strings (e.g. a substring of
+///   an issuer DN).
+/// - [`ScopePropValue::Bytes`] for binary data (e.g. a DER-encoded `Name` or
+///   a DER positive-integer serial number).
+///
+/// `#[non_exhaustive]` so future scope axes can introduce additional variants
+/// (e.g. an `Oid` variant for `PKIX-8mzp`'s planned `PolicyOid` scope)
+/// without a breaking change.
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ScopePropValue {
+    /// A text value. Used for human-readable strings such as the lowercased
+    /// substring of an issuer DN.
+    Text(String),
+    /// A binary value. Used for DER-encoded structures (e.g. `Name`) and for
+    /// DER positive-integer serial numbers (big-endian minimal encoding).
+    Bytes(Vec<u8>),
+}
+
 /// Specifies which certificates a [`Deviation`] applies to.
 ///
-/// Scopes are evaluated against the certificate at chain index 0 (the leaf)
-/// for cert-scope lints. For path-scope lints, the scope is evaluated against
-/// the leaf certificate.
+/// `DeviationScope` is an open-ended discriminator + typed-props bag, mirroring
+/// the OSCAL Subject shape. The discriminator [`Self::kind`] selects the
+/// matching algorithm; [`Self::props`] carries the parameters for that
+/// algorithm.
+///
+/// # Canonical kinds (built in)
+///
+/// Four kinds ship in `pkix-lint`. Use the matching constructor rather than
+/// constructing the struct directly:
+///
+/// | Constructor | Kind constant | Matches |
+/// |-------------|---------------|---------|
+/// | [`Self::any`] | [`SCOPE_KIND_ANY`] | All certificates |
+/// | [`Self::issuer_dn_contains`] | [`SCOPE_KIND_ISSUER_DN_CONTAINS`] | Issuer DN string contains a substring (case-insensitive) |
+/// | [`Self::issuer_dn_exact`] | [`SCOPE_KIND_ISSUER_DN_EXACT`] | Issuer DN matches exactly (RFC 4518 normalized) |
+/// | [`Self::serial_range`] | [`SCOPE_KIND_SERIAL_RANGE`] | Issuer DN + serial in inclusive byte-lex range |
 ///
 /// # Choosing a scope
 ///
 /// Use the narrowest scope that resolves the actual problem:
-/// - Prefer `SerialRange` when the deviation covers a specific issuance batch.
-/// - Prefer `IssuerDnExact` when all certs from a given CA are affected.
-/// - Use `IssuerDnContains` for human-readable convenience scoping in dev/test.
-/// - Use `Any` only for internal CAs or test environments where the profile
-///   is intentionally not applicable.
+/// - Prefer [`Self::serial_range`] when the deviation covers a specific
+///   issuance batch.
+/// - Prefer [`Self::issuer_dn_exact`] when all certs from a given CA are
+///   affected.
+/// - Use [`Self::issuer_dn_contains`] for human-readable convenience scoping
+///   in dev/test.
+/// - Use [`Self::any`] only for internal CAs or test environments where the
+///   profile is intentionally not applicable.
 ///
-/// # Planned additions (tracked as PKIX-8mzp)
+/// # Open-ended extensibility
 ///
-/// - `SubjectDnContains(String)` — for subscriber-identity scoping
-/// - `PolicyOid(ObjectIdentifier)` — certs asserting a specific CP OID
-#[non_exhaustive]
+/// Additional scope axes (e.g. `PKIX-8mzp`'s planned `SubjectDnContains`,
+/// `PolicyOid`) are expressible via new `kind` strings + props without
+/// modifying this struct. [`Self::matches`] short-circuits to `false` for
+/// unknown kinds (fail-closed).
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DeviationScope {
-    /// The deviation applies to all certificates.
+pub struct DeviationScope {
+    /// The subject-type discriminator. One of the `SCOPE_KIND_*` constants for
+    /// the canonical kinds, or a custom kind string for caller-defined axes.
+    pub kind: String,
+    /// Typed props that parameterize the scope. Property names are
+    /// kind-specific; see the `SCOPE_KIND_*` constants for the props each
+    /// canonical kind expects.
     ///
-    /// Use `Any` only for internal CAs or test environments where the profile
-    /// is intentionally not applicable. `Any` deviations are the most likely
-    /// to be questioned by an auditor.
-    Any,
-
-    /// The deviation applies to certs whose issuer DN string representation
-    /// contains the given substring (case-insensitive).
-    ///
-    /// Example: `IssuerDnContains("agency x issuing ca".to_string())` matches
-    /// any cert whose issuer DN contains "Agency X Issuing CA".
-    ///
-    /// The substring is automatically lowercased by [`DeviationStore::add`].
-    /// Constructing the scope with a mixed-case string and inserting it via
-    /// `add()` is safe; the stored string will be normalized. Direct
-    /// construction of a scope without going through `add()` (e.g., for
-    /// serialization round-trips) should use a pre-lowercased string to
-    /// preserve the invariant that matching logic assumes.
-    ///
-    /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
-    /// [`DeviationScope::IssuerDnExact`] when precise DN identity is required.
-    ///
-    /// **Warning**: case folding uses `make_ascii_lowercase()`, which only folds
-    /// ASCII characters. This may fail to match non-ASCII DN components (e.g.,
-    /// accented letters or CJK characters) because non-ASCII code points are left
-    /// unchanged. If the issuer DN contains non-ASCII characters, use
-    /// [`DeviationScope::IssuerDnExact`] instead.
-    IssuerDnContains(String),
-
-    /// The deviation applies to certs whose issuer DN matches exactly, using
-    /// RFC 4518 normalization (the same algorithm as `pkix_path::names_match`).
-    ///
-    /// # Construction
-    ///
-    /// Construct from a certificate you already have:
-    ///
-    /// ```rust,no_run
-    /// // `ca_cert` is a Certificate obtained from the calling context.
-    /// use pkix_lint::deviation::DeviationScope;
-    /// use x509_cert::Certificate;
-    ///
-    /// let ca_cert: Certificate = unimplemented!("load from DER");
-    /// let scope = DeviationScope::IssuerDnExact(
-    ///     ca_cert.tbs_certificate.subject.clone()
-    /// );
-    /// ```
-    ///
-    /// This is the preferred scope for production deviations over `IssuerDnContains`
-    /// because it is unambiguous and resistant to substring-match confusion.
-    IssuerDnExact(x509_cert::name::Name),
-
-    /// The deviation applies to certs issued by a specific CA within a serial
-    /// number range (inclusive on both ends).
-    ///
-    /// `issuer` is the CA's subject DN (RFC 4518-normalized match).
-    /// `start` and `end` are the serial number bounds as raw byte vectors.
-    /// The comparison uses byte-lexicographic order, which is identical to
-    /// numeric order for DER-encoded positive integers (big-endian, no leading
-    /// zeros except to prevent sign-bit confusion).
-    ///
-    /// # Use case
-    ///
-    /// Use when a specific issuance batch (e.g., certs issued between two dates
-    /// from a particular CA) has a known deviation. This is the most precise scope
-    /// and the most defensible in an audit.
-    ///
-    /// # Construction
-    ///
-    /// ```rust,no_run
-    /// // `start_cert`, `end_cert`, and `issuing_ca_cert` are Certificates from the
-    /// // calling context. They are not defined here so this cannot run in a doctest.
-    /// use pkix_lint::deviation::DeviationScope;
-    /// use x509_cert::Certificate;
-    ///
-    /// let start_cert: Certificate = unimplemented!("load from DER");
-    /// let end_cert: Certificate = unimplemented!("load from DER");
-    /// let issuing_ca_cert: Certificate = unimplemented!("load from DER");
-    /// // Obtain the serial bytes from an example cert in the batch:
-    /// let start_bytes = start_cert.tbs_certificate.serial_number.as_bytes().to_vec();
-    /// let end_bytes   = end_cert.tbs_certificate.serial_number.as_bytes().to_vec();
-    /// let scope = DeviationScope::SerialRange {
-    ///     issuer: issuing_ca_cert.tbs_certificate.subject.clone(),
-    ///     start: start_bytes,
-    ///     end: end_bytes,
-    /// };
-    /// ```
-    SerialRange {
-        /// The issuer CA's subject DN.
-        issuer: x509_cert::name::Name,
-        /// Start of the serial number range (inclusive), as raw bytes.
-        start: Vec<u8>,
-        /// End of the serial number range (inclusive), as raw bytes.
-        end: Vec<u8>,
-    },
+    /// Stored as a `Vec` rather than a map to preserve insertion order. Linear
+    /// scans by name are O(N) but N is small (≤3 today, ≤a handful even for
+    /// future scope axes).
+    pub props: Vec<(String, ScopePropValue)>,
 }
 
 impl DeviationScope {
+    /// Construct a [`SCOPE_KIND_ANY`] scope (matches all certificates).
+    #[must_use]
+    pub fn any() -> Self {
+        Self {
+            kind: SCOPE_KIND_ANY.to_string(),
+            props: Vec::new(),
+        }
+    }
+
+    /// Construct a [`SCOPE_KIND_ISSUER_DN_CONTAINS`] scope.
+    ///
+    /// `substring` is matched (case-insensitively) against the RFC 4514 string
+    /// form of the certificate's issuer DN. Pre-lowercase the substring or
+    /// rely on [`DeviationStore::add`] to do so at insertion time; matching
+    /// assumes the stored substring is already lowercase.
+    ///
+    /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
+    /// [`Self::issuer_dn_exact`] when precise DN identity is required.
+    ///
+    /// **Warning**: case folding uses `make_ascii_lowercase()`, which only
+    /// folds ASCII. Non-ASCII DN components (accented letters, CJK, etc.) are
+    /// left unchanged. For non-ASCII issuer DNs, use [`Self::issuer_dn_exact`].
+    #[must_use]
+    pub fn issuer_dn_contains(substring: impl Into<String>) -> Self {
+        Self {
+            kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_string(),
+            props: vec![(
+                PROP_ISSUER_DN_SUBSTRING.to_string(),
+                ScopePropValue::Text(substring.into()),
+            )],
+        }
+    }
+
+    /// Construct a [`SCOPE_KIND_ISSUER_DN_EXACT`] scope.
+    ///
+    /// The issuer DN is matched using
+    /// [`pkix_path::names_match`] (RFC 4518 normalization).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`der::Error`] if `name` fails to DER-encode.
+    pub fn issuer_dn_exact(name: &x509_cert::name::Name) -> Result<Self, der::Error> {
+        use der::Encode as _;
+        let der = name.to_der()?;
+        Ok(Self {
+            kind: SCOPE_KIND_ISSUER_DN_EXACT.to_string(),
+            props: vec![(PROP_ISSUER_DN_DER.to_string(), ScopePropValue::Bytes(der))],
+        })
+    }
+
+    /// Construct a [`SCOPE_KIND_SERIAL_RANGE`] scope.
+    ///
+    /// `issuer` is the CA's subject DN (matched via
+    /// [`pkix_path::names_match`]); `start` and `end` are the serial number
+    /// bounds (inclusive) as raw bytes in DER positive-integer encoding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`der::Error`] if `issuer` fails to DER-encode.
+    pub fn serial_range(
+        issuer: &x509_cert::name::Name,
+        start: Vec<u8>,
+        end: Vec<u8>,
+    ) -> Result<Self, der::Error> {
+        use der::Encode as _;
+        let der = issuer.to_der()?;
+        Ok(Self {
+            kind: SCOPE_KIND_SERIAL_RANGE.to_string(),
+            props: vec![
+                (PROP_ISSUER_DN_DER.to_string(), ScopePropValue::Bytes(der)),
+                (PROP_SERIAL_START.to_string(), ScopePropValue::Bytes(start)),
+                (PROP_SERIAL_END.to_string(), ScopePropValue::Bytes(end)),
+            ],
+        })
+    }
+
+    /// Get a prop value by name, or `None` if no such prop exists.
+    ///
+    /// Used internally by [`Self::matches`] and by the OSCAL emit/parse layer.
+    #[must_use]
+    pub fn get_prop(&self, name: &str) -> Option<&ScopePropValue> {
+        self.props
+            .iter()
+            .find_map(|(k, v)| (k == name).then_some(v))
+    }
+
+    fn get_text(&self, name: &str) -> Option<&str> {
+        match self.get_prop(name)? {
+            ScopePropValue::Text(s) => Some(s.as_str()),
+            ScopePropValue::Bytes(_) => None,
+        }
+    }
+
+    fn get_bytes(&self, name: &str) -> Option<&[u8]> {
+        match self.get_prop(name)? {
+            ScopePropValue::Bytes(b) => Some(b.as_slice()),
+            ScopePropValue::Text(_) => None,
+        }
+    }
+
     /// Returns `true` if `cert` is within this scope.
+    ///
+    /// Dispatches on [`Self::kind`]. Unknown kinds return `false`
+    /// (fail-closed). Within each known kind, missing-or-wrong-typed props
+    /// also return `false` rather than panicking — the constructors prevent
+    /// this for code-built scopes, and the OSCAL parser rejects malformed
+    /// input before any [`DeviationScope`] is constructed.
     #[must_use]
     pub fn matches(&self, cert: &Certificate) -> bool {
-        match self {
-            Self::Any => true,
-
-            Self::IssuerDnContains(substring) => {
-                // Allocates one String per call to convert the Name to its display form.
-                // For high-frequency lint passes, prefer IssuerDnExact (uses RFC 4518
-                // normalized comparison without String allocation).
-                // `substring` is pre-lowercased by `DeviationStore::add`; no
-                // need to call `.to_lowercase()` on it again here.
-                // Use `make_ascii_lowercase` (in-place, single allocation) instead
-                // of `to_lowercase` (which allocates a new String for Unicode chars).
-                // CA DN strings are always ASCII in practice, so this is equivalent
-                // and avoids a second heap allocation.
+        match self.kind.as_str() {
+            SCOPE_KIND_ANY => true,
+            SCOPE_KIND_ISSUER_DN_CONTAINS => {
+                let Some(substring) = self.get_text(PROP_ISSUER_DN_SUBSTRING) else {
+                    return false;
+                };
+                // `substring` is pre-lowercased by `DeviationStore::add`.
+                // Use `make_ascii_lowercase` (in-place) on the cert side too —
+                // CA DN strings are ASCII in practice. Non-ASCII issuer DNs
+                // are documented as unsupported for this scope kind.
                 let mut issuer_str = cert.tbs_certificate.issuer.to_string();
                 issuer_str.make_ascii_lowercase();
-                issuer_str.contains(substring.as_str())
+                issuer_str.contains(substring)
             }
-
-            Self::IssuerDnExact(name) => {
-                // Use pkix_path::names_match for RFC 4518-normalized comparison.
-                pkix_path::names_match(name, &cert.tbs_certificate.issuer)
+            SCOPE_KIND_ISSUER_DN_EXACT => {
+                let Some(der) = self.get_bytes(PROP_ISSUER_DN_DER) else {
+                    return false;
+                };
+                use der::Decode as _;
+                let Ok(name) = x509_cert::name::Name::from_der(der) else {
+                    return false;
+                };
+                pkix_path::names_match(&name, &cert.tbs_certificate.issuer)
             }
-
-            Self::SerialRange { issuer, start, end } => {
-                // Issuer DN must match.
-                if !pkix_path::names_match(issuer, &cert.tbs_certificate.issuer) {
+            SCOPE_KIND_SERIAL_RANGE => {
+                let Some(der) = self.get_bytes(PROP_ISSUER_DN_DER) else {
+                    return false;
+                };
+                let Some(start) = self.get_bytes(PROP_SERIAL_START) else {
+                    return false;
+                };
+                let Some(end) = self.get_bytes(PROP_SERIAL_END) else {
+                    return false;
+                };
+                use der::Decode as _;
+                let Ok(issuer) = x509_cert::name::Name::from_der(der) else {
+                    return false;
+                };
+                if !pkix_path::names_match(&issuer, &cert.tbs_certificate.issuer) {
                     return false;
                 }
-                // Serial number must be within [start, end] by byte-lexicographic order.
-                // DER-encoded positive integers are big-endian with minimal encoding,
-                // so lexicographic order = numeric order for same-length values.
-                // For different-length values: longer byte sequences represent larger numbers
-                // only when stripped of leading-zero padding. We do a simple length-first
-                // comparison, which is correct for well-formed DER serial numbers.
                 let serial = cert.tbs_certificate.serial_number.as_bytes();
                 let cmp_start = serial_cmp(serial, start);
                 let cmp_end = serial_cmp(serial, end);
                 cmp_start.is_ge() && cmp_end.is_le()
             }
+            // Unknown kind: fail-closed.
+            _ => false,
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// serde::Serialize for DeviationScope
+// serde::Serialize for DeviationScope and ScopePropValue
 //
-// x509_cert::name::Name (used in IssuerDnExact and SerialRange) does not
-// implement serde::Serialize in x509-cert 0.2.x.  We provide a manual impl
-// that serializes Name values as their RFC 4514 string representation so that
-// operator tooling can export deviation stores to JSON without pulling in
-// additional encoding dependencies.  Deserialization is not provided because
-// round-tripping through the string representation would require a DN parser,
-// which the current impl does not provide.
+// `Name` (DER-encoded) is the only field that does not have a built-in serde
+// impl. Bytes are serialized as hex strings to keep the JSON readable.
+// Deserialization is not provided; round-tripping requires going through the
+// OSCAL parser (see `pkix_lint::oscal::parse`).
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "serde")]
-impl serde::Serialize for DeviationScope {
+impl serde::Serialize for ScopePropValue {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStructVariant as _;
         match self {
-            Self::Any => serializer.serialize_unit_variant("DeviationScope", 0, "Any"),
-            Self::IssuerDnContains(s) => {
-                serializer.serialize_newtype_variant("DeviationScope", 1, "IssuerDnContains", s)
-            }
-            Self::IssuerDnExact(name) => serializer.serialize_newtype_variant(
-                "DeviationScope",
-                2,
-                "IssuerDnExact",
-                &name.to_string(),
-            ),
-            Self::SerialRange { issuer, start, end } => {
+            Self::Text(s) => serializer.serialize_newtype_variant("ScopePropValue", 0, "Text", s),
+            Self::Bytes(b) => {
                 let mut sv =
-                    serializer.serialize_struct_variant("DeviationScope", 3, "SerialRange", 3)?;
-                sv.serialize_field("issuer", &issuer.to_string())?;
-                sv.serialize_field("start", start)?;
-                sv.serialize_field("end", end)?;
+                    serializer.serialize_struct_variant("ScopePropValue", 1, "Bytes", 1)?;
+                sv.serialize_field("hex", &hex_encode(b))?;
                 sv.end()
             }
         }
     }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for DeviationScope {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct as _;
+        let mut st = serializer.serialize_struct("DeviationScope", 2)?;
+        st.serialize_field("kind", &self.kind)?;
+        st.serialize_field("props", &self.props)?;
+        st.end()
+    }
+}
+
+/// Lowercase-hex encode bytes (no separator). Used by serde::Serialize for
+/// [`ScopePropValue::Bytes`] to keep the JSON form human-readable.
+#[cfg(feature = "serde")]
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
 }
 
 /// Compare two byte slices as DER positive-integer serial numbers.
@@ -535,13 +674,21 @@ impl DeviationStore {
         if self.deviations.iter().any(|d| d.id == deviation.id) {
             return Err(DeviationAddError::DuplicateId(deviation.id.clone()));
         }
-        // Normalize IssuerDnContains substrings to lowercase at insertion time
-        // so that matching logic does not need to re-normalize on every call.
-        // This prevents a silent no-match when callers pass mixed-case strings.
-        // Use make_ascii_lowercase (in-place, no allocation) consistent with
-        // the matching code in DeviationScope::matches.
-        if let DeviationScope::IssuerDnContains(s) = &mut deviation.scope {
-            s.make_ascii_lowercase();
+        // Normalize the issuer-dn-contains substring to lowercase at
+        // insertion time so that matching logic does not need to re-normalize
+        // on every call. This prevents a silent no-match when callers pass a
+        // mixed-case substring.
+        //
+        // Use `make_ascii_lowercase` (in-place, no allocation) consistent with
+        // the matching code in `DeviationScope::matches`.
+        if deviation.scope.kind == SCOPE_KIND_ISSUER_DN_CONTAINS {
+            for (name, value) in &mut deviation.scope.props {
+                if name == PROP_ISSUER_DN_SUBSTRING {
+                    if let ScopePropValue::Text(s) = value {
+                        s.make_ascii_lowercase();
+                    }
+                }
+            }
         }
         self.deviations.push(deviation);
         Ok(())
@@ -841,7 +988,7 @@ mod tests {
         Deviation {
             id: id.to_string(),
             target_lint: lint_id.to_string(),
-            scope: DeviationScope::Any,
+            scope: DeviationScope::any(),
             effective_start: None,
             effective_end: None,
             action: DeviationAction::DowngradeSeverityTo(Severity::Info),
@@ -921,7 +1068,7 @@ mod tests {
     #[test]
     fn scope_any_matches_any_cert() {
         let cert = load_cert();
-        assert!(DeviationScope::Any.matches(&cert));
+        assert!(DeviationScope::any().matches(&cert));
     }
 
     #[test]
@@ -932,12 +1079,12 @@ mod tests {
         let issuer = cert.tbs_certificate.issuer.to_string();
         // Take the first word of the issuer for a partial match.
         let word = issuer.split_whitespace().next().unwrap_or("cert");
-        // IssuerDnContains requires a pre-lowercased substring; the match
+        // issuer_dn_contains requires a pre-lowercased substring; the match
         // is case-insensitive because the cert's issuer string is lowercased
         // at match time. Both lowercase and originally-cased input must match
         // once lowercased at construction.
-        let scope_lower = DeviationScope::IssuerDnContains(word.to_lowercase());
-        let scope_upper = DeviationScope::IssuerDnContains(word.to_uppercase().to_lowercase());
+        let scope_lower = DeviationScope::issuer_dn_contains(word.to_lowercase());
+        let scope_upper = DeviationScope::issuer_dn_contains(word.to_uppercase().to_lowercase());
         assert!(scope_lower.matches(&cert), "lowercase match must succeed");
         assert!(
             scope_upper.matches(&cert),
@@ -948,7 +1095,7 @@ mod tests {
     #[test]
     fn scope_issuer_dn_contains_no_match() {
         let cert = load_cert();
-        let scope = DeviationScope::IssuerDnContains("XYZ_NONEXISTENT_ISSUER_9999".to_string());
+        let scope = DeviationScope::issuer_dn_contains("XYZ_NONEXISTENT_ISSUER_9999");
         assert!(!scope.matches(&cert));
     }
 
@@ -973,27 +1120,28 @@ mod tests {
         // Add a deviation whose scope uses an UPPERCASE substring.
         let mut store = DeviationStore::new();
         let deviation = Deviation {
-            scope: DeviationScope::IssuerDnContains(uppercase_word.clone()),
+            scope: DeviationScope::issuer_dn_contains(uppercase_word.clone()),
             ..make_deviation("norm-test", "test.lint")
         };
         store.add(deviation).expect("add must succeed");
 
         // The stored substring must have been normalized to lowercase.
-        match &store.all()[0].scope {
-            DeviationScope::IssuerDnContains(s) => {
-                assert_eq!(
-                    *s,
-                    uppercase_word.to_lowercase(),
-                    "DeviationStore::add must lowercase IssuerDnContains substring"
-                );
-            }
-            other => panic!("expected IssuerDnContains, got {other:?}"),
-        }
+        let stored = &store.all()[0].scope;
+        assert_eq!(stored.kind, SCOPE_KIND_ISSUER_DN_CONTAINS);
+        let stored_substring = match stored.get_prop(PROP_ISSUER_DN_SUBSTRING) {
+            Some(ScopePropValue::Text(s)) => s,
+            other => panic!("expected Text substring prop, got {other:?}"),
+        };
+        assert_eq!(
+            *stored_substring,
+            uppercase_word.to_lowercase(),
+            "DeviationStore::add must lowercase issuer-dn-substring prop"
+        );
 
         // And the normalized deviation must match the cert.
         assert!(
-            store.all()[0].scope.matches(&cert),
-            "normalized IssuerDnContains must match cert"
+            stored.matches(&cert),
+            "normalized issuer-dn-contains scope must match cert"
         );
     }
 
@@ -1008,10 +1156,11 @@ mod tests {
     fn scope_issuer_dn_exact_matches_cert_issuer() {
         let cert = load_cert();
         // Use the cert's own issuer DN as the exact match — must succeed.
-        let scope = DeviationScope::IssuerDnExact(cert.tbs_certificate.issuer.clone());
+        let scope = DeviationScope::issuer_dn_exact(&cert.tbs_certificate.issuer)
+            .expect("issuer DN must DER-encode");
         assert!(
             scope.matches(&cert),
-            "IssuerDnExact with cert's own issuer must match"
+            "issuer_dn_exact with cert's own issuer must match"
         );
     }
 
@@ -1022,7 +1171,7 @@ mod tests {
         // Use the cert's subject DN as the "issuer" — for a self-signed cert subject==issuer,
         // so use a different cert's issuer if available. Since we only have one fixture
         // that is self-signed (subject == issuer), we test non-match by constructing
-        // an IssuerDnExact with a DIFFERENT cert's issuer.
+        // an issuer_dn_exact with a DIFFERENT cert's issuer.
         //
         // Load the smime fixture (different cert, different DN).
         let other_cert = Certificate::from_der(include_bytes!(
@@ -1030,7 +1179,8 @@ mod tests {
         ))
         .expect("fixture is valid DER");
         // Use smime cert's issuer as the scope — should not match the webpki cert.
-        let scope = DeviationScope::IssuerDnExact(other_cert.tbs_certificate.issuer.clone());
+        let scope = DeviationScope::issuer_dn_exact(&other_cert.tbs_certificate.issuer)
+            .expect("issuer DN must DER-encode");
         // If both certs have the same issuer DN, the test is vacuous. Check first.
         let same = pkix_path::names_match(
             &cert.tbs_certificate.issuer,
@@ -1039,7 +1189,7 @@ mod tests {
         if !same {
             assert!(
                 !scope.matches(&cert),
-                "IssuerDnExact with different issuer must not match"
+                "issuer_dn_exact with different issuer must not match"
             );
         }
         // If same (both self-signed with identical DNs), the test passes vacuously —
@@ -1093,11 +1243,9 @@ mod tests {
         let cert = load_cert();
         let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
         // Range is [serial, serial] — cert's own serial, must match.
-        let scope = DeviationScope::SerialRange {
-            issuer: cert.tbs_certificate.issuer.clone(),
-            start: serial.clone(),
-            end: serial,
-        };
+        let scope =
+            DeviationScope::serial_range(&cert.tbs_certificate.issuer, serial.clone(), serial)
+                .expect("issuer DN must DER-encode");
         assert!(
             scope.matches(&cert),
             "cert's own serial must be within [serial, serial]"
@@ -1112,11 +1260,8 @@ mod tests {
         // Construct a start that is definitely higher: 0xFF repeated.
         let start = vec![0xFF; serial.len() + 1]; // much larger than any fixed serial
         let end = vec![0xFF; serial.len() + 2];
-        let scope = DeviationScope::SerialRange {
-            issuer: cert.tbs_certificate.issuer.clone(),
-            start,
-            end,
-        };
+        let scope = DeviationScope::serial_range(&cert.tbs_certificate.issuer, start, end)
+            .expect("issuer DN must DER-encode");
         assert!(
             !scope.matches(&cert),
             "cert serial below range start must not match"
@@ -1133,11 +1278,12 @@ mod tests {
         .expect("fixture is valid DER");
         let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
         // Use the other cert's issuer — should not match cert.
-        let scope = DeviationScope::SerialRange {
-            issuer: other_cert.tbs_certificate.issuer.clone(),
-            start: vec![0x00],
-            end: vec![0xFF; serial.len() + 2], // large enough to include any serial
-        };
+        let scope = DeviationScope::serial_range(
+            &other_cert.tbs_certificate.issuer,
+            vec![0x00],
+            vec![0xFF; serial.len() + 2],
+        )
+        .expect("issuer DN must DER-encode");
         let same_issuer = pkix_path::names_match(
             &cert.tbs_certificate.issuer,
             &other_cert.tbs_certificate.issuer,
@@ -1145,9 +1291,96 @@ mod tests {
         if !same_issuer {
             assert!(
                 !scope.matches(&cert),
-                "wrong issuer in SerialRange must not match"
+                "wrong issuer in serial_range must not match"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-9vnx.11: open-ended kind discriminator
+    //
+    // Verifies that unknown kinds and props-bag malformations fail closed.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scope_unknown_kind_fails_closed() {
+        let cert = load_cert();
+        let scope = DeviationScope {
+            kind: "pkix-lint.scope.future-axis-not-yet-defined".to_string(),
+            props: vec![],
+        };
+        assert!(
+            !scope.matches(&cert),
+            "unknown kind must fail-closed (return false)"
+        );
+    }
+
+    #[test]
+    fn scope_issuer_dn_contains_missing_prop_fails_closed() {
+        let cert = load_cert();
+        // Hand-built scope with kind set but the substring prop missing.
+        let scope = DeviationScope {
+            kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_string(),
+            props: vec![],
+        };
+        assert!(
+            !scope.matches(&cert),
+            "missing substring prop must fail-closed"
+        );
+    }
+
+    #[test]
+    fn scope_issuer_dn_exact_wrong_typed_prop_fails_closed() {
+        let cert = load_cert();
+        // Hand-built scope where the DER prop is Text instead of Bytes.
+        let scope = DeviationScope {
+            kind: SCOPE_KIND_ISSUER_DN_EXACT.to_string(),
+            props: vec![(
+                PROP_ISSUER_DN_DER.to_string(),
+                ScopePropValue::Text("not bytes".to_string()),
+            )],
+        };
+        assert!(
+            !scope.matches(&cert),
+            "wrong-typed issuer-dn-der prop must fail-closed"
+        );
+    }
+
+    #[test]
+    fn scope_issuer_dn_exact_malformed_der_fails_closed() {
+        let cert = load_cert();
+        let scope = DeviationScope {
+            kind: SCOPE_KIND_ISSUER_DN_EXACT.to_string(),
+            props: vec![(
+                PROP_ISSUER_DN_DER.to_string(),
+                // Random bytes that do not decode as a Name.
+                ScopePropValue::Bytes(vec![0xFF, 0xFE, 0xFD]),
+            )],
+        };
+        assert!(
+            !scope.matches(&cert),
+            "malformed issuer-dn-der bytes must fail-closed"
+        );
+    }
+
+    #[test]
+    fn scope_constructor_kinds_match_constants() {
+        // The constructors must produce scopes whose `kind` field matches the
+        // corresponding `SCOPE_KIND_*` constant. This is an invariant the OSCAL
+        // emit/parse layer relies on.
+        assert_eq!(DeviationScope::any().kind, SCOPE_KIND_ANY);
+        assert_eq!(
+            DeviationScope::issuer_dn_contains("x").kind,
+            SCOPE_KIND_ISSUER_DN_CONTAINS
+        );
+        let cert = load_cert();
+        let exact = DeviationScope::issuer_dn_exact(&cert.tbs_certificate.issuer)
+            .expect("issuer DN must DER-encode");
+        assert_eq!(exact.kind, SCOPE_KIND_ISSUER_DN_EXACT);
+        let range =
+            DeviationScope::serial_range(&cert.tbs_certificate.issuer, vec![0x01], vec![0x02])
+                .expect("issuer DN must DER-encode");
+        assert_eq!(range.kind, SCOPE_KIND_SERIAL_RANGE);
     }
 
     // -----------------------------------------------------------------------

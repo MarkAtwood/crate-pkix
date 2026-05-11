@@ -45,7 +45,15 @@ members = [
 #                              and BasicSmimeProfile (RFC 8551 §3 baseline). PKIX-amgn.4.
 #   - pkix-profiles-cabf 0.2.0 First substantive content release. Houses the CA/B Forum
 #                              profiles moved out of pkix-profiles 0.3.0. PKIX-amgn.4.
-# pkix-lint at 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
+#   - pkix-lint        0.4.0  BREAKING. DeviationScope refactor: closed enum →
+#                              open-ended kind + props bag (`Vec<(String, ScopePropValue)>`)
+#                              mirroring OSCAL Subject shape. Constructors
+#                              (`DeviationScope::any()`, `issuer_dn_contains`,
+#                              `issuer_dn_exact`, `serial_range`) preserve ergonomics.
+#                              The four canonical scope kinds are unchanged at the OSCAL
+#                              JSON level — round-trip preserved bit-for-bit.
+#                              PKIX-9vnx.11.
+# Earlier pkix-lint at 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
 # (not published). Namespace-reservation stubs at 0.1.0: pkix-lint-cabf,
 # pkix-truststore-system, pkix-truststore-pkcs11 — published to crates.io with
 # "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
@@ -63,7 +71,7 @@ pkix-revocation       = { path = "pkix-revocation",       version = "0.3.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.0" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.3.0" }
-pkix-lint             = { path = "pkix-lint",             version = "0.3.0" }
+pkix-lint             = { path = "pkix-lint",             version = "0.4.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }

@@ -61,7 +61,10 @@
 //! PKIX-9vnx.3 closing notes.
 
 use crate::deviation::{
-    DeviatedFinding, Deviation, DeviationAction, DeviationScope, DeviationStore,
+    DeviatedFinding, Deviation, DeviationAction, DeviationScope, DeviationStore, ScopePropValue,
+    PROP_ISSUER_DN_DER, PROP_ISSUER_DN_SUBSTRING, PROP_SERIAL_END, PROP_SERIAL_START,
+    SCOPE_KIND_ANY, SCOPE_KIND_ISSUER_DN_CONTAINS, SCOPE_KIND_ISSUER_DN_EXACT,
+    SCOPE_KIND_SERIAL_RANGE,
 };
 use crate::report::EvaluationReport;
 use crate::{Finding, LintResult};
@@ -492,85 +495,151 @@ fn risk_for_deviation(d: &Deviation) -> Value {
 
 /// Encode a [`DeviationScope`] as one or more OSCAL Subject objects.
 ///
-/// Each scope variant has its own subject `type` discriminator
+/// Each canonical kind constant
 /// (`pkix-lint.scope.any`, `pkix-lint.scope.issuer-dn-contains`,
-/// `pkix-lint.scope.issuer-dn-exact`, `pkix-lint.scope.serial-range`) with
-/// the per-variant data in props.
-///
-/// DN names use a dual encoding: a human-readable string in
-/// `pkix-lint.issuer-dn` (RFC 4514 display form), and the DER bytes hex-
-/// encoded in `pkix-lint.issuer-dn-der`. The DER form is what an eventual
-/// parser uses for lossless `Name` reconstruction; the string form keeps
-/// the OSCAL JSON human-readable for operators reviewing the policy.
+/// `pkix-lint.scope.issuer-dn-exact`, `pkix-lint.scope.serial-range`)
+/// maps 1:1 to an OSCAL Subject `type`. The scope's props bag is rendered
+/// into the OSCAL Subject's `props` array, with `Bytes` values hex-encoded
+/// and DN-typed Bytes additionally rendered as a human-readable
+/// `pkix-lint.issuer-dn` string prop for operator readability.
 ///
 /// `Vec<Value>` rather than a single `Value` to allow future scope kinds
-/// that fan out to multiple Subjects (e.g., a future `SubjectDnContains`
-/// alongside `IssuerDnContains` could emit two subjects).
+/// that fan out to multiple Subjects.
+///
+/// Unknown kinds (those not in the canonical list above) are emitted
+/// best-effort: kind string becomes the OSCAL Subject `type`, props bag is
+/// rendered using a generic mapping, no `title` decoration. This keeps OSCAL
+/// emit stable as new kinds land without requiring per-kind encoder updates.
 fn encode_scope(scope: &DeviationScope) -> Vec<Value> {
-    use der::Encode as _;
-    match scope {
-        DeviationScope::Any => vec![json!({
-            "type": "pkix-lint.scope.any",
+    match scope.kind.as_str() {
+        SCOPE_KIND_ANY => vec![json!({
+            "type": SCOPE_KIND_ANY,
             "subject-uuid": uuid_v8("pkix-lint.oscal.subject.scope-any", b""),
             "title": "All certificates",
         })],
-        DeviationScope::IssuerDnContains(substring) => vec![json!({
-            "type": "pkix-lint.scope.issuer-dn-contains",
-            "subject-uuid": uuid_v8(
-                "pkix-lint.oscal.subject.issuer-dn-contains",
-                substring.as_bytes(),
-            ),
-            "title": format!("Issuer DN contains '{substring}'"),
-            "props": [
-                prop("pkix-lint.issuer-dn-substring", substring),
-            ],
-        })],
-        DeviationScope::IssuerDnExact(name) => {
-            let der = name.to_der().unwrap_or_default();
-            let der_hex = hex(&der);
+        SCOPE_KIND_ISSUER_DN_CONTAINS => {
+            let substring = scope_text(scope, PROP_ISSUER_DN_SUBSTRING);
             vec![json!({
-                "type": "pkix-lint.scope.issuer-dn-exact",
+                "type": SCOPE_KIND_ISSUER_DN_CONTAINS,
                 "subject-uuid": uuid_v8(
-                    "pkix-lint.oscal.subject.issuer-dn-exact",
-                    &der,
+                    "pkix-lint.oscal.subject.issuer-dn-contains",
+                    substring.as_bytes(),
                 ),
-                "title": format!("Issuer DN equals {}", name),
+                "title": format!("Issuer DN contains '{substring}'"),
                 "props": [
-                    prop("pkix-lint.issuer-dn", &name.to_string()),
-                    prop("pkix-lint.issuer-dn-der", &der_hex),
+                    prop(PROP_ISSUER_DN_SUBSTRING, substring),
                 ],
             })]
         }
-        DeviationScope::SerialRange { issuer, start, end } => {
-            let der = issuer.to_der().unwrap_or_default();
-            let der_hex = hex(&der);
+        SCOPE_KIND_ISSUER_DN_EXACT => {
+            let der = scope_bytes(scope, PROP_ISSUER_DN_DER);
+            let der_hex = hex(der);
+            let name_str = decode_name_display(der);
+            vec![json!({
+                "type": SCOPE_KIND_ISSUER_DN_EXACT,
+                "subject-uuid": uuid_v8(
+                    "pkix-lint.oscal.subject.issuer-dn-exact",
+                    der,
+                ),
+                "title": format!("Issuer DN equals {name_str}"),
+                "props": [
+                    prop("pkix-lint.issuer-dn", &name_str),
+                    prop(PROP_ISSUER_DN_DER, &der_hex),
+                ],
+            })]
+        }
+        SCOPE_KIND_SERIAL_RANGE => {
+            let der = scope_bytes(scope, PROP_ISSUER_DN_DER);
+            let start = scope_bytes(scope, PROP_SERIAL_START);
+            let end = scope_bytes(scope, PROP_SERIAL_END);
+            let der_hex = hex(der);
             let start_hex = hex(start);
             let end_hex = hex(end);
+            let name_str = decode_name_display(der);
             let mut seed: Vec<u8> = Vec::with_capacity(der.len() + start.len() + end.len() + 2);
-            seed.extend_from_slice(&der);
+            seed.extend_from_slice(der);
             seed.push(0);
             seed.extend_from_slice(start);
             seed.push(0);
             seed.extend_from_slice(end);
             vec![json!({
-                "type": "pkix-lint.scope.serial-range",
+                "type": SCOPE_KIND_SERIAL_RANGE,
                 "subject-uuid": uuid_v8(
                     "pkix-lint.oscal.subject.serial-range",
                     &seed,
                 ),
                 "title": format!(
                     "Serial range [0x{}, 0x{}] from issuer {}",
-                    start_hex, end_hex, issuer
+                    start_hex, end_hex, name_str
                 ),
                 "props": [
-                    prop("pkix-lint.issuer-dn", &issuer.to_string()),
-                    prop("pkix-lint.issuer-dn-der", &der_hex),
-                    prop("pkix-lint.serial-start", &start_hex),
-                    prop("pkix-lint.serial-end", &end_hex),
+                    prop("pkix-lint.issuer-dn", &name_str),
+                    prop(PROP_ISSUER_DN_DER, &der_hex),
+                    prop(PROP_SERIAL_START, &start_hex),
+                    prop(PROP_SERIAL_END, &end_hex),
                 ],
             })]
         }
+        // Unknown / future kinds: emit a generic Subject with the kind as type
+        // and all props rendered via the typed-value mapping.
+        other => {
+            let mut seed: Vec<u8> = Vec::with_capacity(64);
+            seed.extend_from_slice(other.as_bytes());
+            for (name, value) in &scope.props {
+                seed.push(0);
+                seed.extend_from_slice(name.as_bytes());
+                seed.push(0);
+                match value {
+                    ScopePropValue::Text(s) => seed.extend_from_slice(s.as_bytes()),
+                    ScopePropValue::Bytes(b) => seed.extend_from_slice(b),
+                }
+            }
+            let mut props_json: Vec<Value> = Vec::with_capacity(scope.props.len());
+            for (name, value) in &scope.props {
+                let v = match value {
+                    ScopePropValue::Text(s) => s.clone(),
+                    ScopePropValue::Bytes(b) => hex(b),
+                };
+                props_json.push(prop(name.as_str(), &v));
+            }
+            vec![json!({
+                "type": other,
+                "subject-uuid": uuid_v8("pkix-lint.oscal.subject.custom", &seed),
+                "title": format!("Custom scope '{other}'"),
+                "props": props_json,
+            })]
+        }
     }
+}
+
+/// Read a `Text` prop, falling back to empty string if missing or wrong type.
+/// Used by `encode_scope` for canonical kinds whose schema is enforced by
+/// constructors (so missing/wrong-typed props indicate a code-side bug, not
+/// caller misuse).
+fn scope_text<'a>(scope: &'a DeviationScope, name: &str) -> &'a str {
+    match scope.get_prop(name) {
+        Some(ScopePropValue::Text(s)) => s.as_str(),
+        _ => "",
+    }
+}
+
+/// Read a `Bytes` prop, falling back to empty slice if missing or wrong type.
+fn scope_bytes<'a>(scope: &'a DeviationScope, name: &str) -> &'a [u8] {
+    match scope.get_prop(name) {
+        Some(ScopePropValue::Bytes(b)) => b.as_slice(),
+        _ => &[],
+    }
+}
+
+/// Decode DER-encoded `Name` bytes into an RFC 4514 display string. Returns
+/// "<malformed DN>" if the bytes do not decode; the OSCAL output is best-
+/// effort here because the `title` and `pkix-lint.issuer-dn` prop are
+/// informational. The lossless prop is `pkix-lint.issuer-dn-der`.
+fn decode_name_display(der: &[u8]) -> String {
+    use der::Decode as _;
+    x509_cert::name::Name::from_der(der)
+        .map(|n| n.to_string())
+        .unwrap_or_else(|_| "<malformed DN>".to_string())
 }
 
 /// Render a [`DeviationAction`] as a stable string value usable as both
@@ -1269,7 +1338,7 @@ mod tests {
         Deviation {
             id: "policy-2026-q1-fpki-keyusage".to_string(),
             target_lint: "fpki.common.6.1.5".to_string(),
-            scope: DeviationScope::IssuerDnContains("agency x".to_string()),
+            scope: DeviationScope::issuer_dn_contains("agency x"),
             effective_start: Some(1_704_067_200), // 2024-01-01T00:00:00Z
             effective_end: Some(1_767_225_600),   // 2026-01-01T00:00:00Z
             action: DeviationAction::DowngradeSeverityTo(crate::Severity::Warn),
@@ -1381,14 +1450,14 @@ mod tests {
 
     #[test]
     fn test_encode_scope_any() {
-        let subjects = encode_scope(&DeviationScope::Any);
+        let subjects = encode_scope(&DeviationScope::any());
         assert_eq!(subjects.len(), 1);
         assert_eq!(subjects[0]["type"].as_str(), Some("pkix-lint.scope.any"));
     }
 
     #[test]
     fn test_encode_scope_issuer_dn_contains() {
-        let s = DeviationScope::IssuerDnContains("agency x".to_string());
+        let s = DeviationScope::issuer_dn_contains("agency x");
         let subjects = encode_scope(&s);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];
@@ -1425,7 +1494,7 @@ mod tests {
         use der::Decode as _;
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
         let name = cert.tbs_certificate.subject;
-        let scope = DeviationScope::IssuerDnExact(name.clone());
+        let scope = DeviationScope::issuer_dn_exact(&name).expect("DER encode");
         let subjects = encode_scope(&scope);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];
@@ -1493,11 +1562,12 @@ mod tests {
         };
         use der::Decode as _;
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
-        let scope = DeviationScope::SerialRange {
-            issuer: cert.tbs_certificate.subject.clone(),
-            start: vec![0x01, 0x00],
-            end: vec![0x01, 0xff],
-        };
+        let scope = DeviationScope::serial_range(
+            &cert.tbs_certificate.subject,
+            vec![0x01, 0x00],
+            vec![0x01, 0xff],
+        )
+        .expect("DER encode");
         let subjects = encode_scope(&scope);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];
@@ -1527,7 +1597,7 @@ mod tests {
             .add(Deviation {
                 id: "policy-2026-suppress-test".to_string(),
                 action: DeviationAction::Suppress,
-                scope: DeviationScope::Any,
+                scope: DeviationScope::any(),
                 ..sample_deviation()
             })
             .expect("add");
