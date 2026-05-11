@@ -4,11 +4,30 @@ Context for AI coding agents working in this repository.
 
 ## What this is
 
-Three Rust crates for RFC 5280 X.509 certificate path validation:
+A Rust workspace for RFC 5280 X.509 certificate path validation and
+adjacent PKI concerns.
+
+**Core path-validation crates:**
 
 - **`pkix-path`** — Pure, `no_std` RFC 5280 §6 path validator. Pluggable crypto via `SignatureVerifier` trait.
-- **`pkix-revocation`** — CRL and OCSP revocation checking. `RevocationChecker` trait + `NoRevocation` zero-cost default.
+- **`pkix-revocation`** — CRL and OCSP revocation checking (offline; caller supplies CRL DER / OCSP response bytes). `RevocationChecker` trait + `NoRevocation` zero-cost default.
 - **`pkix-chain`** — High-level umbrella. Re-exports both; provides `verify_chain()` for the 90% case.
+- **`pkix-path-builder`** — RFC 4158 path building from unordered cert bundles. Output feeds `pkix-path`.
+- **`pkix-truststore`** — Tier-1 trust anchor loading from PEM / DER bytes or files. See the `pkix-truststore` section below.
+
+**Adjacent / specialized crates:**
+
+- **`pkix-revocation-http`** — Online HTTP fetching of CRLs and OCSP responses (std-only add-on to `pkix-revocation`).
+- **`pkix-profiles`** — CA/B Forum and RFC profile policy pre-configurations (TLS BR, S/MIME BR).
+- **`pkix-lint`** — Advisory lint engine for CA/B Forum and RFC rules.
+- **`pkix-chain-simple`** — Opinionated validator with extension whitelist for high-assurance contexts.
+- **`pkix-ac`** — RFC 5755 attribute certificate validation (skeleton; tracked as PKIX-ng0x).
+- **`pkix-ct`** — RFC 6962 / RFC 9162 Certificate Transparency / SCT verification (skeleton; tracked as PKIX-baac).
+- **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
+
+**Dev tooling (not published):**
+
+- **`pkix-difftest`** — Differential test harness across `pkix-path` / OpenSSL / pyca-cryptography. PKITS, pyca, and x509-limbo corpora.
 
 ## Non-negotiable constraints
 
@@ -70,7 +89,8 @@ PKITS (NIST) test corpus is the integration-test bar. See
 ## Test discipline
 
 - No test may use the code under test as its own oracle.
-- External oracles: OpenSSL (`openssl verify`), pyca/cryptography, Bouncy Castle vectors.
+- External oracles for differential testing: OpenSSL (`openssl verify`), pyca/cryptography.
+- Test vector / expected-result sources: NIST PKITS (binary fixtures committed), x509-limbo (curated JSON manifest, fetched into `~/GIT/x509-limbo` on demand), per-RFC test vectors.
 - PKITS binary fixtures committed to the repo; tests are fully offline.
 
 ## Escalation rule
