@@ -31,6 +31,11 @@ path = "src/main.rs"
 # "what does the default pkix-path build do?"
 pkix-path = { workspace = true }
 
+# Revocation checking under test (PKIX-emf1.2). The pkix-path oracle wraps
+# validate_path's verdict with an optional pass through CrlChecker when the
+# chain ships with CRLs. Default features pull in the `crl` feature.
+pkix-revocation = { workspace = true, features = ["crl"] }
+
 # Cert parsing. pkix-path's `Certificate` is x509_cert::Certificate, not re-exported.
 x509-cert = { workspace = true }
 der       = { workspace = true }
