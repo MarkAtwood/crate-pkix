@@ -163,6 +163,15 @@ fn build_spec_json(chain: &Chain) -> io::Result<String> {
         );
     }
 
+    // CRLs (PKIX-emf1.4). The sidecar performs an RFC 5280 §6.3 baseline
+    // revocation check when this list is non-empty. Empty list (the common
+    // case for PKITS/PEM-tree corpora that don't ship CRLs in Chain.crls)
+    // preserves the prior shape — the sidecar skips the CRL block entirely.
+    //
+    // Wire format: base64-DER (standard alphabet, not URL-safe) — matches
+    // what the sidecar parses with base64.b64decode + load_der_x509_crl.
+    let crls_b64: Vec<String> = chain.crls.iter().map(|der| base64_encode(der)).collect();
+
     // We use serde_json for the value the sidecar will deserialise — it
     // handles string escaping correctly even for certs with weird DN bytes
     // that contain quotes or backslashes once base64-encoded (PEM should
@@ -172,21 +181,58 @@ fn build_spec_json(chain: &Chain) -> io::Result<String> {
     // sidecar reads it as unix seconds and passes to `PolicyBuilder.time()`;
     // when absent the sidecar uses `datetime.now(utc)`, preserving the
     // existing PKITS / PEM-tree behaviour.
-    let spec = match chain.validation_time_unix {
-        Some(secs) => serde_json::json!({
-            "leaf": leaf_pem,
-            "intermediates": intermediates,
-            "roots": [root_pem],
-            "validation_time_unix": secs,
-        }),
-        None => serde_json::json!({
-            "leaf": leaf_pem,
-            "intermediates": intermediates,
-            "roots": [root_pem],
-        }),
-    };
+    let mut spec = serde_json::json!({
+        "leaf": leaf_pem,
+        "intermediates": intermediates,
+        "roots": [root_pem],
+    });
+    if let Some(secs) = chain.validation_time_unix {
+        spec["validation_time_unix"] = serde_json::json!(secs);
+    }
+    if !crls_b64.is_empty() {
+        spec["crls"] = serde_json::json!(crls_b64);
+    }
     serde_json::to_string(&spec)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON encode: {e}")))
+}
+
+/// Standard-alphabet base64 encode (RFC 4648 §4) without line breaks. The
+/// pyca sidecar calls `base64.b64decode(s, validate=True)` which expects
+/// exactly this alphabet (NOT URL-safe). Hand-rolled to avoid adding a
+/// `base64` crate dependency to pkix-difftest just for this single call
+/// site — the harness already has no general-purpose base64 use.
+fn base64_encode(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    let chunks = bytes.chunks_exact(3);
+    let remainder = chunks.remainder();
+    for chunk in chunks {
+        let n = (u32::from(chunk[0]) << 16) | (u32::from(chunk[1]) << 8) | u32::from(chunk[2]);
+        out.push(ALPHABET[((n >> 18) & 0x3f) as usize] as char);
+        out.push(ALPHABET[((n >> 12) & 0x3f) as usize] as char);
+        out.push(ALPHABET[((n >> 6) & 0x3f) as usize] as char);
+        out.push(ALPHABET[(n & 0x3f) as usize] as char);
+    }
+    match remainder.len() {
+        0 => {}
+        1 => {
+            let n = u32::from(remainder[0]) << 16;
+            out.push(ALPHABET[((n >> 18) & 0x3f) as usize] as char);
+            out.push(ALPHABET[((n >> 12) & 0x3f) as usize] as char);
+            out.push('=');
+            out.push('=');
+        }
+        2 => {
+            let n = (u32::from(remainder[0]) << 16) | (u32::from(remainder[1]) << 8);
+            out.push(ALPHABET[((n >> 18) & 0x3f) as usize] as char);
+            out.push(ALPHABET[((n >> 12) & 0x3f) as usize] as char);
+            out.push(ALPHABET[((n >> 6) & 0x3f) as usize] as char);
+            out.push('=');
+        }
+        _ => unreachable!("ChunksExact remainder is always < 3 bytes"),
+    }
+    out
 }
 
 fn parse_verdict(stdout: &[u8]) -> io::Result<Verdict> {
@@ -312,5 +358,37 @@ mod tests {
     fn parse_verdict_rejects_non_json() {
         let err = parse_verdict(b"hello world").unwrap_err();
         assert!(err.to_string().contains("not JSON"));
+    }
+
+    /// Base64 round-trip against an independent oracle: Python's
+    /// `base64.b64encode` (RFC 4648 §4 standard alphabet). Test vectors are
+    /// the RFC 4648 §10 examples produced by running
+    /// `python3 -c "import base64; print(base64.b64encode(b'<input>').decode())"`
+    /// for each input. The pyca sidecar uses the same Python `base64`
+    /// implementation to decode, so byte-exact equality here verifies the
+    /// hand-rolled encoder agrees with the decoder we will run against in
+    /// the integration tests.
+    #[test]
+    fn base64_encode_matches_python_oracle() {
+        // RFC 4648 §10 test vectors.
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_encode(b"foob"), "Zm9vYg==");
+        assert_eq!(base64_encode(b"fooba"), "Zm9vYmE=");
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+        // Bytes spanning the full 0..256 range to exercise every alphabet
+        // slot (this also catches sign-extension bugs in the bit-shuffling
+        // since byte values >= 0x80 require careful unsigned handling).
+        let all_bytes: Vec<u8> = (0u8..=255u8).collect();
+        // `python3 -c "import base64; print(base64.b64encode(bytes(range(256))).decode())"`
+        let expected = "\
+AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7\
+PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3\
+eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKz\
+tLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v\
+8PHy8/T19vf4+fr7/P3+/w==";
+        assert_eq!(base64_encode(&all_bytes), expected);
     }
 }

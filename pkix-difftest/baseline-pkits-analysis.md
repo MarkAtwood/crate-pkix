@@ -28,20 +28,26 @@ bead OR a written-out justification".
 * `pyca` invocation: `PolicyBuilder::build_client_verifier()` with
   `ExtensionPolicy::permit_all()` for EE and `webpki_defaults_ca()` for CA
   (pyca's own invariant requires basicConstraints on CA policies).
-  **No CRL handling** — `PolicyBuilder` in cryptography 48.0.0 exposes
-  `store / time / extension_policies / max_chain_depth` and no revocation
-  hook. CRL-related divergences in this baseline are therefore expected
-  pyca behaviour, not a pyca bug. Pyca CRL strategy is tracked as
-  PKIX-emf1.4 (human-bound).
+  **RFC 5280 §6.3 baseline CRL handling** (PKIX-emf1.4): the sidecar
+  hand-rolls a CRL check on top of PolicyBuilder, since `PolicyBuilder`
+  in cryptography 48.0.0 exposes `store / time / extension_policies /
+  max_chain_depth` and no revocation hook. The check parses each supplied
+  CRL via `x509.load_der_x509_crl`, drops expired CRLs, matches issuer
+  DN equality to each cert in the chain (leaf + intermediates), and looks
+  up serials in `crl.get_revoked_certificate_by_serial_number`. No
+  indirect/delta/scoped CRL handling; no CRL signature verification — the
+  baseline is intentionally narrow so any divergence vs pkix-path's full
+  RFC 5280 §6.3.3 implementation shows up as a classifier signal (Looser/
+  Stricter or DiagnosticDivergence).
 
 ## Summary
 
 | Class | Count | % |
 |---|---:|---:|
 | LooserThanWild       | 81  | 32.8% |
-| StricterThanWild     | 60  | 24.3% |
+| StricterThanWild     | 46  | 18.6% |
 | OracleDivergence     | 0   | 0.0%  |
-| DiagnosticDivergence | 35  | 14.2% |
+| DiagnosticDivergence | 49  | 19.8% |
 | Agreement            | 71  | 28.7% |
 | **Total**            | **247** | |
 
@@ -85,6 +91,54 @@ intermediate-selection heuristic. Net result: 0 remaining
 `signature invalid at chain index N` entries in the StricterThanWild
 bucket (the one survivor, `4.1.4 Valid DSA Signatures Test4`, is the
 known pkix-path-does-not-support-DSA limitation).
+
+## What changed in this revision (PKIX-emf1.4 pyca CRL)
+
+The pyca sidecar gained a hand-rolled RFC 5280 §6.3 baseline CRL check
+(`pkix-difftest/python/pyca_oracle.py::_crl_revocation_reason`). Prior
+to this change, pyca was *not* a CRL oracle — `PolicyBuilder` does not
+integrate CRL revocation, so when a PKITS chain shipped CRLs the pyca
+verdict reflected path-validation only.
+
+Compared to the pre-emf1.4 baseline (pyca path-only):
+
+| Class | Pre-emf1.4 | Post-emf1.4 | Δ |
+|---|---:|---:|---:|
+| LooserThanWild       | 81  | 81  |  0  |
+| StricterThanWild     | 60  | 46  | −14 |
+| DiagnosticDivergence | 35  | 49  | +14 |
+| Agreement            | 71  | 71  |  0  |
+
+The 14 chains that flipped from `StricterThanWild` to
+`DiagnosticDivergence` are all in §4.4 (CRL Verification), §4.14
+(Distribution Points / onlySomeReasons), and §4.15 (Delta CRLs)
+PKITS sections, and all are **Invalid** tests (`ShouldValidate=false`)
+where the corpus expects the chain to be rejected because of a CRL
+indicator. Pre-emf1.4: pkix-path rejected (revocation), pyca passed
+(no CRL awareness), classifier saw 2-of-3 → `StricterThanWild`.
+Post-emf1.4: all three oracles reject (each with their own reason
+string), classifier sees 3-of-3 Fail → `DiagnosticDivergence`.
+
+The flip is a real improvement in differential signal: fewer false-
+positive `StricterThanWild` entries in the §4.4 / §4.14 / §4.15
+revocation buckets, and pyca now serves as an independent CRL
+oracle alongside OpenSSL. Specific testcases that flipped:
+
+* §4.4: `4.4.2 Invalid Revoked CA Test2`, `4.4.3 Invalid Revoked EE
+  Test3`, `4.4.8 Invalid Unknown CRL Entry Extension Test8`,
+  `4.4.9 Invalid Unknown CRL Extension Test9`, `4.4.18 Invalid Long
+  Serial Number Test18`.
+* §4.14: `4.14.2 Invalid distributionPoint Test2`, `4.14.6 Invalid
+  distributionPoint Test6`, `4.14.15`, `4.14.16`, `4.14.20`,
+  `4.14.21` (`Invalid onlySomeReasons Test15/16/20/21`).
+* §4.15: `4.15.4 Invalid delta-CRL Test4`, `4.15.6 Invalid delta-CRL
+  Test6`, `4.15.9 Invalid delta-CRL Test9`.
+
+Out of scope for the pyca baseline check (indirect/scoped CRLs,
+CRL signature verification, IDP onlySomeReasons honoring) — these
+remain pkix-path-only enforcement points. Future divergences in
+those areas will surface as `StricterThanWild` per the existing
+pattern.
 
 ## What changed in PKIX-emf1.7 (CRL revocation wiring)
 

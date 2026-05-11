@@ -1,13 +1,13 @@
-# pkix-difftest report
+# PKITS baseline (post-PKIX-emf1.4 pyca CRL)
 
 ## Summary
 
 | Class | Count |
 |---|---:|
 | LooserThanWild | 81 |
-| StricterThanWild | 60 |
+| StricterThanWild | 46 |
 | OracleDivergence | 0 |
-| DiagnosticDivergence | 35 |
+| DiagnosticDivergence | 49 |
 | Agreement | 71 |
 | **Total** | 247 |
 
@@ -201,7 +201,7 @@ _(36 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
 _(71 additional sample(s) in this class omitted; see JSON report.)_
 
-## StricterThanWild (60)
+## StricterThanWild (46)
 
 ### `4.1.4 Valid DSA Signatures Test4`
 
@@ -293,9 +293,9 @@ _(71 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
 
-_(50 additional sample(s) in this class omitted; see JSON report.)_
+_(36 additional sample(s) in this class omitted; see JSON report.)_
 
-## DiagnosticDivergence (35)
+## DiagnosticDivergence (49)
 
 ### `4.1.2 Invalid CA Signature Test2`
 
@@ -387,7 +387,7 @@ _(50 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Fail(excluded subtree violation)
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN)
 
-_(25 additional sample(s) in this class omitted; see JSON report.)_
+_(39 additional sample(s) in this class omitted; see JSON report.)_
 
 ## Agreement (71)
 

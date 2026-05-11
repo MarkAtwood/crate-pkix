@@ -787,8 +787,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -1051,8 +1051,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0xb revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -1381,8 +1381,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -1491,8 +1491,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -1535,8 +1535,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x4 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -1579,8 +1579,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -2511,138 +2511,6 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.14.15 Invalid onlySomeReasons Test15",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.16 Invalid onlySomeReasons Test16",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason certificateHold)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.2 Invalid distributionPoint Test2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.20 Invalid onlySomeReasons Test20",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.21 Invalid onlySomeReasons Test21",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 03 is revoked (reason affiliationChanged)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.6 Invalid distributionPoint Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
       "name": "4.15.3 Invalid delta-CRL Test3",
       "verdicts": [
         {
@@ -2657,30 +2525,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.15.4 Invalid delta-CRL Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 03 is revoked (reason keyCompromise)",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -2701,30 +2547,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.15.6 Invalid delta-CRL Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 05 is revoked (reason certificateHold)",
+          "reason": "pyca: certificate 0x4 revoked by CRL",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -2745,140 +2569,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.15.9 Invalid delta-CRL Test9",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
+          "reason": "pyca: certificate 0x6 revoked by CRL",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.18 Invalid Long Serial Number Test18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 7F:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.2 Invalid Revoked CA Test2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 1 revoked by CRL: certificate 0E is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.3 Invalid Revoked EE Test3",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 0F is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.8 Invalid Unknown CRL Entry Extension Test8",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unhandled critical CRL extension",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.9 Invalid Unknown CRL Extension Test9",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unhandled critical CRL extension",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -3391,6 +3083,204 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
+      "name": "4.14.15 Invalid onlySomeReasons Test15",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x1 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.16 Invalid onlySomeReasons Test16",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason certificateHold)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.2 Invalid distributionPoint Test2",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.20 Invalid onlySomeReasons Test20",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.21 Invalid onlySomeReasons Test21",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 03 is revoked (reason affiliationChanged)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.6 Invalid distributionPoint Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.15.4 Invalid delta-CRL Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 03 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.15.6 Invalid delta-CRL Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 05 is revoked (reason certificateHold)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x5 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.15.9 Invalid delta-CRL Test9",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 02 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
       "name": "4.16.2 Invalid Unknown Critical Certificate Extension Test2",
       "verdicts": [
         {
@@ -3582,6 +3472,116 @@
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: certificate serial number cannot be negative (encountered processing <Certificate(subject=<Name(CN=Invalid Negative Serial Number EE Certificate Test15,O=Test Certificates 2011,C=US)>, ...)>)",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.4.18 Invalid Long Serial Number Test18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 7F:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F:10:11:12:13 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x7f0102030405060708090a0b0c0d0e0f10111213 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.4.2 Invalid Revoked CA Test2",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 1 revoked by CRL: certificate 0E is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0xe revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.4.3 Invalid Revoked EE Test3",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 0F is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0xf revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.4.8 Invalid Unknown CRL Entry Extension Test8",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unhandled critical CRL extension",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x1 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.4.9 Invalid Unknown CRL Extension Test9",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unhandled critical CRL extension",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x1 revoked by CRL",
           "verdict": "fail"
         }
       ]
@@ -5695,8 +5695,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -5827,8 +5827,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0xb revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6003,8 +6003,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6113,8 +6113,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6135,8 +6135,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x4 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6157,8 +6157,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6245,8 +6245,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x4 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6267,8 +6267,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pyca: certificate 0x6 revoked by CRL",
+          "verdict": "fail"
         }
       ]
     },
@@ -6451,10 +6451,10 @@
   ],
   "summary": {
     "Agreement": 71,
-    "DiagnosticDivergence": 35,
+    "DiagnosticDivergence": 49,
     "LooserThanWild": 81,
     "OracleDivergence": 0,
-    "StricterThanWild": 60,
+    "StricterThanWild": 46,
     "total": 247
   }
 }
