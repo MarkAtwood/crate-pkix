@@ -13,12 +13,25 @@
 //!
 //! When PKIX-7nsf.5 lands the classifier, the policy will become a CLI flag
 //! so the user can opt into stricter modes for targeted comparisons.
+//!
+//! # Revocation
+//!
+//! When `Chain.crls` is non-empty (PKIX-emf1.2), every cert in the chain is
+//! checked against each supplied CRL via `pkix_revocation::CrlChecker`. The
+//! first CRL that reports `Revoked` produces a `Verdict::Fail` whose reason
+//! is taken from `pkix_revocation::Error::Display`. CRLs that do not apply
+//! to a given cert (issuer mismatch, scope flag mismatch, signature failure,
+//! …) are treated as "this CRL has no determination" and ignored — the diff
+//! classifier's job is to surface where this oracle and OpenSSL / pyca
+//! disagree, including on what counts as a valid CRL. Empty `Chain.crls`
+//! preserves the prior no-revocation behaviour.
 
 use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use der::Decode;
 use pkix_path::{validate_path, DefaultVerifier, TrustAnchor, ValidationPolicy};
+use pkix_revocation::{CrlChecker, Error as RevError, RevocationChecker as _};
 use x509_cert::Certificate;
 
 use crate::{Chain, Verdict};
@@ -87,12 +100,72 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
         .map_or(0, |d| d.as_secs());
     let policy = ValidationPolicy::new(now);
 
-    Ok(
-        match validate_path(&validation_chain, &anchors, &policy, &DefaultVerifier) {
-            Ok(_) => Verdict::Pass,
-            Err(e) => Verdict::Fail {
+    match validate_path(&validation_chain, &anchors, &policy, &DefaultVerifier) {
+        Ok(_) => {}
+        Err(e) => {
+            return Ok(Verdict::Fail {
                 reason: format!("{e}"),
-            },
-        },
-    )
+            });
+        }
+    }
+
+    // Path is valid. If the chain ships CRLs, run revocation per cert.
+    if !chain.crls.is_empty() {
+        if let Some(rev_reason) = check_revocation(&validation_chain, &anchors[0], &chain.crls, now)
+        {
+            return Ok(Verdict::Fail { reason: rev_reason });
+        }
+    }
+
+    Ok(Verdict::Pass)
+}
+
+/// Walk the chain leaf-to-anchor, trying each supplied CRL against each
+/// cert. Return `Some(reason)` on the first revoked outcome; `None` when
+/// no CRL reports any cert revoked.
+///
+/// Iteration order is determined first by chain position (leaf first, anchor
+/// last) and second by CRL order in `crls`. Within a single cert, the first
+/// CRL that reports `Revoked` wins. CRLs that don't apply (issuer mismatch,
+/// scope, signature, parse) are ignored — this matches the "soft per-CRL"
+/// policy documented at the module level.
+fn check_revocation(
+    chain: &[Certificate],
+    anchor: &TrustAnchor,
+    crls: &[Vec<u8>],
+    now_unix: u64,
+) -> Option<String> {
+    for (i, cert) in chain.iter().enumerate() {
+        let issuer_cert: Option<&Certificate> = chain.get(i + 1);
+        for crl_der in crls {
+            // Parse the CRL once per cert/CRL pair. This is wasteful — the
+            // CrlChecker re-parses on every construction — but keeps the
+            // function pure (no allocator state crossing iterations) and the
+            // PKITS corpus is small enough that perf is not a concern. If a
+            // larger corpus needs CRL caching, lift this into a Vec<CrlChecker>
+            // built once before the per-cert loop.
+            let Ok(checker) = CrlChecker::new(crl_der.clone(), now_unix, DefaultVerifier) else {
+                continue;
+            };
+            let result = if let Some(issuer) = issuer_cert {
+                checker.check_revocation(cert, issuer)
+            } else {
+                // Last cert in validation_chain is issued by the anchor.
+                checker.check_revocation_against_anchor(cert, anchor)
+            };
+            // Only the Revoked case flips the verdict. Every other outcome —
+            // including Ok (CRL applied, cert not on list) and Err (CRL did
+            // not apply: mismatch / scope / parse / signature failure) — is
+            // treated as "this CRL has no negative determination, try the
+            // next". Importantly we do NOT stop on Ok: a later CRL may still
+            // revoke this cert. The diff classifier treats divergence in
+            // CRL-coverage policy as its own signal.
+            if let Err(e @ RevError::Revoked { .. }) = result {
+                return Some(format!(
+                    "pkix-path revocation: cert at chain index {i} revoked by CRL: {e}"
+                ));
+            }
+        }
+    }
+    None
 }

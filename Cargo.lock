@@ -1187,6 +1187,7 @@ dependencies = [
  "der",
  "pem-rfc7468",
  "pkix-path",
+ "pkix-revocation",
  "serde",
  "serde_json",
  "tempfile",
