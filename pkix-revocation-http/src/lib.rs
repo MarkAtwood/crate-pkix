@@ -49,14 +49,29 @@
 //! - RFC 5280 §6.3      — CRL validation algorithm
 //! - RFC 6960 §4.1, §A.1 — OCSP request and HTTP transport
 //!
+//! # Caching (feature-gated)
+//!
+//! [`CachedHttpCrlFetcher`] and [`CachedHttpOcspFetcher`] wrap their
+//! uncached counterparts with a pluggable [`RevocationCache`] so repeat
+//! validations within a CRL's / OCSP response's freshness window do not
+//! re-hit the network. The reference [`InMemoryCache`] is unbounded;
+//! consumers needing eviction implement [`RevocationCache`] over their
+//! preferred backing store (e.g. `moka`, Redis). See PKIX-a1yc.7.
+//!
 //! # Status
 //!
-//! Tracked under PKIX-a1yc. The trait surface and struct skeletons are
-//! present; concrete `RevocationChecker` impls land with the helper
-//! children (CDP/AIA URL extraction, OCSP request encoding, fetcher
-//! wiring). Until then the structs hold their fields but do not yet
-//! implement [`pkix_revocation::RevocationChecker`].
+//! Tracked under PKIX-a1yc. The trait surface, the concrete
+//! [`pkix_revocation::RevocationChecker`] impls for sync CRL / OCSP
+//! fetching, and the in-memory cache layer are in place. Online HTTP
+//! fetchers (`clients::ureq::UreqFetcher`,
+//! `clients::reqwest::ReqwestFetcher`) are gated behind their
+//! respective `client-*` features.
 
+// In-memory cache + cached wrappers (PKIX-a1yc.7). Gated on either
+// `crl` or `ocsp` because the trait itself is shared but the wrapper
+// structs and parsing helpers each live behind their protocol feature.
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+mod cache;
 pub mod clients;
 #[cfg(feature = "crl")]
 mod crl;
@@ -87,6 +102,17 @@ pub use async_fetcher::AsyncHttpOcspFetcher;
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use async_fetcher::{AsyncRevocationChecker, AsyncRevocationFetcher};
 
+#[cfg(feature = "crl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
+pub use cache::CachedHttpCrlFetcher;
+#[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
+pub use cache::CachedHttpOcspFetcher;
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "crl", feature = "ocsp"))))]
+pub use cache::{
+    CachedCrl, CachedOcspResponse, CrlCacheKey, InMemoryCache, OcspCacheKey, RevocationCache,
+};
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
