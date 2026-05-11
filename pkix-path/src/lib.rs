@@ -159,6 +159,22 @@ pub enum Error {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
     },
+    /// An intermediate certificate has a `KeyUsage` extension with `cRLSign` not set.
+    ///
+    /// This error is only returned when
+    /// [`ValidationPolicy::require_crl_sign_on_cas`] is `true` **and** the
+    /// intermediate's `KeyUsage` extension is **present** with the `cRLSign` bit
+    /// explicitly absent or zero. Certificates with **no** `KeyUsage` extension
+    /// are not rejected by this check (RFC 5280 does not require the extension
+    /// to be present on CA certificates).
+    ///
+    /// RFC 5280 §6.1 does not mandate this check; it is an opt-in policy that
+    /// restores PKITS §4.7.4 / §4.7.5 conformance for callers who treat a CA
+    /// cert without `cRLSign` as non-issuable. Default is off.
+    CrlSignMissing {
+        /// Zero-based index into the `chain` slice of the failing certificate.
+        index: usize,
+    },
     /// A critical extension is present that this implementation does not handle.
     UnhandledCriticalExtension {
         /// Zero-based index into the `chain` slice of the failing certificate.
@@ -273,6 +289,9 @@ impl core::fmt::Display for Error {
             Self::KeyUsageMissing { index } => {
                 write!(f, "keyCertSign missing at chain index {index}")
             }
+            Self::CrlSignMissing { index } => {
+                write!(f, "cRLSign missing at chain index {index}")
+            }
             Self::UnhandledCriticalExtension { index } => {
                 write!(f, "unhandled critical extension at chain index {index}")
             }
@@ -326,6 +345,7 @@ impl std::error::Error for Error {
             | Self::PathTooLong
             | Self::NotCA { .. }
             | Self::KeyUsageMissing { .. }
+            | Self::CrlSignMissing { .. }
             | Self::UnhandledCriticalExtension { .. }
             | Self::NameConstraintViolation { .. }
             | Self::PolicyViolation { .. }
@@ -610,6 +630,24 @@ pub struct ValidationPolicy {
     /// only mandates the check when the extension is present.
     pub enforce_key_usage: bool,
 
+    /// Require `cRLSign` in `KeyUsage` on every intermediate CA. Default: `false`.
+    ///
+    /// When `true`, an intermediate certificate whose `KeyUsage` extension is
+    /// **present** but does not include `cRLSign` will be rejected with
+    /// [`Error::CrlSignMissing`]. Certificates with **no** `KeyUsage` extension
+    /// are not affected.
+    ///
+    /// RFC 5280 §6.1 does not mandate this check — it conflates path validation
+    /// with revocation infrastructure. PKITS §4.7.4 and §4.7.5 nonetheless
+    /// expect such chains to fail because a CA cert without `cRLSign` cannot
+    /// revoke certs it issued. Enable this flag to restore PKITS conformance
+    /// or to enforce a stricter "every CA must be able to sign CRLs" rule.
+    ///
+    /// This check is independent of [`enforce_key_usage`][Self::enforce_key_usage]:
+    /// `enforce_key_usage` governs the RFC-mandated `keyCertSign` check, while
+    /// `require_crl_sign_on_cas` adds a separate cRLSign requirement.
+    pub require_crl_sign_on_cas: bool,
+
     /// Initial explicit-policy indicator (RFC 5280 §6.1.1).
     ///
     /// When `true`, path validation requires that at least one valid policy exists
@@ -720,6 +758,7 @@ impl Default for ValidationPolicy {
             max_path_len: 10,
             current_time_unix: 0, // caller must set to avoid silent clock skew
             enforce_key_usage: true,
+            require_crl_sign_on_cas: false,
             initial_explicit_policy: false,
             initial_any_policy_inhibit: false,
             initial_policy_mapping_inhibit: false,
@@ -1494,6 +1533,21 @@ fn has_key_cert_sign(cert: &Certificate) -> der::Result<Option<bool>> {
     use x509_cert::ext::pkix::KeyUsage;
 
     try_find_cert_ext::<KeyUsage>(cert, OID_KEY_USAGE).map(|opt| opt.map(|ku| ku.key_cert_sign()))
+}
+
+/// Returns whether the `cRLSign` bit is set in the `KeyUsage` extension.
+///
+/// Same shape as [`has_key_cert_sign`]; used by the
+/// [`ValidationPolicy::require_crl_sign_on_cas`] opt-in check (PKITS §4.7.4 / §4.7.5).
+///
+/// - `Ok(Some(true))`  — cRLSign is set
+/// - `Ok(Some(false))` — `KeyUsage` present, cRLSign NOT set
+/// - `Ok(None)`        — `KeyUsage` extension absent
+/// - `Err(_)`          — `KeyUsage` present but DER-malformed (fail-closed)
+fn has_crl_sign(cert: &Certificate) -> der::Result<Option<bool>> {
+    use x509_cert::ext::pkix::KeyUsage;
+
+    try_find_cert_ext::<KeyUsage>(cert, OID_KEY_USAGE).map(|opt| opt.map(|ku| ku.crl_sign()))
 }
 
 // ---------------------------------------------------------------------------
@@ -2524,6 +2578,7 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
 ///    e. Check cert names (subject DN + SAN) against accumulated NC state.
 ///    f. For all certs except the leaf (i > 0): require `BasicConstraints` cA=TRUE.
 ///    g. For all certs except the leaf (i > 0): if `policy.enforce_key_usage`, require `keyCertSign`.
+///    g'. For all certs except the leaf (i > 0): if `policy.require_crl_sign_on_cas`, require `cRLSign`.
 ///    h. For all certs except the leaf (i > 0): enforce `pathLenConstraint` if present.
 ///    i. For all certs except the leaf (i > 0): accumulate `NameConstraints` state
 ///       (INTERSECTION for permittedSubtrees, UNION for excludedSubtrees).
@@ -3110,6 +3165,21 @@ fn chain_walk<V: SignatureVerifier>(
                     == Some(false)
             {
                 return Err(Error::KeyUsageMissing { index: i });
+            }
+
+            // (g') KeyUsage cRLSign required (opt-in via require_crl_sign_on_cas).
+            // RFC 5280 §6.1 does NOT require this check; it is a stricter policy
+            // motivated by PKITS §4.7.4 / §4.7.5, which treat a CA cert without
+            // cRLSign as unable to revoke certs it issued and therefore invalid.
+            // Same fail-closed and absent-KeyUsage semantics as keyCertSign above.
+            // Independent of `enforce_key_usage`: callers can opt into cRLSign
+            // enforcement without also enabling keyCertSign enforcement, and
+            // vice versa.
+            if policy.require_crl_sign_on_cas
+                && has_crl_sign(cert).map_err(|_| Error::MalformedCertificate { index: i })?
+                    == Some(false)
+            {
+                return Err(Error::CrlSignMissing { index: i });
             }
 
             // (h) pathLenConstraint: count only non-self-issued intermediates below position i
