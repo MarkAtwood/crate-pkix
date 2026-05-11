@@ -95,6 +95,7 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
 
     let dir = TempDir::new()?;
     let has_intermediates = write_chain_to_tempdir(chain, dir.path())?;
+    let has_crls = write_crls_to_tempdir(chain, dir.path())?;
 
     let mut cmd = Command::new(bin);
     cmd.arg("verify")
@@ -107,6 +108,17 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
     if has_intermediates {
         cmd.arg("-untrusted")
             .arg(dir.path().join("intermediates.pem"));
+    }
+    // When the chain carries CRLs, hand them to OpenSSL and ask it to
+    // check every cert in the chain (matching RFC 5280 §6.3 baseline). The
+    // sibling pkix-path oracle (PKIX-emf1.2) checks revocation per cert too;
+    // pyca (PKIX-emf1.4) is decided separately. -crl_check_all is the
+    // OpenSSL flag that maps closest to "check every certificate including
+    // intermediates" rather than only the leaf.
+    if has_crls {
+        cmd.arg("-CRLfile")
+            .arg(dir.path().join("crls.pem"))
+            .arg("-crl_check_all");
     }
     let output = cmd.arg(dir.path().join("leaf.pem")).output().map_err(|e| {
         // Most useful failure: NotFound → "binary not on PATH". Pass
@@ -168,6 +180,31 @@ fn write_chain_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<bool> {
 fn der_to_pem(der: &[u8]) -> io::Result<String> {
     pem_rfc7468::encode_string("CERTIFICATE", pem_rfc7468::LineEnding::LF, der)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("PEM encode: {e}")))
+}
+
+/// Write `chain.crls` into the tempdir as a single concatenated `crls.pem`.
+///
+/// Returns `true` when at least one CRL was written, `false` when the chain
+/// carried no CRLs. The caller uses the return value to decide whether to
+/// add `-CRLfile crls.pem -crl_check_all` to the command line — passing
+/// those flags with an empty / non-existent CRL file would surface as an
+/// OpenSSL load error rather than an honest "no CRLs to check" outcome.
+///
+/// Each DER CRL is wrapped in an `X509 CRL` PEM block. OpenSSL's `-CRLfile`
+/// accepts a multi-block PEM file, so a single file is enough regardless of
+/// `chain.crls.len()`.
+fn write_crls_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<bool> {
+    if chain.crls.is_empty() {
+        return Ok(false);
+    }
+    let mut concat = String::new();
+    for der in &chain.crls {
+        let pem = pem_rfc7468::encode_string("X509 CRL", pem_rfc7468::LineEnding::LF, der)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("CRL PEM encode: {e}")))?;
+        concat.push_str(&pem);
+    }
+    std::fs::write(dir.join("crls.pem"), concat)?;
+    Ok(true)
 }
 
 /// Extract a useful single-line reason from `openssl verify` stderr.
