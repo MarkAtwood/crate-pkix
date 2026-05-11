@@ -653,7 +653,7 @@ fn deviation_action_prop_value(a: &DeviationAction) -> String {
     }
 }
 
-fn severity_label(s: crate::Severity) -> &'static str {
+pub(super) fn severity_label(s: crate::Severity) -> &'static str {
     match s {
         crate::Severity::Info => "info",
         crate::Severity::Warn => "warn",
@@ -662,11 +662,27 @@ fn severity_label(s: crate::Severity) -> &'static str {
     }
 }
 
+pub(super) fn scope_label(s: crate::Scope) -> &'static str {
+    match s {
+        crate::Scope::Certificate => "certificate",
+        crate::Scope::Path => "path",
+    }
+}
+
+pub(super) fn subject_kind_label(s: crate::SubjectKind) -> &'static str {
+    match s {
+        crate::SubjectKind::Leaf => "leaf",
+        crate::SubjectKind::IntermediateCa => "intermediate-ca",
+        crate::SubjectKind::AnchorIssued => "anchor-issued",
+        crate::SubjectKind::Any => "any",
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn prop(name: &str, value: &str) -> Value {
+pub(super) fn prop(name: &str, value: &str) -> Value {
     json!({
         "name": name,
         "value": value,
@@ -713,7 +729,7 @@ fn deviation_action_label(a: &DeviationAction) -> &'static str {
 /// We use v8 rather than v5 because v5 is defined to use SHA-1; using
 /// SHA-256 here lets us avoid a SHA-1 dependency. UUIDv8 explicitly allows
 /// arbitrary 122 bits of custom data with version=8 and variant=10b.
-fn uuid_v8(namespace: &str, seed: &[u8]) -> String {
+pub(super) fn uuid_v8(namespace: &str, seed: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(namespace.as_bytes());
     hasher.update([0x00]); // separator

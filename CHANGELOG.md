@@ -6,6 +6,50 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.4.0`: OSCAL Catalog JSON emitter for registered lints (2026-05-11)
+
+**Additive.** PKIX-9vnx.6.2 — new module
+`pkix_lint::oscal::catalog::catalog_from_lints` projects a slice of
+`Box<dyn Lint>` onto an OSCAL Catalog v1.1.2 JSON Value.
+
+```rust
+pub fn catalog_from_lints(
+    lints: &[Box<dyn crate::Lint>],
+    catalog_id: &str,
+    catalog_version: &str,
+) -> serde_json::Value
+```
+
+Each `Lint` impl maps to one OSCAL Control: `id` from `Lint::id`,
+`title` from `Lint::title`, citation / severity / scope / applies-to /
+section-id / lint-id / control-uuid as `pkix-lint.*` props,
+`Lint::rfc_url` as a `rel="reference"` link,
+`Lint::description` (when `Some`) as a `parts[statement]` prose block,
+and `Lint::parameters` as OSCAL `params[]` with the parameter id
+namespaced as `<lint_id>.<param_id>` to avoid collisions across lints.
+
+UUIDs are derived deterministically from `(catalog_id, catalog_version,
+lint_id, param_id)` via the existing `uuid_v8` helper (SHA-256-seeded
+RFC 9562 §5.8 UUIDv8); `metadata.last-modified` is pinned to
+`1970-01-01T00:00:00Z` for byte-deterministic output. Callers needing
+a wall-clock timestamp post-edit the returned Value.
+
+Parameters land in this bead rather than waiting for PKIX-9vnx.6.5 —
+the Catalog Control is the natural place to *declare* parameters with
+defaults; `.6.5` covers the Profile-side `modify` directive that
+*overrides* them at composition time, which is a distinct concern.
+
+`emit::prop`, `emit::uuid_v8`, `emit::severity_label`, and two new
+helpers (`scope_label`, `subject_kind_label`) became `pub(super)` so
+the catalog submodule can share them without duplication.
+
+Eight new tests under `oscal::catalog::tests` cover structural
+required-field presence, the rfc5280 → Control mapping, the CABF
+no-rfc-url omission case, byte determinism, UUID derivation
+independent-oracle recomputation, version-change UUID invalidation,
+empty input, and parameter id namespacing. Test counts:
+`pkix-lint --features oscal` 201 (was 193), `--all-features` 207 (was 199).
+
 ### `pkix-lint 0.4.0`: `LintParameter` + first RFC-conformance lint (2026-05-11)
 
 **Additive.** PKIX-9vnx.6.4 — Lint parameter mechanism and the first
