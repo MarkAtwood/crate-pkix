@@ -17,6 +17,32 @@ Restores PKITS §4.7.4 / §4.7.5 conformance for callers who opt in.
 `Error` is `#[non_exhaustive]`, so the new variant is additive. See
 `INTEROP.md` §7 for the divergence rationale. Tracked as PKIX-0x9z.
 
+### `pkix-revocation`: path-level CRL signer discovery (RFC 5280 §6.3.3(f)) (2026-05-11)
+
+Additive. New public API for locating a CRL's signer in a caller-supplied
+bundle without inverting the workspace's one-way dep direction
+(`pkix-chain` → `pkix-revocation` → `pkix-path`):
+
+- New free helper `pkix_revocation::discover_crl_signer(bundle, &crl) ->
+  Option<&Certificate>`. AKI/SKI walk (RFC 5280 §4.2.1.1 / §4.2.1.2) with
+  issuer-DN fallback. No signature verification — discovery only.
+- New constructor `CrlChecker::new_with_signer_discovery(crl_der, bundle,
+  cert_to_check, now, verifier)`. Runs discovery, gates the result on
+  `cRLSign` in `KeyUsage` per §6.3.3(f), and performs a structural
+  anchor-reachability walk (the discovered signer must reach a self-signed
+  cert by repeated AKI/SKI or issuer-DN steps within the bundle).
+- New `Error` variants: `CrlSignerNotFound`, `CrlSignerNotTrusted`. `Error`
+  is `#[non_exhaustive]`, so this is additive.
+- PKITS §4.5 integration tests (`pkix-revocation/tests/pkits_4_5.rs`)
+  rewritten to use the new constructor in place of the prior manual
+  AKI/SKI workaround.
+
+The structural anchor-reachability check is intentionally lenient: it
+does NOT verify signatures along the signer's chain. Full RFC 5280 §6.1
+validation of the signer's path remains the responsibility of higher-layer
+composers such as `pkix-chain`. Tradeoff stance tracked as PKIX-yi7k.1.
+Tracked as PKIX-cqwt.
+
 ### Policy: drop v0.x milestone gating (2026-05-11)
 
 Dropped v0.x milestone gating across the workspace. The project drives to

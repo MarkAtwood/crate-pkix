@@ -124,6 +124,16 @@ const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
 ///   present an already-validated cRLIssuer cert. Composing this with
 ///   `pkix-path` to validate the cRLIssuer chain in-process is the umbrella
 ///   crate's responsibility (`pkix-chain`).
+/// - Path-level CRL signer discovery (RFC 5280 §6.3.3(f)) IS supported via
+///   [`CrlChecker::new_with_signer_discovery`] and the free
+///   [`discover_crl_signer`][crate::discover_crl_signer] helper, both gated
+///   by the `crl` feature. Discovery uses `AuthorityKeyIdentifier` →
+///   `SubjectKeyIdentifier` matching with issuer-DN fallback, and verifies
+///   the discovered signer has `cRLSign` in `KeyUsage` and reaches a
+///   self-signed cert in the supplied bundle. Full RFC 5280 §6.1 validation
+///   of the signer's chain remains the responsibility of higher-layer
+///   composers; see that constructor's "Limitations" section for the
+///   project's documented stance on the lenient-vs-strict tradeoff.
 /// - The `certificateIssuer` extension's `issuerAltName` form (a non-DN
 ///   GeneralName) is not currently used for entry-issuer lookup; only the
 ///   `directoryName` form is. Real-world indirect CRLs use directoryName.
@@ -145,13 +155,30 @@ pub struct CrlChecker<V> {
     /// Optional pre-parsed delta CRL. When present, its entries are merged
     /// with the base CRL in `check_revocation` (RFC 5280 §5.2.4).
     delta_crl: Option<CertificateList>,
-    /// Optional cRLIssuer cert when the CRL is indirect (RFC 5280 §5.2.6).
-    /// `Some` ⇔ this is an indirect-CRL checker; the cert's SPKI is used
-    /// for the CRL signature check, its KeyUsage for the cRLSign bit check,
-    /// and its subject DN for the CRL-issuer-identity match. The cert MUST
-    /// have been chain-validated by the caller before being passed in.
+    /// Optional cRLIssuer cert when the CRL is indirect (RFC 5280 §5.2.6)
+    /// or the signer is discovered via [`CrlChecker::new_with_signer_discovery`].
+    /// `Some` ⇔ the stored cert's SPKI is used for the CRL signature check,
+    /// its KeyUsage for the cRLSign bit check, and its subject DN for the
+    /// CRL-issuer-identity match. The caller (or the discovery routine) is
+    /// responsible for any chain validation of the cert.
     /// `None` ⇔ direct CRL: the `issuer` argument's identity is used.
     crl_issuer_cert: Option<Certificate>,
+    /// Tracks whether the stored `crl_issuer_cert` came from path-level
+    /// discovery (true) vs. the legacy `_with_crl_issuer` indirect-CRL
+    /// constructors (false).
+    ///
+    /// When `true`, `check_revocation` accepts the stored cert as the
+    /// effective signer regardless of whether the CRL declares itself
+    /// indirect via `IDP.indirectCRL`. This is required to support PKITS
+    /// §4.5 chains where the CRL is a direct (non-indirect) CRL whose
+    /// signer happens to differ from the EE's stated issuer cert because
+    /// of a self-issued key-rollover bridge — the §4.5 CRLs do **not**
+    /// set `IDP.indirectCRL`, so the legacy `_with_crl_issuer` path
+    /// would (correctly) reject them with `IndirectCrlIssuerUnexpected`.
+    ///
+    /// When `false`, the legacy `IndirectCrlIssuerMissing/Unexpected`
+    /// cross-check applies.
+    signer_discovered: bool,
     now_unix: u64,
     verifier: V,
 }
@@ -185,6 +212,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             crl,
             delta_crl: None,
             crl_issuer_cert: None,
+            signer_discovered: false,
             now_unix,
             verifier,
         })
@@ -217,6 +245,113 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             crl,
             delta_crl: None,
             crl_issuer_cert: Some(crl_issuer_cert),
+            signer_discovered: false,
+            now_unix,
+            verifier,
+        })
+    }
+
+    /// Create a `CrlChecker` that performs path-level CRL signer discovery
+    /// (RFC 5280 §6.3.3(f)).
+    ///
+    /// The caller supplies an unordered `bundle` of candidate certificates
+    /// (typically the certs already collected for the chain plus any local
+    /// CRL-signer candidates) and the certificate that will subsequently be
+    /// revocation-checked. The function:
+    ///
+    /// 1. Parses the CRL DER.
+    /// 2. Calls [`discover_crl_signer`] to locate the cert in `bundle` that
+    ///    signed the CRL (AKI/SKI walk with issuer-DN fallback).
+    /// 3. Verifies the discovered signer has `cRLSign` in its `KeyUsage`
+    ///    extension (RFC 5280 §6.3.3(f)). A signer with no `KeyUsage`
+    ///    extension passes this check (RFC 5280 leaves the extension
+    ///    optional and `pkix-revocation` follows the same fail-open
+    ///    interpretation as [`CrlChecker::new`] / `new_with_crl_issuer`).
+    /// 4. Verifies the discovered signer chains structurally back to a
+    ///    self-signed (anchor-like) certificate present in the same
+    ///    bundle (see "Limitations" below for what "chains structurally"
+    ///    means and why it differs from full RFC 5280 §6.1 validation).
+    /// 5. Stores the discovered signer for use as the effective CRL
+    ///    signer when [`RevocationChecker::check_revocation`] is later
+    ///    called on `cert_to_check`. The signer is used regardless of
+    ///    whether the CRL's `IssuingDistributionPoint.indirectCRL` flag
+    ///    is set, which is required to support PKITS §4.5 (direct CRLs
+    ///    signed by self-issued key-rollover bridge certs).
+    ///
+    /// `cert_to_check` is the certificate whose revocation status will be
+    /// queried via `check_revocation`. It is taken at construction time
+    /// only for ergonomic symmetry with the discovery flow; the actual
+    /// revocation lookup happens at `check_revocation` call time. Passing
+    /// a different `cert` argument to `check_revocation` later is well-
+    /// defined: the stored signer is the one whose SPKI is used to
+    /// authenticate the CRL, but the `(issuer, serial)` lookup is driven
+    /// by the `cert` argument at call time.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::CrlParseError`] if `crl_der` cannot be DER-decoded.
+    /// - [`Error::CrlSignerNotFound`] if no cert in `bundle` could be
+    ///   identified as the CRL's signer via AKI/SKI or issuer-DN match.
+    /// - [`Error::CrlSignMissing`] if the discovered signer has a
+    ///   `KeyUsage` extension that does not include `cRLSign`.
+    /// - [`Error::CrlSignerNotTrusted`] if the discovered signer cannot
+    ///   reach a self-signed cert in `bundle` by repeated AKI/SKI or
+    ///   issuer-DN walks.
+    ///
+    /// # Limitations
+    ///
+    /// **No signature verification is performed on the signer's chain.**
+    /// Step 4 above is a structural reachability check — it verifies the
+    /// bundle *contains* an anchor for the signer, not that any of the
+    /// signatures along the way actually verify. This intentional
+    /// limitation preserves the project's one-way dependency direction
+    /// (`pkix-chain` → `pkix-revocation` → `pkix-path`): pulling
+    /// `pkix-path::validate_path` into this constructor would invert that
+    /// direction.
+    ///
+    /// Higher-layer composers that need full RFC 5280 §6.1 validation of
+    /// the signer's path (signature, validity, name constraints, …) MUST
+    /// do that separately and then pass the validated cert via
+    /// [`CrlChecker::new_with_crl_issuer`]. This constructor is the
+    /// right choice when:
+    ///
+    /// - The bundle is already known to be path-valid (e.g.,
+    ///   `pkix-chain` already validated it), OR
+    /// - The caller accepts the project's documented stance that bundle
+    ///   pre-validation is the caller's responsibility.
+    ///
+    /// **The bundle slice is not retained.** Only the discovered signer
+    /// `Certificate` is cloned and stored.
+    pub fn new_with_signer_discovery(
+        crl_der: impl AsRef<[u8]>,
+        bundle: &[Certificate],
+        _cert_to_check: &Certificate,
+        now_unix: u64,
+        verifier: V,
+    ) -> crate::Result<Self> {
+        let crl = CertificateList::from_der(crl_der.as_ref())
+            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+
+        let signer = crate::signer_discovery::discover_crl_signer(bundle, &crl)
+            .ok_or(Error::CrlSignerNotFound)?;
+
+        // RFC 5280 §6.3.3(f): the signer cert MUST assert cRLSign in
+        // KeyUsage when the extension is present. Reuse the same fail-open
+        // semantics as check_crl_sign (absent extension = no constraint).
+        check_crl_sign(signer)?;
+
+        // Structural anchor-reachability check. See the "Limitations"
+        // section of this method's rustdoc for what this does and does
+        // not guarantee.
+        if !crate::signer_discovery::reaches_self_signed(bundle, signer) {
+            return Err(Error::CrlSignerNotTrusted);
+        }
+
+        Ok(Self {
+            crl,
+            delta_crl: None,
+            crl_issuer_cert: Some(signer.clone()),
+            signer_discovered: true,
             now_unix,
             verifier,
         })
@@ -295,6 +430,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
             crl: base_crl,
             delta_crl: Some(delta_crl),
             crl_issuer_cert: None,
+            signer_discovered: false,
             now_unix,
             verifier,
         })
@@ -360,8 +496,25 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
             }
+            (Some(discovered), false) if self.signer_discovered => {
+                // Path-level signer discovery (new_with_signer_discovery).
+                // The CRL may be direct (§4.5 self-issued key-rollover bridge)
+                // or indirect (§4.14.22-26 indirect CRLs); the cert was located
+                // structurally and the cross-check between "is the CRL declared
+                // indirect" and "did the caller supply a signer" is intentionally
+                // bypassed here. The discovered signer's SPKI is authoritative
+                // for the CRL signature verification regardless of the IDP
+                // indirectCRL flag.
+                signer_subject = &discovered.tbs_certificate.subject;
+                signer_spki = discovered
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref();
+                signer_for_crlsign_check = Some(discovered);
+            }
             (Some(_), false) => {
-                // Caller asserted indirect; CRL says direct. Reject.
+                // Caller asserted indirect via new_with_crl_issuer; CRL says
+                // direct. Reject — this rejects the wrong-constructor case.
                 return Err(Error::IndirectCrlIssuerUnexpected);
             }
             (None, true) => {
@@ -403,7 +556,12 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // For direct CRLs only: the cert's issuer must also match the
         // CRL issuer (this is the legacy invariant). For indirect CRLs
         // this check is intentionally skipped — the whole point of
-        // §5.2.6 is that they may differ.
+        // §5.2.6 is that they may differ. Discovery mode also skips this
+        // check: the §4.5 case has cert.issuer == CRL.issuer by DN but
+        // a different signing key, so the DN-equality test still holds;
+        // for the indirect §4.14.22-26 cases the DN differs by design,
+        // and the per-entry certificateIssuer extension (in indirect
+        // CRLs) carries the actual issuer of each entry.
         if self.crl_issuer_cert.is_none()
             && !names_match(&cert.tbs_certificate.issuer, &crl.tbs_cert_list.issuer)
         {
@@ -546,10 +704,13 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     /// I/O. The CRL DER must be supplied at construction time; for
     /// online fetching from CRL DPs, use `pkix-revocation-http`.
     ///
-    /// Path-level CRL signer discovery (RFC 5280 §6.3.3(f) — walking a
-    /// bundle to find an indirect CRL's signer cert) is also not
-    /// performed by this crate. The caller must identify the CRL signer
-    /// cert; tracked as PKIX-cqwt.
+    /// Path-level CRL signer discovery (RFC 5280 §6.3.3(f)) IS supported
+    /// via [`CrlChecker::new_with_signer_discovery`] on the
+    /// `check_revocation` flow, but is **not** wired into the
+    /// `check_revocation_against_anchor` path: trust anchors do not carry
+    /// a `Certificate` for the bundle walk to terminate at, so the
+    /// anchor flow continues to require an explicit `cRLIssuer` cert for
+    /// indirect CRLs. Direct CRLs at the anchor level are unaffected.
     ///
     /// If the CRL's issuer name does not match the anchor's subject, this
     /// method returns [`Error::CrlIssuerMismatch`] rather than `Ok(())`,
@@ -580,6 +741,18 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                     .subject_public_key_info
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
+            }
+            (Some(discovered), false) if self.signer_discovered => {
+                // Same discovery-mode semantics as check_revocation: the
+                // discovered signer is authoritative regardless of the
+                // CRL's IDP.indirectCRL flag. See the matching arm in
+                // check_revocation for the full rationale.
+                signer_subject = &discovered.tbs_certificate.subject;
+                signer_spki = discovered
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .owned_to_ref();
+                signer_for_crlsign_check = Some(discovered);
             }
             (Some(_), false) => return Err(Error::IndirectCrlIssuerUnexpected),
             (None, true) => return Err(Error::IndirectCrlIssuerMissing),
