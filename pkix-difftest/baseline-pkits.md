@@ -4,8 +4,8 @@
 
 | Class | Count |
 |---|---:|
-| LooserThanWild | 64 |
-| StricterThanWild | 77 |
+| LooserThanWild | 81 |
+| StricterThanWild | 60 |
 | OracleDivergence | 0 |
 | DiagnosticDivergence | 35 |
 | Agreement | 71 |
@@ -13,7 +13,7 @@
 
 ## Ground-truth disagreements
 
-47 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
+46 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
 
 ### `4.10.1.2 Valid Policy Mapping Test1 (Subpart 2)`
 
@@ -105,9 +105,9 @@
   * openssl: Fail(different CRL scope)
   * pyca: Pass
 
-_(37 additional ground-truth disagreement(s) omitted; see JSON report.)_
+_(36 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
-## LooserThanWild (64)
+## LooserThanWild (81)
 
 ### `4.10.1.1 Valid Policy Mapping Test1 (Subpart 1)`
 
@@ -199,9 +199,9 @@ _(37 additional ground-truth disagreement(s) omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
 
-_(54 additional sample(s) in this class omitted; see JSON report.)_
+_(71 additional sample(s) in this class omitted; see JSON report.)_
 
-## StricterThanWild (77)
+## StricterThanWild (60)
 
 ### `4.1.4 Valid DSA Signatures Test4`
 
@@ -293,7 +293,7 @@ _(54 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
 
-_(67 additional sample(s) in this class omitted; see JSON report.)_
+_(50 additional sample(s) in this class omitted; see JSON report.)_
 
 ## DiagnosticDivergence (35)
 

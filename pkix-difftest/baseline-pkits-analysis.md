@@ -38,8 +38,8 @@ bead OR a written-out justification".
 
 | Class | Count | % |
 |---|---:|---:|
-| LooserThanWild       | 64  | 25.9% |
-| StricterThanWild     | 77  | 31.2% |
+| LooserThanWild       | 81  | 32.8% |
+| StricterThanWild     | 60  | 24.3% |
 | OracleDivergence     | 0   | 0.0%  |
 | DiagnosticDivergence | 35  | 14.2% |
 | Agreement            | 71  | 28.7% |
@@ -54,7 +54,39 @@ Two PKITS chains are excluded from classification (harness errors):
   `x509-cert` 0.2.5 rejects pre-2000 UTCTime encoding as malformed
   (RustCrypto/formats issue, separately tracked upstream).
 
-## What changed in this revision (PKIX-emf1.7)
+## What changed in this revision (PKIX-t0w4)
+
+The PKITS corpus loader now runs every `CertPath` bundle through
+`pkix-path-builder::build_path` before handing the chain to the oracles
+(`pkix-difftest/src/corpus/pkits.rs::try_build_chain`). PKITS §4.4 /
+§4.14 / some §4.5 vectors advertise a CRL-signing cert inside `CertPath`
+that is not part of the signature chain; `build_path` discards it via
+AKI/SKI matching and yields the actual signature chain. When `build_path`
+fails (parse error, no path found — typically negative-test bundles
+deliberately violating cA=TRUE or DN chaining), the loader falls back to
+the v1 root-first-reversed ordering so the chain is still classifiable.
+
+Compared to the prior baseline (no path-building integration):
+
+| Class | Pre-t0w4 | Post-t0w4 | Δ |
+|---|---:|---:|---:|
+| LooserThanWild       | 64  | 81  | +17 |
+| StricterThanWild     | 77  | 60  | −17 |
+| DiagnosticDivergence | 35  | 35  |  0  |
+| Agreement            | 71  | 71  |  0  |
+
+The 17 chains that flipped from `StricterThanWild` to `LooserThanWild`
+are PKITS §4.4 / §4.14 / §4.5 bundles where pkix-path previously
+reported `signature invalid at chain index N` because the positional
+chain walker tried to verify a CRL-signing cert against the EE. Post-
+t0w4 the rebuilt chain validates successfully under pkix-path **and**
+OpenSSL, while pyca still rejects them due to its own (unrelated)
+intermediate-selection heuristic. Net result: 0 remaining
+`signature invalid at chain index N` entries in the StricterThanWild
+bucket (the one survivor, `4.1.4 Valid DSA Signatures Test4`, is the
+known pkix-path-does-not-support-DSA limitation).
+
+## What changed in PKIX-emf1.7 (CRL revocation wiring)
 
 Compared to the pre-PKIX-emf1.7 baseline (no revocation oracle wiring):
 
@@ -85,7 +117,7 @@ The shift is dominated by CRL-aware revocation flips:
   cleanest case: pkix-path **and** OpenSSL agree on `Fail (revoked)` and
   pyca alone passes (PKITS §4.4 / §4.13 revoked-EE / revoked-CA tests).
 
-## LooserThanWild (64) — pkix-path Pass, ≥1 oracle Fail
+## LooserThanWild (81) — pkix-path Pass, ≥1 oracle Fail
 
 Bucketed by the **failing** oracle and reason. pkix-path passing here is
 either a deliberate design choice (soft CRL handling) or a permissive
@@ -130,27 +162,28 @@ No follow-up beads filed for this bucket beyond PKIX-cqwt (CRL signer
 discovery, which addresses the 1 "certificate revoked" entry where
 OpenSSL finds a CRL pkix-path could not match to a signer).
 
-## StricterThanWild (77) — pkix-path Fail, ≥1 oracle Pass
+## StricterThanWild (60) — pkix-path Fail, ≥1 oracle Pass
 
 | Reason bucket | Count | Classification |
 |---|---:|---|
 | `certificate policy violation at chain index 0`     | 25 | pkix-path strict §6.1.5 policy-tree; OpenSSL lenient |
 | `pkix-path revocation: ... revoked by CRL` (various serials) | 17 | **Real revocation finding** — pkix-path agrees with OpenSSL on revocation outcome. The Stricter classification comes from pyca's no-CRL-support pass-through. 8 of these are clean "pkix-path + openssl Fail(revoked), pyca Pass" (PKITS §4.4 / §4.13). |
 | `name constraints violated at certificate index 0`  | 12 | pkix-path enforces NameConstraints per §6.1.4(g); OpenSSL lenient on certain NC types |
-| `signature invalid at chain index 1`                | 10 | **harness limitation**: PKITS §4.4 / §4.14 / some §4.5 entries put a CRL-signing cert in CertPath where pkix-path expects the actual signing cert. Tracked as **PKIX-t0w4** (path-building integration). |
 | `certificate policy violation at chain index 1`     | 5  | same as policy-tree above, on intermediate |
 | `certificate at index 1 is not a CA`                | 5  | pkix-path enforces basicConstraints cA=TRUE per §6.1.4(k); OpenSSL also enforces but with subtly different rules around v1/v2 certs |
-| `signature invalid at chain index 0`                | 3  | **harness limitation** (mostly): PKITS §4.5 self-issued bridge + §4.1.4 DSA (pkix-path does not currently support DSA) |
+| `signature invalid at chain index 0`                | 1  | PKITS §4.1.4 DSA (pkix-path does not currently support DSA — unrelated to path building) |
 
 **Net**: 17 entries are real revocation findings (pkix-path and OpenSSL
-agree, pyca lags due to no CRL support — PKIX-emf1.4). The remaining 60
-follow the same pattern as before PKIX-emf1.7: pkix-path strict §6.1
-enforcement vs OpenSSL leniency, plus 13 harness limitations tracked under
-PKIX-t0w4.
+agree, pyca lags due to no CRL support — PKIX-emf1.4). The remaining 43
+follow the same pattern as before: pkix-path strict §6.1 enforcement vs
+OpenSSL leniency. The previous baseline's 13 `signature invalid at chain
+index N` entries (harness limitation tracked under PKIX-t0w4) are now
+gone — the PKITS loader runs `CertPath` through `pkix-path-builder`
+before classification, so the CRL-signing cert no longer poisons the
+positional walk.
 
-Follow-up beads: **PKIX-t0w4** (path-building integration, 13 entries),
-**PKIX-emf1.4** (pyca CRL strategy, surfaces the no-revocation divergence
-visibly here).
+Follow-up beads: **PKIX-emf1.4** (pyca CRL strategy, surfaces the
+no-revocation divergence visibly here).
 
 ## OracleDivergence (0)
 
@@ -189,17 +222,22 @@ PKIX-emf1.4 resolves the pyca side.
 
 ## Conclusion
 
-The PKIX-emf1 revocation wiring produced clear new signal:
+The PKIX-emf1 revocation wiring + PKIX-t0w4 path-building integration
+produced clear new signal:
 
-1. **17 PKITS revocation chains** now correctly flip to `Fail (revoked)`
+1. **17 PKITS revocation chains** correctly flip to `Fail (revoked)`
    under both pkix-path and openssl, matching PKITS' expected
    ShouldValidate=false.
 2. **CRL coverage policy divergence between pkix-path and openssl** is
-   now visible as a documented design difference (22 LooserThanWild
+   visible as a documented design difference (22 LooserThanWild
    chains).
-3. **Pyca's lack of CRL support** is now visible as 8+ Stricter chains
+3. **Pyca's lack of CRL support** is visible as 8+ Stricter chains
    where the two CRL-aware oracles agree on revoked and pyca lags;
    PKIX-emf1.4 documents the maintainer-bound strategy decision.
+4. **PKITS §4.4 / §4.14 / §4.5 path-building harness limitation
+   eliminated** — 13 `signature invalid at chain index N` Stricter
+   chains are gone; pkix-path now validates the rebuilt chains
+   alongside OpenSSL.
 
 No new pkix-path correctness regressions detected. The harness output is
 committed as the canonical baseline for diff-friendly regression

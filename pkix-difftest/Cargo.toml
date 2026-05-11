@@ -31,6 +31,18 @@ path = "src/main.rs"
 # "what does the default pkix-path build do?"
 pkix-path = { workspace = true }
 
+# Path building (PKIX-t0w4). Used by the PKITS loader to reorder CertPath
+# bundles into actual signature chains — PKITS §4.4 / §4.14 / some §4.5 tests
+# advertise CRL-signing certs in CertPath that are not in the signature chain.
+# Without this, pkix-path's positional walk rejects the bundle as having
+# signature mismatch; OpenSSL builds its own path internally.
+#
+# pkix-path-builder is no_std-by-default; we only need its core types so the
+# default feature set is sufficient. Activating its `std` feature would expose
+# a pre-existing `extern crate` lint in the upstream test module, unrelated
+# to our work and out of scope here.
+pkix-path-builder = { workspace = true }
+
 # Revocation checking under test (PKIX-emf1.2). The pkix-path oracle wraps
 # validate_path's verdict with an optional pass through CrlChecker when the
 # chain ships with CRLs. Default features pull in the `crl` feature.
