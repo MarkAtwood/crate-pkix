@@ -6,6 +6,51 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.4.0`: OSCAL Catalog round-trip + id-pair runner (2026-05-11)
+
+**Additive.** PKIX-9vnx.6.3 — closes the OSCAL Catalog round-trip loop.
+
+New function in `pkix_lint::oscal::parse`:
+
+```rust
+pub fn lint_ids_from_catalog(value: &Value) -> Result<Vec<String>, ParseError>
+```
+
+Walks an OSCAL Catalog JSON Value and returns the ordered list of
+Control ids. Parser is intentionally narrow — it accepts the shape
+emitted by `catalog_from_lints`, not arbitrary OSCAL Catalogs nested
+inside `groups[]` or keyed off `class`.
+
+New method on `LintRunner` (feature-gated behind `oscal`):
+
+```rust
+pub fn filter_to_ids(self, ids: &[String])
+    -> Result<LintRunner, oscal::parse::ParseError>
+```
+
+Returns a new `LintRunner` containing only the lints whose `id()`
+appears in `ids`, in the order `ids` requests them. Unknown ids
+(`UnknownLintId`) error. Duplicates in `ids` are silently deduplicated
+(OSCAL Catalogs forbid duplicate Control ids). `bundle_version` is
+preserved.
+
+`ParseError` grew six Catalog-side variants (`CatalogNotObject`,
+`CatalogMissingWrapper`, `ControlsNotArray`, `ControlNotObject`,
+`ControlMissingId`, `ControlIdNotString`, `ControlIdEmpty`) plus
+`UnknownLintId` for the filter step. `non_exhaustive` made these
+additions non-breaking.
+
+Ten new tests in `oscal::catalog::tests`: id extraction order, full
+emit → serialise → parse → filter → run round-trip on the six CABF
+lints with a fixture chain asserting identical Findings (independent
+oracle: the pkix-lint engine itself is shared substrate, the test
+verifies the lint-set survives round-trip), unknown-id error path,
+id-order preservation, subset drop, bundle-version preservation, and
+four malformed-input rejection paths (non-object root, missing
+wrapper, non-array controls, control missing id).
+
+Test counts: oscal 211 (was 201), all-features 217 (was 207).
+
 ### `pkix-lint 0.4.0`: OSCAL Catalog JSON emitter for registered lints (2026-05-11)
 
 **Additive.** PKIX-9vnx.6.2 — new module

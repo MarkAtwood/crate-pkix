@@ -997,6 +997,73 @@ impl LintRunner {
         &self.bundle_version
     }
 
+    /// Return a new `LintRunner` containing only the lints whose
+    /// [`Lint::id`] appears in `ids`, in the order `ids` lists them.
+    ///
+    /// This is the consumer half of the OSCAL Catalog round-trip
+    /// introduced in PKIX-9vnx.6.3: a caller emits a Catalog via
+    /// [`crate::oscal::catalog::catalog_from_lints`], serializes it to
+    /// JSON, parses the JSON back, extracts the ids via
+    /// [`crate::oscal::parse::lint_ids_from_catalog`], and reconstructs
+    /// an equivalent runner with `filter_to_ids`. Running both runners
+    /// on the same chain produces identical [`Finding`] sets — that is
+    /// the closure the round-trip test pins.
+    ///
+    /// `bundle_version` is preserved unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::oscal::parse::ParseError::UnknownLintId`] on the
+    /// first id in `ids` that does not match any registered lint. The
+    /// caller is responsible for catching this when the Catalog and the
+    /// registered lint set are not in sync (e.g., a Catalog was emitted
+    /// from a newer pkix-lint with a lint that does not exist in the
+    /// current runner's set).
+    ///
+    /// Lints whose id is registered but not present in `ids` are
+    /// silently dropped — that is the intended filter semantic.
+    #[cfg(feature = "oscal")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
+    pub fn filter_to_ids(
+        self,
+        ids: &[String],
+    ) -> Result<LintRunner, crate::oscal::parse::ParseError> {
+        // Index by id for O(1) lookup. We extract into Option<Box<dyn Lint>>
+        // so we can take each lint out exactly once, preserving the original
+        // Vec's ownership without cloning Box<dyn Lint> (which is not Clone
+        // in general).
+        let mut by_id: std::collections::HashMap<&'static str, Option<Box<dyn Lint>>> =
+            std::collections::HashMap::with_capacity(self.lints.len());
+        for lint in self.lints {
+            by_id.insert(lint.id(), Some(lint));
+        }
+
+        let mut filtered: Vec<Box<dyn Lint>> = Vec::with_capacity(ids.len());
+        for id in ids {
+            // Match against the registered id set first: lifetime juggling
+            // — `by_id` keys are &'static str but `id` is a runtime String,
+            // so we lift the lookup through the borrow.
+            let key = by_id
+                .keys()
+                .copied()
+                .find(|k| *k == id.as_str())
+                .ok_or_else(|| crate::oscal::parse::ParseError::UnknownLintId {
+                    id: id.clone(),
+                })?;
+            // `take` returns the lint exactly once; subsequent duplicates
+            // in `ids` would silently get None — we treat that as "drop"
+            // since OSCAL Catalogs forbid duplicate Control ids anyway.
+            if let Some(lint) = by_id.get_mut(key).and_then(|slot| slot.take()) {
+                filtered.push(lint);
+            }
+        }
+
+        Ok(LintRunner {
+            lints: filtered,
+            bundle_version: self.bundle_version,
+        })
+    }
+
     /// Evaluate all certificate-scope lints against `cert`.
     ///
     /// `kind` is the position of this certificate in the chain (leaf, intermediate, etc.).
