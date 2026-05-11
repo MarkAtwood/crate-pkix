@@ -11,6 +11,12 @@
 //! [`crate::report::EvaluationReport`] to an OSCAL Assessment Results
 //! `serde_json::Value`.
 //!
+//! [`parse::deviation_store_from_risks`] is the inverse of
+//! [`emit::risks_from_store`]: it reconstructs a
+//! [`crate::deviation::DeviationStore`] from an OSCAL Risk array. The two
+//! halves form a closed round-trip loop for deviation-policy persistence
+//! (`(parse . emit)` over a non-empty store yields an `Eq`-equal store).
+//!
 //! # Feature
 //!
 //! This module is gated behind the `oscal` cargo feature, which pulls in
@@ -18,3 +24,4 @@
 //! dep-light when consumers do not need OSCAL output.
 
 pub mod emit;
+pub mod parse;

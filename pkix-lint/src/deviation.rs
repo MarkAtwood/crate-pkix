@@ -93,7 +93,7 @@ impl std::error::Error for DeviationAddError {}
 ///
 /// See the module-level documentation for the design rationale and usage.
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Deviation {
     /// Unique identifier for this deviation within the operator's store.
     ///
@@ -503,7 +503,7 @@ impl DeviatedFinding {
 /// The store is currently append-only. Future versions may add update/delete
 /// and persistence (file-backed JSON/OSCAL format) — tracked as PKIX-dbhe.
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DeviationStore {
     deviations: Vec<Deviation>,
 }
