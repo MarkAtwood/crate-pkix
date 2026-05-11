@@ -480,4 +480,167 @@ mod tests {
         assert!(pid.starts_with("rfc5280.cert.serial_number.max_octets."));
         assert!(pid.ends_with(".max-octets"));
     }
+
+    // -----------------------------------------------------------------
+    // PKIX-9vnx.6.3 round-trip closure: catalog_from_lints → serde_json
+    // → lint_ids_from_catalog → LintRunner::filter_to_ids → identical
+    // Findings on a fixture chain.
+    // -----------------------------------------------------------------
+
+    use super::super::parse::{lint_ids_from_catalog, ParseError};
+    use crate::cabf_tls_br;
+    use crate::LintRunner;
+
+    /// Load a CABF fixture cert (same source pkix-lint's other tests use).
+    fn load_cert(name: &str) -> x509_cert::Certificate {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../pkix-path/tests/fixtures/policy-checks/")
+            .join(name);
+        let der = std::fs::read(&path)
+            .unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
+        <x509_cert::Certificate as der::Decode>::from_der(&der)
+            .unwrap_or_else(|e| panic!("decode {name}: {e}"))
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_extracts_in_order() {
+        let lints = cabf_tls_br::all_lints();
+        let expected_ids: Vec<String> = lints.iter().map(|l| l.id().to_string()).collect();
+        let catalog = catalog_from_lints(&lints, "cabf-tls-br", "2.0.0");
+        // Round-trip through serde to mimic real on-disk use.
+        let serialized = serde_json::to_string(&catalog).expect("serialise");
+        let parsed: Value = serde_json::from_str(&serialized).expect("deserialise");
+        let ids = lint_ids_from_catalog(&parsed).expect("extract ids");
+        assert_eq!(ids, expected_ids);
+    }
+
+    #[test]
+    fn round_trip_preserves_findings_on_cabf_fixture() {
+        // Independent oracle: run two runners — one direct from all_lints,
+        // one reconstructed from the OSCAL Catalog round-trip — on the
+        // same fixture chain. The pkix-lint engine itself is the
+        // *common substrate*; the test verifies the round-trip preserves
+        // the *configured lint set*, not the engine's correctness.
+
+        let cert = load_cert("leaf-rsa2048-sha1.der");
+
+        // Direct runner: all 6 CABF lints.
+        let runner_direct = LintRunner::new(cabf_tls_br::all_lints());
+
+        // Round-tripped runner: emit Catalog → serialise → parse → ids →
+        // filter a fresh all_lints() set by those ids.
+        let catalog =
+            catalog_from_lints(&cabf_tls_br::all_lints(), "cabf-tls-br", "2.0.0");
+        let serialised = serde_json::to_string(&catalog).expect("serialise");
+        let parsed: Value = serde_json::from_str(&serialised).expect("parse");
+        let ids = lint_ids_from_catalog(&parsed).expect("extract ids");
+        let runner_round_trip = LintRunner::new(cabf_tls_br::all_lints())
+            .filter_to_ids(&ids)
+            .expect("filter to ids");
+
+        assert_eq!(runner_round_trip.lints().len(), runner_direct.lints().len());
+
+        // Same fixture cert + same now_unix to both runners. Use a time
+        // before any SC-081 epoch so validity-cap behaviour is stable.
+        let now_unix = 1_700_000_000u64;
+        let direct = runner_direct.run_cert(&cert, crate::SubjectKind::Leaf, 0, now_unix);
+        let round = runner_round_trip.run_cert(&cert, crate::SubjectKind::Leaf, 0, now_unix);
+
+        // Compare findings sorted by lint_id (independent of evaluation
+        // order, which round-trip preserves but we don't want to rely on).
+        // We compare (lint_id, result) tuples using PartialEq element-wise
+        // by zipping after sorting on lint_id only (LintResult is not Ord).
+        let mut direct_sorted: Vec<_> = direct.iter().collect();
+        let mut round_sorted: Vec<_> = round.iter().collect();
+        direct_sorted.sort_by(|a, b| a.lint_id.cmp(&b.lint_id));
+        round_sorted.sort_by(|a, b| a.lint_id.cmp(&b.lint_id));
+
+        assert_eq!(direct_sorted.len(), round_sorted.len());
+        for (d, r) in direct_sorted.iter().zip(round_sorted.iter()) {
+            assert_eq!(d.lint_id, r.lint_id);
+            assert_eq!(d.result, r.result);
+        }
+    }
+
+    #[test]
+    fn filter_to_ids_errors_on_unknown_id() {
+        let runner = LintRunner::new(cabf_tls_br::all_lints());
+        let ids = vec!["cabf.br.tls.validity.max".to_string(), "not.a.real.lint".to_string()];
+        match runner.filter_to_ids(&ids) {
+            Err(ParseError::UnknownLintId { id }) => {
+                assert_eq!(id, "not.a.real.lint");
+            }
+            other => panic!("expected UnknownLintId error; got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn filter_to_ids_preserves_id_order() {
+        // Reverse the natural order — filter_to_ids must produce a runner
+        // whose lints are in the order *ids* requests, not the source order.
+        let direct = cabf_tls_br::all_lints();
+        let mut reversed_ids: Vec<String> = direct.iter().map(|l| l.id().to_string()).collect();
+        reversed_ids.reverse();
+
+        let runner = LintRunner::new(cabf_tls_br::all_lints())
+            .filter_to_ids(&reversed_ids)
+            .expect("filter ok");
+
+        let observed: Vec<&str> = runner.lints().iter().map(|l| l.id()).collect();
+        let expected: Vec<&str> = reversed_ids.iter().map(String::as_str).collect();
+        assert_eq!(observed, expected);
+    }
+
+    #[test]
+    fn filter_to_ids_subset_drops_other_lints() {
+        let runner = LintRunner::new(cabf_tls_br::all_lints());
+        let ids = vec!["cabf.br.tls.validity.max".to_string()];
+        let filtered = runner.filter_to_ids(&ids).expect("filter ok");
+        assert_eq!(filtered.lints().len(), 1);
+        assert_eq!(filtered.lints()[0].id(), "cabf.br.tls.validity.max");
+    }
+
+    #[test]
+    fn filter_to_ids_preserves_bundle_version() {
+        let runner = LintRunner::with_bundle_version(cabf_tls_br::all_lints(), "v9.9.9");
+        let ids = vec!["cabf.br.tls.validity.max".to_string()];
+        let filtered = runner.filter_to_ids(&ids).expect("filter ok");
+        assert_eq!(filtered.bundle_version(), "v9.9.9");
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_non_object_root() {
+        let v: Value = serde_json::from_str("[]").unwrap();
+        match lint_ids_from_catalog(&v) {
+            Err(ParseError::CatalogNotObject) => {}
+            other => panic!("expected CatalogNotObject; got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_missing_wrapper() {
+        let v: Value = serde_json::json!({"not-catalog": {}});
+        match lint_ids_from_catalog(&v) {
+            Err(ParseError::CatalogMissingWrapper) => {}
+            other => panic!("expected CatalogMissingWrapper; got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_non_array_controls() {
+        let v: Value = serde_json::json!({"catalog": {"controls": "not-an-array"}});
+        match lint_ids_from_catalog(&v) {
+            Err(ParseError::ControlsNotArray) => {}
+            other => panic!("expected ControlsNotArray; got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_control_missing_id() {
+        let v: Value = serde_json::json!({"catalog": {"controls": [{"title": "no id here"}]}});
+        match lint_ids_from_catalog(&v) {
+            Err(ParseError::ControlMissingId { index: 0 }) => {}
+            other => panic!("expected ControlMissingId; got: {other:?}"),
+        }
+    }
 }

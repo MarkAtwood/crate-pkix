@@ -157,6 +157,42 @@ pub enum ParseError {
         /// Underlying error from [`DeviationStore::add`].
         source: DeviationAddError,
     },
+
+    // -- Catalog parsing (PKIX-9vnx.6.3) -----------------------------------
+    /// The top-level OSCAL Catalog value was not a JSON object (Catalog
+    /// emitters produce `{"catalog": {...}}`).
+    CatalogNotObject,
+    /// The expected `catalog` wrapper key was missing or not an object.
+    CatalogMissingWrapper,
+    /// The `catalog.controls` field was missing or not a JSON array.
+    ControlsNotArray,
+    /// A Control at the given index was not a JSON object.
+    ControlNotObject {
+        /// Position of the offending Control in `catalog.controls`.
+        index: usize,
+    },
+    /// A Control was missing its required `id` field.
+    ControlMissingId {
+        /// Position of the offending Control in `catalog.controls`.
+        index: usize,
+    },
+    /// A Control's `id` was present but not a JSON string.
+    ControlIdNotString {
+        /// Position of the offending Control in `catalog.controls`.
+        index: usize,
+    },
+    /// A Control's `id` was a string but empty.
+    ControlIdEmpty {
+        /// Position of the offending Control in `catalog.controls`.
+        index: usize,
+    },
+
+    // -- Catalog → registered Lint set (PKIX-9vnx.6.3) ---------------------
+    /// `filter_to_ids` was passed an id that no registered Lint matches.
+    UnknownLintId {
+        /// The unmatched Catalog Control id.
+        id: String,
+    },
 }
 
 impl std::fmt::Display for ParseError {
@@ -229,6 +265,31 @@ impl std::fmt::Display for ParseError {
             Self::AddFailed { index, source } => write!(
                 f,
                 "Risk at index {index} could not be added to the store: {source}"
+            ),
+            Self::CatalogNotObject => {
+                write!(f, "top-level OSCAL Catalog value is not a JSON object")
+            }
+            Self::CatalogMissingWrapper => {
+                write!(f, "OSCAL Catalog value is missing the 'catalog' wrapper")
+            }
+            Self::ControlsNotArray => {
+                write!(f, "catalog.controls is missing or not a JSON array")
+            }
+            Self::ControlNotObject { index } => {
+                write!(f, "Control at index {index} is not a JSON object")
+            }
+            Self::ControlMissingId { index } => {
+                write!(f, "Control at index {index} is missing required 'id' field")
+            }
+            Self::ControlIdNotString { index } => {
+                write!(f, "Control at index {index} 'id' is not a JSON string")
+            }
+            Self::ControlIdEmpty { index } => {
+                write!(f, "Control at index {index} 'id' is an empty string")
+            }
+            Self::UnknownLintId { id } => write!(
+                f,
+                "Catalog Control id '{id}' has no matching registered Lint"
             ),
         }
     }
@@ -555,6 +616,66 @@ fn nibble(b: u8) -> Option<u8> {
         b'A'..=b'F' => Some(b - b'A' + 10),
         _ => None,
     }
+}
+
+// ---------------------------------------------------------------------------
+// OSCAL Catalog parsing (PKIX-9vnx.6.3)
+// ---------------------------------------------------------------------------
+
+/// Extract the ordered list of Control ids from an OSCAL Catalog JSON
+/// [`Value`].
+///
+/// The parser is intentionally narrow — it matches the shape emitted by
+/// [`super::catalog::catalog_from_lints`], not arbitrary OSCAL Catalogs.
+/// Specifically, it accepts a top-level `{"catalog": { "controls":
+/// [{"id": "…"}, …]}}` document. Catalogs that nest Controls inside
+/// `groups[]`, or that pin Control ids on `class` instead of `id`, are
+/// outside this parser's contract.
+///
+/// Returns the Control ids in document order — same order
+/// [`super::catalog::catalog_from_lints`] emitted them.
+///
+/// # Errors
+///
+/// * [`ParseError::CatalogNotObject`] — top-level value is not a JSON
+///   object.
+/// * [`ParseError::CatalogMissingWrapper`] — the required `catalog` key
+///   is absent or not a JSON object.
+/// * [`ParseError::ControlsNotArray`] — the `controls` field is missing
+///   or not a JSON array.
+/// * [`ParseError::ControlNotObject`], [`ControlMissingId`], etc. —
+///   per-Control validation errors with the index of the offending
+///   entry.
+///
+/// [`ControlMissingId`]: ParseError::ControlMissingId
+pub fn lint_ids_from_catalog(value: &Value) -> Result<Vec<String>, ParseError> {
+    let obj = value.as_object().ok_or(ParseError::CatalogNotObject)?;
+    let catalog = obj
+        .get("catalog")
+        .and_then(|c| c.as_object())
+        .ok_or(ParseError::CatalogMissingWrapper)?;
+    let controls = catalog
+        .get("controls")
+        .and_then(|c| c.as_array())
+        .ok_or(ParseError::ControlsNotArray)?;
+
+    let mut ids: Vec<String> = Vec::with_capacity(controls.len());
+    for (index, control) in controls.iter().enumerate() {
+        let control_obj = control
+            .as_object()
+            .ok_or(ParseError::ControlNotObject { index })?;
+        let id_value = control_obj
+            .get("id")
+            .ok_or(ParseError::ControlMissingId { index })?;
+        let id_str = id_value
+            .as_str()
+            .ok_or(ParseError::ControlIdNotString { index })?;
+        if id_str.is_empty() {
+            return Err(ParseError::ControlIdEmpty { index });
+        }
+        ids.push(id_str.to_owned());
+    }
+    Ok(ids)
 }
 
 #[cfg(test)]
