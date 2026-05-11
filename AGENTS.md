@@ -35,6 +35,7 @@ adjacent PKI concerns.
 2. `pkix-path` does not import `pkix-revocation`. The dependency flows one way: chain → revocation → path.
 3. `SignatureVerifier` is the only place algorithm-specific code lives in `pkix-path`.
 4. The trait surface must be stable across MSRV (rust-version = "1.73").
+5. **OSCAL is the source of truth** for lint catalogs, profile composition, deviations, and assessment findings. `pkix-lint`'s public types ARE OSCAL data models — Catalog, Profile, Assessment Results, Finding, Observation, Risk — just typed in Rust. The destination is Level 3: OSCAL is canonical, not a downstream interchange format. No bespoke serialization formats for these models. Scope axes for deviations are OSCAL Subject props on Risk objects, not new Rust enum variants. Profile composition uses OSCAL semantics (select / exclude / modify / import chaining), not Rust composition functions. `pkix-path::ValidationPolicy` is out of scope for this constraint — it is the validator's runtime config, not a compliance assertion. Stance: PKIX-ztmr. Alignment epic: PKIX-9vnx.
 
 ## What already exists (and why we are not using it)
 
