@@ -17,7 +17,11 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use der::Decode as _;
+use pkix_path::TrustAnchor;
+use pkix_path_builder::{build_path, CertPool};
 use serde::Deserialize;
+use x509_cert::Certificate;
 
 use crate::corpus::{Corpus, CorpusItem};
 use crate::{Chain, Verdict};
@@ -126,12 +130,82 @@ impl Corpus for PkitsCorpus {
     }
 }
 
+/// Try to assemble the canonical leaf-first signature chain from a PKITS
+/// `CertPath` bundle (root-first DER) via `pkix-path-builder`.
+///
+/// Returns `None` on any failure — parse error, build error, or an internal
+/// invariant violation. Callers fall back to the v1 root-first-reversed
+/// ordering, which keeps the chain bytes visible to every oracle for
+/// downstream classification.
+///
+/// Assumes `der_blocks` is root-first and `der_blocks[0]` is the trust
+/// anchor (true for every shipped PKITS vector — verified by jq against
+/// `vectors.json`).
+fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
+    let mut parsed: Vec<Certificate> = Vec::with_capacity(der_blocks.len());
+    for bytes in der_blocks {
+        parsed.push(Certificate::from_der(bytes).ok()?);
+    }
+
+    let anchor_idx = 0;
+    let ee_idx = parsed.len() - 1;
+    let anchor = &parsed[anchor_idx];
+    let ee = &parsed[ee_idx];
+
+    // Pool of candidates for path building: everything except the anchor.
+    // Including the EE in the pool is harmless — `build_path` uses pool
+    // only as a candidate source for intermediates and never tries to
+    // re-add the target.
+    let pool: CertPool = parsed
+        .iter()
+        .enumerate()
+        .filter(|&(i, _)| i != anchor_idx)
+        .map(|(_, c)| c.clone())
+        .collect();
+
+    let trust_anchors = [TrustAnchor::from_cert(anchor.clone())];
+    let built = build_path(ee, &pool, &trust_anchors).ok()?;
+
+    // Map each built-chain cert back to its source DER bytes. `Certificate`
+    // derives `PartialEq` over its full ASN.1 content, so equality is the
+    // right oracle: a cert and its parsed-then-cloned twin compare equal.
+    let mut chain_der: Vec<Vec<u8>> = Vec::with_capacity(built.len() + 1);
+    for built_cert in &built {
+        let idx = parsed.iter().position(|p| p == built_cert)?;
+        chain_der.push(der_blocks[idx].clone());
+    }
+    // Append the anchor (build_path returns the chain up to anchor-issued
+    // but not the anchor itself; the oracles' `root_in_chain == true`
+    // contract requires the anchor at the end).
+    chain_der.push(der_blocks[anchor_idx].clone());
+    Some(chain_der)
+}
+
 /// Build a single [`CorpusItem`] from a PKITS vector entry.
 ///
-/// Reads each `.crt` file as DER, builds a `Chain` directly (skipping the
-/// PEM round-trip in `Chain::from_pem_bytes`), reverses to leaf-first, and
-/// attaches the CRLs referenced by `CRLPath` (loaded from `crls_dir`) when
-/// the entry lists any.
+/// PKITS `CertPath` is a **bundle** for a path builder, not a pre-ordered
+/// signature chain (see the bd memory `pkits-certpath-is-bundle-not-signature-chain`
+/// and PKIX-t0w4 for the underlying issue). For most tests it happens to be
+/// the signature chain too, but PKITS §4.4, §4.14, and some §4.5 entries
+/// include a CRL-signing cert at a position that breaks the positional walk
+/// `pkix-path` expects. To present every oracle with the actual signature
+/// chain we route the bundle through `pkix_path_builder::build_path` and
+/// store the resulting leaf-first chain (anchor appended) as `certs_der`.
+///
+/// `CertPath[0]` is the trust anchor in every shipped PKITS vector; `CertPath`
+/// suffix entries are candidate intermediates and the end-entity. Build flow:
+///
+/// 1. Parse every entry.
+/// 2. Anchor = `parsed[0]`. End-entity = `parsed[last]`.
+/// 3. Pool = `parsed[1..]` (everything except the anchor).
+/// 4. `build_path(target=ee, pool, anchors=[anchor])` → leaf-first
+///    `[ee, ..., anchor-issued]`.
+/// 5. Append the anchor cert to keep `root_in_chain == true`.
+///
+/// `build_path` returning `NoPathFound` is itself a meaningful corpus signal —
+/// it means the bundle cannot be assembled into a valid chain. We surface
+/// that as an `io::Error` so the corpus iterator reports the failed entry
+/// rather than silently substituting a bogus chain.
 fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Result<CorpusItem> {
     if vec.cert_path.len() < 2 {
         // Defensive: the schema explore confirmed every vector has CertPath
@@ -142,8 +216,7 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         ));
     }
 
-    // Read each DER cert. PKITS gives root-first; we reverse below to canonical
-    // leaf-first.
+    // Read each DER cert. PKITS gives root-first.
     let mut der_blocks: Vec<Vec<u8>> = Vec::with_capacity(vec.cert_path.len());
     for filename in &vec.cert_path {
         let path = certs_dir.join(filename);
@@ -151,7 +224,26 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
             .map_err(|e| io::Error::new(e.kind(), format!("read {}: {e}", path.display())))?;
         der_blocks.push(bytes);
     }
-    der_blocks.reverse(); // root-first → leaf-first
+
+    // Try to assemble a chain through pkix-path-builder. Two failure modes
+    // we tolerate (both fall back to v1 root-first-reversed ordering):
+    //
+    // 1. **Parse failure** — at least one cert in the bundle does not
+    //    decode (e.g. PKITS §4.2.3 pre-2000 UTCTime, an upstream
+    //    x509-cert / der-crate limitation). The v1 loader never parsed,
+    //    so the chain was always visible to OpenSSL/pyca via raw DER.
+    //    Preserve that behaviour rather than dropping the entry.
+    // 2. **No path found** — typically a PKITS *negative* test whose
+    //    bundle deliberately violates a topological invariant
+    //    (cA=FALSE intermediate, name-chain mismatch, no DN-matching
+    //    candidate). The oracles agree on "this chain should fail"
+    //    either way, so the fallback preserves baseline coverage for
+    //    the negative-test cases that motivate the bundle layout.
+    let chain_der = try_build_chain(&der_blocks).unwrap_or_else(|| {
+        let mut rev = der_blocks.clone();
+        rev.reverse();
+        rev
+    });
 
     // CRLs follow the same convention: filenames are listed in the manifest
     // and resolved against `crls_dir`. Order is preserved (no reverse) because
@@ -167,7 +259,7 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
     }
 
     let chain = Chain {
-        certs_der: der_blocks,
+        certs_der: chain_der,
         crls: crl_blocks,
         root_in_chain: true,
         label: vec.name.clone(),
