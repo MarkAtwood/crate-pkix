@@ -146,6 +146,7 @@ fn build_item(certs_dir: &Path, vec: &PkitsVector) -> io::Result<CorpusItem> {
 
     let chain = Chain {
         certs_der: der_blocks,
+        crls: Vec::new(),
         root_in_chain: true,
         label: vec.name.clone(),
     };
