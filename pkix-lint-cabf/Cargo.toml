@@ -1,0 +1,18 @@
+[package]
+name        = "pkix-lint-cabf"
+description = "Reference CA/Browser Forum lint bundles for pkix-lint (TLS BR, S/MIME BR) — not authoritative"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "cabforum", "lint", "compliance"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-lint dep added when real lint bundles are wired (PKIX-amgn.3 / PKIX-9vnx.7).
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-truststore-system"
+description = "OS-native trust store adapter for pkix-truststore (macOS, Windows, iOS, Android) — stub"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "truststore", "pki", "system"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-truststore + platform deps (security-framework, wincert-store, JNI) added
+# when real adapters are wired (PKIX-8h87).
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

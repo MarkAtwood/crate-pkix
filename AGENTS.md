@@ -18,12 +18,22 @@ adjacent PKI concerns.
 **Adjacent / specialized crates:**
 
 - **`pkix-revocation-http`** — Online HTTP fetching of CRLs and OCSP responses (std-only add-on to `pkix-revocation`).
-- **`pkix-profiles`** — CA/B Forum and RFC profile policy pre-configurations (TLS BR, S/MIME BR).
-- **`pkix-lint`** — Advisory lint engine for CA/B Forum and RFC rules.
+- **`pkix-profiles`** — RFC-baseline profile policy pre-configurations (RFC 5280 / 6125 / 8551). Per PKIX-amgn this crate is reverting to RFC-baseline only; CA/B Forum content moves to `pkix-profiles-cabf`.
+- **`pkix-lint`** — Advisory lint engine. RFC-conformance lint Catalogs ship here; CA/B Forum bundles move to `pkix-lint-cabf`.
 - **`pkix-chain-simple`** — Opinionated validator with extension whitelist for high-assurance contexts.
 - **`pkix-ac`** — RFC 5755 attribute certificate validation (skeleton; tracked as PKIX-ng0x).
 - **`pkix-ct`** — RFC 6962 / RFC 9162 Certificate Transparency / SCT verification (skeleton; tracked as PKIX-baac).
 - **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
+
+**Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
+
+- **`pkix-profiles-cabf`** — CA/Browser Forum profile types (TLS BR, S/MIME BR, Code Signing BR). Currently a stub; substantive content lands via PKIX-amgn.4.
+- **`pkix-lint-cabf`** — CA/Browser Forum lint bundles (`cabf.br.tls`, `cabf.br.smime`). Currently a stub; substantive content lands via PKIX-amgn.3 / PKIX-9vnx.7.
+
+**Trust store adapter crates** (each fetches DER bytes from a source-specific API and feeds them into `pkix_truststore::from_der_iter(...)`; platform-specific FFI lives here, not in `pkix-truststore`):
+
+- **`pkix-truststore-system`** — OS-native trust stores (macOS, Windows, iOS, Android). Currently a stub; substantive content lands via PKIX-8h87.
+- **`pkix-truststore-pkcs11`** — PKCS#11 / HSM / smart card adapters. Currently a stub; substantive content lands via PKIX-p8vz.
 
 **Dev tooling (not published):**
 
@@ -68,8 +78,9 @@ canonical adapter entry point for non-file sources.
 No compiled-in Mozilla CA bundle (rejects the `webpki-roots` model). No
 built-in knowledge of any platform trust store. Trust data is deployment
 configuration, not library content. Platform / HSM / cloud KMS sources are
-out-of-tree adapter crates (`pkix-truststore-system`, `pkix-truststore-pkcs11`,
-…) that fetch DER bytes from a source-specific API and feed them into
+separate adapter crates (`pkix-truststore-system`, `pkix-truststore-pkcs11`,
+…) — sibling workspace members, not in `pkix-truststore` itself — that fetch
+DER bytes from a source-specific API and feed them into
 `pkix_truststore::from_der_iter(...)`.
 
 Do not add a `webpki-roots`-style trust-data dependency to any crate in this
