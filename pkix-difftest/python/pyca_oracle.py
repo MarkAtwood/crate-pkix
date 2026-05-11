@@ -5,7 +5,8 @@
 #   {
 #     "leaf": "<PEM string>",                      # one cert
 #     "intermediates": ["<PEM>", "<PEM>", ...],    # zero or more
-#     "roots": ["<PEM>", ...]                      # one or more trust anchors
+#     "roots": ["<PEM>", ...],                     # one or more trust anchors
+#     "validation_time_unix": <int>                # optional; unix seconds
 #   }
 #
 # Writes a verdict on stdout as JSON:
@@ -97,6 +98,7 @@ def main() -> None:
     leaf_pem = spec.get("leaf")
     intermediates_pem = spec.get("intermediates", [])
     roots_pem = spec.get("roots", [])
+    validation_time_unix = spec.get("validation_time_unix")
     if (
         not isinstance(leaf_pem, str)
         or not isinstance(intermediates_pem, list)
@@ -105,6 +107,13 @@ def main() -> None:
         fail(
             1,
             "stdin JSON shape: {leaf:str, intermediates:[str], roots:[str]}",
+        )
+    if validation_time_unix is not None and not isinstance(
+        validation_time_unix, int
+    ):
+        fail(
+            1,
+            "validation_time_unix must be an integer (unix seconds) or omitted",
         )
 
     # 3. Parse certs. Failures here are harness errors (exit 1), not Verdicts.
@@ -131,9 +140,16 @@ def main() -> None:
     # Pin verification time. PolicyBuilder.time defaults to "now" but only
     # at build_*_verifier() call time (per pyca docs); pinning explicitly
     # makes the report reproducible across runs (the bead PKIX-7nsf.2 also
-    # forbids non-deterministic reason strings).
-    now = datetime.datetime.now(datetime.timezone.utc)
-    builder = builder.time(now)
+    # forbids non-deterministic reason strings). When the caller supplies
+    # `validation_time_unix` (limbo testcases per PKIX-g9vc.1), use it; else
+    # fall back to current wall clock (PKITS / PEM-tree behaviour).
+    if validation_time_unix is not None:
+        pinned_time = datetime.datetime.fromtimestamp(
+            validation_time_unix, datetime.timezone.utc
+        )
+    else:
+        pinned_time = datetime.datetime.now(datetime.timezone.utc)
+    builder = builder.time(pinned_time)
 
     try:
         from cryptography.x509.verification import ExtensionPolicy

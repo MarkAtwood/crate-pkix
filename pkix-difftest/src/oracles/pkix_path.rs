@@ -91,13 +91,17 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
     let anchors = [TrustAnchor::from_cert(certs[last].clone())];
     let validation_chain: Vec<Certificate> = certs.into_iter().take(last).collect();
 
-    // Use system clock. The harness is run interactively or in CI; chains
-    // with notBefore/notAfter outside the wall-clock window are themselves
-    // a real divergence class (clock-skew tolerance varies between oracles)
-    // and should be visible in the report rather than papered over here.
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
+    // Choose validation time: pinned per-chain value if the corpus loader
+    // supplied one (limbo's `validation_time`), else fall back to the system
+    // clock. Wall-clock fallback is appropriate for PKITS / PEM-tree, where
+    // notBefore/notAfter divergences relative to the current clock are
+    // themselves a real signal the harness should surface (clock-skew
+    // tolerance varies between oracles).
+    let now = chain.validation_time_unix.unwrap_or_else(|| {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs())
+    });
     let policy = ValidationPolicy::new(now);
 
     match validate_path(&validation_chain, &anchors, &policy, &DefaultVerifier) {

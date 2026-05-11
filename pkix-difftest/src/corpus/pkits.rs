@@ -263,6 +263,10 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         crls: crl_blocks,
         root_in_chain: true,
         label: vec.name.clone(),
+        // PKITS has no per-testcase validation time; oracles fall back to
+        // their current-time defaults. The limbo loader (PKIX-g9vc.2) sets
+        // this from each testcase's `validation_time` field.
+        validation_time_unix: None,
     };
 
     Ok(CorpusItem {
