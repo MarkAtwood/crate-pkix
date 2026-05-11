@@ -467,10 +467,11 @@ mod sth {
     /// Acceptance criterion 2 (PKIX-baac.5): "One real-world
     /// inclusion proof verifies against a real STH". The fixture is
     /// synthetic but the algorithm shape is identical to what real
-    /// RFC 6962 logs emit. Capturing a live-log triple offline for
-    /// extra defense in depth is a follow-up; this test exercises
-    /// the full STH-plus-inclusion flow against a hash- and
-    /// signature-validated synthetic oracle.
+    /// RFC 6962 logs emit. Real-world-byte defense in depth is added
+    /// by `tests/live_log.rs` (PKIX-baac.8), which exercises the
+    /// same flow against a triple captured from a deployed CT log.
+    /// This test exercises the full STH-plus-inclusion flow against
+    /// a hash- and signature-validated synthetic oracle.
     #[test]
     fn inclusion_proof_against_sth_verified_root() {
         let v = SctVerifier::new(sth_log_list(), DefaultVerifier);
