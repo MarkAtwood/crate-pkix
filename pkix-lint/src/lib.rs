@@ -218,11 +218,11 @@ where
 
 pub mod cabf_tls_br;
 pub mod deviation;
-pub mod rfc5280;
 #[cfg(feature = "oscal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
 pub mod oscal;
 pub mod report;
+pub mod rfc5280;
 
 // ---------------------------------------------------------------------------
 // Severity
@@ -1047,9 +1047,7 @@ impl LintRunner {
                 .keys()
                 .copied()
                 .find(|k| *k == id.as_str())
-                .ok_or_else(|| crate::oscal::parse::ParseError::UnknownLintId {
-                    id: id.clone(),
-                })?;
+                .ok_or_else(|| crate::oscal::parse::ParseError::UnknownLintId { id: id.clone() })?;
             // `take` returns the lint exactly once; subsequent duplicates
             // in `ids` would silently get None — we treat that as "drop"
             // since OSCAL Catalogs forbid duplicate Control ids anyway.
@@ -1062,6 +1060,77 @@ impl LintRunner {
             lints: filtered,
             bundle_version: self.bundle_version,
         })
+    }
+
+    /// Apply OSCAL Profile `modify.set-parameters` overrides to the
+    /// registered lints in place.
+    ///
+    /// `overrides` is the list produced by
+    /// [`crate::oscal::profile::resolve_profile`]. Each entry's
+    /// [`crate::oscal::profile::ParameterOverride::param_id`] is the
+    /// composite id emitted by
+    /// [`crate::oscal::catalog::catalog_from_lints`] in the form
+    /// `<lint_id>.<param_id>`. This method splits each composite id at
+    /// the rightmost `.`, finds the owning lint by [`Lint::id`], and
+    /// calls [`Lint::set_parameter`] with the unqualified parameter
+    /// name and override value.
+    ///
+    /// Overrides are applied in the order supplied. For composed
+    /// Profiles where inner and outer layers both target the same
+    /// parameter, [`crate::oscal::profile::resolve_profile`] orders
+    /// inner overrides first; the outer Profile's value takes effect
+    /// because it is applied last.
+    ///
+    /// Composite param ids that contain no `.` separator are rejected
+    /// as [`crate::oscal::parse::ParseError::UnknownParameterOverride`]
+    /// — the namespacing is mandatory under
+    /// [`crate::oscal::catalog::catalog_from_lints`]'s contract.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::oscal::parse::ParseError::UnknownParameterOverride`]
+    ///   on the first override whose composite id has no matching
+    ///   registered lint.
+    /// * [`crate::oscal::parse::ParseError::InvalidParameterOverride`]
+    ///   when the matched lint's
+    ///   [`Lint::set_parameter`] rejects the value (wrapping the
+    ///   underlying [`ParameterError`]).
+    ///
+    /// Errors short-circuit on the first failure — overrides applied
+    /// before the failing one remain mutated on the lints. Callers
+    /// that need atomic application should resolve and validate
+    /// overrides against the catalog before installing the lints in a
+    /// runner.
+    #[cfg(feature = "oscal")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
+    pub fn apply_parameter_overrides(
+        &mut self,
+        overrides: &[crate::oscal::profile::ParameterOverride],
+    ) -> Result<(), crate::oscal::parse::ParseError> {
+        for over in overrides {
+            // Split composite id at the rightmost '.' — lint ids may
+            // contain dots (`rfc5280.cert.serial_number.max_octets`)
+            // while parameter ids by convention do not.
+            let (lint_id, param_id) = over.param_id.rsplit_once('.').ok_or_else(|| {
+                crate::oscal::parse::ParseError::UnknownParameterOverride {
+                    param_id: over.param_id.clone(),
+                }
+            })?;
+            let target = self.lints.iter_mut().find(|l| l.id() == lint_id);
+            let lint = target.ok_or_else(|| {
+                crate::oscal::parse::ParseError::UnknownParameterOverride {
+                    param_id: over.param_id.clone(),
+                }
+            })?;
+            lint.set_parameter(param_id, &over.value)
+                .map_err(
+                    |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
+                        param_id: over.param_id.clone(),
+                        source,
+                    },
+                )?;
+        }
+        Ok(())
     }
 
     /// Evaluate all certificate-scope lints against `cert`.
