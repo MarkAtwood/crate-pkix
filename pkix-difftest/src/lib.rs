@@ -148,6 +148,15 @@ pub struct Chain {
     /// Human-readable label, e.g. the source filename or PKITS test name.
     /// Used only for reporting.
     pub label: String,
+    /// Per-chain validation time as Unix seconds. When `Some(secs)`, every
+    /// oracle pins its clock to that instant so a chain with a fixed validity
+    /// window verifies the same way at every wall-clock moment. When `None`,
+    /// each oracle uses its own current-time default (system clock for
+    /// pkix-path, OpenSSL's internal clock for openssl, `datetime.now(utc)`
+    /// for the pyca sidecar). PKITS and pem-tree loaders set `None`; the
+    /// limbo loader (PKIX-g9vc.2) sets `Some` from each testcase's
+    /// `validation_time` field.
+    pub validation_time_unix: Option<u64>,
 }
 
 impl Chain {
@@ -209,6 +218,7 @@ impl Chain {
             crls: Vec::new(),
             root_in_chain: true,
             label,
+            validation_time_unix: None,
         })
     }
 
@@ -225,6 +235,19 @@ impl Chain {
     #[must_use]
     pub fn with_crls(mut self, crls: Vec<Vec<u8>>) -> Self {
         self.crls = crls;
+        self
+    }
+
+    /// Pin this chain's validation time.
+    ///
+    /// Builder method: consumes `self`, returns a new `Chain` whose
+    /// `validation_time_unix` is set to `Some(secs)`. Every oracle that
+    /// consumes the chain uses this instant instead of its current-time
+    /// default. Use from corpus loaders that ship per-testcase clocks
+    /// (limbo's `validation_time` field, RFC 3339 in the source data).
+    #[must_use]
+    pub fn with_validation_time(mut self, secs: u64) -> Self {
+        self.validation_time_unix = Some(secs);
         self
     }
 }
@@ -412,6 +435,7 @@ BBBB
             crls: Vec::new(),
             root_in_chain: true,
             label: "test".to_string(),
+            validation_time_unix: None,
         };
         assert!(chain.crls.is_empty(), "default crls must be empty");
 

@@ -167,11 +167,24 @@ fn build_spec_json(chain: &Chain) -> io::Result<String> {
     // handles string escaping correctly even for certs with weird DN bytes
     // that contain quotes or backslashes once base64-encoded (PEM should
     // never have them, but defensive encoding is free).
-    let spec = serde_json::json!({
-        "leaf": leaf_pem,
-        "intermediates": intermediates,
-        "roots": [root_pem],
-    });
+    //
+    // `validation_time` is emitted only when the caller pinned one. The
+    // sidecar reads it as unix seconds and passes to `PolicyBuilder.time()`;
+    // when absent the sidecar uses `datetime.now(utc)`, preserving the
+    // existing PKITS / PEM-tree behaviour.
+    let spec = match chain.validation_time_unix {
+        Some(secs) => serde_json::json!({
+            "leaf": leaf_pem,
+            "intermediates": intermediates,
+            "roots": [root_pem],
+            "validation_time_unix": secs,
+        }),
+        None => serde_json::json!({
+            "leaf": leaf_pem,
+            "intermediates": intermediates,
+            "roots": [root_pem],
+        }),
+    };
     serde_json::to_string(&spec)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON encode: {e}")))
 }

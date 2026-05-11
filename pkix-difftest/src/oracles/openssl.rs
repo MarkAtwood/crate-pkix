@@ -120,6 +120,14 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
             .arg(dir.path().join("crls.pem"))
             .arg("-crl_check_all");
     }
+    // When the corpus loader pinned a per-chain validation time (limbo),
+    // pass it via `-attime <unix-seconds>`. OpenSSL 1.1+ accepts this flag
+    // and uses it as the wall clock for notBefore/notAfter and CRL
+    // thisUpdate/nextUpdate checks. When `None`, OpenSSL falls back to its
+    // own current clock — same behaviour PKITS / PEM-tree have always had.
+    if let Some(secs) = chain.validation_time_unix {
+        cmd.arg("-attime").arg(secs.to_string());
+    }
     let output = cmd.arg(dir.path().join("leaf.pem")).output().map_err(|e| {
         // Most useful failure: NotFound → "binary not on PATH". Pass
         // through other kinds (Permission, etc.) verbatim. We preserve
@@ -200,7 +208,9 @@ fn write_crls_to_tempdir(chain: &Chain, dir: &Path) -> io::Result<bool> {
     let mut concat = String::new();
     for der in &chain.crls {
         let pem = pem_rfc7468::encode_string("X509 CRL", pem_rfc7468::LineEnding::LF, der)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("CRL PEM encode: {e}")))?;
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("CRL PEM encode: {e}"))
+            })?;
         concat.push_str(&pem);
     }
     std::fs::write(dir.join("crls.pem"), concat)?;
