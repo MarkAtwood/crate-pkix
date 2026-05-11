@@ -266,3 +266,91 @@ fn rejects_unparsable_issuer() {
         Err(Error::ParseError),
     );
 }
+
+// --- verify_embedded_scts (PKIX-baac.7) ----------------------------------
+
+mod embedded {
+    //! Integration tests for [`SctVerifier::verify_embedded_scts`],
+    //! the loop helper that counts how many SCTs in a final cert's
+    //! SCT-list extension verify against a [`CtLogList`].
+
+    use super::{precert_oracle_log_list, read_fixture, DefaultVerifier, Error, SctVerifier};
+    use x509_cert::der::Decode as _;
+    use x509_cert::der::DecodePem as _;
+    use x509_cert::Certificate;
+
+    fn load_cert_der(name: &str) -> Certificate {
+        let der = read_fixture(name);
+        Certificate::from_der(&der).expect("parse cert")
+    }
+
+    #[test]
+    fn counts_exactly_one_valid_sct() {
+        let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let leaf = load_cert_der("precert-leaf-final.der");
+        let issuer = load_cert_der("precert-issuer.der");
+        let count = v
+            .verify_embedded_scts(&leaf, &issuer)
+            .expect("verify embedded SCTs");
+        assert_eq!(count, 1, "oracle fixture has exactly one embedded SCT");
+    }
+
+    #[test]
+    fn returns_zero_when_logs_empty() {
+        // SCTs are present and well-formed, but no log is trusted
+        // (empty CtLogList). Result is Ok(0) — caller's policy
+        // threshold check decides whether to reject.
+        let v = SctVerifier::new(pkix_ct::CtLogList::new(), DefaultVerifier);
+        let leaf = load_cert_der("precert-leaf-final.der");
+        let issuer = load_cert_der("precert-issuer.der");
+        let count = v
+            .verify_embedded_scts(&leaf, &issuer)
+            .expect("returns count even when no SCTs verify");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn returns_zero_when_issuer_wrong() {
+        // Issuer mismatch means every SCT in the list fails to
+        // verify. Result is still Ok(0), NOT an error — the API
+        // contract is "count of successes", and the caller is
+        // expected to enforce thresholds.
+        let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let leaf = load_cert_der("precert-leaf-final.der");
+        let wrong_issuer = load_cert_der("cert.der"); // wrong key
+        let count = v
+            .verify_embedded_scts(&leaf, &wrong_issuer)
+            .expect("returns count even when issuer wrong");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn errors_when_no_sct_extension() {
+        // A cert with no SCT-list extension at all is a different
+        // kind of "no SCTs" — the caller almost certainly wanted to
+        // verify a cert that had embedded SCTs. Report it as
+        // Error::NoScts rather than Ok(0) to surface the input
+        // mismatch.
+        let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let no_sct = load_cert_der("cert.der");
+        let issuer = load_cert_der("precert-issuer.der");
+        assert_eq!(v.verify_embedded_scts(&no_sct, &issuer), Err(Error::NoScts),);
+    }
+
+    #[test]
+    fn errors_when_sct_list_extension_malformed() {
+        // The cryptography-scts.pem fixture has a well-formed
+        // SCT-list extension but its SCTs were issued by retired
+        // logs (Google Argon2018 and Cloudflare Nimbus 2018). Those
+        // log_ids are not in the oracle log list, so each SCT fails
+        // to verify with UnknownLog. The helper returns Ok(0).
+        let pem = std::fs::read_to_string("tests/fixtures/cryptography-scts.pem").unwrap();
+        let leaf = Certificate::from_pem(&pem).unwrap();
+        let issuer = load_cert_der("precert-issuer.der");
+        let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let count = v
+            .verify_embedded_scts(&leaf, &issuer)
+            .expect("retired-log SCTs return Ok(0)");
+        assert_eq!(count, 0);
+    }
+}

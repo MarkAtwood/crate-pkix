@@ -169,11 +169,8 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///
     /// `cert_der` must be the DER encoding of the final (issued)
     /// certificate the SCT commits to. For `precert_entry` SCTs (embedded
-    /// in pre-certificates and re-published in the issued cert via the
-    /// cert extension), use the future `verify_sct_for_precert` API
-    /// (PKIX-baac.4); this function returns
-    /// [`Error::PrecertEntryNotImplemented`] if the SCT carries a
-    /// non-x509 entry type.
+    /// directly in the issued cert via the SCT-list extension), use
+    /// [`Self::verify_sct_for_precert`] instead.
     ///
     /// Note: `pkix-ct`'s `SignedCertificateTimestamp` does not carry an
     /// explicit `entry_type` field (it is implied by the
@@ -339,6 +336,90 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             .map_err(|_| Error::InvalidSignature)?;
 
         Ok(log)
+    }
+
+    /// Count how many SCTs embedded in `leaf_cert`'s SCT-list extension
+    /// successfully verify against this verifier's [`CtLogList`].
+    ///
+    /// Cert-embedded SCTs are always `precert_entry` (RFC 6962 §3.1):
+    /// the log signed the pre-cert before the CA glued the SCT list
+    /// into the final cert. This method dispatches every SCT through
+    /// [`Self::verify_sct_for_precert`].
+    ///
+    /// For SCTs delivered via OCSP or the TLS handshake — which are
+    /// `x509_entry` — callers should extract the SCT list themselves
+    /// via [`crate::sct_list_from_ocsp_response`] /
+    /// [`crate::sct_list_from_tls_extension`] and call
+    /// [`Self::verify_sct_for_cert`] in a loop.
+    ///
+    /// The returned count is the number of SCTs that fully verified
+    /// (signature OK, log known, timestamp inside the log's usable
+    /// window). SCTs that don't verify — wrong signature, unknown
+    /// log, retired log, unsupported algorithm — contribute 0 but are
+    /// NOT errors. The caller is expected to check the count against
+    /// a policy threshold (e.g., CA/Browser Forum TLS BR §3.2.2.9
+    /// requires "at least two SCTs from logs operated by two
+    /// different log operators" for publicly-trusted TLS certs).
+    ///
+    /// `issuer_cert` is the certificate whose `SubjectPublicKeyInfo`
+    /// the CT logs hashed when generating `issuer_key_hash` for the
+    /// `PreCert` structure (typically the immediate issuer — see
+    /// [`Self::verify_sct_for_precert`] for caveats about Precert
+    /// Signing Certificates).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::NoScts`] — the cert has no SCT-list extension or
+    ///   the extension's serialized list is empty.
+    /// - [`Error::ParseError`] — the SCT-list extension is present
+    ///   but malformed, or either cert fails to parse.
+    /// - [`Error::TruncatedOrTrailing`] — the SCT-list extension is
+    ///   present but the wire bytes are truncated or have trailing
+    ///   garbage.
+    /// - [`Error::UnsupportedVersion`] — an SCT in the list carries
+    ///   an unsupported SCT version (propagated from
+    ///   [`crate::SctList::from_extension_value`]).
+    pub fn verify_embedded_scts(
+        &self,
+        leaf_cert: &Certificate,
+        issuer_cert: &Certificate,
+    ) -> Result<usize> {
+        use der::Encode as _;
+
+        let exts = leaf_cert
+            .tbs_certificate
+            .extensions
+            .as_ref()
+            .ok_or(Error::NoScts)?;
+        let ext = exts
+            .iter()
+            .find(|e| e.extn_id == OID_SCT_LIST)
+            .ok_or(Error::NoScts)?;
+
+        let scts = crate::sct::SctList::from_extension_value(ext.extn_value.as_bytes())?;
+        if scts.0.is_empty() {
+            return Err(Error::NoScts);
+        }
+
+        let mut leaf_der = Vec::new();
+        leaf_cert
+            .encode_to_vec(&mut leaf_der)
+            .map_err(|_| Error::ParseError)?;
+        let mut issuer_der = Vec::new();
+        issuer_cert
+            .encode_to_vec(&mut issuer_der)
+            .map_err(|_| Error::ParseError)?;
+
+        let mut valid = 0usize;
+        for sct in &scts.0 {
+            if self
+                .verify_sct_for_precert(sct, &leaf_der, &issuer_der)
+                .is_ok()
+            {
+                valid = valid.saturating_add(1);
+            }
+        }
+        Ok(valid)
     }
 }
 
