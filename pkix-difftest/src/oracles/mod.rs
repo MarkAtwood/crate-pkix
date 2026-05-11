@@ -4,7 +4,7 @@
 //! runs a chain through each oracle in parallel and classifies the resulting
 //! verdict tuple (PKIX-7nsf.5).
 //!
-//! v0.1 status:
+//! Status:
 //! - `pkix_path`: implemented (PKIX-7nsf.1).
 //! - `openssl`:   implemented (PKIX-7nsf.2).
 //! - `pyca`:      implemented (PKIX-7nsf.3).

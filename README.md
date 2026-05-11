@@ -120,7 +120,7 @@ Path building (turning an unordered bag of certificates into an ordered chain)
 is handled by `pkix-path-builder`. Profile-specific policy pre-configuration
 lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 
-## What is validated (v0.2)
+## What is validated
 
 `pkix-path::validate_path` implements RFC 5280 §6.1:
 
@@ -141,7 +141,7 @@ lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 - **CRL checking** — RFC 5280 §5 offline CRL with delta CRL support
 - **OCSP checking** — RFC 6960 offline OCSP response with CertID hash verification
 
-## Not yet implemented (v0.3+)
+## Not yet implemented
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
 - CRL Distribution Points — caller supplies the CRL DER directly

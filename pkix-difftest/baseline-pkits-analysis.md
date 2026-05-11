@@ -78,7 +78,7 @@ No follow-up beads filed for the LooserThanWild bucket.
 | `signature invalid at chain index 1`                | 10 | **harness limitation**: PKITS §4.4 / §4.14 / some §4.5 entries put a CRL-signing cert in CertPath where pkix-path expects the actual signing cert. Tracked as **PKIX-t0w4** (path-building integration) |
 | `certificate policy violation at chain index 1`     | 5  | same as policy-tree above, on intermediate |
 | `certificate at index 1 is not a CA`                | 5  | pkix-path enforces basicConstraints cA=TRUE per §6.1.4(k); OpenSSL also enforces but with subtly different rules around v1/v2 certs |
-| `signature invalid at chain index 0`                | 3  | **harness limitation** (mostly): PKITS §4.5 self-issued bridge + §4.1.4 DSA (pkix-path does not support DSA in v0.1) |
+| `signature invalid at chain index 0`                | 3  | **harness limitation** (mostly): PKITS §4.5 self-issued bridge + §4.1.4 DSA (pkix-path does not currently support DSA) |
 
 **Net**: most are intentional pkix-path strictures (RFC 5280 literal
 reading) where OpenSSL is lenient. 13 entries are harness limitations

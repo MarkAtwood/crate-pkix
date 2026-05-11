@@ -63,7 +63,7 @@
 //!   pass `Box<dyn Lint>` to [`LintRunner`] without modifying this crate.
 //! - **Static detail messages**: `LintResult::Warn` and `LintResult::Error` carry
 //!   `&'static str` detail. This keeps the engine allocation-free in the common path.
-//!   Dynamic messages are planned for v0.3 via `Cow<'static, str>`.
+//!   Dynamic messages are planned via `Cow<'static, str>`.
 //! - **Temporality-aware**: [`LintRunner::run_cert`] takes `now_unix: u64` so lints
 //!   can enforce rules that have effective dates (e.g., SC-081 validity caps).
 //! - **Scope-separated**: certificate lints and path lints run in separate passes so
@@ -129,7 +129,7 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 ///
 /// - Use a separate short-lived process or worker for deserialization and pass
 ///   structured data across a process boundary.
-/// - Or file an issue to accelerate the v0.3 migration of `LintResult` detail
+/// - Or file an issue to accelerate the migration of `LintResult` detail
 ///   fields from `&'static str` to `Cow<'static, str>`, which removes this
 ///   constraint.
 ///
@@ -259,7 +259,7 @@ impl SubjectKind {
 /// # Stability
 ///
 /// The variant names and associated `&'static str` detail fields are stable.
-/// Dynamic `String` detail is planned for v0.3 via `Cow<'static, str>`.
+/// Dynamic `String` detail is planned via `Cow<'static, str>`.
 ///
 /// # Serde memory note
 ///
@@ -478,7 +478,7 @@ pub trait Lint: Send + Sync {
 /// citation from [`Lint::citation`]; `evaluated_at_unix` records when the lint
 /// was run; `rule_bundle_version` records which version of the lint bundle was active.
 ///
-/// # Planned fields (v0.3)
+/// # Planned fields
 ///
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
@@ -487,8 +487,8 @@ pub trait Lint: Send + Sync {
 /// When `serde` is enabled, deserializing `Finding` requires `'de: 'static`
 /// because `LintResult::Warn/Error/Fatal` detail fields are `&'static str`
 /// (deserialized via `de_static_str`, which leaks the allocation). This
-/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`
-/// in v0.3. Until then, callers must deserialize from a `'static` source
+/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`.
+/// Until then, callers must deserialize from a `'static` source
 /// (e.g., `serde_json::from_str` on a `&'static str` or `Box::leak`'d string).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]

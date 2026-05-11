@@ -1,6 +1,6 @@
 //! `pkix-difftest` CLI entry point.
 //!
-//! Subcommands (v0.1, PKIX-7nsf.1):
+//! Subcommands (PKIX-7nsf.1):
 //! - `single <chain.pem>` — verify one concatenated-PEM chain with the
 //!   in-process `pkix-path` oracle and print the verdict.
 //!

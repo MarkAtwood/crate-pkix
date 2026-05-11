@@ -10,7 +10,7 @@
 //! Inline interpreter via `PyO3` would lock the harness to a specific Python
 //! ABI version and add ~500KB of binary size. The OpenSSL oracle is already
 //! a subprocess; the per-call overhead (~30ms Python startup) is acceptable
-//! for v0.1 (PKITS = 249 chains × 30ms = ~8s).
+//! for the harness (PKITS = 249 chains × 30ms = ~8s).
 //!
 //! ## Python interpreter resolution
 //!

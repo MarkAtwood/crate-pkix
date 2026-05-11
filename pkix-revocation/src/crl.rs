@@ -461,7 +461,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // OutOfScope as a failure.
         if let Some(idp) = &parsed_idp {
             // onlyContainsAttributeCerts: attribute cert validation is out of scope
-            // for pkix-revocation (RFC 5755 is handled by pkix-ac, tracked for v0.2).
+            // for pkix-revocation (RFC 5755 is handled by pkix-ac).
             if idp.only_contains_attribute_certs {
                 return Err(Error::OutOfScope(
                     crate::OutOfScopeReason::CrlOnlyAttributeCerts,
@@ -538,7 +538,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     /// check is omitted because trust anchors do not carry a `Certificate` with
     /// extensions to inspect.
     ///
-    /// # Limitations (v0.1)
+    /// # Limitations
     ///
     /// CRL discovery via the `cRLDistributionPoints` extension is not
     /// implemented.  The CRL DER must be supplied at construction time.

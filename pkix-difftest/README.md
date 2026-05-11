@@ -192,7 +192,7 @@ integration:
   PEM-tree loader yields `expected: None`. Cross-reference manually
   via `<output_dir>/<id>/meta.json` and the JSON report.
 * **`has-crl` testcases are filtered** at conversion time (CRL
-  revocation is out of v0.1 harness scope).
+  revocation is out of harness scope).
 * **Non-self-signed trust anchors** (~2.5% of testcases by sample)
   fail the chain auto-detection heuristic and surface as per-chain
   harness errors in the report. Limbo's schema permits them; the
@@ -202,7 +202,7 @@ integration:
 These are exactly the gaps PKIX-g9vc closes; until then, this is the
 fastest way to see the harness exercise a large real-world corpus.
 
-## Limitations (v0.1)
+## Limitations
 
 * The harness requires the trust anchor to be the **last** cert in
   the chain. Real-world TLS chains typically omit the root; you must
@@ -216,7 +216,7 @@ fastest way to see the harness exercise a large real-world corpus.
 * CRL revocation is not exercised. The harness compares path
   verdicts only; revocation differential testing is a separate
   problem (OCSP responder semantics, CRL distribution-point
-  matching). Out of scope for v0.1.
+  matching). Out of scope for this harness.
 * No CT-log scrape (Tier 3 corpus). Tracked as
   [PKIX-5bab](../.beads/).
 * No CI integration — runs are interactive only. Tracked as

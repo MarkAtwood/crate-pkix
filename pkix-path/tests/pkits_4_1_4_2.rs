@@ -43,18 +43,18 @@ fn pkits_4_1_3_invalid_ee_signature() {
     );
 }
 
-/// §4.1.4 Valid DSA Signatures Test4 — DSA not supported in v0.1.
+/// §4.1.4 Valid DSA Signatures Test4 — DSA not currently supported.
 /// Oracle: PKITS §4.1.4 MUST validate (requires DSA backend).
 #[test]
-#[ignore = "DSA signature algorithm not supported in v0.1 (tracked for v0.2)"]
+#[ignore = "DSA signature algorithm not currently supported"]
 fn pkits_4_1_4_valid_dsa_signatures() {
     let result = pkits_validate(&["ValidDSASignaturesTest4EE", "DSACACert"], PKITS_NOW);
     result.expect("§4.1.4 must validate");
 }
 
-/// §4.1.5 Valid DSA Parameter Inheritance Test5 — DSA not supported in v0.1.
+/// §4.1.5 Valid DSA Parameter Inheritance Test5 — DSA not currently supported.
 #[test]
-#[ignore = "DSA signature algorithm not supported in v0.1 (tracked for v0.2)"]
+#[ignore = "DSA signature algorithm not currently supported"]
 fn pkits_4_1_5_valid_dsa_parameter_inheritance() {
     let result = pkits_validate(
         &[
@@ -67,9 +67,9 @@ fn pkits_4_1_5_valid_dsa_parameter_inheritance() {
     result.expect("§4.1.5 must validate");
 }
 
-/// §4.1.6 Invalid DSA Signature Test6 — DSA not supported in v0.1.
+/// §4.1.6 Invalid DSA Signature Test6 — DSA not currently supported.
 #[test]
-#[ignore = "DSA signature algorithm not supported in v0.1 (tracked for v0.2)"]
+#[ignore = "DSA signature algorithm not currently supported"]
 fn pkits_4_1_6_invalid_dsa_signature() {
     let result = pkits_validate(&["InvalidDSASignatureTest6EE", "DSACACert"], PKITS_NOW);
     assert!(result.is_err(), "§4.1.6 must not validate");
@@ -116,9 +116,9 @@ fn pkits_4_2_2_invalid_ee_notbefore() {
 
 /// §4.2.3 Valid pre-2000 UTC notBefore Date Test3.
 /// The cert has notBefore=1950-01-01 (pre-Unix-epoch `UTCTime`).
-/// The `der` crate cannot parse pre-1970 `UTCTime` values — tracked for v0.2.
+/// The `der` crate cannot parse pre-1970 `UTCTime` values.
 #[test]
-#[ignore = "pre-1970 UTCTime (1950-01-01) cannot be parsed by der crate (tracked for v0.2)"]
+#[ignore = "pre-1970 UTCTime (1950-01-01) cannot be parsed by der crate"]
 fn pkits_4_2_3_valid_pre2000_utc_notbefore() {
     let result = pkits_validate(
         &["Validpre2000UTCnotBeforeDateTest3EE", "GoodCACert"],

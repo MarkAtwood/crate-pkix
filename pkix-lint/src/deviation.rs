@@ -213,7 +213,7 @@ impl Deviation {
 /// - Use `Any` only for internal CAs or test environments where the profile
 ///   is intentionally not applicable.
 ///
-/// # Planned additions (v0.3)
+/// # Planned additions
 ///
 /// - `SubjectDnContains(String)` — for subscriber-identity scoping
 /// - `PolicyOid(ObjectIdentifier)` — certs asserting a specific CP OID
@@ -373,7 +373,7 @@ impl DeviationScope {
 // operator tooling can export deviation stores to JSON without pulling in
 // additional encoding dependencies.  Deserialization is not provided because
 // round-tripping through the string representation would require a DN parser,
-// which is out of scope for v0.2.
+// which the current impl does not provide.
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "serde")]
@@ -501,7 +501,7 @@ impl DeviatedFinding {
 
 /// An in-memory collection of [`Deviation`]s.
 ///
-/// The store is append-only in v0.2. Future versions may add update/delete
+/// The store is currently append-only. Future versions may add update/delete
 /// and persistence (file-backed JSON/OSCAL format).
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Clone, Debug, Default)]

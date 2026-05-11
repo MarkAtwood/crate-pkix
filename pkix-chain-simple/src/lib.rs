@@ -479,7 +479,7 @@ pub fn verify_simple(
 }
 
 // ---------------------------------------------------------------------------
-// Gate helpers (stubs — implementation tracked in pkix-chain-simple v0.1)
+// Gate helpers (stubs — implementation pending)
 // ---------------------------------------------------------------------------
 
 /// Reject the certificate if its `signatureAlgorithm` OID is not in

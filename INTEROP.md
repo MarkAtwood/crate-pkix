@@ -29,7 +29,7 @@ This is a living document. PRs that change `pkix-path` verdict
 behaviour and affect any divergence here MUST update this file in the
 same commit.
 
-## Status as of pkix-path v0.2
+## Current status
 
 * **Zero correctness regressions detected** against OpenSSL across the
   247 PKITS chains the harness can classify. Every chain where
@@ -76,7 +76,7 @@ same commit.
   byte-equal comparison, which rejects these chains. **`pkix-path`
   sides with the RFC.**
 * **Status**: intentional. (Note: `pkix-path`'s RFC 4518 implementation
-  is partial — see the parent README for a list of v0.3+ work items.)
+  is partial — see PKIX-l63j for the planned RFC 4518 work.)
 
 ## 3. pyca rejects negative serial numbers and pre-1950 GeneralizedTime
 
