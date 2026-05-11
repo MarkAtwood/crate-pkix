@@ -33,7 +33,11 @@
 //! extension). Merkle inclusion proof verification (RFC 6962 §2.1.1)
 //! and Signed Tree Head signature verification (RFC 6962 §3.5) are
 //! also implemented; see [`SctVerifier::verify_inclusion`] and
-//! [`SctVerifier::verify_sth`].
+//! [`SctVerifier::verify_sth`]. Public `MerkleTreeLeaf` builders for
+//! both entry types are exposed as [`merkle_tree_leaf_for_cert`] and
+//! [`merkle_tree_leaf_for_precert`], pairing with
+//! [`merkle_leaf_hash`] to give consumers the full
+//! "parse SCT → build leaf → hash → verify inclusion" pipeline.
 
 extern crate alloc;
 
@@ -54,7 +58,10 @@ pub use log_list::{CtLog, CtLogList};
 pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg(feature = "log-list")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
-pub use verify::{merkle_leaf_hash, MerkleAuditPath, SctVerifier, SignedTreeHead};
+pub use verify::{
+    merkle_leaf_hash, merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert,
+    MerkleAuditPath, SctVerifier, SignedTreeHead,
+};
 
 /// Errors returned by SCT parsing and verification.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

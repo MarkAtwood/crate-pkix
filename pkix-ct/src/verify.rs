@@ -72,6 +72,8 @@ const ENTRY_TYPE_X509: u16 = 0;
 const ENTRY_TYPE_PRECERT: u16 = 1;
 /// `SignatureType::certificate_timestamp` — RFC 6962 §3.2.
 const SIG_TYPE_CERTIFICATE_TIMESTAMP: u8 = 0;
+/// `MerkleLeafType::timestamped_entry` — RFC 6962 §3.4.
+const MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY: u8 = 0;
 /// `Version::v1` — RFC 6962 §3.2.
 const SCT_VERSION_V1: u8 = 0;
 
@@ -433,11 +435,11 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// leaf is provably in the tree.
     ///
     /// `leaf_hash` is the RFC 6962 §2.1 leaf hash:
-    /// `SHA256(0x00 || MerkleTreeLeaf-bytes)`. Computing it from an
-    /// SCT plus the cert it commits to is the caller's
-    /// responsibility; `pkix-ct` does not currently ship a
-    /// `MerkleTreeLeaf` builder (that lives one level above SCT
-    /// signature verification, which is `verify_sct_for_*`).
+    /// `SHA256(0x00 || MerkleTreeLeaf-bytes)`. Compute it from an
+    /// SCT plus the cert it commits to via
+    /// [`merkle_tree_leaf_for_cert`] (x509_entry) or
+    /// [`merkle_tree_leaf_for_precert`] (precert_entry) followed by
+    /// [`merkle_leaf_hash`].
     ///
     /// # Errors
     ///
@@ -700,6 +702,136 @@ pub fn merkle_leaf_hash(leaf_bytes: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     out.copy_from_slice(&digest);
     out
+}
+
+/// Build the RFC 6962 §3.4 `MerkleTreeLeaf` byte string for an
+/// `x509_entry` SCT.
+///
+/// Layout (all multi-byte fields are network byte order):
+///
+/// ```text
+/// u8       version              (0 = v1)
+/// u8       leaf_type            (0 = timestamped_entry)
+/// u64      timestamp_ms         (from the SCT)
+/// u16      entry_type           (0 = x509_entry)
+/// u24, len cert_der             (ASN.1Cert: opaque<1..2^24-1>)
+/// u16, len extensions           (from the SCT)
+/// ```
+///
+/// The resulting byte string is what the log committed to in its
+/// Merkle tree. Feed it through [`merkle_leaf_hash`] to get the
+/// 32-byte leaf hash that [`SctVerifier::verify_inclusion`] expects.
+///
+/// Errors with [`Error::CertDerTooLong`] if `cert_der` exceeds the RFC
+/// 6962 §3.2 u24 length prefix.
+///
+/// For `precert_entry` SCTs (the common case for SCTs embedded in
+/// final certs — RFC 6962 §3.1), use
+/// [`merkle_tree_leaf_for_precert`] instead.
+pub fn merkle_tree_leaf_for_cert(
+    sct: &SignedCertificateTimestamp,
+    cert_der: &[u8],
+) -> Result<Vec<u8>> {
+    build_merkle_tree_leaf_x509_entry(sct, cert_der)
+}
+
+/// Build the RFC 6962 §3.4 `MerkleTreeLeaf` byte string for a
+/// `precert_entry` SCT.
+///
+/// Layout (all multi-byte fields are network byte order):
+///
+/// ```text
+/// u8       version              (0 = v1)
+/// u8       leaf_type            (0 = timestamped_entry)
+/// u64      timestamp_ms         (from the SCT)
+/// u16      entry_type           (1 = precert_entry)
+/// 32B      issuer_key_hash      (SHA256 of issuer SPKI DER)
+/// u24, len tbs_no_sct           (TBSCertificate with SCT-list
+///                                extension removed, opaque<1..2^24-1>)
+/// u16, len extensions           (from the SCT)
+/// ```
+///
+/// `leaf_cert_der` is the FINAL (issued) cert carrying the embedded
+/// SCT extension; the helper strips OID 1.3.6.1.4.1.11129.2.4.2 from
+/// its TBSCertificate to reconstruct the bytes the log saw at
+/// pre-cert submission time. `issuer_cert_der` is the issuing CA
+/// cert; its SubjectPublicKeyInfo is hashed to produce
+/// `issuer_key_hash`.
+///
+/// Feed the returned bytes through [`merkle_leaf_hash`] to get the
+/// 32-byte leaf hash that [`SctVerifier::verify_inclusion`] expects.
+///
+/// Errors with [`Error::LeafMissingSctList`] if `leaf_cert_der` does
+/// not carry the SCT-list extension; [`Error::ParseError`] if either
+/// cert fails to parse; [`Error::CertDerTooLong`] if the re-encoded
+/// TBS exceeds the u24 length prefix.
+pub fn merkle_tree_leaf_for_precert(
+    sct: &SignedCertificateTimestamp,
+    leaf_cert_der: &[u8],
+    issuer_cert_der: &[u8],
+) -> Result<Vec<u8>> {
+    let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
+    let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
+    build_merkle_tree_leaf_precert_entry(sct, &issuer_key_hash, &tbs_no_sct)
+}
+
+/// MerkleTreeLeaf builder for the x509_entry case. Shares the wire
+/// layout from byte index 2 onward with [`build_signed_input_x509_entry`];
+/// the difference is the byte at index 1
+/// (`leaf_type=timestamped_entry` here vs `signature_type=certificate_timestamp`
+/// there — both happen to be the u8 value `0`, but the semantic
+/// distinction is documented by the constant name).
+fn build_merkle_tree_leaf_x509_entry(
+    sct: &SignedCertificateTimestamp,
+    cert_der: &[u8],
+) -> Result<Vec<u8>> {
+    if cert_der.len() > 0x00FF_FFFF {
+        return Err(Error::CertDerTooLong);
+    }
+    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+
+    let cert_len = cert_der.len();
+    let cap = 1 + 1 + 8 + 2 + 3 + cert_len + 2 + sct.extensions.len();
+    let mut out = Vec::with_capacity(cap);
+    out.push(SCT_VERSION_V1);
+    out.push(MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY);
+    out.extend_from_slice(&sct.timestamp_ms.to_be_bytes());
+    out.extend_from_slice(&ENTRY_TYPE_X509.to_be_bytes());
+    out.push(((cert_len >> 16) & 0xFF) as u8);
+    out.extend_from_slice(&(cert_len as u16).to_be_bytes());
+    out.extend_from_slice(cert_der);
+    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&sct.extensions);
+    Ok(out)
+}
+
+/// MerkleTreeLeaf builder for the precert_entry case. See
+/// [`build_merkle_tree_leaf_x509_entry`] for the byte-index-1 distinction
+/// versus [`build_signed_input_precert_entry`].
+fn build_merkle_tree_leaf_precert_entry(
+    sct: &SignedCertificateTimestamp,
+    issuer_key_hash: &[u8; 32],
+    tbs_no_sct: &[u8],
+) -> Result<Vec<u8>> {
+    if tbs_no_sct.len() > 0x00FF_FFFF {
+        return Err(Error::CertDerTooLong);
+    }
+    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+
+    let tbs_len = tbs_no_sct.len();
+    let cap = 1 + 1 + 8 + 2 + 32 + 3 + tbs_len + 2 + sct.extensions.len();
+    let mut out = Vec::with_capacity(cap);
+    out.push(SCT_VERSION_V1);
+    out.push(MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY);
+    out.extend_from_slice(&sct.timestamp_ms.to_be_bytes());
+    out.extend_from_slice(&ENTRY_TYPE_PRECERT.to_be_bytes());
+    out.extend_from_slice(issuer_key_hash);
+    out.push(((tbs_len >> 16) & 0xFF) as u8);
+    out.extend_from_slice(&(tbs_len as u16).to_be_bytes());
+    out.extend_from_slice(tbs_no_sct);
+    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&sct.extensions);
+    Ok(out)
 }
 
 /// Check whether `timestamp_ms` falls inside the log's usable window.
@@ -1061,6 +1193,100 @@ mod tests {
         assert_eq!(
             build_signed_input_precert_entry(&sct, &issuer_key_hash, &huge),
             Err(Error::CertDerTooLong)
+        );
+    }
+
+    /// PKIX-yzb6 acceptance — byte-layout oracle for the x509_entry
+    /// MerkleTreeLeaf builder. Hand-decoded against RFC 6962 §3.4.
+    ///
+    /// The byte pattern is byte-equal to the corresponding
+    /// `build_signed_input_x509_entry` output because both
+    /// `MerkleLeafType::timestamped_entry` and
+    /// `SignatureType::certificate_timestamp` are encoded as the u8
+    /// value `0`. The test still asserts the literal expected bytes so
+    /// any future divergence (e.g. RFC 9162 v2 raising one of the
+    /// values to a non-zero variant) is caught.
+    #[test]
+    fn merkle_tree_leaf_x509_entry_layout() {
+        let mut sct = empty_sct(4, 3);
+        sct.timestamp_ms = 0x0123_4567_89AB_CDEF;
+        sct.extensions = vec![0xAA, 0xBB];
+        let cert = b"hello";
+        let out = build_merkle_tree_leaf_x509_entry(&sct, cert).unwrap();
+        // Expected bytes (compare with signed_input_layout above):
+        //   00                          version = 0
+        //   00                          leaf_type = timestamped_entry
+        //   01 23 45 67 89 AB CD EF     timestamp_ms (BE)
+        //   00 00                       entry_type = x509_entry
+        //   00 00 05                    u24 cert_len = 5
+        //   68 65 6C 6C 6F              "hello"
+        //   00 02                       ext_len = 2
+        //   AA BB                       extensions
+        let expected: &[u8] = &[
+            0x00, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x00, 0x00, 0x00, 0x00,
+            0x05, b'h', b'e', b'l', b'l', b'o', 0x00, 0x02, 0xAA, 0xBB,
+        ];
+        assert_eq!(out, expected);
+    }
+
+    /// PKIX-yzb6 acceptance — byte-layout oracle for the
+    /// precert_entry MerkleTreeLeaf builder. Hand-decoded against RFC
+    /// 6962 §3.4.
+    #[test]
+    fn merkle_tree_leaf_precert_entry_layout() {
+        let mut sct = empty_sct(4, 3);
+        sct.timestamp_ms = 0x0123_4567_89AB_CDEF;
+        sct.extensions = vec![0xAA, 0xBB];
+        let issuer_key_hash = [0x11u8; 32];
+        let tbs = b"hello";
+        let out = build_merkle_tree_leaf_precert_entry(&sct, &issuer_key_hash, tbs).unwrap();
+        let mut expected = Vec::with_capacity(1 + 1 + 8 + 2 + 32 + 3 + 5 + 2 + 2);
+        expected.extend_from_slice(&[0x00, 0x00]); // version=0, leaf_type=0
+        expected.extend_from_slice(&[0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF]);
+        expected.extend_from_slice(&[0x00, 0x01]); // entry_type=precert
+        expected.extend_from_slice(&[0x11; 32]);
+        expected.extend_from_slice(&[0x00, 0x00, 0x05]); // u24 tbs_len=5
+        expected.extend_from_slice(b"hello");
+        expected.extend_from_slice(&[0x00, 0x02, 0xAA, 0xBB]);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn merkle_tree_leaf_x509_entry_rejects_oversize_cert() {
+        let sct = empty_sct(4, 3);
+        let huge = vec![0u8; 0x0100_0000];
+        assert_eq!(
+            build_merkle_tree_leaf_x509_entry(&sct, &huge),
+            Err(Error::CertDerTooLong)
+        );
+    }
+
+    #[test]
+    fn merkle_tree_leaf_precert_entry_rejects_oversize_tbs() {
+        let sct = empty_sct(4, 3);
+        let issuer_key_hash = [0u8; 32];
+        let huge = vec![0u8; 0x0100_0000];
+        assert_eq!(
+            build_merkle_tree_leaf_precert_entry(&sct, &issuer_key_hash, &huge),
+            Err(Error::CertDerTooLong)
+        );
+    }
+
+    /// PKIX-yzb6: byte index 1 of the MerkleTreeLeaf is named
+    /// `leaf_type`, not `signature_type`. Currently both happen to be
+    /// the u8 value 0, but the constants document the semantic
+    /// distinction. This test pins the convention: if a future
+    /// refactor pulls in a non-zero MerkleLeafType variant (RFC 9162
+    /// CTv2 has yet to introduce one, but might) the test surfaces
+    /// the change.
+    #[test]
+    fn merkle_tree_leaf_second_byte_is_leaf_type_not_signature_type() {
+        let sct = empty_sct(4, 3);
+        let mtl = build_merkle_tree_leaf_x509_entry(&sct, b"x").unwrap();
+        assert_eq!(
+            mtl[1], MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY,
+            "byte 1 must be MerkleLeafType (timestamped_entry = 0), \
+             NOT SignatureType (certificate_timestamp = 0)"
         );
     }
 
