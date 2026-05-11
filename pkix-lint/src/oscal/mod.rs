@@ -23,5 +23,6 @@
 //! `serde_json` as a real dependency. The core lint engine stays
 //! dep-light when consumers do not need OSCAL output.
 
+pub mod catalog;
 pub mod emit;
 pub mod parse;
