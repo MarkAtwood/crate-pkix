@@ -6,6 +6,17 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path`: `ValidationPolicy::require_crl_sign_on_cas` opt-in flag (2026-05-11)
+
+Additive. New `ValidationPolicy::require_crl_sign_on_cas: bool` (default
+`false`). When `true`, an intermediate CA certificate whose `KeyUsage`
+extension is present but does not include `cRLSign` is rejected with the
+new `Error::CrlSignMissing { index }` variant. Default behaviour is
+unchanged (the RFC 5280 §6.1 literal reading does not require this check).
+Restores PKITS §4.7.4 / §4.7.5 conformance for callers who opt in.
+`Error` is `#[non_exhaustive]`, so the new variant is additive. See
+`INTEROP.md` §7 for the divergence rationale. Tracked as PKIX-0x9z.
+
 ### Policy: drop v0.x milestone gating (2026-05-11)
 
 Dropped v0.x milestone gating across the workspace. The project drives to

@@ -158,6 +158,30 @@ same commit.
   proper fix is path-building integration, tracked as
   [PKIX-t0w4](.beads/).
 
+## 7. PKITS §4.7.4 / §4.7.5 (cRLSign on intermediate) — opt-in via policy flag
+
+* **Characteristic chains**:
+  * `4.7.4 Invalid keyUsage Critical cRLSign False Test4`
+  * `4.7.5 Invalid keyUsage Not Critical cRLSign False Test5`
+* **Verdicts (default policy)**:
+  * `pkix-path`: Pass
+  * `openssl`: Pass (RFC-literal reading)
+  * PKITS metadata: must-fail
+* **Reasoning**: RFC 5280 §6.1.4(n) only requires the `keyCertSign` bit
+  on intermediates; the literal §6.1 state machine does not check
+  `cRLSign`. PKITS conflates path validation with revocation
+  infrastructure: a CA cert without `cRLSign` cannot revoke certs it
+  issued, so PKITS treats such chains as invalid even at path-validation
+  time. `pkix-path` defaults to the RFC-literal reading.
+* **Configurable strictness**: set
+  `ValidationPolicy::require_crl_sign_on_cas = true` to opt into PKITS
+  conformance. With the flag on, any intermediate whose `KeyUsage`
+  extension is present but lacks `cRLSign` is rejected with
+  `Error::CrlSignMissing { index }`. Default remains `false`; existing
+  callers see no behavioural change.
+* **Status**: intentional default; opt-in flag exposed. Tracked as
+  PKIX-0x9z.
+
 ## Reproducing these findings
 
 ```sh

@@ -400,10 +400,14 @@ fn pkits_4_7_3_valid_key_usage_not_critical() {
 }
 
 /// §4.7.4 Invalid keyUsage Critical cRLSign False Test4.
-/// Path validation does not currently check cRLSign (RFC 5280 §6.1 only requires keyCertSign).
-/// This test is expected to fail per PKITS but our implementation correctly follows §6.1.
+///
+/// Default `ValidationPolicy` follows RFC 5280 §6.1 literally — which does not
+/// require `cRLSign` on CAs — so this PKITS chain passes with default policy
+/// and these `#[ignore]` tests fail the PKITS assertion. Set
+/// `ValidationPolicy::require_crl_sign_on_cas = true` to opt into PKITS
+/// conformance; see `pkits_4_7_4_invalid_key_usage_no_crl_sign_with_flag` below.
 #[test]
-#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign; tracked as PKIX-0x9z)"]
+#[ignore = "default policy does not enforce cRLSign (RFC 5280 §6.1 only requires keyCertSign); set ValidationPolicy::require_crl_sign_on_cas = true to enable — see PKIX-0x9z"]
 fn pkits_4_7_4_invalid_key_usage_no_crl_sign() {
     let result = pkits_validate(
         &[
@@ -418,7 +422,7 @@ fn pkits_4_7_4_invalid_key_usage_no_crl_sign() {
 /// §4.7.5 Invalid keyUsage Not Critical cRLSign False Test5.
 /// Same as Test4 with non-critical `KeyUsage`.
 #[test]
-#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign; tracked as PKIX-0x9z)"]
+#[ignore = "default policy does not enforce cRLSign (RFC 5280 §6.1 only requires keyCertSign); set ValidationPolicy::require_crl_sign_on_cas = true to enable — see PKIX-0x9z"]
 fn pkits_4_7_5_invalid_key_usage_no_crl_sign_not_critical() {
     let result = pkits_validate(
         &[
@@ -428,4 +432,56 @@ fn pkits_4_7_5_invalid_key_usage_no_crl_sign_not_critical() {
         PKITS_NOW,
     );
     assert!(result.is_err(), "§4.7.5 must not validate per PKITS");
+}
+
+// ---------------------------------------------------------------------------
+// ValidationPolicy::require_crl_sign_on_cas opt-in (PKIX-0x9z)
+// ---------------------------------------------------------------------------
+
+/// Verifies the `require_crl_sign_on_cas` policy flag by running the PKITS
+/// §4.7.4 chain (intermediate has `KeyUsage` critical with `cRLSign=False`)
+/// under two policies.
+///
+/// * Default policy (`require_crl_sign_on_cas == false`): chain validates,
+///   matching `pkix-path`'s RFC 5280 §6.1 literal reading documented in
+///   `INTEROP.md`.
+/// * Opt-in policy (`require_crl_sign_on_cas == true`): chain is rejected
+///   with [`pkix_path::Error::CrlSignMissing`] at the intermediate position,
+///   restoring PKITS §4.7.4 conformance.
+///
+/// Oracle: PKITS metadata says §4.7.4 MUST NOT validate. The cert KeyUsage
+/// extension is parsed by `x509-cert`, an independent crate, so this test
+/// does not use `pkix-path` as its own oracle.
+#[test]
+fn pkits_4_7_4_crl_sign_flag_toggles_outcome() {
+    let leaf = pkits_helper::pkits_cert("InvalidkeyUsageCriticalcRLSignFalseTest4EE");
+    let int = pkits_helper::pkits_cert("keyUsageCriticalcRLSignFalseCACert");
+    let chain = [leaf, int];
+    let anchors = [pkits_helper::pkits_trust_anchor()];
+
+    // Default policy: chain validates (RFC 5280 §6.1 literal reading).
+    let default_policy = ValidationPolicy::new(PKITS_NOW);
+    assert!(
+        !default_policy.require_crl_sign_on_cas,
+        "default policy must leave require_crl_sign_on_cas == false"
+    );
+    let default_result =
+        pkix_path::validate_path(&chain, &anchors, &default_policy, &DefaultVerifier);
+    default_result
+        .as_ref()
+        .expect("§4.7.4 chain must validate with default policy (RFC 5280 §6.1)");
+
+    // Opt-in policy: chain is rejected with CrlSignMissing at intermediate (index 1).
+    let mut strict_policy = ValidationPolicy::new(PKITS_NOW);
+    strict_policy.require_crl_sign_on_cas = true;
+    let strict_result =
+        pkix_path::validate_path(&chain, &anchors, &strict_policy, &DefaultVerifier);
+    assert!(
+        matches!(
+            strict_result,
+            Err(pkix_path::Error::CrlSignMissing { index: 1 })
+        ),
+        "§4.7.4 chain must fail with CrlSignMissing {{ index: 1 }} when \
+         require_crl_sign_on_cas == true, got: {strict_result:?}"
+    );
 }
