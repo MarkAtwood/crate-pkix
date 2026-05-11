@@ -174,7 +174,7 @@ tolerance). No follow-up beads filed for these.
 | `malformed certificate at chain index 0` | 11 | 10 bettertls::nameconstraints (tc8877..tc9476) + 1 webpki::san::unicode-emoji-san. **pkix-path AGREES with corpus ground truth** on all 11 (gt_agreement=true). pkix-path rejects malformed leaves that openssl tolerates; strict-is-correct. No bead. |
 | `signature invalid at chain index 1` | 6 | 3 online::* (apple/cloudflare/akamai, P-384 harness limitation, PKIX-wmch) + 3 bettertls::pathbuilding (tc8/tc15 = forbidden ECDSA-with-SHA1 OID 1.2.840.10045.4.1; tc47 = signature linkage mismatch where pyca *also* fails differently). gt_agreement is true for tc8/tc15/tc47 (corpus expects FAILURE), false for the 3 online::* (P-384 harness limitation). |
 | `signature invalid at chain index 0` | 4 | online::stackoverflow.com (P-384, PKIX-wmch, gt=false), webpki::forbidden-dsa-root (DSA, project-policy unsupported, gt=true), webpki::forbidden-p192-root (P-192, project-policy unsupported, gt=true), and bettertls::pathbuilding::tc41 (gt=true). All four are intentional pkix-path limitations or pkix-path-correct rejections; no bug. |
-| `signature invalid at chain index 3` | 2 | bettertls::pathbuilding::tc60 (gt=false, **genuine pkix-path-builder bug** — depth-6 chain, builder selects a wrong intermediate) and tc74 (gt=true, corpus expects FAILURE). tc60 is the only genuine builder-bug residual; tracked under PKIX-lwr9. |
+| `signature invalid at chain index 3` | 2 | bettertls::pathbuilding::tc60 (gt=false, **harness/API-gap residual** — `build_path` returns the first DFS candidate, which contains a SHA-1 ECDSA intermediate the harness's `DefaultVerifier` does not dispatch; a SHA-256-only candidate exists, see diagnosis on PKIX-lwr9.4) and tc74 (gt=true, corpus expects FAILURE). tc60 is the only single-case residual in this bucket; tracked under PKIX-lwr9.4. |
 | `signature invalid at chain index 4` | 1 | bettertls::pathbuilding::tc80 (gt=true). Corpus expects FAILURE; pkix-path correctly rejects. |
 | `unhandled critical extension at chain index 0` | 1 | rfc5280::ee-critical-aia-invalid (gt=true). **pkix-path correct** — RFC 5280 §4.2.1.1 says AKI MUST NOT be critical. pkix-path enforces; openssl fails too (different wording); pyca passes. |
 | `name constraints violated at certificate index 0` | 1 | rfc5280::nc::nc-permits-invalid-dns-san (gt=true). pkix-path strict NC; openssl lenient; pyca strict too. No bead. |
@@ -191,7 +191,7 @@ Only **5** of the 26 StricterThanWild cases have `gt_agreement=false`
 | `online::apple.com`            | PKIX-wmch (P-384 harness limitation) |
 | `online::cloudflare.com`       | PKIX-wmch (P-384 harness limitation) |
 | `online::stackoverflow.com`    | PKIX-wmch (P-384 harness limitation) |
-| `bettertls::pathbuilding::tc60`| PKIX-lwr9 (genuine path-builder bug, single residual) |
+| `bettertls::pathbuilding::tc60`| PKIX-lwr9.4 (harness/API-gap, single residual; design call pending) |
 
 The other 21 StricterThanWild residuals all have `gt_agreement=true`:
 pkix-path correctly rejects what the corpus expects to fail. Strict
@@ -199,7 +199,7 @@ behaviour is intentional in those cases (malformed-cert rejection,
 RFC 5280 §4.2.1.1 critical-AKI enforcement, DSA / P-192 project-policy
 exclusion).
 
-### `bettertls::pathbuilding` family (7 residuals, 1 genuine bug)
+### `bettertls::pathbuilding` family (7 residuals, 0 algorithmic builder bugs)
 
 PKIX-lwr9.6 (this work) eliminated the 40+ false-positive
 StricterThanWild entries previously attributed to pkix-path-builder.
@@ -207,9 +207,20 @@ Empirical finding from PKIX-lwr9.1 confirmed: the harness was
 bypassing the builder entirely. After routing through `build_path`,
 **6 of 7** residual `bettertls::pathbuilding::*` failures have
 `gt_agreement=true` — pkix-path correctly rejects chains the corpus
-expects to fail. The seventh, **tc60**, is the sole remaining genuine
-builder bug: a depth-6 chain where the builder selects an
-incompatible intermediate at index 3.
+expects to fail. The seventh, **tc60**, is the sole `gt_agreement=false`
+case in this family. Per the PKIX-lwr9.4 diagnosis it is not a
+pkix-path-builder algorithmic bug: `build_path` correctly enumerates
+4 candidate chains via `build_path_candidates`, but the first DFS
+candidate contains an intermediate signed with ecdsa-with-SHA1
+(OID `1.2.840.10045.4.1`, not dispatched by `DefaultVerifier` —
+project policy excludes SHA-1 ECDSA). A SHA-256-only candidate exists
+in the pool and is what openssl and pyca pick. The gap is
+consumer-side: `build_path` is a single-shot wrapper, and the limbo
+harness does not iterate `build_path_candidates` when `validate_path`
+fails on the first candidate. Resolution pending design call between
+(a) harness-side iteration in pkix-difftest, or (b) a new
+`build_first_valid_path` helper in pkix-path-builder. Tracked under
+PKIX-lwr9.4.
 
 Six of seven residual pathbuilding cases break down as:
 
@@ -220,8 +231,10 @@ Six of seven residual pathbuilding cases break down as:
   permissively. gt_agreement=true (pkix-path right by verdict).
 * **tc41 / tc47 / tc74 / tc80** — corpus expects FAILURE; pkix-path
   correctly rejects with a signature-linkage diagnostic. gt_agreement=true.
-* **tc60** — corpus expects SUCCESS; pkix-path-builder picks a wrong
-  intermediate. gt_agreement=false. Tracked under PKIX-lwr9.
+* **tc60** — corpus expects SUCCESS; harness/API-gap (consumer
+  doesn't iterate `build_path_candidates` past the first SHA-1
+  ECDSA-bearing candidate), not an algorithmic builder bug. See the
+  diagnosis above. gt_agreement=false. Tracked under PKIX-lwr9.4.
 
 ### Harness-shape limitations (not pkix-path bugs)
 
@@ -278,7 +291,7 @@ RFC-literal divergence), real ground-truth-disagreement drops to
   key strength, NC type strictness. Each is a project-policy decision
   to keep pkix-path's defaults permissive. Documented per-bucket above.
 * the 5 residual StricterThanWild gt-disagreements (4 P-384 harness
-  + 1 genuine pkix-path-builder bug, tc60 — filed as PKIX-lwr9).
+  + 1 harness/API-gap, tc60 — filed as PKIX-lwr9.4).
 
 The harness is functioning correctly: the dominant ground-truth-
 disagreement signal points at a documented design choice (CN-as-DNS),
@@ -288,9 +301,13 @@ and the smaller signal isolates the genuine follow-up work.
 
 * **PKIX-lwr9** — pkix-path-builder robustness on bettertls::pathbuilding.
   After PKIX-lwr9.6 wired the harness through `build_path`, the
-  residual is **one** case (`tc60`, depth-6 chain, wrong intermediate
-  at index 3). Significantly de-scoped from the original 47-case
-  framing.
+  residual is **one** case (`tc60`), reframed by PKIX-lwr9.4 as a
+  consumer-side harness/API-gap (`build_path` is single-shot;
+  harness does not iterate `build_path_candidates` past a first
+  candidate whose intermediate carries an algorithm `DefaultVerifier`
+  rejects). Significantly de-scoped from the original 47-case framing.
+  Umbrella closed; substantive follow-up tracked under PKIX-lwr9.4
+  (design call pending: harness fix vs new pkix-path-builder helper).
 * **PKIX-wmch** — pkix-difftest secondary baseline with all pkix-path
   signature features enabled (p384, etc.) to validate real-world
   ECDSA chains. Confirmed: 4 online::* chains flip to Agreement with
@@ -302,9 +319,13 @@ and the smaller signal isolates the genuine follow-up work.
 The x509-limbo Tier-2 baseline produces clear signal:
 
 1. **One residual real divergence**: `bettertls::pathbuilding::tc60`,
-   a single depth-6 chain where pkix-path-builder picks a wrong
-   intermediate. Down from 47 cases before PKIX-lwr9.6 wired the
-   harness through `build_path`. Tracked under PKIX-lwr9.
+   a single depth-6 chain. Down from 47 cases before PKIX-lwr9.6
+   wired the harness through `build_path`. PKIX-lwr9.4 diagnosed the
+   residual as a consumer-side harness/API-gap (`build_path` is
+   single-shot; harness does not iterate `build_path_candidates` past
+   a first candidate whose intermediate carries an algorithm
+   `DefaultVerifier` rejects), not an algorithmic builder bug.
+   Resolution design call pending under PKIX-lwr9.4.
 2. **One documented intentional divergence**: openssl applies a
    CN-as-dNSName rule on nameConstraints checks that RFC 5280
    §4.2.1.10 explicitly forbids; pkix-path and pyca agree on the
