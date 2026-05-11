@@ -19,15 +19,17 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 
 ## Crate map
 
+Per-crate versions live on crates.io and in each crate's `Cargo.toml`.
+
 | Crate | What it does | `no_std` | Status |
 |-------|-------------|----------|--------|
-| [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | v0.2 |
-| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only[^revocation-no-std] | v0.2 |
-| [`pkix-chain`] | Umbrella: combines path + revocation | — | v0.2 |
-| [`pkix-chain-simple`] | Opinionated validator with extension whitelist | — | v0.2 |
-| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | v0.2 |
-| [`pkix-profiles`] | CA/B Forum and RFC profile policy pre-configurations | — | v0.2 |
-| [`pkix-lint`] | Advisory lint engine for CA/B Forum and RFC rules | — | v0.2 |
+| [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | released |
+| [`pkix-revocation`] | CRL and OCSP revocation checking (offline) | core only[^revocation-no-std] | released |
+| [`pkix-chain`] | Umbrella: combines path + revocation | — | released |
+| [`pkix-chain-simple`] | Opinionated validator with extension whitelist | — | released |
+| [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | released |
+| [`pkix-profiles`] | CA/B Forum and RFC profile policy pre-configurations | — | released |
+| [`pkix-lint`] | Advisory lint engine for CA/B Forum and RFC rules | — | released |
 | [`pkix-revocation-http`] | Online CRL/OCSP fetching from CDP/AIA | — | planned |
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
 | [`pkix-composite`] | Composite classical+PQC signature verifier | ✓ | planned |
@@ -44,7 +46,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-pkix-chain = "0.2"
+pkix-chain = "0.4"
 ```
 
 Verify a certificate chain:
@@ -72,7 +74,7 @@ println!("chain depth: {}", validated.depth);
 ```
 
 With CRL revocation checking (requires the `crl` Cargo feature, e.g.
-`pkix-chain = { version = "0.2", features = ["crl"] }`):
+`pkix-chain = { version = "0.4", features = ["crl"] }`):
 
 ```rust
 use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};
