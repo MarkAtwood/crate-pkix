@@ -14,6 +14,11 @@ categories  = ["cryptography"]
 # Enable serde Serialize/Deserialize on Finding, DeviatedFinding, and EvaluationReport.
 # Off by default so the core engine stays dep-light for embedded / constrained targets.
 serde = ["dep:serde"]
+# Enable the `oscal` module: emit OSCAL Assessment Results JSON from an
+# `EvaluationReport`. Pulls in `serde_json` as a real dependency. Architecture 2
+# (PKIX-ztmr): the emitter projects pkix-lint's internal types into OSCAL JSON
+# at serialization time; internal Rust types remain lean and lint-tailored.
+oscal = ["dep:serde_json"]
 
 [dependencies]
 pkix-path     = { workspace = true }
@@ -21,11 +26,14 @@ pkix-profiles = { workspace = true }
 x509-cert     = { workspace = true }
 der           = { workspace = true }
 serde         = { workspace = true, optional = true }
-# SHA-256 for Finding.cert_sha256 (PKIX-a86q). Already transitively pulled in
-# by x509-cert; declaring it explicitly here so the dependency is visible and
-# does not silently break if x509-cert's tree changes. `default-features = false`
-# matches the workspace pin and keeps pkix-lint compatible with hypothetical
-# downstream no_std forks even though pkix-lint itself uses std.
+serde_json    = { workspace = true, optional = true }
+# SHA-256 for Finding.cert_sha256 (PKIX-a86q) and for deterministic OSCAL
+# UUIDs (RFC 9562 §5.8 v8) under the `oscal` feature. Already transitively
+# pulled in by x509-cert; declaring it explicitly here so the dependency is
+# visible and does not silently break if x509-cert's tree changes.
+# `default-features = false` matches the workspace pin and keeps pkix-lint
+# compatible with hypothetical downstream no_std forks even though pkix-lint
+# itself uses std.
 sha2          = { workspace = true }
 
 [dev-dependencies]

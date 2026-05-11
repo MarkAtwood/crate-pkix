@@ -23,7 +23,10 @@
 //! - `findings` → `assessment-results.results.findings` (non-deviated)
 //! - `deviated_findings` → `assessment-results.results.risks[status=deviation-approved]`
 //!
-//! A full OSCAL export adapter is planned for the `pkix-lint-oscal` crate (tracked as PKIX-nlxl).
+//! The OSCAL Assessment Results emitter ships in-crate under the `oscal`
+//! cargo feature ([`crate::oscal::emit::assessment_results`]). See that
+//! module's docs for the full field-mapping table and round-trip
+//! guarantees.
 
 use std::borrow::Cow;
 
@@ -348,8 +351,7 @@ mod tests {
         };
         let json = serde_json::to_string(&f).expect("serialize");
         // Use from_slice to confirm no 'de: 'static bound remains.
-        let f2: Finding =
-            serde_json::from_slice(json.as_bytes()).expect("from_slice must succeed");
+        let f2: Finding = serde_json::from_slice(json.as_bytes()).expect("from_slice must succeed");
         match &f2.result {
             LintResult::Error(d) => assert_eq!(d.as_ref(), detail_text.as_str()),
             other => panic!("expected Error variant, got {other:?}"),

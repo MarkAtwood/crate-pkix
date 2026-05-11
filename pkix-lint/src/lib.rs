@@ -161,7 +161,9 @@ mod serde_helpers {
                         // conventions used by OSCAL Link / Prop hrefs and
                         // every Unix sha256sum tool.
                         hex.push(char::from_digit(u32::from(b >> 4), 16).expect("hex high nibble"));
-                        hex.push(char::from_digit(u32::from(b & 0x0f), 16).expect("hex low nibble"));
+                        hex.push(
+                            char::from_digit(u32::from(b & 0x0f), 16).expect("hex low nibble"),
+                        );
                     }
                     s.serialize_some(&hex)
                 }
@@ -216,6 +218,9 @@ where
 
 pub mod cabf_tls_br;
 pub mod deviation;
+#[cfg(feature = "oscal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
+pub mod oscal;
 pub mod report;
 
 // ---------------------------------------------------------------------------
