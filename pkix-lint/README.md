@@ -15,9 +15,12 @@ but violates CA/B Forum TLS BR §7.1.4.2" without aborting validation entirely.
   normative citation, a severity (`Warn`, `Error`, `Fatal`), a scope
   (`Certificate` or `Path`), and a subject-kind filter (`Leaf`,
   `IntermediateCa`, `AnchorIssued`, or `Any`).
-- **`LintResult`** — `Pass | NotApplicable | Warn | Error | Fatal`. `Warn`
-  and `Error` carry a static detail message. `Fatal` stops further lint
-  evaluation for that item; it does not propagate as a hard failure.
+- **`LintResult`** — `Pass | NotApplicable | Warn | Error | Fatal`. `Warn`,
+  `Error`, and `Fatal` carry a `Cow<'static, str>` detail message —
+  zero-allocation for static literals (via `Cow::Borrowed`) and
+  runtime-formatted strings for dynamic values (via `Cow::Owned`). `Fatal`
+  stops further lint evaluation for that item; it does not propagate as a
+  hard failure.
 - **`Finding`** — a lint ID paired with a result and the chain index of the
   offending certificate.
 - **`LintRunner`** — evaluates a set of `dyn Lint` objects against a
@@ -91,7 +94,7 @@ impl Lint for NoEmptySubjectLint {
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         if cert.tbs_certificate.subject.to_string().is_empty() {
-            LintResult::Error("Subject DN must not be empty")
+            LintResult::error("Subject DN must not be empty")
         } else {
             LintResult::Pass
         }

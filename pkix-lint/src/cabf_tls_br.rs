@@ -122,7 +122,7 @@ impl Lint for ValidityMaxLint {
         // return Error here rather than silently passing (duration = 0 via
         // saturating_sub would always pass the cap check, masking the defect).
         if not_after < not_before {
-            return LintResult::Error(
+            return LintResult::error(
                 "leaf certificate notAfter precedes notBefore (inverted validity period)",
             );
         }
@@ -131,7 +131,16 @@ impl Lint for ValidityMaxLint {
         let cap = pkix_profiles::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
-            LintResult::Error("leaf certificate validity period exceeds SC-081 cap")
+            // Dynamic detail (Cow::Owned): report the actual non-conforming
+            // duration vs the cap in effect for this issuance date. The cap
+            // varies with issuance time (SC-081 has multiple effective dates),
+            // so a static "exceeds cap" message would lose audit context.
+            // Demonstrates Cow::Owned usage post-PKIX-ua6q migration.
+            let duration_days = duration_secs / 86_400;
+            let cap_days = cap / 86_400;
+            LintResult::error(format!(
+                "leaf certificate validity period {duration_days} days exceeds SC-081 cap of {cap_days} days at issuance"
+            ))
         } else {
             LintResult::Pass
         }
@@ -176,7 +185,7 @@ impl Lint for Sha1ProhibitedLint {
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let sig_alg = cert.signature_algorithm.oid;
         if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1) {
-            LintResult::Error(
+            LintResult::error(
                 "certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3",
             )
         } else {
@@ -254,12 +263,12 @@ impl Lint for RsaMinKeySizeLint {
         let key_bytes = spki.subject_public_key.raw_bytes();
 
         rsa_modulus_bit_len(key_bytes).map_or(
-            LintResult::Error("RSA public key structure is unparseable"),
+            LintResult::error("RSA public key structure is unparseable"),
             |n_bits| {
                 if n_bits >= 2048 {
                     LintResult::Pass
                 } else {
-                    LintResult::Error("RSA key modulus is less than 2048 bits")
+                    LintResult::error("RSA key modulus is less than 2048 bits")
                 }
             },
         )
@@ -383,23 +392,23 @@ impl Lint for SanRequiredLint {
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let Some(extensions) = &cert.tbs_certificate.extensions else {
-            return LintResult::Error("leaf certificate has no extensions; SubjectAltName absent");
+            return LintResult::error("leaf certificate has no extensions; SubjectAltName absent");
         };
 
         let Some(san_ext) = extensions
             .iter()
             .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
         else {
-            return LintResult::Error("SubjectAltName extension absent from leaf certificate");
+            return LintResult::error("SubjectAltName extension absent from leaf certificate");
         };
 
         // Decode SubjectAltName ::= GeneralNames ::= SEQUENCE OF GeneralName
         match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
             Ok(san) if san.0.is_empty() => {
-                LintResult::Error("SubjectAltName extension is present but contains no names")
+                LintResult::error("SubjectAltName extension is present but contains no names")
             }
             Ok(_) => LintResult::Pass,
-            Err(_) => LintResult::Error("SubjectAltName extension value is malformed DER"),
+            Err(_) => LintResult::error("SubjectAltName extension value is malformed DER"),
         }
     }
 }
@@ -441,7 +450,7 @@ impl Lint for EkuServerAuthLint {
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let Some(extensions) = &cert.tbs_certificate.extensions else {
-            return LintResult::Error(
+            return LintResult::error(
                 "leaf certificate has no extensions; ExtendedKeyUsage absent",
             );
         };
@@ -450,7 +459,7 @@ impl Lint for EkuServerAuthLint {
             .iter()
             .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
         else {
-            return LintResult::Error("ExtendedKeyUsage extension absent from leaf certificate");
+            return LintResult::error("ExtendedKeyUsage extension absent from leaf certificate");
         };
 
         match x509_cert::ext::pkix::ExtendedKeyUsage::from_der(eku_ext.extn_value.as_bytes()) {
@@ -458,12 +467,12 @@ impl Lint for EkuServerAuthLint {
                 if eku.0.contains(&ID_KP_SERVER_AUTH) {
                     LintResult::Pass
                 } else {
-                    LintResult::Error(
+                    LintResult::error(
                         "ExtendedKeyUsage does not include id-kp-serverAuth (1.3.6.1.5.5.7.3.1)",
                     )
                 }
             }
-            Err(_) => LintResult::Error("ExtendedKeyUsage extension value is malformed DER"),
+            Err(_) => LintResult::error("ExtendedKeyUsage extension value is malformed DER"),
         }
     }
 }
@@ -505,7 +514,7 @@ impl Lint for BcCaFlagLint {
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         let Some(extensions) = &cert.tbs_certificate.extensions else {
-            return LintResult::Error(
+            return LintResult::error(
                 "intermediate CA certificate has no extensions; BasicConstraints absent",
             );
         };
@@ -514,18 +523,18 @@ impl Lint for BcCaFlagLint {
             .iter()
             .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
         else {
-            return LintResult::Error(
+            return LintResult::error(
                 "BasicConstraints extension absent from intermediate CA certificate",
             );
         };
 
         x509_cert::ext::pkix::BasicConstraints::from_der(bc_ext.extn_value.as_bytes()).map_or(
-            LintResult::Error("BasicConstraints extension value is malformed DER"),
+            LintResult::error("BasicConstraints extension value is malformed DER"),
             |bc| {
                 if bc.ca {
                     LintResult::Pass
                 } else {
-                    LintResult::Error("BasicConstraints present but cA flag is not TRUE")
+                    LintResult::error("BasicConstraints present but cA flag is not TRUE")
                 }
             },
         )

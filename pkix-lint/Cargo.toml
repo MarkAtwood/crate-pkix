@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version           = "0.2.0"  # first publish
+version           = "0.3.0"  # 0.3 — Cow<'static, str> migration (PKIX-ua6q)
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

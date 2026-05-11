@@ -52,6 +52,74 @@ crates.io); a fresh project that wants `pkix-path 0.3.0` features
 should consume `pkix-path` directly rather than transitively via these
 secondary crates until they ship updates.
 
+### `pkix-lint 0.3.0`
+
+BREAKING. `LintResult::Warn`, `LintResult::Error`, and `LintResult::Fatal`
+now carry `Cow<'static, str>` instead of `&'static str`. Static string
+literals stay zero-allocation (via `Cow::Borrowed`); runtime-formatted
+strings (e.g. `format!(...)`) work without leaking memory (via
+`Cow::Owned`). Tracked as PKIX-ua6q.
+
+#### Changed (breaking)
+
+- `LintResult::Warn(&'static str)` → `LintResult::Warn(Cow<'static, str>)`.
+  Same for `Error` and `Fatal`.
+- `LintResult::detail` returns `Option<&str>` (borrowed from `self`) rather
+  than `Option<&'static str>`. The borrow's lifetime is tied to `self`.
+- `Finding`, `DeviatedFinding`, and `EvaluationReport` lose their
+  `'de: 'static` serde deserialization bound. Deserialization no longer
+  leaks heap allocations from `LintResult` detail strings, fixing the
+  long-running-service memory growth documented in the prior crate's
+  `de_static_str` rustdoc. `serde_json::from_slice` (which could not be
+  used before because of `'de: 'static`) now works.
+- The internal `de_static_str` serde helper is removed (no longer needed).
+
+#### Added
+
+- `LintResult::warn`, `LintResult::error`, and `LintResult::fatal`
+  constructor helpers taking `impl Into<Cow<'static, str>>`. Use these for
+  ergonomic construction from both static literals and runtime strings:
+
+  ```rust
+  use pkix_lint::LintResult;
+  let r1 = LintResult::warn("static text");           // Cow::Borrowed
+  let bits = 1024u32;
+  let r2 = LintResult::error(format!("RSA modulus {bits} bits < 2048"));
+  ```
+
+- One new lint detail in `cabf_tls_br::Sc081ValidityMaxLint` demonstrates
+  `Cow::Owned` usage: the cap-violation error now reports the actual cert
+  duration in days and the cap in effect at issuance, instead of a static
+  "exceeds cap" message. Audit trails see the offending value.
+
+#### Migration
+
+Pattern-matches stay unchanged — `LintResult::Warn(_)` still works.
+
+Construction sites change:
+
+```rust
+// Before (0.2.x):
+LintResult::Error("static text")
+
+// After (0.3.0):
+LintResult::error("static text")
+// or equivalently:
+LintResult::Error(std::borrow::Cow::Borrowed("static text"))
+```
+
+The constructor-helper form (`LintResult::error("...")`) is recommended.
+It is zero-cost for static strings and also accepts `String` /
+`format!(...)` output:
+
+```rust
+LintResult::error(format!("duration {days} > {cap_days}"))
+```
+
+Code that used `Box::leak` on JSON input to satisfy the prior
+`'de: 'static` bound can drop the leak — `serde_json::from_str` and
+`from_slice` both work directly on any owned String / slice now.
+
 ### `pkix-revocation 0.3.2`
 
 #### Added
