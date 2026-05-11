@@ -62,8 +62,12 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use der::Decode as _;
 use pem_rfc7468 as pem;
+use pkix_path::TrustAnchor;
+use pkix_path_builder::{build_path, CertPool};
 use serde::Deserialize;
+use x509_cert::Certificate;
 
 use crate::corpus::{Corpus, CorpusItem};
 use crate::{Chain, Verdict};
@@ -415,11 +419,79 @@ fn pem_to_der(pem_text: &str) -> io::Result<Vec<u8>> {
     Ok(der)
 }
 
+/// Try to assemble the canonical leaf-first signature chain from a limbo
+/// testcase's leaf-first DER bundle (peer at `[0]`, anchor at `[last]`,
+/// intermediates in between) via [`pkix_path_builder::build_path`].
+///
+/// Returns `None` on any failure — parse error, build error, or an internal
+/// invariant violation. Callers fall back to the testcase's positional
+/// ordering, which keeps the chain bytes visible to every oracle for
+/// downstream classification.
+///
+/// Empirical finding from PKIX-lwr9.1 (2026-05-11): of the 25
+/// `bettertls::pathbuilding` fixtures sampled into
+/// `pkix-path-builder/tests/bettertls.rs`, 23 of 25 pass end-to-end when
+/// routed through `build_path` — the bypass was the root cause of the
+/// 47-case `StricterThanWild` bucket in `baseline-limbo.json`. This mirrors
+/// PKITS's `pkits.rs::try_build_chain`, but adapted for leaf-first input.
+fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
+    if der_blocks.len() < 2 {
+        return None;
+    }
+
+    let mut parsed: Vec<Certificate> = Vec::with_capacity(der_blocks.len());
+    for bytes in der_blocks {
+        parsed.push(Certificate::from_der(bytes).ok()?);
+    }
+
+    let ee_idx = 0;
+    let anchor_idx = parsed.len() - 1;
+    let ee = &parsed[ee_idx];
+    let anchor = &parsed[anchor_idx];
+
+    // Pool of candidates for path building: everything except the anchor.
+    // Including the EE in the pool is harmless — `build_path` uses pool
+    // only as a candidate source for intermediates and never tries to
+    // re-add the target. Mirrors `pkits.rs::try_build_chain`.
+    let pool: CertPool = parsed
+        .iter()
+        .enumerate()
+        .filter(|&(i, _)| i != anchor_idx)
+        .map(|(_, c)| c.clone())
+        .collect();
+
+    let trust_anchors = [TrustAnchor::from_cert(anchor.clone())];
+    let built = build_path(ee, &pool, &trust_anchors).ok()?;
+
+    // Map each built-chain cert back to its source DER bytes. `Certificate`
+    // derives `PartialEq` over its full ASN.1 content, so equality is the
+    // right oracle.
+    let mut chain_der: Vec<Vec<u8>> = Vec::with_capacity(built.len() + 1);
+    for built_cert in &built {
+        let idx = parsed.iter().position(|p| p == built_cert)?;
+        chain_der.push(der_blocks[idx].clone());
+    }
+    // Append the anchor (build_path returns the chain up to anchor-issued
+    // but not the anchor itself; the oracles' `root_in_chain == true`
+    // contract requires the anchor at the end).
+    chain_der.push(der_blocks[anchor_idx].clone());
+    Some(chain_der)
+}
+
 /// Build the [`CorpusItem`] for a filtered testcase.
 ///
 /// Chain ordering is leaf-first per the harness contract (`Chain::certs_der`
 /// is documented as canonical leaf-first):
 ///   `[peer_certificate, ..untrusted_intermediates, trusted_certs[0]]`.
+///
+/// The leaf-first positional bundle is routed through
+/// [`pkix_path_builder::build_path`] before classification (PKIX-lwr9.6).
+/// The bundle is a path-builder input, not a pre-ordered signature chain:
+/// `bettertls::pathbuilding` testcases in particular ship multiple
+/// candidate intermediates and rely on the consumer to pick the right
+/// one. Falling back to positional ordering on build failure preserves
+/// baseline coverage for negative testcases whose bundles deliberately
+/// violate a topological invariant. Mirrors PKITS's `pkits.rs::build_item`.
 ///
 /// The trust anchor at the tail is required for `root_in_chain = true`. If
 /// a testcase ships multiple `trusted_certs`, only the first is used — see
@@ -432,13 +504,18 @@ fn build_item(tc: &FilteredTestcase) -> io::Result<CorpusItem> {
         )
     })?;
 
-    let mut certs_der: Vec<Vec<u8>> = Vec::with_capacity(2 + tc.intermediates_pem.len());
+    let mut positional_der: Vec<Vec<u8>> = Vec::with_capacity(2 + tc.intermediates_pem.len());
 
-    certs_der.push(pem_to_der(&tc.peer_certificate_pem)?);
+    positional_der.push(pem_to_der(&tc.peer_certificate_pem)?);
     for inter in &tc.intermediates_pem {
-        certs_der.push(pem_to_der(inter)?);
+        positional_der.push(pem_to_der(inter)?);
     }
-    certs_der.push(pem_to_der(trusted_pem)?);
+    positional_der.push(pem_to_der(trusted_pem)?);
+
+    // Try the path-builder reorder; fall back to the testcase's positional
+    // leaf-first ordering on any builder failure. See `try_build_chain`
+    // rustdoc and the function-level docstring above for rationale.
+    let certs_der = try_build_chain(&positional_der).unwrap_or(positional_der);
 
     let chain = Chain {
         certs_der,

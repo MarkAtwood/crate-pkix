@@ -1,19 +1,19 @@
-# x509-limbo Tier-2 baseline — pkix-path with rustcrypto features (PKIX-wmch)
+# pkix-difftest report
 
 ## Summary
 
 | Class | Count |
 |---|---:|
-| LooserThanWild | 819 |
-| StricterThanWild | 70 |
+| LooserThanWild | 827 |
+| StricterThanWild | 22 |
 | OracleDivergence | 0 |
-| DiagnosticDivergence | 5901 |
-| Agreement | 2936 |
+| DiagnosticDivergence | 5898 |
+| Agreement | 2979 |
 | **Total** | 9726 |
 
 ## Ground-truth disagreements
 
-2944 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
+2901 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
 
 ### `bettertls::nameconstraints::tc1471`
 
@@ -105,9 +105,9 @@
   * openssl: Fail(permitted subtree violation)
   * pyca: Pass
 
-_(2934 additional ground-truth disagreement(s) omitted; see JSON report.)_
+_(2891 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
-## LooserThanWild (819)
+## LooserThanWild (827)
 
 ### `bettertls::nameconstraints::tc1471`
 
@@ -199,9 +199,9 @@ _(2934 additional ground-truth disagreement(s) omitted; see JSON report.)_
   * openssl: Fail(permitted subtree violation)
   * pyca: Pass
 
-_(809 additional sample(s) in this class omitted; see JSON report.)_
+_(817 additional sample(s) in this class omitted; see JSON report.)_
 
-## StricterThanWild (70)
+## StricterThanWild (22)
 
 ### `bettertls::nameconstraints::tc8877`
 
@@ -293,9 +293,9 @@ _(809 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Pass
 
-_(60 additional sample(s) in this class omitted; see JSON report.)_
+_(12 additional sample(s) in this class omitted; see JSON report.)_
 
-## DiagnosticDivergence (5901)
+## DiagnosticDivergence (5898)
 
 ### `bettertls::nameconstraints::tc1000`
 
@@ -387,9 +387,9 @@ _(60 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Fail(excluded subtree violation)
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN)
 
-_(5891 additional sample(s) in this class omitted; see JSON report.)_
+_(5888 additional sample(s) in this class omitted; see JSON report.)_
 
-## Agreement (2936)
+## Agreement (2979)
 
 ### `bettertls::nameconstraints::tc0`
 
@@ -481,5 +481,5 @@ _(5891 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Pass
 
-_(2926 additional sample(s) in this class omitted; see JSON report.)_
+_(2969 additional sample(s) in this class omitted; see JSON report.)_
 
