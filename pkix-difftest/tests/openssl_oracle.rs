@@ -88,3 +88,73 @@ fn openssl_oracle_returns_err_when_binary_missing() {
         err.kind()
     );
 }
+
+/// Helper: load a PKITS testcase by name and return the corresponding Chain
+/// (with CRLs already attached via the PKITS loader).
+///
+/// Independent oracle:
+/// * The Chain construction uses the PkitsCorpus loader, whose CRL plumbing
+///   is independently asserted in `tests/corpus_pkits.rs`. This test asserts
+///   only how the openssl oracle reacts to a Chain that carries CRLs.
+fn pkits_chain(name: &str) -> Chain {
+    use pkix_difftest::corpus::pkits::PkitsCorpus;
+    use pkix_difftest::corpus::Corpus;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root")
+        .join("pkix-path/tests/pkits");
+    let corpus = PkitsCorpus::load(&root).expect("load PKITS manifest");
+    for item in corpus.iter() {
+        let item = item.expect("PKITS entry resolves");
+        if item.name == name {
+            return item.chain;
+        }
+    }
+    panic!("PKITS testcase not found: {name}");
+}
+
+#[test]
+fn openssl_oracle_reports_revoked_for_pkits_4_4_3() {
+    // Oracle: PKITS 4.4.3 "Invalid Revoked EE Test3" — the EE serial is on
+    // the GoodCACRL. ShouldValidate is false. The chain ships with both
+    // the trust anchor CRL and the issuer CRL. We pass them to OpenSSL via
+    // `-CRLfile` + `-crl_check_all`.
+    //
+    // OpenSSL 3.0 reports a revoked cert with `error 23 at <depth> lookup:
+    // certificate revoked`. Our extract_reason() returns the substring
+    // after the last `: `, so the reason string should contain "revoked".
+    let chain = pkits_chain("4.4.3 Invalid Revoked EE Test3");
+    assert!(
+        !chain.crls.is_empty(),
+        "PKITS 4.4.3 must ship with CRLs (precondition for this test)"
+    );
+    let verdict = expect_openssl_available(oracles::openssl::verify(&chain));
+    match verdict {
+        Verdict::Pass => panic!("PKITS 4.4.3 must fail under openssl verify (EE is revoked)"),
+        Verdict::Fail { reason } => {
+            assert!(
+                reason.to_lowercase().contains("revoked"),
+                "expected revocation-related reason, got: {reason:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn openssl_oracle_pkits_4_1_1_passes_with_crls_attached() {
+    // Oracle: PKITS 4.1.1 "Valid Signatures Test1" — should pass with or
+    // without CRL flags. This is the regression check that `-CRLfile` +
+    // `-crl_check_all` does not flip an otherwise valid chain to Fail.
+    // The chain ships with two CRLs covering anchor + intermediate.
+    let chain = pkits_chain("4.1.1 Valid Signatures Test1");
+    assert!(
+        !chain.crls.is_empty(),
+        "PKITS 4.1.1 must ship with CRLs (precondition for this test)"
+    );
+    let verdict = expect_openssl_available(oracles::openssl::verify(&chain));
+    assert_eq!(
+        verdict,
+        Verdict::Pass,
+        "PKITS 4.1.1 must validate under openssl verify with CRLs; got {verdict}"
+    );
+}
