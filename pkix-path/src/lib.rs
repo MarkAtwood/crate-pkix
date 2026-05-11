@@ -2381,6 +2381,80 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
 /// would require passing this state through many function boundaries without clarity
 /// gain. The monolithic structure mirrors the RFC's sequential algorithm description
 /// and keeps all state-mutation sites visible in one place for audit.
+///
+/// The per-walk mutable state is grouped into [`WorkingState`] to make the
+/// state-machine inputs/outputs explicit at the call boundary. Future
+/// per-substep helper extractions take a `&mut WorkingState` so that adding
+/// helpers does not grow each helper's parameter list.
+///
+/// `working_spki` and `working_issuer_name` carry the borrow of either `anchor`
+/// or some `chain[i]` and so the struct takes a single lifetime `'a` covering
+/// both inputs. The lifetime is elided at the call site because `chain_walk`
+/// constructs and consumes `WorkingState` within its own body.
+///
+/// RFC 5280 §6.1.2 maps to the struct fields as follows:
+///
+/// - `working_spki`, `working_issuer_name`, `working_issuer_is_san_identity`
+///   — §6.1.2(d)/(f) `working_public_key` + §6.1.2(e) `working_issuer_name`,
+///   plus the §4.2.1.6 SAN-identity escape hatch tracked separately so the
+///   §6.1.3(a)(2) DN-linkage check can be skipped when the issuer's identity
+///   came from a critical SAN over an empty Subject DN.
+/// - `nc_permitted`, `nc_excluded`, `nc_constrained_types`
+///   — §6.1.2(b)/(c) `permitted_subtrees`/`excluded_subtrees`. The
+///   `nc_constrained_types` bitmask is a workspace addition: it tracks which
+///   name types have *ever* been constrained by a CA so an empty post-
+///   intersection set still rejects names of that type (not derivable from
+///   `nc_permitted` contents alone).
+/// - `explicit_policy`, `inhibit_any`, `policy_mapping`
+///   — §6.1.2 `explicit_policy`, `inhibit_anyPolicy`, `policy_mapping` counters.
+/// - `policy_tree`
+///   — §6.1.2(a) `valid_policy_tree`. `None` represents the RFC NULL tree.
+struct WorkingState<'a> {
+    /// §6.1.2(d)/(f) `working_public_key`. Borrows from the trust anchor or a
+    /// chain certificate; rebound to the just-validated cert's SPKI at the end
+    /// of every loop iteration.
+    working_spki: &'a spki::SubjectPublicKeyInfoOwned,
+    /// §6.1.2(e) `working_issuer_name`. Borrows from the trust anchor or a
+    /// chain certificate's subject; rebound at the end of every loop iteration.
+    working_issuer_name: &'a x509_cert::name::Name,
+    /// Whether the certificate that produced `working_issuer_name` identifies
+    /// itself via a critical `SubjectAltName` over an empty Subject DN
+    /// (RFC 5280 §4.2.1.6). When `true`, the §6.1.3(a)(2) DN-linkage check is
+    /// skipped because comparing against an empty Subject would be meaningless;
+    /// the §6.1.3(a)(1) signature check has already established the
+    /// cryptographic binding.
+    working_issuer_is_san_identity: bool,
+    /// §6.1.2(b) `permitted_subtrees`. `None` means "no permitted constraint
+    /// of any type has been imposed yet"; once any CA contributes a
+    /// `permittedSubtrees`, this becomes `Some(...)` and only narrows
+    /// (intersection per §6.1.4(g)).
+    nc_permitted: Option<GeneralSubtrees>,
+    /// §6.1.2(c) `excluded_subtrees`. Accumulates via union per §6.1.4(g).
+    nc_excluded: GeneralSubtrees,
+    /// Workspace-local invariant: bitmask of name types for which at least one
+    /// CA has imposed a `permittedSubtrees` constraint. Bits are only ORed in,
+    /// never cleared. Required for correct rejection when intersection of
+    /// incompatible same-type constraints empties `nc_permitted` for a type
+    /// while that type is still semantically forbidden. See the initialisation
+    /// site in `chain_walk` for the long-form rationale.
+    nc_constrained_types: NcTypeMask,
+    /// §6.1.2 `explicit_policy` counter. Decremented by §6.1.4(h) on each
+    /// non-self-issued intermediate; clamped by §6.1.4(i) PolicyConstraints
+    /// `requireExplicitPolicy`; finalised by §6.1.5(a)+(b).
+    explicit_policy: u32,
+    /// §6.1.2 `inhibit_anyPolicy` counter. Decremented by §6.1.4(h);
+    /// clamped by §6.1.4(j) `InhibitAnyPolicy`.
+    inhibit_any: u32,
+    /// §6.1.2 `policy_mapping` counter. Decremented by §6.1.4(h);
+    /// clamped by §6.1.4(i) PolicyConstraints `inhibitPolicyMapping`.
+    policy_mapping: u32,
+    /// §6.1.2(a) `valid_policy_tree`. `None` represents the RFC's NULL tree
+    /// (every transition that would empty the tree maps to `None`); a
+    /// non-empty `Some(...)` carries the live policy graph. Returned to
+    /// `validate_path` at §6.1.5 for post-validation qualifier extraction.
+    policy_tree: Option<Vec<PolicyNode>>,
+}
+
 fn chain_walk<V: SignatureVerifier>(
     chain: &[Certificate],
     anchor: &TrustAnchor,
@@ -2391,19 +2465,11 @@ fn chain_walk<V: SignatureVerifier>(
     use spki::der::referenced::OwnedToRef as _;
     use x509_cert::ext::pkix::{InhibitAnyPolicy, PolicyConstraints, PolicyMappings};
 
-    let mut working_spki = &anchor.subject_public_key_info;
-    let mut working_issuer_name = &anchor.subject;
-    // RFC 5280 §4.2.1.6: when a CA cert has an empty Subject DN and a critical
-    // SubjectAltName, the SAN is the cert's identity — the Subject DN is not used
-    // for name matching. Track whether the current issuer (working_issuer_name)
-    // was set from such a cert so we can skip the DN linkage check below.
-    let mut working_issuer_is_san_identity = false;
-
     // RFC 5280 §6.1.2 (b)+(c): seed the initial permitted/excluded subtrees
     // from the trust anchor. These initial constraints apply to ALL certs in
     // the chain (including intermediates), not just to leaves — the chain walk
     // enforces them from the first certificate onward.
-    let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {
+    let (initial_nc_permitted, initial_nc_excluded) = match &anchor.name_constraints {
         None => (None, GeneralSubtrees::default()),
         Some(nc) => (
             // Clone necessary: nc_permitted and nc_excluded are mutated during the walk.
@@ -2422,8 +2488,8 @@ fn chain_walk<V: SignatureVerifier>(
     // "is type constrained?" from nc_permitted contents alone — that would
     // silently allow names of a type whose permitted set was emptied by
     // conflicting CA constraints.
-    let mut nc_constrained_types: NcTypeMask =
-        nc_permitted
+    let initial_nc_constrained_types: NcTypeMask =
+        initial_nc_permitted
             .as_ref()
             .map_or(NcTypeMask::EMPTY, |permitted| {
                 let mut bits = NcTypeMask::EMPTY;
@@ -2444,23 +2510,42 @@ fn chain_walk<V: SignatureVerifier>(
     // u32::MAX is safe: counters are only decremented (saturating), so u32::MAX
     // behaves identically to any value > the chain length for these semantics.
     let n_u32 = u32::try_from(n).unwrap_or(u32::MAX);
-    let mut explicit_policy: u32 = if policy.initial_explicit_policy {
+    let initial_explicit_policy: u32 = if policy.initial_explicit_policy {
         0
     } else {
         n_u32.saturating_add(1)
     };
-    let mut inhibit_any: u32 = if policy.initial_any_policy_inhibit {
+    let initial_inhibit_any: u32 = if policy.initial_any_policy_inhibit {
         0
     } else {
         n_u32.saturating_add(1)
     };
-    let mut policy_mapping: u32 = if policy.initial_policy_mapping_inhibit {
+    let initial_policy_mapping: u32 = if policy.initial_policy_mapping_inhibit {
         0
     } else {
         n_u32.saturating_add(1)
     };
-    // §6.1.2(a): initial valid_policy_tree — single anyPolicy root node.
-    let mut policy_tree: Option<Vec<PolicyNode>> = Some(init_policy_tree());
+
+    // Group all per-walk mutable state into a single `WorkingState` for clarity
+    // at the call boundaries of the per-substep helpers introduced in
+    // subsequent commits.
+    let mut state = WorkingState {
+        working_spki: &anchor.subject_public_key_info,
+        working_issuer_name: &anchor.subject,
+        // RFC 5280 §4.2.1.6: when a CA cert has an empty Subject DN and a critical
+        // SubjectAltName, the SAN is the cert's identity — the Subject DN is not used
+        // for name matching. Track whether the current issuer was set from such a cert
+        // so we can skip the DN linkage check below.
+        working_issuer_is_san_identity: false,
+        nc_permitted: initial_nc_permitted,
+        nc_excluded: initial_nc_excluded,
+        nc_constrained_types: initial_nc_constrained_types,
+        explicit_policy: initial_explicit_policy,
+        inhibit_any: initial_inhibit_any,
+        policy_mapping: initial_policy_mapping,
+        // §6.1.2(a): initial valid_policy_tree — single anyPolicy root node.
+        policy_tree: Some(init_policy_tree()),
+    };
 
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
@@ -2497,7 +2582,7 @@ fn chain_walk<V: SignatureVerifier>(
         verifier
             .verify_signature(
                 cert.signature_algorithm.owned_to_ref(),
-                working_spki.owned_to_ref(),
+                state.working_spki.owned_to_ref(),
                 tbs_bytes,
                 cert.signature.raw_bytes(),
             )
@@ -2511,8 +2596,8 @@ fn chain_walk<V: SignatureVerifier>(
         // we cannot compare `cert.issuer` against an empty Subject and expect a
         // meaningful match. The signature verification in step (a) already
         // confirmed the issuer's key, so the cryptographic binding is intact.
-        if !working_issuer_is_san_identity
-            && !names_match(working_issuer_name, &cert.tbs_certificate.issuer)
+        if !state.working_issuer_is_san_identity
+            && !names_match(state.working_issuer_name, &cert.tbs_certificate.issuer)
         {
             return Err(Error::ChainBroken { index: i });
         }
@@ -2575,7 +2660,7 @@ fn chain_walk<V: SignatureVerifier>(
 
         // (policy-d) CertificatePolicies extension (RFC 5280 §6.1.3(d)).
         // Only processed when the policy tree is still alive.
-        if let Some(tree) = &mut policy_tree {
+        if let Some(tree) = &mut state.policy_tree {
             if let Some(cp_ext) = &cert_cp {
                 let mut new_nodes: Vec<PolicyNode> = Vec::new();
                 let mut has_any_policy = false;
@@ -2634,7 +2719,7 @@ fn chain_walk<V: SignatureVerifier>(
                 // self-issued non-leaf), expand for each unmatched expected
                 // policy from parent nodes.
                 if has_any_policy {
-                    let may_expand = inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
+                    let may_expand = state.inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));
                     if may_expand {
                         // RFC §6.1.3(d)(2) qualifier source: the qualifiers
                         // attached to the cert's anyPolicy PolicyInformation
@@ -2667,17 +2752,17 @@ fn chain_walk<V: SignatureVerifier>(
                 }
                 // If no nodes at depth >= 1 remain, tree is effectively NULL.
                 if !tree.iter().any(|nd| nd.depth >= 1) {
-                    policy_tree = None;
+                    state.policy_tree = None;
                 }
             } else {
                 // §6.1.3(e): CertificatePolicies absent → tree becomes NULL.
-                policy_tree = None;
+                state.policy_tree = None;
             }
         }
 
         // (policy-f) RFC 5280 §6.1.3(f): explicit_policy == 0 and tree NULL
         // → policy violation.
-        if explicit_policy == 0 && policy_tree.is_none() {
+        if state.explicit_policy == 0 && state.policy_tree.is_none() {
             return Err(Error::PolicyViolation { index: i });
         }
 
@@ -2694,9 +2779,9 @@ fn chain_walk<V: SignatureVerifier>(
             check_name_constraints(
                 cert,
                 san.as_ref(),
-                nc_permitted.as_ref(),
-                &nc_excluded,
-                nc_constrained_types,
+                state.nc_permitted.as_ref(),
+                &state.nc_excluded,
+                state.nc_constrained_types,
                 i,
             )?;
         }
@@ -2827,8 +2912,8 @@ fn chain_walk<V: SignatureVerifier>(
 
                 // §6.1.4(b)(1): if policy_mapping > 0, update expected_policy_set.
                 // §6.1.4(b)(2): if policy_mapping == 0, delete mapped nodes.
-                if let Some(tree) = &mut policy_tree {
-                    if policy_mapping > 0 {
+                if let Some(tree) = &mut state.policy_tree {
+                    if state.policy_mapping > 0 {
                         // RFC §6.1.4(b)(1)(ii) qualifier source for the
                         // synthesis branch below: the qualifiers attached
                         // to the cert's anyPolicy PolicyInformation entry.
@@ -2894,9 +2979,9 @@ fn chain_walk<V: SignatureVerifier>(
                 }
             }
             // Check if tree became effectively NULL after mapping operations.
-            if let Some(t) = &policy_tree {
+            if let Some(t) = &state.policy_tree {
                 if !t.iter().any(|nd| nd.depth >= 1) {
-                    policy_tree = None;
+                    state.policy_tree = None;
                 }
             }
 
@@ -2905,9 +2990,9 @@ fn chain_walk<V: SignatureVerifier>(
             // This happens AFTER policy mappings processing (§6.1.4(b)) and
             // BEFORE clamping from extensions (§6.1.4(i)/(j)).
             if !is_self_issued_cert(cert) {
-                explicit_policy = explicit_policy.saturating_sub(1);
-                policy_mapping = policy_mapping.saturating_sub(1);
-                inhibit_any = inhibit_any.saturating_sub(1);
+                state.explicit_policy = state.explicit_policy.saturating_sub(1);
+                state.policy_mapping = state.policy_mapping.saturating_sub(1);
+                state.inhibit_any = state.inhibit_any.saturating_sub(1);
             }
 
             // (policy-i) PolicyConstraints (RFC 5280 §6.1.4(c)): clamp
@@ -2918,10 +3003,10 @@ fn chain_walk<V: SignatureVerifier>(
                 .map_err(|_| Error::MalformedCertificate { index: i })?
             {
                 if let Some(req) = pc.require_explicit_policy {
-                    explicit_policy = explicit_policy.min(req);
+                    state.explicit_policy = state.explicit_policy.min(req);
                 }
                 if let Some(ipm) = pc.inhibit_policy_mapping {
-                    policy_mapping = policy_mapping.min(ipm);
+                    state.policy_mapping = state.policy_mapping.min(ipm);
                 }
             }
 
@@ -2931,7 +3016,7 @@ fn chain_walk<V: SignatureVerifier>(
             if let Some(iap) = try_find_cert_ext::<InhibitAnyPolicy>(cert, OID_INHIBIT_ANY_POLICY)
                 .map_err(|_| Error::MalformedCertificate { index: i })?
             {
-                inhibit_any = inhibit_any.min(iap.0);
+                state.inhibit_any = state.inhibit_any.min(iap.0);
             }
 
             // (i) NC update: NameConstraints state update (RFC 5280 §6.1.4(b)).
@@ -2944,12 +3029,12 @@ fn chain_walk<V: SignatureVerifier>(
                 if let Some(new_permitted) = nc.permitted_subtrees {
                     // Track which types this CA is constraining.
                     for entry in &new_permitted {
-                        nc_constrained_types |= name_type_bit(&entry.base);
+                        state.nc_constrained_types |= name_type_bit(&entry.base);
                     }
-                    match nc_permitted.as_mut() {
+                    match state.nc_permitted.as_mut() {
                         None => {
                             // First constraint seen; adopt it directly.
-                            nc_permitted = Some(new_permitted);
+                            state.nc_permitted = Some(new_permitted);
                         }
                         Some(current) => {
                             // Type-aware intersection of two permitted-subtrees sets.
@@ -3031,13 +3116,13 @@ fn chain_walk<V: SignatureVerifier>(
                         // check: two entries are considered the same subtree when each
                         // matches the other (i.e., they are semantically equivalent, not
                         // just byte-equal).
-                        let already_present = nc_excluded.iter().any(|existing| {
+                        let already_present = state.nc_excluded.iter().any(|existing| {
                             same_nc_variant(&existing.base, &new_entry.base)
                                 && name_matches_subtree(&existing.base, new_entry)
                                 && name_matches_subtree(&new_entry.base, existing)
                         });
                         if !already_present {
-                            nc_excluded.push(new_entry.clone());
+                            state.nc_excluded.push(new_entry.clone());
                         }
                     }
                 }
@@ -3045,12 +3130,12 @@ fn chain_walk<V: SignatureVerifier>(
         }
 
         // Update state for next iteration.
-        working_spki = &cert.tbs_certificate.subject_public_key_info;
-        working_issuer_name = &cert.tbs_certificate.subject;
+        state.working_spki = &cert.tbs_certificate.subject_public_key_info;
+        state.working_issuer_name = &cert.tbs_certificate.subject;
         // Determine whether the cert we just processed presents itself via SAN
         // identity (empty Subject + critical SAN). This affects the chain-linkage
         // check for the certificate immediately below it in the next iteration.
-        working_issuer_is_san_identity = cert_has_san_identity(cert);
+        state.working_issuer_is_san_identity = cert_has_san_identity(cert);
     }
 
     // RFC 5280 §6.1.5(a-b): post-loop leaf policy finalisation.
@@ -3067,7 +3152,7 @@ fn chain_walk<V: SignatureVerifier>(
         // but are not used after this point in the algorithm — only explicit_policy
         // is tested in §6.1.5(g) and the final check.
         if !is_self_issued_cert(leaf) {
-            explicit_policy = explicit_policy.saturating_sub(1);
+            state.explicit_policy = state.explicit_policy.saturating_sub(1);
             // Per §6.1.5(a): RFC also decrements inhibit_any and policy_mapping here,
             // but neither is read after §6.1.5(a) in our implementation.
         }
@@ -3079,7 +3164,7 @@ fn chain_walk<V: SignatureVerifier>(
             .map_err(|_| Error::MalformedCertificate { index: 0 })?
         {
             if let Some(req) = pc.require_explicit_policy {
-                explicit_policy = explicit_policy.min(req);
+                state.explicit_policy = state.explicit_policy.min(req);
             }
         }
     }
@@ -3098,7 +3183,7 @@ fn chain_walk<V: SignatureVerifier>(
     //     nodes for each P-OID in initial_policy_set not already present.
     //   §6.1.5(g)(iii)(4): prune childless ancestors.
     if !policy.initial_policy_set.is_empty() {
-        if let Some(tree) = &mut policy_tree {
+        if let Some(tree) = &mut state.policy_tree {
             let leaf_depth = n;
 
             // §6.1.5(g)(iii): intersect the valid_policy_tree with
@@ -3219,14 +3304,14 @@ fn chain_walk<V: SignatureVerifier>(
             // (only the synthetic depth-0 anyPolicy root is left, which
             // does not represent any actual valid policy).
             if !tree.iter().any(|nd| nd.depth >= 1) {
-                policy_tree = None;
+                state.policy_tree = None;
             }
         }
     }
 
     // §6.1.5 final check: path is valid iff explicit_policy > 0 OR tree
     // is non-NULL.
-    if explicit_policy == 0 && policy_tree.is_none() {
+    if state.explicit_policy == 0 && state.policy_tree.is_none() {
         return Err(Error::PolicyViolation { index: 0 });
     }
 
@@ -3236,7 +3321,7 @@ fn chain_walk<V: SignatureVerifier>(
     // during validation; callers that rely on §6.1.5 outputs MUST treat
     // `None` as "no policy information available", not as a validation
     // failure (the policy-success check above already happened).
-    Ok(policy_tree)
+    Ok(state.policy_tree)
 }
 
 // ---------------------------------------------------------------------------
