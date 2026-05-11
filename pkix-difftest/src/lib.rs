@@ -117,6 +117,16 @@ impl fmt::Display for OracleName {
 /// (matches `openssl verify`'s argument order). The loader detects the
 /// input ordering using a self-issued-cert heuristic and reverses if needed.
 ///
+/// # Revocation
+///
+/// `crls` carries DER-encoded `CertificateList` blobs (RFC 5280 §5.1) that
+/// oracle adapters use for revocation checking. An empty `crls` vector
+/// disables revocation in every oracle — the chain is then validated for
+/// path correctness only. A non-empty `crls` opts every oracle into RFC 5280
+/// §6.3 revocation against the supplied CRLs. Pyca's `PolicyBuilder` has no
+/// integrated CRL verifier (verified against cryptography 48.0.0); see
+/// `PKIX-emf1.4` for the pyca-side strategy.
+///
 /// **Limitation**: the harness requires the trust anchor to be
 /// present in the chain (it is split off as the anchor when calling
 /// `pkix-path`, and used as `-CAfile` for OpenSSL). Real-world TLS chains
@@ -127,6 +137,11 @@ impl fmt::Display for OracleName {
 pub struct Chain {
     /// Leaf-first DER-encoded certificates.
     pub certs_der: Vec<Vec<u8>>,
+    /// DER-encoded `CertificateList` blobs (RFC 5280 §5.1) that oracle
+    /// adapters apply for revocation checking. Empty disables revocation.
+    /// Populated by corpus loaders (PKITS, limbo, pem-tree) when the source
+    /// testcase ships CRLs.
+    pub crls: Vec<Vec<u8>>,
     /// True when the last cert is intended as the trust anchor.
     /// Always true currently — see the type-level docs.
     pub root_in_chain: bool,
@@ -191,9 +206,26 @@ impl Chain {
 
         Ok(Chain {
             certs_der: der_blocks,
+            crls: Vec::new(),
             root_in_chain: true,
             label,
         })
+    }
+
+    /// Attach a CRL bundle to this chain.
+    ///
+    /// Builder method: consumes `self`, returns a new `Chain` whose `crls`
+    /// field is replaced with the supplied DER-encoded `CertificateList`
+    /// bytes. An empty `crls` argument is equivalent to leaving the chain
+    /// unchanged (oracles skip revocation when `crls` is empty).
+    ///
+    /// Use this from corpus loaders that have already constructed a `Chain`
+    /// and now want to layer CRL bytes on top (typical pattern for the PKITS
+    /// loader, where chain certs and CRLs come from sibling directories).
+    #[must_use]
+    pub fn with_crls(mut self, crls: Vec<Vec<u8>>) -> Self {
+        self.crls = crls;
+        self
     }
 }
 
@@ -365,5 +397,37 @@ BBBB
         assert_eq!(OracleName::PkixPath.as_str(), "pkix-path");
         assert_eq!(OracleName::OpenSsl.as_str(), "openssl");
         assert_eq!(OracleName::Pyca.as_str(), "pyca");
+    }
+
+    #[test]
+    fn chain_with_crls_attaches_bundle() {
+        // Build a Chain via the public constructor path, then layer CRL
+        // bytes on top via with_crls. Verify (a) the empty default and
+        // (b) the post-attach state.
+        //
+        // We do not need a real CRL DER here — the field is a Vec<Vec<u8>>
+        // with no parsing contract at the harness layer. Oracles parse it.
+        let chain = Chain {
+            certs_der: vec![vec![0u8; 4], vec![1u8; 4]],
+            crls: Vec::new(),
+            root_in_chain: true,
+            label: "test".to_string(),
+        };
+        assert!(chain.crls.is_empty(), "default crls must be empty");
+
+        let crl_der_a = vec![0xAAu8; 8];
+        let crl_der_b = vec![0xBBu8; 8];
+        let chain = chain.with_crls(vec![crl_der_a.clone(), crl_der_b.clone()]);
+        assert_eq!(chain.crls.len(), 2, "with_crls must populate the field");
+        assert_eq!(chain.crls[0], crl_der_a);
+        assert_eq!(chain.crls[1], crl_der_b);
+
+        // Idempotency / overwrite: with_crls(empty) restores the no-revocation
+        // state. The builder is replace-semantics, not append-semantics.
+        let chain = chain.with_crls(Vec::new());
+        assert!(
+            chain.crls.is_empty(),
+            "with_crls(empty) must reset to no revocation"
+        );
     }
 }
