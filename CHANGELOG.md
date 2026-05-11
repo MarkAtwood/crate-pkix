@@ -6,6 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Policy: drop v0.x milestone gating (2026-05-11)
+
+Dropped v0.x milestone gating across the workspace. The project drives to
+full RFC 5280 and adjacent-RFC coverage; no features are gated by a version
+milestone. Per-crate `# Limitations` rustdoc sections continue to describe
+current shipped behavior and shrink as features land — not by editorial
+fiat, but when the underlying code changes. Sweep tracked as PKIX-agp7.
+
 ### Coordinated 0.3 follow-up wave (May 2026)
 
 The `pkix-path 0.3.0` release on git is the centerpiece of a coordinated
