@@ -109,21 +109,27 @@ work without leaking memory (via `Cow::Owned`).
   `x509-cert`, so the binary footprint cost is zero).
 
 - `oscal` cargo feature exposing `pkix_lint::oscal::emit::assessment_results`
-  (PKIX-9vnx.3, Architecture 2 per PKIX-ztmr). The emitter projects an
-  `EvaluationReport` into a NIST OSCAL v1.1.2 Assessment Results
-  `serde_json::Value` document — top-level `assessment-results` with
-  `metadata`, `import-ap`, and one `results[]` entry containing
-  Observations (one per `Finding`, carrying `cert_sha256` and lint
-  citation as evidence) and Findings (with `target.status.state` set to
+  (PKIX-9vnx.3 + PKIX-9vnx.4, Architecture 2 per PKIX-ztmr). The emitter
+  projects an `EvaluationReport` into a NIST OSCAL v1.1.2 Assessment
+  Results `serde_json::Value` document — top-level `assessment-results`
+  with `metadata`, `import-ap`, and one `results[]` entry containing
+  evidence-deduplicated Observations and per-lint Findings.
+  Observations are keyed by `(cert_sha256, cert_index)` so multiple
+  Findings sharing one piece of evidence (e.g., multiple lints on the
+  same cert) reference one Observation via `related-observations`,
+  matching OSCAL's intended 1:N Observation:Finding cardinality.
+  Path-scope findings (both keys `None`) share a single
+  "path-scope" Observation. Each Finding's `target.status.state` is
   `satisfied` for Pass/NotApplicable and `not-satisfied` for
-  Warn/Error/Fatal). `DeviatedFinding`s become Risks with
-  `status="deviation-approved"`. UUIDs are deterministically derived
-  (RFC 9562 §5.8 v8 using SHA-256) so identical lint runs yield
-  byte-identical OSCAL output. The feature gates a new optional
-  `serde_json` dependency; default builds are unchanged. Internal
-  `EvaluationReport` / `Finding` / `DeviatedFinding` shapes are NOT
-  reshaped to mirror OSCAL field-for-field — the emitter projects, per
-  the Architecture 2 stance.
+  Warn/Error/Fatal; lint-specific metadata (`lint-id`, `citation`,
+  `severity`) lives on the Finding side as props. `DeviatedFinding`s
+  become Risks with `status="deviation-approved"`. UUIDs are
+  deterministically derived (RFC 9562 §5.8 v8 using SHA-256) so
+  identical lint runs yield byte-identical OSCAL output. The feature
+  gates a new optional `serde_json` dependency; default builds are
+  unchanged. Internal `EvaluationReport` / `Finding` / `DeviatedFinding`
+  shapes are NOT reshaped to mirror OSCAL field-for-field — the emitter
+  projects, per the Architecture 2 stance.
 
 #### Migration
 
