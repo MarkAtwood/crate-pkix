@@ -17,12 +17,23 @@ default = []
 # parser is `no_std` + `alloc`; this feature gates only the std-only
 # trait impl plus propagates the std feature to transitive deps so they
 # can use std::io etc. when wired into a std-only consumer.
-std = ["der/std", "x509-cert/std", "signature/std", "x509-ocsp?/std"]
+std = ["der/std", "x509-cert/std", "signature/std", "x509-ocsp?/std", "sha2?/std"]
 
 # Enable the OCSP-response SCT extractor (`sct_list_from_ocsp_response`).
 # Pulls in `x509-ocsp` for `BasicOcspResponse` parsing. Disabled by
 # default so the core parser stays free of OCSP-specific deps.
 ocsp = ["dep:x509-ocsp"]
+
+# Enable the CT-log-list type (`CtLog`, `CtLogList`, log_id ↔ SPKI hash
+# consistency check). Pulls in `sha2` for the consistency check. The
+# core SCT-parser does not depend on this; consumers only need it to
+# associate parsed SCTs back to trusted log keys.
+log-list = ["dep:sha2"]
+
+# Enable the Google/Chrome log_list.json schema parser
+# (`CtLogList::from_google_log_list_json`). Pulls in `serde`,
+# `serde_json`, and `base64` for the JSON shape. Implies `log-list`.
+log-list-json = ["log-list", "dep:serde", "dep:serde_json", "dep:base64"]
 
 [dependencies]
 pkix-path = { workspace = true }
@@ -30,6 +41,10 @@ der        = { workspace = true }
 x509-cert  = { workspace = true }
 signature  = { workspace = true }
 x509-ocsp  = { workspace = true, optional = true }
+sha2       = { workspace = true, optional = true }
+serde      = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+base64     = { version = "0.22", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 # Integration tests load PEM/DER certs and walk extensions; x509-cert with
