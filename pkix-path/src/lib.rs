@@ -2482,14 +2482,155 @@ struct WorkingState<'a> {
     policy_tree: Option<Vec<PolicyNode>>,
 }
 
+/// RFC 5280 §6.1.3(a)(1) preface — project-policy signature-algorithm allowlist.
+///
+/// Fires before the cryptographic signature check so that a chain whose only
+/// problem is a disallowed algorithm returns the diagnostic
+/// [`Error::AlgorithmNotAllowed`] rather than the confusing
+/// [`Error::SignatureInvalid`]. Applies to every cert in the chain (CA/B Forum
+/// profile intent — there is no leaf/intermediate distinction here). Uses the
+/// outer `signatureAlgorithm` OID; RFC 5280 §4.1.1.2 requires it to equal the
+/// inner `TBSCertificate.signature` OID.
+fn enforce_signature_alg_allowlist(
+    cert: &Certificate,
+    policy: &ValidationPolicy,
+    index: usize,
+) -> Result<()> {
+    if let Some(allowed) = &policy.allowed_signature_algs {
+        // O(n) over a typically 2–6 element list; acceptable for the common case.
+        if !allowed.contains(&cert.signature_algorithm.oid) {
+            return Err(Error::AlgorithmNotAllowed { index });
+        }
+    }
+    Ok(())
+}
+
+/// Project max-validity check.
+///
+/// Not part of RFC 5280 §6.1; this is a CA/B-Forum-style ceiling on the cert's
+/// (notAfter − notBefore) duration. Applies to every cert in the chain.
+///
+/// `saturating_sub` avoids wrap on a malformed cert where `notAfter < notBefore`;
+/// a resulting duration of 0 trivially passes the `> max_secs` test (safe — the
+/// validity-period check in §6.1.3(a)(2) catches the malformed cert separately).
+fn check_max_validity(cert: &Certificate, policy: &ValidationPolicy, index: usize) -> Result<()> {
+    if let Some(max_secs) = policy.max_validity_secs {
+        let not_before = cert
+            .tbs_certificate
+            .validity
+            .not_before
+            .to_unix_duration()
+            .as_secs();
+        let not_after = cert
+            .tbs_certificate
+            .validity
+            .not_after
+            .to_unix_duration()
+            .as_secs();
+        if not_after.saturating_sub(not_before) > max_secs {
+            return Err(Error::ValidityPeriodExceedsMax { index });
+        }
+    }
+    Ok(())
+}
+
+/// Project minimum-RSA-key-bits check.
+///
+/// Not part of RFC 5280 §6.1; a deployment-policy floor on RSA modulus size.
+/// Non-RSA keys are silently skipped (`rsa_public_key_bits` returns `None`),
+/// so this is RSA-specific and inert for ECDSA/EdDSA chains. Applies to every
+/// cert in the chain.
+fn check_min_rsa_bits(cert: &Certificate, policy: &ValidationPolicy, index: usize) -> Result<()> {
+    if let Some(min_bits) = policy.min_rsa_key_bits {
+        if let Some(actual_bits) =
+            rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info)
+        {
+            if actual_bits < min_bits {
+                return Err(Error::KeyTooSmall { index });
+            }
+        }
+        // Non-RSA keys: rsa_public_key_bits returns None → check silently skipped.
+    }
+    Ok(())
+}
+
+/// RFC 5280 §6.1.3(a)(2) — issuer/subject DN linkage with §4.2.1.6 SAN-identity exception.
+///
+/// Verifies that the cert's issuer DN matches the previously-validated cert's
+/// (or trust anchor's) subject DN, unless that subject DN was empty and the
+/// previous cert identified itself via a critical SubjectAltName (RFC 5280
+/// §4.2.1.6). In the SAN-identity case the DN comparison is skipped because
+/// comparing against an empty Subject is meaningless; the signature check in
+/// §6.1.3(a)(1) has already established the cryptographic binding.
+///
+/// IMPORTANT (PKIX-als9 design §7): the *assignment* of
+/// `working_issuer_is_san_identity` for the next iteration is the caller's
+/// responsibility (see chain_walk's end-of-loop state update). Moving the
+/// assignment into this helper would silently break the §4.2.1.6 exception
+/// for chains where an intermediate (not the leaf) uses SAN identity, a case
+/// PKITS does not cover.
+fn check_issuer_linkage(
+    cert: &Certificate,
+    working_issuer_name: &x509_cert::name::Name,
+    working_issuer_is_san_identity: bool,
+    index: usize,
+) -> Result<()> {
+    if !working_issuer_is_san_identity
+        && !names_match(working_issuer_name, &cert.tbs_certificate.issuer)
+    {
+        return Err(Error::ChainBroken { index });
+    }
+    Ok(())
+}
+
+/// RFC 5280 §6.1.3(a)(1) — cryptographic signature verification.
+///
+/// Re-encodes the cert's TBSCertificate (the canonical signed bytes) and asks
+/// the pluggable [`SignatureVerifier`] to verify the cert's `signature` field
+/// against the current `working_spki` (the previously-validated issuer's
+/// public key). Returns [`Error::SignatureInvalid`] on failure.
+///
+/// Uses heap-backed encoding (`alloc::vec`) so that large certificates
+/// (government, enterprise, HSM attestation certs > 8 KiB TBSCertificate)
+/// encode without a fixed-buffer limit; the only `Error::Der` failure mode is
+/// a genuine DER encoding error in a malformed certificate.
+///
+/// Does NOT update `working_spki` — that next-iteration state transition is
+/// the caller's responsibility (chain_walk binds it at the end of each loop
+/// iteration).
+fn verify_cert_signature<V: SignatureVerifier>(
+    cert: &Certificate,
+    working_spki: &spki::SubjectPublicKeyInfoOwned,
+    verifier: &V,
+    index: usize,
+) -> Result<()> {
+    use der::Encode;
+    use spki::der::referenced::OwnedToRef as _;
+    let tbs_bytes_owned = {
+        let mut buf = Vec::new();
+        cert.tbs_certificate
+            .encode_to_vec(&mut buf)
+            .map_err(|e| Error::Der(DerError(e)))?;
+        buf
+    };
+    let tbs_bytes: &[u8] = &tbs_bytes_owned;
+    verifier
+        .verify_signature(
+            cert.signature_algorithm.owned_to_ref(),
+            working_spki.owned_to_ref(),
+            tbs_bytes,
+            cert.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::SignatureInvalid { index })?;
+    Ok(())
+}
+
 fn chain_walk<V: SignatureVerifier>(
     chain: &[Certificate],
     anchor: &TrustAnchor,
     policy: &ValidationPolicy,
     verifier: &V,
 ) -> Result<Option<Vec<PolicyNode>>> {
-    use der::Encode;
-    use spki::der::referenced::OwnedToRef as _;
     use x509_cert::ext::pkix::{InhibitAnyPolicy, PolicyConstraints, PolicyMappings};
 
     // RFC 5280 §6.1.2 (b)+(c): seed the initial permitted/excluded subtrees
@@ -2577,96 +2718,33 @@ fn chain_walk<V: SignatureVerifier>(
     for i in (0..chain.len()).rev() {
         let cert = &chain[i];
 
-        // (a0) Signature algorithm allowlist check.
-        //      Fires BEFORE signature verification to give a diagnostic error
-        //      (AlgorithmNotAllowed) rather than a confusing SignatureInvalid.
-        //      Uses the outer signatureAlgorithm field, which RFC 5280 §4.1.1.2
-        //      requires to be identical to the inner TBSCertificate.signature OID.
-        //      Applies to every cert in the chain (no i == 0 guard), matching
-        //      CA/B Forum profile intent.
-        if let Some(allowed) = &policy.allowed_signature_algs {
-            // O(n) over a typically 2–6 element list; acceptable for the common case.
-            if !allowed.contains(&cert.signature_algorithm.oid) {
-                return Err(Error::AlgorithmNotAllowed { index: i });
-            }
-        }
+        // (a0) Signature algorithm allowlist check (extracted to helper for
+        //      readability; see `enforce_signature_alg_allowlist`).
+        enforce_signature_alg_allowlist(cert, policy, i)?;
 
-        // (a) Verify signature with the current issuer's SPKI.
-        //     Use heap-backed encoding (alloc::vec) so that large certificates
-        //     (government, enterprise, HSM attestation certs > 8 KiB TBSCertificate)
-        //     are handled correctly. The previous fixed 8 KiB stack buffer returned
-        //     Error::Der for oversized certs, which is an implementation limit not a
-        //     cert defect. Heap encoding eliminates this limit; the only failure mode
-        //     is a genuine DER encoding error in a malformed certificate.
-        let tbs_bytes_owned = {
-            let mut buf = Vec::new();
-            cert.tbs_certificate
-                .encode_to_vec(&mut buf)
-                .map_err(|e| Error::Der(DerError(e)))?;
-            buf
-        };
-        let tbs_bytes: &[u8] = &tbs_bytes_owned;
-        verifier
-            .verify_signature(
-                cert.signature_algorithm.owned_to_ref(),
-                state.working_spki.owned_to_ref(),
-                tbs_bytes,
-                cert.signature.raw_bytes(),
-            )
-            .map_err(|_| Error::SignatureInvalid { index: i })?;
+        // (a) §6.1.3(a)(1) signature verification (extracted; see `verify_cert_signature`).
+        verify_cert_signature(cert, state.working_spki, verifier, i)?;
 
-        // (b) Issuer/subject name linkage.
-        //
-        // RFC 5280 §4.2.1.6: if the issuer cert has an empty Subject DN and a
-        // critical SubjectAltName, the issuer is identified by its SAN rather
-        // than its Subject DN. In that case, skip the DN-based linkage check —
-        // we cannot compare `cert.issuer` against an empty Subject and expect a
-        // meaningful match. The signature verification in step (a) already
-        // confirmed the issuer's key, so the cryptographic binding is intact.
-        if !state.working_issuer_is_san_identity
-            && !names_match(state.working_issuer_name, &cert.tbs_certificate.issuer)
-        {
-            return Err(Error::ChainBroken { index: i });
-        }
+        // (b) §6.1.3(a)(2) issuer DN linkage (extracted; see `check_issuer_linkage`).
+        //     NOTE: the `working_issuer_is_san_identity` assignment for the next
+        //     iteration is updated at the end-of-loop state block below (PKIX-als9
+        //     design §7 — must stay in chain_walk to preserve §4.2.1.6 handling
+        //     across multi-intermediate chains).
+        check_issuer_linkage(
+            cert,
+            state.working_issuer_name,
+            state.working_issuer_is_san_identity,
+            i,
+        )?;
 
         // (c) Validity period.
         check_validity(cert, policy.current_time_unix, i)?;
 
-        // (c2) Max validity period length check.
-        //      saturating_sub avoids wrap on a malformed cert where notAfter < notBefore;
-        //      a duration of 0 trivially passes the > max_secs test (safe, not a bypass).
-        //      Applies to every cert in the chain per the epic intent.
-        if let Some(max_secs) = policy.max_validity_secs {
-            let not_before = cert
-                .tbs_certificate
-                .validity
-                .not_before
-                .to_unix_duration()
-                .as_secs();
-            let not_after = cert
-                .tbs_certificate
-                .validity
-                .not_after
-                .to_unix_duration()
-                .as_secs();
-            if not_after.saturating_sub(not_before) > max_secs {
-                return Err(Error::ValidityPeriodExceedsMax { index: i });
-            }
-        }
+        // (c2) Max validity period length check (extracted; see `check_max_validity`).
+        check_max_validity(cert, policy, i)?;
 
-        // (c3) Minimum RSA key size check.
-        //      Non-RSA keys produce None from rsa_public_key_bits and are silently skipped.
-        //      Applies to every cert in the chain per the epic intent.
-        if let Some(min_bits) = policy.min_rsa_key_bits {
-            if let Some(actual_bits) =
-                rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info)
-            {
-                if actual_bits < min_bits {
-                    return Err(Error::KeyTooSmall { index: i });
-                }
-            }
-            // Non-RSA keys: rsa_public_key_bits returns None → check silently skipped.
-        }
+        // (c3) Minimum RSA key size check (extracted; see `check_min_rsa_bits`).
+        check_min_rsa_bits(cert, policy, i)?;
 
         // (d) Critical extension guard.
         check_critical_extensions(cert, i)?;
@@ -3368,6 +3446,98 @@ enum CheckMode {
     Permitted,
 }
 
+/// Check the cert's subject DN against `subtrees` in the given `mode`.
+///
+/// Skipped entirely when the subject DN is empty (RFC 5280 §6.1.3(b)).
+///
+/// Avoids constructing a `GeneralName::DirectoryName` (which would require a
+/// clone) by handling `DirectoryName` constraints inline: pull `DirectoryName`
+/// entries from `subtrees` and test directly against the subject `Name`
+/// (vjc.24).
+///
+/// - `CheckMode::Excluded`: any DN match is a violation.
+/// - `CheckMode::Permitted`: only enforced if some CA in the path has
+///   contributed a `DirectoryName` permitted-subtree (tracked in
+///   `nc_constrained_types`); then a non-match is a violation.
+fn check_subject_dn_against_subtrees(
+    subject: &x509_cert::name::Name,
+    subject_is_empty: bool,
+    subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+    mode: CheckMode,
+    nc_constrained_types: NcTypeMask,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    if subject_is_empty {
+        return Ok(());
+    }
+    let subject_constrained = nc_constrained_types.intersects(NcTypeMask::DIRECTORY_NAME);
+    let dn_matches_any = subtrees.iter().any(|st| {
+        if let GeneralName::DirectoryName(constr) = &st.base {
+            dn_within_subtree(subject, constr)
+        } else {
+            false
+        }
+    });
+    match mode {
+        CheckMode::Excluded => {
+            if dn_matches_any {
+                return Err(Error::NameConstraintViolation { index });
+            }
+        }
+        CheckMode::Permitted => {
+            if subject_constrained && !dn_matches_any {
+                return Err(Error::NameConstraintViolation { index });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Check each SAN entry of the cert against `subtrees` in the given `mode`.
+///
+/// - `CheckMode::Excluded`: any SAN entry that matches any subtree is a
+///   violation.
+/// - `CheckMode::Permitted`: a SAN entry whose type has been constrained
+///   somewhere in the path (per `nc_constrained_types`) must match at least
+///   one subtree entry; unconstrained types are accepted.
+///
+/// A `None` SAN extension is a no-op.
+fn check_san_against_subtrees(
+    san: Option<&x509_cert::ext::pkix::SubjectAltName>,
+    subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
+    mode: CheckMode,
+    nc_constrained_types: NcTypeMask,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    let Some(san_ext) = san else {
+        return Ok(());
+    };
+    let type_constrained =
+        |name: &GeneralName| -> bool { nc_constrained_types.intersects(name_type_bit(name)) };
+
+    for name in &san_ext.0 {
+        match mode {
+            CheckMode::Excluded => {
+                if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            }
+            CheckMode::Permitted => {
+                if type_constrained(name)
+                    && !subtrees.iter().any(|st| name_matches_subtree(name, st))
+                {
+                    return Err(Error::NameConstraintViolation { index });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Check that all names in `cert` satisfy the current `NameConstraints` state.
 ///
 /// Called once per certificate during `chain_walk`, BEFORE updating the NC
@@ -3392,65 +3562,21 @@ fn check_name_constraints(
     let subject = &cert.tbs_certificate.subject;
     let subject_is_empty = subject.0.is_empty();
 
-    // Helper: check all cert names (subject DN + SAN) against `subtrees`.
-    //
-    // CheckMode::Excluded → any match is a violation.
-    // CheckMode::Permitted → a name type is constrained if any CA in the path
-    // ever added a permittedSubtrees entry of that type (tracked in
-    // nc_constrained_types). Constrained types must match at least one permitted
-    // subtree entry; unconstrained types are always accepted.
+    // Dispatch the subject DN and the SAN entries against `subtrees` in the
+    // requested mode. See `check_subject_dn_against_subtrees` and
+    // `check_san_against_subtrees` for the per-name-class logic.
     let check_names = |subtrees: &[x509_cert::ext::pkix::constraints::name::GeneralSubtree],
                        mode: CheckMode|
      -> crate::Result<()> {
-        let type_constrained =
-            |name: &GeneralName| -> bool { nc_constrained_types.intersects(name_type_bit(name)) };
-
-        // subject DN — skipped when empty per RFC 5280 §6.1.3(b).
-        // Avoid constructing a GeneralName::DirectoryName (which requires a clone)
-        // by handling DirectoryName constraints inline: pull DirectoryName entries
-        // from `subtrees` and test directly against the subject Name (vjc.24).
-        if !subject_is_empty {
-            let subject_constrained = nc_constrained_types.intersects(NcTypeMask::DIRECTORY_NAME);
-            let dn_matches_any = subtrees.iter().any(|st| {
-                if let GeneralName::DirectoryName(constr) = &st.base {
-                    dn_within_subtree(subject, constr)
-                } else {
-                    false
-                }
-            });
-            match mode {
-                CheckMode::Excluded => {
-                    if dn_matches_any {
-                        return Err(Error::NameConstraintViolation { index });
-                    }
-                }
-                CheckMode::Permitted => {
-                    if subject_constrained && !dn_matches_any {
-                        return Err(Error::NameConstraintViolation { index });
-                    }
-                }
-            }
-        }
-
-        // SAN entries.
-        if let Some(san_ext) = san {
-            for name in &san_ext.0 {
-                match mode {
-                    CheckMode::Excluded => {
-                        if subtrees.iter().any(|st| name_matches_subtree(name, st)) {
-                            return Err(Error::NameConstraintViolation { index });
-                        }
-                    }
-                    CheckMode::Permitted => {
-                        if type_constrained(name)
-                            && !subtrees.iter().any(|st| name_matches_subtree(name, st))
-                        {
-                            return Err(Error::NameConstraintViolation { index });
-                        }
-                    }
-                }
-            }
-        }
+        check_subject_dn_against_subtrees(
+            subject,
+            subject_is_empty,
+            subtrees,
+            mode,
+            nc_constrained_types,
+            index,
+        )?;
+        check_san_against_subtrees(san, subtrees, mode, nc_constrained_types, index)?;
         Ok(())
     };
 
