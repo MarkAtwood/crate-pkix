@@ -85,8 +85,9 @@ shipped code currently does and does not do. The driving goal is full
 RFC 5280 and adjacent-RFC coverage; no work is gated by a version
 milestone.
 
-PKITS (NIST) test corpus is the integration-test bar. See
-`pkix-difftest/baseline-pkits-analysis.md` for current state.
+PKITS (NIST) test corpus is the Tier-1 integration-test bar; the
+x509-limbo corpus is Tier-2. See `pkix-difftest/baseline-pkits-analysis.md`
+and `pkix-difftest/baseline-limbo-analysis.md` for current state.
 
 ## Test discipline
 
