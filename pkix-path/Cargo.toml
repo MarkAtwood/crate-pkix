@@ -18,9 +18,10 @@ default   = ["rsa", "p256"]
 std = ["der/std", "spki/std", "x509-cert/std", "signature/std"]
 
 # RustCrypto algorithm backends — disable all to bring your own SignatureVerifier.
-# Currently implemented: RSA-PKCS1v15-SHA-256, ECDSA-P-256-SHA-256, and
-# ECDSA-P-384-SHA-384. Additional algorithms (Ed25519, RSA SHA-384/512)
-# are future work; see project tracker (PKIX-gphz).
+# Currently implemented: RSA-PKCS1v15-SHA-256, RSA-PKCS1v15-SHA-384,
+# RSA-PKCS1v15-SHA-512, ECDSA-P-256-SHA-256, and ECDSA-P-384-SHA-384.
+# Ed25519 (RFC 8032) and RSA-PSS (RFC 4055) remain future work; see project
+# tracker (PKIX-gphz).
 rustcrypto = ["rsa", "p256", "p384"]
 rsa        = ["dep:rsa", "dep:sha2"]
 p256       = ["dep:p256"]
