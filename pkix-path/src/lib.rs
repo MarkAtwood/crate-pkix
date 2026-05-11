@@ -1451,6 +1451,33 @@ fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {
     }
 }
 
+/// Combined "prune childless ancestors + check whether the tree has effectively
+/// become NULL" post-operation. Used at three points in `chain_walk` after a
+/// policy-tree mutation:
+///
+/// 1. After §6.1.3(d) CertificatePolicies processing.
+/// 2. After §6.1.4(b) PolicyMappings processing.
+/// 3. After §6.1.5(g)(iii) user-initial-policy-set intersection.
+///
+/// `prune_depth` is the depth that just had nodes added or removed; the prune
+/// pass walks upward from `prune_depth - 1` toward the root removing any
+/// ancestor with no surviving children. A `prune_depth` of `0` skips the prune
+/// pass entirely (matching the legacy `if depth > 0` / `if n > 0` guards at
+/// the call sites, and avoiding the `prune_depth.wrapping_sub(1)` underflow
+/// path inside [`prune_policy_tree`]).
+///
+/// Returns `true` when the tree is effectively NULL after the prune — i.e.,
+/// no nodes at depth ≥ 1 remain (only the synthetic depth-0 anyPolicy root,
+/// which on its own does not represent any surviving policy). Callers MUST
+/// honour this by setting `policy_tree = None`; this helper does not own the
+/// `Option` and therefore cannot clear it itself.
+fn policy_tree_post_op_prune(tree: &mut Vec<PolicyNode>, prune_depth: usize) -> bool {
+    if prune_depth > 0 {
+        prune_policy_tree(tree, prune_depth);
+    }
+    !tree.iter().any(|nd| nd.depth >= 1)
+}
+
 // ---------------------------------------------------------------------------
 // KeyUsage extraction (PKIX-8ae)
 // ---------------------------------------------------------------------------
@@ -2746,12 +2773,9 @@ fn chain_walk<V: SignatureVerifier>(
 
                 tree.extend(new_nodes);
 
-                // Step (d)(3): prune ancestors with no children.
-                if cert_depth > 1 {
-                    prune_policy_tree(tree, cert_depth);
-                }
-                // If no nodes at depth >= 1 remain, tree is effectively NULL.
-                if !tree.iter().any(|nd| nd.depth >= 1) {
+                // Step (d)(3): prune childless ancestors and collapse the
+                // tree to NULL if no nodes at depth >= 1 remain.
+                if policy_tree_post_op_prune(tree, cert_depth) {
                     state.policy_tree = None;
                 }
             } else {
@@ -2966,21 +2990,25 @@ fn chain_walk<V: SignatureVerifier>(
                         }
                     } else {
                         // policy_mapping == 0: delete nodes whose valid_policy
-                        // is an issuer_domain_policy in a mapping.
+                        // is an issuer_domain_policy in a mapping. Prune
+                        // childless ancestors after the deletion; the
+                        // post-op NULL-check fires once at the outer scope
+                        // below so we discard the helper's return value here.
                         let mapped_policies: Vec<der::asn1::ObjectIdentifier> =
                             pm.0.iter().map(|m| m.issuer_domain_policy).collect();
                         tree.retain(|nd| {
                             nd.depth != cert_depth || !mapped_policies.contains(&nd.valid_policy)
                         });
-                        if cert_depth > 0 {
-                            prune_policy_tree(tree, cert_depth);
-                        }
+                        let _ = policy_tree_post_op_prune(tree, cert_depth);
                     }
                 }
             }
             // Check if tree became effectively NULL after mapping operations.
-            if let Some(t) = &state.policy_tree {
-                if !t.iter().any(|nd| nd.depth >= 1) {
+            // Pass `prune_depth = 0` so the helper only runs the NULL-check;
+            // any required prune already happened in the §6.1.4(b)(2) branch
+            // above (the §6.1.4(b)(1) branch only adds nodes, no prune needed).
+            if let Some(tree) = state.policy_tree.as_mut() {
+                if policy_tree_post_op_prune(tree, 0) {
                     state.policy_tree = None;
                 }
             }
@@ -3296,14 +3324,12 @@ fn chain_walk<V: SignatureVerifier>(
                 tree.retain(|nd| !(nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY));
             }
 
-            // Step (iii)(4): prune childless ancestors.
-            if n > 0 {
-                prune_policy_tree(tree, leaf_depth);
-            }
-            // The tree is effectively NULL if no nodes exist at depth >= 1
-            // (only the synthetic depth-0 anyPolicy root is left, which
-            // does not represent any actual valid policy).
-            if !tree.iter().any(|nd| nd.depth >= 1) {
+            // Step (iii)(4): prune childless ancestors and collapse to NULL
+            // if no nodes at depth >= 1 remain. `leaf_depth` equals `n`; on
+            // an empty chain the helper's `prune_depth > 0` guard turns the
+            // prune pass into a no-op (matching the legacy `if n > 0` guard)
+            // and the NULL-check still runs.
+            if policy_tree_post_op_prune(tree, leaf_depth) {
                 state.policy_tree = None;
             }
         }
