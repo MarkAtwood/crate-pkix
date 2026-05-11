@@ -54,11 +54,17 @@ secondary crates until they ship updates.
 
 ### `pkix-lint 0.3.0`
 
-BREAKING. `LintResult::Warn`, `LintResult::Error`, and `LintResult::Fatal`
-now carry `Cow<'static, str>` instead of `&'static str`. Static string
-literals stay zero-allocation (via `Cow::Borrowed`); runtime-formatted
-strings (e.g. `format!(...)`) work without leaking memory (via
-`Cow::Owned`). Tracked as PKIX-ua6q.
+BREAKING. Two coordinated changes ship in 0.3.0:
+
+1. `LintResult` detail field migrated to `Cow<'static, str>` (PKIX-ua6q).
+2. `Finding.cert_sha256: Option<[u8; 32]>` added for evidence-pack
+   provenance (PKIX-a86q).
+
+The first sub-change is the LintResult migration: `LintResult::Warn`,
+`LintResult::Error`, and `LintResult::Fatal` now carry `Cow<'static, str>`
+instead of `&'static str`. Static string literals stay zero-allocation
+(via `Cow::Borrowed`); runtime-formatted strings (e.g. `format!(...)`)
+work without leaking memory (via `Cow::Owned`).
 
 #### Changed (breaking)
 
@@ -92,6 +98,16 @@ strings (e.g. `format!(...)`) work without leaking memory (via
   duration in days and the cap in effect at issuance, instead of a static
   "exceeds cap" message. Audit trails see the offending value.
 
+- `Finding.cert_sha256: Option<[u8; 32]>` (PKIX-a86q). SHA-256 of the
+  DER-encoded certificate that triggered the finding, pinning the
+  finding to a specific cert by content hash so evidence packs are
+  replayable. `Some(hash)` for cert-scope findings (populated by
+  `LintRunner::run_cert`), `None` for path-scope findings (no single
+  triggering cert). JSON serialisation uses a lowercase 64-char hex
+  string; binary serde formats emit the same hex-string form for
+  consistency. Adds a direct `sha2` dependency (already transitive via
+  `x509-cert`, so the binary footprint cost is zero).
+
 #### Migration
 
 Pattern-matches stay unchanged — `LintResult::Warn(_)` still works.
@@ -119,6 +135,13 @@ LintResult::error(format!("duration {days} > {cap_days}"))
 Code that used `Box::leak` on JSON input to satisfy the prior
 `'de: 'static` bound can drop the leak — `serde_json::from_str` and
 `from_slice` both work directly on any owned String / slice now.
+
+Construction sites that build a `Finding` via struct literal must add
+`cert_sha256: None` (or the appropriate `Some([u8; 32])`) to the field
+list — adding a public field to a non-`#[non_exhaustive]` struct is a
+breaking change for external code that constructs via struct literal.
+`LintRunner::run_cert` populates the field automatically; callers using
+the runner do not need to construct `Finding` manually.
 
 ### `pkix-revocation 0.3.2`
 

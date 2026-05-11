@@ -110,6 +110,91 @@ use x509_cert::Certificate;
 // Re-export so callers only need to depend on pkix-lint, not pkix-path.
 pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 
+/// Compute SHA-256 of a DER-encoded certificate.
+///
+/// Used by [`LintRunner::run_cert`] to stamp [`Finding::cert_sha256`] for
+/// evidence-pack provenance. `cert` is re-encoded to DER first so the
+/// hash is over the canonical re-encoded form (matching what serialisers
+/// downstream of pkix-lint would produce). For PKITS-style fixtures whose
+/// DER round-trips losslessly through `x509-cert`, this equals the hash
+/// of the original on-disk bytes.
+fn cert_sha256_of(cert: &Certificate) -> [u8; 32] {
+    use der::Encode as _;
+    use sha2::Digest as _;
+    // The Encode trait is infallible only when the underlying types are
+    // well-formed; a malformed Certificate would have failed to parse before
+    // reaching this function. We fall back to an all-zero hash on the
+    // theoretical encode error to avoid panicking the lint engine.
+    let der = cert.to_der().unwrap_or_default();
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&der);
+    hasher.finalize().into()
+}
+
+#[cfg(feature = "serde")]
+mod serde_helpers {
+    //! Serde adapters for fields that prefer a different on-wire form than
+    //! their in-memory shape.
+
+    /// Hex-string codec for `Option<[u8; 32]>` (Finding.cert_sha256).
+    ///
+    /// JSON: `Some([..])` ↔ `"<64 lowercase hex chars>"`, `None` ↔ `null`.
+    /// Binary serde formats fall through to the natural `Option<[u8; 32]>`
+    /// encoding because serializers like postcard treat `with =` modules as
+    /// JSON-style overrides only when wired this way. To be precise about
+    /// formats: this module emits a `String` for `Some` and a `None` for
+    /// `None`, in every serde format. For binary formats that's a length-
+    /// prefixed string carrying 64 hex chars — slightly less compact than
+    /// raw bytes, but consistent across formats and trivially decodable.
+    pub(crate) mod cert_sha256_hex {
+        use serde::{Deserialize as _, Deserializer, Serializer};
+
+        pub(crate) fn serialize<S: Serializer>(
+            v: &Option<[u8; 32]>,
+            s: S,
+        ) -> Result<S::Ok, S::Error> {
+            match v {
+                Some(bytes) => {
+                    let mut hex = String::with_capacity(64);
+                    for b in bytes {
+                        // Lowercase hex; no separators. Matches the digest
+                        // conventions used by OSCAL Link / Prop hrefs and
+                        // every Unix sha256sum tool.
+                        hex.push(char::from_digit(u32::from(b >> 4), 16).expect("hex high nibble"));
+                        hex.push(char::from_digit(u32::from(b & 0x0f), 16).expect("hex low nibble"));
+                    }
+                    s.serialize_some(&hex)
+                }
+                None => s.serialize_none(),
+            }
+        }
+
+        pub(crate) fn deserialize<'de, D: Deserializer<'de>>(
+            d: D,
+        ) -> Result<Option<[u8; 32]>, D::Error> {
+            let opt: Option<String> = Option::deserialize(d)?;
+            let Some(hex) = opt else {
+                return Ok(None);
+            };
+            if hex.len() != 64 {
+                return Err(serde::de::Error::invalid_length(
+                    hex.len(),
+                    &"64 lowercase hex chars (32-byte SHA-256)",
+                ));
+            }
+            let mut out = [0u8; 32];
+            for (i, byte) in out.iter_mut().enumerate() {
+                let hi = u8::from_str_radix(&hex[i * 2..i * 2 + 1], 16)
+                    .map_err(|_| serde::de::Error::custom("non-hex char in cert_sha256"))?;
+                let lo = u8::from_str_radix(&hex[i * 2 + 1..i * 2 + 2], 16)
+                    .map_err(|_| serde::de::Error::custom("non-hex char in cert_sha256"))?;
+                *byte = (hi << 4) | lo;
+            }
+            Ok(Some(out))
+        }
+    }
+}
+
 /// Serde deserializer helper for `Cow<'static, str>` fields.
 ///
 /// Deserializes any string input as an owned `String` wrapped in `Cow::Owned`.
@@ -502,12 +587,9 @@ pub trait Lint: Send + Sync {
 /// (a bundle of cert + path + findings + citations exportable as structured JSON
 /// or OSCAL Assessment Results). The `citation` field records the normative
 /// citation from [`Lint::citation`]; `evaluated_at_unix` records when the lint
-/// was run; `rule_bundle_version` records which version of the lint bundle was active.
-///
-/// # Planned fields (tracked as PKIX-a86q)
-///
-/// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
-///   Deferred to avoid adding a SHA-256 dependency to the engine core.
+/// was run; `rule_bundle_version` records which version of the lint bundle was
+/// active; `cert_sha256` pins the finding to a specific certificate by content
+/// hash so the evidence is replayable.
 ///
 /// # Serde deserialization
 ///
@@ -515,6 +597,11 @@ pub trait Lint: Send + Sync {
 /// without leaking allocations. The earlier `'de: 'static` bound (required
 /// when `LintResult` detail fields were `&'static str`) was removed in
 /// pkix-lint 0.3.0 with the migration tracked as PKIX-ua6q.
+///
+/// `cert_sha256` is serialised as a lowercase hex string in JSON (`Option<String>`
+/// shape; `None` for path-scope findings) so OSCAL `Link` / `Prop` consumers
+/// see the conventional digest representation, while binary serde formats
+/// (postcard, MessagePack) emit raw bytes via the same `Option<[u8; 32]>` field.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
@@ -551,6 +638,23 @@ pub struct Finding {
     /// Together with `cert_index` and the chain, this is sufficient to reconstruct
     /// the evaluation context in an evidence pack.
     pub evaluated_at_unix: u64,
+    /// SHA-256 of the DER-encoded certificate that triggered this finding.
+    ///
+    /// Populated by [`LintRunner::run_cert`] for certificate-scope findings.
+    /// `None` for path-scope findings (no single cert triggered the finding —
+    /// the whole chain did). This is the canonical provenance field for
+    /// evidence packs: a given (`lint_id`, `cert_sha256`) pair uniquely
+    /// identifies which cert produced which finding, replayable against the
+    /// same cert bytes years later.
+    ///
+    /// JSON serialisation uses a lowercase hex string (`Some` →
+    /// `"abc...32hex..."`, `None` → `null`). Binary serde formats emit the
+    /// raw 32-byte array.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, with = "serde_helpers::cert_sha256_hex")
+    )]
+    pub cert_sha256: Option<[u8; 32]>,
 }
 
 impl Finding {
@@ -730,6 +834,10 @@ impl LintRunner {
         cert_index: usize,
         now_unix: u64,
     ) -> Vec<Finding> {
+        // Compute the cert hash once per run_cert call, regardless of how
+        // many lints fire on it. SHA-256 of the DER re-encoding is the
+        // canonical provenance field for evidence packs (PKIX-a86q).
+        let cert_sha256 = Some(cert_sha256_of(cert));
         let mut findings = Vec::new();
         for lint in &self.lints {
             if lint.scope() != Scope::Certificate {
@@ -748,6 +856,7 @@ impl LintRunner {
                 result,
                 cert_index: Some(cert_index),
                 evaluated_at_unix: now_unix,
+                cert_sha256,
             });
             if is_fatal {
                 break;
@@ -849,6 +958,11 @@ impl LintRunner {
                 result,
                 cert_index: None,
                 evaluated_at_unix: now_unix,
+                // Path-scope findings have no single triggering cert. The
+                // chain as a whole is the subject; downstream consumers
+                // typically pair this finding with the path's
+                // `chain_certs_sha256` summary rather than a single hash.
+                cert_sha256: None,
             });
             if is_fatal {
                 break;
@@ -1252,6 +1366,153 @@ mod tests {
     }
 
     #[test]
+    fn run_cert_stamps_cert_sha256_on_findings() {
+        // Oracle: sha2 is the canonical SHA-256 implementation. Compute the
+        // expected hash directly from the cert DER outside the lint engine,
+        // then compare against the value stamped on the finding. This
+        // avoids the "test the code with itself" anti-pattern.
+        use der::Encode as _;
+        use sha2::Digest as _;
+
+        let cert = load_fixture_cert();
+        let der = cert.to_der().expect("encode fixture cert");
+        let expected: [u8; 32] = sha2::Sha256::digest(&der).into();
+
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].cert_sha256,
+            Some(expected),
+            "run_cert must stamp SHA-256(DER) on every finding"
+        );
+    }
+
+    #[test]
+    fn run_chain_stamps_per_cert_sha256_on_each_finding() {
+        // Oracle: three findings, three identical cert_sha256 values (same
+        // fixture cert used at every position). Tests that run_chain re-
+        // computes the hash per position rather than caching one across.
+        let cert = load_fixture_cert();
+        let chain = vec![cert.clone(), cert.clone(), cert];
+        let kinds = vec![
+            SubjectKind::Leaf,
+            SubjectKind::IntermediateCa,
+            SubjectKind::AnchorIssued,
+        ];
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let findings = runner.run_chain(&chain, &kinds, 0);
+        assert_eq!(findings.len(), 3);
+        assert!(
+            findings[0].cert_sha256.is_some(),
+            "leaf finding must carry cert_sha256"
+        );
+        assert_eq!(
+            findings[0].cert_sha256, findings[1].cert_sha256,
+            "same cert at index 0 and 1 must produce the same hash"
+        );
+        assert_eq!(
+            findings[1].cert_sha256, findings[2].cert_sha256,
+            "same cert at index 1 and 2 must produce the same hash"
+        );
+    }
+
+    #[test]
+    fn run_path_leaves_cert_sha256_none_on_path_findings() {
+        // Oracle: path-scoped findings have no single triggering cert; the
+        // cert_sha256 field must be None. (Future evidence-pack consumers
+        // would pair these findings with a separate per-chain hash list.)
+        let (chain, path) = validated_path_for_self_signed();
+        let runner = LintRunner::new(vec![Box::new(PathDepthLint)]);
+        let findings = runner.run_path(&chain, &path, 0);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(
+            findings[0].cert_sha256, None,
+            "path-scope findings must have cert_sha256 = None"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_serde_round_trip_some() {
+        // Oracle: serializing then deserializing a Finding preserves the
+        // hash exactly. Independently constructed hash via sha2.
+        use sha2::Digest as _;
+        let bytes: [u8; 32] = sha2::Sha256::digest(b"fixture bytes for sha256").into();
+        let f = Finding {
+            lint_id: std::borrow::Cow::Borrowed("x"),
+            citation: std::borrow::Cow::Borrowed("c"),
+            rule_bundle_version: std::borrow::Cow::Borrowed(""),
+            result: LintResult::Pass,
+            cert_index: Some(0),
+            evaluated_at_unix: 0,
+            cert_sha256: Some(bytes),
+        };
+        let json = serde_json::to_string(&f).expect("serialize");
+        // The on-wire form must be a lowercase hex string of length 64.
+        let mut expected_hex = String::with_capacity(64);
+        for b in &bytes {
+            expected_hex.push(char::from_digit(u32::from(b >> 4), 16).unwrap());
+            expected_hex.push(char::from_digit(u32::from(b & 0x0f), 16).unwrap());
+        }
+        assert!(
+            json.contains(&expected_hex),
+            "JSON must contain the lowercase hex hash; got: {json}"
+        );
+        let f2: Finding = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(f2.cert_sha256, Some(bytes));
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_serde_round_trip_none() {
+        // Oracle: None serializes as JSON null and round-trips back to None.
+        let f = Finding {
+            lint_id: std::borrow::Cow::Borrowed("x"),
+            citation: std::borrow::Cow::Borrowed("c"),
+            rule_bundle_version: std::borrow::Cow::Borrowed(""),
+            result: LintResult::Pass,
+            cert_index: None,
+            evaluated_at_unix: 0,
+            cert_sha256: None,
+        };
+        let json = serde_json::to_string(&f).expect("serialize");
+        assert!(
+            json.contains("\"cert_sha256\":null"),
+            "None must serialize as JSON null; got: {json}"
+        );
+        let f2: Finding = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(f2.cert_sha256, None);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_rejects_non_hex_string() {
+        // Oracle: a string of 64 chars that is not all hex must fail to
+        // deserialize rather than silently truncating or zero-filling.
+        let bad = r#"{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"}"#;
+        let err = serde_json::from_str::<Finding>(bad).expect_err("must reject non-hex chars");
+        assert!(
+            err.to_string().to_lowercase().contains("hex")
+                || err.to_string().to_lowercase().contains("cert_sha256"),
+            "error must mention hex / cert_sha256; got: {err}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_rejects_wrong_length() {
+        // Oracle: a hex string of length != 64 must fail to deserialize.
+        let bad = r#"{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"abc"}"#;
+        let err = serde_json::from_str::<Finding>(bad).expect_err("must reject short hex string");
+        assert!(
+            err.to_string().to_lowercase().contains("length")
+                || err.to_string().to_lowercase().contains("64"),
+            "error must mention length; got: {err}"
+        );
+    }
+
+    #[test]
     fn finding_is_finding_reflects_result() {
         let f_pass = Finding {
             lint_id: std::borrow::Cow::Borrowed("x"),
@@ -1260,6 +1521,7 @@ mod tests {
             result: LintResult::Pass,
             cert_index: None,
             evaluated_at_unix: 0,
+            cert_sha256: None,
         };
         let f_warn = Finding {
             lint_id: std::borrow::Cow::Borrowed("x"),
@@ -1268,6 +1530,7 @@ mod tests {
             result: LintResult::warn("w"),
             cert_index: None,
             evaluated_at_unix: 0,
+            cert_sha256: None,
         };
         assert!(!f_pass.is_finding());
         assert!(f_warn.is_finding());

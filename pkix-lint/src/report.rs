@@ -198,6 +198,7 @@ mod tests {
             result: LintResult::Pass,
             cert_index: Some(0),
             evaluated_at_unix: 1_780_272_000,
+            cert_sha256: None,
         }
     }
 
@@ -343,6 +344,7 @@ mod tests {
             result: LintResult::error(detail_text.clone()),
             cert_index: Some(0),
             evaluated_at_unix: 0,
+            cert_sha256: None,
         };
         let json = serde_json::to_string(&f).expect("serialize");
         // Use from_slice to confirm no 'de: 'static bound remains.
