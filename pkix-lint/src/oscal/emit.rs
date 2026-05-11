@@ -60,7 +60,9 @@
 //! follow-up if a CI-grade conformance check is wanted; see the
 //! PKIX-9vnx.3 closing notes.
 
-use crate::deviation::{DeviatedFinding, DeviationAction};
+use crate::deviation::{
+    DeviatedFinding, Deviation, DeviationAction, DeviationScope, DeviationStore,
+};
 use crate::report::EvaluationReport;
 use crate::{Finding, LintResult};
 
@@ -397,6 +399,198 @@ fn risk_for(df: &DeviatedFinding, report_seed: &[u8], i: usize) -> Value {
         ]);
     }
     risk
+}
+
+// ---------------------------------------------------------------------------
+// Deviation (policy) → OSCAL Risk projection
+// ---------------------------------------------------------------------------
+
+/// Emit every [`Deviation`] in a [`DeviationStore`] as a Vec of OSCAL Risk
+/// `serde_json::Value`s, suitable for persisting a deviation policy as a
+/// JSON array of OSCAL Risks.
+///
+/// The emitted Risks are policy entries (the deviations themselves), not
+/// applied-deviation events on a specific evaluation run. The
+/// [`assessment_results`] emitter already projects per-run
+/// [`crate::deviation::DeviatedFinding`]s into Risk shapes inside an
+/// Assessment Results document; this function is the policy-side
+/// counterpart.
+///
+/// # Round-trip
+///
+/// A parser back to `DeviationStore` is intended as follow-up work (see
+/// PKIX-9vnx.5 follow-up trackers). Today's emitter therefore tags every
+/// Risk with the props needed for lossless reconstruction:
+///
+/// - `pkix-lint.deviation-id` — the [`Deviation::id`].
+/// - `pkix-lint.target-lint` — [`Deviation::target_lint`].
+/// - `pkix-lint.action` — `"suppress"` or `"downgrade:<severity>"`.
+/// - `pkix-lint.effective-start` / `pkix-lint.effective-end` — Unix seconds,
+///   emitted only when `Some`.
+/// - `pkix-lint.authorized-by` — [`Deviation::authorized_by`].
+/// - Scope-axis props on the Risk's `subjects[]` (see [`encode_scope`]).
+///
+/// # Determinism
+///
+/// Risk UUIDs derive from `(NS_RISK_POLICY, deviation.id)` so identical
+/// deviation IDs yield identical Risk UUIDs across runs. Two stores
+/// containing the same deviations emit byte-identical arrays.
+#[must_use]
+pub fn risks_from_store(store: &DeviationStore) -> Vec<Value> {
+    store.all().iter().map(risk_for_deviation).collect()
+}
+
+/// Namespace for policy-side deviation Risk UUIDs. Distinct from
+/// [`NS_RISK`] (which is used by per-run DeviatedFinding Risks) so a
+/// deviation policy entry and an applied-deviation event cannot collide.
+const NS_RISK_POLICY: &str = "pkix-lint.oscal.risk.policy";
+
+fn risk_for_deviation(d: &Deviation) -> Value {
+    let uuid = uuid_v8(NS_RISK_POLICY, d.id.as_bytes());
+
+    let mut props = Vec::with_capacity(8);
+    props.push(prop("pkix-lint.deviation-id", &d.id));
+    props.push(prop("pkix-lint.target-lint", &d.target_lint));
+    props.push(prop(
+        "pkix-lint.action",
+        &deviation_action_prop_value(&d.action),
+    ));
+    props.push(prop("pkix-lint.authorized-by", &d.authorized_by));
+    if let Some(start) = d.effective_start {
+        props.push(prop("pkix-lint.effective-start", &start.to_string()));
+    }
+    if let Some(end) = d.effective_end {
+        props.push(prop("pkix-lint.effective-end", &end.to_string()));
+    }
+
+    let mut risk = json!({
+        "uuid": uuid,
+        "title": format!("Deviation {} for lint {}", d.id, d.target_lint),
+        "description": d.justification.clone(),
+        // OSCAL Risks may carry a free-form `statement` describing the
+        // condition that triggers the risk. For pkix-lint deviations we
+        // reuse the justification — the operator wrote it specifically to
+        // explain "why this is permitted." Real OSCAL POA&M Risk
+        // statements are richer; pkix-lint deviations are intentionally
+        // narrower.
+        "statement": d.justification.clone(),
+        "status": "deviation-approved",
+        "props": props,
+        "subjects": encode_scope(&d.scope),
+    });
+    if let Some(uri) = d.evidence_uri.as_ref() {
+        risk["links"] = json!([
+            {
+                "href": uri,
+                "rel": "reference",
+                "text": "Deviation authorization document",
+            }
+        ]);
+    }
+    risk
+}
+
+/// Encode a [`DeviationScope`] as one or more OSCAL Subject objects.
+///
+/// Each scope variant has its own subject `type` discriminator
+/// (`pkix-lint.scope.any`, `pkix-lint.scope.issuer-dn-contains`,
+/// `pkix-lint.scope.issuer-dn-exact`, `pkix-lint.scope.serial-range`) with
+/// the per-variant data in props.
+///
+/// DN names use a dual encoding: a human-readable string in
+/// `pkix-lint.issuer-dn` (RFC 4514 display form), and the DER bytes hex-
+/// encoded in `pkix-lint.issuer-dn-der`. The DER form is what an eventual
+/// parser uses for lossless `Name` reconstruction; the string form keeps
+/// the OSCAL JSON human-readable for operators reviewing the policy.
+///
+/// `Vec<Value>` rather than a single `Value` to allow future scope kinds
+/// that fan out to multiple Subjects (e.g., a future `SubjectDnContains`
+/// alongside `IssuerDnContains` could emit two subjects).
+fn encode_scope(scope: &DeviationScope) -> Vec<Value> {
+    use der::Encode as _;
+    match scope {
+        DeviationScope::Any => vec![json!({
+            "type": "pkix-lint.scope.any",
+            "subject-uuid": uuid_v8("pkix-lint.oscal.subject.scope-any", b""),
+            "title": "All certificates",
+        })],
+        DeviationScope::IssuerDnContains(substring) => vec![json!({
+            "type": "pkix-lint.scope.issuer-dn-contains",
+            "subject-uuid": uuid_v8(
+                "pkix-lint.oscal.subject.issuer-dn-contains",
+                substring.as_bytes(),
+            ),
+            "title": format!("Issuer DN contains '{substring}'"),
+            "props": [
+                prop("pkix-lint.issuer-dn-substring", substring),
+            ],
+        })],
+        DeviationScope::IssuerDnExact(name) => {
+            let der = name.to_der().unwrap_or_default();
+            let der_hex = hex(&der);
+            vec![json!({
+                "type": "pkix-lint.scope.issuer-dn-exact",
+                "subject-uuid": uuid_v8(
+                    "pkix-lint.oscal.subject.issuer-dn-exact",
+                    &der,
+                ),
+                "title": format!("Issuer DN equals {}", name),
+                "props": [
+                    prop("pkix-lint.issuer-dn", &name.to_string()),
+                    prop("pkix-lint.issuer-dn-der", &der_hex),
+                ],
+            })]
+        }
+        DeviationScope::SerialRange { issuer, start, end } => {
+            let der = issuer.to_der().unwrap_or_default();
+            let der_hex = hex(&der);
+            let start_hex = hex(start);
+            let end_hex = hex(end);
+            let mut seed: Vec<u8> = Vec::with_capacity(der.len() + start.len() + end.len() + 2);
+            seed.extend_from_slice(&der);
+            seed.push(0);
+            seed.extend_from_slice(start);
+            seed.push(0);
+            seed.extend_from_slice(end);
+            vec![json!({
+                "type": "pkix-lint.scope.serial-range",
+                "subject-uuid": uuid_v8(
+                    "pkix-lint.oscal.subject.serial-range",
+                    &seed,
+                ),
+                "title": format!(
+                    "Serial range [0x{}, 0x{}] from issuer {}",
+                    start_hex, end_hex, issuer
+                ),
+                "props": [
+                    prop("pkix-lint.issuer-dn", &issuer.to_string()),
+                    prop("pkix-lint.issuer-dn-der", &der_hex),
+                    prop("pkix-lint.serial-start", &start_hex),
+                    prop("pkix-lint.serial-end", &end_hex),
+                ],
+            })]
+        }
+    }
+}
+
+/// Render a [`DeviationAction`] as a stable string value usable as both
+/// an OSCAL prop value and (eventually) the discriminator a parser keys
+/// off of. `"suppress"` is bare; `"downgrade:<severity-label>"` carries
+/// the target severity inline.
+fn deviation_action_prop_value(a: &DeviationAction) -> String {
+    match a {
+        DeviationAction::Suppress => "suppress".to_string(),
+        DeviationAction::DowngradeSeverityTo(s) => format!("downgrade:{}", severity_label(*s)),
+    }
+}
+
+fn severity_label(s: crate::Severity) -> &'static str {
+    match s {
+        crate::Severity::Info => "info",
+        crate::Severity::Warn => "warn",
+        crate::Severity::Error => "error",
+        crate::Severity::Fatal => "fatal",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1062,6 +1256,328 @@ mod tests {
                 "finding props must include severity (got {names:?})"
             );
         }
+    }
+
+    // -------------------------------------------------------------------
+    // Deviation → OSCAL Risk emit (policy side)
+    // PKIX-9vnx.5: deviation policy entries are emitted as OSCAL Risks
+    // suitable for persistence as a JSON array. The full parse/round-trip
+    // pair is a separate follow-up; today we lock down the emit shape.
+    // -------------------------------------------------------------------
+
+    fn sample_deviation() -> Deviation {
+        Deviation {
+            id: "policy-2026-q1-fpki-keyusage".to_string(),
+            target_lint: "fpki.common.6.1.5".to_string(),
+            scope: DeviationScope::IssuerDnContains("agency x".to_string()),
+            effective_start: Some(1_704_067_200), // 2024-01-01T00:00:00Z
+            effective_end: Some(1_767_225_600),   // 2026-01-01T00:00:00Z
+            action: DeviationAction::DowngradeSeverityTo(crate::Severity::Warn),
+            justification: "FPKIPA waiver memo 2025-11-03".to_string(),
+            authorized_by: "agency-x-ciso@agency.gov".to_string(),
+            evidence_uri: Some("https://policy.agency.gov/waivers/2025-11-03".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_risk_for_deviation_required_fields() {
+        let d = sample_deviation();
+        let r = risk_for_deviation(&d);
+        // All OSCAL Risk required fields.
+        assert!(r["uuid"].as_str().is_some(), "uuid required");
+        assert!(r["title"].as_str().is_some(), "title required");
+        assert!(r["description"].as_str().is_some(), "description required");
+        assert!(r["statement"].as_str().is_some(), "statement required");
+        assert_eq!(r["status"].as_str(), Some("deviation-approved"));
+        assert!(r["props"].as_array().is_some(), "props required");
+        assert!(r["subjects"].as_array().is_some(), "subjects required");
+        // Evidence URI propagates as a link.
+        let links = r["links"].as_array().expect("evidence_uri produces links");
+        assert_eq!(
+            links[0]["href"].as_str(),
+            Some("https://policy.agency.gov/waivers/2025-11-03")
+        );
+    }
+
+    #[test]
+    fn test_risk_for_deviation_props_carry_persistence_metadata() {
+        let d = sample_deviation();
+        let r = risk_for_deviation(&d);
+        let prop_value = |name: &str| -> Option<String> {
+            r["props"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|p| p["name"].as_str() == Some(name))
+                .and_then(|p| p["value"].as_str())
+                .map(String::from)
+        };
+        assert_eq!(
+            prop_value("pkix-lint.deviation-id"),
+            Some("policy-2026-q1-fpki-keyusage".to_string())
+        );
+        assert_eq!(
+            prop_value("pkix-lint.target-lint"),
+            Some("fpki.common.6.1.5".to_string())
+        );
+        assert_eq!(
+            prop_value("pkix-lint.action"),
+            Some("downgrade:warn".to_string())
+        );
+        assert_eq!(
+            prop_value("pkix-lint.authorized-by"),
+            Some("agency-x-ciso@agency.gov".to_string())
+        );
+        assert_eq!(
+            prop_value("pkix-lint.effective-start"),
+            Some("1704067200".to_string())
+        );
+        assert_eq!(
+            prop_value("pkix-lint.effective-end"),
+            Some("1767225600".to_string())
+        );
+    }
+
+    #[test]
+    fn test_risk_for_deviation_omits_optional_time_bounds() {
+        let d = Deviation {
+            effective_start: None,
+            effective_end: None,
+            ..sample_deviation()
+        };
+        let r = risk_for_deviation(&d);
+        let names: Vec<&str> = r["props"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect();
+        assert!(
+            !names.contains(&"pkix-lint.effective-start"),
+            "effective-start prop must be omitted when None"
+        );
+        assert!(
+            !names.contains(&"pkix-lint.effective-end"),
+            "effective-end prop must be omitted when None"
+        );
+    }
+
+    #[test]
+    fn test_risk_for_deviation_action_suppress() {
+        let d = Deviation {
+            action: DeviationAction::Suppress,
+            ..sample_deviation()
+        };
+        let r = risk_for_deviation(&d);
+        let action_value = r["props"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"].as_str() == Some("pkix-lint.action"))
+            .and_then(|p| p["value"].as_str())
+            .unwrap();
+        assert_eq!(action_value, "suppress");
+    }
+
+    #[test]
+    fn test_encode_scope_any() {
+        let subjects = encode_scope(&DeviationScope::Any);
+        assert_eq!(subjects.len(), 1);
+        assert_eq!(subjects[0]["type"].as_str(), Some("pkix-lint.scope.any"));
+    }
+
+    #[test]
+    fn test_encode_scope_issuer_dn_contains() {
+        let s = DeviationScope::IssuerDnContains("agency x".to_string());
+        let subjects = encode_scope(&s);
+        assert_eq!(subjects.len(), 1);
+        let subj = &subjects[0];
+        assert_eq!(
+            subj["type"].as_str(),
+            Some("pkix-lint.scope.issuer-dn-contains")
+        );
+        let substring = subj["props"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"].as_str() == Some("pkix-lint.issuer-dn-substring"))
+            .and_then(|p| p["value"].as_str())
+            .unwrap();
+        assert_eq!(substring, "agency x");
+    }
+
+    #[test]
+    fn test_encode_scope_issuer_dn_exact_carries_der() {
+        // Reuse an existing PKITS cert fixture to obtain a real Name.
+        // Path is relative to pkix-lint crate root; CARGO_MANIFEST_DIR at
+        // test time is pkix-lint/.
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../pkix-path/tests/pkits/certs/GoodCACert.crt");
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(_) => {
+                // PKITS fixtures not co-located; skip when running this
+                // crate's tests outside the workspace.
+                eprintln!("PKITS fixture not found, skipping test");
+                return;
+            }
+        };
+        use der::Decode as _;
+        let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
+        let name = cert.tbs_certificate.subject;
+        let scope = DeviationScope::IssuerDnExact(name.clone());
+        let subjects = encode_scope(&scope);
+        assert_eq!(subjects.len(), 1);
+        let subj = &subjects[0];
+        assert_eq!(
+            subj["type"].as_str(),
+            Some("pkix-lint.scope.issuer-dn-exact")
+        );
+        // The DER prop must be present, non-empty, and parse back to the
+        // original Name — that's the round-trip oracle (lossless DER
+        // encoding of the DN).
+        let der_hex = subj["props"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"].as_str() == Some("pkix-lint.issuer-dn-der"))
+            .and_then(|p| p["value"].as_str())
+            .expect("dn-der prop must be present");
+        assert!(!der_hex.is_empty());
+        let der_bytes = hex_decode(der_hex).expect("hex decodes");
+        let parsed = x509_cert::name::Name::from_der(&der_bytes).expect("DER round-trip");
+        assert!(
+            pkix_path::names_match(&name, &parsed),
+            "DER round-trip must yield an equivalent Name"
+        );
+    }
+
+    /// Local hex-string decoder for the round-trip test above. Returns
+    /// `None` on invalid input. Kept inline to avoid pulling in a hex
+    /// crate dependency just for one test.
+    fn hex_decode(s: &str) -> Option<Vec<u8>> {
+        if s.len() % 2 != 0 {
+            return None;
+        }
+        let mut out = Vec::with_capacity(s.len() / 2);
+        let bytes = s.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            let hi = nibble(bytes[i])?;
+            let lo = nibble(bytes[i + 1])?;
+            out.push((hi << 4) | lo);
+            i += 2;
+        }
+        Some(out)
+    }
+
+    fn nibble(b: u8) -> Option<u8> {
+        match b {
+            b'0'..=b'9' => Some(b - b'0'),
+            b'a'..=b'f' => Some(b - b'a' + 10),
+            b'A'..=b'F' => Some(b - b'A' + 10),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn test_encode_scope_serial_range() {
+        // Synthesise a SerialRange using a real Name (PKITS fixture) and
+        // small byte vectors. We only check the structural shape; the
+        // DER round-trip is covered by test_encode_scope_issuer_dn_exact.
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../pkix-path/tests/pkits/certs/GoodCACert.crt");
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        use der::Decode as _;
+        let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
+        let scope = DeviationScope::SerialRange {
+            issuer: cert.tbs_certificate.subject.clone(),
+            start: vec![0x01, 0x00],
+            end: vec![0x01, 0xff],
+        };
+        let subjects = encode_scope(&scope);
+        assert_eq!(subjects.len(), 1);
+        let subj = &subjects[0];
+        assert_eq!(subj["type"].as_str(), Some("pkix-lint.scope.serial-range"));
+        let prop_value = |name: &str| -> Option<String> {
+            subj["props"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|p| p["name"].as_str() == Some(name))
+                .and_then(|p| p["value"].as_str())
+                .map(String::from)
+        };
+        assert_eq!(
+            prop_value("pkix-lint.serial-start"),
+            Some("0100".to_string())
+        );
+        assert_eq!(prop_value("pkix-lint.serial-end"), Some("01ff".to_string()));
+        assert!(prop_value("pkix-lint.issuer-dn-der").is_some());
+    }
+
+    #[test]
+    fn test_risks_from_store_round_trips_through_serde_json() {
+        let mut store = DeviationStore::new();
+        store.add(sample_deviation()).expect("add");
+        store
+            .add(Deviation {
+                id: "policy-2026-suppress-test".to_string(),
+                action: DeviationAction::Suppress,
+                scope: DeviationScope::Any,
+                ..sample_deviation()
+            })
+            .expect("add");
+        let arr = risks_from_store(&store);
+        assert_eq!(arr.len(), 2);
+        // serde_json round-trip on the array.
+        let json = serde_json::to_string(&Value::Array(arr.clone())).expect("serialize");
+        let parsed: Value = serde_json::from_str(&json).expect("parse back");
+        assert_eq!(
+            parsed,
+            Value::Array(arr),
+            "OSCAL Risk array must round-trip byte-equal"
+        );
+    }
+
+    #[test]
+    fn test_risk_for_deviation_uuid_is_deterministic() {
+        let d = sample_deviation();
+        let a = risk_for_deviation(&d);
+        let b = risk_for_deviation(&d);
+        assert_eq!(
+            a["uuid"], b["uuid"],
+            "same deviation must yield same Risk UUID across calls"
+        );
+    }
+
+    #[test]
+    fn test_risk_for_deviation_uuid_namespace_isolates_from_run_risk() {
+        // A policy-side deviation Risk and a run-side DeviatedFinding Risk
+        // must not collide even if their seeds overlap. Verified by the
+        // distinct NS_RISK vs NS_RISK_POLICY namespaces — same input,
+        // different UUIDs.
+        let report_seed = b"shared-seed".to_vec();
+        let df = DeviatedFinding {
+            lint_id: Cow::Borrowed("x"),
+            citation: Cow::Borrowed("y"),
+            original_result: LintResult::error("z"),
+            deviation_id: "policy-2026-q1-fpki-keyusage".to_string(),
+            action: DeviationAction::Suppress,
+            justification: "j".to_string(),
+            evidence_uri: None,
+            cert_index: Some(0),
+            evaluated_at_unix: 0,
+        };
+        let run_risk = risk_for(&df, &report_seed, 0);
+        let policy_risk = risk_for_deviation(&sample_deviation());
+        assert_ne!(
+            run_risk["uuid"], policy_risk["uuid"],
+            "policy-side and run-side Risk UUIDs must not collide"
+        );
     }
 
     // -------------------------------------------------------------------
