@@ -1189,6 +1189,7 @@ dependencies = [
  "pkix-path",
  "signature",
  "x509-cert",
+ "x509-ocsp",
 ]
 
 [[package]]

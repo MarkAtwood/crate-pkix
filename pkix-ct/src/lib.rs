@@ -18,15 +18,23 @@
 //! # Limitations
 //!
 //! SCT binary-format parsing (RFC 6962 §3.2 / §3.3) is implemented; see
-//! [`SignedCertificateTimestamp`] and [`SctList`]. Log list management,
+//! [`SignedCertificateTimestamp`] and [`SctList`]. Delivery-channel
+//! adapters for the TLS handshake extension and OCSP responses are also
+//! implemented; see [`sct_list_from_tls_extension`] and (behind the
+//! `ocsp` feature) `sct_list_from_ocsp_response`. Log list management,
 //! signature verification, pre-cert handling, and Merkle inclusion proof
 //! verification are not yet implemented; see the project tracker
 //! (PKIX-baac children) for status.
 
 extern crate alloc;
 
+mod delivery;
 mod sct;
 
+#[cfg(feature = "ocsp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
+pub use delivery::sct_list_from_ocsp_response;
+pub use delivery::sct_list_from_tls_extension;
 pub use sct::{SctList, SignedCertificateTimestamp};
 
 use x509_cert::Certificate;

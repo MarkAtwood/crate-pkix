@@ -429,7 +429,7 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
 
   Tracked as PKIX-qgw1 in the project beads.
 
-### `pkix-ct` — SCT binary-format parser (RFC 6962 §3.2 / §3.3)
+### `pkix-ct` — SCT binary-format parser and delivery-channel adapters
 
 #### Added
 
@@ -446,6 +446,14 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
 - `SctList::from_serialized_list` parses bare `SerializedSCTList` bytes
   for callers handling TLS-handshake-extension or OCSP-extension delivery
   (the OCSP and TLS forms are not double-wrapped).
+- `sct_list_from_tls_extension` parses the payload of TLS handshake
+  extension 18 (`signed_certificate_timestamp`). Thin alias over
+  `SctList::from_serialized_list` since the TLS-wire form is not
+  OCTET-STRING-wrapped.
+- `sct_list_from_ocsp_response` parses an OCSP `BasicOcspResponse` DER
+  and extracts the first `SignedCertificateTimestampList` extension found
+  (single-response extensions first, then top-level response extensions).
+  Gated behind a new `ocsp` crate feature; pulls in `x509-ocsp`.
 - New `Error` variants `UnsupportedVersion(u8)` and `TruncatedOrTrailing`
   (`Error` is `#[non_exhaustive]`; adding variants is non-breaking).
 
@@ -453,19 +461,21 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
 
 - The crate is now `no_std` + `alloc` by default (default features is
   the empty set). A new `std` feature gates the `std::error::Error` impl
-  on `Error` and propagates `std` to `der`, `x509-cert`, and `signature`.
-  Consumers wanting std-only behaviour add `features = ["std"]`. No
-  consumer code is currently broken: the previous default included
-  `std::error::Error`; the new default does not, so a consumer that
-  relied on `Error: std::error::Error` will need to enable the feature.
-  pkix-ct is at `0.0.0` and not published, so the impact is contained
-  to in-tree consumers.
+  on `Error` and propagates `std` to `der`, `x509-cert`, `signature`,
+  and optionally `x509-ocsp`. Consumers wanting std-only behaviour add
+  `features = ["std"]`. No consumer code is currently broken: the
+  previous default included `std::error::Error`; the new default does
+  not, so a consumer that relied on `Error: std::error::Error` will
+  need to enable the feature. pkix-ct is at `0.0.0` and not published,
+  so the impact is contained to in-tree consumers.
 
 - The `Limitations` rustdoc section is updated to describe what's
-  implemented (parsing) vs what is not (log lists, signature verification,
-  pre-cert handling, Merkle inclusion proofs).
+  implemented (parsing + delivery-channel adapters) vs what is not (log
+  lists, signature verification, pre-cert handling, Merkle inclusion
+  proofs).
 
-  Tracked as PKIX-baac.1 in the project beads.
+  Tracked as PKIX-baac.1 (parser) and PKIX-baac.6 (delivery adapters)
+  in the project beads.
 
 ## [0.3.0 / 0.2.1] — 2026-05-07
 

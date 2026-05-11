@@ -17,13 +17,19 @@ default = []
 # parser is `no_std` + `alloc`; this feature gates only the std-only
 # trait impl plus propagates the std feature to transitive deps so they
 # can use std::io etc. when wired into a std-only consumer.
-std = ["der/std", "x509-cert/std", "signature/std"]
+std = ["der/std", "x509-cert/std", "signature/std", "x509-ocsp?/std"]
+
+# Enable the OCSP-response SCT extractor (`sct_list_from_ocsp_response`).
+# Pulls in `x509-ocsp` for `BasicOcspResponse` parsing. Disabled by
+# default so the core parser stays free of OCSP-specific deps.
+ocsp = ["dep:x509-ocsp"]
 
 [dependencies]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
 signature  = { workspace = true }
+x509-ocsp  = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Integration tests load PEM/DER certs and walk extensions; x509-cert with
