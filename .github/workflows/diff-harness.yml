@@ -1,0 +1,113 @@
+# Differential-test harness CI for pkix-path.
+#
+# Runs the pkix-difftest harness against the in-tree NIST PKITS corpus on
+# every push / PR and compares the verdict-class summary against the
+# committed baseline (pkix-difftest/baseline-pkits.json). Any change in the
+# Agreement / LooserThanWild / StricterThanWild / OracleDivergence /
+# DiagnosticDivergence counts — or in ground_truth_disagreements — fails
+# the job and surfaces a unified diff in the CI log.
+#
+# Tracks PKIX-klku.
+#
+# Scope decisions:
+#
+# - PKITS only on every push. PKITS is in-tree (~1MB of certs+CRLs) and runs
+#   in ~20 seconds with all three oracles. The x509-limbo corpus is Tier-2
+#   (~88MB clone, ~14 min full run) — appropriate as a scheduled nightly,
+#   but the limbo testdata is not in this repo and a scrape/clone step
+#   adds CI flake surface. Filed as out-of-scope here; the bead notes that
+#   "scheduled nightly full pyca-corpus run" is *optional*.
+#
+# - ubuntu-latest only. The diff harness's verdicts are sensitive to the
+#   exact OpenSSL build (option string parsing, error wording) and pyca
+#   release. Multi-platform CI would surface platform-specific drift, not
+#   pkix-path regressions. If we want platform coverage for pkix-path
+#   itself, that belongs in a separate `cargo test` workflow (out of scope
+#   for this bead — see AGENTS.md "Scope and Style").
+#
+# - Stable Rust toolchain only. MSRV 1.73 enforcement is a separate concern
+#   and would go in a sibling workflow.
+#
+# - No caching of cargo or pip. The bead explicitly lists "pyca venv caching
+#   tuning" as out of scope (a follow-up if CI run time becomes a problem).
+#   Without caching, the workflow takes a couple of minutes total; that is
+#   fine for a non-tight feedback loop.
+
+name: diff-harness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel an in-flight diff-harness run if the same branch is pushed again.
+# The harness is deterministic and read-only — replaying it for an older
+# commit when the next commit is already in flight wastes minutes.
+concurrency:
+  group: diff-harness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pkits-diff:
+    name: PKITS verdict-class diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Show tool versions
+        # Recorded in the job log so a divergent run can be cross-referenced
+        # against the OpenSSL / cryptography / Rust version on the runner.
+        run: |
+          openssl version
+          python3 --version
+          cargo --version
+          rustc --version
+          jq --version
+
+      - name: Bootstrap pyca/cryptography venv
+        # setup-venv.sh is idempotent (skips already-installed packages) and
+        # pins cryptography>=45 so build_client_verifier / ExtensionPolicy
+        # are available. Stub 'cargo run' would also trigger this via the
+        # pyca oracle's auto-detection, but doing it explicitly gives us a
+        # clean failure point if the venv setup itself breaks.
+        run: ./pkix-difftest/python/setup-venv.sh
+
+      - name: Build pkix-difftest (release)
+        # The diff script expects target/release/pkix-difftest. Release is
+        # ~2-3x faster on the PKITS corpus than debug — matters for the
+        # repeat-runs case where a developer pushes 5 commits in quick
+        # succession and wants the queue to clear.
+        run: cargo build -p pkix-difftest --release
+
+      - name: Run PKITS diff against committed baseline
+        run: |
+          ./pkix-difftest/scripts/ci-diff-baseline.sh \
+            pkits \
+            pkix-path/tests/pkits \
+            pkix-difftest/baseline-pkits.json \
+            --oracles=pkix-path,openssl,pyca
+
+      - name: Upload fresh report on divergence
+        # Only fires when the previous step failed (i.e. ci-diff-baseline.sh
+        # exited non-zero). The fresh JSON lives in $RUNNER_TEMP via mktemp;
+        # we surface it as an artefact so a developer can `cp` it over the
+        # committed baseline if the divergence is intentional.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkits-fresh-report
+          path: /tmp/pkix-difftest-fresh.*.json
+          if-no-files-found: warn
+          retention-days: 14

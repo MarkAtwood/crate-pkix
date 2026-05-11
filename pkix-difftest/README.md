@@ -146,6 +146,51 @@ change that affects any verdict, re-run the harness, then `git diff`
 the `.json` to see exactly which chains moved between classes. Update
 `baseline-pkits-analysis.md` to reflect the new state.
 
+## CI integration
+
+The PKITS corpus runs on every push and pull request via
+[`.github/workflows/diff-harness.yml`](../.github/workflows/diff-harness.yml).
+The workflow invokes [`scripts/ci-diff-baseline.sh`](scripts/ci-diff-baseline.sh),
+which runs the harness and asserts that the verdict-class `summary` and
+`ground_truth_disagreements` fields match the committed
+`baseline-pkits.json`.
+
+What the CI script intentionally does *not* diff:
+
+- Per-chain `classified[]` reason strings. OpenSSL minor releases reword
+  diagnostics ("unable to get local issuer certificate" tweaks across
+  3.0 → 3.2) and pyca/cryptography releases change error formatting. A
+  reason-string change flips chains between Agreement and
+  DiagnosticDivergence without any pkix-path behaviour change — false
+  positives the CI script is built to suppress.
+
+What CI does diff:
+
+- `summary`: per-verdict-class counts (Agreement, LooserThanWild,
+  StricterThanWild, OracleDivergence, DiagnosticDivergence, total).
+- `ground_truth_disagreements`: number of chains where the worst
+  verdict disagrees with the corpus expected_result (limbo only).
+
+If CI fails with a diff, the workflow uploads the fresh JSON as a
+build artefact (`pkits-fresh-report`). To accept the new state as
+intentional:
+
+```sh
+# Download the artefact, then locally:
+cp <fresh-pkits.json> pkix-difftest/baseline-pkits.json
+# Regenerate the markdown report + analysis:
+cargo run --release -p pkix-difftest -- run pkits pkix-path/tests/pkits \
+  --oracles pkix-path,openssl,pyca \
+  --output-md pkix-difftest/baseline-pkits.md
+# Update baseline-pkits-analysis.md to reflect the new bucket counts.
+# Commit all three: .json, .md, -analysis.md.
+```
+
+The x509-limbo Tier-2 corpus is *not* run in CI today because the
+~88MB testdata is out-of-tree (lives in `~/GIT/x509-limbo`) and a full
+run is ~14 minutes. A scheduled nightly limbo job is filed as a
+follow-up; see PKIX-klku notes.
+
 ## Tier-2: x509-limbo corpus
 
 [x509-limbo](https://github.com/C2SP/x509-limbo) is the curated
