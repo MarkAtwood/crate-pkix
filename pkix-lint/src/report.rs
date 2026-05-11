@@ -45,13 +45,14 @@ use crate::de_cow_static;
 /// renamed without a semver-major bump. Consumers may safely parse them
 /// across minor version updates.
 ///
-/// # Serde note
+/// # Serde
 ///
-/// When the `serde` feature is enabled, deserialization requires a `'static`-lifetime
-/// deserializer (e.g., `serde_json::from_str`, not `serde_json::from_slice`).
-/// This constraint arises from internal `&'static str` fields in `Finding`.
+/// All string fields use `Cow<'static, str>` and deserialize as `Cow::Owned`
+/// without leaking allocations. The earlier `'de: 'static` bound (required
+/// when `LintResult` detail fields were `&'static str`) was removed in
+/// pkix-lint 0.3.0. Deserialization works from any source — `serde_json::from_str`,
+/// `serde_json::from_slice`, or any other.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct EvaluationReport {
     /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
@@ -202,14 +203,14 @@ mod tests {
 
     fn error_finding() -> Finding {
         Finding {
-            result: LintResult::Error("something wrong"),
+            result: LintResult::error("something wrong"),
             ..pass_finding()
         }
     }
 
     fn warn_finding() -> Finding {
         Finding {
-            result: LintResult::Warn("advisory"),
+            result: LintResult::warn("advisory"),
             ..pass_finding()
         }
     }
@@ -310,15 +311,46 @@ mod tests {
         );
 
         // Round-trip: deserialize back into EvaluationReport and verify key fields.
-        // EvaluationReport requires 'de: 'static (due to &'static str fields like
-        // rule_bundle_version). Box::leak promotes the owned JSON string to 'static
-        // so the deserializer satisfies that bound. This is acceptable in tests.
-        let json_static: &'static str = Box::leak(json.into_boxed_str());
+        // No 'de: 'static bound is required after the PKIX-ua6q migration —
+        // both serde_json::from_str and serde_json::from_slice work.
         let r2: EvaluationReport =
-            serde_json::from_str(json_static).expect("deserialization must succeed");
+            serde_json::from_str(&json).expect("deserialization must succeed");
         assert_eq!(r2.profile_id, r.profile_id);
         assert_eq!(r2.profile_version, r.profile_version);
         assert_eq!(r2.rule_bundle_version, r.rule_bundle_version);
         assert_eq!(r2.findings.len(), r.findings.len());
+
+        // Also verify the Cow<'static, str> detail in LintResult round-trips
+        // correctly. The deserialized detail must equal the source detail.
+        match (&r.findings[0].result, &r2.findings[0].result) {
+            (LintResult::Error(a), LintResult::Error(b)) => assert_eq!(a, b),
+            (a, b) => panic!("unexpected result variants: {a:?} vs {b:?}"),
+        }
+    }
+
+    /// LintResult round-trips dynamic (Cow::Owned) detail through serde without
+    /// leaking the allocation. Regression coverage for the PKIX-ua6q migration.
+    #[test]
+    #[cfg(feature = "serde")]
+    fn lint_result_dynamic_detail_round_trip() {
+        // Build a finding whose detail is a runtime-formatted owned string.
+        let actual = 400u64;
+        let detail_text = format!("validity {actual} days exceeds 398-day cap");
+        let f = Finding {
+            lint_id: std::borrow::Cow::Borrowed("test.lint"),
+            citation: std::borrow::Cow::Borrowed("test"),
+            rule_bundle_version: std::borrow::Cow::Borrowed("v0.3.0"),
+            result: LintResult::error(detail_text.clone()),
+            cert_index: Some(0),
+            evaluated_at_unix: 0,
+        };
+        let json = serde_json::to_string(&f).expect("serialize");
+        // Use from_slice to confirm no 'de: 'static bound remains.
+        let f2: Finding =
+            serde_json::from_slice(json.as_bytes()).expect("from_slice must succeed");
+        match &f2.result {
+            LintResult::Error(d) => assert_eq!(d.as_ref(), detail_text.as_str()),
+            other => panic!("expected Error variant, got {other:?}"),
+        }
     }
 }

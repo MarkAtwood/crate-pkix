@@ -455,7 +455,6 @@ pub enum DeviationAction {
 /// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
 /// operators can navigate to the backing waiver document without a second lookup.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.
@@ -1278,7 +1277,7 @@ mod tests {
         let f = DeviatedFinding {
             lint_id: std::borrow::Cow::Borrowed("test.lint"),
             citation: std::borrow::Cow::Borrowed("test citation"),
-            original_result: LintResult::Error("original"),
+            original_result: LintResult::error("original"),
             deviation_id: "d1".to_string(),
             action: DeviationAction::DowngradeSeverityTo(Severity::Info),
             justification: "test justification".to_string(),
@@ -1324,7 +1323,7 @@ mod tests {
             _kind: crate::SubjectKind,
             _now: u64,
         ) -> crate::LintResult {
-            crate::LintResult::Error("always errors")
+            crate::LintResult::error("always errors")
         }
     }
 

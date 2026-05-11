@@ -61,9 +61,10 @@
 //!
 //! - **Trait-based, not enum-based**: external crates can implement [`Lint`] and
 //!   pass `Box<dyn Lint>` to [`LintRunner`] without modifying this crate.
-//! - **Static detail messages**: `LintResult::Warn` and `LintResult::Error` carry
-//!   `&'static str` detail. This keeps the engine allocation-free in the common path.
-//!   Dynamic messages are planned via `Cow<'static, str>`.
+//! - **Cow detail messages**: `LintResult::Warn`, `Error`, and `Fatal` carry
+//!   `Cow<'static, str>` detail. Static string literals are zero-allocation
+//!   (`Cow::Borrowed`); runtime-formatted strings such as `format!(...)` use
+//!   `Cow::Owned` without leaking memory.
 //! - **Temporality-aware**: [`LintRunner::run_cert`] takes `now_unix: u64` so lints
 //!   can enforce rules that have effective dates (e.g., SC-081 validity caps).
 //! - **Scope-separated**: certificate lints and path lints run in separate passes so
@@ -87,7 +88,7 @@
 //!     fn applies_to(&self) -> SubjectKind { SubjectKind::Leaf }
 //!     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
 //!         if cert.tbs_certificate.subject.to_string().is_empty() {
-//!             LintResult::Warn("empty Subject DN")
+//!             LintResult::warn("empty Subject DN")
 //!         } else {
 //!             LintResult::Pass
 //!         }
@@ -103,67 +104,29 @@
 //! }
 //! ```
 
+use std::borrow::Cow;
 use x509_cert::Certificate;
 
 // Re-export so callers only need to depend on pkix-lint, not pkix-path.
 pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 
-/// Serde deserializer helper for `&'static str` fields.
-///
-/// Deserializes any string input as an owned `String`, then leaks it to produce a
-/// `&'static str`.  This is intentional: `LintResult` uses `&'static str` for its
-/// detail fields because those are always compile-time constants in normal usage.
-/// When deserializing from JSON (e.g., loading a saved evidence pack), we accept
-/// the small allocation + leak to preserve the field type.
-///
-/// # Memory — important for long-running services
-///
-/// **This function leaks one heap allocation per unique deserialized string, permanently.**
-/// In short-lived processes (CLI tools, test runners, single-request lambdas), this
-/// is acceptable: the process exits before the leak matters.
-///
-/// **In long-running services** (e.g., a TLS policy daemon that continuously
-/// deserializes `Finding` or `EvaluationReport` values from a database or message
-/// queue), each unique `LintResult` detail string will permanently grow process
-/// memory with no bound. If you are in that scenario:
-///
-/// - Use a separate short-lived process or worker for deserialization and pass
-///   structured data across a process boundary.
-/// - Or follow PKIX-ua6q, which tracks the migration of `LintResult` detail
-///   fields from `&'static str` to `Cow<'static, str>`, removing this
-///   constraint.
-///
-/// All other string fields in `Finding` and `EvaluationReport` already use
-/// `Cow<'static, str>` and do not leak.
-#[cfg(feature = "serde")]
-pub(crate) fn de_static_str<'de, D>(deserializer: D) -> Result<&'static str, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize as _;
-    let s = String::deserialize(deserializer)?;
-    Ok(Box::leak(s.into_boxed_str()))
-}
-
 /// Serde deserializer helper for `Cow<'static, str>` fields.
 ///
 /// Deserializes any string input as an owned `String` wrapped in `Cow::Owned`.
-/// Unlike [`de_static_str`], this does not leak memory — the allocation is owned
-/// and freed when the containing struct is dropped.
+/// This does not leak memory — the allocation is owned and freed when the
+/// containing struct is dropped.
 ///
 /// Used for `Finding.lint_id`, `Finding.citation`, and `DeviatedFinding` fields
 /// that are `&'static str` at construction time (populated from lint metadata) but
 /// need to round-trip through serde without leaking.
 #[cfg(feature = "serde")]
-pub(crate) fn de_cow_static<'de, D>(
-    deserializer: D,
-) -> Result<std::borrow::Cow<'static, str>, D::Error>
+pub(crate) fn de_cow_static<'de, D>(deserializer: D) -> Result<Cow<'static, str>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     use serde::Deserialize as _;
     let s = String::deserialize(deserializer)?;
-    Ok(std::borrow::Cow::Owned(s))
+    Ok(Cow::Owned(s))
 }
 
 pub mod cabf_tls_br;
@@ -258,18 +221,41 @@ impl SubjectKind {
 ///
 /// # Stability
 ///
-/// The variant names and associated `&'static str` detail fields are stable.
-/// Dynamic `String` detail is planned via `Cow<'static, str>`.
+/// The variant names are stable. The detail field type is
+/// `Cow<'static, str>`, accepting both static string literals (zero-cost,
+/// via `Cow::Borrowed`) and runtime-formatted owned strings (via
+/// `Cow::Owned`).
 ///
-/// # Serde memory note
+/// # Constructing
 ///
-/// When the `serde` feature is enabled, deserializing `LintResult::Warn`,
-/// `Error`, or `Fatal` variants leaks the detail string (one allocation per
-/// unique string, permanently). This is harmless in short-lived processes.
-/// See `de_static_str` for details and the mitigation path for long-running
-/// services.
+/// Use the helpers [`LintResult::warn`], [`LintResult::error`], and
+/// [`LintResult::fatal`] for idiomatic construction from any
+/// `Into<Cow<'static, str>>` source — string literals or owned `String`
+/// values both work without explicit `Cow::Borrowed(...)` wrapping:
+///
+/// ```rust
+/// use pkix_lint::LintResult;
+///
+/// // Static literal — zero-allocation Cow::Borrowed.
+/// let r1 = LintResult::error("validity exceeds cap");
+///
+/// // Runtime-formatted — Cow::Owned, freed with the LintResult.
+/// let actual_days = 400u64;
+/// let r2 = LintResult::error(format!("validity {actual_days} days exceeds cap"));
+/// ```
+///
+/// Pattern matches use the variant constructors directly:
+///
+/// ```rust
+/// # use pkix_lint::LintResult;
+/// # let r = LintResult::warn("x");
+/// match &r {
+///     LintResult::Warn(detail) => println!("warn: {}", detail),
+///     LintResult::Error(detail) => println!("error: {}", detail),
+///     _ => {}
+/// }
+/// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LintResult {
@@ -285,17 +271,20 @@ pub enum LintResult {
     NotApplicable,
     /// Advisory finding — the cert deviates from a SHOULD or best practice.
     ///
-    /// The `&'static str` field is a human-readable explanation of the finding.
-    Warn(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
+    /// The detail string is a human-readable explanation of the finding.
+    /// Use [`LintResult::warn`] for ergonomic construction.
+    Warn(Cow<'static, str>),
     /// Error finding — the cert violates a MUST or REQUIRED requirement.
     ///
-    /// The `&'static str` field is a human-readable explanation of the finding.
-    Error(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
+    /// The detail string is a human-readable explanation of the finding.
+    /// Use [`LintResult::error`] for ergonomic construction.
+    Error(Cow<'static, str>),
     /// Fatal finding — further evaluation of this cert/path is not meaningful.
     ///
-    /// The `&'static str` field is a human-readable explanation of the finding.
+    /// The detail string is a human-readable explanation of the finding.
     /// The runner stops evaluating remaining lints for the current item when
-    /// it encounters a `Fatal`.
+    /// it encounters a `Fatal`. Use [`LintResult::fatal`] for ergonomic
+    /// construction.
     ///
     /// # `Fatal` is report-only
     ///
@@ -309,7 +298,7 @@ pub enum LintResult {
     /// The only effect of `Fatal` within `pkix-lint` itself is to stop evaluating
     /// further lints for the current certificate or path — it does not propagate
     /// as a `Result::Err` or cause any panic.
-    Fatal(#[cfg_attr(feature = "serde", serde(deserialize_with = "de_static_str"))] &'static str),
+    Fatal(Cow<'static, str>),
 }
 
 impl LintResult {
@@ -332,12 +321,49 @@ impl LintResult {
     }
 
     /// Returns the detail message for `Warn`, `Error`, or `Fatal`; `None` for `Pass`/`NotApplicable`.
+    ///
+    /// The returned reference is borrowed from `self` and lives only as long
+    /// as `self` does. To obtain an owned copy that outlives `self`, clone the
+    /// `Cow` directly from the matched variant.
     #[must_use]
-    pub const fn detail(&self) -> Option<&'static str> {
+    pub fn detail(&self) -> Option<&str> {
         match self {
-            Self::Warn(d) | Self::Error(d) | Self::Fatal(d) => Some(d),
+            Self::Warn(d) | Self::Error(d) | Self::Fatal(d) => Some(d.as_ref()),
             _ => None,
         }
+    }
+
+    /// Construct a [`LintResult::Warn`] from any value convertible to
+    /// `Cow<'static, str>`.
+    ///
+    /// Accepts string literals (zero-allocation `Cow::Borrowed`) and owned
+    /// `String` values (allocated `Cow::Owned`). Use this for lints that
+    /// report runtime-formatted detail.
+    #[must_use]
+    pub fn warn(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Warn(detail.into())
+    }
+
+    /// Construct a [`LintResult::Error`] from any value convertible to
+    /// `Cow<'static, str>`.
+    ///
+    /// Accepts string literals (zero-allocation `Cow::Borrowed`) and owned
+    /// `String` values (allocated `Cow::Owned`). Use this for lints that
+    /// report runtime-formatted detail.
+    #[must_use]
+    pub fn error(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Error(detail.into())
+    }
+
+    /// Construct a [`LintResult::Fatal`] from any value convertible to
+    /// `Cow<'static, str>`.
+    ///
+    /// Accepts string literals (zero-allocation `Cow::Borrowed`) and owned
+    /// `String` values (allocated `Cow::Owned`). Use this for lints that
+    /// report runtime-formatted detail.
+    #[must_use]
+    pub fn fatal(detail: impl Into<Cow<'static, str>>) -> Self {
+        Self::Fatal(detail.into())
     }
 }
 
@@ -482,27 +508,25 @@ pub trait Lint: Send + Sync {
 ///
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
-/// # Serde deserialization bound
 ///
-/// When `serde` is enabled, deserializing `Finding` requires `'de: 'static`
-/// because `LintResult::Warn/Error/Fatal` detail fields are `&'static str`
-/// (deserialized via `de_static_str`, which leaks the allocation). This
-/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`
-/// (tracked as PKIX-ua6q). Until then, callers must deserialize from a `'static` source
-/// (e.g., `serde_json::from_str` on a `&'static str` or `Box::leak`'d string).
+/// # Serde deserialization
+///
+/// All string fields use `Cow<'static, str>` and deserialize as `Cow::Owned`
+/// without leaking allocations. The earlier `'de: 'static` bound (required
+/// when `LintResult` detail fields were `&'static str`) was removed in
+/// pkix-lint 0.3.0 with the migration tracked as PKIX-ua6q.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
-    pub lint_id: std::borrow::Cow<'static, str>,
+    pub lint_id: Cow<'static, str>,
     /// The normative citation for this lint (from [`Lint::citation`]).
     ///
     /// Included here so consumers of `Vec<Finding>` do not need to re-look up
     /// the lint to get the citation for report generation and evidence packs.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
-    pub citation: std::borrow::Cow<'static, str>,
+    pub citation: Cow<'static, str>,
     /// Version string of the rule bundle that produced this finding.
     ///
     /// Set by [`LintRunner::with_bundle_version`]. Defaults to `""` when the runner
@@ -514,7 +538,7 @@ pub struct Finding {
     /// rule bundle from v1.3 to v1.4" explanation that prevents operators from
     /// treating a finding change as a tool defect.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
-    pub rule_bundle_version: std::borrow::Cow<'static, str>,
+    pub rule_bundle_version: Cow<'static, str>,
     /// The outcome of the lint evaluation.
     pub result: LintResult,
     /// For certificate-scope lints, the zero-based chain index of the evaluated cert.
@@ -943,7 +967,7 @@ mod tests {
 
     #[test]
     fn lint_result_warn_is_finding() {
-        let r = LintResult::Warn("test warning");
+        let r = LintResult::warn("test warning");
         assert!(!r.is_pass());
         assert!(r.is_finding());
         assert!(!r.is_fatal());
@@ -952,7 +976,7 @@ mod tests {
 
     #[test]
     fn lint_result_error_is_finding() {
-        let r = LintResult::Error("test error");
+        let r = LintResult::error("test error");
         assert!(!r.is_pass());
         assert!(r.is_finding());
         assert!(!r.is_fatal());
@@ -961,7 +985,7 @@ mod tests {
 
     #[test]
     fn lint_result_fatal_is_fatal_and_finding() {
-        let r = LintResult::Fatal("fatal error");
+        let r = LintResult::fatal("fatal error");
         assert!(!r.is_pass());
         assert!(r.is_finding());
         assert!(r.is_fatal());
@@ -1018,7 +1042,7 @@ mod tests {
             SubjectKind::Any
         }
         fn check_cert(&self, _cert: &Certificate, _kind: SubjectKind, _now: u64) -> LintResult {
-            LintResult::Warn("always warns")
+            LintResult::warn("always warns")
         }
     }
 
@@ -1041,7 +1065,7 @@ mod tests {
             SubjectKind::Any
         }
         fn check_cert(&self, _cert: &Certificate, _kind: SubjectKind, _now: u64) -> LintResult {
-            LintResult::Fatal("always fatal")
+            LintResult::fatal("always fatal")
         }
     }
 
@@ -1064,7 +1088,7 @@ mod tests {
             SubjectKind::Leaf
         }
         fn check_cert(&self, _cert: &Certificate, _kind: SubjectKind, _now: u64) -> LintResult {
-            LintResult::Warn("leaf lint fires")
+            LintResult::warn("leaf lint fires")
         }
     }
 
@@ -1093,7 +1117,7 @@ mod tests {
             _now: u64,
         ) -> LintResult {
             if path.depth > 5 {
-                LintResult::Warn("chain depth exceeds 5")
+                LintResult::warn("chain depth exceeds 5")
             } else {
                 LintResult::Pass
             }
@@ -1241,7 +1265,7 @@ mod tests {
             lint_id: std::borrow::Cow::Borrowed("x"),
             citation: std::borrow::Cow::Borrowed("test"),
             rule_bundle_version: std::borrow::Cow::Borrowed(""),
-            result: LintResult::Warn("w"),
+            result: LintResult::warn("w"),
             cert_index: None,
             evaluated_at_unix: 0,
         };
