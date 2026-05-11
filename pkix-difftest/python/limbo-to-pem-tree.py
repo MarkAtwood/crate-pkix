@@ -66,7 +66,7 @@ from typing import Any
 # tagged with any of these are skipped at conversion. See the limbo schema
 # at https://github.com/C2SP/x509-limbo for the full feature taxonomy.
 SKIP_FEATURES = {
-    # CRL revocation is out of pkix-difftest scope.
+    # CRL revocation is out of pkix-difftest scope (tracked as PKIX-emf1).
     "has-crl",
 }
 

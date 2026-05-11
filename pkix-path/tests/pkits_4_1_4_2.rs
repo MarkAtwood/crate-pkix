@@ -43,18 +43,18 @@ fn pkits_4_1_3_invalid_ee_signature() {
     );
 }
 
-/// §4.1.4 Valid DSA Signatures Test4 — DSA not currently supported.
+/// §4.1.4 Valid DSA Signatures Test4 — DSA is deprecated; will not implement.
 /// Oracle: PKITS §4.1.4 MUST validate (requires DSA backend).
 #[test]
-#[ignore = "DSA signature algorithm not currently supported"]
+#[ignore = "DSA signature algorithm is deprecated; will not implement"]
 fn pkits_4_1_4_valid_dsa_signatures() {
     let result = pkits_validate(&["ValidDSASignaturesTest4EE", "DSACACert"], PKITS_NOW);
     result.expect("§4.1.4 must validate");
 }
 
-/// §4.1.5 Valid DSA Parameter Inheritance Test5 — DSA not currently supported.
+/// §4.1.5 Valid DSA Parameter Inheritance Test5 — DSA is deprecated; will not implement.
 #[test]
-#[ignore = "DSA signature algorithm not currently supported"]
+#[ignore = "DSA signature algorithm is deprecated; will not implement"]
 fn pkits_4_1_5_valid_dsa_parameter_inheritance() {
     let result = pkits_validate(
         &[
@@ -67,9 +67,9 @@ fn pkits_4_1_5_valid_dsa_parameter_inheritance() {
     result.expect("§4.1.5 must validate");
 }
 
-/// §4.1.6 Invalid DSA Signature Test6 — DSA not currently supported.
+/// §4.1.6 Invalid DSA Signature Test6 — DSA is deprecated; will not implement.
 #[test]
-#[ignore = "DSA signature algorithm not currently supported"]
+#[ignore = "DSA signature algorithm is deprecated; will not implement"]
 fn pkits_4_1_6_invalid_dsa_signature() {
     let result = pkits_validate(&["InvalidDSASignatureTest6EE", "DSACACert"], PKITS_NOW);
     assert!(result.is_err(), "§4.1.6 must not validate");

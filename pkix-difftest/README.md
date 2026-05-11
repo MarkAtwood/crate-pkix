@@ -216,7 +216,7 @@ fastest way to see the harness exercise a large real-world corpus.
 * CRL revocation is not exercised. The harness compares path
   verdicts only; revocation differential testing is a separate
   problem (OCSP responder semantics, CRL distribution-point
-  matching). Out of scope for this harness.
+  matching). Out of scope for this harness (tracked as PKIX-emf1).
 * No CT-log scrape (Tier 3 corpus). Tracked as
   [PKIX-5bab](../.beads/).
 * No CI integration — runs are interactive only. Tracked as

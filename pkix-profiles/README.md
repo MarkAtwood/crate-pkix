@@ -79,7 +79,7 @@ look up the correct cap for a given issuance date.
 
 - `SmimeProfile` covers the Mailbox-validated / strict generation only.
   Organization-validated, Sponsor-validated, and Individual-validated S/MIME
-  profiles are planned.
+  profiles are planned (tracked as PKIX-jbvb).
 - Timestamp authority verification (CS BR requirement) is out of scope for
   `pkix-path`; it requires RFC 3161 timestamp token parsing.
 
