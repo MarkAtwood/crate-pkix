@@ -218,6 +218,7 @@ where
 
 pub mod cabf_tls_br;
 pub mod deviation;
+pub mod rfc5280;
 #[cfg(feature = "oscal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
 pub mod oscal;
@@ -302,6 +303,87 @@ impl SubjectKind {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// LintParameter (PKIX-9vnx.6.4)
+// ---------------------------------------------------------------------------
+
+/// Descriptor for a tunable parameter exposed by a [`Lint`] implementation.
+///
+/// `LintParameter` is the in-memory form of an OSCAL Catalog `Parameter` (see
+/// the [OSCAL Catalog model][oscal-cat]). Each parameter has a stable
+/// identifier (`id`), a human-readable label, and a default value rendered
+/// as a string for OSCAL interchange.
+///
+/// `LintParameter` is **descriptor-only**. It does not hold the lint's
+/// current value; the lint stores its own typed state (`usize`, `Duration`,
+/// etc.) and serialises through the descriptor at OSCAL boundaries. The
+/// "current value" plumbing happens via [`Lint::set_parameter`]:
+/// implementations parse the supplied `value: &str` into their typed state
+/// and update it in place. Callers wishing to inspect or override defaults
+/// at OSCAL Profile composition time use the `id` to address parameters
+/// across lint impls.
+///
+/// # OSCAL mapping
+///
+/// | `LintParameter` field | OSCAL `parameter` field |
+/// |-----------------------|-------------------------|
+/// | `id`                  | `id` (string token)     |
+/// | `label`               | `label` (human-readable)|
+/// | `default_value`       | `values[0]` (string)    |
+///
+/// OSCAL's richer parameter shape (constraint, guideline, select, link)
+/// is not modelled here; callers needing that surface should serialise
+/// `LintParameter` first and then graft on additional OSCAL fields at
+/// the Catalog-emit boundary.
+///
+/// [oscal-cat]: https://pages.nist.gov/OSCAL/concepts/layer/control/catalog/
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LintParameter {
+    /// Stable identifier — used to address the parameter in
+    /// [`Lint::set_parameter`] and in OSCAL Profile `modify` directives.
+    /// Example: `"max-octets"`.
+    pub id: Cow<'static, str>,
+
+    /// Human-readable label, suitable for UI display.
+    /// Example: `"Maximum allowed serial number length in octets"`.
+    pub label: Cow<'static, str>,
+
+    /// Default value rendered as a string. Lints parse this back into their
+    /// typed state if a caller has not supplied an override via
+    /// [`Lint::set_parameter`].
+    pub default_value: Cow<'static, str>,
+}
+
+/// Error reported by [`Lint::set_parameter`].
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ParameterError {
+    /// The lint does not expose a parameter with the supplied id.
+    UnknownParameter(String),
+    /// The supplied value failed to parse or violated a domain constraint
+    /// declared by the lint.
+    InvalidValue {
+        /// Parameter id the invalid value was supplied for.
+        id: String,
+        /// Human-readable explanation suitable for surfacing to operators.
+        reason: String,
+    },
+}
+
+impl core::fmt::Display for ParameterError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnknownParameter(id) => write!(f, "unknown lint parameter '{id}'"),
+            Self::InvalidValue { id, reason } => {
+                write!(f, "invalid value for lint parameter '{id}': {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParameterError {}
 
 // ---------------------------------------------------------------------------
 // LintResult
@@ -614,6 +696,52 @@ pub trait Lint: Send + Sync {
     /// Default: `None`.
     fn rfc_url(&self) -> Option<&str> {
         None
+    }
+
+    // -- OSCAL Parameter mechanism (PKIX-9vnx.6.4) -------------------------
+    //
+    // `parameters()` advertises tunable knobs in OSCAL Catalog
+    // `Parameter`-shape. `set_parameter` mutates the lint's typed internal
+    // state from a string value; this is the bridge for OSCAL Profile
+    // `modify` directives that override defaults at composition time.
+
+    /// Tunable parameters exposed by this lint.
+    ///
+    /// Returns the OSCAL Catalog `Parameter`-shaped descriptors for every
+    /// knob the lint exposes. Each descriptor names the parameter, gives a
+    /// human-readable label, and renders its default value as a string.
+    ///
+    /// The descriptors do not carry the lint's current value — the lint
+    /// stores typed state internally. To update a parameter at runtime,
+    /// use [`set_parameter`](Self::set_parameter).
+    ///
+    /// Default: empty slice (no tunable parameters).
+    fn parameters(&self) -> &[LintParameter] {
+        &[]
+    }
+
+    /// Update a tunable parameter from its string-rendered value.
+    ///
+    /// `id` is the [`LintParameter::id`] addressed by the caller; `value`
+    /// is the OSCAL-interchange string the lint must parse back into its
+    /// typed internal state. Returns [`ParameterError::UnknownParameter`]
+    /// when the id is not exposed by this lint, and
+    /// [`ParameterError::InvalidValue`] when the value fails to parse or
+    /// violates a lint-defined constraint.
+    ///
+    /// Default: returns [`ParameterError::UnknownParameter`] for every
+    /// call. Lints with non-empty [`parameters`](Self::parameters) MUST
+    /// override this method.
+    ///
+    /// # Mutability
+    ///
+    /// `set_parameter` takes `&mut self` because parameter updates change
+    /// the lint's behaviour. Callers typically configure parameters before
+    /// installing the lint into a [`LintRunner`]; the runner itself stores
+    /// `Box<dyn Lint>` and does not expose mutation.
+    #[allow(unused_variables)]
+    fn set_parameter(&mut self, id: &str, value: &str) -> Result<(), ParameterError> {
+        Err(ParameterError::UnknownParameter(id.to_owned()))
     }
 
     /// Evaluate the lint against a single certificate.
