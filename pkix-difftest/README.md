@@ -230,6 +230,79 @@ After a code change that affects any verdict, re-run the harness,
 `git diff` the `.json`, and update the analysis MD with any new
 buckets or net-count shifts.
 
+## Tier-3: CT log scrape corpus
+
+[`python/fetch-ct.py`](python/fetch-ct.py) scrapes a window of cert
+chains from a public RFC 6962 CT log (default Cloudflare Nimbus2026)
+into a chain.pem tree consumable by `pkix-difftest run pem-tree`.
+The Tier-3 corpus is real-world-wild chains: not curated like PKITS,
+not adversarial like x509-limbo. Its purpose is to surface verdict
+divergences on production traffic that Tier-1 and Tier-2 do not
+exercise.
+
+```sh
+# 1. Scrape (default: 1000 x509_entry chains from Cloudflare
+#    Nimbus2026, ~3 seconds end-to-end, ~16MB on disk).
+python3 pkix-difftest/python/fetch-ct.py
+
+# 2. Run the harness over the resulting tree (default storage location
+#    is ~/PKIX-CT-CORPUS/<log-shard>/; override with $PKIX_CT_CORPUS
+#    env var or --out-dir).
+cargo run --release -p pkix-difftest -- run pem-tree \
+    ~/PKIX-CT-CORPUS/Nimbus2026 \
+    --oracles pkix-path,openssl,pyca \
+    --output-md  pkix-difftest/baseline-ct-tier3.md \
+    --output-json pkix-difftest/baseline-ct-tier3.json
+```
+
+### Storage strategy
+
+Tier-3 raw chains are stored **out of tree** by design. The committed
+artefacts are summary JSON files plus
+[`baseline-ct-tier3-analysis.md`](baseline-ct-tier3-analysis.md); the
+~16MB chain tree lives at `$PKIX_CT_CORPUS` (default
+`~/PKIX-CT-CORPUS/`).
+
+Rationale: a meaningful Tier-3 scrape is at least 1000 chains
+(~16MB). Refreshing the baseline regularly would balloon git history,
+while the specific cert bytes are not load-bearing — Tier-3's purpose
+is statistical-shape signal, not RFC-numbered conformance vectors. The
+JSON summaries and per-class counts are sufficient for differential
+analysis; per-chain reason strings drift with OpenSSL minor releases
+and pyca version bumps (same false-positive surface CI suppresses for
+PKITS).
+
+### Tier-3 design constraints
+
+* **x509_entry only.** Log entries are either ``x509_entry`` (final
+  issued certs) or ``precert_entry`` (pre-issuance shape with the CT
+  poison extension, never deployed as TLS certs). The fetcher keeps
+  only x509_entry chains — those are what real consumers ask
+  validators to verify.
+
+* **Trust anchor via the system bundle.** CT log entries do NOT
+  include the root cert. The fetcher resolves the root by Subject DN
+  in a PEM bundle (default `/etc/ssl/certs/ca-certificates.crt`; pass
+  `--trust-bundle` to override). Chains whose root is not in the
+  bundle are skipped (counted as `root_not_in_bundle` in the
+  scrape-summary).
+
+* **Log-included roots are handled.** Some CT logs (e.g. Cloudflare
+  Nimbus shards) ship the root cert in the entry's intermediate chain
+  as a convenience; others omit it. The fetcher detects a self-signed
+  last-intermediate and prefers the log-shipped copy over the bundle
+  copy (so chain bytes stay provenance-correct), avoiding a duplicate
+  root that would trigger the harness to verify the root's own
+  self-signature inside the §6.1 walk.
+
+* **Stdlib only.** Mirrors `limbo-to-pem-tree.py`: the fetcher must
+  run from system Python without the pyca venv so it stays trivial to
+  run on minimal CI runners (even though Tier-3 is not currently in
+  CI).
+
+See [`baseline-ct-tier3-analysis.md`](baseline-ct-tier3-analysis.md)
+for the curated walkthrough of the 2026-05-11 baseline.
+
 ### Secondary baseline: full crypto profile (PKIX-wmch)
 
 The primary baseline answers "what does an unsuspecting downstream
@@ -336,10 +409,9 @@ fastest way to see the harness exercise a large real-world corpus.
   verdicts only; revocation differential testing is a separate
   problem (OCSP responder semantics, CRL distribution-point
   matching). Out of scope for this harness (tracked as PKIX-emf1).
-* No CT-log scrape (Tier 3 corpus). Tracked as
-  [PKIX-5bab](../.beads/).
-* No CI integration — runs are interactive only. Tracked as
-  [PKIX-klku](../.beads/).
+* CT-log scrape (Tier-3 corpus) ships as a separate workflow; see
+  the "Tier-3: CT log scrape corpus" section above. The harness's
+  PKITS and limbo paths are unchanged.
 
 ## Independent oracle discipline
 
