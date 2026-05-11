@@ -12,14 +12,16 @@ TLS certificates include at least two SCTs from distinct logs.
 SCTs can be embedded in three places:
 
 - The certificate itself — `SignedCertificateTimestampList` extension
-  (OID 1.3.6.1.4.1.11129.2.4.2). Parser implemented; SCTs are typically
-  `precert_entry` here and full signature verification of the precert
-  variant is not yet implemented (tracked as PKIX-baac.4).
+  (OID 1.3.6.1.4.1.11129.2.4.2). Always `precert_entry`; verified via
+  [`SctVerifier::verify_sct_for_precert`][verifier-precert] or the
+  loop helper [`SctVerifier::verify_embedded_scts`][verifier-embedded].
 - OCSP responses — `SignedCertificateTimestampList` extension under
   OID 1.3.6.1.4.1.11129.2.4.5. Parser implemented behind the `ocsp` feature.
-  Typically `x509_entry`, which `SctVerifier` fully verifies.
+  Always `x509_entry`; verified via
+  [`SctVerifier::verify_sct_for_cert`][verifier-cert].
 - TLS handshake — delivered as a TLS extension (raw `SerializedSCTList`).
   Parser implemented (see [`sct_list_from_tls_extension`][delivery]).
+  Also `x509_entry`.
 
 ## Status
 
@@ -31,36 +33,40 @@ Implemented:
   `log_list.json` schema parser behind `log-list-json`.
 - Delivery-channel extractors for the TLS handshake extension and (behind
   the `ocsp` feature) OCSP responses.
-- SCT signature verification for the `x509_entry` log entry type via
-  [`SctVerifier`][verifier], dispatching algorithm-specific verification
-  through `pkix-path`'s [`SignatureVerifier`] trait.
+- SCT signature verification for both the `x509_entry` and
+  `precert_entry` log entry types via [`SctVerifier`][verifier],
+  dispatching algorithm-specific verification through `pkix-path`'s
+  [`SignatureVerifier`] trait.
 
 Not yet implemented (tracked under PKIX-baac):
 
-- `precert_entry` signature verification — the pre-cert branch of
-  RFC 6962 §3.2.
 - Merkle inclusion proof verification (RFC 6962 §2.1.1).
 
 ## Example
 
+Verify the SCTs embedded in a cert against a trusted log list:
+
 ```rust,no_run
 # #[cfg(all(feature = "log-list", feature = "log-list-json"))]
 # fn example() -> Result<(), pkix_ct::Error> {
-use pkix_ct::{CtLogList, SctList, SctVerifier};
+use pkix_ct::{CtLogList, SctVerifier};
 use pkix_path::DefaultVerifier;
+use x509_cert::der::Decode as _;
+use x509_cert::Certificate;
 
 // Caller-supplied log list. pkix-ct ships no built-in trust data.
 let log_list_json: &str = ""; // load from a trusted source
 let logs = CtLogList::from_google_log_list_json(log_list_json)?;
 
-let cert_der: &[u8] = &[]; // final certificate, DER-encoded
-let sct_list_bytes: &[u8] = &[]; // extracted from cert/OCSP/TLS
-let scts = SctList::from_extension_value(sct_list_bytes)?;
+let leaf_der: &[u8] = &[]; // final cert, DER-encoded
+let issuer_der: &[u8] = &[]; // its immediate issuer, DER-encoded
+let leaf = Certificate::from_der(leaf_der).map_err(|_| pkix_ct::Error::ParseError)?;
+let issuer = Certificate::from_der(issuer_der).map_err(|_| pkix_ct::Error::ParseError)?;
 
 let v = SctVerifier::new(logs, DefaultVerifier);
-for sct in &scts.0 {
-    v.verify_sct_for_cert(sct, cert_der)?;
-}
+let valid = v.verify_embedded_scts(&leaf, &issuer)?;
+// CA/Browser Forum TLS BR §3.2.2.9 requires at least two SCTs.
+assert!(valid >= 2, "cert has too few valid SCTs (got {valid})");
 # Ok(())
 # }
 ```
@@ -75,6 +81,9 @@ for sct in &scts.0 {
 [RFC 9162]: https://www.rfc-editor.org/rfc/rfc9162
 [delivery]: https://docs.rs/pkix-ct/latest/pkix_ct/fn.sct_list_from_tls_extension.html
 [verifier]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html
+[verifier-cert]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_sct_for_cert
+[verifier-precert]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_sct_for_precert
+[verifier-embedded]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_embedded_scts
 [`SignatureVerifier`]: https://docs.rs/pkix-path/latest/pkix_path/trait.SignatureVerifier.html
 
 ## License

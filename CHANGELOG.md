@@ -479,16 +479,31 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
   will need to enable the feature. pkix-ct is at `0.0.0` and not
   published, so the impact is contained to in-tree consumers.
 
-- When neither `log-list` nor `log-list-json` is enabled, `CtLogList`
-  is an empty stub struct retained so the `verify_scts` signature stays
-  stable across feature combinations.
+- `verify_scts` removed from the crate root. Replaced by methods on
+  [`SctVerifier`]: `verify_sct_for_cert` (RFC 6962 `x509_entry`),
+  `verify_sct_for_precert` (`precert_entry`), and `verify_embedded_scts`
+  (count-returning loop helper for cert-embedded SCT-list extensions).
+  BREAKING for any in-tree caller of `pkix_ct::verify_scts`; none
+  exist, and pkix-ct remains at 0.0.0 (unpublished). The non-`log-list`
+  stub `CtLogList` was retired together with the old standalone
+  helper. Tracked as PKIX-baac.7.
+
+- Error variants `NoTrustedSct` and `PrecertEntryNotImplemented` removed
+  from `Error`: both were only emitted by the prior `verify_scts` stub
+  / pre-cert stub paths that no longer exist. New variant
+  `LeafMissingSctList` added for the `verify_sct_for_precert` case
+  where the leaf has no SCT-list extension. `Error` remains
+  `#[non_exhaustive]`.
 
 - The `Limitations` rustdoc section is updated to describe what's
-  implemented (parsing + delivery adapters + log list) vs what is not
-  (signature verification, pre-cert handling, Merkle inclusion proofs).
+  implemented (parsing + delivery adapters + log list + signature
+  verification for both `x509_entry` and `precert_entry`) vs what is
+  not (Merkle inclusion proofs, tracked as PKIX-baac.5).
 
   Tracked as PKIX-baac.1 (parser), PKIX-baac.6 (delivery adapters),
-  and PKIX-baac.2 (log list) in the project beads.
+  PKIX-baac.2 (log list), PKIX-baac.3 (`x509_entry` verifier),
+  PKIX-baac.4 (`precert_entry` verifier), and PKIX-baac.7
+  (`verify_embedded_scts`).
 
 ## [0.3.0 / 0.2.1] — 2026-05-07
 

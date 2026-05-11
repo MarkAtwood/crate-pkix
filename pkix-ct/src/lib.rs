@@ -54,35 +54,12 @@ pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
 pub use verify::SctVerifier;
 
-use x509_cert::Certificate;
-
-/// Stub log-list type used when the `log-list` feature is disabled, so
-/// the existing [`verify_scts`] stub signature compiles. The real
-/// `CtLogList` is enabled by the `log-list` feature.
-#[cfg(not(feature = "log-list"))]
-#[derive(Debug, Default)]
-#[non_exhaustive]
-pub struct CtLogList {
-    _empty: (),
-}
-
-#[cfg(not(feature = "log-list"))]
-impl CtLogList {
-    /// Create an empty log list.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self { _empty: () }
-    }
-}
-
 /// Errors returned by SCT parsing and verification.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate contains no SCT extension.
     NoScts,
-    /// None of the SCTs in the certificate were signed by a log in the [`CtLogList`].
-    NoTrustedSct,
     /// An SCT signature was invalid.
     InvalidSignature,
     /// DER parsing of the SCT list extension failed.
@@ -112,15 +89,6 @@ pub enum Error {
     /// The SCT timestamp falls outside the log's
     /// `[usable_from_ms, retired_at_ms)` window.
     SctTimestampOutsideLogWindow,
-    /// Encountered a `precert_entry` SCT but signature verification for
-    /// the pre-cert flow is not yet implemented (tracked as PKIX-baac.4).
-    ///
-    /// Retained for source compatibility with earlier pkix-ct releases
-    /// where `precert_entry` verification was a stub. The PKIX-baac.4
-    /// implementation does not return this variant; callers wishing
-    /// to detect pre-cert SCT support should call
-    /// [`SctVerifier::verify_sct_for_precert`] directly.
-    PrecertEntryNotImplemented,
     /// The supplied certificate DER exceeds the 2^24 - 1 octet limit of
     /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate`)
     /// opaque-length-prefixed field.
@@ -139,7 +107,6 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::NoScts => f.write_str("certificate contains no SCTs"),
-            Self::NoTrustedSct => f.write_str("no SCT from a trusted log found"),
             Self::InvalidSignature => f.write_str("SCT signature invalid"),
             Self::ParseError => f.write_str("SCT list parse error"),
             Self::UnsupportedVersion(v) => {
@@ -164,9 +131,6 @@ impl core::fmt::Display for Error {
             Self::SctTimestampOutsideLogWindow => {
                 f.write_str("SCT timestamp falls outside the log's usable window")
             }
-            Self::PrecertEntryNotImplemented => {
-                f.write_str("precert_entry SCT verification is not yet implemented")
-            }
             Self::CertDerTooLong => {
                 f.write_str("certificate DER exceeds the 2^24 - 1 octet ASN.1Cert limit")
             }
@@ -182,23 +146,3 @@ impl std::error::Error for Error {}
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
-
-/// Verify that `cert` contains at least one valid SCT from a log in `logs`.
-///
-/// Returns `Err(Error::NoTrustedSct)` unconditionally. This function is a
-/// thin signature-less stub kept for source-compatibility with earlier
-/// pkix-ct releases that did not expose [`SctVerifier`]. New callers
-/// should use [`SctVerifier::verify_sct_for_cert`] directly, which takes
-/// a [`pkix_path::SignatureVerifier`] and performs real verification
-/// (PKIX-baac.3 shipped). A future revision will replace this stub with
-/// a generic helper that iterates the cert's SCT extension and dispatches
-/// through `SctVerifier`; doing so cleanly requires adding a
-/// `SignatureVerifier` generic to this function's signature, which is a
-/// breaking change tracked separately (PKIX-baac follow-up).
-///
-/// # Errors
-///
-/// Returns `Err(Error::NoTrustedSct)` unconditionally.
-pub const fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
-    Err(Error::NoTrustedSct)
-}
