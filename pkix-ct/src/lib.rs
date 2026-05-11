@@ -21,39 +21,47 @@
 //! [`SignedCertificateTimestamp`] and [`SctList`]. Delivery-channel
 //! adapters for the TLS handshake extension and OCSP responses are also
 //! implemented; see [`sct_list_from_tls_extension`] and (behind the
-//! `ocsp` feature) `sct_list_from_ocsp_response`. Log list management,
-//! signature verification, pre-cert handling, and Merkle inclusion proof
-//! verification are not yet implemented; see the project tracker
+//! `ocsp` feature) `sct_list_from_ocsp_response`. CT log list management
+//! is implemented behind the `log-list` and `log-list-json` features;
+//! see `CtLog`, `CtLogList`, and `CtLogList::from_google_log_list_json`.
+//! SCT signature verification, pre-cert handling, and Merkle inclusion
+//! proof verification are not yet implemented; see the project tracker
 //! (PKIX-baac children) for status.
 
 extern crate alloc;
 
 mod delivery;
+#[cfg(feature = "log-list")]
+mod log_list;
 mod sct;
 
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use delivery::sct_list_from_ocsp_response;
 pub use delivery::sct_list_from_tls_extension;
+#[cfg(feature = "log-list")]
+#[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
+pub use log_list::{CtLog, CtLogList};
 pub use sct::{SctList, SignedCertificateTimestamp};
 
 use x509_cert::Certificate;
 
-/// A set of trusted CT log public keys used to verify SCTs.
-///
-/// Populate from the current CT log list (e.g. Chrome's
-/// <https://www.gstatic.com/ct/log_list/v3/log_list.json>) before verifying.
+/// Stub log-list type used when the `log-list` feature is disabled, so
+/// the existing [`verify_scts`] stub signature compiles. The real
+/// `CtLogList` is enabled by the `log-list` feature.
+#[cfg(not(feature = "log-list"))]
 #[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct CtLogList {
-    // log public keys indexed by log_id — not yet implemented (tracked as PKIX-baac.2)
+    _empty: (),
 }
 
+#[cfg(not(feature = "log-list"))]
 impl CtLogList {
     /// Create an empty log list.
     #[must_use]
     pub const fn new() -> Self {
-        Self {}
+        Self { _empty: () }
     }
 }
 

@@ -1185,8 +1185,12 @@ dependencies = [
 name = "pkix-ct"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "der",
  "pkix-path",
+ "serde",
+ "serde_json",
+ "sha2",
  "signature",
  "x509-cert",
  "x509-ocsp",
