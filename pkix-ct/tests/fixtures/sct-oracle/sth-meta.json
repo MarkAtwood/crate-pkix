@@ -1,0 +1,13 @@
+{
+  "hash_alg": 4,
+  "log_id_hex": "b39af9547e439255b5ee658cb4b080a867090081e32d32d6c1544ec56016f514",
+  "log_spki_len": 91,
+  "oracle": "pyca/cryptography (ec.ECDSA(SHA256)) + hand-rolled RFC 6962 \u00a73.5 wire format",
+  "root_hash_hex": "3560191803028444b232018ac047fdb561c09c23a7a6876c85e08b5e4d48e9f3",
+  "scheme": "RFC 6962 \u00a73.5 TreeHeadSignature, ECDSA-P256-SHA256",
+  "sig_alg": 3,
+  "signature_len": 71,
+  "signed_input_len": 50,
+  "timestamp_ms": 1750032000000,
+  "tree_size": 7
+}
