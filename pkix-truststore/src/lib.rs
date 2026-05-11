@@ -169,11 +169,14 @@ fn strip_bom(bytes: &[u8]) -> &[u8] {
 /// * [`Error::NoCertificates`] — input contained zero PEM blocks.
 pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
     let bytes = strip_bom(bytes);
-    // x509-cert 0.2.5's `load_pem_chain` panics on input that is empty after
+    // x509-cert 0.2.x's `load_pem_chain` panics on input that is empty after
     // its internal trailing-whitespace strip (subtract-with-overflow at
-    // `certificate.rs:256`). Defend against that here so consumers see
-    // `Error::NoCertificates` instead of a panic. The check is also correct
-    // for input with no `-----BEGIN CERTIFICATE-----` markers at all.
+    // `certificate.rs:256`). Fixed upstream in RustCrypto/formats#1965 and
+    // shipped in x509-cert 0.3.0-rc.2+; this guard can be removed once the
+    // workspace bumps to x509-cert 0.3.x stable. Until then, defend against
+    // the panic here so consumers see `Error::NoCertificates` instead. The
+    // check is also correct for input with no `-----BEGIN CERTIFICATE-----`
+    // markers at all.
     if !bytes
         .windows(BEGIN_BOUNDARY.len())
         .any(|w| w == BEGIN_BOUNDARY)
