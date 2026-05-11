@@ -32,7 +32,7 @@ The RustCrypto upstream gap is tracked at RustCrypto/formats#838 (open since 202
 ## Key design facts
 
 - RFC 5280 §6.1 state machine lives in `pkix-path::validate_path`.
-- Path building (RFC 4158 — cross-signed certs, multiple candidate issuers) is out of scope for v0.1.
+- Path building (RFC 4158 — cross-signed certs, multiple candidate issuers) lives in `pkix-path-builder`. `pkix-path` itself is positional: `chain[i+1]` must be the issuer of `chain[i]`.
 - DN comparison must follow RFC 4518 string prep — do not use byte-equality for names.
 - `BasicConstraints` cA=TRUE is mandatory on every intermediate; keyCertSign in KeyUsage must be checked.
 - PKITS (NIST) test corpus is the integration test bar.
@@ -56,10 +56,16 @@ workspace without explicit human approval. Do not add platform-specific FFI
 or `[target.<platform>.dependencies]` to `pkix-truststore` itself; that
 belongs in an adapter crate.
 
-## v0.1 deliverable
+## Status
 
-RSA-PKCS1v15 + P-256 signing, no NameConstraints, no revocation, configurable max depth.
-PKITS happy-path subset green. All unimplemented features have rustdoc `# Limitations` sections.
+Crypto coverage, RFC compliance, and feature surfaces land incrementally.
+Per-crate `# Limitations` rustdoc sections describe what each crate's
+shipped code currently does and does not do. The driving goal is full
+RFC 5280 and adjacent-RFC coverage; no work is gated by a version
+milestone.
+
+PKITS (NIST) test corpus is the integration-test bar. See
+`pkix-difftest/baseline-pkits-analysis.md` for current state.
 
 ## Test discipline
 
