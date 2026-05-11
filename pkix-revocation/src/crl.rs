@@ -540,8 +540,17 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     ///
     /// # Limitations
     ///
-    /// CRL discovery via the `cRLDistributionPoints` extension is not
-    /// implemented.  The CRL DER must be supplied at construction time.
+    /// CRL discovery via the `cRLDistributionPoints` extension is by
+    /// design not implemented in `pkix-revocation` itself — this crate
+    /// stays `no_std` for its core types and does not perform network
+    /// I/O. The CRL DER must be supplied at construction time; for
+    /// online fetching from CRL DPs, use `pkix-revocation-http`.
+    ///
+    /// Path-level CRL signer discovery (RFC 5280 §6.3.3(f) — walking a
+    /// bundle to find an indirect CRL's signer cert) is also not
+    /// performed by this crate. The caller must identify the CRL signer
+    /// cert; tracked as PKIX-cqwt.
+    ///
     /// If the CRL's issuer name does not match the anchor's subject, this
     /// method returns [`Error::CrlIssuerMismatch`] rather than `Ok(())`,
     /// ensuring a mismatched CRL is surfaced rather than silently skipped.

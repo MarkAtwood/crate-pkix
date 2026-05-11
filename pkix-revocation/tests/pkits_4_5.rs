@@ -20,7 +20,7 @@
 //! Several §4.5 CRLs are signed by a cert that is *not* the same as the cert
 //! that issued the EE — exactly the cases that test [RFC 5280] indirect-CRL
 //! handling. `pkix-revocation` does not currently perform path-level CRL signer
-//! discovery. Each test below explicitly identifies the
+//! discovery (tracked as PKIX-cqwt). Each test below explicitly identifies the
 //! CRL signer cert (by matching CRL `AuthorityKeyIdentifier` against the cert
 //! bundle's `SubjectKeyIdentifier`) and supplies it as the `issuer` argument
 //! to [`CrlChecker::check_revocation`]. This is mechanically valid: the API

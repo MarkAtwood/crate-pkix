@@ -213,7 +213,7 @@ impl Deviation {
 /// - Use `Any` only for internal CAs or test environments where the profile
 ///   is intentionally not applicable.
 ///
-/// # Planned additions
+/// # Planned additions (tracked as PKIX-8mzp)
 ///
 /// - `SubjectDnContains(String)` — for subscriber-identity scoping
 /// - `PolicyOid(ObjectIdentifier)` — certs asserting a specific CP OID
@@ -502,7 +502,7 @@ impl DeviatedFinding {
 /// An in-memory collection of [`Deviation`]s.
 ///
 /// The store is currently append-only. Future versions may add update/delete
-/// and persistence (file-backed JSON/OSCAL format).
+/// and persistence (file-backed JSON/OSCAL format) — tracked as PKIX-dbhe.
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Clone, Debug, Default)]
 pub struct DeviationStore {

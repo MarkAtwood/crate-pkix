@@ -199,7 +199,7 @@ impl Profile for WebPkiProfile {
 ///
 /// Implements [`Profile`] for the strictest S/MIME BR validation tier.
 /// Organization-validated, Sponsor-validated, and Individual-validated sub-profiles
-/// are planned.
+/// are planned (tracked as PKIX-jbvb).
 ///
 /// The free-function alias [`smime_policy`] is equivalent to
 /// `SmimeProfile.policy(now_unix)`.
@@ -207,7 +207,7 @@ impl Profile for WebPkiProfile {
 /// # Limitations
 ///
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
-/// Sponsor-validated, and Individual-validated profiles are planned.
+/// Sponsor-validated, and Individual-validated profiles are planned (tracked as PKIX-jbvb).
 ///
 /// [`ValidationPolicy::max_validity_secs`] applies to **every** certificate in
 /// the chain, not just the leaf. Typical S/MIME CA certificates have validity
@@ -446,7 +446,7 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// # Limitations
 ///
 /// Only the Mailbox-validated / strict profile is enforced. Organization-validated,
-/// Sponsor-validated, and Individual-validated profiles are planned.
+/// Sponsor-validated, and Individual-validated profiles are planned (tracked as PKIX-jbvb).
 ///
 /// `max_validity_secs` applies to **every** certificate in the chain, not just
 /// the leaf. Typical S/MIME CA certificates have validity periods of 10–20 years

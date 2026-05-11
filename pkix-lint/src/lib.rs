@@ -129,8 +129,8 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 ///
 /// - Use a separate short-lived process or worker for deserialization and pass
 ///   structured data across a process boundary.
-/// - Or file an issue to accelerate the migration of `LintResult` detail
-///   fields from `&'static str` to `Cow<'static, str>`, which removes this
+/// - Or follow PKIX-ua6q, which tracks the migration of `LintResult` detail
+///   fields from `&'static str` to `Cow<'static, str>`, removing this
 ///   constraint.
 ///
 /// All other string fields in `Finding` and `EvaluationReport` already use
@@ -478,7 +478,7 @@ pub trait Lint: Send + Sync {
 /// citation from [`Lint::citation`]; `evaluated_at_unix` records when the lint
 /// was run; `rule_bundle_version` records which version of the lint bundle was active.
 ///
-/// # Planned fields
+/// # Planned fields (tracked as PKIX-a86q)
 ///
 /// - `cert_sha256: [u8; 32]` — SHA-256 of the DER cert that triggered this finding.
 ///   Deferred to avoid adding a SHA-256 dependency to the engine core.
@@ -487,8 +487,8 @@ pub trait Lint: Send + Sync {
 /// When `serde` is enabled, deserializing `Finding` requires `'de: 'static`
 /// because `LintResult::Warn/Error/Fatal` detail fields are `&'static str`
 /// (deserialized via `de_static_str`, which leaks the allocation). This
-/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`.
-/// Until then, callers must deserialize from a `'static` source
+/// constraint will be removed when `LintResult` migrates to `Cow<'static, str>`
+/// (tracked as PKIX-ua6q). Until then, callers must deserialize from a `'static` source
 /// (e.g., `serde_json::from_str` on a `&'static str` or `Box::leak`'d string).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(bound(deserialize = "'de: 'static")))]

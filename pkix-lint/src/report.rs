@@ -23,7 +23,7 @@
 //! - `findings` → `assessment-results.results.findings` (non-deviated)
 //! - `deviated_findings` → `assessment-results.results.risks[status=deviation-approved]`
 //!
-//! A full OSCAL export adapter is planned for the `pkix-lint-oscal` crate.
+//! A full OSCAL export adapter is planned for the `pkix-lint-oscal` crate (tracked as PKIX-nlxl).
 
 use std::borrow::Cow;
 
