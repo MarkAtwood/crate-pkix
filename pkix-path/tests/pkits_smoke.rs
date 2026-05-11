@@ -4,6 +4,8 @@
 //! Oracle: NIST PKITS (SP 800-89) §4.1.1 specifies that
 //! `ValidCertificatePathTest1EE` with `GoodCACert` and the trust anchor MUST pass.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
 

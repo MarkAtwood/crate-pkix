@@ -5,6 +5,8 @@
 //!
 //! Oracle: NIST PKITS (SP 800-89) document §4.3.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
 

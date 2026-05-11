@@ -20,6 +20,8 @@
 //! - NIST-test-policy-3 = 2.16.840.1.101.3.2.1.48.3
 //! - NIST-test-policy-6 = 2.16.840.1.101.3.2.1.48.6
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
 use pkits_helper::{pkits_cert, pkits_trust_anchor, PKITS_NOW};

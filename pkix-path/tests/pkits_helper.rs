@@ -18,6 +18,8 @@
 //!
 //! The trust anchor (`TrustAnchorRootCertificate.crt`) is always loaded automatically.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidatedPath, ValidationPolicy};
 use x509_cert::Certificate;
