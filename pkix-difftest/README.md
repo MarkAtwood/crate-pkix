@@ -61,7 +61,7 @@ signal; non-zero exit means the harness itself failed).
 pkix-difftest/
 ├── src/
 │   ├── lib.rs         # Verdict, OracleName, Chain, PEM split
-│   ├── main.rs        # CLI: single / run pkits|pem-tree|pem-multi
+│   ├── main.rs        # CLI: single / run pkits|limbo|pem-tree|pem-multi
 │   ├── classify.rs    # 5-class verdict classifier (worst-first)
 │   ├── report.rs      # markdown + JSON writers (pure)
 │   ├── oracles/
@@ -70,6 +70,7 @@ pkix-difftest/
 │   │   └── pyca.rs        # Python sidecar + JSON IPC
 │   └── corpus/
 │       ├── pkits.rs       # NIST PKITS vectors.json loader
+│       ├── limbo.rs       # x509-limbo limbo.json loader (PKIX-g9vc.2)
 │       ├── pem_tree.rs    # recursive chain.pem tree walker
 │       └── pem_multi.rs   # explicit-paths CLI corpus
 ├── python/
@@ -81,9 +82,12 @@ pkix-difftest/
 │   ├── pyca_oracle.rs        # PKIX-7nsf.3 (skips if no venv)
 │   ├── corpus_*.rs           # PKIX-7nsf.4
 │   └── fixtures/             # PKITS 4.1.1 + 4.1.2 chains
-├── baseline-pkits.md         # auto-generated PKITS report
-├── baseline-pkits.json       # machine-readable source of truth
-├── baseline-pkits-analysis.md# curated bucket-by-bucket analysis
+├── baseline-pkits.md         # auto-generated PKITS (Tier-1) report
+├── baseline-pkits.json       # PKITS machine-readable source of truth
+├── baseline-pkits-analysis.md# PKITS curated bucket-by-bucket analysis
+├── baseline-limbo.md         # auto-generated x509-limbo (Tier-2) report
+├── baseline-limbo.json       # limbo machine-readable source of truth
+├── baseline-limbo-analysis.md# limbo curated bucket-by-bucket analysis
 └── baseline-pyca.md          # corpus-shape finding (see PKIX-g9vc)
 ```
 
@@ -142,7 +146,49 @@ change that affects any verdict, re-run the harness, then `git diff`
 the `.json` to see exactly which chains moved between classes. Update
 `baseline-pkits-analysis.md` to reflect the new state.
 
-## Demo: running the entire x509-limbo corpus
+## Tier-2: x509-limbo corpus
+
+[x509-limbo](https://github.com/C2SP/x509-limbo) is the curated
+~9.7k-testcase chain-validation corpus that pyca/cryptography's
+verifier tests run against. The harness ships a first-class loader
+(`pkix-difftest/src/corpus/limbo.rs`) that filters to the
+RFC-5280-shaped subset (drops CLIENT validation, feature-tagged
+cases, max-chain-depth outliers, and CRL-bearing cases — 9726
+cases remaining of 9773) and threads per-testcase `validation_time`
+through every oracle.
+
+```sh
+# 1. Clone x509-limbo (~88MB, one-time):
+git clone --depth=1 https://github.com/C2SP/x509-limbo.git ~/GIT/x509-limbo
+
+# 2. Run the harness (full corpus ≈14 min on a modern workstation):
+cargo run --release -p pkix-difftest -- run limbo \
+  ~/GIT/x509-limbo/limbo.json \
+  --oracles pkix-path,openssl,pyca \
+  --output-md pkix-difftest/baseline-limbo.md \
+  --output-json pkix-difftest/baseline-limbo.json \
+  --title "pkix-difftest baseline (x509-limbo Tier-2)"
+```
+
+Committed baseline files:
+
+* `baseline-limbo.json` — machine-readable, lossless source of truth.
+* `baseline-limbo.md` — auto-generated per-bucket detail.
+* `baseline-limbo-analysis.md` — curated bucket-by-bucket analysis
+  (mirrors `baseline-pkits-analysis.md`).
+
+After a code change that affects any verdict, re-run the harness,
+`git diff` the `.json`, and update the analysis MD with any new
+buckets or net-count shifts.
+
+## Demo: running the entire x509-limbo corpus (legacy PEM-tree path)
+
+This section predates the proper LimboCorpus loader (see "Tier-2"
+above for the supported workflow). It is kept for reference because
+the PEM-tree converter is still useful for ad-hoc cherry-picking of
+testcases into shareable on-disk corpora.
+
+
 
 [x509-limbo](https://github.com/C2SP/x509-limbo) is the curated 9,773-
 testcase chain-validation corpus that pyca/cryptography's verifier tests
@@ -150,11 +196,9 @@ run against. It is the corpus the parent epic PKIX-7nsf originally
 called "Tier 2: pyca corpus" (see `baseline-pyca.md` for the discovery
 that pyca's `tests/x509/` is parser-shaped, not chain-shaped).
 
-The structurally-correct integration — a `LimboCorpus` loader with
-per-testcase `validation_time` threading through every oracle — is
-tracked under [PKIX-g9vc](../.beads/). Until that lands, you can
-exercise the existing PEM-tree corpus loader over the entire limbo
-corpus by running the bundled converter:
+The structurally-correct integration is `run limbo` (see "Tier-2: x509-limbo
+corpus" above). The PEM-tree converter described below is a legacy ad-hoc
+path predating the proper loader; prefer `run limbo` for any baseline run.
 
 ```sh
 # 1. Clone x509-limbo (~88MB, one-time):
@@ -206,13 +250,15 @@ fastest way to see the harness exercise a large real-world corpus.
 
 * The harness requires the trust anchor to be the **last** cert in
   the chain. Real-world TLS chains typically omit the root; you must
-  append it from a trust store before running the harness. This is
-  tracked under [PKIX-g9vc](../.beads/) (x509-limbo integration also
-  fixes this — its testcase shape carries trust anchors separately).
-* Per-chain `validation_time` is system-clock-only. Some test
-  corpora (notably x509-limbo) ship per-testcase validation times
-  for chains that are now expired but were valid at issue time.
-  Threading this through is part of [PKIX-g9vc](../.beads/).
+  append it from a trust store before running the harness. The
+  PKITS and LimboCorpus loaders both handle this from corpus
+  metadata; the PEM-tree and PEM-multi loaders require pre-assembled
+  full chains.
+* Per-chain `validation_time` threading: PKITS uses
+  per-testcase times from `vectors.json`, LimboCorpus uses
+  per-testcase RFC 3339 times from `limbo.json` (with a 2023-11-14
+  fallback when null), pyca demo-mode PEM-tree uses the system
+  clock. Mix accordingly.
 * CRL revocation is not exercised. The harness compares path
   verdicts only; revocation differential testing is a separate
   problem (OCSP responder semantics, CRL distribution-point
