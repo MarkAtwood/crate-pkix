@@ -27,6 +27,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 use pkix_difftest::classify::{classify, sort_by_severity, Classified};
+use pkix_difftest::corpus::limbo::LimboCorpus;
 use pkix_difftest::corpus::pem_multi::PemMultiCorpus;
 use pkix_difftest::corpus::pem_tree::PemTreeCorpus;
 use pkix_difftest::corpus::pkits::PkitsCorpus;
@@ -89,6 +90,20 @@ enum CorpusCmd {
     PemMulti {
         /// One or more cert files (PEM or DER, auto-detected).
         files: Vec<PathBuf>,
+        #[command(flatten)]
+        opts: RunOpts,
+    },
+    /// Run over the x509-limbo corpus (`limbo.json`, ~9.7k testcases).
+    ///
+    /// Applies a default RFC-5280-shaped filter: drops CLIENT validation,
+    /// any feature-tagged case (has-crl, pedantic-*, name-constraint-dn,
+    /// max-chain-depth, denial-of-service, policy-constraints), and inline
+    /// CRLs. See `pkix-difftest/src/corpus/limbo.rs` for the filter
+    /// rationale. Per-testcase `validation_time` is pinned through every
+    /// oracle via `Chain::validation_time_unix`.
+    Limbo {
+        /// Path to `limbo.json` (typically `~/GIT/x509-limbo/limbo.json`).
+        manifest: PathBuf,
         #[command(flatten)]
         opts: RunOpts,
     },
@@ -172,6 +187,7 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
             Box::new(PemMultiCorpus::new(files.clone(), "pem-multi")),
             opts,
         ),
+        CorpusCmd::Limbo { manifest, opts } => (Box::new(LimboCorpus::load(manifest)?), opts),
     };
 
     let oracle_names = parse_oracle_list(&opts.oracles)?;
