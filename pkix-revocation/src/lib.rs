@@ -294,6 +294,34 @@ pub enum Error {
     /// (RFC 5280 §6.3.3(f)).
     CrlSignMissing,
 
+    /// Path-level CRL signer discovery (RFC 5280 §6.3.3(f)) could not
+    /// locate a certificate in the caller-supplied bundle that signed
+    /// the CRL.
+    ///
+    /// Returned by [`CrlChecker::new_with_signer_discovery`] when neither
+    /// the CRL's `AuthorityKeyIdentifier` matches any bundle cert's
+    /// `SubjectKeyIdentifier`, nor any bundle cert's subject DN matches
+    /// the CRL's issuer DN. The caller must either supply a more
+    /// complete bundle or use a different constructor.
+    ///
+    /// [`CrlChecker::new_with_signer_discovery`]: crate::CrlChecker::new_with_signer_discovery
+    CrlSignerNotFound,
+
+    /// Path-level CRL signer discovery found a candidate cert in the
+    /// bundle, but the candidate does not chain back to a self-signed
+    /// (anchor-like) cert in the same bundle.
+    ///
+    /// Returned by [`CrlChecker::new_with_signer_discovery`]. This is
+    /// the structural half of RFC 5280 §6.3.3(f)'s "chain back to a
+    /// trust anchor" gate; it ensures the bundle is not missing the
+    /// signer's CA path. Full RFC 5280 §6.1 signature/policy validation
+    /// of the signer's chain is the responsibility of higher-layer
+    /// composers such as `pkix-chain` and is intentionally not
+    /// performed here.
+    ///
+    /// [`CrlChecker::new_with_signer_discovery`]: crate::CrlChecker::new_with_signer_discovery
+    CrlSignerNotTrusted,
+
     /// The base/delta CRL pair cannot be used together.
     ///
     /// Returned in any of these cases:
@@ -440,6 +468,12 @@ impl core::fmt::Display for Error {
             Self::CrlSignMissing => {
                 f.write_str("CRL issuer KeyUsage does not include cRLSign (RFC 5280 §6.3.3(f))")
             }
+            Self::CrlSignerNotFound => f.write_str(
+                "no certificate in the supplied bundle signed the CRL (path-level discovery)",
+            ),
+            Self::CrlSignerNotTrusted => f.write_str(
+                "discovered CRL signer does not chain back to a self-signed anchor in the supplied bundle",
+            ),
             Self::DeltaCrlBaseMismatch => {
                 f.write_str("delta CRL BaseCRLNumber does not match the base CRL's CRLNumber")
             }
@@ -617,8 +651,13 @@ impl RevocationChecker for NoRevocation {
 #[cfg(feature = "crl")]
 mod crl;
 #[cfg(feature = "crl")]
+mod signer_discovery;
+#[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use crl::CrlChecker;
+#[cfg(feature = "crl")]
+#[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
+pub use signer_discovery::discover_crl_signer;
 
 #[cfg(feature = "ocsp")]
 mod ocsp;
