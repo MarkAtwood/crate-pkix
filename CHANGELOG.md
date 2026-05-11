@@ -6,6 +6,54 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-profiles 0.3.0` + `pkix-profiles-cabf 0.2.0`: framework-not-policy split (2026-05-11)
+
+**BREAKING for `pkix-profiles 0.3.0`. Substantive content release for `pkix-profiles-cabf 0.2.0`.**
+
+CA/Browser Forum-specific profile content moved from `pkix-profiles` to
+the sibling `pkix-profiles-cabf` crate per the framework-not-policy
+workspace stance (PKIX-amgn):
+
+- `WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile` and their
+  `web_pki_policy`/`smime_policy`/`code_signing_policy` aliases.
+- `sc081_validity_cap()` (CA/B Forum SC-081 phased validity).
+- `CABF_TLS_BR_ALLOWED_ALGS`, `CABF_SMIME_BR_ALLOWED_ALGS`,
+  `CABF_CS_BR_ALLOWED_ALGS` (the latter three are now `pub` in
+  `pkix-profiles-cabf`; in `pkix-profiles 0.2.x` they were
+  crate-private).
+
+`pkix-profiles 0.3.0` keeps RFC-baseline content:
+
+- `Rfc5280Profile` / `rfc5280_policy` (unchanged from 0.2.x).
+- New `BasicTlsProfile` / `basic_tls_policy` — RFC 5280 + RFC 6125 +
+  `id-kp-serverAuth` EKU. No CA/B Forum overlay.
+- New `BasicSmimeProfile` / `basic_smime_policy` — RFC 8551 §3 baseline:
+  `id-kp-emailProtection` EKU + `rfc822Name` SAN. No CA/B Forum overlay.
+
+`pkix-profiles 0.3.x` carries deprecated `pub use` re-exports of the
+moved symbols (`WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`,
+`web_pki_policy`, `smime_policy`, `code_signing_policy`,
+`sc081_validity_cap`) so existing `use pkix_profiles::WebPkiProfile;`
+imports continue to compile with a deprecation warning. The re-exports
+drop in `pkix-profiles 0.4.0`. Migration:
+
+```rust
+// Before (pkix-profiles 0.2.x):
+use pkix_profiles::{WebPkiProfile, web_pki_policy, sc081_validity_cap};
+
+// After (pkix-profiles-cabf 0.2.x):
+use pkix_profiles_cabf::{WebPkiProfile, web_pki_policy, sc081_validity_cap};
+```
+
+`pkix-lint`'s `cabf_tls_br` module migrated to the new crate as part of
+this change; the `pkix-profiles` dependency was replaced with
+`pkix-profiles-cabf` in `pkix-lint`'s `Cargo.toml`. (`cabf_tls_br` itself
+is slated to move to `pkix-lint-cabf` via PKIX-amgn.5.)
+
+`pkix-profiles-cabf 0.1.0` was a namespace-reservation stub with no
+public types; `0.2.0` is the first substantive content release. Tracked
+as PKIX-amgn.4.
+
 ### `pkix-path`: `ValidationPolicy::require_crl_sign_on_cas` opt-in flag (2026-05-11)
 
 Additive. New `ValidationPolicy::require_crl_sign_on_cas: bool` (default

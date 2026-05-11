@@ -37,8 +37,16 @@ members = [
 #   - pkix-path-builder 0.3.0  BREAKING. Dep major bump on pkix-path; skip-not-fail
 #                              behavior change for malformed BasicConstraints
 #                              candidates (PKIX-qgw1, no longer aborts the search).
+#   - pkix-profiles     0.3.0  BREAKING. CA/B Forum content (WebPkiProfile, SmimeProfile,
+#                              CodeSigningProfile, sc081_validity_cap, CABF_*_ALLOWED_ALGS)
+#                              moved to pkix-profiles-cabf. Deprecated re-exports remain
+#                              in pkix-profiles for one release; drop in 0.4.0. New
+#                              BasicTlsProfile (RFC 5280 + RFC 6125 + serverAuth EKU)
+#                              and BasicSmimeProfile (RFC 8551 §3 baseline). PKIX-amgn.4.
+#   - pkix-profiles-cabf 0.2.0 First substantive content release. Houses the CA/B Forum
+#                              profiles moved out of pkix-profiles 0.3.0. PKIX-amgn.4.
 # pkix-lint at 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
-# (not published). Namespace-reservation stubs at 0.1.0: pkix-profiles-cabf, pkix-lint-cabf,
+# (not published). Namespace-reservation stubs at 0.1.0: pkix-lint-cabf,
 # pkix-truststore-system, pkix-truststore-pkcs11 — published to crates.io with
 # "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
 version      = "0.2.1"
@@ -54,14 +62,14 @@ pkix-path             = { path = "pkix-path",             version = "0.3.0" }
 pkix-revocation       = { path = "pkix-revocation",       version = "0.3.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.0" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
-pkix-profiles         = { path = "pkix-profiles",         version = "0.2.1" }
+pkix-profiles         = { path = "pkix-profiles",         version = "0.3.0" }
 pkix-lint             = { path = "pkix-lint",             version = "0.3.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.0.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
-pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.1.0" }
+pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.2.0" }
 pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.1.0" }
 pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" }
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }

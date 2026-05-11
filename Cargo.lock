@@ -1218,7 +1218,7 @@ version = "0.3.0"
 dependencies = [
  "der",
  "pkix-path",
- "pkix-profiles",
+ "pkix-profiles-cabf",
  "serde",
  "serde_json",
  "sha2",
@@ -1254,20 +1254,21 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "der",
  "pkix-path",
+ "pkix-profiles-cabf",
  "x509-cert",
 ]
 
 [[package]]
 name = "pkix-profiles-cabf"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "der",
  "pkix-path",
- "pkix-profiles",
+ "x509-cert",
 ]
 
 [[package]]

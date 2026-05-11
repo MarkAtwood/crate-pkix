@@ -128,7 +128,7 @@ impl Lint for ValidityMaxLint {
         }
 
         let duration_secs = not_after - not_before;
-        let cap = pkix_profiles::sc081_validity_cap(not_before);
+        let cap = pkix_profiles_cabf::sc081_validity_cap(not_before);
 
         if duration_secs > cap {
             // Dynamic detail (Cow::Owned): report the actual non-conforming
@@ -547,7 +547,7 @@ impl Lint for BcCaFlagLint {
 
 /// The CA/B Forum TLS Baseline Requirements profile for `pkix-lint`.
 ///
-/// Implements both [`pkix_path::Profile`] (delegating to [`pkix_profiles::WebPkiProfile`])
+/// Implements both [`pkix_path::Profile`] (delegating to [`pkix_profiles_cabf::WebPkiProfile`])
 /// and [`LintProfile`] (providing all six CABF TLS BR lints above).
 ///
 /// # Usage
@@ -568,19 +568,19 @@ pub struct CabfTlsBrProfile;
 
 impl pkix_path::Profile for CabfTlsBrProfile {
     fn id(&self) -> &'static str {
-        pkix_profiles::WebPkiProfile.id()
+        pkix_profiles_cabf::WebPkiProfile.id()
     }
 
     fn version(&self) -> &'static str {
-        pkix_profiles::WebPkiProfile.version()
+        pkix_profiles_cabf::WebPkiProfile.version()
     }
 
     fn policy(&self, now_unix: u64) -> pkix_path::ValidationPolicy {
-        pkix_profiles::WebPkiProfile.policy(now_unix)
+        pkix_profiles_cabf::WebPkiProfile.policy(now_unix)
     }
 
     fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier] {
-        pkix_profiles::WebPkiProfile.policy_oids()
+        pkix_profiles_cabf::WebPkiProfile.policy_oids()
     }
 }
 

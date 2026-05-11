@@ -183,7 +183,7 @@ fn validity_max_cap_function_100d_phase() {
     // These constants are derived from the ballot text, not from the code under test.
     // The fixture-based tests (validity_max_error_110d_in_100d_phase, etc.) are the
     // primary regression tests; this test independently checks the cap function.
-    use pkix_profiles::sc081_validity_cap;
+    use pkix_profiles_cabf::sc081_validity_cap;
     const T_2027_MAR_15: u64 = 1_805_068_800;
     const T_2027_MAR_16: u64 = 1_805_068_800 + 86_400;
     const DAYS_100_SECS: u64 = 100 * 86_400;
@@ -209,7 +209,7 @@ fn validity_max_cap_function_47d_phase() {
     // Oracle: CA/B Forum Ballot SC-081 — the 47-day threshold is 2029-03-15T00:00:00Z
     // and the cap value is exactly 47 * 86_400 = 4_060_800 seconds.
     // Constants derived from ballot text, not code under test.
-    use pkix_profiles::sc081_validity_cap;
+    use pkix_profiles_cabf::sc081_validity_cap;
     const T_2029_MAR_15: u64 = 1_868_227_200;
     const T_2029_MAR_16: u64 = 1_868_227_200 + 86_400;
     const DAYS_47_SECS: u64 = 47 * 86_400;

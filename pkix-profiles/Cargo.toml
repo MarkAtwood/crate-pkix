@@ -1,19 +1,23 @@
 [package]
 name        = "pkix-profiles"
-description = "CA/Browser Forum and RFC certificate profile policies for pkix-chain"
-version.workspace     = true
+description = "RFC-baseline certificate profile policies (RFC 5280, RFC 6125, RFC 8551) for pkix-path"
+version     = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
 repository.workspace  = true
 authors.workspace     = true
-keywords    = ["x509", "certificate", "pki", "cabforum", "tls"]
+keywords    = ["x509", "certificate", "pki", "rfc5280", "tls"]
 categories  = ["cryptography"]
 
 [dependencies]
 der       = { workspace = true }
 # Default features (rsa, p256) are intentionally enabled: pkix-profiles tests use EcdsaP256Verifier.
 pkix-path = { workspace = true }
+# Used solely for the deprecated re-exports of WebPkiProfile, SmimeProfile,
+# CodeSigningProfile, and sc081_validity_cap — moved to pkix-profiles-cabf in
+# the 0.3.0 release. Drops in 0.4.0 alongside removal of the re-exports.
+pkix-profiles-cabf = { workspace = true }
 
 [dev-dependencies]
 x509-cert = { workspace = true }
