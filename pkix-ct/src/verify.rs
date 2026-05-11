@@ -421,6 +421,285 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         }
         Ok(valid)
     }
+
+    /// Verify a Merkle inclusion proof (RFC 6962 §2.1.1 / RFC 9162 §2.1.3.2).
+    ///
+    /// An inclusion proof demonstrates that a particular leaf is in
+    /// the CT log's append-only Merkle tree at the position the log
+    /// claims. Verifying the proof reconstructs the tree's root hash
+    /// from the leaf hash and the audit-path siblings; if the
+    /// reconstructed root equals the `root_hash` the consumer trusts
+    /// (typically from a [`SignedTreeHead`] signed by the log), the
+    /// leaf is provably in the tree.
+    ///
+    /// `leaf_hash` is the RFC 6962 §2.1 leaf hash:
+    /// `SHA256(0x00 || MerkleTreeLeaf-bytes)`. Computing it from an
+    /// SCT plus the cert it commits to is the caller's
+    /// responsibility; `pkix-ct` does not currently ship a
+    /// `MerkleTreeLeaf` builder (that lives one level above SCT
+    /// signature verification, which is `verify_sct_for_*`).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::MerkleProofMalformed`] — `tree_size` is 0, or the
+    ///   audit path is longer than the maximum height for the tree
+    ///   size (`ceil(log2(tree_size))` hashes), indicating either a
+    ///   buggy proof source or a tampered proof.
+    /// - [`Error::MerkleProofInvalid`] — `leaf_index >= tree_size`,
+    ///   or the reconstructed root hash does not match `root_hash`.
+    ///   Tampered proofs (any single byte changed in any audit-path
+    ///   hash, the leaf hash, the leaf index, the tree size, or the
+    ///   expected root) all surface as this variant.
+    ///
+    /// This method does not use `self.logs` or `self.verifier` — it
+    /// is hash-only. Placed on `SctVerifier` for API discoverability
+    /// (callers verifying SCTs are the same ones who will want to
+    /// verify inclusion proofs) and to match the RFC 6962 §2 family
+    /// of "log behavior" operations grouped together.
+    pub fn verify_inclusion(
+        &self,
+        leaf_hash: &[u8; 32],
+        proof: &MerkleAuditPath,
+        root_hash: &[u8; 32],
+    ) -> Result<()> {
+        verify_inclusion_inner(leaf_hash, proof, root_hash)
+    }
+
+    /// Verify a Signed Tree Head's signature against the log's
+    /// public key (RFC 6962 §3.5).
+    ///
+    /// `log_id` identifies which log signed the STH (a SHA-256 hash
+    /// of the log's `SubjectPublicKeyInfo` DER, per RFC 6962 §3.2).
+    /// The verifier looks up the matching [`CtLog`] in its
+    /// [`CtLogList`] and dispatches signature verification through
+    /// the configured [`SignatureVerifier`].
+    ///
+    /// The signed structure (RFC 6962 §3.5) is:
+    ///
+    /// ```text
+    /// digitally-signed struct {
+    ///     Version version;            // 1 byte; v1 = 0
+    ///     SignatureType signature_type;  // 1 byte; tree_hash = 1
+    ///     uint64 timestamp;           // 8 bytes BE
+    ///     uint64 tree_size;           // 8 bytes BE
+    ///     opaque sha256_root_hash[32];
+    /// } TreeHeadSignature;
+    /// ```
+    ///
+    /// On success the matching [`CtLog`] is returned so the caller
+    /// can correlate the STH with the log entry it came from.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::UnknownLog`] — `log_id` is not present in the log list.
+    /// - [`Error::UnsupportedSignatureAlgorithm`] — `(hash_alg, sig_alg)`
+    ///   is not a recognised combination.
+    /// - [`Error::LogKeyMalformed`] — the log's `key_der` does not
+    ///   parse as a valid `SubjectPublicKeyInfo`.
+    /// - [`Error::InvalidSignature`] — the underlying verifier
+    ///   rejected the signature. Tampered timestamp, tree_size, or
+    ///   root_hash bytes all surface as this variant.
+    pub fn verify_sth(&self, log_id: &[u8; 32], sth: &SignedTreeHead) -> Result<&CtLog> {
+        let log = self.logs.get(log_id).ok_or(Error::UnknownLog)?;
+
+        let oid = tls_alg_to_x509_oid(sth.hash_alg, sth.sig_alg).ok_or(
+            Error::UnsupportedSignatureAlgorithm {
+                hash_alg: sth.hash_alg,
+                sig_alg: sth.sig_alg,
+            },
+        )?;
+
+        let signed_input = build_signed_input_tree_head(sth);
+
+        let spki =
+            SubjectPublicKeyInfoRef::from_der(&log.key_der).map_err(|_| Error::LogKeyMalformed)?;
+
+        let alg_id = AlgorithmIdentifierRef {
+            oid,
+            parameters: None,
+        };
+
+        self.verifier
+            .verify_signature(alg_id, spki, &signed_input, &sth.signature)
+            .map_err(|_| Error::InvalidSignature)?;
+
+        Ok(log)
+    }
+}
+
+/// Reconstruct the RFC 6962 §3.5 `digitally-signed` input for an STH.
+///
+/// Layout (all multi-byte fields are network byte order):
+///
+/// ```text
+/// u8       version             (0)
+/// u8       signature_type      (1 = tree_hash)
+/// u64      timestamp_ms
+/// u64      tree_size
+/// 32B      sha256_root_hash
+/// ```
+fn build_signed_input_tree_head(sth: &SignedTreeHead) -> alloc::vec::Vec<u8> {
+    let mut out = alloc::vec::Vec::with_capacity(1 + 1 + 8 + 8 + 32);
+    out.push(SCT_VERSION_V1);
+    out.push(SIG_TYPE_TREE_HASH);
+    out.extend_from_slice(&sth.timestamp_ms.to_be_bytes());
+    out.extend_from_slice(&sth.tree_size.to_be_bytes());
+    out.extend_from_slice(&sth.root_hash);
+    out
+}
+
+/// `SignatureType::tree_hash` — RFC 6962 §3.5 (used by STH signatures).
+const SIG_TYPE_TREE_HASH: u8 = 1;
+
+/// A Signed Tree Head: the log's signed commitment to a tree state
+/// (RFC 6962 §3.5).
+///
+/// An STH is the trust anchor for Merkle inclusion proofs: the log
+/// periodically publishes an STH committing to its current tree size,
+/// root hash, and timestamp. Consumers cache STHs from logs they
+/// trust, and any inclusion proof against `root_hash` is only as
+/// trustworthy as the STH it was checked against.
+///
+/// `pkix-ct` does not parse STHs from log responses (the JSON
+/// `get-sth` API is log-specific transport); the caller constructs
+/// this struct from whichever source they fetch STHs from.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SignedTreeHead {
+    /// Tree size at the time the STH was signed.
+    pub tree_size: u64,
+    /// Timestamp the log committed to, milliseconds since Unix epoch.
+    pub timestamp_ms: u64,
+    /// Merkle root hash for the tree at `tree_size`.
+    pub root_hash: [u8; 32],
+    /// `HashAlgorithm` (RFC 5246 §7.4.1.4.1).
+    pub hash_alg: u8,
+    /// `SignatureAlgorithm` (RFC 5246 §7.4.1.4.1).
+    pub sig_alg: u8,
+    /// Raw signature bytes (DER-encoded ECDSA-Sig-Value for ECDSA, or
+    /// raw RSA signature octet string for RSA).
+    pub signature: alloc::vec::Vec<u8>,
+}
+
+/// An audit path proving a single leaf's inclusion in an RFC 6962 §2
+/// Merkle tree at some `tree_size`.
+///
+/// Built either from a CT log's `get-proof-by-hash` response (parsed
+/// out of the response JSON by the caller) or programmatically. The
+/// type does not currently carry parser methods — `pkix-ct` is
+/// transport-agnostic.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MerkleAuditPath {
+    /// 0-based index of the leaf in the tree.
+    pub leaf_index: u64,
+    /// Total number of leaves in the tree at the time the proof was
+    /// generated. Must equal the `tree_size` of the
+    /// [`SignedTreeHead`] whose `root_hash` is being checked against.
+    pub tree_size: u64,
+    /// Sibling hashes from leaf-to-root, ordered RFC 6962 §2.1.1-style
+    /// (innermost sibling first, root's-direct-child sibling last).
+    pub audit_path: alloc::vec::Vec<[u8; 32]>,
+}
+
+/// Hash-only worker for [`SctVerifier::verify_inclusion`].
+///
+/// Implements RFC 9162 §2.1.3.2 (the verification-side restatement of
+/// RFC 6962 §2.1.1). This is the iterative form used by every shipped
+/// open-source CT implementation (certificate-transparency-go,
+/// Trillian, etc.) — chosen over the recursive RFC 6962 §2.1.1
+/// statement because the iterative form avoids stack allocations and
+/// terminates exactly when the audit path is exhausted.
+fn verify_inclusion_inner(
+    leaf_hash: &[u8; 32],
+    proof: &MerkleAuditPath,
+    expected_root: &[u8; 32],
+) -> Result<()> {
+    if proof.tree_size == 0 {
+        return Err(Error::MerkleProofMalformed);
+    }
+    if proof.leaf_index >= proof.tree_size {
+        return Err(Error::MerkleProofInvalid);
+    }
+    // Maximum audit path length for a tree of N leaves is ceil(log2(N))
+    // (no path elements for N=1). Any longer is malformed.
+    let max_path_len = if proof.tree_size <= 1 {
+        0
+    } else {
+        // `64 - leading_zeros(N - 1)` = ceil(log2(N)) for N >= 2.
+        64 - (proof.tree_size - 1).leading_zeros() as usize
+    };
+    if proof.audit_path.len() > max_path_len {
+        return Err(Error::MerkleProofMalformed);
+    }
+
+    let mut fn_ = proof.leaf_index;
+    let mut sn = proof.tree_size - 1;
+    let mut r: [u8; 32] = *leaf_hash;
+
+    for p in &proof.audit_path {
+        if sn == 0 {
+            // Audit path has more elements than the tree size
+            // justifies — proof is over-long.
+            return Err(Error::MerkleProofMalformed);
+        }
+        if (fn_ & 1) == 1 || fn_ == sn {
+            // The leaf is on the right of this internal node, or it
+            // is the rightmost leaf in an odd-sized subtree (the
+            // left-leaning rebalance from RFC 6962 §2.1).
+            r = inner_hash(p, &r);
+            // Bubble both fn_ and sn up until LSB(fn_) == 1 again
+            // (or fn_ == 0, meaning we've processed all the
+            // rebalance shifts).
+            while (fn_ & 1) == 0 && fn_ != 0 {
+                fn_ >>= 1;
+                sn >>= 1;
+            }
+        } else {
+            // Standard left-child case: sibling is on the right.
+            r = inner_hash(&r, p);
+        }
+        fn_ >>= 1;
+        sn >>= 1;
+    }
+
+    if sn != 0 {
+        // The audit path was shorter than the tree size required —
+        // the proof never bubbled all the way to the root.
+        return Err(Error::MerkleProofMalformed);
+    }
+    if r != *expected_root {
+        return Err(Error::MerkleProofInvalid);
+    }
+    Ok(())
+}
+
+/// RFC 6962 §2.1 inner-node hash: `SHA256(0x01 || left || right)`.
+fn inner_hash(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update([0x01u8]);
+    h.update(left);
+    h.update(right);
+    let digest = h.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
+}
+
+/// RFC 6962 §2.1 leaf hash: `SHA256(0x00 || leaf_bytes)`.
+///
+/// Computes the leaf hash of a `MerkleTreeLeaf` byte string. Callers
+/// that have parsed an SCT and want to feed it through
+/// [`SctVerifier::verify_inclusion`] use this helper to derive the
+/// 32-byte leaf hash from the `MerkleTreeLeaf` bytes the log
+/// committed to.
+#[must_use]
+pub fn merkle_leaf_hash(leaf_bytes: &[u8]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    h.update([0x00u8]);
+    h.update(leaf_bytes);
+    let digest = h.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
 }
 
 /// Check whether `timestamp_ms` falls inside the log's usable window.

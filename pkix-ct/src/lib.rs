@@ -30,8 +30,10 @@
 //! via OCSP or the TLS handshake) and
 //! [`SctVerifier::verify_sct_for_precert`] (used when SCTs are
 //! embedded directly in the issued certificate via the SCT-list
-//! extension). Merkle inclusion proof verification is not yet
-//! implemented; see the project tracker (PKIX-baac.5) for status.
+//! extension). Merkle inclusion proof verification (RFC 6962 §2.1.1)
+//! and Signed Tree Head signature verification (RFC 6962 §3.5) are
+//! also implemented; see [`SctVerifier::verify_inclusion`] and
+//! [`SctVerifier::verify_sth`].
 
 extern crate alloc;
 
@@ -52,7 +54,7 @@ pub use log_list::{CtLog, CtLogList};
 pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg(feature = "log-list")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
-pub use verify::SctVerifier;
+pub use verify::{merkle_leaf_hash, MerkleAuditPath, SctVerifier, SignedTreeHead};
 
 /// Errors returned by SCT parsing and verification.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -101,6 +103,17 @@ pub enum Error {
     /// different delivery channel (OCSP / TLS handshake), for which
     /// callers should use [`SctVerifier::verify_sct_for_cert`].
     LeafMissingSctList,
+    /// Merkle inclusion proof verification failed: the reconstructed
+    /// root hash does not match the supplied root, or the proof's
+    /// `leaf_index` is outside `[0, tree_size)`, or the audit path's
+    /// length is inconsistent with the tree size. Tampered proofs
+    /// (flipped node, wrong index, wrong tree size) all surface as
+    /// this variant.
+    MerkleProofInvalid,
+    /// Merkle inclusion proof has an invalid shape: `tree_size` is 0
+    /// (the empty tree contains nothing), or the audit path is
+    /// indefinitely long for the claimed tree size.
+    MerkleProofMalformed,
 }
 
 impl core::fmt::Display for Error {
@@ -137,6 +150,8 @@ impl core::fmt::Display for Error {
             Self::LeafMissingSctList => {
                 f.write_str("leaf certificate does not contain the SCT-list extension")
             }
+            Self::MerkleProofInvalid => f.write_str("Merkle inclusion proof failed verification"),
+            Self::MerkleProofMalformed => f.write_str("Merkle inclusion proof has invalid shape"),
         }
     }
 }

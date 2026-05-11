@@ -502,8 +502,24 @@ Same migration and rationale as `pkix-chain 0.4.0` above.
 
   Tracked as PKIX-baac.1 (parser), PKIX-baac.6 (delivery adapters),
   PKIX-baac.2 (log list), PKIX-baac.3 (`x509_entry` verifier),
-  PKIX-baac.4 (`precert_entry` verifier), and PKIX-baac.7
-  (`verify_embedded_scts`).
+  PKIX-baac.4 (`precert_entry` verifier), PKIX-baac.5
+  (Merkle inclusion + STH signature verification, see below), and
+  PKIX-baac.7 (`verify_embedded_scts`).
+
+- `SctVerifier::verify_inclusion` verifies an RFC 6962 §2.1.1 / RFC
+  9162 §2.1.3.2 Merkle audit path against a trusted root hash. Helper
+  `merkle_leaf_hash` computes the §2.1 leaf hash. New types
+  `MerkleAuditPath` and `SignedTreeHead`. Tracked as PKIX-baac.5.
+
+- `SctVerifier::verify_sth` verifies the signature on a Signed Tree
+  Head (RFC 6962 §3.5) against the log's public key. Tampered
+  timestamps, tree sizes, or root hashes all surface as
+  `Error::InvalidSignature`.
+
+- Error variants added: `MerkleProofInvalid` (verification failed —
+  reconstructed root mismatch or out-of-range index) and
+  `MerkleProofMalformed` (proof shape inconsistent — empty tree,
+  audit path longer than tree height permits).
 
 ## [0.3.0 / 0.2.1] — 2026-05-07
 

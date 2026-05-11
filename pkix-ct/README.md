@@ -38,9 +38,12 @@ Implemented:
   dispatching algorithm-specific verification through `pkix-path`'s
   [`SignatureVerifier`] trait.
 
-Not yet implemented (tracked under PKIX-baac):
+Implemented (continued):
 
-- Merkle inclusion proof verification (RFC 6962 §2.1.1).
+- Merkle inclusion proof verification and Signed Tree Head signature
+  verification (RFC 6962 §2.1.1 / §3.5). See
+  [`SctVerifier::verify_inclusion`][verifier-inclusion] and
+  [`SctVerifier::verify_sth`][verifier-sth].
 
 ## Example
 
@@ -84,6 +87,8 @@ assert!(valid >= 2, "cert has too few valid SCTs (got {valid})");
 [verifier-cert]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_sct_for_cert
 [verifier-precert]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_sct_for_precert
 [verifier-embedded]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_embedded_scts
+[verifier-inclusion]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_inclusion
+[verifier-sth]: https://docs.rs/pkix-ct/latest/pkix_ct/struct.SctVerifier.html#method.verify_sth
 [`SignatureVerifier`]: https://docs.rs/pkix-path/latest/pkix_path/trait.SignatureVerifier.html
 
 ## License
