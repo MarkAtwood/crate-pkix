@@ -62,6 +62,7 @@ signature = "2"
 
 # Algorithm backends (feature-gated in pkix-path)
 p256           = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8"] }
+p384           = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8"] }
 rsa            = { version = "0.9",  default-features = false }
 sha1           = { version = "0.10", default-features = false, features = ["oid"] }
 sha2           = { version = "0.10", default-features = false, features = ["oid"] }

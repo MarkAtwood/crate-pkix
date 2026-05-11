@@ -11,7 +11,8 @@
 //!
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
 //! The default feature set (`rustcrypto`) wires in `RustCrypto` backends for
-//! RSA-PKCS1v15-SHA-256 (`rsa` feature) and ECDSA-P-256-SHA-256 (`p256` feature).
+//! RSA-PKCS1v15-SHA-256 (`rsa` feature), ECDSA-P-256-SHA-256 (`p256` feature),
+//! and ECDSA-P-384-SHA-384 (`p384` feature).
 //! P-384 and Ed25519 are planned for a future release.
 //! For FIPS-validated crypto, implement [`SignatureVerifier`] against
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
@@ -2270,6 +2271,56 @@ impl SignatureVerifier for EcdsaP256Verifier {
 }
 
 // ---------------------------------------------------------------------------
+// ECDSA P-384 SHA-384 backend (PKIX-gphz.2)
+// ---------------------------------------------------------------------------
+
+/// `ecdsa-with-SHA384` OID (RFC 5758 §3.2): 1.2.840.10045.4.3.3
+#[cfg(feature = "p384")]
+const OID_ECDSA_P384_SHA384: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.3");
+
+/// ECDSA P-384 with SHA-384 signature verifier.
+///
+/// Handles OID `ecdsa-with-SHA384` (1.2.840.10045.4.3.3).
+/// Feature-gated behind `p384`.
+///
+/// RFC 5758 §3.2 mandates that `AlgorithmIdentifier.parameters` MUST be
+/// absent for `ecdsa-with-SHA384`. The `p384` crate's `VerifyingKey::try_from`
+/// parses the issuer SPKI and enforces RFC 5480 §2.1.1 (named-curve only;
+/// implicit `null` parameters); algorithm-identifier parameter handling is
+/// the caller's responsibility — `pkix-path` does not currently reject a
+/// trailing-NULL parameter on the signature algorithm. This matches the
+/// existing behaviour for [`EcdsaP256Verifier`].
+#[cfg(feature = "p384")]
+#[cfg_attr(docsrs, doc(cfg(feature = "p384")))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct EcdsaP384Verifier;
+
+#[cfg(feature = "p384")]
+impl SignatureVerifier for EcdsaP384Verifier {
+    fn verify_signature(
+        &self,
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
+        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> core::result::Result<(), SignatureError> {
+        use p384::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
+
+        // Reject any OID other than ecdsa-with-SHA384.
+        if algorithm.oid != OID_ECDSA_P384_SHA384 {
+            return Err(SignatureError::new());
+        }
+
+        let vk = VerifyingKey::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
+
+        let sig = DerSignature::try_from(signature).map_err(|_| SignatureError::new())?;
+
+        vk.verify(message, &sig).map_err(|_| SignatureError::new())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // RSA PKCS#1 v1.5 SHA-256 backend (PKIX-gmv)
 // ---------------------------------------------------------------------------
 
@@ -3675,18 +3726,22 @@ fn check_name_constraints(
 /// the default `RustCrypto` feature set. It supports:
 ///
 /// - `ecdsa-with-SHA256` (1.2.840.10045.4.3.2) — via the `p256` feature
+/// - `ecdsa-with-SHA384` (1.2.840.10045.4.3.3) — via the `p384` feature
 /// - `sha256WithRSAEncryption` (1.2.840.113549.1.1.11) — via the `rsa` feature
 ///
 /// Any OID not in the above set returns `Err(signature::Error::new())`.
 ///
 /// To support additional algorithms, implement [`SignatureVerifier`] directly
 /// and dispatch your own OID table.
-#[cfg(any(feature = "p256", feature = "rsa"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "p256", feature = "rsa"))))]
+#[cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(feature = "p256", feature = "p384", feature = "rsa")))
+)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DefaultVerifier;
 
-#[cfg(any(feature = "p256", feature = "rsa"))]
+#[cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
 impl SignatureVerifier for DefaultVerifier {
     fn verify_signature(
         &self,
@@ -3699,6 +3754,10 @@ impl SignatureVerifier for DefaultVerifier {
         #[cfg(feature = "p256")]
         if oid == OID_ECDSA_P256_SHA256 {
             return EcdsaP256Verifier.verify_signature(algorithm, issuer_spki, message, signature);
+        }
+        #[cfg(feature = "p384")]
+        if oid == OID_ECDSA_P384_SHA384 {
+            return EcdsaP384Verifier.verify_signature(algorithm, issuer_spki, message, signature);
         }
         #[cfg(feature = "rsa")]
         if oid == OID_SHA256_WITH_RSA {
@@ -3749,6 +3808,126 @@ mod tests_ecdsa_p256 {
                 .is_ok(),
             "self-signed P-256 cert should verify"
         );
+    }
+}
+
+#[cfg(all(test, feature = "p384"))]
+mod tests_ecdsa_p384 {
+    //! Test vectors for ECDSA P-384 / SHA-384 (PKIX-gphz.2).
+    //!
+    //! Oracle: `openssl verify -CAfile ec-p384-sha384.pem ec-p384-sha384.pem`
+    //! returns OK against the same fixture (the PEM form lives at
+    //! `tests/fixtures/ec-p384-sha384.der`; regenerate with the recipe in the
+    //! commit that introduced this file). Independent oracle — pkix-path was
+    //! not used to compute the expected verdict.
+    use super::*;
+    use der::Decode;
+
+    const FIXTURE: &[u8] = include_bytes!("../tests/fixtures/ec-p384-sha384.der");
+
+    #[test]
+    fn verify_p384_self_signed() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let cert = Certificate::from_der(FIXTURE).expect("parse cert");
+
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+
+        // Self-signed cert: signer SPKI is the cert's own SPKI.
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        let verifier = EcdsaP384Verifier;
+        verifier
+            .verify_signature(
+                cert.signature_algorithm.owned_to_ref(),
+                spki_ref,
+                &tbs_der,
+                sig_bytes,
+            )
+            .expect("self-signed P-384 cert should verify");
+    }
+
+    #[test]
+    fn tampered_signature_rejected() {
+        // Flip a bit in the signature and confirm verification fails. This
+        // exercises the actual cryptographic check, not just the OID and
+        // SPKI parse paths.
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let cert = Certificate::from_der(FIXTURE).expect("parse cert");
+
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        // Tamper a byte well inside the DER signature (any byte after the
+        // initial SEQUENCE header). The DerSignature decoder rejects most
+        // structural corruption with try_from, which is also a valid
+        // verification failure — either way the result must be Err.
+        let mid = sig_bytes.len() / 2;
+        sig_bytes[mid] ^= 0x01;
+
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        let verifier = EcdsaP384Verifier;
+        assert!(
+            verifier
+                .verify_signature(
+                    cert.signature_algorithm.owned_to_ref(),
+                    spki_ref,
+                    &tbs_der,
+                    &sig_bytes,
+                )
+                .is_err(),
+            "tampered signature must not verify"
+        );
+    }
+
+    #[test]
+    fn wrong_oid_rejected() {
+        // Verifier MUST reject OIDs other than ecdsa-with-SHA384, even if
+        // the SPKI and signature would otherwise verify. We synthesise an
+        // AlgorithmIdentifier with ecdsa-with-SHA256's OID and expect the
+        // verifier to short-circuit before any crypto runs.
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let cert = Certificate::from_der(FIXTURE).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        let wrong_alg = spki::AlgorithmIdentifierRef {
+            oid: der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2"), // ecdsa-with-SHA256
+            parameters: None,
+        };
+        let verifier = EcdsaP384Verifier;
+        assert!(
+            verifier
+                .verify_signature(wrong_alg, spki_ref, &tbs_der, sig_bytes)
+                .is_err(),
+            "verifier must reject OIDs other than ecdsa-with-SHA384"
+        );
+    }
+
+    #[test]
+    fn default_verifier_dispatches_to_p384() {
+        // DefaultVerifier's OID dispatch should route ecdsa-with-SHA384 to
+        // EcdsaP384Verifier when the `p384` feature is active. Confirm the
+        // same fixture verifies under DefaultVerifier too.
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let cert = Certificate::from_der(FIXTURE).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        DefaultVerifier
+            .verify_signature(
+                cert.signature_algorithm.owned_to_ref(),
+                spki_ref,
+                &tbs_der,
+                sig_bytes,
+            )
+            .expect("DefaultVerifier must dispatch to EcdsaP384Verifier for ecdsa-with-SHA384");
     }
 }
 
