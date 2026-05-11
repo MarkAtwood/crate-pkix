@@ -6,6 +6,56 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.4.0`: `LintParameter` + first RFC-conformance lint (2026-05-11)
+
+**Additive.** PKIX-9vnx.6.4 — Lint parameter mechanism and the first
+RFC-conformance lint demonstrate it end-to-end.
+
+New public types in `pkix-lint`:
+
+```rust
+pub struct LintParameter {
+    pub id: Cow<'static, str>,
+    pub label: Cow<'static, str>,
+    pub default_value: Cow<'static, str>,
+}
+
+pub enum ParameterError {
+    UnknownParameter(String),
+    InvalidValue { id: String, reason: String },
+}
+```
+
+New default-provided trait methods on `Lint`:
+
+```rust
+fn parameters(&self) -> &[LintParameter] { &[] }
+fn set_parameter(&mut self, id: &str, value: &str)
+    -> Result<(), ParameterError> { ... default rejects all ids ... }
+```
+
+`LintParameter` is descriptor-only — it maps onto an OSCAL Catalog
+`Parameter` (id, label, default value) and does not hold the lint's
+current value. Lints store typed state directly (`usize`, `Duration`,
+etc.); `set_parameter` parses the string-rendered override into that
+state. `&mut self` is required because parameter updates change
+behaviour; callers configure parameters before installing the lint
+into a `LintRunner` (the runner exposes no mutation).
+
+New module `pkix_lint::rfc5280` with the first RFC-conformance lint:
+
+* **`Rfc5280MaxSerialLengthLint`** — RFC 5280 §4.1.2.2: certificate
+  serialNumber must not exceed 20 octets. Parametric on `max-octets`
+  (default 20). First built-in lint in `pkix-lint` proper; all other
+  shipped lints are still CA/B Forum-shaped in `cabf_tls_br` (they
+  migrate to `pkix-lint-cabf` via PKIX-amgn.5).
+
+Nine new tests cover the lint's behaviour, parameter machinery,
+boundary conditions, and metadata, with `openssl x509 -serial` as the
+independent oracle for fixture serial-length values. Test counts:
+pkix-lint default 130 (was 121), `--features oscal` 193 (was 184),
+`--all-features` 199 (was 190).
+
 ### `pkix-lint 0.4.0`: `Lint` trait grows OSCAL-Control metadata methods (2026-05-11)
 
 **Additive.** Four new default-provided methods on the `Lint` trait
