@@ -23,10 +23,12 @@
 //! implemented; see [`sct_list_from_tls_extension`] and (behind the
 //! `ocsp` feature) `sct_list_from_ocsp_response`. CT log list management
 //! is implemented behind the `log-list` and `log-list-json` features;
-//! see `CtLog`, `CtLogList`, and `CtLogList::from_google_log_list_json`.
-//! SCT signature verification, pre-cert handling, and Merkle inclusion
-//! proof verification are not yet implemented; see the project tracker
-//! (PKIX-baac children) for status.
+//! see [`CtLog`], [`CtLogList`], and `CtLogList::from_google_log_list_json`.
+//! SCT signature verification for the `x509_entry` log entry type is
+//! implemented; see [`SctVerifier`]. Pre-cert (`precert_entry`)
+//! signature verification and Merkle inclusion proof verification are
+//! not yet implemented; see the project tracker (PKIX-baac children)
+//! for status.
 
 extern crate alloc;
 
@@ -34,6 +36,8 @@ mod delivery;
 #[cfg(feature = "log-list")]
 mod log_list;
 mod sct;
+#[cfg(feature = "log-list")]
+mod verify;
 
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
@@ -43,6 +47,9 @@ pub use delivery::sct_list_from_tls_extension;
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
 pub use log_list::{CtLog, CtLogList};
 pub use sct::{SctList, SignedCertificateTimestamp};
+#[cfg(feature = "log-list")]
+#[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
+pub use verify::SctVerifier;
 
 use x509_cert::Certificate;
 
@@ -83,6 +90,31 @@ pub enum Error {
     /// A length prefix in the SCT or SCT list ran past the available input,
     /// or trailing bytes remained after the declared length was consumed.
     TruncatedOrTrailing,
+    /// The SCT's `log_id` does not appear in the [`CtLogList`] used to
+    /// construct the [`SctVerifier`].
+    UnknownLog,
+    /// The SCT carries `(hash_alg, sig_alg)` tags that
+    /// [`SctVerifier`] does not know how to map to an X.509 signature
+    /// algorithm. See the [`SctVerifier`] module documentation for the
+    /// supported combinations.
+    UnsupportedSignatureAlgorithm {
+        /// RFC 5246 §7.4.1.4.1 `HashAlgorithm` tag carried by the SCT.
+        hash_alg: u8,
+        /// RFC 5246 §7.4.1.4.1 `SignatureAlgorithm` tag carried by the SCT.
+        sig_alg: u8,
+    },
+    /// The [`CtLog::key_der`] bytes did not parse as a valid
+    /// `SubjectPublicKeyInfo`. Indicates a corrupted log list.
+    LogKeyMalformed,
+    /// The SCT timestamp falls outside the log's
+    /// `[usable_from_ms, retired_at_ms)` window.
+    SctTimestampOutsideLogWindow,
+    /// Encountered a `precert_entry` SCT but signature verification for
+    /// the pre-cert flow is not yet implemented (tracked as PKIX-baac.4).
+    PrecertEntryNotImplemented,
+    /// The supplied certificate DER exceeds the 2^24 - 1 octet limit of
+    /// the RFC 6962 §3.2 `ASN.1Cert` opaque-length-prefixed field.
+    CertDerTooLong,
 }
 
 impl core::fmt::Display for Error {
@@ -101,6 +133,25 @@ impl core::fmt::Display for Error {
             Self::TruncatedOrTrailing => {
                 f.write_str("SCT or SCT list bytes were truncated or had trailing data")
             }
+            Self::UnknownLog => f.write_str("SCT log_id not present in the log list"),
+            Self::UnsupportedSignatureAlgorithm { hash_alg, sig_alg } => {
+                write!(
+                    f,
+                    "SCT signature algorithm not supported: hash_alg={hash_alg}, sig_alg={sig_alg}"
+                )
+            }
+            Self::LogKeyMalformed => {
+                f.write_str("CT log key_der is not a valid SubjectPublicKeyInfo")
+            }
+            Self::SctTimestampOutsideLogWindow => {
+                f.write_str("SCT timestamp falls outside the log's usable window")
+            }
+            Self::PrecertEntryNotImplemented => {
+                f.write_str("precert_entry SCT verification is not yet implemented")
+            }
+            Self::CertDerTooLong => {
+                f.write_str("certificate DER exceeds the 2^24 - 1 octet ASN.1Cert limit")
+            }
         }
     }
 }
@@ -113,24 +164,20 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 /// Verify that `cert` contains at least one valid SCT from a log in `logs`.
 ///
-/// Checks the `SignedCertificateTimestampList` extension (OID
-/// 1.3.6.1.4.1.11129.2.4.2). Returns `Ok(())` if at least one SCT verifies
-/// against a trusted log; returns [`Error::NoTrustedSct`] otherwise.
+/// Returns `Err(Error::NoTrustedSct)` unconditionally. This function is a
+/// thin signature-less stub kept for source-compatibility with earlier
+/// pkix-ct releases that did not expose [`SctVerifier`]. New callers
+/// should use [`SctVerifier::verify_sct_for_cert`] directly, which takes
+/// a [`pkix_path::SignatureVerifier`] and performs real verification
+/// (PKIX-baac.3 shipped). A future revision will replace this stub with
+/// a generic helper that iterates the cert's SCT extension and dispatches
+/// through `SctVerifier`; doing so cleanly requires adding a
+/// `SignatureVerifier` generic to this function's signature, which is a
+/// breaking change tracked separately (PKIX-baac follow-up).
 ///
 /// # Errors
 ///
-/// Returns `Err(Error::NoTrustedSct)` unconditionally. This function is a stub.
-///
-/// # Note
-///
-/// This is a stub. The function always returns `Err(Error::NoTrustedSct)`
-/// regardless of input. See the crate-level documentation.
-///
-/// # Limitations
-///
-/// Signature verification is not yet implemented (tracked as PKIX-baac.3).
-/// SCT parsing IS implemented; use [`SctList::from_extension_value`] to
-/// parse the SCT-list extension value directly.
+/// Returns `Err(Error::NoTrustedSct)` unconditionally.
 pub const fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> {
     Err(Error::NoTrustedSct)
 }

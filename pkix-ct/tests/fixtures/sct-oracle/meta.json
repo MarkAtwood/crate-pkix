@@ -1,0 +1,14 @@
+{
+  "cert_len": 308,
+  "extensions_len": 0,
+  "hash_alg": 4,
+  "log_id_hex": "25d3e965c73752c37470ff253812d646f8fec12070fb39ce90a3d87bfe67c3a3",
+  "log_spki_len": 91,
+  "oracle": "pyca/cryptography (ec.ECDSA(SHA256)) + hand-rolled RFC 6962 wire format",
+  "scheme": "RFC 6962 \u00a73.2 x509_entry SCT, ECDSA-P256-SHA256",
+  "sct_wire_len": 119,
+  "sig_alg": 3,
+  "signature_len": 72,
+  "signed_input_len": 325,
+  "timestamp_ms": 1750032000000
+}
