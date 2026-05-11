@@ -4,10 +4,13 @@
 //! triples. The harness runs each chain through every configured oracle and
 //! classifies the resulting verdict tuple (PKIX-7nsf.5).
 //!
-//! Three loaders are provided:
+//! Four loaders are provided:
 //! * [`pkits::PkitsCorpus`] — reads `tests/pkits/vectors.json` shipped with
 //!   the NIST PKITS test vector pack. Provides ground truth via
 //!   `ShouldValidate`.
+//! * [`limbo::LimboCorpus`] — reads x509-limbo's `limbo.json` (~9.7k
+//!   testcases). Provides ground truth via `expected_result` and pins
+//!   per-testcase validation time via `Chain::validation_time_unix`.
 //! * [`pem_tree::PemTreeCorpus`] — recursively walks a directory tree and
 //!   yields every file matching a configurable filename (default
 //!   `chain.pem`). No ground truth.
@@ -18,6 +21,7 @@
 //! Iterator + '_` because workspace MSRV is 1.73 and `impl Trait in trait
 //! return position` (RPITIT) only stabilised in 1.75.
 
+pub mod limbo;
 pub mod pem_multi;
 pub mod pem_tree;
 pub mod pkits;
