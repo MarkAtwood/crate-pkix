@@ -8,14 +8,21 @@ types map to each, and which models are out of scope.
 ## Scope
 
 - **Stance:** PKIX-ztmr — OSCAL is the source of truth for lint catalogs,
-  profile composition, deviations, and assessment findings.
+  profile composition, deviations, and assessment findings (at the
+  serialization + policy-vocabulary level).
+- **Architecture:** Interpreter, not binding. `pkix-lint` consumes OSCAL
+  Catalog/Profile JSON as configuration and emits OSCAL Assessment
+  Results JSON as canonical output. Internal Rust types stay lean and
+  tailored to lint work; thin serializer/parser modules bridge between
+  them and OSCAL JSON. **No 1:1 Rust mirror of OSCAL types** — no
+  `pkix-oscal` crate, no `roscal_lib` dependency, no schema-generated
+  binding. Decided 2026-05-11; see PKIX-ztmr notes.
 - **Alignment epic:** PKIX-9vnx.
 - **Audit issue:** PKIX-9vnx.1.
 
-This document precedes implementation. The next step (PKIX-9vnx.2) decides
-the Rust binding strategy (existing crate, hand-rolled subset, or
-generated from JSON Schema); the audit bounds how much of OSCAL the
-binding has to cover.
+The mapping tables below describe **what each Rust type serializes to or
+parses from in OSCAL JSON**, not what its Rust shape mimics. Round-trip
+correctness is at the JSON layer.
 
 ## Pinned OSCAL version
 
