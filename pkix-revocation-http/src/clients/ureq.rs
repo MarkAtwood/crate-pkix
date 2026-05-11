@@ -132,7 +132,10 @@ impl RevocationFetcher for UreqFetcher {
             return Err(FetchError::TooLarge);
         }
 
-        Ok(FetchResponse { bytes, content_type })
+        Ok(FetchResponse {
+            bytes,
+            content_type,
+        })
     }
 }
 

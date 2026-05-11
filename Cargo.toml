@@ -68,11 +68,23 @@ sha2           = { version = "0.10", default-features = false, features = ["oid"
 x509-ocsp = "0.2"
 
 # HTTP client backends for pkix-revocation-http reference impls. Pinned
-# at workspace level so a future async backend (PKIX-a1yc.10) using a
-# matching reqwest version stays in lockstep. default-features = false
-# avoids pulling cookies / brotli / charset crates we do not need for
-# OCSP / CRL transport; rustls is enabled for HTTPS responders.
-ureq = { version = "3", default-features = false, features = ["rustls"] }
+# at workspace level so the sync (ureq) and async (reqwest) backends stay
+# in lockstep across the workspace. default-features = false avoids
+# pulling cookies / brotli / charset crates we do not need for OCSP / CRL
+# transport; rustls is enabled for HTTPS responders.
+ureq    = { version = "3",    default-features = false, features = ["rustls"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+# Async trait macro for the AsyncRevocationFetcher / AsyncRevocationChecker
+# traits in pkix-revocation-http. Stable-channel MSRV trivially fits within
+# the workspace's 1.73 floor; pinned at the workspace level so the
+# crate-local feature flag does not drift from the version used by tests.
+# Tokio is intentionally NOT a workspace dep — it is a dev-only dep of
+# pkix-revocation-http's async integration tests, and a transitive runtime
+# requirement of `reqwest`'s async client (the consumer brings their own
+# runtime). Hoisting tokio to the workspace would force every member crate
+# to think about an async runtime they do not use.
+async-trait = "0.1"
 
 # Serialization (used by pkix-lint serde feature)
 serde     = { version = "1", features = ["derive"] }

@@ -109,9 +109,7 @@ pub fn build_ocsp_request(
     }
     .map_err(map_builder_err)?;
 
-    let req = OcspRequestBuilder::default()
-        .with_request(request)
-        .build();
+    let req = OcspRequestBuilder::default().with_request(request).build();
 
     let body = req.to_der()?;
 
@@ -129,8 +127,7 @@ pub fn build_ocsp_request(
 fn map_builder_err(e: x509_ocsp::builder::Error) -> BuildError {
     match e {
         x509_ocsp::builder::Error::Asn1(d) => BuildError::Asn1(d),
-        x509_ocsp::builder::Error::PublicKey(_)
-        | x509_ocsp::builder::Error::Signature(_) => {
+        x509_ocsp::builder::Error::PublicKey(_) | x509_ocsp::builder::Error::Signature(_) => {
             // Build path is non-signing; these arms are unreachable in
             // practice but we still convert safely. Wrap as a synthetic
             // DER error so the public surface remains a single variant.
@@ -175,7 +172,8 @@ mod tests {
         let out = build_ocsp_request(&leaf, &ca, OcspHashAlg::Sha1).unwrap();
         assert_eq!(out.content_type, "application/ocsp-request");
         assert_eq!(
-            out.body, REQ_SHA1,
+            out.body,
+            REQ_SHA1,
             "SHA-1 OCSP request does not match openssl reference (len {} vs {})",
             out.body.len(),
             REQ_SHA1.len()
@@ -188,7 +186,8 @@ mod tests {
         let out = build_ocsp_request(&leaf, &ca, OcspHashAlg::Sha256).unwrap();
         assert_eq!(out.content_type, "application/ocsp-request");
         assert_eq!(
-            out.body, REQ_SHA256,
+            out.body,
+            REQ_SHA256,
             "SHA-256 OCSP request does not match openssl reference (len {} vs {})",
             out.body.len(),
             REQ_SHA256.len()
@@ -203,8 +202,7 @@ mod tests {
         let (ca, leaf) = fixtures();
         for alg in [OcspHashAlg::Sha1, OcspHashAlg::Sha256] {
             let out = build_ocsp_request(&leaf, &ca, alg).unwrap();
-            x509_ocsp::OcspRequest::from_der(&out.body)
-                .expect("emitted bytes must round-trip");
+            x509_ocsp::OcspRequest::from_der(&out.body).expect("emitted bytes must round-trip");
         }
     }
 
