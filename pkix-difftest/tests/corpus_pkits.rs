@@ -91,3 +91,59 @@ fn pkits_load_errors_on_missing_directory() {
         "expected useful error message; got: {err}"
     );
 }
+
+#[test]
+fn pkits_chain_carries_crls_from_manifest_crl_path() {
+    // Oracle: vectors.json declares CRLPath for every entry (verified
+    // during PKIX-7nsf.4 explore). The loader must read each CRL file and
+    // populate Chain.crls in the same order as the manifest. Every entry
+    // in the shipped PKITS manifest has a non-empty CRLPath, so we assert
+    // that ALL chains end up with crls populated; if a future PKITS
+    // update introduces entries without CRLs, relax this to "first N
+    // entries carry CRLs".
+    let corpus = PkitsCorpus::load(pkits_root()).expect("load");
+    let mut empty = 0usize;
+    let mut total = 0usize;
+    for item in corpus.iter() {
+        let item = item.expect("PKITS entry must resolve cleanly");
+        total += 1;
+        if item.chain.crls.is_empty() {
+            empty += 1;
+        } else {
+            // Each CRL DER must be non-empty (the file actually has bytes).
+            for (i, c) in item.chain.crls.iter().enumerate() {
+                assert!(
+                    !c.is_empty(),
+                    "{}: crls[{}] is an empty Vec — bad file read?",
+                    item.name,
+                    i
+                );
+            }
+        }
+    }
+    assert_eq!(total, 249, "expected to iterate 249 PKITS entries");
+    assert_eq!(
+        empty, 0,
+        "expected every PKITS entry to carry CRLs (all 249 have CRLPath); {} had empty crls",
+        empty
+    );
+}
+
+#[test]
+fn pkits_first_entry_carries_expected_crl_names() {
+    // Oracle: PKITS 4.1.1 has CRLPath = [TrustAnchorRootCRL.crl, GoodCACRL.crl]
+    // (verified manually against vectors.json). The loader reads both files
+    // in that order; we check that Chain.crls has length 2 and that the
+    // first byte of each is the DER SEQUENCE tag (0x30), proving the files
+    // were opened and not, say, swapped with empty placeholders.
+    let corpus = PkitsCorpus::load(pkits_root()).expect("load");
+    let first = corpus
+        .iter()
+        .next()
+        .expect("at least one entry")
+        .expect("first entry resolves");
+    assert_eq!(first.name, "4.1.1 Valid Signatures Test1");
+    assert_eq!(first.chain.crls.len(), 2);
+    assert_eq!(first.chain.crls[0][0], 0x30);
+    assert_eq!(first.chain.crls[1][0], 0x30);
+}

@@ -3,11 +3,13 @@
 //! Reads the NIST PKITS test vector manifest (`vectors.json`) and emits one
 //! [`crate::corpus::CorpusItem`] per test case. The certificate files
 //! referenced by `CertPath` live in the `certs/` subdirectory of the
-//! supplied corpus root.
+//! supplied corpus root. The CRL files referenced by `CRLPath` live in the
+//! `crls/` subdirectory and are loaded into [`crate::Chain::crls`] for
+//! oracle-side revocation checking.
 //!
 //! The vectors.json schema is fully uniform across the 249 entries shipped
 //! with this project — see PKIX-7nsf.4 explore notes. We deserialise every
-//! field, even the ones the v1 harness ignores (`CRLPath`, `InitialPolicy*`),
+//! field, even the ones the v1 harness ignores (`InitialPolicy*`),
 //! to make the loader fail loudly if a future PKITS update changes the
 //! schema. `#[serde(deny_unknown_fields)]` is the canonical way to do that.
 
@@ -104,13 +106,18 @@ impl PkitsCorpus {
     fn certs_dir(&self) -> PathBuf {
         self.root.join("certs")
     }
+
+    fn crls_dir(&self) -> PathBuf {
+        self.root.join("crls")
+    }
 }
 
 impl Corpus for PkitsCorpus {
     fn iter(&self) -> Box<dyn Iterator<Item = io::Result<CorpusItem>> + '_> {
         let certs_dir = self.certs_dir();
+        let crls_dir = self.crls_dir();
         Box::new(self.vectors.iter().map(move |vec| {
-            build_item(&certs_dir, vec).map_err(|e| {
+            build_item(&certs_dir, &crls_dir, vec).map_err(|e| {
                 // Annotate the error with the test name so reporters can
                 // attribute it without cross-referencing.
                 io::Error::new(e.kind(), format!("PKITS '{}': {}", vec.name, e))
@@ -122,8 +129,10 @@ impl Corpus for PkitsCorpus {
 /// Build a single [`CorpusItem`] from a PKITS vector entry.
 ///
 /// Reads each `.crt` file as DER, builds a `Chain` directly (skipping the
-/// PEM round-trip in `Chain::from_pem_bytes`), and reverses to leaf-first.
-fn build_item(certs_dir: &Path, vec: &PkitsVector) -> io::Result<CorpusItem> {
+/// PEM round-trip in `Chain::from_pem_bytes`), reverses to leaf-first, and
+/// attaches the CRLs referenced by `CRLPath` (loaded from `crls_dir`) when
+/// the entry lists any.
+fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Result<CorpusItem> {
     if vec.cert_path.len() < 2 {
         // Defensive: the schema explore confirmed every vector has CertPath
         // length ≥ 2, but a future PKITS update could violate that.
@@ -144,9 +153,22 @@ fn build_item(certs_dir: &Path, vec: &PkitsVector) -> io::Result<CorpusItem> {
     }
     der_blocks.reverse(); // root-first → leaf-first
 
+    // CRLs follow the same convention: filenames are listed in the manifest
+    // and resolved against `crls_dir`. Order is preserved (no reverse) because
+    // CRLs are not chain-ordered — each one stands alone, and downstream
+    // oracles use them positionally only for deterministic reason-string
+    // attribution.
+    let mut crl_blocks: Vec<Vec<u8>> = Vec::with_capacity(vec.crl_path.len());
+    for filename in &vec.crl_path {
+        let path = crls_dir.join(filename);
+        let bytes = fs::read(&path)
+            .map_err(|e| io::Error::new(e.kind(), format!("read {}: {e}", path.display())))?;
+        crl_blocks.push(bytes);
+    }
+
     let chain = Chain {
         certs_der: der_blocks,
-        crls: Vec::new(),
+        crls: crl_blocks,
         root_in_chain: true,
         label: vec.name.clone(),
     };
