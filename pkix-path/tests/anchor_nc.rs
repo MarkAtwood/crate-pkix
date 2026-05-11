@@ -18,6 +18,8 @@
 //! 5. `from_cert_valid_nc_populates_name_constraints` — `TrustAnchor::from_cert`
 //!    on a cert with a well-formed NC extension sets `name_constraints = Some(...)`.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 use der::{asn1::OctetString, Decode as _};
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
 use x509_cert::Certificate;

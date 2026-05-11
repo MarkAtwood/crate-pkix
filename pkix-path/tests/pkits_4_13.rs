@@ -3,6 +3,8 @@
 //! All cert names and expected outcomes come from the PKITS vectors.
 //! Oracle: NIST PKITS (SP 800-89) document §4.13.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
 

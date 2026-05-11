@@ -28,6 +28,8 @@
 //! decomposition. The intermediate-basic-constraints (pathLen) and policy-tree
 //! (counter) helpers must continue to pass these tests after refactor.
 
+#![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
+
 #[path = "pkits_helper.rs"]
 mod pkits_helper;
 

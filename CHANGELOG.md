@@ -6,6 +6,18 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path`: integration tests gated on algorithm features (2026-05-11)
+
+Test-only. `cargo test -p pkix-path --no-default-features` previously
+failed to compile the integration test crates because they
+unconditionally import `DefaultVerifier`, which is itself gated on
+`any(feature = "p256", feature = "p384", feature = "rsa")`. Each of the
+nine integration test files now carries the matching `#![cfg(...)]`
+attribute, so `--no-default-features` compiles cleanly (yielding an
+empty test suite per the integration test crate, which is the
+intended behaviour when no algorithm backend is enabled). No runtime
+behaviour change. Tracked as PKIX-yg2r.
+
 ### `pkix-profiles 0.3.0` + `pkix-profiles-cabf 0.2.0`: framework-not-policy split (2026-05-11)
 
 **BREAKING for `pkix-profiles 0.3.0`. Substantive content release for `pkix-profiles-cabf 0.2.0`.**
