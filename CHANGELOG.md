@@ -108,9 +108,10 @@ work without leaking memory (via `Cow::Owned`).
   consistency. Adds a direct `sha2` dependency (already transitive via
   `x509-cert`, so the binary footprint cost is zero).
 
-- `oscal` cargo feature exposing `pkix_lint::oscal::emit::assessment_results`
-  and `pkix_lint::oscal::emit::risks_from_store`
-  (PKIX-9vnx.3 + .4 + .5, Architecture 2 per PKIX-ztmr).
+- `oscal` cargo feature exposing `pkix_lint::oscal::emit::assessment_results`,
+  `pkix_lint::oscal::emit::risks_from_store`, and
+  `pkix_lint::oscal::parse::deviation_store_from_risks`
+  (PKIX-9vnx.3 + .4 + .5 + .10, Architecture 2 per PKIX-ztmr).
   - `assessment_results(&EvaluationReport) -> serde_json::Value` projects
     an evaluation run into a NIST OSCAL v1.1.2 Assessment Results
     `serde_json::Value` document — top-level `assessment-results` with
@@ -133,9 +134,22 @@ work without leaking memory (via `Cow::Owned`).
     authorized_by, effective_start/end, evidence_uri), plus the scope
     encoded as OSCAL Subjects with type-specific props. `IssuerDnExact`
     and `SerialRange` scopes carry both a human-readable DN string and
-    the DER bytes hex-encoded for lossless reconstruction. The matching
-    parser (`risks_from_store` ↔ `DeviationStore`) is filed as
-    PKIX-9vnx.10 as follow-up.
+    the DER bytes hex-encoded for lossless reconstruction.
+  - `deviation_store_from_risks(&serde_json::Value) -> Result<DeviationStore, ParseError>`
+    is the inverse of `risks_from_store`: it reconstructs a
+    `DeviationStore` from a JSON array of OSCAL Risk objects in the
+    shape this crate emits. `(emit . parse)` over any non-empty store
+    yields an `Eq`-equal store, closing the round-trip loop for
+    deviation-policy persistence. The parser is intentionally narrow —
+    it accepts the exact shape emitted by `risks_from_store`, not
+    arbitrary OSCAL Risk documents authored by other tools — which
+    keeps the error surface tight and the round-trip contract
+    guaranteed by construction. The DN-DER prop
+    (`pkix-lint.issuer-dn-der`) is the canonical oracle for `Name`
+    reconstruction; the companion RFC-4514 string prop is
+    informational and ignored by the parser. `Deviation` and
+    `DeviationStore` now derive `PartialEq, Eq` to support the
+    round-trip assertion (additive change; pattern-matching unchanged).
   - UUIDs are deterministically derived (RFC 9562 §5.8 v8 using SHA-256)
     so identical inputs yield byte-identical OSCAL output. The feature
     gates a new optional `serde_json` dependency; default builds are
