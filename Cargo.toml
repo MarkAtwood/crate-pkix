@@ -8,12 +8,16 @@ members = [
     "pkix-path-builder",
     "pkix-revocation-http",
     "pkix-profiles",
+    "pkix-profiles-cabf",
     "pkix-lint",
+    "pkix-lint-cabf",
     "pkix-ct",
     "pkix-composite",
     "pkix-ac",
     "pkix-difftest",
     "pkix-truststore",
+    "pkix-truststore-system",
+    "pkix-truststore-pkcs11",
 ]
 
 [workspace.package]
@@ -33,7 +37,10 @@ members = [
 #   - pkix-path-builder 0.3.0  BREAKING. Dep major bump on pkix-path; skip-not-fail
 #                              behavior change for malformed BasicConstraints
 #                              candidates (PKIX-qgw1, no longer aborts the search).
-# pkix-lint at 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Stubs at 0.0.0 (not published).
+# pkix-lint at 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
+# (not published). Namespace-reservation stubs at 0.1.0: pkix-profiles-cabf, pkix-lint-cabf,
+# pkix-truststore-system, pkix-truststore-pkcs11 — published to crates.io with
+# "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
 version      = "0.2.1"
 edition      = "2021"
 rust-version = "1.73"
@@ -53,6 +60,11 @@ pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.0.0" }
+# Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
+pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.1.0" }
+pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.1.0" }
+pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" }
+pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }
 
 # RustCrypto core
 der       = "0.7"

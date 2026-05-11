@@ -1,0 +1,18 @@
+[package]
+name        = "pkix-truststore-pkcs11"
+description = "PKCS#11 / HSM / smart card trust store adapter for pkix-truststore — stub"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "pkcs11", "hsm", "truststore", "pki"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-truststore + cryptoki deps added when real PKCS#11 adapter is wired (PKIX-p8vz).
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1226,6 +1226,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-lint-cabf"
+version = "0.1.0"
+
+[[package]]
 name = "pkix-path"
 version = "0.3.0"
 dependencies = [
@@ -1255,6 +1259,15 @@ dependencies = [
  "der",
  "pkix-path",
  "x509-cert",
+]
+
+[[package]]
+name = "pkix-profiles-cabf"
+version = "0.1.0"
+dependencies = [
+ "der",
+ "pkix-path",
+ "pkix-profiles",
 ]
 
 [[package]]
@@ -1297,6 +1310,14 @@ dependencies = [
  "pkix-path",
  "x509-cert",
 ]
+
+[[package]]
+name = "pkix-truststore-pkcs11"
+version = "0.1.0"
+
+[[package]]
+name = "pkix-truststore-system"
+version = "0.1.0"
 
 [[package]]
 name = "potential_utf"
