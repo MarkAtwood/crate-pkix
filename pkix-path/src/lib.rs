@@ -21,7 +21,7 @@
 //!
 //! # Limitations
 //!
-//! The following are **not** implemented in v0.2:
+//! The following are **not** currently implemented:
 //! - **RFC 4518 full Unicode NFKC DN normalization** — ASCII case-folding
 //!   plus insignificant-whitespace collapsing is applied. `BMPString` AVA
 //!   values are transcoded UCS-2-BE → UTF-8 and then compared via the same

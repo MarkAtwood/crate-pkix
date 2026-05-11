@@ -50,7 +50,7 @@ where
         // RevocationFetchFailed: the cert claims to advertise a CRL
         // location but the helper cannot resolve it. Stricter callers
         // wishing to treat this as a per-cert error can pre-validate
-        // certs separately; for v0.x we lump cert-level malformation
+        // certs separately; we currently lump cert-level malformation
         // into the same "no usable revocation source" bucket as
         // network failure.
         let urls = extract_cdp_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {

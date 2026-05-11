@@ -73,12 +73,12 @@ impl AiaUrls {
 ///   `iPAddress`, etc.) are silently ignored — they are not HTTP-fetchable.
 /// - `NameRelativeToCRLIssuer(RelativeDistinguishedName)` — yields nothing.
 ///   Resolving an RDN-relative name requires knowledge of the cRLIssuer
-///   field that is out of scope for v0.x of this helper. Documented as a
+///   field that is out of scope for this helper. Documented as a
 ///   limitation.
 /// - `None` (the DistributionPoint has no `distributionPoint` field) —
 ///   yields nothing. Per RFC 5280 §4.2.1.13 the URL set is then implicitly
 ///   formed from `cRLIssuer` or the cert's own issuer; resolving that into
-///   a URL requires lookup logic outside the scope of v0.x.
+///   a URL requires lookup logic outside the scope of this helper.
 ///
 /// # Returns
 ///

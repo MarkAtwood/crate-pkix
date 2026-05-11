@@ -42,7 +42,7 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "pkix-path oracle requires the trust anchor to be present as the last cert; \
-             root_in_chain = false is not supported in v0.1 (PKIX-7nsf.4 follow-up)",
+             root_in_chain = false is not supported (PKIX-7nsf.4 follow-up)",
         ));
     }
     if chain.certs_der.len() < 2 {

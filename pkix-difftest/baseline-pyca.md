@@ -1,6 +1,6 @@
 # pyca corpus baseline — corpus-shape finding
 
-This file is the v0.1 deliverable for PKIX-7nsf.7 ("pyca corpus baseline
+This file is the deliverable for PKIX-7nsf.7 ("pyca corpus baseline
 run + commit"). The expected output was a `baseline-pyca.json` with
 divergence buckets, mirroring the PKITS baseline at `baseline-pkits.json`.
 
@@ -22,7 +22,7 @@ that this is not the case:
 * The single chain file (`cryptography.io.chain.pem`) ships a TLS
   leaf + intermediate but no trust anchor (the actual root, GeoTrust
   Global CA, is sourced from the system trust store at runtime). The
-  harness's v0.1 input contract requires the trust anchor to be in the
+  harness's input contract requires the trust anchor to be in the
   chain.
 * The `custom/` subtree under `vectors/cryptography_vectors/x509/`
   contains feature-targeted single certs (basic-constraints variants,
@@ -56,7 +56,7 @@ on disk). Each testcase is a structured spec:
 That schema is **exactly** the input shape this harness wants. Building
 a `LimboCorpus` loader is the right Tier-2 deliverable; integrating it
 requires a non-trivial harness extension (per-testcase
-`validation_time` threading through every oracle, replacing the v0.1
+`validation_time` threading through every oracle, replacing the current
 "system clock everywhere" model).
 
 ## Decision
@@ -66,7 +66,7 @@ corpus integration (Tier 2 for real)**. That bead is P3 (not blocking
 the parent epic) and includes the schema, the architectural changes
 required, and the acceptance criteria.
 
-For the `pkix-difftest` v0.1 baseline of "run on a real-world corpus
+For the `pkix-difftest` baseline of "run on a real-world corpus
 and surface divergences", the PKITS baseline (PKIX-7nsf.6,
 `baseline-pkits.{md,json}`) already satisfies the parent epic's
 "at least one real divergence found, classified, and recorded"
@@ -87,8 +87,8 @@ The bead's literal acceptance criteria, mapped to what we have:
 
 ## What this means for PKIX-7nsf as a whole
 
-The v0.1 differential harness is structurally complete and produces
+The differential harness is structurally complete and produces
 real signal on PKITS. The full Tier-2 corpus (x509-limbo, 9,773
 testcases) is one P3 bead away. The harness architecture (Corpus
 trait, oracle modules, classifier, reporter) is set up to absorb that
-work without touching v0.1 surfaces.
+work without touching current surfaces.

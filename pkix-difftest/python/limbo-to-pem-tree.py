@@ -22,7 +22,7 @@ Output layout:
 Filtering:
 
 * Testcases whose `features` list contains anything in SKIP_FEATURES
-  (currently just `has-crl`, since CRL revocation is out of v0.1 harness
+  (currently just `has-crl`, since CRL revocation is out of harness
   scope) are skipped at conversion time and counted in the summary.
 * Testcases with no `trusted_certs` are skipped (the harness needs a
   trust anchor in the chain).
@@ -66,7 +66,7 @@ from typing import Any
 # tagged with any of these are skipped at conversion. See the limbo schema
 # at https://github.com/C2SP/x509-limbo for the full feature taxonomy.
 SKIP_FEATURES = {
-    # CRL revocation is out of pkix-difftest v0.1 scope.
+    # CRL revocation is out of pkix-difftest scope.
     "has-crl",
 }
 

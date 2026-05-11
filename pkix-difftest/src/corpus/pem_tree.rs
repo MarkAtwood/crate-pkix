@@ -98,8 +98,8 @@ fn load_one(root: &Path, path: &Path) -> io::Result<CorpusItem> {
     })
 }
 
-/// Naive recursive directory walker. Avoids the `walkdir` dep — for v0.1
-/// the corpora we walk are small (PKITS, pyca tests). If/when CT-log-scale
+/// Naive recursive directory walker. Avoids the `walkdir` dep — the
+/// corpora we walk are small (PKITS, pyca tests). If/when CT-log-scale
 /// walking lands (PKIX-5bab), reconsider.
 fn walk(dir: &Path, filename: &str, out: &mut Vec<PathBuf>) -> io::Result<()> {
     for entry in fs::read_dir(dir)? {

@@ -10,7 +10,7 @@
 //! See the parent bead `PKIX-7nsf` and the in-scope decomposition
 //! `PKIX-7nsf.1`–`PKIX-7nsf.8` for full context.
 //!
-//! v0.1 status (PKIX-7nsf.1, this commit): only the `Chain` loader and the
+//! Status (PKIX-7nsf.1, this commit): only the `Chain` loader and the
 //! in-process `pkix-path` oracle are implemented. The `OpenSsl` and `Pyca`
 //! oracle modules are stubbed; the `pkits` and `pem-tree` corpus loaders
 //! are TODO.
@@ -117,7 +117,7 @@ impl fmt::Display for OracleName {
 /// (matches `openssl verify`'s argument order). The loader detects the
 /// input ordering using a self-issued-cert heuristic and reverses if needed.
 ///
-/// **Limitation (v0.1)**: the harness requires the trust anchor to be
+/// **Limitation**: the harness requires the trust anchor to be
 /// present in the chain (it is split off as the anchor when calling
 /// `pkix-path`, and used as `-CAfile` for OpenSSL). Real-world TLS chains
 /// often omit the root. Lifting this restriction is tracked under PKIX-7nsf.4
@@ -128,7 +128,7 @@ pub struct Chain {
     /// Leaf-first DER-encoded certificates.
     pub certs_der: Vec<Vec<u8>>,
     /// True when the last cert is intended as the trust anchor.
-    /// Always true in v0.1 — see the type-level docs.
+    /// Always true currently — see the type-level docs.
     pub root_in_chain: bool,
     /// Human-readable label, e.g. the source filename or PKITS test name.
     /// Used only for reporting.

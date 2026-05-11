@@ -121,7 +121,7 @@ impl RevocationChecker for MyRevocationChecker {
 9. Returns based on `certStatus`: `good → Ok(())`, `revoked → Err(Revoked)`,
    `unknown → Err(OcspStatusUnknown)`.
 
-## v0.3 limitations
+## Limitations
 
 - CRL checking does not follow CRL Distribution Points — caller supplies the CRL.
 - Indirect CRLs (RFC 5280 §5.2.6) are not yet supported (tracked).

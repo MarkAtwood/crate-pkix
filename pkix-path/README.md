@@ -90,13 +90,13 @@ Per RFC 5280 §6.1, for each certificate in the chain:
   addresses, URIs, distinguished names, and IP addresses (IPv4/IPv6)
 - **Duplicate detection** — issuer+serial uniqueness across the chain
 
-## Not validated (v0.2)
+## Not validated
 
 - Path building — chain must be caller-ordered, leaf first;
   use [`pkix-path-builder`] for unordered bags of certificates
 - CRL/OCSP revocation — use [`pkix-revocation`]
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString
-  transcoding is deferred to v0.3)
+  transcoding tracked as PKIX-l63j)
 
 ## Standards
 

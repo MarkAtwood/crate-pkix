@@ -75,11 +75,11 @@ directly. It is handled by `ValidityMaxLint` in `pkix-lint`, which evaluates
 each certificate at issuance time. Use `sc081_validity_cap(not_before_unix)` to
 look up the correct cap for a given issuance date.
 
-## Limitations (v0.2)
+## Limitations
 
 - `SmimeProfile` covers the Mailbox-validated / strict generation only.
   Organization-validated, Sponsor-validated, and Individual-validated S/MIME
-  profiles are planned for v0.3.
+  profiles are planned.
 - Timestamp authority verification (CS BR requirement) is out of scope for
   `pkix-path`; it requires RFC 3161 timestamp token parsing.
 

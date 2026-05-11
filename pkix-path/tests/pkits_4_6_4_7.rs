@@ -400,10 +400,10 @@ fn pkits_4_7_3_valid_key_usage_not_critical() {
 }
 
 /// §4.7.4 Invalid keyUsage Critical cRLSign False Test4.
-/// v0.1 does not check cRLSign in path validation (RFC 5280 §6.1 only requires keyCertSign).
+/// Path validation does not currently check cRLSign (RFC 5280 §6.1 only requires keyCertSign).
 /// This test is expected to fail per PKITS but our implementation correctly follows §6.1.
 #[test]
-#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign; tracked for v0.2)"]
+#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign)"]
 fn pkits_4_7_4_invalid_key_usage_no_crl_sign() {
     let result = pkits_validate(
         &[
@@ -418,7 +418,7 @@ fn pkits_4_7_4_invalid_key_usage_no_crl_sign() {
 /// §4.7.5 Invalid keyUsage Not Critical cRLSign False Test5.
 /// Same as Test4 with non-critical `KeyUsage`.
 #[test]
-#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign; tracked for v0.2)"]
+#[ignore = "cRLSign enforcement not implemented in path validation (RFC 5280 §6.1 only requires keyCertSign)"]
 fn pkits_4_7_5_invalid_key_usage_no_crl_sign_not_critical() {
     let result = pkits_validate(
         &[
