@@ -17427,6 +17427,50 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc38",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc44",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
       "name": "bettertls::pathbuilding::tc5",
       "verdicts": [
         {
@@ -17443,6 +17487,94 @@
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
           "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc57",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc71",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc77",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "cve::cve-2024-0567",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -17508,6 +17640,28 @@
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "pathlen::self-issued-certs-pathlen",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
           "verdict": "fail"
         }
       ]
@@ -17641,6 +17795,28 @@
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: unsupported name constraint",
           "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "rfc5280::root-and-intermediate-swapped",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -18240,28 +18416,6 @@
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc15",
       "verdicts": [
@@ -18284,496 +18438,12 @@
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc16",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc17",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc20",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc21",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc22",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc23",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc24",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc25",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc26",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc27",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc28",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc29",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc30",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc31",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc32",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc33",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc34",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc35",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc38",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: all candidates exhausted with no interior errors",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc41",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "signature invalid at chain index 1",
           "verdict": "fail"
         },
         {
@@ -18783,19 +18453,19 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: all candidates exhausted with no interior errors",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
           "verdict": "fail"
         }
       ]
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc48",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc47",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
+          "reason": "signature invalid at chain index 1",
           "verdict": "fail"
         },
         {
@@ -18805,250 +18475,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc49",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc50",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "permitted subtree violation",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc51",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc52",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc53",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc54",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc55",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc56",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "permitted subtree violation",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc57",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc58",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "certificate at index 6 is not a CA",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc59",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "certificate at index 6 is not a CA",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -19059,7 +18487,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 6",
+          "reason": "signature invalid at chain index 3",
           "verdict": "fail"
         },
         {
@@ -19069,184 +18497,30 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "verdict": "fail"
         }
       ]
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc61",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc74",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "signature invalid at chain index 3",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
+          "reason": null,
+          "verdict": "pass"
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc62",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc63",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc64",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc65",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc66",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc67",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc68",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -19274,34 +18548,12 @@
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "cve::cve-2024-0567",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc80",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathlen::intermediate-pathlen-may-increase",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "signature invalid at chain index 4",
           "verdict": "fail"
         },
         {
@@ -19311,52 +18563,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathlen::self-issued-certs-pathlen",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: path length constraint violated",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathological::multiple-chains-expired-intermediate",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -19373,28 +18581,6 @@
         {
           "oracle": "openssl",
           "reason": "unhandled critical extension",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -19423,72 +18609,6 @@
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: unsatisfiable DNS name constraint: malformed SAN .example.com",
           "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::permitted-self-issued",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::root-and-intermediate-swapped",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::unknown-critical-extension-unrelated-intermediate",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -147957,12 +147077,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "validity period check failed at chain index 1",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "certificate has expired",
           "verdict": "fail"
         },
         {
@@ -147979,7 +147099,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
@@ -147989,7 +147109,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: all candidates exhausted with no interior errors",
+          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
           "verdict": "fail"
         }
       ]
@@ -148067,12 +147187,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "validity period check failed at chain index 2",
+          "reason": "validity period check failed at chain index 1",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "certificate has expired",
           "verdict": "fail"
         },
         {
@@ -148089,39 +147209,17 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "permitted subtree violation",
           "verdict": "fail"
         },
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc44",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
           "verdict": "fail"
         }
       ]
@@ -148172,22 +147270,22 @@
     },
     {
       "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc47",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc56",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 2",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "permitted subtree violation",
           "verdict": "fail"
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
           "verdict": "fail"
         }
       ]
@@ -148221,12 +147319,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "validity period check failed at chain index 4",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "certificate has expired",
           "verdict": "fail"
         },
         {
@@ -148265,39 +147363,17 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "permitted subtree violation",
           "verdict": "fail"
         },
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc71",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
           "verdict": "fail"
         }
       ]
@@ -148349,38 +147425,16 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc74",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc75",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "validity period check failed at chain index 4",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "certificate has expired",
           "verdict": "fail"
         },
         {
@@ -148397,39 +147451,17 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
+          "reason": "permitted subtree violation",
           "verdict": "fail"
         },
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc77",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
           "verdict": "fail"
         }
       ]
@@ -148481,28 +147513,6 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc80",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": true,
       "name": "invalid::invalid-issuer-key",
       "verdicts": [
         {
@@ -148529,7 +147539,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
@@ -148551,7 +147561,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
@@ -148881,7 +147891,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "name constraints violated at certificate index 1",
           "verdict": "fail"
         },
         {
@@ -148903,7 +147913,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "name constraints violated at certificate index 2",
           "verdict": "fail"
         },
         {
@@ -148987,11 +147997,33 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": false,
+      "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "signature invalid at chain index 1",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get local issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": false,
       "name": "rfc5280::nc::nc-forbids-same-chain-ica",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 3",
+          "reason": "name constraints violated at certificate index 1",
           "verdict": "fail"
         },
         {
@@ -149001,7 +148033,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "reason": "VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN",
           "verdict": "fail"
         }
       ]
@@ -149074,12 +148106,34 @@
     },
     {
       "class": "DiagnosticDivergence",
+      "ground_truth_agreement": false,
+      "name": "rfc5280::nc::permitted-self-issued",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "signature invalid at chain index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get local issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
       "name": "rfc5280::nc::restrictive-permits-in-intermediates-narrows",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "name constraints violated at certificate index 1",
           "verdict": "fail"
         },
         {
@@ -149101,7 +148155,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "name constraints violated at certificate index 1",
           "verdict": "fail"
         },
         {
@@ -212303,6 +211357,886 @@
     {
       "class": "Agreement",
       "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc1",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc16",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc17",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc2",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc20",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc21",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc22",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc23",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc24",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc25",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc26",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc27",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc28",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc29",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc30",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc31",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc32",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc33",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc34",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc35",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc48",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc49",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc50",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc51",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc52",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc53",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc54",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc55",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc58",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc59",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc61",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc62",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc63",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc64",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc65",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc66",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc67",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc68",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc9",
       "verdicts": [
         {
@@ -212655,7 +212589,51 @@
     {
       "class": "Agreement",
       "ground_truth_agreement": true,
+      "name": "pathlen::intermediate-pathlen-may-increase",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
       "name": "pathlen::validation-ignores-pathlen-in-leaf",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "pathological::multiple-chains-expired-intermediate",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -213228,6 +213206,28 @@
       "class": "Agreement",
       "ground_truth_agreement": false,
       "name": "rfc5280::ski::root-missing-ski",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "rfc5280::unknown-critical-extension-unrelated-intermediate",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -229465,7 +229465,95 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc38",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc44",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
       "name": "bettertls::pathbuilding::tc5",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc71",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Neither EKU nor anyEKU could be found",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": false,
+      "name": "bettertls::pathbuilding::tc77",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -229971,11 +230059,11 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc1",
+      "name": "bettertls::pathbuilding::tc60",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "signature invalid at chain index 3",
           "verdict": "fail"
         },
         {
@@ -229985,657 +230073,19 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "verdict": "fail"
         }
       ]
     },
     {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc16",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc17",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc20",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc21",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc22",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc23",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc24",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc25",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc26",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc27",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc28",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc29",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc30",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc31",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc32",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc33",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc34",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc35",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc48",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc49",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc50",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "permitted subtree violation",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc51",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc52",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc53",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc54",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc55",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
+      "class": "DiagnosticDivergence",
       "ground_truth_agreement": false,
       "name": "bettertls::pathbuilding::tc56",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
+          "reason": "name constraints violated at certificate index 0",
           "verdict": "fail"
         },
         {
@@ -230645,371 +230095,19 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc57",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 5",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc58",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "certificate at index 6 is not a CA",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc59",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "certificate at index 6 is not a CA",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "invalid CA certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc60",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 6",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc61",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc62",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc63",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc64",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc65",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc66",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc67",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc68",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "cve::cve-2024-0567",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathlen::intermediate-pathlen-may-increase",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathlen::self-issued-certs-pathlen",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: path length constraint violated",
+          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
           "verdict": "fail"
         }
       ]
     },
     {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "pathological::multiple-chains-expired-intermediate",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
+      "class": "DiagnosticDivergence",
       "ground_truth_agreement": false,
       "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "signature invalid at chain index 1",
           "verdict": "fail"
         },
         {
@@ -231019,74 +230117,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::permitted-self-issued",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
           "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::root-and-intermediate-swapped",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::unknown-critical-extension-unrelated-intermediate",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "no path to a trusted anchor",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -231097,12 +230129,34 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 3",
+          "reason": "name constraints violated at certificate index 1",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
           "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": false,
+      "name": "rfc5280::nc::permitted-self-issued",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "signature invalid at chain index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -278744,11 +277798,11 @@
     }
   ],
   "summary": {
-    "Agreement": 2936,
-    "DiagnosticDivergence": 5901,
-    "LooserThanWild": 819,
+    "Agreement": 2979,
+    "DiagnosticDivergence": 5898,
+    "LooserThanWild": 827,
     "OracleDivergence": 0,
-    "StricterThanWild": 70,
+    "StricterThanWild": 22,
     "total": 9726
   }
 }
