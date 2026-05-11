@@ -34,8 +34,9 @@
 //!   precomposed U+00E9 'é' vs decomposed U+0065 U+0301 'e'+ combining
 //!   acute) compare unequal. `UniversalString` AVA values are rejected by
 //!   the `der` crate at parse time (tag 0x1C is not in `der::Tag` in 0.7)
-//!   and never reach the path validator. `TeletexString` AVAs fall through
-//!   to raw DER byte comparison only — see `any_to_str_bytes` rustdoc.
+//!   and never reach the path validator. `TeletexString` AVAs use raw DER
+//!   byte comparison by policy — `pkix-path` deliberately does not transcode
+//!   T.61 to Unicode; see `any_to_str_bytes` rustdoc for the rationale.
 //! - **Online revocation** — revocation is handled by `pkix-revocation`
 //!   (CRL/OCSP); this crate is network-free by design.
 //! - **Path building** — converting an unordered bag of certificates into a
@@ -1623,9 +1624,12 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 ///   would generalize to `UniversalString` (UCS-4-BE → UTF-8) once the
 ///   parser accepts it.
 /// - **`TeletexString` (T61String) uses raw DER byte comparison.**
-///   T.61→Unicode mapping is deferred pending a clear interoperability
-///   target. Certificates from legacy PKIs using `TeletexString` may
-///   fail name matching even when the names are semantically equivalent.
+///   `pkix-path` deliberately does not transcode T.61 to Unicode; no
+///   canonical mapping exists (RFC 4518 §2.1 leaves it "a local matter"
+///   and OpenSSL, NSS, and `GnuTLS` use mutually incompatible vendor
+///   tables). Byte-equal `TeletexString` AVAs match; `TeletexString`
+///   never matches any other string type. Well-formed chains that copy
+///   the issuer DN bytes per RFC 5280 §4.1.2.4 are unaffected.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     let a_rdns = a.0.as_slice();
@@ -1797,16 +1801,19 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// upstream fix in `der` (or our own pre-decode shim) is required before
 /// `UniversalString` becomes reachable here.
 ///
-/// **Deferred — `TeletexString` (T61String):**
-/// Raw DER byte comparison only. RFC 4518 §2.1 states: "As there is no
+/// **Committed policy — `TeletexString` (T61String):**
+/// Raw DER byte comparison only. `pkix-path` deliberately does not
+/// transcode T.61 to Unicode. RFC 4518 §2.1 states: "As there is no
 /// standard for mapping `TeletexString` values to Unicode, the mapping is
 /// left a local matter." RFC 5280 §7.1 classifies `TeletexString` support
 /// as OPTIONAL. No canonical T.61→Unicode table exists — OpenSSL, NSS,
-/// and `GnuTLS` each use incompatible vendor extensions. Any mapping we
-/// choose would silently accept mismatches that other validators reject,
-/// or reject chains those validators accept. Support is deferred until a
-/// clear interoperability target exists (e.g., alignment with OpenSSL's
-/// table). Tracked in PKIX-19l.
+/// and `GnuTLS` each use incompatible vendor extensions. Adopting any one
+/// of those tables would silently accept mismatches the others reject and
+/// reject chains the others accept — a name-confusion smell with no
+/// interoperability win. Byte-equality is fail-closed: two `TeletexString`
+/// AVAs match iff their DER content bytes are identical, which is what
+/// RFC 5280 §4.1.2.4 already requires of well-formed issuer/subject DN
+/// reuse across a chain.
 ///
 /// # Future work
 ///
