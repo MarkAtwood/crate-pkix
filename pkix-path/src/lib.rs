@@ -2321,13 +2321,23 @@ impl SignatureVerifier for EcdsaP384Verifier {
 }
 
 // ---------------------------------------------------------------------------
-// RSA PKCS#1 v1.5 SHA-256 backend (PKIX-gmv)
+// RSA PKCS#1 v1.5 SHA-256 / SHA-384 / SHA-512 backend (PKIX-gmv, PKIX-gphz.4)
 // ---------------------------------------------------------------------------
 
 /// OID for `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
 #[cfg(feature = "rsa")]
 const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+
+/// OID for `sha384WithRSAEncryption` (1.2.840.113549.1.1.12).
+#[cfg(feature = "rsa")]
+const OID_SHA384_WITH_RSA: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
+
+/// OID for `sha512WithRSAEncryption` (1.2.840.113549.1.1.13).
+#[cfg(feature = "rsa")]
+const OID_SHA512_WITH_RSA: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
 
 /// RSA with PKCS#1 v1.5 padding and SHA-256 signature verifier.
 ///
@@ -2358,6 +2368,78 @@ impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
 
         let vk =
             VerifyingKey::<Sha256>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
+
+        let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
+
+        vk.verify(message, &sig).map_err(|_| SignatureError::new())
+    }
+}
+
+/// RSA with PKCS#1 v1.5 padding and SHA-384 signature verifier.
+///
+/// Handles OID `sha384WithRSAEncryption` (1.2.840.113549.1.1.12).
+/// Feature-gated behind `rsa` (same gate as the SHA-256 variant — the
+/// `sha2` and `rsa` crates already expose `Sha384` and the corresponding
+/// `VerifyingKey<Sha384>` impl without further opt-in).
+#[cfg(feature = "rsa")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct RsaPkcs1v15Sha384Verifier;
+
+#[cfg(feature = "rsa")]
+impl SignatureVerifier for RsaPkcs1v15Sha384Verifier {
+    fn verify_signature(
+        &self,
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
+        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> core::result::Result<(), SignatureError> {
+        use rsa::pkcs1v15::{Signature, VerifyingKey};
+        use rsa::signature::Verifier as _;
+        use sha2::Sha384;
+
+        if algorithm.oid != OID_SHA384_WITH_RSA {
+            return Err(SignatureError::new());
+        }
+
+        let vk =
+            VerifyingKey::<Sha384>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
+
+        let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
+
+        vk.verify(message, &sig).map_err(|_| SignatureError::new())
+    }
+}
+
+/// RSA with PKCS#1 v1.5 padding and SHA-512 signature verifier.
+///
+/// Handles OID `sha512WithRSAEncryption` (1.2.840.113549.1.1.13).
+/// Feature-gated behind `rsa`.
+#[cfg(feature = "rsa")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct RsaPkcs1v15Sha512Verifier;
+
+#[cfg(feature = "rsa")]
+impl SignatureVerifier for RsaPkcs1v15Sha512Verifier {
+    fn verify_signature(
+        &self,
+        algorithm: spki::AlgorithmIdentifierRef<'_>,
+        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> core::result::Result<(), SignatureError> {
+        use rsa::pkcs1v15::{Signature, VerifyingKey};
+        use rsa::signature::Verifier as _;
+        use sha2::Sha512;
+
+        if algorithm.oid != OID_SHA512_WITH_RSA {
+            return Err(SignatureError::new());
+        }
+
+        let vk =
+            VerifyingKey::<Sha512>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
 
         let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
 
@@ -3728,6 +3810,8 @@ fn check_name_constraints(
 /// - `ecdsa-with-SHA256` (1.2.840.10045.4.3.2) — via the `p256` feature
 /// - `ecdsa-with-SHA384` (1.2.840.10045.4.3.3) — via the `p384` feature
 /// - `sha256WithRSAEncryption` (1.2.840.113549.1.1.11) — via the `rsa` feature
+/// - `sha384WithRSAEncryption` (1.2.840.113549.1.1.12) — via the `rsa` feature
+/// - `sha512WithRSAEncryption` (1.2.840.113549.1.1.13) — via the `rsa` feature
 ///
 /// Any OID not in the above set returns `Err(signature::Error::new())`.
 ///
@@ -3762,6 +3846,24 @@ impl SignatureVerifier for DefaultVerifier {
         #[cfg(feature = "rsa")]
         if oid == OID_SHA256_WITH_RSA {
             return RsaPkcs1v15Sha256Verifier.verify_signature(
+                algorithm,
+                issuer_spki,
+                message,
+                signature,
+            );
+        }
+        #[cfg(feature = "rsa")]
+        if oid == OID_SHA384_WITH_RSA {
+            return RsaPkcs1v15Sha384Verifier.verify_signature(
+                algorithm,
+                issuer_spki,
+                message,
+                signature,
+            );
+        }
+        #[cfg(feature = "rsa")]
+        if oid == OID_SHA512_WITH_RSA {
+            return RsaPkcs1v15Sha512Verifier.verify_signature(
                 algorithm,
                 issuer_spki,
                 message,
@@ -3963,6 +4065,152 @@ mod tests_rsa {
                 .is_ok(),
             "self-signed RSA cert should verify"
         );
+    }
+
+    /// RSA-PKCS1v15 SHA-384 verifier (PKIX-gphz.4).
+    ///
+    /// Independent oracle: `openssl verify -CAfile rsa-pkcs1v15-sha384.pem
+    /// rsa-pkcs1v15-sha384.pem` returns OK against the same fixture
+    /// (generated by `openssl req -new -x509 -sha384 ...`).
+    #[test]
+    fn verify_rsa_pkcs1v15_sha384_self_signed() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
+        let cert = Certificate::from_der(der).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        RsaPkcs1v15Sha384Verifier
+            .verify_signature(
+                cert.signature_algorithm.owned_to_ref(),
+                spki_ref,
+                &tbs_der,
+                sig_bytes,
+            )
+            .expect("self-signed RSA SHA-384 cert should verify");
+    }
+
+    /// Tamper-rejection for SHA-384 variant.
+    #[test]
+    fn rsa_pkcs1v15_sha384_tampered_signature_rejected() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
+        let cert = Certificate::from_der(der).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        let mid = sig_bytes.len() / 2;
+        sig_bytes[mid] ^= 0x01;
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        assert!(
+            RsaPkcs1v15Sha384Verifier
+                .verify_signature(
+                    cert.signature_algorithm.owned_to_ref(),
+                    spki_ref,
+                    &tbs_der,
+                    &sig_bytes,
+                )
+                .is_err(),
+            "tampered RSA SHA-384 signature must not verify"
+        );
+    }
+
+    /// RSA-PKCS1v15 SHA-512 verifier (PKIX-gphz.4).
+    #[test]
+    fn verify_rsa_pkcs1v15_sha512_self_signed() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der");
+        let cert = Certificate::from_der(der).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        RsaPkcs1v15Sha512Verifier
+            .verify_signature(
+                cert.signature_algorithm.owned_to_ref(),
+                spki_ref,
+                &tbs_der,
+                sig_bytes,
+            )
+            .expect("self-signed RSA SHA-512 cert should verify");
+    }
+
+    /// Tamper-rejection for SHA-512 variant.
+    #[test]
+    fn rsa_pkcs1v15_sha512_tampered_signature_rejected() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der");
+        let cert = Certificate::from_der(der).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        let mid = sig_bytes.len() / 2;
+        sig_bytes[mid] ^= 0x01;
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        assert!(
+            RsaPkcs1v15Sha512Verifier
+                .verify_signature(
+                    cert.signature_algorithm.owned_to_ref(),
+                    spki_ref,
+                    &tbs_der,
+                    &sig_bytes,
+                )
+                .is_err(),
+            "tampered RSA SHA-512 signature must not verify"
+        );
+    }
+
+    /// Wrong-OID rejection: SHA-384 verifier must reject SHA-512 OID and
+    /// vice versa, and both must reject SHA-256 OID.
+    #[test]
+    fn rsa_pkcs1v15_wrong_oid_rejected() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+        let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
+        let cert = Certificate::from_der(der).expect("parse cert");
+        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+        let sig_bytes = cert.signature.raw_bytes();
+        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+
+        // SHA-512 verifier must refuse the SHA-384 OID.
+        let sha384_alg = cert.signature_algorithm.owned_to_ref();
+        assert!(RsaPkcs1v15Sha512Verifier
+            .verify_signature(sha384_alg, spki_ref.clone(), &tbs_der, sig_bytes)
+            .is_err());
+        // SHA-256 verifier must refuse the SHA-384 OID.
+        assert!(RsaPkcs1v15Sha256Verifier
+            .verify_signature(sha384_alg, spki_ref, &tbs_der, sig_bytes)
+            .is_err());
+    }
+
+    /// `DefaultVerifier` dispatches the SHA-384 and SHA-512 RSA OIDs.
+    #[test]
+    fn default_verifier_dispatches_to_rsa_sha384_and_sha512() {
+        use der::Encode as _;
+        use spki::der::referenced::OwnedToRef as _;
+
+        for fixture in [
+            &include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der")[..],
+            &include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der")[..],
+        ] {
+            let cert = Certificate::from_der(fixture).expect("parse cert");
+            let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
+            let sig_bytes = cert.signature.raw_bytes();
+            let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+            DefaultVerifier
+                .verify_signature(
+                    cert.signature_algorithm.owned_to_ref(),
+                    spki_ref,
+                    &tbs_der,
+                    sig_bytes,
+                )
+                .expect("DefaultVerifier must dispatch RSA SHA-384/512 by OID");
+        }
     }
 
     /// Regression (PKIX-5u0): `spki_key_matches` ignores the NULL-vs-absent
