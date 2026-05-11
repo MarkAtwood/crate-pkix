@@ -113,7 +113,7 @@ let mut store = DeviationStore::new();
 store.add(Deviation {
     id: "waiver-2026-003".to_string(),
     target_lint: "cabf.br.tls.validity.max".to_string(),
-    scope: DeviationScope::IssuerDnContains("agency x issuing ca".to_string()),
+    scope: DeviationScope::issuer_dn_contains("agency x issuing ca"),
     reason: "Agency X issued certs before SC-081 effective date".to_string(),
     justification: "PKIPPA waiver memo 2026-03-01".to_string(),
     authorized_by: "pki-policy@agency.gov".to_string(),

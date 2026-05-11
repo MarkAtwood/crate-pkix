@@ -6,6 +6,71 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.4.0`: `DeviationScope` refactor to open-ended kind + props bag (2026-05-11)
+
+**BREAKING.** Replaces `pub enum DeviationScope { Any, IssuerDnContains(String),
+IssuerDnExact(Name), SerialRange { ... } }` with a struct:
+
+```rust
+pub struct DeviationScope {
+    pub kind: String,                            // e.g. "pkix-lint.scope.issuer-dn-exact"
+    pub props: Vec<(String, ScopePropValue)>,
+}
+
+#[non_exhaustive]
+pub enum ScopePropValue {
+    Text(String),
+    Bytes(Vec<u8>),
+}
+```
+
+The shape mirrors OSCAL Subject (kind discriminator + typed props bag) per
+the workspace OSCAL alignment stance (PKIX-9vnx / PKIX-ztmr). Future scope
+axes (PKIX-8mzp's planned `SubjectDnContains`, `PolicyOid`, etc.) are now
+expressible via new `kind` strings + props without growing the public Rust
+enum surface.
+
+**Migration** — replace direct enum-variant construction with the new
+constructors:
+
+```rust
+// Before (pkix-lint 0.3.x):
+let s = DeviationScope::Any;
+let s = DeviationScope::IssuerDnContains("agency x".to_string());
+let s = DeviationScope::IssuerDnExact(cert.tbs_certificate.subject.clone());
+let s = DeviationScope::SerialRange {
+    issuer: cert.tbs_certificate.subject.clone(),
+    start: vec![0x01], end: vec![0x02],
+};
+
+// After (pkix-lint 0.4.x):
+let s = DeviationScope::any();
+let s = DeviationScope::issuer_dn_contains("agency x");
+let s = DeviationScope::issuer_dn_exact(&cert.tbs_certificate.subject)?;
+let s = DeviationScope::serial_range(&cert.tbs_certificate.subject, vec![0x01], vec![0x02])?;
+```
+
+Public constants are exported for the four canonical kind discriminators
+and the four canonical prop names: `SCOPE_KIND_ANY`,
+`SCOPE_KIND_ISSUER_DN_CONTAINS`, `SCOPE_KIND_ISSUER_DN_EXACT`,
+`SCOPE_KIND_SERIAL_RANGE`; `PROP_ISSUER_DN_SUBSTRING`,
+`PROP_ISSUER_DN_DER`, `PROP_SERIAL_START`, `PROP_SERIAL_END`.
+
+**Round-trip preservation.** The OSCAL emit and parse layers are unchanged
+at the JSON-wire level — the same subject `type` discriminators and prop
+names. Stores that round-trip through OSCAL JSON before and after this
+release produce bit-identical output.
+
+**Fail-closed semantics.** `DeviationScope::matches` returns `false` for
+unknown kinds, for missing props, for wrong-typed props (e.g. `Text` where
+`Bytes` is expected), and for malformed DER under the
+`pkix-lint.issuer-dn-der` prop. Code-built scopes go through constructors
+and cannot hit these paths; only hand-built scopes (or hand-edited OSCAL
+JSON that bypasses the parser) can. The OSCAL parser rejects malformed
+input before constructing a `DeviationScope`.
+
+Tracked as PKIX-9vnx.11.
+
 ### `pkix-path`: integration tests gated on algorithm features (2026-05-11)
 
 Test-only. `cargo test -p pkix-path --no-default-features` previously

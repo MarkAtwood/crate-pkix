@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version           = "0.3.0"  # 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q)
+version           = "0.4.0"  # 0.4 — DeviationScope refactor to open-ended kind + props bag (PKIX-9vnx.11). 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q).
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

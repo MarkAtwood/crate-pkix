@@ -427,42 +427,55 @@ fn parse_subject(idx: usize, subj: &Value) -> Result<DeviationScope, ParseError>
         get_prop(name).ok_or(ParseError::MissingSubjectProp { index: idx, name })
     };
 
+    use crate::deviation::{
+        PROP_ISSUER_DN_DER, PROP_ISSUER_DN_SUBSTRING, PROP_SERIAL_END, PROP_SERIAL_START,
+        SCOPE_KIND_ANY, SCOPE_KIND_ISSUER_DN_CONTAINS, SCOPE_KIND_ISSUER_DN_EXACT,
+        SCOPE_KIND_SERIAL_RANGE,
+    };
     match ty {
-        "pkix-lint.scope.any" => Ok(DeviationScope::Any),
+        SCOPE_KIND_ANY => Ok(DeviationScope::any()),
 
-        "pkix-lint.scope.issuer-dn-contains" => {
-            let substring = required("pkix-lint.issuer-dn-substring")?.to_string();
-            Ok(DeviationScope::IssuerDnContains(substring))
+        SCOPE_KIND_ISSUER_DN_CONTAINS => {
+            let substring = required(PROP_ISSUER_DN_SUBSTRING)?.to_string();
+            Ok(DeviationScope::issuer_dn_contains(substring))
         }
 
-        "pkix-lint.scope.issuer-dn-exact" => {
-            let der_hex = required("pkix-lint.issuer-dn-der")?;
+        SCOPE_KIND_ISSUER_DN_EXACT => {
+            let der_hex = required(PROP_ISSUER_DN_DER)?;
             let der = hex_decode(der_hex).ok_or(ParseError::MalformedHex {
                 index: idx,
-                prop: "pkix-lint.issuer-dn-der",
+                prop: PROP_ISSUER_DN_DER,
             })?;
-            let name = decode_name(idx, &der, "pkix-lint.issuer-dn-der")?;
-            Ok(DeviationScope::IssuerDnExact(name))
+            let name = decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
+            DeviationScope::issuer_dn_exact(&name).map_err(|_| ParseError::MalformedDer {
+                index: idx,
+                prop: PROP_ISSUER_DN_DER,
+            })
         }
 
-        "pkix-lint.scope.serial-range" => {
-            let der_hex = required("pkix-lint.issuer-dn-der")?;
+        SCOPE_KIND_SERIAL_RANGE => {
+            let der_hex = required(PROP_ISSUER_DN_DER)?;
             let der = hex_decode(der_hex).ok_or(ParseError::MalformedHex {
                 index: idx,
-                prop: "pkix-lint.issuer-dn-der",
+                prop: PROP_ISSUER_DN_DER,
             })?;
-            let issuer = decode_name(idx, &der, "pkix-lint.issuer-dn-der")?;
-            let start_hex = required("pkix-lint.serial-start")?;
+            let issuer = decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
+            let start_hex = required(PROP_SERIAL_START)?;
             let start = hex_decode(start_hex).ok_or(ParseError::MalformedHex {
                 index: idx,
-                prop: "pkix-lint.serial-start",
+                prop: PROP_SERIAL_START,
             })?;
-            let end_hex = required("pkix-lint.serial-end")?;
+            let end_hex = required(PROP_SERIAL_END)?;
             let end = hex_decode(end_hex).ok_or(ParseError::MalformedHex {
                 index: idx,
-                prop: "pkix-lint.serial-end",
+                prop: PROP_SERIAL_END,
             })?;
-            Ok(DeviationScope::SerialRange { issuer, start, end })
+            DeviationScope::serial_range(&issuer, start, end).map_err(|_| {
+                ParseError::MalformedDer {
+                    index: idx,
+                    prop: PROP_ISSUER_DN_DER,
+                }
+            })
         }
 
         other => Err(ParseError::UnknownSubjectType {
@@ -566,7 +579,7 @@ mod tests {
         Deviation {
             id: "policy-2026-fpki-keyusage-q1".to_string(),
             target_lint: "fpki.common.6.1.5".to_string(),
-            scope: DeviationScope::IssuerDnContains("agency x issuing ca".to_string()),
+            scope: DeviationScope::issuer_dn_contains("agency x issuing ca"),
             effective_start: Some(1_704_067_200),
             effective_end: Some(1_767_225_600),
             action: DeviationAction::DowngradeSeverityTo(Severity::Warn),
@@ -594,7 +607,7 @@ mod tests {
             .add(Deviation {
                 id: "policy-internal-ca-suppress".to_string(),
                 target_lint: "rfc5280.keyusage.required".to_string(),
-                scope: DeviationScope::Any,
+                scope: DeviationScope::any(),
                 effective_start: None,
                 effective_end: None,
                 action: DeviationAction::Suppress,
@@ -631,7 +644,8 @@ mod tests {
             .add(Deviation {
                 id: "policy-good-ca-exact".to_string(),
                 target_lint: "rfc5280.bc.ca-true-required".to_string(),
-                scope: DeviationScope::IssuerDnExact(cert.tbs_certificate.subject.clone()),
+                scope: DeviationScope::issuer_dn_exact(&cert.tbs_certificate.subject)
+                    .expect("DER encode"),
                 effective_start: None,
                 effective_end: Some(2_000_000_000),
                 action: DeviationAction::DowngradeSeverityTo(Severity::Info),
@@ -656,11 +670,12 @@ mod tests {
             .add(Deviation {
                 id: "policy-batch-2026-q1".to_string(),
                 target_lint: "rfc5280.serial.unique".to_string(),
-                scope: DeviationScope::SerialRange {
-                    issuer: cert.tbs_certificate.subject.clone(),
-                    start: vec![0x01, 0x00],
-                    end: vec![0x01, 0xff],
-                },
+                scope: DeviationScope::serial_range(
+                    &cert.tbs_certificate.subject,
+                    vec![0x01, 0x00],
+                    vec![0x01, 0xff],
+                )
+                .expect("DER encode"),
                 effective_start: Some(1_704_067_200),
                 effective_end: Some(1_711_929_600),
                 action: DeviationAction::DowngradeSeverityTo(Severity::Warn),
@@ -684,7 +699,7 @@ mod tests {
             .add(Deviation {
                 id: "policy-no-optionals".to_string(),
                 target_lint: "rfc5280.aki.required".to_string(),
-                scope: DeviationScope::Any,
+                scope: DeviationScope::any(),
                 effective_start: None,
                 effective_end: None,
                 action: DeviationAction::Suppress,
@@ -717,7 +732,7 @@ mod tests {
             .add(Deviation {
                 id: "policy-second-suppress".to_string(),
                 action: DeviationAction::Suppress,
-                scope: DeviationScope::Any,
+                scope: DeviationScope::any(),
                 ..sample_deviation_contains()
             })
             .expect("add 2");
