@@ -193,6 +193,144 @@ pub enum ParseError {
         /// The unmatched Catalog Control id.
         id: String,
     },
+
+    // -- Profile composition (PKIX-9vnx.7) ---------------------------------
+    /// The top-level OSCAL Profile value was not a JSON object.
+    ProfileNotObject,
+    /// The expected `profile` wrapper key was missing or not an object.
+    ProfileMissingWrapper,
+    /// The `profile.imports` field was missing or not a JSON array.
+    ProfileImportsNotArray,
+    /// An entry in `profile.imports` was not a JSON object.
+    ProfileImportNotObject {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// An import was missing its required `href` field.
+    ProfileImportMissingHref {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// An import's `href` was present but not a JSON string.
+    ProfileImportHrefNotString {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// An import's `href` was a string but empty.
+    ProfileImportHrefEmpty {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// An import's `href` had no matching entry in the supplied
+    /// `sources` map.
+    ProfileImportUnresolved {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+        /// The unresolved href.
+        href: String,
+    },
+    /// A `sources` entry referenced by an import was neither an OSCAL
+    /// Catalog (`{"catalog": …}`) nor an OSCAL Profile
+    /// (`{"profile": …}`).
+    ProfileImportSourceUnknown {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+        /// The href whose source had an unrecognised wrapper.
+        href: String,
+    },
+    /// Profile-imports-Profile chain visited the same href twice.
+    ProfileImportCycle {
+        /// The href whose re-entry closed the cycle.
+        href: String,
+    },
+    /// `profile.imports[].include-controls` was present but not a JSON
+    /// array.
+    ProfileIncludeControlsNotArray {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// `profile.imports[].exclude-controls` was present but not a JSON
+    /// array.
+    ProfileExcludeControlsNotArray {
+        /// Position of the offending import in `profile.imports`.
+        index: usize,
+    },
+    /// An entry in `include-controls` / `exclude-controls` was not a
+    /// JSON object.
+    ProfileWithIdsEntryNotObject {
+        /// Position of the parent import in `profile.imports`.
+        index: usize,
+        /// Position of the offending entry in the directives array.
+        entry_index: usize,
+    },
+    /// An entry's `with-ids` field was not a JSON array.
+    ProfileWithIdsNotArray {
+        /// Position of the parent import in `profile.imports`.
+        index: usize,
+        /// Position of the offending entry in the directives array.
+        entry_index: usize,
+    },
+    /// An id in a `with-ids` array was not a JSON string.
+    ProfileWithIdNotString {
+        /// Position of the parent import in `profile.imports`.
+        index: usize,
+        /// Position of the offending entry in the directives array.
+        entry_index: usize,
+    },
+    /// `profile.modify.set-parameters` was present but not a JSON
+    /// array.
+    ProfileSetParametersNotArray,
+    /// An entry in `set-parameters` was not a JSON object.
+    ProfileSetParameterNotObject {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+    /// A `set-parameters` entry was missing its required `param-id`
+    /// field or it was not a JSON string.
+    ProfileSetParameterMissingId {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+    /// A `set-parameters` entry's `param-id` was a string but empty.
+    ProfileSetParameterIdEmpty {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+    /// A `set-parameters` entry's `values` field was missing or not a
+    /// JSON array.
+    ProfileSetParameterValuesNotArray {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+    /// A `set-parameters` entry's `values` field was an empty array
+    /// (OSCAL requires at least one value).
+    ProfileSetParameterValuesEmpty {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+    /// A `set-parameters` entry's first `values[0]` was not a JSON
+    /// string.
+    ProfileSetParameterValueNotString {
+        /// Position of the offending entry in `set-parameters`.
+        entry_index: usize,
+    },
+
+    // -- Profile overrides → registered Lint set (PKIX-9vnx.7) -------------
+    /// `apply_parameter_overrides` was passed a composite param id that
+    /// did not match `<lint_id>.<param_id>` for any registered Lint.
+    UnknownParameterOverride {
+        /// The unmatched composite param id.
+        param_id: String,
+    },
+    /// `apply_parameter_overrides` matched a lint by id but
+    /// [`crate::Lint::set_parameter`] rejected the value.
+    InvalidParameterOverride {
+        /// The composite param id where the override originated.
+        param_id: String,
+        /// Underlying [`crate::ParameterError`] surfaced from
+        /// [`crate::Lint::set_parameter`].
+        source: crate::ParameterError,
+    },
 }
 
 impl std::fmt::Display for ParseError {
@@ -291,6 +429,94 @@ impl std::fmt::Display for ParseError {
                 f,
                 "Catalog Control id '{id}' has no matching registered Lint"
             ),
+            Self::ProfileNotObject => {
+                write!(f, "top-level OSCAL Profile value is not a JSON object")
+            }
+            Self::ProfileMissingWrapper => {
+                write!(f, "OSCAL Profile value is missing the 'profile' wrapper")
+            }
+            Self::ProfileImportsNotArray => {
+                write!(f, "profile.imports is missing or not a JSON array")
+            }
+            Self::ProfileImportNotObject { index } => {
+                write!(f, "profile.imports[{index}] is not a JSON object")
+            }
+            Self::ProfileImportMissingHref { index } => write!(
+                f,
+                "profile.imports[{index}] is missing required 'href' field"
+            ),
+            Self::ProfileImportHrefNotString { index } => {
+                write!(f, "profile.imports[{index}] 'href' is not a JSON string")
+            }
+            Self::ProfileImportHrefEmpty { index } => {
+                write!(f, "profile.imports[{index}] 'href' is an empty string")
+            }
+            Self::ProfileImportUnresolved { index, href } => write!(
+                f,
+                "profile.imports[{index}] href '{href}' has no entry in sources"
+            ),
+            Self::ProfileImportSourceUnknown { index, href } => write!(
+                f,
+                "profile.imports[{index}] href '{href}' source is neither a Catalog nor a Profile"
+            ),
+            Self::ProfileImportCycle { href } => {
+                write!(f, "profile import cycle detected at href '{href}'")
+            }
+            Self::ProfileIncludeControlsNotArray { index } => write!(
+                f,
+                "profile.imports[{index}].include-controls is not a JSON array"
+            ),
+            Self::ProfileExcludeControlsNotArray { index } => write!(
+                f,
+                "profile.imports[{index}].exclude-controls is not a JSON array"
+            ),
+            Self::ProfileWithIdsEntryNotObject { index, entry_index } => write!(
+                f,
+                "profile.imports[{index}] include/exclude-controls[{entry_index}] is not a JSON object"
+            ),
+            Self::ProfileWithIdsNotArray { index, entry_index } => write!(
+                f,
+                "profile.imports[{index}] include/exclude-controls[{entry_index}].with-ids is not a JSON array"
+            ),
+            Self::ProfileWithIdNotString { index, entry_index } => write!(
+                f,
+                "profile.imports[{index}] include/exclude-controls[{entry_index}].with-ids contains a non-string id"
+            ),
+            Self::ProfileSetParametersNotArray => {
+                write!(f, "profile.modify.set-parameters is not a JSON array")
+            }
+            Self::ProfileSetParameterNotObject { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] is not a JSON object"
+            ),
+            Self::ProfileSetParameterMissingId { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] is missing required 'param-id'"
+            ),
+            Self::ProfileSetParameterIdEmpty { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] 'param-id' is an empty string"
+            ),
+            Self::ProfileSetParameterValuesNotArray { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] 'values' is missing or not a JSON array"
+            ),
+            Self::ProfileSetParameterValuesEmpty { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] 'values' is empty"
+            ),
+            Self::ProfileSetParameterValueNotString { entry_index } => write!(
+                f,
+                "profile.modify.set-parameters[{entry_index}] 'values[0]' is not a JSON string"
+            ),
+            Self::UnknownParameterOverride { param_id } => write!(
+                f,
+                "no registered Lint owns composite parameter id '{param_id}'"
+            ),
+            Self::InvalidParameterOverride { param_id, source } => write!(
+                f,
+                "Lint rejected parameter override for '{param_id}': {source}"
+            ),
         }
     }
 }
@@ -299,6 +525,7 @@ impl std::error::Error for ParseError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::AddFailed { source, .. } => Some(source),
+            Self::InvalidParameterOverride { source, .. } => Some(source),
             _ => None,
         }
     }

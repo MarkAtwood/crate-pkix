@@ -26,3 +26,4 @@
 pub mod catalog;
 pub mod emit;
 pub mod parse;
+pub mod profile;
