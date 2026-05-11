@@ -217,14 +217,42 @@ cargo run --release -p pkix-difftest -- run limbo \
 
 Committed baseline files:
 
-* `baseline-limbo.json` — machine-readable, lossless source of truth.
+* `baseline-limbo.json` — machine-readable, lossless source of truth
+  (default `pkix-path` features: `rsa`, `p256`).
 * `baseline-limbo.md` — auto-generated per-bucket detail.
 * `baseline-limbo-analysis.md` — curated bucket-by-bucket analysis
-  (mirrors `baseline-pkits-analysis.md`).
+  (mirrors `baseline-pkits-analysis.md`). Includes a "With full
+  crypto" section covering the secondary baseline below.
+* `baseline-limbo-allfeatures.json` / `.md` — secondary baseline with
+  `pkix-path/rustcrypto` activated (adds `p384`). See PKIX-wmch.
 
 After a code change that affects any verdict, re-run the harness,
 `git diff` the `.json`, and update the analysis MD with any new
 buckets or net-count shifts.
+
+### Secondary baseline: full crypto profile (PKIX-wmch)
+
+The primary baseline answers "what does an unsuspecting downstream
+consumer get?" and uses `pkix-path`'s default feature set
+(`rsa`, `p256`). The secondary baseline activates every signature
+backend `pkix-path` currently ships via the `rustcrypto` umbrella
+(`rsa` + `p256` + `p384`) so the harness can verify real-world
+ECDSA P-384 chains (Apple, Cloudflare, Akamai, StackOverflow roots
+in the `online::*` testcases). Build and run:
+
+```sh
+cargo build --release -p pkix-difftest --features rustcrypto
+./target/release/pkix-difftest run limbo \
+  ~/GIT/x509-limbo/limbo.json \
+  --oracles pkix-path,openssl,pyca \
+  --output-md  pkix-difftest/baseline-limbo-allfeatures.md \
+  --output-json pkix-difftest/baseline-limbo-allfeatures.json \
+  --title "x509-limbo Tier-2 baseline — pkix-path with rustcrypto features (PKIX-wmch)"
+```
+
+The secondary baseline is **not** in CI; CI continues to diff against
+the default-features baseline. Re-generate the secondary file when a
+new `SignatureVerifier` lands or the corpus is refreshed.
 
 ## Demo: running the entire x509-limbo corpus (legacy PEM-tree path)
 

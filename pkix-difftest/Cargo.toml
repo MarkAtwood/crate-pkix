@@ -24,11 +24,34 @@ path = "src/lib.rs"
 name = "pkix-difftest"
 path = "src/main.rs"
 
+[features]
+# Default: build pkix-path with its own default features ("rsa", "p256"). This
+# answers "what does an unsuspecting downstream consumer get?" and is the
+# primary baseline corpus (baseline-pkits.* / baseline-limbo.*).
+default = []
+
+# Secondary baseline: activate every signature backend pkix-path ships
+# (pkix-path/rustcrypto = rsa + p256 + p384). Used to produce
+# baseline-limbo-allfeatures.{json,md} per PKIX-wmch — the "with full crypto"
+# delta that exercises real-world ECDSA P-384 chains (Apple, Cloudflare,
+# Akamai, StackOverflow roots) and webpki:: P-384 testcases.
+#
+# Ed25519 is intentionally NOT in this list: pkix-path does not yet implement
+# an Ed25519 SignatureVerifier (the rustcrypto umbrella feature is rsa + p256
+# + p384 only). Cases requiring Ed25519 will continue to fail signature
+# verification under this feature; that delta is documented in
+# baseline-limbo-analysis.md.
+rustcrypto = ["pkix-path/rustcrypto"]
+
 [dependencies]
 # Core path validation under test. Default features ("rsa", "p256") give us
 # DefaultVerifier — exactly what an unsuspecting downstream consumer would get.
 # That is the right thing to test, since this harness is asking the question
 # "what does the default pkix-path build do?"
+#
+# The harness itself can be built with --features rustcrypto to activate
+# pkix-path's full set of signature backends (adds p384). That secondary
+# build is what produces baseline-limbo-allfeatures.{json,md} per PKIX-wmch.
 pkix-path = { workspace = true }
 
 # Path building (PKIX-t0w4). Used by the PKITS loader to reorder CertPath
