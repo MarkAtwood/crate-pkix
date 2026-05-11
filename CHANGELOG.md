@@ -108,6 +108,23 @@ work without leaking memory (via `Cow::Owned`).
   consistency. Adds a direct `sha2` dependency (already transitive via
   `x509-cert`, so the binary footprint cost is zero).
 
+- `oscal` cargo feature exposing `pkix_lint::oscal::emit::assessment_results`
+  (PKIX-9vnx.3, Architecture 2 per PKIX-ztmr). The emitter projects an
+  `EvaluationReport` into a NIST OSCAL v1.1.2 Assessment Results
+  `serde_json::Value` document — top-level `assessment-results` with
+  `metadata`, `import-ap`, and one `results[]` entry containing
+  Observations (one per `Finding`, carrying `cert_sha256` and lint
+  citation as evidence) and Findings (with `target.status.state` set to
+  `satisfied` for Pass/NotApplicable and `not-satisfied` for
+  Warn/Error/Fatal). `DeviatedFinding`s become Risks with
+  `status="deviation-approved"`. UUIDs are deterministically derived
+  (RFC 9562 §5.8 v8 using SHA-256) so identical lint runs yield
+  byte-identical OSCAL output. The feature gates a new optional
+  `serde_json` dependency; default builds are unchanged. Internal
+  `EvaluationReport` / `Finding` / `DeviatedFinding` shapes are NOT
+  reshaped to mirror OSCAL field-for-field — the emitter projects, per
+  the Architecture 2 stance.
+
 #### Migration
 
 Pattern-matches stay unchanged — `LintResult::Warn(_)` still works.
