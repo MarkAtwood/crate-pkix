@@ -233,12 +233,9 @@ mod tests {
         Certificate::from_der(bytes).expect("fixture parses")
     }
 
-    const FIXTURE_HTTP: &[u8] =
-        include_bytes!("../tests/fixtures/cert-cdp-aia-http.der");
-    const FIXTURE_MIXED: &[u8] =
-        include_bytes!("../tests/fixtures/cert-cdp-aia-mixed-schemes.der");
-    const FIXTURE_NONE: &[u8] =
-        include_bytes!("../tests/fixtures/cert-no-extensions.der");
+    const FIXTURE_HTTP: &[u8] = include_bytes!("../tests/fixtures/cert-cdp-aia-http.der");
+    const FIXTURE_MIXED: &[u8] = include_bytes!("../tests/fixtures/cert-cdp-aia-mixed-schemes.der");
+    const FIXTURE_NONE: &[u8] = include_bytes!("../tests/fixtures/cert-no-extensions.der");
 
     // ----- CDP -----
 
@@ -291,14 +288,12 @@ mod tests {
         // RelativeDistinguishedName containing CN=ignored.
         use der::{asn1::SetOfVec, Encode};
         use x509_cert::{
-            attr::AttributeTypeAndValue,
-            ext::pkix::crl::dp::DistributionPoint,
+            attr::AttributeTypeAndValue, ext::pkix::crl::dp::DistributionPoint,
             name::RelativeDistinguishedName,
         };
 
         let cn_oid = der::asn1::ObjectIdentifier::new_unwrap("2.5.4.3"); // id-at-commonName
-        let cn_value =
-            der::asn1::PrintableString::new("ignored").unwrap();
+        let cn_value = der::asn1::PrintableString::new("ignored").unwrap();
         let ava = AttributeTypeAndValue {
             oid: cn_oid,
             value: der::Any::encode_from(&cn_value).unwrap(),
@@ -308,9 +303,7 @@ mod tests {
         let rdn = RelativeDistinguishedName(set);
 
         let dp = DistributionPoint {
-            distribution_point: Some(
-                DistributionPointName::NameRelativeToCRLIssuer(rdn),
-            ),
+            distribution_point: Some(DistributionPointName::NameRelativeToCRLIssuer(rdn)),
             reasons: None,
             crl_issuer: None,
         };
@@ -328,9 +321,8 @@ mod tests {
         // Sanity: the extension value still re-decodes as
         // CrlDistributionPoints (so the test is exercising the
         // NameRelativeToCRLIssuer branch, not a parse failure).
-        let reparsed =
-            CrlDistributionPoints::from_der(cdp_ext.extn_value.as_bytes())
-                .expect("synthesised CDP must round-trip");
+        let reparsed = CrlDistributionPoints::from_der(cdp_ext.extn_value.as_bytes())
+            .expect("synthesised CDP must round-trip");
         assert!(
             matches!(
                 reparsed.0[0].distribution_point,
@@ -364,8 +356,7 @@ mod tests {
         // Overwrite with bytes that are not valid CrlDistributionPoints.
         // 0x30 0x01 0xFF is "SEQUENCE of length 1 containing one byte 0xFF",
         // which cannot decode as a SEQUENCE OF DistributionPoint.
-        cdp.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..])
-            .unwrap();
+        cdp.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
 
         // Round-trip through DER so the parsed structure matches what
         // extract_cdp_http_urls would receive. We don't actually need to
@@ -428,8 +419,7 @@ mod tests {
             .iter_mut()
             .find(|e| e.extn_id == OID_AUTHORITY_INFO_ACCESS)
             .expect("fixture has AIA");
-        aia_ext.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..])
-            .unwrap();
+        aia_ext.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
 
         let err = extract_aia_http_urls(&cert).unwrap_err();
         match err {

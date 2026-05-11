@@ -53,12 +53,8 @@ where
         // certs separately; for v0.x we lump cert-level malformation
         // into the same "no usable revocation source" bucket as
         // network failure.
-        let urls = extract_cdp_http_urls(cert).map_err(|e| {
-            RevError::RevocationFetchFailed {
-                description: format!(
-                    "cRLDistributionPoints extension parse failed: {e}"
-                ),
-            }
+        let urls = extract_cdp_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
+            description: format!("cRLDistributionPoints extension parse failed: {e}"),
         })?;
 
         // Step 2 — No URLs ⇒ nothing for this checker to do.
@@ -86,11 +82,7 @@ where
                     // succeeds, the checker's verdict is
                     // returned IMMEDIATELY — see module docs for why we
                     // do not retry on e.g. CrlExpired.
-                    match CrlChecker::new(
-                        &resp.bytes,
-                        self.now_unix,
-                        self.verifier.clone(),
-                    ) {
+                    match CrlChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
                         Ok(checker) => return checker.check_revocation(cert, issuer),
                         Err(e) => {
                             failures.push(format!("{url}: CRL parse: {e}"));
@@ -107,11 +99,7 @@ where
 
         // Step 4 — Every URL failed. Surface a structured description.
         Err(RevError::RevocationFetchFailed {
-            description: format!(
-                "all {} URL(s) failed: {}",
-                urls.len(),
-                failures.join("; ")
-            ),
+            description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
         })
     }
 
@@ -136,12 +124,9 @@ mod tests {
 
     const CA: &[u8] = include_bytes!("../tests/fixtures/http-ca.der");
     const LEAF_GOOD: &[u8] = include_bytes!("../tests/fixtures/http-leaf-good.der");
-    const LEAF_REVOKED: &[u8] =
-        include_bytes!("../tests/fixtures/http-leaf-revoked.der");
-    const LEAF_NO_CDP: &[u8] =
-        include_bytes!("../tests/fixtures/http-leaf-no-cdp.der");
-    const CRL_REVOKES_2: &[u8] =
-        include_bytes!("../tests/fixtures/http-crl-revokes-2.der");
+    const LEAF_REVOKED: &[u8] = include_bytes!("../tests/fixtures/http-leaf-revoked.der");
+    const LEAF_NO_CDP: &[u8] = include_bytes!("../tests/fixtures/http-leaf-no-cdp.der");
+    const CRL_REVOKES_2: &[u8] = include_bytes!("../tests/fixtures/http-crl-revokes-2.der");
     const CRL_EMPTY: &[u8] = include_bytes!("../tests/fixtures/http-crl-empty.der");
 
     /// Validation timestamp: 2026-06-01 00:00:00 UTC. Matches the CRL's
@@ -157,10 +142,7 @@ mod tests {
     }
 
     impl RevocationFetcher for StaticMap {
-        fn fetch(
-            &self,
-            req: &FetchRequest<'_>,
-        ) -> Result<FetchResponse, FetchError> {
+        fn fetch(&self, req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
             self.seen.borrow_mut().push(req.url.to_owned());
             for (url, bytes) in &self.map {
                 if *url == req.url {
@@ -177,10 +159,7 @@ mod tests {
     /// Mock fetcher that always returns a fixed error.
     struct AlwaysFail;
     impl RevocationFetcher for AlwaysFail {
-        fn fetch(
-            &self,
-            _req: &FetchRequest<'_>,
-        ) -> Result<FetchResponse, FetchError> {
+        fn fetch(&self, _req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
             Err(FetchError::HttpStatus(503))
         }
     }
@@ -238,9 +217,7 @@ mod tests {
     #[test]
     fn all_fetches_failing_returns_revocation_fetch_failed() {
         let h = HttpCrlFetcher::new(AlwaysFail, DefaultVerifier, NOW);
-        let err = h
-            .check_revocation(&cert(LEAF_GOOD), &cert(CA))
-            .unwrap_err();
+        let err = h.check_revocation(&cert(LEAF_GOOD), &cert(CA)).unwrap_err();
         match err {
             RevError::RevocationFetchFailed { description } => {
                 // Per-URL summary must mention the URL and the HTTP status.
@@ -267,9 +244,7 @@ mod tests {
             seen: RefCell::new(Vec::new()),
         };
         let h = HttpCrlFetcher::new(f, DefaultVerifier, NOW);
-        let err = h
-            .check_revocation(&cert(LEAF_GOOD), &cert(CA))
-            .unwrap_err();
+        let err = h.check_revocation(&cert(LEAF_GOOD), &cert(CA)).unwrap_err();
         match err {
             RevError::RevocationFetchFailed { description } => {
                 assert!(

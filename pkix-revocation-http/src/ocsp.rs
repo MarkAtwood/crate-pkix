@@ -26,8 +26,7 @@
 //! and adding one is tracked as future work.
 
 use crate::{
-    build_ocsp_request, extract_aia_http_urls, FetchRequest, HttpOcspFetcher,
-    RevocationFetcher,
+    build_ocsp_request, extract_aia_http_urls, FetchRequest, HttpOcspFetcher, RevocationFetcher,
 };
 use pkix_path::SignatureVerifier;
 use pkix_revocation::{Error as RevError, OcspChecker, RevocationChecker};
@@ -55,20 +54,15 @@ where
         // is mapping the BuildError to a different pkix_revocation::Error
         // variant, which would either lie about what happened or
         // require yet another variant addition).
-        let req_bytes =
-            build_ocsp_request(cert, issuer, self.hash_alg).map_err(|e| {
-                RevError::RevocationFetchFailed {
-                    description: format!("OCSP request build failed: {e}"),
-                }
-            })?;
+        let req_bytes = build_ocsp_request(cert, issuer, self.hash_alg).map_err(|e| {
+            RevError::RevocationFetchFailed {
+                description: format!("OCSP request build failed: {e}"),
+            }
+        })?;
 
         // Step 2 — Extract HTTP/HTTPS OCSP responder URLs from the cert.
-        let aia = extract_aia_http_urls(cert).map_err(|e| {
-            RevError::RevocationFetchFailed {
-                description: format!(
-                    "authorityInfoAccess extension parse failed: {e}"
-                ),
-            }
+        let aia = extract_aia_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
+            description: format!("authorityInfoAccess extension parse failed: {e}"),
         })?;
 
         // Step 3 — No OCSP URLs ⇒ nothing for this checker to do.
@@ -91,11 +85,7 @@ where
                     // OcspChecker; on parse failure, fall through to
                     // the next URL. On construction success the
                     // checker's verdict is returned immediately.
-                    match OcspChecker::new(
-                        &resp.bytes,
-                        self.now_unix,
-                        self.verifier.clone(),
-                    ) {
+                    match OcspChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
                         Ok(checker) => return checker.check_revocation(cert, issuer),
                         Err(e) => {
                             failures.push(format!("{url}: OCSP parse: {e}"));
@@ -141,14 +131,10 @@ mod tests {
 
     const CA: &[u8] = include_bytes!("../tests/fixtures/http-ca.der");
     const LEAF_GOOD: &[u8] = include_bytes!("../tests/fixtures/http-leaf-good.der");
-    const LEAF_REVOKED: &[u8] =
-        include_bytes!("../tests/fixtures/http-leaf-revoked.der");
-    const LEAF_NO_AIA: &[u8] =
-        include_bytes!("../tests/fixtures/http-leaf-no-cdp.der");
-    const RESP_GOOD: &[u8] =
-        include_bytes!("../tests/fixtures/http-ocsp-good.der");
-    const RESP_REVOKED: &[u8] =
-        include_bytes!("../tests/fixtures/http-ocsp-revoked.der");
+    const LEAF_REVOKED: &[u8] = include_bytes!("../tests/fixtures/http-leaf-revoked.der");
+    const LEAF_NO_AIA: &[u8] = include_bytes!("../tests/fixtures/http-leaf-no-cdp.der");
+    const RESP_GOOD: &[u8] = include_bytes!("../tests/fixtures/http-ocsp-good.der");
+    const RESP_REVOKED: &[u8] = include_bytes!("../tests/fixtures/http-ocsp-revoked.der");
 
     /// Validation timestamp: 2026-06-01 00:00:00 UTC. Inside the
     /// thisUpdate / nextUpdate window of the gen-script-produced
@@ -171,10 +157,7 @@ mod tests {
     }
 
     impl RevocationFetcher for StaticOcspMap {
-        fn fetch(
-            &self,
-            req: &FetchRequest<'_>,
-        ) -> Result<FetchResponse, FetchError> {
+        fn fetch(&self, req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
             let (body, content_type) = match req.method {
                 FetchMethod::Get => (None, None),
                 FetchMethod::Post { body, content_type } => {
@@ -190,9 +173,7 @@ mod tests {
                 if *url == req.url {
                     return Ok(FetchResponse {
                         bytes: bytes.clone(),
-                        content_type: Some(
-                            "application/ocsp-response".to_string(),
-                        ),
+                        content_type: Some("application/ocsp-response".to_string()),
                     });
                 }
             }
@@ -203,10 +184,7 @@ mod tests {
     /// Mock fetcher that always returns a fixed error.
     struct AlwaysFail;
     impl RevocationFetcher for AlwaysFail {
-        fn fetch(
-            &self,
-            _req: &FetchRequest<'_>,
-        ) -> Result<FetchResponse, FetchError> {
+        fn fetch(&self, _req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
             Err(FetchError::HttpStatus(503))
         }
     }
@@ -252,9 +230,7 @@ mod tests {
     #[test]
     fn all_fetches_failing_returns_revocation_fetch_failed() {
         let h = HttpOcspFetcher::new(AlwaysFail, DefaultVerifier, NOW);
-        let err = h
-            .check_revocation(&cert(LEAF_GOOD), &cert(CA))
-            .unwrap_err();
+        let err = h.check_revocation(&cert(LEAF_GOOD), &cert(CA)).unwrap_err();
         match err {
             RevError::RevocationFetchFailed { description } => {
                 assert!(
@@ -277,9 +253,7 @@ mod tests {
             seen: RefCell::new(Vec::new()),
         };
         let h = HttpOcspFetcher::new(f, DefaultVerifier, NOW);
-        let err = h
-            .check_revocation(&cert(LEAF_GOOD), &cert(CA))
-            .unwrap_err();
+        let err = h.check_revocation(&cert(LEAF_GOOD), &cert(CA)).unwrap_err();
         match err {
             RevError::RevocationFetchFailed { description } => {
                 assert!(
@@ -325,8 +299,7 @@ mod tests {
         // request body (different CertID.hashAlgorithm OID). This is a
         // regression guard against silent ignoring of with_hash_alg.
         let f = fetcher_with(RESP_GOOD);
-        let h = HttpOcspFetcher::new(f, DefaultVerifier, NOW)
-            .with_hash_alg(OcspHashAlg::Sha1);
+        let h = HttpOcspFetcher::new(f, DefaultVerifier, NOW).with_hash_alg(OcspHashAlg::Sha1);
         // Cert is good, response is good, but we won't make it that far —
         // the response was generated with SHA-256 so the CertID will not
         // match. We just want to inspect what we POSTed.
@@ -340,11 +313,7 @@ mod tests {
         let f2 = fetcher_with(RESP_GOOD);
         let h2 = HttpOcspFetcher::new(f2, DefaultVerifier, NOW);
         let _ = h2.check_revocation(&cert(LEAF_GOOD), &cert(CA));
-        let body_sha256 = h2.fetcher.seen.borrow()[0]
-            .body
-            .as_ref()
-            .unwrap()
-            .clone();
+        let body_sha256 = h2.fetcher.seen.borrow()[0].body.as_ref().unwrap().clone();
 
         assert_ne!(
             body_sha1, body_sha256,

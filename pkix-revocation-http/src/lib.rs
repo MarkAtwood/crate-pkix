@@ -22,6 +22,26 @@
 //! query, which carries a DER-encoded request body and a fixed content
 //! type per RFC 6960 §A.1).
 //!
+//! # Async (feature `async`)
+//!
+//! An async parallel of the trait family lives behind the `async`
+//! feature: [`AsyncRevocationFetcher`], [`AsyncRevocationChecker`],
+//! [`AsyncHttpCrlFetcher`], [`AsyncHttpOcspFetcher`]. The async
+//! [`AsyncRevocationChecker`] is defined in this crate (NOT in
+//! `pkix-revocation`) so the core revocation crate stays sync-only and
+//! free of `async-trait` machinery. The async API mirrors the sync API
+//! exactly — same arguments, same error type, same per-cert +
+//! against-anchor split — so consumers can write thin parallel impls
+//! for both flavours when needed. See [`AsyncRevocationFetcher`] for
+//! the architectural rationale (we considered three shapes; landed on
+//! "two parallel families").
+//!
+//! A reference [`AsyncRevocationFetcher`] backed by `reqwest`'s async
+//! client lives at [`crate::clients::reqwest::ReqwestFetcher`] behind
+//! the `client-reqwest-async` feature. Consumers using a different
+//! async HTTP backend (hyper, isahc-async, custom) implement
+//! [`AsyncRevocationFetcher`] themselves and pay no reqwest cost.
+//!
 //! # Spec references
 //!
 //! - RFC 5280 §4.2.1.13 — `CRLDistributionPoints` extension
@@ -45,6 +65,27 @@ mod extract;
 mod ocsp;
 #[cfg(feature = "ocsp")]
 mod ocsp_request;
+
+// Async trait family (PKIX-a1yc.10). Gated on the `async` feature so the
+// default build profile is unchanged. Sub-impls reuse the per-protocol
+// feature flags (`crl`, `ocsp`) so an async build can opt into one
+// protocol without the other.
+#[cfg(all(feature = "async", feature = "crl"))]
+mod async_crl;
+#[cfg(feature = "async")]
+mod async_fetcher;
+#[cfg(all(feature = "async", feature = "ocsp"))]
+mod async_ocsp;
+
+#[cfg(all(feature = "async", feature = "crl"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "async", feature = "crl"))))]
+pub use async_fetcher::AsyncHttpCrlFetcher;
+#[cfg(all(feature = "async", feature = "ocsp"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "async", feature = "ocsp"))))]
+pub use async_fetcher::AsyncHttpOcspFetcher;
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+pub use async_fetcher::{AsyncRevocationChecker, AsyncRevocationFetcher};
 
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
 #[cfg(feature = "ocsp")]
@@ -131,7 +172,10 @@ impl<'a> FetchRequest<'a> {
     /// Build a `GET` request — used for CRL fetches.
     #[must_use]
     pub const fn get(url: &'a str) -> Self {
-        Self { url, method: FetchMethod::Get }
+        Self {
+            url,
+            method: FetchMethod::Get,
+        }
     }
 
     /// Build a `POST` request — used for OCSP queries.
@@ -141,7 +185,10 @@ impl<'a> FetchRequest<'a> {
     /// RFC 6960 §A.1).
     #[must_use]
     pub const fn post(url: &'a str, body: &'a [u8], content_type: &'a str) -> Self {
-        Self { url, method: FetchMethod::Post { body, content_type } }
+        Self {
+            url,
+            method: FetchMethod::Post { body, content_type },
+        }
     }
 }
 
@@ -253,7 +300,11 @@ impl<F, V> HttpCrlFetcher<F, V> {
     /// (PKIX-a1yc.5), matching the bound-placement style of
     /// [`pkix_revocation::CrlChecker`].
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
-        Self { fetcher, verifier, now_unix }
+        Self {
+            fetcher,
+            verifier,
+            now_unix,
+        }
     }
 }
 
@@ -350,13 +401,12 @@ mod tests {
     #[test]
     fn fetch_request_post_shape() {
         let body = b"\x30\x00";
-        let req = FetchRequest::post(
-            "http://example.com/ocsp",
-            body,
-            "application/ocsp-request",
-        );
+        let req = FetchRequest::post("http://example.com/ocsp", body, "application/ocsp-request");
         match req.method {
-            FetchMethod::Post { body: b, content_type } => {
+            FetchMethod::Post {
+                body: b,
+                content_type,
+            } => {
                 assert_eq!(b, body);
                 assert_eq!(content_type, "application/ocsp-request");
             }
@@ -382,8 +432,14 @@ mod tests {
         let inner: Box<dyn std::error::Error + Send + Sync> = "connection refused".into();
         let err = FetchError::Transport(inner);
         let s = format!("{err}");
-        assert!(s.contains("connection refused"), "Display should include inner message: {s}");
-        assert!(std::error::Error::source(&err).is_some(), "Transport should expose source()");
+        assert!(
+            s.contains("connection refused"),
+            "Display should include inner message: {s}"
+        );
+        assert!(
+            std::error::Error::source(&err).is_some(),
+            "Transport should expose source()"
+        );
     }
 
     #[cfg(feature = "crl")]

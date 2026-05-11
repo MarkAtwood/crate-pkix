@@ -23,6 +23,16 @@ ocsp = [
 # this feature pulls in rustls for HTTPS support.
 client-ureq = ["dep:ureq"]
 
+# Async fetcher trait + reference reqwest async backend (PKIX-a1yc.10).
+# `async` enables only the AsyncRevocationFetcher / AsyncRevocationChecker
+# traits and the AsyncHttpCrlFetcher / AsyncHttpOcspFetcher wrappers
+# (consumer brings their own reqwest / hyper / etc. impl of the trait).
+# `client-reqwest-async` additionally pulls in the reference reqwest
+# implementation. Consumers driving these futures must bring their own
+# async runtime (tokio, async-std); the crate does not.
+async                = ["dep:async-trait"]
+client-reqwest-async = ["async", "dep:reqwest"]
+
 [dependencies]
 pkix-path       = { workspace = true }
 pkix-revocation = { workspace = true }
@@ -40,6 +50,18 @@ sha2      = { workspace = true, optional = true }
 # Reference HTTP client (PKIX-a1yc.8). See `clients::ureq` module.
 ureq = { workspace = true, optional = true }
 
+# Async trait machinery (PKIX-a1yc.10). Pulled in by the `async` feature.
+# The trait macro generates code that boxes returned futures as
+# `Pin<Box<dyn Future + Send + 'async_trait>>`; that allocation cost is
+# accepted as the price of object-safe async traits at MSRV 1.73 (native
+# `async fn` in traits is stable but is 1.75+).
+async-trait = { workspace = true, optional = true }
+
+# Reference async HTTP client (PKIX-a1yc.10). See `clients::reqwest`
+# module. Pulled in only by the `client-reqwest-async` feature; the
+# trait crate itself does not depend on reqwest.
+reqwest = { workspace = true, optional = true }
+
 [dev-dependencies]
 # DefaultVerifier (rsa + p256 OID dispatch) is needed by the CrlChecker
 # / OcspChecker delegation tests. std needed for std::error::Error.
@@ -47,6 +69,14 @@ pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 # Mock HTTP server for the integration-test suite (PKIX-a1yc.9). MSRV
 # 1.70, comfortably within the workspace's 1.73 MSRV.
 mockito = "1.7"
+
+# Async runtime + async mock server, dev-only (PKIX-a1yc.10). Tokio is
+# the universal async runtime for reqwest's async client; the integration
+# tests drive futures via `#[tokio::test]`. wiremock provides a real
+# tokio-hosted HTTP mock server (mockito is sync-only by design). Both
+# are dev-deps, so they do not propagate to consumers of pkix-revocation-http.
+tokio    = { version = "1", default-features = false, features = ["rt", "macros"] }
+wiremock = "0.6"
 
 [package.metadata.docs.rs]
 all-features = true

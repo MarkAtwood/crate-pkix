@@ -28,12 +28,12 @@ use der::{Decode, Encode};
 use pkix_path::DefaultVerifier;
 use pkix_revocation::{Error as RevError, RevocationChecker};
 use pkix_revocation_http::{
-    clients::ureq::UreqFetcher, FetchError, FetchRequest, FetchResponse,
-    HttpCrlFetcher, RevocationFetcher,
+    clients::ureq::UreqFetcher, FetchError, FetchRequest, FetchResponse, HttpCrlFetcher,
+    RevocationFetcher,
 };
+use x509_cert::ext::pkix::crl::dp::DistributionPoint;
 use x509_cert::ext::pkix::name::{DistributionPointName, GeneralName, GeneralNames};
 use x509_cert::ext::pkix::CrlDistributionPoints;
-use x509_cert::ext::pkix::crl::dp::DistributionPoint;
 use x509_cert::Certificate;
 
 const CA: &[u8] = include_bytes!("fixtures/http-ca.der");
@@ -168,10 +168,7 @@ struct PerUrlMock {
 }
 
 impl RevocationFetcher for PerUrlMock {
-    fn fetch(
-        &self,
-        req: &FetchRequest<'_>,
-    ) -> Result<FetchResponse, FetchError> {
+    fn fetch(&self, req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
         for (url, result) in &self.responses {
             if *url == req.url {
                 return match result {
@@ -201,9 +198,7 @@ fn rewrite_cdp_to_urls(mut cert: Certificate, urls: &[&str]) -> Certificate {
 
     let mut dps: Vec<DistributionPoint> = Vec::with_capacity(urls.len());
     for u in urls {
-        let gn = GeneralName::UniformResourceIdentifier(
-            Ia5String::new(*u).unwrap(),
-        );
+        let gn = GeneralName::UniformResourceIdentifier(Ia5String::new(*u).unwrap());
         let names: GeneralNames = vec![gn];
         let dp = DistributionPoint {
             distribution_point: Some(DistributionPointName::FullName(names)),
@@ -240,10 +235,7 @@ fn crl_multi_cdp_first_fails_second_succeeds() {
 
     let f = PerUrlMock {
         responses: vec![
-            (
-                "http://primary.example.com/test.crl".to_string(),
-                Err(503),
-            ),
+            ("http://primary.example.com/test.crl".to_string(), Err(503)),
             (
                 "http://secondary.example.com/test.crl".to_string(),
                 Ok(CRL_EMPTY.to_vec()),
@@ -272,9 +264,7 @@ fn crl_multi_cdp_all_fail_surfaces_aggregated_error() {
         ],
     };
     let h = HttpCrlFetcher::new(f, DefaultVerifier, NOW);
-    let err = h
-        .check_revocation(&leaf, &parse_cert(CA))
-        .unwrap_err();
+    let err = h.check_revocation(&leaf, &parse_cert(CA)).unwrap_err();
     match err {
         RevError::RevocationFetchFailed { description } => {
             // All three URLs and statuses must appear.
@@ -317,8 +307,7 @@ fn crl_full_integration_ureq_against_mockito_revoked_leaf_yields_revoked() {
         .create();
 
     let leaf = rewrite_cdp_to_urls(
-        Certificate::from_der(include_bytes!("fixtures/http-leaf-revoked.der"))
-            .unwrap(),
+        Certificate::from_der(include_bytes!("fixtures/http-leaf-revoked.der")).unwrap(),
         &[&mock_url],
     );
 
@@ -379,10 +368,7 @@ fn ocsp_full_integration_uses_post_with_correct_content_type() {
             .create();
 
         // Synthesise a leaf with an AIA pointing at the mockito server.
-        let leaf = rewrite_aia_ocsp(
-            Certificate::from_der(LEAF_GOOD).unwrap(),
-            &mock_url,
-        );
+        let leaf = rewrite_aia_ocsp(Certificate::from_der(LEAF_GOOD).unwrap(), &mock_url);
 
         let h = HttpOcspFetcher::new(UreqFetcher::new(), DefaultVerifier, NOW);
         // We don't care about the returned verdict — just that a POST
@@ -399,9 +385,7 @@ fn rewrite_aia_ocsp(mut cert: Certificate, url: &str) -> Certificate {
 
     let ad = AccessDescription {
         access_method: der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1"),
-        access_location: GeneralName::UniformResourceIdentifier(
-            Ia5String::new(url).unwrap(),
-        ),
+        access_location: GeneralName::UniformResourceIdentifier(Ia5String::new(url).unwrap()),
     };
     let aia = AuthorityInfoAccessSyntax(vec![ad]);
     let aia_der = aia.to_der().expect("encode synthetic AIA");
