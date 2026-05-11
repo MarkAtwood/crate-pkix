@@ -275,9 +275,11 @@ The x509-limbo Tier-2 baseline produced clear signal:
    RFC-literal reading. 748 of 819 LooserThanWild cases are this
    family.
 3. **One harness-shape limitation**: default-features-only build
-   excludes p384, causing 4 online::* ECDSA chains and several
-   webpki:: ECC root tests to fail signature verification. Tracked
-   as PKIX-wmch.
+   excludes p384, causing 4 online::* ECDSA chains (apple.com,
+   cloudflare.com, akamai.com, stackoverflow.com) to fail signature
+   verification. Tracked as PKIX-wmch — the secondary `rustcrypto`-
+   features baseline below confirms these 4 are the only signature-
+   verification flips from the feature surface change.
 4. **Zero new pkix-path correctness regressions** detected against
    the existing project policy lines (no DSA, no P-192,
    permissive-by-default EKU/SAN/criticality).
@@ -285,3 +287,95 @@ The x509-limbo Tier-2 baseline produced clear signal:
 Future runs should diff against this baseline as a regression
 detector: any chain that flips Pass/Fail without a corresponding
 documented change in pkix-path or the harness is worth investigating.
+
+## With full crypto (`--features rustcrypto`, PKIX-wmch)
+
+A secondary baseline run was produced with `pkix-difftest` built using
+the `rustcrypto` feature, which activates `pkix-path/rustcrypto`
+(`rsa` + `p256` + `p384`). All other oracle and corpus parameters
+are unchanged. Files:
+
+* `baseline-limbo-allfeatures.json` — machine-readable.
+* `baseline-limbo-allfeatures.md` — auto-generated detail.
+
+Invocation:
+
+```sh
+cargo build -p pkix-difftest --release --features rustcrypto
+./target/release/pkix-difftest run limbo /path/to/limbo.json \
+    --oracles pkix-path,openssl,pyca \
+    --output-md  pkix-difftest/baseline-limbo-allfeatures.md \
+    --output-json pkix-difftest/baseline-limbo-allfeatures.json
+```
+
+### Summary delta
+
+| Class                | default | rustcrypto | Δ |
+|----------------------|--------:|-----------:|---:|
+| LooserThanWild       |     819 |        819 |  0 |
+| StricterThanWild     |      74 |         70 | −4 |
+| OracleDivergence     |       0 |          0 |  0 |
+| DiagnosticDivergence |    5901 |       5901 |  0 |
+| Agreement            |    2932 |       2936 | +4 |
+| Total                |    9726 |       9726 |  — |
+
+Ground-truth disagreements: 2948 → 2944 (−4, matching the 4 flips
+to Agreement(Pass) — all 4 cases have `expected_result: SUCCESS`).
+
+### Chains that flipped
+
+Exactly 4 cases changed class between the two baselines, all from
+`StricterThanWild` (pkix-path Fail with `signature invalid at chain
+index N`, openssl + pyca Pass) to `Agreement` (all three oracles
+Pass):
+
+| Case                       | default-features verdict (pkix-path)     | rustcrypto verdict (pkix-path) |
+|----------------------------|------------------------------------------|--------------------------------|
+| `online::apple.com`        | Fail: signature invalid at chain index 1 | Pass                           |
+| `online::cloudflare.com`   | Fail: signature invalid at chain index 1 | Pass                           |
+| `online::akamai.com`       | Fail: signature invalid at chain index 1 | Pass                           |
+| `online::stackoverflow.com`| Fail: signature invalid at chain index 0 | Pass                           |
+
+All 4 chains terminate at an ECDSA P-384 trust anchor (DigiCert
+Global Root G3 family for the first three; the fourth has a P-384
+root higher in the chain). Activating `pkix-path/p384` is sufficient
+for `DefaultVerifier` to dispatch the `ecdsa-with-SHA384` OID and
+verify the certificate signatures end-to-end.
+
+No other case changed class.
+
+### Why no `webpki::*` flips
+
+The bead text anticipated that several `webpki::*` testcases would
+also flip under the full crypto profile (P-384 / Ed25519). The
+empirical answer from the run is **no `webpki::*` case flipped**.
+
+Counting signature-verification failures in the default baseline,
+filtered to `webpki::*` names:
+
+| Case                          | Class                | pkix-path reason                |
+|-------------------------------|----------------------|---------------------------------|
+| `webpki::forbidden-dsa-root`  | StricterThanWild     | signature invalid at chain index 0 |
+| `webpki::forbidden-p192-root` | StricterThanWild     | signature invalid at chain index 0 |
+| `webpki::explicit-curve`      | DiagnosticDivergence | signature invalid at chain index 0 |
+
+None are P-384 or Ed25519. Two are policy-excluded curves (DSA,
+P-192) that pkix-path does not implement and will not implement;
+the third is `explicit-curve`, where pkix-path's signature rejection
+agrees on verdict with the other oracles (all three say Fail) and
+the divergence is in the failure reason only. Activating
+`rustcrypto` has no effect on any of them.
+
+Ed25519 was a strict superset of the speculation in the bead —
+pkix-path has not implemented an Ed25519 `SignatureVerifier` at all.
+The `rustcrypto` feature is `rsa + p256 + p384`, not Ed25519. If
+real-world Ed25519 chains land in the corpus in the future, that
+will be tracked separately.
+
+### Operational note
+
+This secondary baseline is **not** wired into CI. CI continues to
+diff against `baseline-limbo.json` (the default-features baseline)
+per `pkix-difftest/scripts/ci-diff-baseline.sh`. The all-features
+baseline is a snapshot for manual regression review when a new
+signature backend lands or when the limbo corpus is refreshed.
