@@ -20,6 +20,11 @@ test_must_use*
 # pip output is large and OS/python-version-specific; never commit.
 /pkix-difftest/python/.venv/
 
+# Python bytecode caches produced when invoking the stdlib helper scripts
+# directly (limbo-to-pem-tree.py, fetch-ct.py, etc).
+__pycache__/
+*.pyc
+
 # Per-session brain-dump file. AGENTS.md prohibits MEMORY.md-style knowledge
 # stores in the repo; durable insights belong in `bd remember` instead.
 # Listed here so accidental `git add .` does not commit it.
