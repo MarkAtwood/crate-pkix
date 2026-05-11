@@ -116,18 +116,26 @@ pub fn assessment_results(report: &EvaluationReport) -> Value {
 
     let result_uuid = uuid_v8(NS_RESULT, &report_seed);
 
-    let observations: Vec<Value> = report
-        .findings
+    // Evidence-deduplicated Observations: one Observation per unique
+    // (cert_sha256, cert_index) pair. Findings that share evidence (e.g.,
+    // multiple lints on the same cert) reference the same Observation
+    // UUID via `related-observations`. This implements OSCAL's intended
+    // 1:N (Observation : Finding) cardinality.
+    let evidence_index = EvidenceIndex::build(&report.findings);
+    let observations: Vec<Value> = evidence_index
+        .keys_in_order()
         .iter()
-        .enumerate()
-        .map(|(i, f)| observation_for(f, &report_seed, i, &last_modified))
+        .map(|key| observation_for_evidence(key, &report_seed, &last_modified))
         .collect();
 
     let findings: Vec<Value> = report
         .findings
         .iter()
         .enumerate()
-        .map(|(i, f)| finding_for(f, &report_seed, i))
+        .map(|(i, f)| {
+            let observation_uuid = evidence_index.observation_uuid(&report_seed, f);
+            finding_for(f, &report_seed, i, &observation_uuid)
+        })
         .collect();
 
     let risks: Vec<Value> = report
@@ -182,33 +190,115 @@ pub fn assessment_results(report: &EvaluationReport) -> Value {
 }
 
 // ---------------------------------------------------------------------------
-// Per-finding projection
+// Evidence index (Observation : Finding = 1:N)
 // ---------------------------------------------------------------------------
 
-/// OSCAL Observation projection for one [`Finding`].
+/// The identifying tuple of an OSCAL Observation: which cert (by hash and
+/// chain index) the evidence concerns.
 ///
-/// `i` is the finding's position in `report.findings`. The position feeds
-/// into the deterministic UUID derivation so two findings sharing all
-/// other fields still get distinct Observation UUIDs.
-fn observation_for(f: &Finding, report_seed: &[u8], i: usize, collected: &str) -> Value {
-    let uuid = uuid_v8(NS_OBSERVATION, &observation_seed(report_seed, i, f));
-    let mut description = format!("Lint `{}` ({})", f.lint_id, f.citation);
-    if let Some(idx) = f.cert_index {
-        description.push_str(&format!(" at chain index {idx}"));
+/// `(Some(hash), Some(idx))` is the typical cert-scope finding case;
+/// `(None, None)` represents path-scope findings (no single cert
+/// triggered the finding — the whole chain did). Mixed cases
+/// `(None, Some)` and `(Some, None)` are valid but rare.
+///
+/// Equality on this key is what binds Findings to a shared Observation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct EvidenceKey {
+    cert_sha256: Option<[u8; 32]>,
+    cert_index: Option<usize>,
+}
+
+impl EvidenceKey {
+    fn from_finding(f: &Finding) -> Self {
+        Self {
+            cert_sha256: f.cert_sha256,
+            cert_index: f.cert_index,
+        }
     }
-    if let Some(detail) = result_detail(&f.result) {
-        description.push_str(&format!(": {detail}"));
+
+    /// Seed bytes for the Observation UUID derived from this evidence key.
+    ///
+    /// Two Findings with identical `(cert_sha256, cert_index)` produce the
+    /// same seed, so they share an Observation UUID.
+    fn seed(&self, report_seed: &[u8]) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(report_seed.len() + 48);
+        buf.extend_from_slice(report_seed);
+        match self.cert_sha256 {
+            Some(h) => {
+                buf.push(1);
+                buf.extend_from_slice(&h);
+            }
+            None => buf.push(0),
+        }
+        match self.cert_index {
+            Some(i) => {
+                buf.push(1);
+                buf.extend_from_slice(&i.to_le_bytes());
+            }
+            None => buf.push(0),
+        }
+        buf
     }
-    let mut props = Vec::with_capacity(4);
-    props.push(prop("pkix-lint.lint-id", &f.lint_id));
-    props.push(prop("pkix-lint.citation", &f.citation));
-    props.push(prop(
-        "pkix-lint.severity",
-        lint_result_severity_label(&f.result),
-    ));
-    if let Some(hash) = f.cert_sha256.as_ref() {
+}
+
+/// Insertion-ordered set of distinct evidence keys. First-seen ordering
+/// keeps the emitter deterministic and stable across runs (test invariant
+/// `test_emit_deterministic`).
+struct EvidenceIndex {
+    keys: Vec<EvidenceKey>,
+}
+
+impl EvidenceIndex {
+    fn build(findings: &[Finding]) -> Self {
+        let mut keys: Vec<EvidenceKey> = Vec::new();
+        for f in findings {
+            let k = EvidenceKey::from_finding(f);
+            if !keys.contains(&k) {
+                keys.push(k);
+            }
+        }
+        Self { keys }
+    }
+
+    fn keys_in_order(&self) -> &[EvidenceKey] {
+        &self.keys
+    }
+
+    fn observation_uuid(&self, report_seed: &[u8], f: &Finding) -> String {
+        let key = EvidenceKey::from_finding(f);
+        uuid_v8(NS_OBSERVATION, &key.seed(report_seed))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-evidence and per-finding projection
+// ---------------------------------------------------------------------------
+
+/// OSCAL Observation projection for one [`EvidenceKey`].
+///
+/// The Observation describes the *evidence* (which cert) and not the lint
+/// outcome — multiple Findings may reference the same Observation when
+/// they share evidence. Lint-specific details (severity, citation, result
+/// detail) live on the Finding side, not the Observation side.
+fn observation_for_evidence(key: &EvidenceKey, report_seed: &[u8], collected: &str) -> Value {
+    let uuid = uuid_v8(NS_OBSERVATION, &key.seed(report_seed));
+    let mut props = Vec::with_capacity(2);
+    if let Some(hash) = key.cert_sha256.as_ref() {
         props.push(prop("pkix-lint.cert-sha256", &hex(hash)));
     }
+    if let Some(idx) = key.cert_index {
+        props.push(prop("pkix-lint.cert-index", &idx.to_string()));
+    }
+    let description = match (key.cert_index, key.cert_sha256) {
+        (Some(idx), Some(_)) => {
+            format!("Certificate at chain index {idx} (identified by SHA-256 digest)")
+        }
+        (Some(idx), None) => format!("Certificate at chain index {idx}"),
+        (None, Some(_)) => "Certificate identified by SHA-256 digest".to_string(),
+        (None, None) => {
+            "Path-scope evidence: the validated certificate chain as a whole".to_string()
+        }
+    };
     let mut obs = json!({
         "uuid": uuid,
         // OSCAL Observation requires `methods`, an array with at least one
@@ -220,7 +310,7 @@ fn observation_for(f: &Finding, report_seed: &[u8], i: usize, collected: &str) -
         "description": description,
         "props": props,
     });
-    if let Some(idx) = f.cert_index {
+    if let Some(idx) = key.cert_index {
         // Reference the cert as an OSCAL Subject. `subject-uuid` is
         // synthesised deterministically from the chain index so multiple
         // observations of the same cert share a subject identity.
@@ -242,12 +332,12 @@ fn observation_for(f: &Finding, report_seed: &[u8], i: usize, collected: &str) -
 /// OSCAL Finding projection for one [`Finding`].
 ///
 /// Each Finding has a `target` describing what was assessed and its
-/// satisfaction state; `related-observations` link back to the Observation
-/// carrying the evidence. The same `i` index is used to derive the matched
-/// Observation UUID so the link is stable.
-fn finding_for(f: &Finding, report_seed: &[u8], i: usize) -> Value {
-    let finding_uuid = uuid_v8(NS_FINDING, &observation_seed(report_seed, i, f));
-    let observation_uuid = uuid_v8(NS_OBSERVATION, &observation_seed(report_seed, i, f));
+/// satisfaction state; `related-observations` links back to the
+/// (deduplicated) Observation carrying the evidence. The Finding holds
+/// the lint-specific metadata (lint_id, citation, severity) as props;
+/// shared cert evidence lives on the Observation side.
+fn finding_for(f: &Finding, report_seed: &[u8], i: usize, observation_uuid: &str) -> Value {
+    let finding_uuid = uuid_v8(NS_FINDING, &finding_seed(report_seed, i, f));
     let state = if f.is_finding() {
         "not-satisfied"
     } else {
@@ -257,6 +347,11 @@ fn finding_for(f: &Finding, report_seed: &[u8], i: usize) -> Value {
     if let Some(detail) = result_detail(&f.result) {
         description.push_str(&format!(": {detail}"));
     }
+    let props = vec![
+        prop("pkix-lint.lint-id", &f.lint_id),
+        prop("pkix-lint.citation", &f.citation),
+        prop("pkix-lint.severity", lint_result_severity_label(&f.result)),
+    ];
     json!({
         "uuid": finding_uuid,
         "title": f.lint_id.as_ref(),
@@ -269,6 +364,7 @@ fn finding_for(f: &Finding, report_seed: &[u8], i: usize) -> Value {
             "target-id": f.lint_id.as_ref(),
             "status": { "state": state },
         },
+        "props": props,
         "related-observations": [ { "observation-uuid": observation_uuid } ],
     })
 }
@@ -391,9 +487,13 @@ fn report_seed(r: &EvaluationReport) -> Vec<u8> {
     buf
 }
 
-/// Seed bytes for an Observation / Finding UUID derived from one
-/// [`Finding`]'s position and content.
-fn observation_seed(report_seed: &[u8], i: usize, f: &Finding) -> Vec<u8> {
+/// Seed bytes for a Finding UUID derived from one [`Finding`]'s position
+/// and content.
+///
+/// Observation UUIDs are derived separately, from
+/// [`EvidenceKey::seed`], so that multiple Findings sharing one piece of
+/// evidence still get distinct Finding UUIDs.
+fn finding_seed(report_seed: &[u8], i: usize, f: &Finding) -> Vec<u8> {
     let mut buf = Vec::with_capacity(report_seed.len() + 64);
     buf.extend_from_slice(report_seed);
     buf.extend_from_slice(&i.to_le_bytes());
@@ -536,6 +636,10 @@ mod tests {
         }
     }
 
+    /// Builds a report with three distinct evidence keys so emitted
+    /// Observations and Findings are 1:1 in this case. Other tests
+    /// construct reports with intentional evidence sharing to exercise
+    /// the 1:N path.
     fn sample_report() -> EvaluationReport {
         let mut r = EvaluationReport::new(
             "cabf.br.tls",
@@ -544,10 +648,19 @@ mod tests {
             2,
             1_780_272_000, // 2026-06-01T00:00:00Z — see test_rfc3339_known_value
         );
+        // Finding 0: cert_index=0, cert_sha256=None.
         r.findings
             .push(pass_finding("test.lint.always-pass", Some(0)));
-        r.findings
-            .push(error_finding("test.lint.error", "something failed"));
+        // Finding 1: cert_index=Some(2), cert_sha256=None. Distinct key
+        // from finding 0 so the 1:1 assumption in
+        // test_emit_observations_and_findings_aligned holds for this
+        // sample.
+        r.findings.push(Finding {
+            cert_index: Some(2),
+            ..error_finding("test.lint.error", "something failed")
+        });
+        // Finding 2: cert_index=Some(1), cert_sha256=Some(...). Distinct
+        // key again — third Observation in the emitted output.
         let mut hash = [0u8; 32];
         for (i, b) in hash.iter_mut().enumerate() {
             *b = i as u8;
@@ -796,6 +909,159 @@ mod tests {
         let a = serde_json::to_string(&assessment_results(&r)).unwrap();
         let b = serde_json::to_string(&assessment_results(&r)).unwrap();
         assert_eq!(a, b, "emit must be deterministic for identical input");
+    }
+
+    // -------------------------------------------------------------------
+    // Evidence deduplication (Observation : Finding = 1:N)
+    // OSCAL's Observation model is specifically designed for one evidence
+    // record to support multiple Findings. The acceptance criterion
+    // "One Observation may support multiple Findings (1:N relationship
+    // preserved)" from PKIX-9vnx.4 is exercised here.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_emit_evidence_deduplicates_shared_cert() {
+        // Two findings on the same cert (same cert_index AND same
+        // cert_sha256) must collapse into ONE Observation, and both
+        // Findings reference it.
+        let mut r = EvaluationReport::new("p", "v", "rbv", 1, 0);
+        let mut hash = [0u8; 32];
+        for (i, b) in hash.iter_mut().enumerate() {
+            *b = i as u8;
+        }
+        r.findings.push(Finding {
+            cert_sha256: Some(hash),
+            ..error_finding("test.lint.a", "lint A failed")
+        });
+        r.findings.push(Finding {
+            cert_sha256: Some(hash),
+            ..error_finding("test.lint.b", "lint B failed")
+        });
+
+        let v = assessment_results(&r);
+        let result = &v["assessment-results"]["results"][0];
+        let obs = result["observations"].as_array().expect("observations");
+        let findings = result["findings"].as_array().expect("findings");
+
+        assert_eq!(obs.len(), 1, "shared evidence → one Observation");
+        assert_eq!(findings.len(), 2, "still two Findings");
+        let shared_uuid = obs[0]["uuid"].as_str().unwrap();
+        for (idx, f) in findings.iter().enumerate() {
+            let ref_uuid = f["related-observations"][0]["observation-uuid"]
+                .as_str()
+                .unwrap();
+            assert_eq!(
+                ref_uuid, shared_uuid,
+                "finding {idx} must link to the shared Observation"
+            );
+        }
+    }
+
+    #[test]
+    fn test_emit_distinct_certs_get_distinct_observations() {
+        // Findings on certs at different chain indices get distinct
+        // Observations even when no cert_sha256 is set.
+        let mut r = EvaluationReport::new("p", "v", "rbv", 3, 0);
+        r.findings.push(error_finding("test.lint.x", "fail at 0"));
+        r.findings.push(Finding {
+            cert_index: Some(1),
+            ..error_finding("test.lint.y", "fail at 1")
+        });
+        r.findings.push(Finding {
+            cert_index: Some(2),
+            ..error_finding("test.lint.z", "fail at 2")
+        });
+
+        let v = assessment_results(&r);
+        let obs = v["assessment-results"]["results"][0]["observations"]
+            .as_array()
+            .expect("observations");
+        assert_eq!(
+            obs.len(),
+            3,
+            "three distinct cert positions → three Observations"
+        );
+        // UUIDs must be pairwise distinct.
+        let mut uuids: Vec<&str> = obs.iter().map(|o| o["uuid"].as_str().unwrap()).collect();
+        uuids.sort_unstable();
+        uuids.dedup();
+        assert_eq!(
+            uuids.len(),
+            3,
+            "Observation UUIDs must be pairwise distinct"
+        );
+    }
+
+    #[test]
+    fn test_emit_path_scope_findings_share_observation() {
+        // Findings with both cert_index=None AND cert_sha256=None share
+        // a single "path-scope" Observation.
+        let mut r = EvaluationReport::new("p", "v", "rbv", 2, 0);
+        r.findings.push(Finding {
+            cert_index: None,
+            cert_sha256: None,
+            ..error_finding("test.lint.path1", "path-scope fail 1")
+        });
+        r.findings.push(Finding {
+            cert_index: None,
+            cert_sha256: None,
+            ..error_finding("test.lint.path2", "path-scope fail 2")
+        });
+
+        let v = assessment_results(&r);
+        let obs = v["assessment-results"]["results"][0]["observations"]
+            .as_array()
+            .expect("observations");
+        let findings = v["assessment-results"]["results"][0]["findings"]
+            .as_array()
+            .expect("findings");
+        assert_eq!(
+            obs.len(),
+            1,
+            "all path-scope findings share one Observation"
+        );
+        assert_eq!(findings.len(), 2);
+        // Path-scope observation description must signal that scope so
+        // OSCAL consumers can render it differently from cert-scope.
+        let desc = obs[0]["description"].as_str().unwrap();
+        assert!(
+            desc.contains("Path-scope"),
+            "path-scope observation description should identify its scope (got: {desc})"
+        );
+        // Observation should NOT have a subjects array because there is
+        // no specific cert position.
+        assert!(
+            obs[0].get("subjects").is_none(),
+            "path-scope Observation should not carry a subjects array"
+        );
+    }
+
+    #[test]
+    fn test_emit_finding_props_include_lint_metadata() {
+        // After the evidence-dedup refactor, lint-specific metadata
+        // (lint_id, citation, severity) lives on the Finding side as
+        // props. The Observation side carries only evidence pointers.
+        let r = sample_report();
+        let v = assessment_results(&r);
+        let findings = v["assessment-results"]["results"][0]["findings"]
+            .as_array()
+            .unwrap();
+        for f in findings {
+            let props = f["props"].as_array().expect("finding props");
+            let names: Vec<&str> = props.iter().map(|p| p["name"].as_str().unwrap()).collect();
+            assert!(
+                names.contains(&"pkix-lint.lint-id"),
+                "finding props must include lint-id (got {names:?})"
+            );
+            assert!(
+                names.contains(&"pkix-lint.citation"),
+                "finding props must include citation (got {names:?})"
+            );
+            assert!(
+                names.contains(&"pkix-lint.severity"),
+                "finding props must include severity (got {names:?})"
+            );
+        }
     }
 
     // -------------------------------------------------------------------
