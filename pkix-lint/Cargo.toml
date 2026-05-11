@@ -21,8 +21,12 @@ serde = ["dep:serde"]
 oscal = ["dep:serde_json"]
 
 [dependencies]
-pkix-path     = { workspace = true }
-pkix-profiles = { workspace = true }
+pkix-path          = { workspace = true }
+# CA/B Forum profile definitions live in pkix-profiles-cabf; pkix-lint's
+# cabf_tls_br module depends on WebPkiProfile and sc081_validity_cap from
+# that crate. (Pre-0.3.0 these symbols lived in pkix-profiles; they were
+# moved as part of PKIX-amgn.4 to enforce the framework-not-policy stance.)
+pkix-profiles-cabf = { workspace = true }
 x509-cert     = { workspace = true }
 der           = { workspace = true }
 serde         = { workspace = true, optional = true }
@@ -37,8 +41,8 @@ serde_json    = { workspace = true, optional = true }
 sha2          = { workspace = true }
 
 [dev-dependencies]
-pkix-path     = { workspace = true, features = ["p256", "std"] }
-pkix-profiles = { workspace = true }
+pkix-path          = { workspace = true, features = ["p256", "std"] }
+pkix-profiles-cabf = { workspace = true }
 der           = { workspace = true }
 x509-cert     = { workspace = true }
 # serde_json is used by the json_round_trip test which requires --features serde.

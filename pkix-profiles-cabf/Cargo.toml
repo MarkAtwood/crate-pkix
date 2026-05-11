@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-profiles-cabf"
 description = "Reference implementation of CA/Browser Forum certificate profile requirements (TLS BR, S/MIME BR, Code Signing BR) — not authoritative"
-version     = "0.1.0"
+version     = "0.2.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -12,8 +12,12 @@ categories  = ["cryptography"]
 
 [dependencies]
 der           = { workspace = true }
+# Default features (rsa, p256) are intentionally enabled: pkix-profiles-cabf tests
+# use EcdsaP256Verifier and the workspace pin already enables them.
 pkix-path     = { workspace = true }
-pkix-profiles = { workspace = true }
+
+[dev-dependencies]
+x509-cert = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
