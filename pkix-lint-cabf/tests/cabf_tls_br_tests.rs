@@ -24,7 +24,7 @@
 //!   smime-self-signed-365d.der  : P-256, emailProtection EKU, 365 days
 
 use der::Decode as _;
-use pkix_lint::cabf_tls_br::{
+use pkix_lint_cabf::cabf_tls_br::{
     BcCaFlagLint, EkuServerAuthLint, RsaMinKeySizeLint, SanRequiredLint, Sha1ProhibitedLint,
     ValidityMaxLint,
 };
@@ -707,7 +707,7 @@ fn bc_ca_flag_not_applicable_for_leaf() {
 
 #[test]
 fn cabf_tls_br_profile_lint_runner_has_all_six_lints() {
-    use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
     let profile = CabfTlsBrProfile;
     let runner = profile.lint_runner();
     let ids: Vec<&str> = runner.lints().iter().map(|l| l.id()).collect();
@@ -740,7 +740,7 @@ fn cabf_tls_br_profile_lint_runner_has_all_six_lints() {
 
 #[test]
 fn cabf_tls_br_profile_lints_method_has_all_ids() {
-    use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
     let profile = CabfTlsBrProfile;
     let lints = profile.lints();
     let ids: Vec<&str> = lints.iter().map(|l| l.id()).collect();
@@ -757,7 +757,7 @@ fn cabf_tls_br_profile_run_chain_webpki_cert_all_pass() {
     // webpki-self-signed-365d.der evaluated pre-SC-081 (T_2026_JAN_01) should
     // produce Pass for all cert-scope lints that apply to Leaf.
     // now = 2026-01-01 (cap = 398 days); cert is 365 days → validity passes.
-    use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
     let cert = load_cert!("webpki-self-signed-365d.der");
     let profile = CabfTlsBrProfile;
     let runner = profile.lint_runner();

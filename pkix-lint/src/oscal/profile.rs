@@ -407,24 +407,61 @@ mod tests {
     //!
     //! End-to-end execution (Catalog → Profile resolve →
     //! `apply_parameter_overrides` → `filter_to_ids` → `run_chain`) is
-    //! covered separately in `cabf_tls_br_tests.rs`-style integration
-    //! tests; here we focus on the resolver itself.
+    //! covered separately in pkix-lint-cabf's integration tests; here we
+    //! focus on the resolver itself.
 
     use super::*;
-    use crate::cabf_tls_br::ValidityMaxLint;
     use crate::oscal::catalog::catalog_from_lints;
     use crate::rfc5280::Rfc5280MaxSerialLengthLint;
-    use crate::Lint;
+    use crate::{Lint, LintResult, Scope, Severity, SubjectKind};
     use serde_json::json;
+    use x509_cert::Certificate;
+
+    /// Minimal policy-shaped fixture Lint used as the "second catalog"
+    /// in cross-catalog Profile tests. Mirrors the metadata shape of a
+    /// CA/B Forum lint (rfc_section_id set, rfc_url None) without
+    /// depending on pkix-lint-cabf content.
+    struct PolicyShapedLint;
+    impl Lint for PolicyShapedLint {
+        fn id(&self) -> &'static str {
+            "test.policy.shaped"
+        }
+        fn citation(&self) -> &'static str {
+            "Test Policy §1.2.3"
+        }
+        fn severity(&self) -> Severity {
+            Severity::Error
+        }
+        fn scope(&self) -> Scope {
+            Scope::Certificate
+        }
+        fn applies_to(&self) -> SubjectKind {
+            SubjectKind::Leaf
+        }
+        fn rfc_section_id(&self) -> Option<&str> {
+            Some("test-policy-1.2.3")
+        }
+        fn check_cert(
+            &self,
+            _cert: &Certificate,
+            _kind: SubjectKind,
+            _now_unix: u64,
+        ) -> LintResult {
+            LintResult::Pass
+        }
+    }
 
     fn rfc_catalog() -> Value {
         let lints: Vec<Box<dyn Lint>> = vec![Box::new(Rfc5280MaxSerialLengthLint::default())];
         catalog_from_lints(&lints, "rs.pkix.rfc5280", "0.1.0")
     }
 
-    fn cabf_catalog() -> Value {
-        let lints: Vec<Box<dyn Lint>> = vec![Box::new(ValidityMaxLint)];
-        catalog_from_lints(&lints, "rs.pkix.cabf.br.tls", "0.1.0")
+    /// Stand-in second-catalog used by the layered-profile tests. Previously
+    /// keyed off the CA/B Forum `ValidityMaxLint`; now uses a self-contained
+    /// fixture so pkix-lint's tests do not depend on pkix-lint-cabf content.
+    fn policy_catalog() -> Value {
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(PolicyShapedLint)];
+        catalog_from_lints(&lints, "rs.pkix.policy.fixture", "0.1.0")
     }
 
     // -- Example 1: plain Profile, include-all from one Catalog --------
@@ -486,19 +523,19 @@ mod tests {
     fn layered_profile_imports_two_catalogs_with_overrides() {
         let mut sources = HashMap::new();
         sources.insert("#rs.pkix.rfc5280".to_owned(), rfc_catalog());
-        sources.insert("#rs.pkix.cabf.br.tls".to_owned(), cabf_catalog());
+        sources.insert("#rs.pkix.policy.fixture".to_owned(), policy_catalog());
 
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000003",
-                "metadata": { "title": "cabf-br-tls" },
+                "metadata": { "title": "policy-fixture" },
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
                         "include-all": {}
                     },
                     {
-                        "href": "#rs.pkix.cabf.br.tls",
+                        "href": "#rs.pkix.policy.fixture",
                         "include-all": {}
                     }
                 ],
@@ -518,7 +555,7 @@ mod tests {
             resolved.control_ids,
             vec![
                 "rfc5280.cert.serial_number.max_octets".to_owned(),
-                "cabf.br.tls.validity.max".to_owned(),
+                "test.policy.shaped".to_owned(),
             ]
         );
         assert_eq!(
@@ -536,7 +573,7 @@ mod tests {
     fn override_profile_imports_profile_and_excludes_one_control() {
         let mut sources = HashMap::new();
         sources.insert("#rs.pkix.rfc5280".to_owned(), rfc_catalog());
-        sources.insert("#rs.pkix.cabf.br.tls".to_owned(), cabf_catalog());
+        sources.insert("#rs.pkix.policy.fixture".to_owned(), policy_catalog());
 
         // Inner Profile: layered selection across the two Catalogs.
         let inner = json!({
@@ -545,13 +582,13 @@ mod tests {
                 "metadata": { "title": "inner" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} },
-                    { "href": "#rs.pkix.cabf.br.tls", "include-all": {} }
+                    { "href": "#rs.pkix.policy.fixture", "include-all": {} }
                 ]
             }
         });
         sources.insert("#pkix.profile.inner".to_owned(), inner);
 
-        // Outer Profile: import inner, drop the cabf control.
+        // Outer Profile: import inner, drop the policy-fixture control.
         let outer = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000ef00",
@@ -561,7 +598,7 @@ mod tests {
                         "href": "#pkix.profile.inner",
                         "include-all": {},
                         "exclude-controls": [
-                            { "with-ids": ["cabf.br.tls.validity.max"] }
+                            { "with-ids": ["test.policy.shaped"] }
                         ]
                     }
                 ],

@@ -16,13 +16,15 @@
 //! CA/B Forum conformance, you SHOULD vendor and review the relevant rule
 //! definitions yourself.
 //!
-//! ## Status
+//! ## Modules
 //!
-//! Stub crate. The substantive content (`cabf.br.tls` / `cabf.br.smime` lint
-//! bundles, ballot-specific rules such as SC-081 validity caps, identity-tier
-//! required-field lints) is scheduled to land via [PKIX-amgn.3] — creation of
-//! this crate alongside [PKIX-amgn.5] — refactor of [`pkix-lint`] to keep only
-//! RFC-conformance lints in the main crate.
+//! - [`cabf_tls_br`] — CA/B Forum TLS Baseline Requirements lints. Migrated
+//!   from `pkix-lint` 0.4.0 in [PKIX-amgn.5]. Bundles SC-081 phased validity
+//!   caps, SHA-1 prohibition, RSA min-key-size, SAN/EKU presence, and
+//!   `BasicConstraints` cA-flag checks behind [`cabf_tls_br::CabfTlsBrProfile`].
+//!
+//! Future bundles (`cabf_smime_br`, `cabf_cs_br`) and zlint-derived OSCAL
+//! Catalogs will land via [PKIX-amgn.8] and friends.
 //!
 //! This crate authors lint bundles as OSCAL Profiles per the workspace OSCAL
 //! alignment stance ([PKIX-ztmr] / [PKIX-9vnx]). The executable lint impls
@@ -36,13 +38,14 @@
 //! [PKIX-ztmr]: https://github.com/MarkAtwood/crate-pkix
 //! [PKIX-9vnx]: https://github.com/MarkAtwood/crate-pkix
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
-//! [PKIX-amgn.3]: https://github.com/MarkAtwood/crate-pkix
 //! [PKIX-amgn.5]: https://github.com/MarkAtwood/crate-pkix
+//! [PKIX-amgn.8]: https://github.com/MarkAtwood/crate-pkix
 //! [PKIX-8qz1]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-lint`]: https://docs.rs/pkix-lint
 
-#![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![deny(rust_2018_idioms, unreachable_pub)]
 #![warn(missing_docs)]
+
+pub mod cabf_tls_br;

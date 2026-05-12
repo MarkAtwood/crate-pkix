@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version           = "0.4.0"  # 0.4 — DeviationScope refactor to open-ended kind + props bag (PKIX-9vnx.11). 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q).
+version           = "0.5.0"  # 0.5 — BREAKING. CA/B Forum lint bundles (cabf_tls_br) moved to pkix-lint-cabf (PKIX-amgn.5). 0.4 — DeviationScope refactor to open-ended kind + props bag (PKIX-9vnx.11). 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q).
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -22,11 +22,6 @@ oscal = ["dep:serde_json"]
 
 [dependencies]
 pkix-path          = { workspace = true }
-# CA/B Forum profile definitions live in pkix-profiles-cabf; pkix-lint's
-# cabf_tls_br module depends on WebPkiProfile and sc081_validity_cap from
-# that crate. (Pre-0.3.0 these symbols lived in pkix-profiles; they were
-# moved as part of PKIX-amgn.4 to enforce the framework-not-policy stance.)
-pkix-profiles-cabf = { workspace = true }
 x509-cert     = { workspace = true }
 der           = { workspace = true }
 serde         = { workspace = true, optional = true }
@@ -42,7 +37,6 @@ sha2          = { workspace = true }
 
 [dev-dependencies]
 pkix-path          = { workspace = true, features = ["p256", "std"] }
-pkix-profiles-cabf = { workspace = true }
 der           = { workspace = true }
 x509-cert     = { workspace = true }
 # serde_json is used by the json_round_trip test which requires --features serde.

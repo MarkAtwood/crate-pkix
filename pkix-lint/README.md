@@ -44,27 +44,32 @@ layer. This is intentional:
 - `pkix-lint` does not know whether you are in audit, monitoring, or hard-fail
   enforcement context. The caller does.
 
-## Built-in lints (`pkix-lint::cabf_tls_br`)
+## Built-in lints (`pkix-lint::rfc5280`)
+
+`pkix-lint` ships the framework and standards-body (RFC) conformance lints.
+CA/B Forum lint bundles live in the sibling [`pkix-lint-cabf`] crate marked
+"reference / not authoritative"; project policy (see workspace `AGENTS.md`)
+is that vendor and industry-forum policy interpretations stay out of the
+main crate.
 
 | ID | Rule | Scope |
 |----|------|-------|
-| `cabf.br.tls.validity.max` | SC-081 phased validity cap (47–398 days) | Leaf |
-| `cabf.br.tls.alg.sha1_prohibited` | SHA-1 signature algorithm prohibited | All |
-| `cabf.br.tls.rsa.min_key_size` | RSA modulus ≥ 2048 bits | Leaf |
-| `cabf.br.tls.san.required` | SubjectAltName extension required and non-empty | Leaf |
-| `cabf.br.tls.eku.server_auth` | `id-kp-serverAuth` EKU required | Leaf |
-| `cabf.br.tls.bc.ca_flag` | `cA = TRUE` required on non-leaf certs | Intermediate |
+| `rfc5280.cert.serial_number.max_octets` | Certificate `serialNumber` length cap (RFC 5280 §4.1.2.2) | Any |
 
-Use `CabfTlsBrProfile` (implements `LintProfile`) to run all built-in TLS BR
-lints with a single call to `run_chain`.
+CA/B Forum TLS BR lints (`cabf.br.tls.*`) — SC-081 phased validity caps,
+SHA-1 prohibition, RSA min-key-size, SAN/EKU presence, `BasicConstraints`
+cA-flag — are in [`pkix-lint-cabf::cabf_tls_br`].
+
+[`pkix-lint-cabf`]: https://docs.rs/pkix-lint-cabf
+[`pkix-lint-cabf::cabf_tls_br`]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/
 
 ## Usage
 
-### Run built-in CA/B Forum TLS BR lints against a chain
+### Run CA/B Forum TLS BR lints against a chain (via `pkix-lint-cabf`)
 
 ```rust,no_run
-use pkix_lint::cabf_tls_br::{CabfTlsBrProfile, LintProfile};
-use pkix_lint::SubjectKind;
+use pkix_lint::{LintProfile, SubjectKind};
+use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
 
 let profile = CabfTlsBrProfile;
 let runner = profile.lint_runner();

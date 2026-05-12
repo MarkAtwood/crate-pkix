@@ -6,6 +6,62 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.5.0` + `pkix-lint-cabf 0.2.0`: CA/B Forum bundle migration (2026-05-11)
+
+**BREAKING.** PKIX-amgn.5 — refactor `pkix-lint` to ship only the framework
+plus standards-body (RFC) conformance lints; the CA/B Forum TLS BR lint
+bundle (`cabf_tls_br`) moves to the sibling `pkix-lint-cabf` reference
+crate per the workspace framework-not-policy stance (`AGENTS.md`
+non-negotiable #6, PKIX-amgn).
+
+Moved out of `pkix-lint` 0.4.0 → into `pkix-lint-cabf` 0.2.0:
+
+- `cabf_tls_br` module
+  - Types: `ValidityMaxLint`, `Sha1ProhibitedLint`, `RsaMinKeySizeLint`,
+    `SanRequiredLint`, `EkuServerAuthLint`, `BcCaFlagLint`,
+    `CabfTlsBrProfile`.
+  - Free function: `all_lints() -> Vec<Box<dyn Lint>>`.
+- Integration tests (`tests/cabf_tls_br_tests.rs`).
+
+Stays in `pkix-lint` 0.5.0:
+
+- Framework: `Lint`, `LintRunner`, `LintProfile`, `LintResult`, `Finding`,
+  `Scope`, `Severity`, `SubjectKind`, `LintParameter`, `ParameterError`.
+- `report::EvaluationReport`, `deviation::DeviationStore`,
+  `deviation::DeviationRunner`, `deviation::Deviation`.
+- OSCAL Catalog + Profile machinery (`oscal::catalog::catalog_from_lints`,
+  `oscal::parse::lint_ids_from_catalog`, `oscal::profile::resolve_profile`,
+  `oscal::emit::*`).
+- RFC-conformance lints (`rfc5280::Rfc5280MaxSerialLengthLint`).
+
+Migration:
+
+```rust
+// before (pkix-lint 0.4.0):
+use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+
+// after (pkix-lint 0.5.0 + pkix-lint-cabf 0.2.0):
+use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+```
+
+Downstream consumers must add `pkix-lint-cabf` to their `Cargo.toml` to
+continue using the CA/B Forum TLS BR lint bundle. `pkix-lint` no longer
+depends on `pkix-profiles-cabf`; that dep moves to `pkix-lint-cabf`.
+
+OSCAL catalog/profile tests inside `pkix-lint` previously used
+`cabf_tls_br::ValidityMaxLint` and `cabf_tls_br::all_lints()` as
+fixtures. Those tests now use a self-contained `PolicyShapedLint` test
+fixture (rfc_section_id set, rfc_url left None — same metadata shape)
+and an in-crate `multi_lint_fixture()` so `pkix-lint`'s tests stay
+independent of CA/B Forum policy content. Cross-crate round-trip
+coverage against the real CA/B Forum lint set continues in
+`pkix-lint-cabf`'s integration tests.
+
+`pkix-lint-cabf` 0.2.0 carries the same "reference / not authoritative"
+crate-level rustdoc disclaimer as the existing 0.1.0 stub. Future bundles
+(`cabf_smime_br`, `cabf_cs_br`) and zlint-derived OSCAL Catalogs will
+land via PKIX-amgn.8 and friends.
+
 ### `pkix-path-builder 0.3.1`: `build_first_valid_path<V>` helper (2026-05-11)
 
 **Additive.** PKIX-lwr9.4.2 — closes the consumer ergonomics gap surfaced
