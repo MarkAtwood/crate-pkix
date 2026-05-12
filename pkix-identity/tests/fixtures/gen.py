@@ -25,10 +25,23 @@ Run from this directory:
 import datetime
 from pathlib import Path
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import NameOID, ObjectIdentifier
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 import ipaddress
+
+# RFC 8398 §3 id-on-SmtpUTF8Mailbox
+OID_SMTP_UTF8_MAILBOX = ObjectIdentifier("1.3.6.1.5.5.7.8.9")
+
+
+def utf8_string_der(s: str) -> bytes:
+    """DER-encode a UTF8String (tag 0x0c)."""
+    data = s.encode("utf-8")
+    if len(data) < 128:
+        return bytes([0x0C, len(data)]) + data
+    if len(data) < 256:
+        return bytes([0x0C, 0x81, len(data)]) + data
+    raise NotImplementedError("UTF8String longer than 255 bytes not supported in fixtures")
 
 OUT = Path(__file__).parent
 NOT_BEFORE = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
@@ -57,6 +70,7 @@ def build_leaf(sans, *, common_name="leaf", omit_san=False):
 
 
 fixtures = {
+    # ----- DNS / IP SAN fixtures (PKIX-fmtv.11.1) -----
     # Exact DNS name only.
     "san-exact-dns.der": build_leaf([x509.DNSName("www.example.com")]),
     # Single-label leftmost wildcard.
@@ -84,6 +98,34 @@ fixtures = {
     "san-missing.der": build_leaf([], omit_san=True),
     # CN-only cert (no SAN). Identity in CN should NOT be honored.
     "cn-only.der": build_leaf([], omit_san=True),
+
+    # ----- Mailbox SAN fixtures (PKIX-fmtv.12.1) -----
+    # Plain rfc822Name.
+    "san-rfc822.der": build_leaf([x509.RFC822Name("alice@example.com")]),
+    # rfc822Name with mixed-case domain (must still match lowercase target).
+    "san-rfc822-mixedcase.der": build_leaf([x509.RFC822Name("alice@Example.COM")]),
+    # otherName SmtpUTF8Mailbox with internationalized local-part.
+    "san-smtputf8.der": build_leaf([
+        x509.OtherName(
+            OID_SMTP_UTF8_MAILBOX,
+            utf8_string_der("用户@example.com"),
+        )
+    ]),
+    # otherName SmtpUTF8Mailbox with U-label domain (RFC 8398 §3 form).
+    "san-smtputf8-u-label-domain.der": build_leaf([
+        x509.OtherName(
+            OID_SMTP_UTF8_MAILBOX,
+            utf8_string_der("user@bücher.example"),
+        )
+    ]),
+    # Mixed: rfc822Name AND otherName SmtpUTF8Mailbox.
+    "san-mailbox-mixed.der": build_leaf([
+        x509.RFC822Name("alice@example.com"),
+        x509.OtherName(
+            OID_SMTP_UTF8_MAILBOX,
+            utf8_string_der("用户@example.com"),
+        ),
+    ]),
 }
 
 for name, cert in fixtures.items():

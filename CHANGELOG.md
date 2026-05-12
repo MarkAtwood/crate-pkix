@@ -6,10 +6,11 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
-### pkix-identity — RFC 6125 §6.4 hostname binding (2026-05-11)
+### pkix-identity — RFC 6125 §6.4 + RFC 5280/8398 identity binding (2026-05-11)
 
-PKIX-fmtv.11.1 fills in the pkix-identity scaffold with the RFC 6125
-§6.4 hostname-binding implementation:
+PKIX-fmtv.11.1 and PKIX-fmtv.12.1 fill in the pkix-identity scaffold
+with the RFC 6125 §6.4 hostname-binding and RFC 5280 §4.2.1.6 + RFC
+8398 mailbox-binding implementations:
 
 - `ServerName::dns_name` — LDH + length validation, ASCII lower-casing,
   IDN U-label → A-label conversion via the `idna` crate.
@@ -20,6 +21,16 @@ PKIX-fmtv.11.1 fills in the pkix-identity scaffold with the RFC 6125
   entries with case-insensitive exact comparison plus single
   leftmost-label wildcards. CN fallback is intentionally not performed
   (RFC 6125 §6.4.4 deprecates it).
+- `MailboxName::parse` — RFC 5322 dot-atom local-part validation,
+  non-ASCII local-parts pass through verbatim (RFC 6532), domain
+  normalized to lower-case A-label form via the `idna` crate.
+- `verify_mailbox` — walks `Rfc822Name` SAN entries for ASCII targets
+  and `OtherName(id-on-SmtpUTF8Mailbox)` SAN entries (OID
+  1.3.6.1.5.5.7.8.9, RFC 8398 §3) for internationalized targets.
+  Decodes the inner `UTF8String` of each `OtherName.value`. Local-part
+  match is byte-equal; domain match is ASCII case-insensitive against
+  the A-label form so U-label SAN and A-label target (and vice versa)
+  interoperate.
 - New error variant `IdentityError::MalformedSan` for SAN extensions
   that fail to parse.
 
@@ -28,10 +39,9 @@ Workspace gained an `idna` dependency entry (1.x, no_std + `alloc` +
 deps gained `idna` and `der` (the `0.1.0` scaffold had only
 `x509-cert`).
 
-`MailboxName::parse` and `verify_mailbox` still return
-`IdentityError::NotYetImplemented`; PKIX-fmtv.12 fills those in next.
-The `pkix-chain` `verify_tls_server` / `verify_tls_client` wrappers
-are split out as PKIX-fmtv.11.2, still blocked on the
+The `pkix-chain` `verify_tls_server` / `verify_tls_client` /
+`verify_smime_signer` / `verify_smime_recipient` wrappers are split
+out as PKIX-fmtv.11.2 and PKIX-fmtv.12.2, still blocked on the
 PKIX-fmtv.7 wrapper-set decision.
 
 ### pkix-identity 0.1.0 — initial scaffold (2026-05-11)
