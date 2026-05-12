@@ -21,6 +21,8 @@ CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
 
 Per-crate versions live on crates.io and in each crate's `Cargo.toml`.
 
+### Core workspace crates
+
 | Crate | What it does | `no_std` | Status |
 |-------|-------------|----------|--------|
 | [`pkix-path`] | RFC 5280 §6 path validation, pluggable crypto | ✓ | released |
@@ -28,12 +30,27 @@ Per-crate versions live on crates.io and in each crate's `Cargo.toml`.
 | [`pkix-chain`] | Umbrella: combines path + revocation | — | released |
 | [`pkix-chain-simple`] | Opinionated validator with extension whitelist | — | released |
 | [`pkix-path-builder`] | RFC 4158 path building from unordered certs | ✓ | released |
-| [`pkix-profiles`] | CA/B Forum and RFC profile policy pre-configurations | — | released |
-| [`pkix-lint`] | Advisory lint engine for CA/B Forum and RFC rules | — | released |
+| [`pkix-profiles`] | `Profile` trait + RFC-baseline profile pre-configurations | — | released |
+| [`pkix-lint`] | Advisory lint engine + RFC-conformance lint bundle | — | released |
 | [`pkix-revocation-http`] | Online CRL/OCSP fetching from CDP/AIA | — | planned |
 | [`pkix-ct`] | Certificate Transparency SCT verification | — | planned |
 | [`pkix-composite`] | Composite classical+PQC signature verifier | ✓ | planned |
 | [`pkix-ac`] | RFC 5755 attribute certificate validation | ✓ | planned |
+
+### Industry-forum reference crates (not authoritative)
+
+These crates encode specific industry-forum requirements (e.g., CA/B Forum
+Baseline Requirements) on top of the core framework. They are explicit
+reference implementations — snapshot-style, not maintained as canonical
+encodings — and ship with a "fork and adapt to your deployment's current
+interpretation" caveat in their crate-level rustdoc. See the
+[framework / policy split](#framework--policy-split) section below for the
+rationale.
+
+| Crate | What it does | `no_std` | Status |
+|-------|-------------|----------|--------|
+| [`pkix-profiles-cabf`] | CA/B Forum TLS BR / S/MIME BR / Code Signing BR profile pre-configurations (reference) | — | released |
+| [`pkix-lint-cabf`] | CA/B Forum TLS BR lint bundle (`cabf_tls_br`) (reference) | — | released |
 
 [^revocation-no-std]: `pkix-revocation`'s core (`NoRevocation`, the
     `RevocationChecker` trait, `Error` enum) is `no_std`. The `crl` and
@@ -121,6 +138,32 @@ entire cryptographic foundation without touching validation logic.
 Path building (turning an unordered bag of certificates into an ordered chain)
 is handled by `pkix-path-builder`. Profile-specific policy pre-configuration
 lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
+
+## Framework / policy split
+
+The workspace ships standards-based **mechanisms** (the `Profile` trait,
+`ValidationPolicy`, the `Lint` trait, `LintRunner`, OSCAL Catalog / Profile
+machinery, …) and **RFC-baseline implementations** in the core crates. It
+does **not** ship canonical encodings of any single organization's policy —
+CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, individual CA
+CPSs — in the core crates.
+
+Industry-forum content (CA/B Forum TLS BR, S/MIME BR, Code Signing BR) lives
+in sibling **`-cabf` reference crates** carrying a "reference / not
+authoritative" header in their rustdoc. They are a starting point that you
+are expected to fork and adapt to your deployment's current interpretation
+of the BR text.
+
+| Concern | Core crate | Reference crate |
+|---------|-----------|-----------------|
+| `Profile` trait + RFC-baseline (`BasicTlsProfile`, `BasicSmimeProfile`) | [`pkix-profiles`] | — |
+| CA/B Forum profiles (`WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`) | — | [`pkix-profiles-cabf`] |
+| `Lint` trait, `LintRunner`, `EvaluationReport`, RFC-conformance lints | [`pkix-lint`] | — |
+| CA/B Forum TLS BR lints (`cabf_tls_br`) | — | [`pkix-lint-cabf`] |
+
+Encoded as workspace stance in [`AGENTS.md`] non-negotiable #6 (PKIX-amgn).
+
+[`AGENTS.md`]: ./AGENTS.md
 
 ## What is validated
 

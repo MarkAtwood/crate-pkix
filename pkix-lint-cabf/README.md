@@ -10,9 +10,33 @@ For the current Baseline Requirements:
 
 Maintained on a best-effort basis. If your deployment depends on bit-exact CA/B Forum conformance, you SHOULD vendor and review the relevant rule definitions yourself.
 
-## Status
+## Modules
 
-Stub crate. Substantive content lands when the OSCAL Profile composition machinery (PKIX-9vnx.7) and `pkix-lint` framework/policy split (PKIX-amgn.5) are in place.
+- `cabf_tls_br` — CA/B Forum TLS Baseline Requirements lint bundle. Migrated
+  from `pkix-lint` 0.4.0 (see workspace `CHANGELOG.md` under `pkix-lint
+  0.5.0`). Bundles SC-081 phased validity caps, SHA-1 prohibition, RSA
+  min-key-size, SAN/EKU presence, and `BasicConstraints` cA-flag checks
+  behind `cabf_tls_br::CabfTlsBrProfile`.
+
+Future bundles (`cabf_smime_br`, `cabf_cs_br`) and zlint-derived OSCAL
+Catalogs will land via PKIX-amgn.8 and friends.
+
+## Usage
+
+```rust,no_run
+use pkix_lint::{LintProfile, SubjectKind};
+use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+
+let profile = CabfTlsBrProfile;
+let runner = profile.lint_runner();
+
+let kinds = vec![SubjectKind::Leaf, SubjectKind::AnchorIssued];
+let findings = runner.run_chain(&chain, &kinds, now_unix);
+
+for f in findings.iter().filter(|f| f.is_finding()) {
+    eprintln!("[{}] {}: {:?}", f.cert_index, f.lint_id, f.result);
+}
+```
 
 ## License
 
