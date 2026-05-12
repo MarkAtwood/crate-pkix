@@ -3,10 +3,10 @@
 //! **Reference implementation of CA/Browser Forum cert profile requirements. Not authoritative.**
 //!
 //! CA/B Forum Baseline Requirements (TLS BR, S/MIME BR, Code Signing BR) change
-//! on a ballot cycle. The implementations in this crate are a snapshot of those
-//! requirements at the time of the most recent revision. They are intended as a
-//! starting point: fork and adapt to your deployment's current interpretation of
-//! the BR text, which is the only canonical source.
+//! on a ballot cycle. The implementations in this crate are a small, curated
+//! snapshot of marquee BR requirements. They are intended as a starting point:
+//! fork and adapt to your deployment's current interpretation of the BR text,
+//! which is the only canonical source.
 //!
 //! For the current Baseline Requirements:
 //! - <https://cabforum.org/baseline-requirements/> (TLS)
@@ -15,7 +15,29 @@
 //!
 //! Maintained on a best-effort basis. If your deployment depends on bit-exact
 //! CA/B Forum conformance, you SHOULD vendor and review the relevant rule
-//! definitions yourself.
+//! definitions yourself, or use `pkix-policy-zlint` (see below).
+//!
+//! # Unprincipled exception
+//!
+//! This crate is an **explicit, bounded violation** of the workspace's
+//! no-transcription rule (AGENTS.md non-negotiable #5, three-mode policy-class
+//! architecture). Under that rule, industry-forum / vendor policies (CA/B
+//! Forum BR, Mozilla / Apple / Microsoft root programs, ETSI, DoD, FedRAMP,
+//! individual CA CPSs) are NOT transcribed into Rust — they are consumed via
+//! sibling policy-adapter crates (`pkix-policy-zlint`, `pkix-policy-pkilint`)
+//! that defer to the upstream maintainer's tool at runtime.
+//!
+//! This crate does contain Rust transcriptions of CA/B Forum BR rules and
+//! does violate that rule. It exists because (a) CA/B Forum BR is the
+//! most-asked-about industry-forum spec, and (b) a small marquee-violation
+//! reference is useful for downstream consumers comparing their interpretation
+//! against the workspace's.
+//!
+//! The exception is **not a template.** No equivalent `pkix-profiles-mozilla`,
+//! `pkix-profiles-fedramp`, `pkix-profiles-dod`, or `pkix-profiles-etsi`
+//! crates are admitted without explicit human re-decision. For comprehensive
+//! CA/B Forum coverage (matching zlint's ~700-lint scope), use
+//! `pkix-policy-zlint` (PKIX-jy95).
 //!
 //! # Profiles
 //!
@@ -48,12 +70,11 @@
 //!
 //! # Stance
 //!
-//! - Framework, not policy: workspace stance [PKIX-amgn].
-//! - Per-rule split (standards-body specs in fast Rust, policy choices in
-//!   OSCAL Profiles): workspace stance [PKIX-8qz1].
+//! - AGENTS.md non-negotiable #5 — three-mode policy-class architecture,
+//!   including the unprincipled-exception clause that admits this crate.
+//! - Stance / epic: [PKIX-amgn].
 //!
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
-//! [PKIX-8qz1]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-profiles`]: https://docs.rs/pkix-profiles
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
