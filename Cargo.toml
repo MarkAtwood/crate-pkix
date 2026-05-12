@@ -15,6 +15,7 @@ members = [
     "pkix-composite",
     "pkix-ac",
     "pkix-difftest",
+    "pkix-lint-cabf-refresh",
     "pkix-truststore",
     "pkix-truststore-system",
     "pkix-truststore-pkcs11",
