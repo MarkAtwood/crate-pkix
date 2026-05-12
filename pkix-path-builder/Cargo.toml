@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-path-builder"
 description = "RFC 4158 certification path building for pkix-path"
-version               = "0.3.0"  # BREAKING: pkix-path 0.3 dep major bump + skip-not-fail behavior change; see CHANGELOG.md
+version               = "0.3.1"  # Additive: build_first_valid_path<V> helper + Error::NoValidPath variant (PKIX-lwr9.4.2). See CHANGELOG.md.
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -21,6 +21,12 @@ x509-cert  = { workspace = true }
 
 [dev-dependencies]
 pkix-path = { path = "../pkix-path", features = ["rsa", "p256", "std"] }
+# Used by the `AlwaysRejectVerifier` in `tests/build_first_valid_path.rs` to
+# spell out the `pkix_path::SignatureVerifier` trait's argument types. Both
+# are transitive deps via pkix-path's public API; declared here only so the
+# integration test's `impl SignatureVerifier` block can name the types.
+spki      = { workspace = true }
+signature = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

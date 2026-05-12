@@ -6,6 +6,82 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path-builder 0.3.1`: `build_first_valid_path<V>` helper (2026-05-11)
+
+**Additive.** PKIX-lwr9.4.2 — closes the consumer ergonomics gap surfaced
+by PKIX-lwr9.4 / BetterTLS tc60: [`build_path`] is single-shot and has no
+[`SignatureVerifier`] dependency, so it cannot know which of its DFS
+candidates will be rejected downstream by [`pkix_path::validate_path`]
+(e.g., cross-signed pools containing an intermediate signed under an
+algorithm the verifier does not dispatch).
+
+New functions in `pkix_path_builder`:
+
+```rust
+pub fn build_first_valid_path<V>(
+    target: &Certificate,
+    pool: &CertPool,
+    anchors: &[pkix_path::TrustAnchor],
+    policy: &pkix_path::ValidationPolicy,
+    verifier: &V,
+) -> Result<Vec<Certificate>>
+where
+    V: pkix_path::SignatureVerifier;
+
+pub fn build_first_valid_path_with_config<V>(
+    target: &Certificate,
+    pool: &CertPool,
+    anchors: &[pkix_path::TrustAnchor],
+    policy: &pkix_path::ValidationPolicy,
+    verifier: &V,
+    config: &PathBuilderConfig,
+) -> Result<Vec<Certificate>>
+where
+    V: pkix_path::SignatureVerifier;
+```
+
+Semantics: iterate [`build_path_candidates`] until the first candidate
+chain passes [`pkix_path::validate_path`]. Return that chain. If every
+candidate is rejected, surface the new `Error::NoValidPath { tried,
+last_error }` variant. Zero-yield exhaustion still surfaces as
+`Error::NoPathFound` (matches `build_path`'s contract).
+
+New error variant on the `#[non_exhaustive]` `Error` enum:
+
+```rust
+NoValidPath {
+    tried: usize,
+    last_error: String,
+},
+```
+
+The inner `pkix_path::Error` is rendered to `String` rather than carried
+verbatim so the builder's `Error` enum retains its `Hash` derive
+(`pkix_path::Error` is not `Hash`). Consumers needing programmatic match
+on inner errors should drop to `build_path_candidates` and call
+`validate_path` per candidate themselves.
+
+Rustdoc updates: `build_path`, `PathCandidates`, and the new helpers
+cross-reference each other under a three-way "Choosing between ..."
+heading. Existing signatures unchanged.
+
+Three new integration tests in `tests/build_first_valid_path.rs`:
+
+- Positive: BetterTLS tc60 fixture (cross-signed depth-6 pool, one
+  intermediate uses ecdsa-with-SHA1 which `DefaultVerifier` does not
+  dispatch). `build_path` returns a chain that `validate_path` rejects
+  with `SignatureInvalid { index: 3 }`; `build_first_valid_path` iterates
+  past that candidate and returns a SHA-256-only chain that validates.
+- `NoValidPath`: PKITS §4.1.1 chain paired with an `AlwaysRejectVerifier`
+  that rejects every signature. Confirms `tried >= 1` and `last_error`
+  populated.
+- `NoPathFound` passthrough: empty pool. Confirms zero-yield exhaustion
+  surfaces as `NoPathFound`, not `NoValidPath { tried: 0 }`.
+
+New dev-dependencies (workspace-pinned): `spki`, `signature`. Required to
+spell out the `SignatureVerifier` trait's argument types in the
+`AlwaysRejectVerifier` impl in the new test.
+
 ### `pkix-lint 0.4.0`: OSCAL Catalog round-trip + id-pair runner (2026-05-11)
 
 **Additive.** PKIX-9vnx.6.3 — closes the OSCAL Catalog round-trip loop.
