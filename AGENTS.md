@@ -40,6 +40,28 @@ adjacent PKI concerns.
 
 - **`pkix-difftest`** — Differential test harness across `pkix-path` / OpenSSL / pyca-cryptography. PKITS, pyca, and x509-limbo corpora.
 
+## Project phase and decision framing
+
+This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, done right from the start." That phase shapes how design decisions are made.
+
+**Apply these frames:**
+
+- **Design for the eventual complete shape.** Ask "what does this API look like when finished?" not "what's the minimum we can ship?" Architectural completeness is the target; iterative accretion is not.
+- **Maintainer judgment without consumer pressure.** Decisions are made on architectural and design merit. There are no users yet — that is the default condition for this phase, not a signal about whether a feature belongs. The point of the prelaunch window is that the maintainer can apply judgment without organic-growth pressure.
+- **Breaking changes are free.** Pre-1.0, semver explicitly permits breaking changes across 0.x releases. They are the *mechanism* for getting the design right. Treating "non-breaking later" as a tiebreaker is wrong in this phase.
+- **YAGNI applies to features, not to architecture.** "Should we ship a TLS profile?" is a feature question; YAGNI may apply. "Should the trust-domain seam have three callbacks or two?" is an architectural-completeness question; YAGNI does not apply. A trait that completes a structural pattern (e.g., `SignatureVerifier` + `RevocationChecker` + `AiaFetcher` as the complete trust-domain seam) is design closure, not surface bloat.
+
+**Reject these frames when they appear in decision support:**
+
+- "No concrete consumer is asking" — true for almost every decision in this phase; not informative.
+- "Wait for consumer demand to drive the API" — produces an organic-growth shape, the opposite of "done right from the start."
+- "We can add it later non-breakingly" — applicable post-1.0; pre-1.0 it is avoidance of design closure.
+- "Speculative engineering" / "path of least regret = minimum surface" — speculation cost is real for features, not for architectural completeness.
+
+**When this phase ends:** post-1.0, with users, the post-launch frames (preserve the API, gate on concrete consumer asks, etc.) become appropriate. Until then, decisions are made on design grounds.
+
+**Rationale for this framing:** captured 2026-05-12 after a sweep found that several closed decisions had used post-launch-flavored reasoning ("no consumer demand," "non-breaking later") as supporting arguments. The substantive architectural reasons usually stood on their own; the wrong-frame reasoning had been weakening them. This section establishes the correct frame for future decisions. See memory `pkix-prelaunch-framing-2026-05-12` and the closed decision sweep recorded under that key.
+
 ## Non-negotiable constraints
 
 1. `pkix-path` is `no_std`. Do not add network, async, or std-only deps to it. Ever.
