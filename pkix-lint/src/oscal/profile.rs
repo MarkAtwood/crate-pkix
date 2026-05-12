@@ -1,10 +1,15 @@
 //! OSCAL Profile composition for pkix-lint.
 //!
-//! Under the workspace's OSCAL alignment stance (`AGENTS.md` constraint 5),
-//! lint-bundle composition is expressed via OSCAL Profile semantics —
-//! `import` references, `include-controls` / `exclude-controls` filters,
-//! and `modify.set-parameters` overrides — not bespoke Rust composition
-//! functions.
+//! Implements OSCAL Profile resolution semantics — `import` references,
+//! `include-controls` / `exclude-controls` filters, and
+//! `modify.set-parameters` overrides — for callers who choose OSCAL
+//! Profile JSON as their lint-bundle composition format. OSCAL Profile
+//! semantics are one supported way to compose pkix-lint bundles, not the
+//! mandated workspace mechanism: callers can equally compose bundles
+//! directly via [`crate::LintRunner::filter_to_ids`] and
+//! [`crate::LintRunner::apply_parameter_overrides`] without ever
+//! producing an OSCAL document. See `pkix-lint/src/oscal/mod.rs` for the
+//! framing.
 //!
 //! This module is the resolver. Given an OSCAL Profile
 //! [`serde_json::Value`] and a `sources` map of referenced Catalogs
@@ -393,10 +398,13 @@ mod tests {
     //!
     //! * The Profile JSON shapes are hand-constructed in tests and assert
     //!   on the output `control_ids` ordering and `parameter_overrides`
-    //!   list. The Profile JSON IS the source of truth; the code under
-    //!   test produces the resolution, and the test compares against an
-    //!   independently computed expected output (the set of ids the
-    //!   author of the Profile JSON intended).
+    //!   list. Within each individual test the hand-written Profile JSON
+    //!   serves as the test oracle — the parser under test produces the
+    //!   resolution, and the test compares against an independently
+    //!   computed expected output (the set of ids the test author of
+    //!   that JSON intended). This per-test oracle role does not imply
+    //!   anything about OSCAL Profiles as a global workspace source of
+    //!   truth; see `pkix-lint/src/oscal/mod.rs` for the stance.
     //! * Catalog inputs are constructed via the catalog emitter
     //!   ([`crate::oscal::catalog::catalog_from_lints`]) over known
     //!   `Lint` impls, so the Control id set of each Catalog is fixed by
