@@ -772,16 +772,15 @@ fn cabf_tls_br_profile_run_chain_webpki_cert_all_pass() {
 }
 
 // ===========================================================================
-// OSCAL Control metadata (PKIX-9vnx.6.1)
+// Standards-body metadata (PKIX-9vnx.6.1; renamed to `spec_*` in pkix-lint 0.6.0)
 // ===========================================================================
 //
-// These tests pin the OSCAL-Control-grade metadata each CABF TLS BR lint
-// exposes via the new default-method extension to `Lint`. The independent
-// oracle is the CA/B Forum TLS Baseline Requirements (v2.0.0+) document
-// itself — the section numbers below match the BR text and the lint
-// citation strings; the OSCAL Control-id-shaped strings
-// (`cabf-tls-br-<section>`) follow the project's `<source>-<section>`
-// convention documented on `Lint::rfc_section_id`.
+// These tests pin the standards-body metadata each CABF TLS BR lint exposes
+// via the default-method extension to `Lint`. The independent oracle is the
+// CA/B Forum TLS Baseline Requirements (v2.0.0+) document itself — the
+// section numbers below match the BR text and the lint citation strings;
+// the `<source>-<section>`-shaped strings (`cabf-tls-br-<section>`) follow
+// the convention documented on `Lint::spec_section_id`.
 
 #[test]
 fn metadata_validity_max() {
@@ -791,10 +790,10 @@ fn metadata_validity_max() {
         lint.title(),
         "Leaf certificate validity must not exceed SC-081 cap"
     );
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-6.3.2"));
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-6.3.2"));
     // CA/B Forum BR has no stable per-section URL; left as None per
     // the trait rustdoc.
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_url(), None);
     assert_eq!(lint.description(), None);
 }
 
@@ -803,8 +802,8 @@ fn metadata_sha1_prohibited() {
     let lint = Sha1ProhibitedLint;
     assert_eq!(lint.id(), "cabf.br.tls.alg.sha1_prohibited");
     assert_eq!(lint.title(), "SHA-1 signature algorithm prohibited");
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.3"));
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.3"));
+    assert_eq!(lint.spec_url(), None);
 }
 
 #[test]
@@ -812,8 +811,8 @@ fn metadata_rsa_min_key_size() {
     let lint = RsaMinKeySizeLint;
     assert_eq!(lint.id(), "cabf.br.tls.rsa.min_key_size");
     assert_eq!(lint.title(), "RSA modulus must be at least 2048 bits");
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-6.1.5"));
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-6.1.5"));
+    assert_eq!(lint.spec_url(), None);
 }
 
 #[test]
@@ -821,8 +820,8 @@ fn metadata_san_required() {
     let lint = SanRequiredLint;
     assert_eq!(lint.id(), "cabf.br.tls.san.required");
     assert_eq!(lint.title(), "Leaf certificate must include subjectAltName");
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.4.2"));
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.4.2"));
+    assert_eq!(lint.spec_url(), None);
 }
 
 #[test]
@@ -833,8 +832,8 @@ fn metadata_eku_server_auth() {
         lint.title(),
         "Leaf certificate must include id-kp-serverAuth EKU"
     );
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.2.7.3"));
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.7.3"));
+    assert_eq!(lint.spec_url(), None);
 }
 
 #[test]
@@ -845,8 +844,8 @@ fn metadata_bc_ca_flag() {
         lint.title(),
         "CA certificates must set BasicConstraints.cA=TRUE"
     );
-    assert_eq!(lint.rfc_section_id(), Some("cabf-tls-br-7.1.2.5"));
-    assert_eq!(lint.rfc_url(), None);
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.5"));
+    assert_eq!(lint.spec_url(), None);
 }
 
 #[test]
@@ -886,6 +885,6 @@ fn metadata_title_defaults_to_id_when_not_overridden() {
     let l = MinimalLint;
     assert_eq!(l.title(), l.id(), "default title() must equal id()");
     assert_eq!(l.description(), None);
-    assert_eq!(l.rfc_section_id(), None);
-    assert_eq!(l.rfc_url(), None);
+    assert_eq!(l.spec_section_id(), None);
+    assert_eq!(l.spec_url(), None);
 }

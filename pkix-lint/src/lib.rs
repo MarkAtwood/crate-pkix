@@ -635,80 +635,121 @@ pub trait Lint: Send + Sync {
     /// when the path does not qualify.
     fn applies_to(&self) -> SubjectKind;
 
-    // -- OSCAL Control metadata (PKIX-9vnx.6.1) ----------------------------
+    // -- Standards-body metadata (PKIX-9vnx.6.1, renamed in pkix-lint 0.6.0)
     //
-    // The next four methods carry OSCAL-Control-grade metadata that lets a
-    // serializer emit each `Lint` impl as an OSCAL Catalog `Control`. They
-    // are default-provided so existing impls keep compiling, but every
-    // shipped lint should override at least `title` and one citation field
-    // for a usable Catalog. See `pkix-lint`'s OSCAL emit module for the
-    // mapping.
+    // The next six methods declare per-lint metadata that is useful for any
+    // report or serialization format. The OSCAL emit code in
+    // `pkix_lint::oscal` is one consumer that maps these fields to OSCAL
+    // Catalog Control properties, but the methods are not OSCAL-specific.
+    // All are default-provided so existing impls keep compiling; shipped
+    // lints should override at least `title` and one standards-body
+    // citation field for a usable catalog.
 
-    /// Short human-readable title — the OSCAL `Control.title` field.
+    /// Short human-readable title for the lint.
     ///
     /// Default: returns [`id`](Self::id) verbatim. Override when the lint id
     /// is a slug (e.g., `"cabf.br.tls.validity.max"`) and the title needs to
     /// be a sentence (e.g., `"Leaf certificate validity must not exceed
-    /// SC-081 cap"`).
+    /// SC-081 cap"`). The OSCAL emit code maps this to `control.title` when
+    /// producing an OSCAL Catalog.
     fn title(&self) -> &str {
         self.id()
     }
 
-    /// Long-form description — the OSCAL `Control.description` (or
-    /// statement-prop). Optional because not every lint has more to say
-    /// than its title and citation.
+    /// Long-form description of the lint's purpose. Optional because not
+    /// every lint has more to say than its title and citation.
     ///
-    /// Default: `None`.
+    /// Default: `None`. The OSCAL emit code maps this to
+    /// `control.parts[name=statement].prose` when producing an OSCAL Catalog.
     fn description(&self) -> Option<&str> {
         None
     }
 
-    /// Standards-body section identifier in OSCAL Control-id shape.
+    /// Standards-body section identifier in `<source>-<section>` shape.
     ///
-    /// Despite the name `rfc_section_id` (kept for compatibility with the
-    /// PKIX-9vnx.6 design discussion), the slot accepts any standards-body
-    /// section identifier — IETF RFC, ITU-T X.509, CA/B Forum Baseline
-    /// Requirements, NIST SP, etc. Format is `<source>-<section>`:
+    /// The slot accepts any standards-body section identifier — IETF RFC,
+    /// ITU-T X.509, CA/B Forum Baseline Requirements, NIST SP, etc.:
     ///
     /// * `"rfc5280-4.2.1.9"` — RFC 5280 §4.2.1.9.
     /// * `"cabf-tls-br-6.3.2"` — CA/B Forum TLS BR §6.3.2.
     /// * `"x509-ed4-section-8"` — ITU-T X.509 Edition 4 §8.
     ///
-    /// Used by OSCAL Catalog emitters as the `Control.id` (or a stable
-    /// `Control.prop`). When this returns `Some`, [`rfc_url`](Self::rfc_url)
-    /// should also return a permanent URL where one exists.
+    /// When this returns `Some`, [`spec_url`](Self::spec_url) should also
+    /// return a permanent URL where one exists. The OSCAL emit code maps
+    /// this to a stable `control.prop` when producing an OSCAL Catalog.
+    ///
+    /// Renamed from `rfc_section_id` in pkix-lint 0.6.0 because the slot
+    /// was never RFC-specific; the deprecated alias remains for one minor
+    /// version to ease migration.
     ///
     /// Default: `None`.
+    fn spec_section_id(&self) -> Option<&str> {
+        None
+    }
+
+    /// Deprecated alias for [`spec_section_id`](Self::spec_section_id).
+    ///
+    /// Renamed because the slot accepts CA/B Forum, ITU-T, NIST, and other
+    /// standards-body section identifiers in addition to IETF RFCs.
+    /// Override `spec_section_id` instead. Callers should also migrate to
+    /// `spec_section_id`; the two methods are independent default impls,
+    /// so calling the deprecated alias on a lint that overrides only
+    /// `spec_section_id` returns `None`.
+    #[deprecated(
+        since = "0.6.0",
+        note = "renamed to `spec_section_id` because the slot accepts non-RFC ids (CA/B Forum, ITU-T, NIST); override and call `spec_section_id` instead"
+    )]
     fn rfc_section_id(&self) -> Option<&str> {
         None
     }
 
     /// Permanent URL to the standards-body section referenced by
-    /// [`rfc_section_id`](Self::rfc_section_id).
+    /// [`spec_section_id`](Self::spec_section_id).
     ///
     /// For IETF RFCs the canonical form is
     /// `"https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9"`. CA/B
     /// Forum has no stable per-section anchor URL (BR documents are
     /// versioned and re-published frequently); leave this `None` and let
-    /// the citation carry the §-reference.
+    /// the citation carry the §-reference. The OSCAL emit code maps this
+    /// to `control.links[rel=reference]` when producing an OSCAL Catalog.
+    ///
+    /// Renamed from `rfc_url` in pkix-lint 0.6.0 alongside
+    /// `spec_section_id`; the deprecated alias remains for one minor
+    /// version to ease migration.
     ///
     /// Default: `None`.
+    fn spec_url(&self) -> Option<&str> {
+        None
+    }
+
+    /// Deprecated alias for [`spec_url`](Self::spec_url).
+    ///
+    /// Renamed alongside `spec_section_id` so the standards-body slot is
+    /// consistently named. Override and call `spec_url` instead; the two
+    /// methods are independent default impls, so calling the deprecated
+    /// alias on a lint that overrides only `spec_url` returns `None`.
+    #[deprecated(
+        since = "0.6.0",
+        note = "renamed to `spec_url`; override and call `spec_url` instead"
+    )]
     fn rfc_url(&self) -> Option<&str> {
         None
     }
 
-    // -- OSCAL Parameter mechanism (PKIX-9vnx.6.4) -------------------------
+    // -- Tunable parameters (PKIX-9vnx.6.4) --------------------------------
     //
-    // `parameters()` advertises tunable knobs in OSCAL Catalog
-    // `Parameter`-shape. `set_parameter` mutates the lint's typed internal
-    // state from a string value; this is the bridge for OSCAL Profile
-    // `modify` directives that override defaults at composition time.
+    // `parameters()` advertises tunable knobs the lint exposes;
+    // `set_parameter` mutates the lint's typed internal state from a
+    // string-rendered value. The OSCAL emit code maps `parameters()` to
+    // `control.params[*]` and `set_parameter` is the bridge for OSCAL
+    // Profile `modify` directives when consuming an OSCAL Profile; but
+    // both methods are useful independent of OSCAL.
 
     /// Tunable parameters exposed by this lint.
     ///
-    /// Returns the OSCAL Catalog `Parameter`-shaped descriptors for every
-    /// knob the lint exposes. Each descriptor names the parameter, gives a
-    /// human-readable label, and renders its default value as a string.
+    /// Returns descriptors for every knob the lint exposes. Each
+    /// descriptor names the parameter, gives a human-readable label, and
+    /// renders its default value as a string.
     ///
     /// The descriptors do not carry the lint's current value — the lint
     /// stores typed state internally. To update a parameter at runtime,
@@ -722,7 +763,7 @@ pub trait Lint: Send + Sync {
     /// Update a tunable parameter from its string-rendered value.
     ///
     /// `id` is the [`LintParameter::id`] addressed by the caller; `value`
-    /// is the OSCAL-interchange string the lint must parse back into its
+    /// is the string-rendered value the lint must parse back into its
     /// typed internal state. Returns [`ParameterError::UnknownParameter`]
     /// when the id is not exposed by this lint, and
     /// [`ParameterError::InvalidValue`] when the value fails to parse or

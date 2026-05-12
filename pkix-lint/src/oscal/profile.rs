@@ -427,7 +427,7 @@ mod tests {
 
     /// Minimal policy-shaped fixture Lint used as the "second catalog"
     /// in cross-catalog Profile tests. Mirrors the metadata shape of a
-    /// CA/B Forum lint (rfc_section_id set, rfc_url None) without
+    /// CA/B Forum lint (spec_section_id set, spec_url None) without
     /// depending on pkix-lint-cabf content.
     struct PolicyShapedLint;
     impl Lint for PolicyShapedLint {
@@ -446,7 +446,7 @@ mod tests {
         fn applies_to(&self) -> SubjectKind {
             SubjectKind::Leaf
         }
-        fn rfc_section_id(&self) -> Option<&str> {
+        fn spec_section_id(&self) -> Option<&str> {
             Some("test-policy-1.2.3")
         }
         fn check_cert(

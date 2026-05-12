@@ -114,7 +114,7 @@ impl Lint for ValidityMaxLint {
         "Leaf certificate validity must not exceed SC-081 cap"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-6.3.2")
     }
 
@@ -197,7 +197,7 @@ impl Lint for Sha1ProhibitedLint {
         "SHA-1 signature algorithm prohibited"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-7.1.3")
     }
 
@@ -272,7 +272,7 @@ impl Lint for RsaMinKeySizeLint {
         "RSA modulus must be at least 2048 bits"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-6.1.5")
     }
 
@@ -421,7 +421,7 @@ impl Lint for SanRequiredLint {
         "Leaf certificate must include subjectAltName"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-7.1.4.2")
     }
 
@@ -487,7 +487,7 @@ impl Lint for EkuServerAuthLint {
         "Leaf certificate must include id-kp-serverAuth EKU"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-7.1.2.7.3")
     }
 
@@ -559,7 +559,7 @@ impl Lint for BcCaFlagLint {
         "CA certificates must set BasicConstraints.cA=TRUE"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("cabf-tls-br-7.1.2.5")
     }
 

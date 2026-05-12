@@ -121,11 +121,11 @@ impl Lint for Rfc5280MaxSerialLengthLint {
         "Certificate serialNumber must not exceed 20 octets"
     }
 
-    fn rfc_section_id(&self) -> Option<&str> {
+    fn spec_section_id(&self) -> Option<&str> {
         Some("rfc5280-4.1.2.2")
     }
 
-    fn rfc_url(&self) -> Option<&str> {
+    fn spec_url(&self) -> Option<&str> {
         Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2")
     }
 
@@ -357,9 +357,9 @@ mod tests {
         let lint = Rfc5280MaxSerialLengthLint::default();
         assert_eq!(lint.id(), "rfc5280.cert.serial_number.max_octets");
         assert_eq!(lint.citation(), "RFC 5280 §4.1.2.2");
-        assert_eq!(lint.rfc_section_id(), Some("rfc5280-4.1.2.2"));
+        assert_eq!(lint.spec_section_id(), Some("rfc5280-4.1.2.2"));
         assert_eq!(
-            lint.rfc_url(),
+            lint.spec_url(),
             Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2")
         );
     }
