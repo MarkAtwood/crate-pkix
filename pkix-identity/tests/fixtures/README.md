@@ -16,6 +16,11 @@ so a self-signed cert is sufficient.
 | `san-mixed-case.der` | `DnsName("Host.Example.COM")` |
 | `san-missing.der` | (no SAN extension) |
 | `cn-only.der` | (no SAN extension; CN is `leaf`) |
+| `san-rfc822.der` | `Rfc822Name("alice@example.com")` |
+| `san-rfc822-mixedcase.der` | `Rfc822Name("alice@Example.COM")` |
+| `san-smtputf8.der` | `otherName(SmtpUTF8Mailbox, UTF8String "用户@example.com")` |
+| `san-smtputf8-u-label-domain.der` | `otherName(SmtpUTF8Mailbox, UTF8String "user@bücher.example")` |
+| `san-mailbox-mixed.der` | `Rfc822Name("alice@example.com") + otherName(SmtpUTF8Mailbox, "用户@example.com")` |
 
 Validity 2000-01-01 to 2050-01-01. P-256 ECDSA self-signed.
 

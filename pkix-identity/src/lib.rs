@@ -63,12 +63,13 @@
 //!
 //! `0.1.0` (PKIX-fmtv.21) shipped the public API surface with stub
 //! bodies that returned [`IdentityError::NotYetImplemented`]. The
-//! unreleased line on `main` (PKIX-fmtv.11.1) fills in
-//! [`ServerName::dns_name`], [`ServerName::ip_address`], and
-//! [`verify_dns_name`] with the RFC 6125 §6.4 hostname-binding
-//! implementation. [`MailboxName::parse`] and [`verify_mailbox`] still
-//! return [`IdentityError::NotYetImplemented`]; the fillings land in
-//! PKIX-fmtv.12.
+//! unreleased line on `main` (PKIX-fmtv.11.1, PKIX-fmtv.12.1) fills in
+//! all four public entry points: [`ServerName::dns_name`],
+//! [`ServerName::ip_address`], [`MailboxName::parse`],
+//! [`verify_dns_name`], and [`verify_mailbox`].
+//! [`IdentityError::NotYetImplemented`] is retained as a non-removed
+//! variant so future scaffold-then-fill workflows can reuse it without
+//! a breaking API change.
 //!
 //! [`pkix-chain`]: https://docs.rs/pkix-chain
 //! [`pkix-truststore-system`]: https://docs.rs/pkix-truststore-system
@@ -79,7 +80,6 @@ extern crate alloc;
 
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::ext::pkix::{name::GeneralName, SubjectAltName};
 use x509_cert::Certificate;
@@ -191,27 +191,123 @@ impl<'a> ServerName<'a> {
 
 /// Parsed RFC 5322 / RFC 8398 mailbox.
 ///
-/// Construct via [`MailboxName::parse`]. Borrowed against the caller's
-/// input string for the lifetime `'a`.
+/// Construct via [`MailboxName::parse`]. Holds a split of the input
+/// into local-part and domain plus a normalized A-label form of the
+/// domain used to compare against `rfc822Name` SAN entries. The `'a`
+/// lifetime borrows from the caller's input only when no allocation
+/// was required.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct MailboxName<'a> {
-    _borrow: PhantomData<&'a str>,
+    /// Original local-part. Case-preserving. May contain non-ASCII for
+    /// RFC 8398 internationalized mailboxes.
+    local: Cow<'a, str>,
+    /// Domain in lowercase ASCII A-label form. Always allocated when
+    /// case-folding or U-label → A-label conversion was required, or
+    /// when the input came pre-lowercased. Used for both rfc822Name and
+    /// SmtpUTF8Mailbox matching paths.
+    domain_a_label: Cow<'a, str>,
+    /// True if the local-part contains non-ASCII bytes — in that case
+    /// the mailbox can only match an `otherName(SmtpUTF8Mailbox)` SAN
+    /// entry, never an `rfc822Name` (which is IA5String, ASCII-only).
+    is_internationalized: bool,
 }
 
 impl<'a> MailboxName<'a> {
     /// Parse an RFC 5322 mailbox, optionally with an internationalized
     /// local-part (RFC 8398 SmtpUTF8Mailbox).
     ///
+    /// Supported syntax is the pragmatic subset of `addr-spec` that
+    /// real-world S/MIME certificates carry:
+    ///
+    /// - `local-part "@" domain` with exactly one `@`.
+    /// - `local-part` non-empty, no `@`, no whitespace, no NUL.
+    ///   ASCII local-parts must use `atext` characters (RFC 5322 §3.2.3:
+    ///   letters / digits / `! # $ % & ' * + - / = ? ^ _ \` { | } ~ .`).
+    ///   Non-ASCII local-parts are accepted as-is and flagged as
+    ///   internationalized (RFC 6532).
+    /// - `domain` validated against the same LDH+length rules as
+    ///   [`ServerName::dns_name`], with U-label → A-label conversion
+    ///   for non-ASCII inputs (idna 2008).
+    ///
+    /// Quoted local-parts (`"a b"@example.com`), comments, and folding
+    /// whitespace are not supported; such inputs are rejected with
+    /// [`IdentityError::MalformedInput`].
+    ///
     /// # Errors
     ///
-    /// Will return [`IdentityError::MalformedInput`] for inputs that do
-    /// not parse as a mailbox once PKIX-fmtv.12 fills in validation.
-    /// Currently returns [`IdentityError::NotYetImplemented`] for any
-    /// input.
-    pub fn parse(_mailbox: &'a str) -> Result<Self, IdentityError> {
-        Err(IdentityError::NotYetImplemented)
+    /// Returns [`IdentityError::MalformedInput`] for inputs that do not
+    /// parse as a mailbox under the above rules.
+    pub fn parse(mailbox: &'a str) -> Result<Self, IdentityError> {
+        let (local_raw, domain_raw) = mailbox
+            .rsplit_once('@')
+            .ok_or(IdentityError::MalformedInput)?;
+        if local_raw.is_empty() || domain_raw.is_empty() {
+            return Err(IdentityError::MalformedInput);
+        }
+        // Local-part: no further `@`, no whitespace, no NUL.
+        if local_raw.contains('@') {
+            return Err(IdentityError::MalformedInput);
+        }
+        for c in local_raw.chars() {
+            if c.is_whitespace() || c == '\0' || c == '<' || c == '>' || c == ',' || c == '"' {
+                return Err(IdentityError::MalformedInput);
+            }
+        }
+        let is_internationalized = !local_raw.is_ascii();
+        if !is_internationalized {
+            validate_ascii_local_part(local_raw)?;
+        }
+        let domain_a_label = normalize_dns_name(domain_raw)?;
+        let local: Cow<'_, str> = Cow::Borrowed(local_raw);
+        Ok(Self {
+            local,
+            domain_a_label,
+            is_internationalized,
+        })
     }
+}
+
+/// Validate an ASCII local-part against the `atext` rule of RFC 5322
+/// §3.2.3 (extended with `.` as a separator per §3.2.3 "dot-atom").
+fn validate_ascii_local_part(s: &str) -> Result<(), IdentityError> {
+    if s.is_empty() {
+        return Err(IdentityError::MalformedInput);
+    }
+    // RFC 5322 §3.2.3 dot-atom: at least one atext, separated by single
+    // dots; cannot start or end with `.`, cannot have consecutive dots.
+    if s.starts_with('.') || s.ends_with('.') || s.contains("..") {
+        return Err(IdentityError::MalformedInput);
+    }
+    for &b in s.as_bytes() {
+        let ok = b.is_ascii_alphanumeric()
+            || matches!(
+                b,
+                b'!' | b'#'
+                    | b'$'
+                    | b'%'
+                    | b'&'
+                    | b'\''
+                    | b'*'
+                    | b'+'
+                    | b'-'
+                    | b'/'
+                    | b'='
+                    | b'?'
+                    | b'^'
+                    | b'_'
+                    | b'`'
+                    | b'{'
+                    | b'|'
+                    | b'}'
+                    | b'~'
+                    | b'.'
+            );
+        if !ok {
+            return Err(IdentityError::MalformedInput);
+        }
+    }
+    Ok(())
 }
 
 /// Identity-binding errors.
@@ -319,20 +415,100 @@ pub fn verify_dns_name(cert: &Certificate, name: &ServerName<'_>) -> Result<(), 
 ///
 /// Walks `cert`'s Subject Alternative Name extension for `rfc822Name`
 /// (ASCII mailbox) and `otherName` with the SmtpUTF8Mailbox OID
-/// (internationalized mailbox). Returns `Ok(())` if any entry matches
-/// `mailbox`; otherwise [`IdentityError::NoMatchingSan`] or
-/// [`IdentityError::MissingSan`].
+/// `1.3.6.1.5.5.7.8.9` (internationalized mailbox). Returns `Ok(())` if
+/// any entry matches `mailbox`; otherwise [`IdentityError::NoMatchingSan`]
+/// or [`IdentityError::MissingSan`].
+///
+/// Matching rules:
+///
+/// - Local-part: byte-equal comparison. Per RFC 5321 §2.4 the case
+///   sensitivity of the local-part is the receiving domain's decision;
+///   we conservatively require exact case match. (`webpki` and
+///   `pyca/cryptography` both make the same choice.)
+/// - Domain: case-insensitive ASCII comparison. Targets and SAN entries
+///   are both normalized to A-label form (idna 2008) before comparing.
+///
+/// An internationalized [`MailboxName`] (non-ASCII local-part) can only
+/// match an `otherName(SmtpUTF8Mailbox)` SAN entry — `rfc822Name` is
+/// IA5String and cannot carry non-ASCII bytes. An ASCII [`MailboxName`]
+/// matches `rfc822Name` only. RFC 8398 §4 requires CAs to use
+/// `SmtpUTF8Mailbox` exclusively for non-ASCII mailboxes, so the two
+/// SAN forms encode disjoint identity spaces.
 ///
 /// # Errors
 ///
-/// See [`IdentityError`]. Currently always returns
-/// [`IdentityError::NotYetImplemented`] until PKIX-fmtv.12 fills in the
-/// body.
-pub const fn verify_mailbox(
-    _cert: &Certificate,
-    _mailbox: &MailboxName<'_>,
-) -> Result<(), IdentityError> {
-    Err(IdentityError::NotYetImplemented)
+/// - [`IdentityError::MissingSan`] — the certificate has no SAN extension.
+/// - [`IdentityError::MalformedSan`] — the SAN extension is present but
+///   cannot be parsed.
+/// - [`IdentityError::NoMatchingSan`] — the SAN extension is well-formed
+///   but no entry matches.
+pub fn verify_mailbox(cert: &Certificate, mailbox: &MailboxName<'_>) -> Result<(), IdentityError> {
+    let san = find_san(cert)?;
+    for entry in san.0.iter() {
+        if san_entry_matches_mailbox(entry, mailbox) {
+            return Ok(());
+        }
+    }
+    Err(IdentityError::NoMatchingSan)
+}
+
+/// Returns true if `entry` is a mailbox-shaped SAN entry that matches
+/// `target`. Non-mailbox SAN types (DnsName, IpAddress, …) always
+/// return false.
+fn san_entry_matches_mailbox(entry: &GeneralName, target: &MailboxName<'_>) -> bool {
+    match entry {
+        GeneralName::Rfc822Name(rfc822) if !target.is_internationalized => {
+            matches_rfc822_mailbox(rfc822.as_str(), target)
+        }
+        GeneralName::OtherName(other) if other.type_id == OID_SMTP_UTF8_MAILBOX => {
+            match decode_utf8_string_any(&other.value) {
+                Ok(utf8) => matches_smtp_utf8_mailbox(&utf8, target),
+                Err(_) => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// RFC 8398 SmtpUTF8Mailbox OID (`id-on-SmtpUTF8Mailbox`).
+const OID_SMTP_UTF8_MAILBOX: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.8.9");
+
+/// Decode an [`der::Any`] that wraps a `UTF8String` into its contained
+/// string. Used to extract the inner mailbox bytes from an
+/// `otherName(SmtpUTF8Mailbox)` SAN entry.
+fn decode_utf8_string_any(any: &der::Any) -> Result<alloc::string::String, IdentityError> {
+    use der::asn1::Utf8StringRef;
+    let s = Utf8StringRef::try_from(any).map_err(|_| IdentityError::MalformedSan)?;
+    Ok(s.as_str().into())
+}
+
+fn matches_rfc822_mailbox(san_value: &str, target: &MailboxName<'_>) -> bool {
+    // SAN entry must split into local@domain.
+    let Some((san_local, san_domain)) = san_value.rsplit_once('@') else {
+        return false;
+    };
+    if san_local != target.local.as_ref() {
+        return false;
+    }
+    // Domain: ASCII case-insensitive compare. The target's domain is
+    // already lower-case A-label; the SAN may be mixed-case but is
+    // always IA5String (ASCII) for rfc822Name.
+    san_domain.eq_ignore_ascii_case(target.domain_a_label.as_ref())
+}
+
+fn matches_smtp_utf8_mailbox(san_value: &str, target: &MailboxName<'_>) -> bool {
+    let Some((san_local, san_domain)) = san_value.rsplit_once('@') else {
+        return false;
+    };
+    if san_local != target.local.as_ref() {
+        return false;
+    }
+    // The SAN's domain is encoded as U-labels per RFC 8398 §3. Convert
+    // both to A-label before comparing.
+    let Ok(san_domain_a) = idna::domain_to_ascii(san_domain) else {
+        return false;
+    };
+    san_domain_a.eq_ignore_ascii_case(target.domain_a_label.as_ref())
 }
 
 // ---------------------------------------------------------------------------
@@ -858,14 +1034,129 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // MailboxName + verify_mailbox still scaffolded (PKIX-fmtv.12)
+    // MailboxName::parse
     // -----------------------------------------------------------------
 
     #[test]
-    fn mailbox_parse_still_not_yet_implemented() {
+    fn mailbox_parse_simple_ascii() {
+        let m = MailboxName::parse("alice@example.com").unwrap();
+        assert_eq!(m.local, "alice");
+        assert_eq!(m.domain_a_label, "example.com");
+        assert!(!m.is_internationalized);
+    }
+
+    #[test]
+    fn mailbox_parse_lowercases_domain() {
+        let m = MailboxName::parse("alice@Example.COM").unwrap();
+        assert_eq!(m.local, "alice");
+        assert_eq!(m.domain_a_label, "example.com");
+    }
+
+    #[test]
+    fn mailbox_parse_preserves_local_case() {
+        let m = MailboxName::parse("Alice@example.com").unwrap();
+        assert_eq!(m.local, "Alice");
+    }
+
+    #[test]
+    fn mailbox_parse_internationalized_local_part() {
+        let m = MailboxName::parse("用户@example.com").unwrap();
+        assert_eq!(m.local, "用户");
+        assert_eq!(m.domain_a_label, "example.com");
+        assert!(m.is_internationalized);
+    }
+
+    #[test]
+    fn mailbox_parse_u_label_domain_normalizes_to_a_label() {
+        let m = MailboxName::parse("user@bücher.example").unwrap();
+        assert_eq!(m.domain_a_label, "xn--bcher-kva.example");
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_missing_at() {
         assert_eq!(
-            MailboxName::parse("user@example.com").err(),
-            Some(IdentityError::NotYetImplemented),
+            MailboxName::parse("alice.example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_empty_parts() {
+        assert_eq!(
+            MailboxName::parse("@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+        assert_eq!(
+            MailboxName::parse("alice@").err(),
+            Some(IdentityError::MalformedInput),
+        );
+        assert_eq!(
+            MailboxName::parse("@").err(),
+            Some(IdentityError::MalformedInput)
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_whitespace_in_local() {
+        assert_eq!(
+            MailboxName::parse("a b@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_quoted_local() {
+        assert_eq!(
+            MailboxName::parse("\"a b\"@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_double_at() {
+        assert_eq!(
+            MailboxName::parse("a@b@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_leading_or_double_dot_in_local() {
+        assert_eq!(
+            MailboxName::parse(".alice@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+        assert_eq!(
+            MailboxName::parse("alice.@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+        assert_eq!(
+            MailboxName::parse("ali..ce@example.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+    }
+
+    #[test]
+    fn mailbox_parse_accepts_atext_specials() {
+        // RFC 5322 §3.2.3 atext: !#$%&'*+-/=?^_`{|}~ are all legal.
+        for ch in "!#$%&'*+-/=?^_`{|}~".chars() {
+            let s = alloc::format!("a{ch}b@example.com");
+            assert!(
+                MailboxName::parse(&s).is_ok(),
+                "should accept atext char {ch:?} in local-part"
+            );
+        }
+    }
+
+    #[test]
+    fn mailbox_parse_rejects_bad_domain() {
+        assert_eq!(
+            MailboxName::parse("alice@-bad.com").err(),
+            Some(IdentityError::MalformedInput),
+        );
+        assert_eq!(
+            MailboxName::parse("alice@..").err(),
+            Some(IdentityError::MalformedInput),
         );
     }
 }
