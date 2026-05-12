@@ -1216,6 +1216,8 @@ dependencies = [
 name = "pkix-identity"
 version = "0.1.0"
 dependencies = [
+ "der",
+ "idna",
  "x509-cert",
 ]
 
