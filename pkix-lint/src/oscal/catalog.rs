@@ -24,8 +24,8 @@
 //! | [`Lint::severity`]           | `control.props[name="pkix-lint.severity"]`         |
 //! | [`Lint::scope`]              | `control.props[name="pkix-lint.scope"]`            |
 //! | [`Lint::applies_to`]         | `control.props[name="pkix-lint.applies-to"]`       |
-//! | [`Lint::rfc_section_id`]     | `control.props[name="pkix-lint.section-id"]`       |
-//! | [`Lint::rfc_url`]            | `control.links[rel="reference"].href`              |
+//! | [`Lint::spec_section_id`]    | `control.props[name="pkix-lint.section-id"]`       |
+//! | [`Lint::spec_url`]           | `control.links[rel="reference"].href`              |
 //! | [`Lint::description`]        | `control.parts[name="statement"]` (`prose`)        |
 //! | [`Lint::parameters`]         | `control.params[]`                                 |
 //!
@@ -35,8 +35,8 @@
 //! [`Lint::severity`]: crate::Lint::severity
 //! [`Lint::scope`]: crate::Lint::scope
 //! [`Lint::applies_to`]: crate::Lint::applies_to
-//! [`Lint::rfc_section_id`]: crate::Lint::rfc_section_id
-//! [`Lint::rfc_url`]: crate::Lint::rfc_url
+//! [`Lint::spec_section_id`]: crate::Lint::spec_section_id
+//! [`Lint::spec_url`]: crate::Lint::spec_url
 //! [`Lint::description`]: crate::Lint::description
 //! [`Lint::parameters`]: crate::Lint::parameters
 //!
@@ -157,7 +157,7 @@ fn control_for_lint(lint: &dyn Lint, catalog_id: &str, catalog_version: &str) ->
         "pkix-lint.applies-to",
         subject_kind_label(lint.applies_to()),
     ));
-    if let Some(section_id) = lint.rfc_section_id() {
+    if let Some(section_id) = lint.spec_section_id() {
         props.push(prop("pkix-lint.section-id", section_id));
     }
     // Carry the lint id as a prop too so OSCAL consumers that key off
@@ -168,7 +168,7 @@ fn control_for_lint(lint: &dyn Lint, catalog_id: &str, catalog_version: &str) ->
     props.push(prop("pkix-lint.control-uuid", &control_uuid));
 
     let mut links: Vec<Value> = Vec::new();
-    if let Some(url) = lint.rfc_url() {
+    if let Some(url) = lint.spec_url() {
         links.push(json!({
             "href": url,
             "rel": "reference",
@@ -294,8 +294,8 @@ mod tests {
     use x509_cert::Certificate;
 
     /// Fixture lint that mirrors the metadata shape of a CA/B Forum-style
-    /// policy lint: `rfc_section_id` overridden to a non-RFC string,
-    /// `rfc_url` left as `None`. Used to pin the "lint without rfc_url
+    /// policy lint: `spec_section_id` overridden to a non-RFC string,
+    /// `spec_url` left as `None`. Used to pin the "lint without spec_url
     /// omits the OSCAL links array" contract without depending on
     /// pkix-lint-cabf content.
     struct PolicyShapedLint {
@@ -321,7 +321,7 @@ mod tests {
         fn title(&self) -> &str {
             "Policy-shaped fixture lint (no RFC URL)"
         }
-        fn rfc_section_id(&self) -> Option<&str> {
+        fn spec_section_id(&self) -> Option<&str> {
             Some(self.section_id)
         }
         fn check_cert(
@@ -456,8 +456,8 @@ mod tests {
     }
 
     #[test]
-    fn policy_lint_without_rfc_url_omits_links_array() {
-        // PolicyShapedLint overrides rfc_section_id but leaves rfc_url
+    fn policy_lint_without_spec_url_omits_links_array() {
+        // PolicyShapedLint overrides spec_section_id but leaves spec_url
         // as None — the Catalog must therefore omit any `links` array
         // (we don't emit empty arrays). This pins the documented
         // behaviour from the trait rustdoc for any policy-style lint
@@ -468,7 +468,7 @@ mod tests {
         assert_eq!(policy["id"], "test.policy.shaped");
         assert!(
             policy.get("links").is_none(),
-            "Lint without rfc_url must not emit links array; got: {policy}",
+            "Lint without spec_url must not emit links array; got: {policy}",
         );
         // section-id is still present (PolicyShapedLint overrides it).
         let props = policy["props"].as_array().unwrap();

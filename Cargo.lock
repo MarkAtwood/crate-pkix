@@ -1223,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-lint"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -1242,16 +1242,6 @@ dependencies = [
  "pkix-path",
  "pkix-profiles-cabf",
  "x509-cert",
-]
-
-[[package]]
-name = "pkix-lint-cabf-refresh"
-version = "0.0.0"
-dependencies = [
- "clap",
- "pkix-lint",
- "serde",
- "serde_json",
 ]
 
 [[package]]

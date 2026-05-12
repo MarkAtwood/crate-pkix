@@ -16,7 +16,6 @@ members = [
     "pkix-ac",
     "pkix-identity",
     "pkix-difftest",
-    "pkix-lint-cabf-refresh",
     "pkix-truststore",
     "pkix-truststore-system",
     "pkix-truststore-pkcs11",
@@ -47,8 +46,16 @@ members = [
 #                              and BasicSmimeProfile (RFC 8551 §3 baseline). PKIX-amgn.4.
 #   - pkix-profiles-cabf 0.2.0 First substantive content release. Houses the CA/B Forum
 #                              profiles moved out of pkix-profiles 0.3.0. PKIX-amgn.4.
-#   - pkix-lint        0.5.0  BREAKING. CA/B Forum lint bundles (`cabf_tls_br`)
-#                              moved to pkix-lint-cabf 0.2.0. pkix-lint keeps the
+#   - pkix-lint        0.6.0  ADDITIVE. Lint trait gains `spec_section_id` and
+#                              `spec_url`; `rfc_section_id` and `rfc_url`
+#                              become #[deprecated] aliases retained for one
+#                              minor version to ease migration (PKIX-ncab.11).
+#                              In-tree call sites and impls were migrated;
+#                              external consumers see a deprecation warning
+#                              until they rename their overrides/call sites.
+#                              0.5.0 (earlier May 2026) was BREAKING: CA/B
+#                              Forum lint bundles (`cabf_tls_br`) moved to
+#                              pkix-lint-cabf 0.2.0. pkix-lint keeps the
 #                              framework (Lint trait, LintRunner, Finding,
 #                              EvaluationReport, DeviationStore) plus
 #                              RFC-conformance lints (`rfc5280` module).
@@ -78,7 +85,7 @@ pkix-revocation       = { path = "pkix-revocation",       version = "0.3.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.1" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.3.0" }
-pkix-lint             = { path = "pkix-lint",             version = "0.5.0" }
+pkix-lint             = { path = "pkix-lint",             version = "0.6.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }

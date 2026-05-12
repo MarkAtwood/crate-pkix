@@ -6,6 +6,38 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint 0.6.0`: `Lint::rfc_section_id` / `rfc_url` renamed to `spec_section_id` / `spec_url` (2026-05-12)
+
+Additive rename of two `Lint` trait default methods to reflect that the
+slot was never RFC-specific — it accepts CA/B Forum BR, ITU-T X.509,
+NIST SP, and other standards-body section identifiers. Filed under
+[PKIX-ncab.11] as part of the post-OSCAL-demotion framing cleanup
+([PKIX-ncab]).
+
+- `Lint::spec_section_id() -> Option<&str>` is the new canonical name.
+- `Lint::spec_url() -> Option<&str>` is the new canonical name.
+- `Lint::rfc_section_id()` and `Lint::rfc_url()` remain as
+  `#[deprecated(since = "0.6.0")]` default methods that return `None`.
+  Override and call the new names; the deprecated aliases are
+  independent default impls, so calling them on a lint that overrides
+  only the new name returns `None`.
+- Doc comments on `title`, `description`, `spec_section_id`, `spec_url`,
+  `parameters`, and `set_parameter` were softened to reflect that
+  OSCAL emit is one consumer of this metadata rather than its sole
+  purpose (post-OSCAL-demotion framing, [`AGENTS.md`][AGENTS]
+  non-negotiable #5).
+- In-tree consumers updated: `pkix-lint/src/rfc5280.rs` (RFC 5280
+  serial-length lint), `pkix-lint/src/oscal/catalog.rs` (Catalog
+  emitter and test fixture), `pkix-lint/src/oscal/profile.rs` (test
+  fixture), `pkix-lint-cabf/src/cabf_tls_br.rs` (six lint impls), and
+  `pkix-lint-cabf/tests/cabf_tls_br_tests.rs` (metadata test
+  assertions).
+- The deprecated aliases will be removed in a future minor release
+  (no earlier than `pkix-lint 0.7.0`).
+
+[PKIX-ncab]: https://github.com/MarkAtwood/crate-pkix  "OSCAL demotion cleanup"
+[PKIX-ncab.11]: https://github.com/MarkAtwood/crate-pkix  "Apply .6 decision to Lint trait OSCAL-Control metadata methods"
+
 ### pkix-identity — RFC 6125 §6.4 + RFC 5280/8398 identity binding (2026-05-11)
 
 PKIX-fmtv.11.1 and PKIX-fmtv.12.1 fill in the pkix-identity scaffold
