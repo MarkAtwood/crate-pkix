@@ -12,13 +12,17 @@ categories  = ["cryptography", "no-std"]
 
 [features]
 default = []
-std     = ["x509-cert/std"]
+std     = ["x509-cert/std", "idna/std"]
 
 [dependencies]
-# Scaffold dependencies only. Implementation-time deps (`der`, `idna`) land
-# in PKIX-fmtv.11 / .12 alongside the bodies that use them — declaring them
-# now would trip `unused-crate-dependencies` lints in the scaffold build.
+# x509-cert exposes the Certificate / GeneralName types we walk.
 x509-cert = { workspace = true }
+# der gives us the OID constant + raw octet inspection for the SAN extension.
+der       = { workspace = true }
+# idna does the U-label ↔ A-label conversion required by RFC 6125 §6.4
+# for internationalized DNS hostnames. Pinned no_std + alloc at the
+# workspace level; we never need full `std` here.
+idna      = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

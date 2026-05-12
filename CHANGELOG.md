@@ -6,6 +6,34 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### pkix-identity — RFC 6125 §6.4 hostname binding (2026-05-11)
+
+PKIX-fmtv.11.1 fills in the pkix-identity scaffold with the RFC 6125
+§6.4 hostname-binding implementation:
+
+- `ServerName::dns_name` — LDH + length validation, ASCII lower-casing,
+  IDN U-label → A-label conversion via the `idna` crate.
+- `ServerName::ip_address` — IPv4 dotted-quad and IPv6 (with or
+  without brackets) → canonical 4- or 16-byte form.
+- `verify_dns_name` — walks the leaf's Subject Alternative Name
+  extension, matches `GeneralName::DnsName` and `GeneralName::IpAddress`
+  entries with case-insensitive exact comparison plus single
+  leftmost-label wildcards. CN fallback is intentionally not performed
+  (RFC 6125 §6.4.4 deprecates it).
+- New error variant `IdentityError::MalformedSan` for SAN extensions
+  that fail to parse.
+
+Workspace gained an `idna` dependency entry (1.x, no_std + `alloc` +
+`compiled_data`); only pkix-identity consumes it. `pkix-identity`'s own
+deps gained `idna` and `der` (the `0.1.0` scaffold had only
+`x509-cert`).
+
+`MailboxName::parse` and `verify_mailbox` still return
+`IdentityError::NotYetImplemented`; PKIX-fmtv.12 fills those in next.
+The `pkix-chain` `verify_tls_server` / `verify_tls_client` wrappers
+are split out as PKIX-fmtv.11.2, still blocked on the
+PKIX-fmtv.7 wrapper-set decision.
+
 ### pkix-identity 0.1.0 — initial scaffold (2026-05-11)
 
 New workspace crate (PKIX-fmtv.21) for cert-side identity matching:
