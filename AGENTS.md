@@ -25,6 +25,8 @@ adjacent PKI concerns.
 - **`pkix-ct`** — RFC 6962 / RFC 9162 Certificate Transparency / SCT verification (skeleton; tracked as PKIX-baac).
 - **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
 - **`pkix-identity`** — Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal). Pure function over (cert, identity-string); no chain context, no trust anchors. Scaffold-only at 0.1.0; bodies land via PKIX-fmtv.11 / .12.
+- **`pkix-dane`** — DANE (RFC 6698 + 7218 + 7671) TLSA record parsing and per-usage match logic (PKIX-TA / PKIX-EE / DANE-TA / DANE-EE). No DNS — caller supplies validated TLSA records. Not yet shipped; planned per PKIX-j32w.
+- **`pkix-dane-resolver`** — DNSSEC-validating resolver that fetches TLSA records. Std-only. Default upstream uses system resolv.conf. Not yet shipped; planned per PKIX-j32w.
 
 **Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
 
