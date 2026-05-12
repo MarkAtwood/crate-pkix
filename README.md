@@ -142,11 +142,16 @@ lives in `pkix-profiles`. Advisory linting lives in `pkix-lint`.
 ## Framework / policy split
 
 The workspace ships standards-based **mechanisms** (the `Profile` trait,
-`ValidationPolicy`, the `Lint` trait, `LintRunner`, OSCAL Catalog / Profile
-machinery, …) and **RFC-baseline implementations** in the core crates. It
-does **not** ship canonical encodings of any single organization's policy —
-CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, individual CA
-CPSs — in the core crates.
+`ValidationPolicy`, the `Lint` trait, `LintRunner`, …) and
+**RFC-baseline implementations** in the core crates. It does **not**
+ship canonical encodings of any single organization's policy —
+CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, individual
+CA CPSs — in the core crates. The serialization format for externalized
+policy data is an open design question: `pkix-lint` ships an optional
+OSCAL Catalog / Profile / Assessment Results bridge (`oscal` feature)
+as one supported wire format, but it is not the workspace-mandated
+encoding — callers may equally use the Rust APIs directly or wrap
+them in any other format.
 
 Industry-forum content (CA/B Forum TLS BR, S/MIME BR, Code Signing BR) lives
 in sibling **`-cabf` reference crates** carrying a "reference / not
