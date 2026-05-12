@@ -82,6 +82,18 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 
    Stance / epic: PKIX-amgn. Previous wire-format question (PKIX-apmt) resolved 2026-05-12 by the three-mode model: the question dissolves rather than gets answered, because each mode has different format ownership.
 
+6. **Prevalidation, batch validation, and caching must remain possible.** No API in the workspace shall foreclose on these patterns. Specifically:
+
+   - **Callbacks not closed structs.** Per-cert callbacks (`SignatureVerifier`, `RevocationChecker`, `AiaFetcher`, `Lint`) admit caller-side caching by design — any caller can implement a caching wrapper. Do not collapse callbacks into closed structs that hide the seam.
+
+   - **Cache-friendly result types.** Public result/error types (`ValidatedPath`, `Error`, `Finding`, `TrustAnchor`, `ValidationPolicy`, etc.) MUST derive `Clone + Debug + PartialEq + Eq` and MUST be `Send + Sync`. They SHOULD support `serde::Serialize + Deserialize` behind a `serde` feature flag for cross-process / persistent caches. Do not embed non-clonable, non-serializable handles (raw OS handles, `&'a` borrows, `Rc<T>`) into these types.
+
+   - **Batch APIs where setup cost is non-trivial.** Policy-adapter crates with subprocess overhead (`pkix-policy-zlint`, `pkix-policy-pkilint`, future similar) MUST expose batch APIs that amortize subprocess setup across many certs. Subprocess fork+exec is ~10ms; the upstream linter typically runs in microseconds. Per-cert subprocess invocation is not just an optimization issue — it changes asymptotic cost by 1000×.
+
+   - **Prevalidation is a supported pattern.** Producing a verdict ahead of point-of-use, storing it, and replaying later is part of the design. `ValidatedPath` represents the verdict; persisting and replaying it is a caller responsibility, but the workspace must not bake in assumptions that prevent it.
+
+   The workspace does not have to BUILD caches. It has to ADMIT them. Caches and batch wrappers are caller-side or sibling-crate concerns.
+
 ## What already exists (and why we are not using it)
 
 | Crate | Why not |
