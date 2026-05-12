@@ -1,14 +1,19 @@
 //! NIST OSCAL bridge for pkix-lint outputs.
 //!
-//! Under the project's OSCAL alignment stance (PKIX-ztmr / PKIX-9vnx) the
-//! canonical wire format for a pkix-lint run is an OSCAL Assessment Results
-//! JSON document. Architecture 2 is in effect: pkix-lint's internal Rust
-//! types ([`crate::Finding`], [`crate::report::EvaluationReport`], …) are
-//! kept lean and tailored to lint work, and this module bridges between
-//! them and OSCAL JSON at serialization time.
+//! This module provides an OSCAL Assessment Results JSON projection of a
+//! pkix-lint run. OSCAL is one supported output format, not the source of
+//! truth: pkix-lint's internal Rust types ([`crate::Finding`],
+//! [`crate::report::EvaluationReport`], …) remain the authoritative
+//! in-process representation, and this module bridges between them and
+//! OSCAL JSON at serialization time. Other output formats (custom JSON
+//! shapes, plain-text reports, machine-consumable Rust enums) are
+//! perfectly reasonable alternatives; choosing OSCAL is a deployment
+//! decision, not a workspace mandate. See the project stance memory
+//! `pkix-oscal-demoted-2026-05-11` for the framing change that demoted
+//! OSCAL from "canonical" to "available, not privileged."
 //!
-//! [`emit::assessment_results`] is the canonical projection from an
-//! [`crate::report::EvaluationReport`] to an OSCAL Assessment Results
+//! [`emit::assessment_results`] projects an
+//! [`crate::report::EvaluationReport`] into an OSCAL Assessment Results
 //! `serde_json::Value`.
 //!
 //! [`parse::deviation_store_from_risks`] is the inverse of
