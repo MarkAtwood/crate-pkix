@@ -151,6 +151,36 @@ pub enum Error {
     /// chain can be built — including when the only available intermediates
     /// have a malformed `BasicConstraints` extension.
     MalformedIntermediate,
+    /// [`build_first_valid_path`] exhausted [`build_path_candidates`] without
+    /// finding a candidate that [`pkix_path::validate_path`] accepted.
+    ///
+    /// At least one topologically valid chain was found by the path builder,
+    /// but every chain was rejected by the verifier or the validation policy
+    /// (e.g., mixed-signature-algorithm cross-signed pools where the DFS
+    /// candidate order picks an algorithm the [`SignatureVerifier`] does not
+    /// dispatch; cross-cert chains where one issuer is expired at the
+    /// validation time; etc.).
+    ///
+    /// `tried` is the count of candidate chains rejected; it is always
+    /// `>= 1` for this variant (zero-yield exhaustion is reported as
+    /// [`Error::NoPathFound`] instead, matching [`build_path`]'s contract).
+    ///
+    /// `last_error` is the [`pkix_path::Error::Display`] rendering of the
+    /// last candidate's validation failure. It is carried as a `String`
+    /// rather than a `pkix_path::Error` so [`Error`] retains its `Hash`
+    /// derive (the upstream error enum does not implement `Hash`). Callers
+    /// that need to programmatically match on the inner error should iterate
+    /// [`build_path_candidates`] directly and call [`pkix_path::validate_path`]
+    /// per candidate themselves.
+    ///
+    /// [`SignatureVerifier`]: pkix_path::SignatureVerifier
+    /// [`pkix_path::Error::Display`]: pkix_path::Error
+    NoValidPath {
+        /// Number of candidate chains that were tried and rejected.
+        tried: usize,
+        /// `Display` rendering of the last [`pkix_path::Error`] observed.
+        last_error: alloc::string::String,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -165,6 +195,10 @@ impl core::fmt::Display for Error {
             ),
             Self::MalformedIntermediate => f.write_str(
                 "a candidate intermediate's BasicConstraints extension is present but cannot be decoded",
+            ),
+            Self::NoValidPath { tried, last_error } => write!(
+                f,
+                "tried {tried} candidate path(s); none validated. Last validation error: {last_error}"
             ),
         }
     }
@@ -464,6 +498,13 @@ impl Frame {
 ///     }
 /// }
 /// ```
+///
+/// The pattern above is exactly what [`build_first_valid_path`] wraps:
+/// callers that only need "find any chain that validates" should prefer
+/// the helper. Drop down to this iterator when you need per-candidate
+/// diagnostics, want to limit the number of candidates tried, or are
+/// composing the retry loop with additional per-candidate policy
+/// (e.g., per-candidate revocation checks).
 pub struct PathCandidates<'a> {
     pool: &'a [Certificate],
     anchors: &'a [pkix_path::TrustAnchor],
@@ -720,7 +761,7 @@ pub fn build_path_candidates_with_config<'a>(
 ///   before a path was found; the pool may be adversarially large or
 ///   structured to produce exponential search.
 ///
-/// # Choosing between `build_path` and the iterator
+/// # Choosing between `build_path`, the iterator, and `build_first_valid_path`
 ///
 /// Use this single-shot API when:
 /// - the pool is from a trusted source (in-house cert store, configured
@@ -729,12 +770,21 @@ pub fn build_path_candidates_with_config<'a>(
 ///   not need to retry with alternate chains if signature verification
 ///   fails downstream).
 ///
-/// Use [`build_path_candidates`] (or its `_with_config` sibling) for
-/// adversarial pools (CMS `SignedData.certificates` bags, federal-bridge
-/// cross-cert topologies, anywhere the wire-order of certs is not under
-/// your control) so failed signature verification can be retried against
-/// the next candidate path. See [`PathCandidates`] for the build-then-
-/// validate retry-loop pattern.
+/// Use [`build_path_candidates`] (or its `_with_config` sibling) when you
+/// want full control over candidate iteration — for adversarial pools (CMS
+/// `SignedData.certificates` bags, federal-bridge cross-cert topologies,
+/// anywhere the wire-order of certs is not under your control) so failed
+/// signature verification can be retried against the next candidate path.
+/// See [`PathCandidates`] for the build-then-validate retry-loop pattern.
+///
+/// Use [`build_first_valid_path`] (or its `_with_config` sibling) for the
+/// common case of "iterate candidates until one validates": it wraps the
+/// iterator + [`pkix_path::validate_path`] retry loop and returns the
+/// first chain that survives both topological build and signature
+/// verification. Prefer this over `build_path` when the pool contains
+/// alternatives whose signatures may be rejected by the verifier (e.g.,
+/// cross-signed intermediates using algorithms outside the verifier's
+/// dispatch table).
 ///
 /// # Limitations
 ///
@@ -827,6 +877,156 @@ pub fn build_path_with_config(
         Some(Ok(_)) => Err(Error::DepthExceeded),
         Some(Err(e)) => Err(e),
         None => Err(Error::NoPathFound),
+    }
+}
+
+// =========================================================================
+// build_first_valid_path — candidate iteration + signature verification
+// =========================================================================
+
+/// Build a certification path that both **(a)** is topologically valid through
+/// `pool` to one of `anchors` and **(b)** passes
+/// [`pkix_path::validate_path`] under `policy` and `verifier`.
+///
+/// Iterates [`build_path_candidates`] until the first candidate chain
+/// validates. Returns the validating chain. If every candidate is rejected
+/// by `validate_path`, returns [`Error::NoValidPath`] carrying the count of
+/// candidates tried and the `Display` rendering of the last
+/// [`pkix_path::Error`].
+///
+/// # When to use this over [`build_path`]
+///
+/// [`build_path`] is single-shot: it returns the first DFS candidate without
+/// any knowledge of which signature algorithms `verifier` actually dispatches
+/// or which intermediates are within their validity window at `policy`'s
+/// validation time. In adversarial pools — for example, cross-signed graphs
+/// that include an alternative intermediate signed under
+/// `ecdsa-with-SHA1` (RFC 5758 §3.2 legacy OID, not dispatched by
+/// [`pkix_path::DefaultVerifier`]) — the first DFS yield can be rejected by
+/// `validate_path` even though a SHA-256-only path exists in the same pool.
+///
+/// `build_first_valid_path` closes this gap: it iterates
+/// [`build_path_candidates`] and tries `validate_path` per yielded chain,
+/// returning the first chain that survives both passes.
+///
+/// # Errors
+///
+/// - [`Error::NoPathFound`] — the underlying iterator yielded no candidates
+///   at all (no topologically valid chain through `pool` to any anchor).
+///   Matches [`build_path`]'s behaviour for that case.
+/// - [`Error::DepthExceeded`] / [`Error::BudgetExceeded`] — propagated from
+///   [`build_path_candidates`] when the iterator surfaces them.
+/// - [`Error::NoValidPath`] — at least one candidate was yielded but none
+///   passed `validate_path`. Carries `tried` (>= 1) and the last
+///   `validate_path` error rendering.
+///
+/// # Out of scope
+///
+/// - Async / parallel candidate evaluation. Candidates are tried sequentially.
+/// - Caching of `validate_path` failures across candidates. Each yielded
+///   chain is freshly validated.
+/// - Promoting [`build_path`] itself to iterate. The single-shot helper is
+///   retained verbatim for backward compatibility; callers opt in to the
+///   iterating semantics by using this function.
+///
+/// # Relationship to other path-builder entry points
+///
+/// | Entry point                  | Verifier? | Returns                                      |
+/// |------------------------------|-----------|----------------------------------------------|
+/// | [`build_path`]               | No        | First DFS topological candidate (one-shot)   |
+/// | [`build_path_candidates`]    | No        | Iterator of topological candidates           |
+/// | [`build_first_valid_path`]   | Yes       | First candidate that passes `validate_path`  |
+pub fn build_first_valid_path<V>(
+    target: &Certificate,
+    pool: &CertPool,
+    anchors: &[pkix_path::TrustAnchor],
+    policy: &pkix_path::ValidationPolicy,
+    verifier: &V,
+) -> Result<Vec<Certificate>>
+where
+    V: pkix_path::SignatureVerifier,
+{
+    build_first_valid_path_with_config(
+        target,
+        pool,
+        anchors,
+        policy,
+        verifier,
+        &PathBuilderConfig::new(),
+    )
+}
+
+/// Build a verifier-validated certification path with caller-provided
+/// budget and depth tunables.
+///
+/// Behaves identically to [`build_first_valid_path`] but uses the limits
+/// in `config` instead of the workspace defaults. See
+/// [`PathBuilderConfig`] for the individual knobs and
+/// [`build_first_valid_path`] for full semantics.
+///
+/// # Errors
+///
+/// Same as [`build_first_valid_path`].
+pub fn build_first_valid_path_with_config<V>(
+    target: &Certificate,
+    pool: &CertPool,
+    anchors: &[pkix_path::TrustAnchor],
+    policy: &pkix_path::ValidationPolicy,
+    verifier: &V,
+    config: &PathBuilderConfig,
+) -> Result<Vec<Certificate>>
+where
+    V: pkix_path::SignatureVerifier,
+{
+    let mut iter = PathCandidates::new(target, pool.as_slice(), anchors, config);
+    let mut tried: usize = 0;
+    let mut last_error: Option<alloc::string::String> = None;
+
+    loop {
+        match iter.next() {
+            Some(Ok(chain)) => {
+                match pkix_path::validate_path(&chain, anchors, policy, verifier) {
+                    Ok(_) => return Ok(chain),
+                    Err(e) => {
+                        tried += 1;
+                        last_error = Some(alloc::format!("{e}"));
+                        // Continue to the next candidate.
+                    }
+                }
+            }
+            // The iterator surfaces its own errors (BudgetExceeded; in
+            // principle future variants). Propagate verbatim. We do NOT
+            // wrap these in NoValidPath because they describe failures
+            // of the topological search, not of signature verification.
+            Some(Err(e)) => return Err(e),
+            // Iterator exhausted.
+            None => {
+                return match last_error {
+                    // At least one candidate was yielded; every one was
+                    // rejected by validate_path.
+                    Some(last) => Err(Error::NoValidPath {
+                        tried,
+                        last_error: last,
+                    }),
+                    // Zero candidates ever yielded. Distinguish
+                    // NoPathFound from DepthExceeded the same way
+                    // build_path does: probe at max_depth + 1.
+                    None => {
+                        let probe_config = PathBuilderConfig {
+                            max_depth: config.max_depth.saturating_add(1),
+                            dfs_budget: config.dfs_budget,
+                        };
+                        let mut probe =
+                            PathCandidates::new(target, pool.as_slice(), anchors, &probe_config);
+                        match probe.next() {
+                            Some(Ok(_)) => Err(Error::DepthExceeded),
+                            Some(Err(e)) => Err(e),
+                            None => Err(Error::NoPathFound),
+                        }
+                    }
+                };
+            }
+        }
     }
 }
 
