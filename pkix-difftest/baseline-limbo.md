@@ -1,19 +1,19 @@
-# pkix-difftest report
+# pkix-difftest baseline (x509-limbo Tier-2) — PKIX-lwr9.4.1
 
 ## Summary
 
 | Class | Count |
 |---|---:|
 | LooserThanWild | 827 |
-| StricterThanWild | 26 |
+| StricterThanWild | 23 |
 | OracleDivergence | 0 |
 | DiagnosticDivergence | 5898 |
-| Agreement | 2975 |
+| Agreement | 2978 |
 | **Total** | 9726 |
 
 ## Ground-truth disagreements
 
-2905 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
+2902 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
 
 ### `bettertls::nameconstraints::tc1471`
 
@@ -105,7 +105,7 @@
   * openssl: Fail(permitted subtree violation)
   * pyca: Pass
 
-_(2895 additional ground-truth disagreement(s) omitted; see JSON report.)_
+_(2892 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
 ## LooserThanWild (827)
 
@@ -201,7 +201,7 @@ _(2895 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
 _(817 additional sample(s) in this class omitted; see JSON report.)_
 
-## StricterThanWild (26)
+## StricterThanWild (23)
 
 ### `bettertls::nameconstraints::tc8877`
 
@@ -293,7 +293,7 @@ _(817 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Pass
 
-_(16 additional sample(s) in this class omitted; see JSON report.)_
+_(13 additional sample(s) in this class omitted; see JSON report.)_
 
 ## DiagnosticDivergence (5898)
 
@@ -389,7 +389,7 @@ _(16 additional sample(s) in this class omitted; see JSON report.)_
 
 _(5888 additional sample(s) in this class omitted; see JSON report.)_
 
-## Agreement (2975)
+## Agreement (2978)
 
 ### `bettertls::nameconstraints::tc0`
 
@@ -481,5 +481,5 @@ _(5888 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Pass
 
-_(2965 additional sample(s) in this class omitted; see JSON report.)_
+_(2968 additional sample(s) in this class omitted; see JSON report.)_
 

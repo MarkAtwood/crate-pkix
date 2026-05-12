@@ -64,8 +64,8 @@ use std::path::Path;
 
 use der::Decode as _;
 use pem_rfc7468 as pem;
-use pkix_path::TrustAnchor;
-use pkix_path_builder::{build_path, CertPool};
+use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
+use pkix_path_builder::{build_first_valid_path, CertPool};
 use serde::Deserialize;
 use x509_cert::Certificate;
 
@@ -421,20 +421,36 @@ fn pem_to_der(pem_text: &str) -> io::Result<Vec<u8>> {
 
 /// Try to assemble the canonical leaf-first signature chain from a limbo
 /// testcase's leaf-first DER bundle (peer at `[0]`, anchor at `[last]`,
-/// intermediates in between) via [`pkix_path_builder::build_path`].
+/// intermediates in between) via
+/// [`pkix_path_builder::build_first_valid_path`].
 ///
-/// Returns `None` on any failure — parse error, build error, or an internal
-/// invariant violation. Callers fall back to the testcase's positional
-/// ordering, which keeps the chain bytes visible to every oracle for
-/// downstream classification.
+/// Returns `None` on any failure — parse error, no topological path found,
+/// or every candidate rejected by [`pkix_path::validate_path`]. Callers
+/// fall back to the testcase's positional ordering, which keeps the chain
+/// bytes visible to every oracle for downstream classification.
+///
+/// **Why `build_first_valid_path` and not `build_path`?** PKIX-lwr9.4
+/// (2026-05-11) found that `build_path` is single-shot: in cross-signed
+/// pools containing intermediates whose signature algorithm
+/// `DefaultVerifier` does not dispatch (e.g., the depth-6 `bettertls::tc60`
+/// fixture with an `ecdsa-with-SHA1` cross-cert), the first DFS candidate
+/// can fail signature verification while a valid alternative exists at a
+/// later DFS position. `build_first_valid_path` iterates
+/// `build_path_candidates` internally and returns the first chain that
+/// also passes `validate_path` — exactly the build-then-validate retry
+/// loop the limbo harness needs.
+///
+/// `now_unix` is the testcase's pinned `validation_time_unix`; threading
+/// it through the builder ensures the validate step honors the same time
+/// anchor the downstream oracles will use.
 ///
 /// Empirical finding from PKIX-lwr9.1 (2026-05-11): of the 25
 /// `bettertls::pathbuilding` fixtures sampled into
 /// `pkix-path-builder/tests/bettertls.rs`, 23 of 25 pass end-to-end when
-/// routed through `build_path` — the bypass was the root cause of the
-/// 47-case `StricterThanWild` bucket in `baseline-limbo.json`. This mirrors
-/// PKITS's `pkits.rs::try_build_chain`, but adapted for leaf-first input.
-fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
+/// routed through the iterating helper. PKIX-lwr9.4.1 closes the tc60 gap
+/// inside `pkix-difftest`. This mirrors PKITS's `pkits.rs::try_build_chain`,
+/// but adapted for leaf-first input and the verifier-aware iteration.
+fn try_build_chain(der_blocks: &[Vec<u8>], now_unix: u64) -> Option<Vec<Vec<u8>>> {
     if der_blocks.len() < 2 {
         return None;
     }
@@ -450,7 +466,7 @@ fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
     let anchor = &parsed[anchor_idx];
 
     // Pool of candidates for path building: everything except the anchor.
-    // Including the EE in the pool is harmless — `build_path` uses pool
+    // Including the EE in the pool is harmless — the builder uses pool
     // only as a candidate source for intermediates and never tries to
     // re-add the target. Mirrors `pkits.rs::try_build_chain`.
     let pool: CertPool = parsed
@@ -461,7 +477,9 @@ fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
         .collect();
 
     let trust_anchors = [TrustAnchor::from_cert(anchor.clone())];
-    let built = build_path(ee, &pool, &trust_anchors).ok()?;
+    let policy = ValidationPolicy::new(now_unix);
+    let built =
+        build_first_valid_path(ee, &pool, &trust_anchors, &policy, &DefaultVerifier).ok()?;
 
     // Map each built-chain cert back to its source DER bytes. `Certificate`
     // derives `PartialEq` over its full ASN.1 content, so equality is the
@@ -471,7 +489,7 @@ fn try_build_chain(der_blocks: &[Vec<u8>]) -> Option<Vec<Vec<u8>>> {
         let idx = parsed.iter().position(|p| p == built_cert)?;
         chain_der.push(der_blocks[idx].clone());
     }
-    // Append the anchor (build_path returns the chain up to anchor-issued
+    // Append the anchor (the builder returns the chain up to anchor-issued
     // but not the anchor itself; the oracles' `root_in_chain == true`
     // contract requires the anchor at the end).
     chain_der.push(der_blocks[anchor_idx].clone());
@@ -515,7 +533,14 @@ fn build_item(tc: &FilteredTestcase) -> io::Result<CorpusItem> {
     // Try the path-builder reorder; fall back to the testcase's positional
     // leaf-first ordering on any builder failure. See `try_build_chain`
     // rustdoc and the function-level docstring above for rationale.
-    let certs_der = try_build_chain(&positional_der).unwrap_or(positional_der);
+    //
+    // `tc.validation_time_unix` is threaded into the builder so the inner
+    // `validate_path` step honors the testcase's pinned time anchor —
+    // otherwise certs that are valid at limbo-pinned-time but expired at
+    // wall-clock-now would be rejected by the builder and silently dropped
+    // into the positional fallback.
+    let certs_der =
+        try_build_chain(&positional_der, tc.validation_time_unix).unwrap_or(positional_der);
 
     let chain = Chain {
         certs_der,
