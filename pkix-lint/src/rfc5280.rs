@@ -15,11 +15,13 @@
 //!
 //! Added in PKIX-9vnx.6.4 as the demonstration vehicle for the
 //! [`Lint::parameters`] / [`Lint::set_parameter`] OSCAL Parameter
-//! mechanism. Pre-existing CABF-shaped lints live in
-//! [`crate::cabf_tls_br`]; project policy (see workspace `AGENTS.md` and
-//! the PKIX-amgn / PKIX-9vnx alignment epics) is that RFC-conformance
-//! lints stay in `pkix-lint` while CA/B Forum policy lints move to
-//! `pkix-lint-cabf`.
+//! mechanism. CABF-shaped lints now live in the `pkix-lint-cabf`
+//! crate ([`cabf_tls_br`][cabf_tls_br]); project policy (see workspace
+//! `AGENTS.md` and the PKIX-amgn / PKIX-9vnx alignment epics) is that
+//! RFC-conformance lints stay in `pkix-lint` while CA/B Forum policy
+//! lints live in `pkix-lint-cabf`.
+//!
+//! [cabf_tls_br]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/
 
 use std::borrow::Cow;
 

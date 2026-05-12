@@ -72,7 +72,7 @@ pub struct EvaluationReport {
 
     /// The rule bundle version string (from [`crate::LintRunner::bundle_version`]).
     ///
-    /// Example: `"pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
+    /// Example: `"pkix-lint-cabf/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
     /// Empty string if the runner was constructed without a bundle version.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
     pub rule_bundle_version: Cow<'static, str>,

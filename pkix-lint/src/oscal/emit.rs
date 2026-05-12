@@ -923,7 +923,7 @@ mod tests {
         let mut r = EvaluationReport::new(
             "cabf.br.tls",
             "SC-081",
-            "pkix-lint/cabf_tls_br v0.2.0",
+            "pkix-lint-cabf/cabf_tls_br v0.2.0",
             2,
             1_780_272_000, // 2026-06-01T00:00:00Z — see test_rfc3339_known_value
         );

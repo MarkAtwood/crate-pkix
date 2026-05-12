@@ -216,7 +216,6 @@ where
     Ok(Cow::Owned(s))
 }
 
-pub mod cabf_tls_br;
 pub mod deviation;
 #[cfg(feature = "oscal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
@@ -814,7 +813,7 @@ pub struct Finding {
     /// Set by [`LintRunner::with_bundle_version`]. Defaults to `""` when the runner
     /// was constructed with [`LintRunner::new`] without a version.
     ///
-    /// Example: `"pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
+    /// Example: `"pkix-lint-cabf/cabf_tls_br v0.2.0, sourced from TLS BR SC-081"`.
     ///
     /// This field enables the "yellow today, green tomorrow because we updated the
     /// rule bundle from v1.3 to v1.4" explanation that prevents operators from
@@ -966,7 +965,7 @@ impl LintRunner {
     /// // Static literal — zero allocation
     /// let runner = LintRunner::with_bundle_version(
     ///     lints,
-    ///     "pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081",
+    ///     "pkix-lint-cabf/cabf_tls_br v0.2.0, sourced from TLS BR SC-081",
     /// );
     ///
     /// // Runtime-constructed version — e.g., read from config
@@ -1978,13 +1977,13 @@ mod tests {
         let cert = load_fixture_cert();
         let runner = LintRunner::with_bundle_version(
             vec![Box::new(AlwaysPass)],
-            "pkix-lint/cabf_tls_br v0.2.0",
+            "pkix-lint-cabf/cabf_tls_br v0.2.0",
         );
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
         assert_eq!(findings.len(), 1);
         assert_eq!(
             findings[0].rule_bundle_version.as_ref(),
-            "pkix-lint/cabf_tls_br v0.2.0",
+            "pkix-lint-cabf/cabf_tls_br v0.2.0",
             "rule_bundle_version must be stamped from runner into Finding"
         );
     }

@@ -19,7 +19,7 @@
 //!
 //! ```rust,no_run
 //! // `cert` and `now_unix` are obtained from the calling context.
-//! use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+//! use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
 //! use pkix_lint::{LintProfile, SubjectKind};
 //! use x509_cert::Certificate;
 //!
@@ -33,7 +33,10 @@
 use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::Certificate;
 
-use crate::{Lint, LintProfile, LintResult, LintRunner, Scope, Severity, SubjectKind};
+use pkix_lint::{
+    Lint, LintProfile, LintResult, LintRunner, Profile, Scope, Severity, SubjectKind,
+    ValidationPolicy,
+};
 
 // ---------------------------------------------------------------------------
 // OID constants
@@ -602,7 +605,7 @@ impl Lint for BcCaFlagLint {
 ///
 /// ```rust,no_run
 /// // `cert` and `now_unix` are obtained from the calling context.
-/// use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
+/// use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
 /// use pkix_lint::{LintProfile, SubjectKind};
 /// use x509_cert::Certificate;
 ///
@@ -614,7 +617,7 @@ impl Lint for BcCaFlagLint {
 /// ```
 pub struct CabfTlsBrProfile;
 
-impl pkix_path::Profile for CabfTlsBrProfile {
+impl Profile for CabfTlsBrProfile {
     fn id(&self) -> &'static str {
         pkix_profiles_cabf::WebPkiProfile.id()
     }
@@ -623,7 +626,7 @@ impl pkix_path::Profile for CabfTlsBrProfile {
         pkix_profiles_cabf::WebPkiProfile.version()
     }
 
-    fn policy(&self, now_unix: u64) -> pkix_path::ValidationPolicy {
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
         pkix_profiles_cabf::WebPkiProfile.policy(now_unix)
     }
 

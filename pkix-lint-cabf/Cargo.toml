@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-lint-cabf"
 description = "Reference CA/Browser Forum lint bundles for pkix-lint (TLS BR, S/MIME BR) — not authoritative"
-version     = "0.1.0"
+version     = "0.2.0"  # 0.2 — first substantive content: cabf_tls_br module migrated from pkix-lint (PKIX-amgn.5).
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -11,7 +11,22 @@ keywords    = ["x509", "certificate", "cabforum", "lint", "compliance"]
 categories  = ["cryptography"]
 
 [dependencies]
-# pkix-lint dep added when real lint bundles are wired (PKIX-amgn.3 / PKIX-9vnx.7).
+# pkix-lint: framework (Lint trait, LintRunner, LintResult, ...).
+pkix-lint          = { workspace = true }
+# pkix-profiles-cabf: WebPkiProfile (delegated to by CabfTlsBrProfile) and the
+# SC-081 phased validity cap helper.
+pkix-profiles-cabf = { workspace = true }
+x509-cert          = { workspace = true }
+der                = { workspace = true }
+
+[dev-dependencies]
+# pkix-path's p256 + std features are required by the integration tests that
+# build a real validated chain to feed CabfTlsBrProfile via LintProfile.
+pkix-path          = { workspace = true, features = ["p256", "std"] }
+pkix-lint          = { workspace = true }
+pkix-profiles-cabf = { workspace = true }
+x509-cert          = { workspace = true }
+der                = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

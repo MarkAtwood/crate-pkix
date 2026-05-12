@@ -278,21 +278,103 @@ mod tests {
     //! Independent oracle: assertions are anchored to the OSCAL Catalog
     //! v1.1.2 JSON Schema's required-field set (`uuid`, `metadata`,
     //! `controls` at the catalog root; `id`, `title` on each Control) and
-    //! to the rfc5280 / cabf_tls_br lint's own metadata methods (which
-    //! are themselves tested independently in their own modules). The
-    //! UUID derivation is verified by recomputing it with the same
-    //! `uuid_v8` salt + seed in the test, providing a second-path
-    //! oracle.
+    //! to the rfc5280 / fixture lint's own metadata methods (which are
+    //! themselves tested independently in their own modules). The UUID
+    //! derivation is verified by recomputing it with the same `uuid_v8`
+    //! salt + seed in the test, providing a second-path oracle.
+    //!
+    //! Cross-crate round-trip coverage against the substantive
+    //! `pkix-lint-cabf::cabf_tls_br` lint set lives in that crate's
+    //! integration tests (`pkix-lint-cabf/tests/oscal_catalog_round_trip.rs`)
+    //! so this module stays independent of CA/B Forum policy content.
 
     use super::*;
-    use crate::cabf_tls_br::ValidityMaxLint;
     use crate::rfc5280::Rfc5280MaxSerialLengthLint;
-    use crate::Lint;
+    use crate::{Lint, LintResult, Scope, Severity, SubjectKind};
+    use x509_cert::Certificate;
+
+    /// Fixture lint that mirrors the metadata shape of a CA/B Forum-style
+    /// policy lint: `rfc_section_id` overridden to a non-RFC string,
+    /// `rfc_url` left as `None`. Used to pin the "lint without rfc_url
+    /// omits the OSCAL links array" contract without depending on
+    /// pkix-lint-cabf content.
+    struct PolicyShapedLint {
+        id: &'static str,
+        section_id: &'static str,
+    }
+    impl Lint for PolicyShapedLint {
+        fn id(&self) -> &'static str {
+            self.id
+        }
+        fn citation(&self) -> &'static str {
+            "Test Policy §1.2.3"
+        }
+        fn severity(&self) -> Severity {
+            Severity::Error
+        }
+        fn scope(&self) -> Scope {
+            Scope::Certificate
+        }
+        fn applies_to(&self) -> SubjectKind {
+            SubjectKind::Leaf
+        }
+        fn title(&self) -> &str {
+            "Policy-shaped fixture lint (no RFC URL)"
+        }
+        fn rfc_section_id(&self) -> Option<&str> {
+            Some(self.section_id)
+        }
+        fn check_cert(
+            &self,
+            _cert: &Certificate,
+            _kind: SubjectKind,
+            _now_unix: u64,
+        ) -> LintResult {
+            LintResult::Pass
+        }
+    }
+
+    /// Default `PolicyShapedLint` for the two-element `sample_lints()` set.
+    const POLICY_SHAPED_DEFAULT: PolicyShapedLint = PolicyShapedLint {
+        id: "test.policy.shaped",
+        section_id: "test-policy-1.2.3",
+    };
 
     fn sample_lints() -> Vec<Box<dyn Lint>> {
         vec![
             Box::new(Rfc5280MaxSerialLengthLint::default()),
-            Box::new(ValidityMaxLint),
+            Box::new(POLICY_SHAPED_DEFAULT),
+        ]
+    }
+
+    /// Multi-lint fixture used by `filter_to_ids` / round-trip tests where
+    /// the count and ordering matter. Six lints with distinct ids mirrors
+    /// the historical CABF TLS BR bundle size; the content is pkix-lint
+    /// internal so the catalog/profile tests stay free of CA/B Forum
+    /// policy dependencies.
+    fn multi_lint_fixture() -> Vec<Box<dyn Lint>> {
+        vec![
+            Box::new(Rfc5280MaxSerialLengthLint::default()),
+            Box::new(PolicyShapedLint {
+                id: "test.policy.one",
+                section_id: "test-policy-1",
+            }),
+            Box::new(PolicyShapedLint {
+                id: "test.policy.two",
+                section_id: "test-policy-2",
+            }),
+            Box::new(PolicyShapedLint {
+                id: "test.policy.three",
+                section_id: "test-policy-3",
+            }),
+            Box::new(PolicyShapedLint {
+                id: "test.policy.four",
+                section_id: "test-policy-4",
+            }),
+            Box::new(PolicyShapedLint {
+                id: "test.policy.five",
+                section_id: "test-policy-5",
+            }),
         ]
     }
 
@@ -374,27 +456,27 @@ mod tests {
     }
 
     #[test]
-    fn cabf_lint_omits_rfc_url_link() {
-        // ValidityMaxLint overrides rfc_section_id but leaves rfc_url
+    fn policy_lint_without_rfc_url_omits_links_array() {
+        // PolicyShapedLint overrides rfc_section_id but leaves rfc_url
         // as None — the Catalog must therefore omit any `links` array
-        // (we don't emit empty arrays). This pins the documented CABF
-        // behaviour from the trait rustdoc.
+        // (we don't emit empty arrays). This pins the documented
+        // behaviour from the trait rustdoc for any policy-style lint
+        // that cites a non-RFC source (CA/B Forum, vendor CPS, etc.).
         let catalog = catalog_from_lints(&sample_lints(), "rs.pkix.test", "0.1.0");
         let controls = catalog["catalog"]["controls"].as_array().unwrap();
-        let cabf = &controls[1];
-        assert_eq!(cabf["id"], "cabf.br.tls.validity.max");
+        let policy = &controls[1];
+        assert_eq!(policy["id"], "test.policy.shaped");
         assert!(
-            cabf.get("links").is_none(),
-            "CABF lint without rfc_url must not emit links array; got: {}",
-            cabf
+            policy.get("links").is_none(),
+            "Lint without rfc_url must not emit links array; got: {policy}",
         );
-        // section-id is still present (CABF lint overrides it).
-        let props = cabf["props"].as_array().unwrap();
+        // section-id is still present (PolicyShapedLint overrides it).
+        let props = policy["props"].as_array().unwrap();
         let section_id_prop = props
             .iter()
             .find(|p| p["name"] == "pkix-lint.section-id")
             .expect("section-id prop");
-        assert_eq!(section_id_prop["value"], "cabf-tls-br-6.3.2");
+        assert_eq!(section_id_prop["value"], "test-policy-1.2.3");
     }
 
     #[test]
@@ -484,14 +566,14 @@ mod tests {
     // -----------------------------------------------------------------
     // PKIX-9vnx.6.3 round-trip closure: catalog_from_lints → serde_json
     // → lint_ids_from_catalog → LintRunner::filter_to_ids → identical
-    // Findings on a fixture chain.
+    // Findings on a fixture chain. Uses the in-crate `multi_lint_fixture`
+    // so the round-trip is exercised without depending on pkix-lint-cabf.
     // -----------------------------------------------------------------
 
     use super::super::parse::{lint_ids_from_catalog, ParseError};
-    use crate::cabf_tls_br;
     use crate::LintRunner;
 
-    /// Load a CABF fixture cert (same source pkix-lint's other tests use).
+    /// Load a fixture cert from the workspace pkix-path test corpus.
     fn load_cert(name: &str) -> x509_cert::Certificate {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../pkix-path/tests/fixtures/policy-checks/")
@@ -504,9 +586,9 @@ mod tests {
 
     #[test]
     fn lint_ids_from_catalog_extracts_in_order() {
-        let lints = cabf_tls_br::all_lints();
+        let lints = multi_lint_fixture();
         let expected_ids: Vec<String> = lints.iter().map(|l| l.id().to_string()).collect();
-        let catalog = catalog_from_lints(&lints, "cabf-tls-br", "2.0.0");
+        let catalog = catalog_from_lints(&lints, "rs.pkix.test", "2.0.0");
         // Round-trip through serde to mimic real on-disk use.
         let serialized = serde_json::to_string(&catalog).expect("serialise");
         let parsed: Value = serde_json::from_str(&serialized).expect("deserialise");
@@ -515,41 +597,38 @@ mod tests {
     }
 
     #[test]
-    fn round_trip_preserves_findings_on_cabf_fixture() {
-        // Independent oracle: run two runners — one direct from all_lints,
-        // one reconstructed from the OSCAL Catalog round-trip — on the
-        // same fixture chain. The pkix-lint engine itself is the
-        // *common substrate*; the test verifies the round-trip preserves
-        // the *configured lint set*, not the engine's correctness.
+    fn round_trip_preserves_findings_on_fixture() {
+        // Independent oracle: run two runners — one direct from
+        // `multi_lint_fixture`, one reconstructed from the OSCAL Catalog
+        // round-trip — on the same fixture chain. The pkix-lint engine
+        // itself is the *common substrate*; the test verifies the
+        // round-trip preserves the *configured lint set*, not the
+        // engine's correctness. Cross-crate round-trip coverage against
+        // pkix-lint-cabf's real lint set lives in that crate's
+        // integration tests.
 
         let cert = load_cert("leaf-rsa2048-sha1.der");
 
-        // Direct runner: all 6 CABF lints.
-        let runner_direct = LintRunner::new(cabf_tls_br::all_lints());
+        let runner_direct = LintRunner::new(multi_lint_fixture());
 
         // Round-tripped runner: emit Catalog → serialise → parse → ids →
-        // filter a fresh all_lints() set by those ids.
-        let catalog =
-            catalog_from_lints(&cabf_tls_br::all_lints(), "cabf-tls-br", "2.0.0");
+        // filter a fresh fixture set by those ids.
+        let catalog = catalog_from_lints(&multi_lint_fixture(), "rs.pkix.test", "2.0.0");
         let serialised = serde_json::to_string(&catalog).expect("serialise");
         let parsed: Value = serde_json::from_str(&serialised).expect("parse");
         let ids = lint_ids_from_catalog(&parsed).expect("extract ids");
-        let runner_round_trip = LintRunner::new(cabf_tls_br::all_lints())
+        let runner_round_trip = LintRunner::new(multi_lint_fixture())
             .filter_to_ids(&ids)
             .expect("filter to ids");
 
         assert_eq!(runner_round_trip.lints().len(), runner_direct.lints().len());
 
-        // Same fixture cert + same now_unix to both runners. Use a time
-        // before any SC-081 epoch so validity-cap behaviour is stable.
         let now_unix = 1_700_000_000u64;
         let direct = runner_direct.run_cert(&cert, crate::SubjectKind::Leaf, 0, now_unix);
         let round = runner_round_trip.run_cert(&cert, crate::SubjectKind::Leaf, 0, now_unix);
 
         // Compare findings sorted by lint_id (independent of evaluation
         // order, which round-trip preserves but we don't want to rely on).
-        // We compare (lint_id, result) tuples using PartialEq element-wise
-        // by zipping after sorting on lint_id only (LintResult is not Ord).
         let mut direct_sorted: Vec<_> = direct.iter().collect();
         let mut round_sorted: Vec<_> = round.iter().collect();
         direct_sorted.sort_by(|a, b| a.lint_id.cmp(&b.lint_id));
@@ -564,8 +643,8 @@ mod tests {
 
     #[test]
     fn filter_to_ids_errors_on_unknown_id() {
-        let runner = LintRunner::new(cabf_tls_br::all_lints());
-        let ids = vec!["cabf.br.tls.validity.max".to_string(), "not.a.real.lint".to_string()];
+        let runner = LintRunner::new(multi_lint_fixture());
+        let ids = vec!["test.policy.one".to_string(), "not.a.real.lint".to_string()];
         match runner.filter_to_ids(&ids) {
             Err(ParseError::UnknownLintId { id }) => {
                 assert_eq!(id, "not.a.real.lint");
@@ -578,11 +657,11 @@ mod tests {
     fn filter_to_ids_preserves_id_order() {
         // Reverse the natural order — filter_to_ids must produce a runner
         // whose lints are in the order *ids* requests, not the source order.
-        let direct = cabf_tls_br::all_lints();
+        let direct = multi_lint_fixture();
         let mut reversed_ids: Vec<String> = direct.iter().map(|l| l.id().to_string()).collect();
         reversed_ids.reverse();
 
-        let runner = LintRunner::new(cabf_tls_br::all_lints())
+        let runner = LintRunner::new(multi_lint_fixture())
             .filter_to_ids(&reversed_ids)
             .expect("filter ok");
 
@@ -593,17 +672,17 @@ mod tests {
 
     #[test]
     fn filter_to_ids_subset_drops_other_lints() {
-        let runner = LintRunner::new(cabf_tls_br::all_lints());
-        let ids = vec!["cabf.br.tls.validity.max".to_string()];
+        let runner = LintRunner::new(multi_lint_fixture());
+        let ids = vec!["test.policy.one".to_string()];
         let filtered = runner.filter_to_ids(&ids).expect("filter ok");
         assert_eq!(filtered.lints().len(), 1);
-        assert_eq!(filtered.lints()[0].id(), "cabf.br.tls.validity.max");
+        assert_eq!(filtered.lints()[0].id(), "test.policy.one");
     }
 
     #[test]
     fn filter_to_ids_preserves_bundle_version() {
-        let runner = LintRunner::with_bundle_version(cabf_tls_br::all_lints(), "v9.9.9");
-        let ids = vec!["cabf.br.tls.validity.max".to_string()];
+        let runner = LintRunner::with_bundle_version(multi_lint_fixture(), "v9.9.9");
+        let ids = vec!["test.policy.one".to_string()];
         let filtered = runner.filter_to_ids(&ids).expect("filter ok");
         assert_eq!(filtered.bundle_version(), "v9.9.9");
     }
