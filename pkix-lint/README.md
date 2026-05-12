@@ -2,10 +2,14 @@
 
 Advisory lint engine for X.509 certificate chains. Ships the framework
 (`Lint` trait, `LintRunner`, `Finding`, `EvaluationReport`, deviation
-machinery, OSCAL Catalog / Profile / Assessment Results emission) plus
-the standards-body (RFC) conformance lint bundle. Industry-forum lint
-bundles (CA/B Forum) live in sibling reference crates such as
-[`pkix-lint-cabf`].
+machinery) plus the standards-body (RFC) conformance lint bundle.
+Industry-forum lint bundles (CA/B Forum) live in sibling reference
+crates such as [`pkix-lint-cabf`].
+
+An optional OSCAL Catalog / Profile / Assessment Results bridge ships
+behind the `oscal` cargo feature for callers who want NIST OSCAL JSON
+as their wire format; it is one supported output shape, not a
+workspace mandate. See `src/oscal/mod.rs` for the framing.
 
 ## What this crate provides
 
@@ -33,8 +37,10 @@ but violates CA/B Forum TLS BR §7.1.4.2" without aborting validation entirely.
   method so a profile struct bundles its own lint set.
 - **`deviation` module** — a waiver/exception mechanism that records approved
   deviations from lint rules for audit purposes.
-- **`EvaluationReport`** — an exportable evidence pack suitable for OSCAL
-  Assessment Results and compliance audits.
+- **`EvaluationReport`** — an exportable evidence pack. The optional
+  `oscal` feature can serialize it as OSCAL Assessment Results JSON;
+  callers can also consume it directly as Rust data or marshal it into
+  any other format.
 
 ## Advisory-only contract
 

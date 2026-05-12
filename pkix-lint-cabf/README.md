@@ -18,8 +18,10 @@ Maintained on a best-effort basis. If your deployment depends on bit-exact CA/B 
   min-key-size, SAN/EKU presence, and `BasicConstraints` cA-flag checks
   behind `cabf_tls_br::CabfTlsBrProfile`.
 
-Future bundles (`cabf_smime_br`, `cabf_cs_br`) and zlint-derived OSCAL
-Catalogs will land via PKIX-amgn.8 and friends.
+Future bundles (`cabf_smime_br`, `cabf_cs_br`) and zlint-derived catalog
+content will land via PKIX-amgn.8 and friends. The wire format for the
+vendored catalog data is an open design question (OSCAL Catalog JSON is
+one candidate); see the bead for current status.
 
 ## Usage
 
