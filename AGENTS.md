@@ -28,8 +28,8 @@ adjacent PKI concerns.
 
 **Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
 
-- **`pkix-profiles-cabf`** — CA/Browser Forum profile types (TLS BR, S/MIME BR, Code Signing BR). Currently a stub; substantive content lands via PKIX-amgn.4.
-- **`pkix-lint-cabf`** — CA/Browser Forum lint bundles (`cabf.br.tls`, `cabf.br.smime`). Currently a stub; substantive content lands via PKIX-amgn.3 / PKIX-9vnx.7.
+- **`pkix-profiles-cabf`** — CA/Browser Forum profile types (TLS BR, S/MIME BR, Code Signing BR), hand-authored as a small curated reference set. Explicit **unprincipled exception** to non-negotiable #5's no-transcription rule. For comprehensive CA/B Forum coverage, use `pkix-policy-zlint` (sibling adapter crate, when shipped).
+- **`pkix-lint-cabf`** — CA/Browser Forum lint bundles, hand-authored as a small curated reference set. Same **unprincipled exception** status as `pkix-profiles-cabf`. For comprehensive coverage, use `pkix-policy-zlint`.
 
 **Trust store adapter crates** (each fetches DER bytes from a source-specific API and feeds them into `pkix_truststore::from_der_iter(...)`; platform-specific FFI lives here, not in `pkix-truststore`):
 
@@ -68,7 +68,19 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 2. `pkix-path` does not import `pkix-revocation`. The dependency flows one way: chain → revocation → path.
 3. `SignatureVerifier` is the only place algorithm-specific code lives in `pkix-path`.
 4. The trait surface must be stable across MSRV (rust-version = "1.73").
-5. **Framework, not policy.** The workspace ships standards-based mechanisms (`Profile` trait, `Lint` trait, `ValidationPolicy`, `DeviationStore`, etc.) and RFC / ITU-T / NIST baseline implementations. It does NOT ship canonical encodings of any single organization's policy — CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, or individual CA CPSs. CA/B Forum reference implementations live in sibling `-cabf` crates (`pkix-profiles-cabf`, `pkix-lint-cabf`) marked "reference / not authoritative." Adding new vendor or industry-forum policy encodings to the main crates requires explicit human approval. **Per-rule split:** standards-body technical specifications (IETF RFCs, ITU-T X.509, ISO standards governing cert structure) are implemented as fast Rust validator/lint code in the relevant crate (`pkix-path`, `pkix-revocation`, `pkix-lint` RFC-conformance Catalog, etc.). Policy choices — which specs to enforce, in what combinations, with what deprecations/overrides, including all CA/B Forum / vendor / root-program rules — are externalized as data consumed by those Rust crates. The serialization format for policy data is an open design question and is not prescribed at the workspace level; do not reintroduce a single mandated wire format without explicit human re-decision. Stance / epic: PKIX-amgn.
+5. **Framework, not policy. Three policy classes with different ownership.** The workspace ships mechanisms (`Profile` trait, `Lint` trait, `ValidationPolicy`, `DeviationStore`, etc.) and standards-body baselines. It does NOT ship Rust transcriptions of industry-forum or vendor policy that the maintainer would have to track in lockstep with the upstream source — that path puts the maintainer on the hook for someone else's living rule set.
+
+   1. **Standards-body specs** (IETF RFCs, ITU-T X.509, ISO standards governing cert structure) — authored as fast Rust validator/lint code in the workspace's core crates (`pkix-path`, `pkix-revocation`, `pkix-identity`, `pkix-profiles`, `pkix-lint` RFC-conformance Catalog). These are stable, slow-changing standards the workspace commits to; not "someone else's policy."
+
+   2. **Industry-forum / vendor policies** (CA/B Forum BR, Mozilla / Apple / Microsoft root programs, ETSI, DoD, root-program ingestion rules, FedRAMP, individual CA CPSs) — NOT transcribed as Rust in the workspace. Consumed via sibling **policy-adapter crates** that defer to the upstream maintainer's tool: `pkix-policy-zlint`, `pkix-policy-pkilint`, etc. Each adapter normalizes upstream findings into the workspace's `Finding`/`Lint` shape. The workspace does not transcribe vendor predicates.
+
+   3. **Site-local policy** — entirely consumer-defined. Deployers write their own `Lint` / `Profile` impls or load policy data in whatever format suits them. Workspace does not prescribe shape.
+
+   **No prescribed wire format.** Each policy-adapter crate consumes the upstream tool's natural format (zlint NDJSON, pkilint Python API, OSCAL JSON, etc.). Site-local policy uses the deployer's choice. The OSCAL emit/parse shipped in `pkix-lint/src/oscal/*` is one optional adapter, not a workspace canonical format.
+
+   **Unprincipled exception:** `pkix-lint-cabf` and `pkix-profiles-cabf` exist as hand-authored small curated reference sets for CA/B Forum BR. They *do* contain Rust transcriptions of vendor policy and *do* violate the no-transcription rule. They are bounded, explicitly labeled "reference, not authoritative," and exist because (a) CA/B Forum BR is the most-asked-about industry-forum spec, (b) a small marquee-violation reference is useful for downstream consumers comparing their interpretation against the workspace's. This exception is **not a template** — no equivalent `-mozilla`, `-fedramp`, `-dod`, `-etsi` crates are admitted without explicit human re-decision. The principled path for comprehensive CA/B Forum coverage is `pkix-policy-zlint`.
+
+   Stance / epic: PKIX-amgn. Previous wire-format question (PKIX-apmt) resolved 2026-05-12 by the three-mode model: the question dissolves rather than gets answered, because each mode has different format ownership.
 
 ## What already exists (and why we are not using it)
 
