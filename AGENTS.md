@@ -29,6 +29,7 @@ adjacent PKI concerns.
 - **`pkix-dane-resolver`** — DNSSEC-validating resolver that fetches TLSA records. Std-only. Default upstream uses system resolv.conf. Not yet shipped; planned per PKIX-j32w.
 - **`pkix-zlint-bridge`** — Shared subprocess + NDJSON-parsing infrastructure for running zlint on certificates. Consumed by `pkix-policy-zlint` (runtime adapter) and `pkix-difftest`'s zlint oracle. Not yet shipped; planned per PKIX-jy95.7.
 - **`pkix-pkilint-bridge`** — Shared subprocess + output-parsing infrastructure for running pkilint on certificates. Same shape as `pkix-zlint-bridge` for pkilint. Not yet shipped; planned per PKIX-jy95.8.
+- **`pkix-policy-oscal`** — Adapter that consumes OSCAL Profile JSON (NIST OSCAL v1.2.2) and produces a configured `LintRunner`. Pure JSON parsing + Lint-impl lookup; no subprocess. Reuses OSCAL parsing primitives from `pkix-lint/src/oscal/*`. Not yet shipped; planned per PKIX-jy95.9.
 
 **Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
 
