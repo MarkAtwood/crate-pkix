@@ -6,6 +6,25 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### pkix-identity 0.1.0 — initial scaffold (2026-05-11)
+
+New workspace crate (PKIX-fmtv.21) for cert-side identity matching:
+RFC 6125 hostname binding, RFC 5280 §4.2.1.6 + RFC 8398 mailbox
+binding, IP literal matching. Pure function over (cert,
+identity-string); no chain context, no trust anchors. `no_std`. The
+`0.1.0` release ships the public API surface (`ServerName`,
+`MailboxName`, `IdentityError`, `verify_dns_name`, `verify_mailbox`)
+with stub bodies that return `IdentityError::NotYetImplemented`.
+Bodies fill in via PKIX-fmtv.11 (`verify_dns_name` + IDN
+normalization) and PKIX-fmtv.12 (`verify_mailbox` + SmtpUTF8Mailbox
+handling). The split-out crate is precedented by
+`rustls-pki-types::ServerName` + `webpki::SubjectNameRef`; identity
+matching is a stateless data transform that does not fit the
+`Profile` trait. See [`pkix-identity/README.md`][pi-readme] for
+in-scope / out-of-scope discipline. [PKIX-fmtv.21]
+
+[pi-readme]: pkix-identity/README.md
+
 ### Workspace: framework / policy split (2026-05-11)
 
 The workspace stance encoded in [`AGENTS.md`][AGENTS] non-negotiable #6

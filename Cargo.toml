@@ -14,6 +14,7 @@ members = [
     "pkix-ct",
     "pkix-composite",
     "pkix-ac",
+    "pkix-identity",
     "pkix-difftest",
     "pkix-lint-cabf-refresh",
     "pkix-truststore",
@@ -81,6 +82,7 @@ pkix-lint             = { path = "pkix-lint",             version = "0.5.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }
+pkix-identity         = { path = "pkix-identity",         version = "0.1.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.0.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
 pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.2.0" }
