@@ -18443,7 +18443,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -18453,73 +18453,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc47",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc60",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 3",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc74",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 3",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "reason": "VerificationError: validation failed: candidates exhausted: all candidates exhausted with no interior errors",
           "verdict": "fail"
         }
       ]
@@ -18532,28 +18466,6 @@
         {
           "oracle": "pkix-path",
           "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc80",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 4",
           "verdict": "fail"
         },
         {
@@ -18609,6 +18521,28 @@
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: unsatisfiable DNS name constraint: malformed SAN .example.com",
           "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "rfc5280::nc::permitted-self-issued",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "no path to a trusted anchor",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -147077,12 +147011,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "validity period check failed at chain index 1",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "certificate has expired",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147099,7 +147033,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -147109,7 +147043,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
+          "reason": "VerificationError: validation failed: candidates exhausted: all candidates exhausted with no interior errors",
           "verdict": "fail"
         }
       ]
@@ -147187,12 +147121,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "validity period check failed at chain index 1",
+          "reason": "validity period check failed at chain index 2",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "certificate has expired",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147209,12 +147143,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "signature invalid at chain index 1",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147270,22 +147204,22 @@
     },
     {
       "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc56",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc47",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "signature invalid at chain index 2",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
           "verdict": "fail"
         }
       ]
@@ -147319,12 +147253,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "validity period check failed at chain index 4",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "certificate has expired",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147363,12 +147297,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147425,16 +147359,38 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
-      "name": "bettertls::pathbuilding::tc75",
+      "name": "bettertls::pathbuilding::tc74",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "validity period check failed at chain index 4",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "certificate has expired",
+          "reason": "unable to get local issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc75",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "path length exceeds maximum",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147451,12 +147407,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "path length exceeds maximum",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -147513,6 +147469,28 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc80",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "path length exceeds maximum",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get local issuer certificate",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
       "name": "invalid::invalid-issuer-key",
       "verdicts": [
         {
@@ -147539,7 +147517,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -147561,7 +147539,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "path length exceeds maximum",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -147891,7 +147869,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 1",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -147913,7 +147891,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 2",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -147997,33 +147975,11 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": false,
-      "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
       "name": "rfc5280::nc::nc-forbids-same-chain-ica",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 1",
+          "reason": "signature invalid at chain index 3",
           "verdict": "fail"
         },
         {
@@ -148033,7 +147989,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
           "verdict": "fail"
         }
       ]
@@ -148106,34 +148062,12 @@
     },
     {
       "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::permitted-self-issued",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 0",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
       "name": "rfc5280::nc::restrictive-permits-in-intermediates-narrows",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 1",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -148155,7 +148089,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 1",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -212017,6 +211951,28 @@
     {
       "class": "Agreement",
       "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc56",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc58",
       "verdicts": [
         {
@@ -212040,6 +211996,28 @@
       "class": "Agreement",
       "ground_truth_agreement": true,
       "name": "bettertls::pathbuilding::tc59",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "bettertls::pathbuilding::tc60",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -212876,6 +212854,28 @@
       "class": "Agreement",
       "ground_truth_agreement": true,
       "name": "rfc5280::nc::excluded-different-constraint-type",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "Agreement",
+      "ground_truth_agreement": true,
+      "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -230059,11 +230059,11 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc60",
+      "name": "rfc5280::nc::permitted-self-issued",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 3",
+          "reason": "no path to a trusted anchor",
           "verdict": "fail"
         },
         {
@@ -230073,52 +230073,8 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden signature algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Other(ObjectIdentifier { oid: 1.2.840.10045.4.1 }, None) }",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
-      "name": "bettertls::pathbuilding::tc56",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "permitted subtree violation",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: no permitted name constraints matched SAN",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::nc-forbids-alternate-chain-ica",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 1",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
-          "verdict": "fail"
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -230129,34 +230085,12 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 1",
+          "reason": "signature invalid at chain index 3",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
           "reason": "excluded subtree violation",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: excluded name constraint matched SAN",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "DiagnosticDivergence",
-      "ground_truth_agreement": false,
-      "name": "rfc5280::nc::permitted-self-issued",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 0",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get local issuer certificate",
           "verdict": "fail"
         },
         {
@@ -277798,11 +277732,11 @@
     }
   ],
   "summary": {
-    "Agreement": 2979,
+    "Agreement": 2982,
     "DiagnosticDivergence": 5898,
     "LooserThanWild": 827,
     "OracleDivergence": 0,
-    "StricterThanWild": 22,
+    "StricterThanWild": 19,
     "total": 9726
   }
 }

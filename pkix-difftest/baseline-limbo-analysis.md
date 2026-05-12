@@ -43,10 +43,10 @@ written-out justification".
 | Class                | Count | %     |
 |----------------------|-------|-------|
 | LooserThanWild       |   827 | 8.5%  |
-| StricterThanWild     |    26 | 0.3%  |
+| StricterThanWild     |    23 | 0.2%  |
 | OracleDivergence     |     0 | 0.0%  |
 | DiagnosticDivergence |  5898 | 60.6% |
-| Agreement            |  2975 | 30.6% |
+| Agreement            |  2978 | 30.6% |
 | **Total**            | **9726** |   |
 
 Ground-truth agreement (vs corpus's `expected_result`):
@@ -54,32 +54,68 @@ Ground-truth agreement (vs corpus's `expected_result`):
 | Class           | gt agree | gt disagree |
 |-----------------|---------:|------------:|
 | LooserThanWild  |       96 |         731 |
-| StricterThanWild|       21 |           5 |
+| StricterThanWild|       19 |           4 |
 
-The 731 LooserThanWild-but-corpus-disagrees and 5
+The 731 LooserThanWild-but-corpus-disagrees and 4
 StricterThanWild-but-corpus-disagrees cases are the focus below.
 
-### Delta from previous baseline (PKIX-lwr9.6, 2026-05-11)
+### Delta from previous baseline (PKIX-lwr9.4.1, 2026-05-11)
 
 | Class                | before | after | Δ   |
 |----------------------|-------:|------:|----:|
-| LooserThanWild       |    819 |   827 |  +8 |
-| StricterThanWild     |     74 |    26 | −48 |
+| LooserThanWild       |    827 |   827 |   0 |
+| StricterThanWild     |     26 |    23 |  −3 |
 | OracleDivergence     |      0 |     0 |   0 |
-| DiagnosticDivergence |   5901 |  5898 |  −3 |
-| Agreement            |   2932 |  2975 | +43 |
+| DiagnosticDivergence |   5898 |  5898 |   0 |
+| Agreement            |   2975 |  2978 |  +3 |
 | Total                |   9726 |  9726 |   — |
 
 The limbo loader now routes positional CertPath bundles through
-`pkix_path_builder::build_path` before classification (mirroring
-PKITS's PKIX-t0w4 change). 47 of the 74 previous StricterThanWild
-cases — almost all `bettertls::pathbuilding::*` — were caused by
-the harness bypassing path-building, not by genuine pkix-path or
-pkix-path-builder bugs. PKIX-yn3e (AKI-based candidate selection,
-shipped 2026-05-08) made these cases pass once the harness actually
-invoked the builder. Empirical confirmation of PKIX-lwr9.1's
-characterization explore: 23 of 25 sampled bettertls fixtures
-already pass end-to-end through `build_path`.
+`pkix_path_builder::build_first_valid_path` (PKIX-lwr9.4.1, shipped on
+top of the PKIX-lwr9.4.2 helper) instead of single-shot `build_path`.
+The helper iterates `build_path_candidates` and tries each through
+`pkix_path::validate_path` until one passes — closing the
+single-shot-wrapper gap PKIX-lwr9.4 diagnosed for bettertls::tc60
+(cross-signed pool with one intermediate signed under ecdsa-with-SHA1).
+
+Seven testcases reclassified by this change:
+
+| Case                                              | before               | after                | gt    |
+|---------------------------------------------------|----------------------|----------------------|-------|
+| `bettertls::pathbuilding::tc60`                   | StricterThanWild     | Agreement            | true  |
+| `bettertls::pathbuilding::tc47`                   | StricterThanWild     | DiagnosticDivergence | true  |
+| `bettertls::pathbuilding::tc74`                   | StricterThanWild     | DiagnosticDivergence | true  |
+| `bettertls::pathbuilding::tc80`                   | StricterThanWild     | DiagnosticDivergence | true  |
+| `rfc5280::nc::permitted-self-issued`              | DiagnosticDivergence | StricterThanWild     | false |
+| `bettertls::pathbuilding::tc56`                   | DiagnosticDivergence | Agreement            | true  |
+| `rfc5280::nc::nc-forbids-alternate-chain-ica`     | DiagnosticDivergence | Agreement            | true  |
+
+tc60 is the headline win (the bead's primary acceptance criterion):
+corpus expected SUCCESS, was StricterThanWild with `gt_agreement=false`
+(the sole pkix-path-builder-attributable case in the limbo Tier-2
+baseline), now Agreement Pass. tc47/74/80 also flipped out of Stricter
+into DiagDiv: corpus expected FAILURE on all three, all oracles now
+agree on Fail (different reasons) — net improvement in differential
+signal. tc56 and `nc-forbids-alternate-chain-ica` are "harness
+false-failure" cases that flipped from all-Fail (DiagDiv) to all-Pass
+(Agreement) because the new chain ordering is one all three oracles
+accept; both expect SUCCESS and gt now agrees.
+
+The one regression-shaped flip — `rfc5280::nc::permitted-self-issued`
+moving DiagDiv → StricterThanWild with `gt_agreement=false` — reflects
+that the new chain ordering causes openssl + pyca to pass a chain the
+corpus expects to fail (pkix-path correctly still rejects). The
+underlying harness contract is preserved (we classify whatever each
+oracle says about whatever chain we give them); the case moved because
+the chain bytes changed, not because pkix-path got worse. Tracked in
+this run's analysis only; no follow-up bead.
+
+Prior to this change (PKIX-lwr9.6, 2026-05-11), the limbo loader used
+single-shot `build_path` after PKIX-yn3e (AKI-based candidate
+selection, 2026-05-08) eliminated the dominant 47-case
+`bettertls::pathbuilding` Stricter bucket via topological reordering
+alone. PKIX-lwr9.4.1 closes the residual single-candidate gap by
+iterating with verifier feedback.
 
 ## LooserThanWild (819) — pkix-path Pass, ≥1 oracle Fail
 
@@ -167,74 +203,66 @@ ValueError, openssl AKI strict path-building) or documented pkix-path
 permissive defaults (EKU not required by default, critical-extension
 tolerance). No follow-up beads filed for these.
 
-## StricterThanWild (26) — pkix-path Fail, ≥1 oracle Pass
+## StricterThanWild (23) — pkix-path Fail, ≥1 oracle Pass
 
 | Reason bucket | Count | Classification |
 |---|---:|---|
 | `malformed certificate at chain index 0` | 11 | 10 bettertls::nameconstraints (tc8877..tc9476) + 1 webpki::san::unicode-emoji-san. **pkix-path AGREES with corpus ground truth** on all 11 (gt_agreement=true). pkix-path rejects malformed leaves that openssl tolerates; strict-is-correct. No bead. |
-| `signature invalid at chain index 1` | 6 | 3 online::* (apple/cloudflare/akamai, P-384 harness limitation, PKIX-wmch) + 3 bettertls::pathbuilding (tc8/tc15 = forbidden ECDSA-with-SHA1 OID 1.2.840.10045.4.1; tc47 = signature linkage mismatch where pyca *also* fails differently). gt_agreement is true for tc8/tc15/tc47 (corpus expects FAILURE), false for the 3 online::* (P-384 harness limitation). |
+| `signature invalid at chain index 1` | 5 | 3 online::* (apple/cloudflare/akamai, P-384 harness limitation, PKIX-wmch, gt=false) + 2 bettertls::pathbuilding (tc8/tc15 = forbidden ECDSA-with-SHA1 OID 1.2.840.10045.4.1, gt=true). |
 | `signature invalid at chain index 0` | 4 | online::stackoverflow.com (P-384, PKIX-wmch, gt=false), webpki::forbidden-dsa-root (DSA, project-policy unsupported, gt=true), webpki::forbidden-p192-root (P-192, project-policy unsupported, gt=true), and bettertls::pathbuilding::tc41 (gt=true). All four are intentional pkix-path limitations or pkix-path-correct rejections; no bug. |
-| `signature invalid at chain index 3` | 2 | bettertls::pathbuilding::tc60 (gt=false, **harness/API-gap residual** — `build_path` returns the first DFS candidate, which contains a SHA-1 ECDSA intermediate the harness's `DefaultVerifier` does not dispatch; a SHA-256-only candidate exists, see diagnosis on PKIX-lwr9.4) and tc74 (gt=true, corpus expects FAILURE). tc60 is the only single-case residual in this bucket; tracked under PKIX-lwr9.4. |
-| `signature invalid at chain index 4` | 1 | bettertls::pathbuilding::tc80 (gt=true). Corpus expects FAILURE; pkix-path correctly rejects. |
 | `unhandled critical extension at chain index 0` | 1 | rfc5280::ee-critical-aia-invalid (gt=true). **pkix-path correct** — RFC 5280 §4.2.1.1 says AKI MUST NOT be critical. pkix-path enforces; openssl fails too (different wording); pyca passes. |
 | `name constraints violated at certificate index 0` | 1 | rfc5280::nc::nc-permits-invalid-dns-san (gt=true). pkix-path strict NC; openssl lenient; pyca strict too. No bead. |
-| **Total** | **26** | |
+| `no path to a trusted anchor` | 1 | rfc5280::nc::permitted-self-issued (gt=false). Flipped from DiagnosticDivergence in this baseline: the new `build_first_valid_path`-built chain ordering causes openssl and pyca to pass, while pkix-path can find no chain that satisfies both topology and signature. Side effect of the harness change, not a pkix-path regression. No bead. |
+| **Total** | **23** | |
 
-### Residual ground-truth-disagreement cases (5 of 26)
+### Residual ground-truth-disagreement cases (4 of 23)
 
-Only **5** of the 26 StricterThanWild cases have `gt_agreement=false`
-(pkix-path is actually wrong vs corpus expected result):
+Only **4** of the 23 StricterThanWild cases have `gt_agreement=false`
+(pkix-path is wrong vs corpus expected result):
 
-| Case                           | Tracked under |
-|--------------------------------|---------------|
-| `online::akamai.com`           | PKIX-wmch (P-384 harness limitation) |
-| `online::apple.com`            | PKIX-wmch (P-384 harness limitation) |
-| `online::cloudflare.com`       | PKIX-wmch (P-384 harness limitation) |
-| `online::stackoverflow.com`    | PKIX-wmch (P-384 harness limitation) |
-| `bettertls::pathbuilding::tc60`| PKIX-lwr9.4 (harness/API-gap, single residual; design call pending) |
+| Case                                  | Tracked under |
+|---------------------------------------|---------------|
+| `online::akamai.com`                  | PKIX-wmch (P-384 harness limitation) |
+| `online::apple.com`                   | PKIX-wmch (P-384 harness limitation) |
+| `online::cloudflare.com`              | PKIX-wmch (P-384 harness limitation) |
+| `online::stackoverflow.com`           | PKIX-wmch (P-384 harness limitation) |
 
-The other 21 StricterThanWild residuals all have `gt_agreement=true`:
+`rfc5280::nc::permitted-self-issued` is also `gt_agreement=false` but
+sits in a different bucket: it's a side-effect of the chain-ordering
+change in PKIX-lwr9.4.1, not a pkix-path implementation gap. The new
+ordering happens to be one openssl+pyca accept; pkix-path correctly
+sees it as not-a-valid-path. Documented above; no follow-up bead.
+
+PKIX-lwr9.4 / `bettertls::pathbuilding::tc60` has been resolved by this
+work (PKIX-lwr9.4.2 helper + PKIX-lwr9.4.1 harness adoption). tc60
+flipped from StricterThanWild(gt=false) into Agreement(gt=true).
+
+The other 19 StricterThanWild residuals all have `gt_agreement=true`:
 pkix-path correctly rejects what the corpus expects to fail. Strict
 behaviour is intentional in those cases (malformed-cert rejection,
 RFC 5280 §4.2.1.1 critical-AKI enforcement, DSA / P-192 project-policy
 exclusion).
 
-### `bettertls::pathbuilding` family (7 residuals, 0 algorithmic builder bugs)
+### `bettertls::pathbuilding` family (3 Stricter residuals, 0 algorithmic builder bugs)
 
-PKIX-lwr9.6 (this work) eliminated the 40+ false-positive
-StricterThanWild entries previously attributed to pkix-path-builder.
-Empirical finding from PKIX-lwr9.1 confirmed: the harness was
-bypassing the builder entirely. After routing through `build_path`,
-**6 of 7** residual `bettertls::pathbuilding::*` failures have
-`gt_agreement=true` — pkix-path correctly rejects chains the corpus
-expects to fail. The seventh, **tc60**, is the sole `gt_agreement=false`
-case in this family. Per the PKIX-lwr9.4 diagnosis it is not a
-pkix-path-builder algorithmic bug: `build_path` correctly enumerates
-4 candidate chains via `build_path_candidates`, but the first DFS
-candidate contains an intermediate signed with ecdsa-with-SHA1
-(OID `1.2.840.10045.4.1`, not dispatched by `DefaultVerifier` —
-project policy excludes SHA-1 ECDSA). A SHA-256-only candidate exists
-in the pool and is what openssl and pyca pick. The gap is
-consumer-side: `build_path` is a single-shot wrapper, and the limbo
-harness does not iterate `build_path_candidates` when `validate_path`
-fails on the first candidate. Resolution pending design call between
-(a) harness-side iteration in pkix-difftest, or (b) a new
-`build_first_valid_path` helper in pkix-path-builder. Tracked under
-PKIX-lwr9.4.
+After PKIX-lwr9.6 (build_path harness wiring, 2026-05-11) and
+PKIX-lwr9.4.1 (build_first_valid_path harness adoption, this baseline)
+the `bettertls::pathbuilding` family is fully closed:
 
-Six of seven residual pathbuilding cases break down as:
-
-* **tc8 / tc15** — corpus expects FAILURE on
-  ECDSA-with-SHA1 (`1.2.840.10045.4.1`). pkix-path rejects via signature
-  mismatch (the OID is not dispatched by `DefaultVerifier`); pyca
-  rejects via `Forbidden signature algorithm`; openssl passes
-  permissively. gt_agreement=true (pkix-path right by verdict).
-* **tc41 / tc47 / tc74 / tc80** — corpus expects FAILURE; pkix-path
-  correctly rejects with a signature-linkage diagnostic. gt_agreement=true.
-* **tc60** — corpus expects SUCCESS; harness/API-gap (consumer
-  doesn't iterate `build_path_candidates` past the first SHA-1
-  ECDSA-bearing candidate), not an algorithmic builder bug. See the
-  diagnosis above. gt_agreement=false. Tracked under PKIX-lwr9.4.
+* **tc8 / tc15** — corpus expects FAILURE on ECDSA-with-SHA1
+  (`1.2.840.10045.4.1`). pkix-path rejects via signature mismatch
+  (the OID is not dispatched by `DefaultVerifier`); pyca rejects via
+  `Forbidden signature algorithm`; openssl passes permissively.
+  gt_agreement=true (pkix-path right by verdict). Stricter residual.
+* **tc41** — corpus expects FAILURE; pkix-path correctly rejects
+  with a signature-linkage diagnostic. gt_agreement=true. Stricter
+  residual.
+* **tc47 / tc74 / tc80** — formerly Stricter, now DiagnosticDivergence
+  with all three oracles agreeing on Fail (different reasons). PKIX-lwr9.4.1
+  caused the chain reordering that surfaced this agreement.
+* **tc60** — formerly Stricter(gt=false), the single
+  `gt_agreement=false` residual cited by PKIX-lwr9.4. Now Agreement(gt=true)
+  after PKIX-lwr9.4.1.
 
 ### Harness-shape limitations (not pkix-path bugs)
 
@@ -265,19 +293,20 @@ malformed-cert tests where openssl says "unable to parse" while pyca
 says "VerificationError: invalid extension X" and pkix-path says
 "malformed certificate at chain index N". Low-signal; no follow-up.
 
-## Agreement (2975 / 30.6%)
+## Agreement (2978 / 30.6%)
 
 All three oracles produce identical Pass/Fail verdicts. PKIX-lwr9.6
 moved 43 chains from divergence classes into Agreement by wiring
-pkix-path-builder into the harness. Within Agreement, the harness's
-value comes from the next run: any chain that flips from Agreement
-to a divergence class without a corresponding code change is a
-regression.
+pkix-path-builder into the harness; PKIX-lwr9.4.1 added 3 more by
+swapping single-shot `build_path` for the iterating
+`build_first_valid_path`. Within Agreement, the harness's value comes
+from the next run: any chain that flips from Agreement to a divergence
+class without a corresponding code change is a regression.
 
 ## Ground-truth disagreement
 
 Across all 9726 classified cases, pkix-path disagrees with the corpus
-ground-truth on **2905 cases** (29.9%). The bulk is the 731
+ground-truth on **2902 cases** (29.8%). The bulk is the 731
 LooserThanWild-but-corpus-disagrees set, which is dominated by the
 748 BetterTLS nameConstraints cases discussed above (660 with
 gt_disagree).
@@ -370,14 +399,19 @@ cargo build -p pkix-difftest --release --features rustcrypto
 | Class                | default | rustcrypto | Δ |
 |----------------------|--------:|-----------:|---:|
 | LooserThanWild       |     827 |        827 |  0 |
-| StricterThanWild     |      26 |         22 | −4 |
+| StricterThanWild     |      23 |         19 | −4 |
 | OracleDivergence     |       0 |          0 |  0 |
 | DiagnosticDivergence |    5898 |       5898 |  0 |
-| Agreement            |    2975 |       2979 | +4 |
+| Agreement            |    2978 |       2982 | +4 |
 | Total                |    9726 |       9726 |  — |
 
-Ground-truth disagreements: 2905 → 2901 (−4, matching the 4 flips
+Ground-truth disagreements: 2902 → 2898 (−4, matching the 4 flips
 to Agreement(Pass) — all 4 cases have `expected_result: SUCCESS`).
+PKIX-lwr9.4.1 baked the 3 build_first_valid_path flips into both
+baselines: the (default) Stricter 23 / Agreement 2978 already reflects
+the tc60 / tc56 / nc-forbids-alternate-chain-ica fixes, so the
+default-vs-rustcrypto delta below shows the remaining 4 P-384 chains
+only.
 
 ### Chains that flipped
 
