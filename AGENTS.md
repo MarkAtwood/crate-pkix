@@ -24,6 +24,7 @@ adjacent PKI concerns.
 - **`pkix-ac`** — RFC 5755 attribute certificate validation (skeleton; tracked as PKIX-ng0x).
 - **`pkix-ct`** — RFC 6962 / RFC 9162 Certificate Transparency / SCT verification (skeleton; tracked as PKIX-baac).
 - **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
+- **`pkix-identity`** — Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal). Pure function over (cert, identity-string); no chain context, no trust anchors. Scaffold-only at 0.1.0; bodies land via PKIX-fmtv.11 / .12.
 
 **Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
 

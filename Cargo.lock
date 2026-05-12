@@ -1213,6 +1213,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-identity"
+version = "0.1.0"
+dependencies = [
+ "x509-cert",
+]
+
+[[package]]
 name = "pkix-lint"
 version = "0.5.0"
 dependencies = [
