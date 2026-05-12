@@ -6,6 +6,81 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Workspace: framework / policy split (2026-05-11)
+
+The workspace stance encoded in [`AGENTS.md`][AGENTS] non-negotiable #6
+(PKIX-amgn) splits standards-body mechanisms from industry-forum policy
+content across crate boundaries. Core crates ship the framework + RFC
+baselines; CA/B Forum content lives in sibling `-cabf` reference crates
+marked "not authoritative."
+
+Crate boundary changes that landed across the PKIX-amgn umbrella:
+
+```
+pkix-profiles  →  pkix-profiles-cabf  (WebPkiProfile, SmimeProfile,
+                                       CodeSigningProfile, sc081_validity_cap,
+                                       CABF_*_ALLOWED_ALGS)             [PKIX-amgn.4]
+pkix-lint      →  pkix-lint-cabf      (cabf_tls_br module: ValidityMaxLint,
+                                       Sha1ProhibitedLint, RsaMinKeySizeLint,
+                                       SanRequiredLint, EkuServerAuthLint,
+                                       BcCaFlagLint, CabfTlsBrProfile,
+                                       all_lints)                       [PKIX-amgn.5]
+```
+
+The `-cabf` crates carry a "reference, not authoritative" rustdoc header
+and are explicitly not maintained as canonical CA/B Forum encodings. They
+are intended as a starting point: fork and adapt to your deployment's
+current interpretation of the BR text.
+
+Migration for downstream consumers:
+
+```toml
+# Cargo.toml — add a dep on the relevant -cabf crate
+pkix-profiles      = "0.3"
+pkix-profiles-cabf = "0.2"  # CA/B Forum Profile types
+pkix-lint          = "0.5"
+pkix-lint-cabf     = "0.2"  # CA/B Forum lint bundles
+```
+
+```rust
+// Profile types
+- use pkix_profiles::{WebPkiProfile, SmimeProfile, CodeSigningProfile};
++ use pkix_profiles_cabf::{WebPkiProfile, SmimeProfile, CodeSigningProfile};
+
+// SC-081 helper
+- use pkix_profiles::sc081_validity_cap;
++ use pkix_profiles_cabf::sc081_validity_cap;
+
+// CA/B Forum lint bundle
+- use pkix_lint::cabf_tls_br::CabfTlsBrProfile;
++ use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+```
+
+Retained in `pkix-profiles` 0.3.0:
+
+- `Profile` trait + `ValidationPolicy` re-exports.
+- `BasicTlsProfile` — RFC 5280 + RFC 6125 + universally-required
+  `id-kp-serverAuth` EKU.
+- `BasicSmimeProfile` — RFC 8551 §3 baseline (`id-kp-emailProtection`
+  EKU + `rfc822Name` SAN).
+- Deprecated re-exports of the CA/B Forum types from
+  `pkix-profiles-cabf` (drop in 0.4.0).
+
+Retained in `pkix-lint` 0.5.0:
+
+- Framework: `Lint`, `LintRunner`, `LintProfile`, `Finding`,
+  `EvaluationReport`, `Deviation`, `DeviationStore`, `DeviationRunner`.
+- OSCAL Catalog + Profile machinery (`oscal::catalog::catalog_from_lints`,
+  `oscal::parse::lint_ids_from_catalog`, `oscal::profile::resolve_profile`,
+  `oscal::emit::assessment_results`).
+- RFC-conformance lint bundle (`rfc5280::Rfc5280MaxSerialLengthLint`).
+
+See [PKIX-amgn] for the full rationale and the framework/policy stance
+encoded in [`AGENTS.md`][AGENTS] non-negotiable #6.
+
+[AGENTS]: ./AGENTS.md
+[PKIX-amgn]: ./AGENTS.md
+
 ### `pkix-lint 0.5.0` + `pkix-lint-cabf 0.2.0`: CA/B Forum bundle migration (2026-05-11)
 
 **BREAKING.** PKIX-amgn.5 — refactor `pkix-lint` to ship only the framework

@@ -1,7 +1,11 @@
 # pkix-lint
 
-Advisory lint engine for X.509 certificate chains — CA/B Forum and RFC rules
-with structured soft-fail results, deviations, and exportable evidence packs.
+Advisory lint engine for X.509 certificate chains. Ships the framework
+(`Lint` trait, `LintRunner`, `Finding`, `EvaluationReport`, deviation
+machinery, OSCAL Catalog / Profile / Assessment Results emission) plus
+the standards-body (RFC) conformance lint bundle. Industry-forum lint
+bundles (CA/B Forum) live in sibling reference crates such as
+[`pkix-lint-cabf`].
 
 ## What this crate provides
 
