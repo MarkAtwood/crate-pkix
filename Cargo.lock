@@ -1230,6 +1230,16 @@ name = "pkix-lint-cabf"
 version = "0.1.0"
 
 [[package]]
+name = "pkix-lint-cabf-refresh"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "pkix-lint",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pkix-path"
 version = "0.3.0"
 dependencies = [
