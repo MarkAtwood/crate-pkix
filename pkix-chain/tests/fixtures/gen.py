@@ -27,9 +27,35 @@ Run from this directory:
 import datetime
 from pathlib import Path
 from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import NameOID, ObjectIdentifier
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+
+# RFC 8398 §3 id-on-SmtpUTF8Mailbox.
+OID_SMTP_UTF8_MAILBOX = ObjectIdentifier("1.3.6.1.5.5.7.8.9")
+
+
+def utf8_string_der(s: str) -> bytes:
+    """DER-encode a UTF8String (tag 0x0c) carrying `s`.
+
+    Short-form length only; tests never need >127-byte mailboxes.
+    """
+    data = s.encode("utf-8")
+    if len(data) >= 128:
+        raise NotImplementedError("UTF8String >127 bytes not used by fixtures")
+    return bytes([0x0C, len(data)]) + data
+
+
+def utf8_string_der_bytes(raw: bytes) -> bytes:
+    """DER-encode a UTF8String with raw value bytes — caller chooses validity.
+
+    Used to construct an `otherName(SmtpUTF8Mailbox)` SAN entry whose
+    inner UTF8String value is intentionally not valid UTF-8 (RFC 8398
+    §3 violation), so that the consumer-side parser surfaces the error.
+    """
+    if len(raw) >= 128:
+        raise NotImplementedError("UTF8String >127 bytes not used by fixtures")
+    return bytes([0x0C, len(raw)]) + raw
 
 OUT = Path(__file__).parent
 NOT_BEFORE = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
@@ -184,6 +210,134 @@ def main():
         eku_critical=True,
     )
     write_der("leaf-timestamping-not-sole.der", leaf_tsa_not_sole)
+
+    # ------------------------------------------------------------------
+    # PKIX-fmtv.23: curated RFC 8398 mailbox corpus.
+    #
+    # Each leaf below carries id-kp-emailProtection so it passes the
+    # BasicSmimeProfile EKU check; the SAN payload varies to exercise
+    # the verify_smime_signer / verify_smime_recipient binding rules.
+    # ------------------------------------------------------------------
+    EMAIL_PROT = [x509.ExtendedKeyUsageOID.EMAIL_PROTECTION]
+
+    # rfc822Name = user@example.com — baseline positive / mismatch fixture.
+    leaf_mailbox_user = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("user@example.com")],
+        serial=20,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-rfc822-user-example.der", leaf_mailbox_user)
+
+    # rfc822Name = user@EXAMPLE.com — domain mixed-case SAN; matching must
+    # be ASCII case-insensitive on the domain part (RFC 5321 §2.4).
+    leaf_mailbox_user_mixed_domain = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("user@EXAMPLE.com")],
+        serial=21,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-rfc822-user-EXAMPLE.der", leaf_mailbox_user_mixed_domain)
+
+    # rfc822Name = User@example.com — local-part case differs from the
+    # target's local-part. Under strict RFC 5321 §2.4 the receiving
+    # domain decides; the shipped pkix-identity matcher chooses STRICT
+    # (byte-equal local-part). Documented in mailbox_corpus_baseline.md.
+    leaf_mailbox_user_mixed_local = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("User@example.com")],
+        serial=22,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-rfc822-User-example.der", leaf_mailbox_user_mixed_local)
+
+    # otherName(SmtpUTF8Mailbox) = 用户@example.com (internationalized
+    # local-part). RFC 8398 §3 form; must NOT also be expressed as
+    # rfc822Name (which is IA5String / ASCII-only).
+    leaf_mailbox_smtputf8_only = build_leaf(
+        root_key, root_cert,
+        sans=[x509.OtherName(
+            OID_SMTP_UTF8_MAILBOX,
+            utf8_string_der("用户@example.com"),
+        )],
+        serial=23,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-smtputf8-only.der", leaf_mailbox_smtputf8_only)
+
+    # Mixed SANs on one leaf: rfc822Name AND otherName(SmtpUTF8Mailbox)
+    # naming two different mailboxes. Either target should bind (RFC
+    # 8398 §3).
+    leaf_mailbox_mixed = build_leaf(
+        root_key, root_cert,
+        sans=[
+            x509.RFC822Name("user@example.com"),
+            x509.OtherName(
+                OID_SMTP_UTF8_MAILBOX,
+                utf8_string_der("用户@example.com"),
+            ),
+        ],
+        serial=24,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-mixed.der", leaf_mailbox_mixed)
+
+    # Multi-mailbox: three rfc822Name SANs on one leaf. Any one of them
+    # should bind; a target outside the set should NOT bind.
+    leaf_mailbox_multi = build_leaf(
+        root_key, root_cert,
+        sans=[
+            x509.RFC822Name("alpha@example.com"),
+            x509.RFC822Name("beta@example.com"),
+            x509.RFC822Name("gamma@example.com"),
+        ],
+        serial=25,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-multi-rfc822.der", leaf_mailbox_multi)
+
+    # DNS-only SAN: SAN extension is present but carries no
+    # rfc822Name/SmtpUTF8 entries. verify_mailbox returns NoMatchingSan;
+    # BasicSmimeProfile additionally rejects at path validation with
+    # MissingRfc822San.
+    leaf_mailbox_dns_only = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("example.com")],
+        serial=26,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-dns-only.der", leaf_mailbox_dns_only)
+
+    # rfc822Name SAN value that has no '@' separator: structurally a
+    # valid IA5String, semantically malformed as a mailbox. The
+    # verify_mailbox matcher cannot split it; result is NoMatchingSan
+    # (not a parse error — the SAN itself is well-formed).
+    leaf_mailbox_malformed_local = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("no-at-sign")],
+        serial=27,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-rfc822-malformed-no-at.der", leaf_mailbox_malformed_local)
+
+    # otherName(SmtpUTF8Mailbox) whose inner UTF8String tag is correct
+    # but whose value bytes are NOT valid UTF-8. RFC 8398 §3 violation;
+    # decode_utf8_string_any returns IdentityError::MalformedSan via
+    # Utf8StringRef::try_from, BUT san_entry_matches_mailbox swallows
+    # the error and treats this SAN entry as a non-match. The leaf is
+    # therefore expected to fail with NoMatchingSan (not MalformedSan).
+    # This is the shipped behavior; documented in the baseline.
+    malformed_utf8 = bytes([0xFF, 0xFE, 0xFD, 0xFC])
+    leaf_mailbox_bad_utf8 = build_leaf(
+        root_key, root_cert,
+        sans=[x509.OtherName(
+            OID_SMTP_UTF8_MAILBOX,
+            utf8_string_der_bytes(malformed_utf8),
+        )],
+        serial=28,
+        eku=EMAIL_PROT,
+    )
+    write_der("mailbox-smtputf8-bad-utf8.der", leaf_mailbox_bad_utf8)
 
 
 if __name__ == "__main__":
