@@ -12,7 +12,7 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 | Wrapper | OpenSSL invocation | Subbead | Status |
 |---|---|---|---|
 | `verify_tls_server` | `-purpose sslserver -verify_hostname/-verify_ip X` | PKIX-fmtv.18.2 | shipped |
-| `verify_tls_client_dns` | `-purpose sslclient -verify_hostname X` | PKIX-fmtv.18.3 | open |
+| `verify_tls_client_dns` | `-purpose sslclient -verify_hostname X` | PKIX-fmtv.18.3 | shipped |
 | `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | open |
 | `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | open |
 | `verify_code_signer` | `-purpose codesign` | PKIX-fmtv.18.5 | open |
@@ -92,7 +92,43 @@ consumed directly.
 
 ## TLS client (PKIX-fmtv.18.3)
 
-_Open. Will populate when the subbead lands._
+**7 / 7 cases produced a verdict on both sides.**
+**7 / 7 in agreement** (100%). **0 Rust-looser, 0 Rust-stricter.**
+
+Corpus: `leaf-clientauth-dns.der`, `leaf-clientauth-mailbox.der`,
+`host-exact-foo.der` (serverAuth-only, used for negative EKU cases),
+all from `pkix-chain/tests/fixtures/`. Profiles exercised:
+`Rfc5280Profile` (no EKU enforcement) and `BasicTlsClientProfile`
+(id-kp-clientAuth required).
+
+| # | Case | Profile | Hostname | Rust | OpenSSL | Agreement |
+|---|---|---|---|---|---|---|
+| 1 | `match_under_rfc5280` | Rfc5280 | `client.example.com` | Ok | pass | Agree |
+| 2 | `match_under_basic_client` | BasicClient | `client.example.com` | Ok | pass | Agree |
+| 3 | `san_mismatch` | Rfc5280 | `other.example.com` | NoMatchingSan | fail | Agree |
+| 4 | `eku_mismatch_basic_client` | BasicClient | `foo.example.com` | Path | fail | Agree |
+| 5 | `mailbox_leaf_dns_binding_rejected` | Rfc5280 | `client.example.com` | NoMatchingSan | fail | Agree |
+| 6 | `no_binding_clientauth_ok` | Rfc5280 | (none) | Ok | pass | Agree |
+| 7 | `no_binding_eku_rejected` | BasicClient | (none) | Path | fail | Agree |
+
+### Why OpenSSL is the strong oracle here
+
+Unlike pyca's `build_client_verifier()` (which does not bind subject
+and does not enforce EKU under `permit_all` EE policy), OpenSSL's
+`-purpose sslclient -verify_hostname X` enforces:
+
+- **id-kp-clientAuth EKU** — case 4 (serverAuth-only leaf) and case 7
+  (no-binding, serverAuth-only) both reject under `-purpose
+  sslclient` with "unsuitable certificate purpose". Matches what
+  `BasicTlsClientProfile` enforces.
+
+- **dNSName SAN binding** — case 3 (mismatched hostname) and case 5
+  (mailbox-only leaf, no dNSName SAN) both reject with "hostname
+  mismatch". Matches `verify_tls_client_dns(..., Some(name))`.
+
+`baseline-verify-pyca.md` records 3/5 client agree (2 expected
+pyca-weaker) on a strict subset of these cases; the OpenSSL 7/7
+result here is the canonical client-mode comparison.
 
 ## S/MIME signer / recipient (PKIX-fmtv.18.4)
 
