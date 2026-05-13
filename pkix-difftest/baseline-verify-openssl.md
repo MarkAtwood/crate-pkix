@@ -185,7 +185,7 @@ this corpus. Listed once for both roles:
   in stderr) and reports email mismatch. Matches our `MailboxName`
   parser's behaviour of declining to bind a malformed SAN value.
 
-## Code signing (PKIX-fmtv.18.5)
+## Code signing (PKIX-fmtv.18.5 / PKIX-fmtv.24)
 
 **No OpenSSL oracle available.** Empirically verified against
 OpenSSL 3.0.13: `openssl verify -help` lists exactly these recognized
@@ -203,13 +203,38 @@ IS recognized as an EKU OID by OpenSSL elsewhere — `openssl x509
 `1.3.6.1.5.5.7.3.3` — but `openssl verify -purpose` has no
 code-signing verb.)
 
-**Status: escalated** (PKIX-fmtv.18.5 labeled `human`). The pyca
-diff (PKIX-fmtv.19) also has no oracle for code-signing; the
-workspace's three AGENTS.md-acceptable oracles (OpenSSL,
-pyca/cryptography, Bouncy Castle) do not cover this wrapper. A
-future signtool / osslsigncode oracle could be added separately if
-the workspace wants substantive differential coverage for
-`verify_code_signer`.
+PKIX-fmtv.18.5 closed as superseded. **PKIX-fmtv.24 resolved the gap
+with a composed pyca oracle.**
+
+### pyca composed oracle (PKIX-fmtv.24, shipped)
+
+Lives in `pkix-difftest/python/pyca_codesign_oracle.py` and is driven
+by `tests/verify_wrapper_codesign.rs`. The oracle does NOT use pyca's
+`PolicyBuilder` (which is TLS-bound and has no code-signing surface).
+Instead it decomposes the wrapper's job into two independent checks
+that don't touch workspace code:
+
+1. **Chain walk** via pyca's `Certificate.verify_directly_issued_by`
+   primitive (issuer DN match + signature verification on each pair),
+   plus validity-period overlap on every cert.
+2. **Standalone EKU check**: a hand-rolled ~10-line extension-lookup
+   + OID-comparison that asserts `id-kp-codeSigning` (1.3.6.1.5.5.7.3.3)
+   is present in the leaf's `ExtendedKeyUsage`.
+
+Combined verdict: `chain_ok AND eku_ok`. Compared to
+`pkix_chain::verify_code_signer(...).is_ok()`. Hard invariant: zero
+disagreement in either direction.
+
+**3 / 3 cases in agreement** (100%) on the seed corpus
+(`leaf-codesigning.der` + `root.der` from pkix-chain fixtures):
+positive code-signing chain, EKU mismatch (serverAuth leaf), and
+validity-period before notBefore. **0 Rust-looser, 0 Rust-stricter.**
+
+A future signtool / osslsigncode oracle could still be added if the
+workspace wants substantive differential coverage that exercises
+PKCS#7 SignedData semantics around the code-signing chain; that is
+out of scope for the current `verify_code_signer` wrapper, which
+validates the chain only.
 
 ## Time stamping (PKIX-fmtv.18.6)
 
