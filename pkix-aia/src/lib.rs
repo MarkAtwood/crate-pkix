@@ -54,9 +54,10 @@
 //!
 //! ## Status
 //!
-//! Initial release: [`AiaError`] only. The `AiaFetcher` trait and
-//! `NoAiaFetcher` default land in subsequent point releases that
-//! ship alongside this one in the same workspace.
+//! Initial release: [`AiaError`] + [`AiaFetcher`] + [`NoAiaFetcher`].
+//! The remaining work under the PKIX-zkjb epic integrates the trait
+//! into `pkix-chain::Verifier` (PKIX-zkjb.9) and ships the HTTP
+//! transport adapter `pkix-aia-http` (PKIX-zkjb.5).
 
 extern crate alloc;
 
@@ -587,17 +588,83 @@ pub trait AiaFetcher {
 }
 
 // ---------------------------------------------------------------------------
+// NoAiaFetcher — zero-cost default
+// ---------------------------------------------------------------------------
+
+/// Zero-cost [`AiaFetcher`] default that never fetches.
+///
+/// Every call to [`fetch`](Self::fetch) returns
+/// [`AiaError::FetchingDisabled`]; [`batch_fetch`](AiaFetcher::batch_fetch)
+/// returns a `Vec` of the same error, one per input URI. Never
+/// panics; performs no I/O; performs no allocation beyond what the
+/// `Err` discriminant requires (the [`AiaError::FetchingDisabled`]
+/// variant carries no payload).
+///
+/// `NoAiaFetcher` is the default placeholder in
+/// `pkix-chain::Verifier<'a, V, R, A = NoAiaFetcher>` (PKIX-zkjb.9,
+/// planned). Callers who do not want AIA fetching wired up — the
+/// historical "caller supplies the complete chain" semantics — can
+/// use it directly, and consumers who later opt into real fetching
+/// simply pass a different `A: AiaFetcher` impl.
+///
+/// # Example
+///
+/// ```
+/// use pkix_aia::{AiaError, AiaFetcher, NoAiaFetcher};
+///
+/// let fetcher = NoAiaFetcher;
+///
+/// // Single fetch returns `FetchingDisabled` regardless of URI.
+/// assert_eq!(
+///     fetcher.fetch("http://ca.example/intermediate.crt"),
+///     Err(AiaError::FetchingDisabled),
+/// );
+///
+/// // Batch returns one `FetchingDisabled` per URI in input order.
+/// let batch = fetcher.batch_fetch(&[
+///     "http://ca.example/a.crt",
+///     "http://ca.example/b.crt",
+/// ]);
+/// assert_eq!(batch.len(), 2);
+/// assert!(batch.iter().all(|r| matches!(r, Err(AiaError::FetchingDisabled))));
+/// ```
+///
+/// # Why `Copy` is intentional
+///
+/// `NoAiaFetcher` is a zero-sized type with a `Copy + Clone` derive.
+/// Callers can pass it by value to APIs that take ownership without
+/// thinking about ownership semantics. The zero-sized struct
+/// compiles down to nothing; there is no monomorphization or
+/// runtime cost beyond the `Err` discriminant write.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct NoAiaFetcher;
+
+impl AiaFetcher for NoAiaFetcher {
+    fn fetch(&self, _uri: &str) -> Result<Vec<u8>, AiaError> {
+        Err(AiaError::FetchingDisabled)
+    }
+    // `batch_fetch` deliberately uses the trait's default-impl.
+    // Overriding to short-circuit (return a single allocation of N
+    // identical `FetchingDisabled` errors without N function calls)
+    // is not worth the extra surface area: the default-impl already
+    // produces the correct shape and the cost is one tiny Err per
+    // URI, not a real workload.
+}
+
+// ---------------------------------------------------------------------------
 // Send + Sync invariant (AGENTS.md non-negotiable #6 / PKIX-2l0v.2)
 // ---------------------------------------------------------------------------
 
-// Compile-time assertion that `AiaError` is `Send + Sync`. A future
-// variant that breaks this invariant (e.g. an `Rc<T>` or raw-pointer
-// field) fails the workspace build immediately, not a runtime test.
-// Pattern is the workspace standard recorded in memory
+// Compile-time assertion that load-bearing types are `Send + Sync`.
+// A future field that breaks this invariant (e.g. an `Rc<T>` or
+// raw-pointer field on `AiaError`) fails the workspace build
+// immediately, not a runtime test. Pattern is the workspace
+// standard recorded in memory
 // `send-sync-invariant-in-pkix-workspace-pkix-2l0v`.
 const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<AiaError>();
+    _assert_send_sync::<NoAiaFetcher>();
 };
 
 // ---------------------------------------------------------------------------
@@ -868,5 +935,90 @@ mod tests {
         assert_eq!(results[0], Err(AiaError::Timeout));
         assert_eq!(results[1], Err(AiaError::Timeout));
         assert_eq!(f.batch_calls.get(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // NoAiaFetcher
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn no_aia_fetcher_fetch_returns_fetching_disabled_for_any_uri() {
+        let f = NoAiaFetcher;
+        // Every URI shape resolves to the same FetchingDisabled
+        // error: HTTP, HTTPS, schemes the trait understands, schemes
+        // it doesn't, and the empty string.
+        for uri in [
+            "http://ca.example/ca.crt",
+            "https://ca.example/ca.crt",
+            "ldap://ca.example/cn=ca",
+            "file:///etc/ssl/ca.pem",
+            "",
+        ] {
+            assert_eq!(
+                f.fetch(uri),
+                Err(AiaError::FetchingDisabled),
+                "fetch({uri:?})",
+            );
+        }
+    }
+
+    #[test]
+    fn no_aia_fetcher_batch_fetch_returns_fetching_disabled_per_uri() {
+        let f = NoAiaFetcher;
+        let uris: &[&str] = &[
+            "http://ca.example/a.crt",
+            "http://ca.example/b.crt",
+            "http://ca.example/c.crt",
+        ];
+        let results = f.batch_fetch(uris);
+        assert_eq!(results.len(), 3);
+        for (i, result) in results.iter().enumerate() {
+            assert_eq!(
+                *result,
+                Err(AiaError::FetchingDisabled),
+                "batch_fetch index {i}",
+            );
+        }
+    }
+
+    #[test]
+    fn no_aia_fetcher_batch_fetch_empty_input() {
+        let f = NoAiaFetcher;
+        let empty: &[&str] = &[];
+        let results = f.batch_fetch(empty);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn no_aia_fetcher_is_zero_sized() {
+        // Zero-sized type contract is part of the rustdoc; pin it
+        // as a compile-time invariant. Any future field added to
+        // `NoAiaFetcher` (even a `PhantomData`-with-bound) fails
+        // this test.
+        assert_eq!(core::mem::size_of::<NoAiaFetcher>(), 0);
+    }
+
+    #[test]
+    fn no_aia_fetcher_derives_default() {
+        // `Default` is part of the surface — callers using
+        // `Default::default()` in generic contexts (e.g. an
+        // `A: AiaFetcher + Default` bound) get the same zero-cost
+        // unit value.
+        let f: NoAiaFetcher = Default::default();
+        assert_eq!(f.fetch("http://x"), Err(AiaError::FetchingDisabled));
+    }
+
+    #[test]
+    fn no_aia_fetcher_is_copy() {
+        // `Copy`: callers can pass `NoAiaFetcher` by value without
+        // ownership friction. `Copy` implies `Clone`, so both
+        // derives are exercised here. Both produce identical
+        // behaviour because the type is zero-sized.
+        let a = NoAiaFetcher;
+        let b = a;
+        // After the move-by-copy above, `a` is still usable —
+        // that's the Copy semantics this test pins.
+        assert_eq!(a.fetch("http://x"), Err(AiaError::FetchingDisabled));
+        assert_eq!(b.fetch("http://x"), Err(AiaError::FetchingDisabled));
     }
 }
