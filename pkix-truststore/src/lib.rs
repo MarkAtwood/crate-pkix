@@ -283,6 +283,18 @@ fn map_pem_chain_error(e: der::Error) -> Error {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Send + Sync compile-time assertions (AGENTS.md non-negotiable #6, PKIX-2l0v.2)
+// ---------------------------------------------------------------------------
+//
+// `TrustAnchor` is re-exported from `pkix-path`; the assertion in `pkix-path`
+// covers it. Here we only need to pin `pkix_truststore::Error` itself.
+
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<Error>();
+};
+
 #[cfg(test)]
 mod tests {
     //! Internal smoke tests.
