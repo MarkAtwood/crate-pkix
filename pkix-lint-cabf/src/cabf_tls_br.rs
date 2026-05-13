@@ -18,28 +18,32 @@
 //! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | [TLS BR §7.1.2.7.10](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712710-subscriber-certificate-extended-key-usage) | Error | Leaf |
 //! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | [TLS BR §7.1.2.10.4](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712104-ca-certificate-basic-constraints) | Error | `IntermediateCa` |
 //!
-//! # Using the profile
+//! # Bundling these lints into a profile
+//!
+//! These lint types are bundled by `pkix_profiles_cabf::WebPkiProfile` via its
+//! [`pkix_lint::LintProfile`] impl. Most callers should reach for the profile
+//! rather than wiring the individual lints by hand:
 //!
 //! ```rust,no_run
 //! // `cert` and `now_unix` are obtained from the calling context.
-//! use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+//! use pkix_profiles_cabf::WebPkiProfile;
 //! use pkix_lint::{LintProfile, SubjectKind};
 //! use x509_cert::Certificate;
 //!
 //! let cert: Certificate = unimplemented!("load from DER");
 //! let now_unix: u64 = unimplemented!("current Unix epoch seconds");
-//! let profile = CabfTlsBrProfile;
+//! let profile = WebPkiProfile;
 //! let runner = profile.lint_runner();
 //! let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, now_unix);
 //! ```
+//!
+//! The canonical lint-list constructor is [`all_lints`]; the profile's
+//! `LintProfile` impl simply returns those six lints.
 
 use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::Certificate;
 
-use pkix_lint::{
-    Lint, LintProfile, LintResult, LintRunner, Profile, Scope, Severity, SubjectKind,
-    ValidationPolicy,
-};
+use pkix_lint::{Lint, LintResult, Scope, Severity, SubjectKind};
 
 // ---------------------------------------------------------------------------
 // OID constants
@@ -70,6 +74,52 @@ const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.
 
 /// id-kp-serverAuth — RFC 5280 §4.2.1.12, TLS BR §7.1.2.7.10.
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+
+/// Seconds in one day (60 × 60 × 24).
+const SECS_PER_DAY: u64 = 86_400;
+
+/// Return the maximum permitted certificate validity period in seconds for a
+/// leaf TLS certificate with the given `notBefore` issuance time, per CA/B
+/// Forum Ballot SC-081.
+///
+/// SC-081 phases (UTC midnight on the effective date, seconds since Unix epoch):
+/// - Before 2026-03-15T00:00:00Z (`1_773_532_800`): 398 days
+/// - On/after 2026-03-15, before 2027-03-15: 200 days
+/// - On/after 2027-03-15, before 2029-03-15: 100 days
+/// - On/after 2029-03-15: 47 days
+///
+/// The cap phase is evaluated at the certificate's `notBefore` (issuance time),
+/// not at the relying party's current time. This matches the SC-081 requirement:
+/// the validity period cap in force at issuance governs the cert for its lifetime.
+///
+/// # Why this is duplicated
+///
+/// `pkix_profiles_cabf::sc081_validity_cap` is the public-facing copy of this
+/// math. This file carries a `pub(crate)` duplicate to keep
+/// `pkix-lint-cabf` from depending on `pkix-profiles-cabf` (the profile crate
+/// depends on the lint crate, not the other way around — see AGENTS.md /
+/// PKIX-9vnx.9.2.2 architectural invariant). Drift between the two copies
+/// is pinned by a cross-validation test in `pkix-profiles-cabf/tests/`.
+///
+/// Epoch boundaries verified via:
+/// `python3 -c "import calendar; print(calendar.timegm((YYYY,3,15,0,0,0,0,0,0)))"`
+#[must_use]
+pub(crate) const fn sc081_validity_cap(not_before_unix: u64) -> u64 {
+    // Exact UTC midnight boundaries.
+    const SC081_200D_EPOCH: u64 = 1_773_532_800; // 2026-03-15T00:00:00Z
+    const SC081_100D_EPOCH: u64 = 1_805_068_800; // 2027-03-15T00:00:00Z
+    const SC081_47D_EPOCH: u64 = 1_868_227_200; // 2029-03-15T00:00:00Z
+
+    if not_before_unix >= SC081_47D_EPOCH {
+        47 * SECS_PER_DAY
+    } else if not_before_unix >= SC081_100D_EPOCH {
+        100 * SECS_PER_DAY
+    } else if not_before_unix >= SC081_200D_EPOCH {
+        200 * SECS_PER_DAY
+    } else {
+        398 * SECS_PER_DAY
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Lint 1 — cabf.br.tls.validity.max
@@ -145,7 +195,7 @@ impl Lint for ValidityMaxLint {
         }
 
         let duration_secs = not_after - not_before;
-        let cap = pkix_profiles_cabf::sc081_validity_cap(not_before);
+        let cap = sc081_validity_cap(not_before);
 
         if duration_secs > cap {
             // Dynamic detail (Cow::Owned): report the actual non-conforming
@@ -614,53 +664,18 @@ impl Lint for BcCaFlagLint {
 }
 
 // ---------------------------------------------------------------------------
-// CabfTlsBrProfile — bundles all lints with the WebPkiProfile path policy
+// Canonical lint list — consumed by pkix_profiles_cabf::WebPkiProfile's
+// LintProfile impl
 // ---------------------------------------------------------------------------
-
-/// The CA/B Forum TLS Baseline Requirements profile for `pkix-lint`.
-///
-/// Implements both [`pkix_lint::Profile`] (re-exported from `pkix_path`;
-/// delegating to [`pkix_profiles_cabf::WebPkiProfile`]) and [`LintProfile`]
-/// (providing all six CABF TLS BR lints above).
-///
-/// # Usage
-///
-/// ```rust,no_run
-/// // `cert` and `now_unix` are obtained from the calling context.
-/// use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
-/// use pkix_lint::{LintProfile, SubjectKind};
-/// use x509_cert::Certificate;
-///
-/// let cert: Certificate = unimplemented!("load from DER");
-/// let now_unix: u64 = unimplemented!("current Unix epoch seconds");
-/// let profile = CabfTlsBrProfile;
-/// let runner = profile.lint_runner();
-/// let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, now_unix);
-/// ```
-pub struct CabfTlsBrProfile;
-
-impl Profile for CabfTlsBrProfile {
-    fn id(&self) -> &'static str {
-        pkix_profiles_cabf::WebPkiProfile.id()
-    }
-
-    fn version(&self) -> &'static str {
-        pkix_profiles_cabf::WebPkiProfile.version()
-    }
-
-    fn policy(&self, now_unix: u64) -> ValidationPolicy {
-        pkix_profiles_cabf::WebPkiProfile.policy(now_unix)
-    }
-
-    fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier] {
-        pkix_profiles_cabf::WebPkiProfile.policy_oids()
-    }
-}
 
 /// Build the canonical list of CABF TLS BR lints.
 ///
 /// Returns a fresh `Vec<Box<dyn Lint>>` on each call — the caller owns the lints.
-/// Use [`CabfTlsBrProfile::lint_runner`] for a ready-to-use [`LintRunner`].
+///
+/// This is the constructor that `pkix_profiles_cabf::WebPkiProfile`'s
+/// [`pkix_lint::LintProfile`] impl returns; consumers who want a ready-to-use
+/// [`pkix_lint::LintRunner`] should call `WebPkiProfile.lint_runner()` rather
+/// than wrapping this function themselves.
 #[must_use]
 pub fn all_lints() -> Vec<Box<dyn Lint>> {
     vec![
@@ -671,40 +686,4 @@ pub fn all_lints() -> Vec<Box<dyn Lint>> {
         Box::new(EkuServerAuthLint),
         Box::new(BcCaFlagLint),
     ]
-}
-
-impl LintProfile for CabfTlsBrProfile {
-    /// Return the shared lint list for this profile.
-    ///
-    /// The returned slice is backed by a lazily-initialized `static OnceLock`.
-    /// The lint instances returned here are different objects from those used
-    /// inside a `LintRunner` produced by [`lint_runner`][Self::lint_runner]:
-    /// each call to `lint_runner()` constructs a fresh set of instances via
-    /// [`all_lints()`]. Both use the same lint types and IDs, but the instances
-    /// are not shared.
-    ///
-    /// Note: if `Lint` implementations ever become stateful, callers should
-    /// prefer [`lint_runner`][Self::lint_runner] for a self-contained runner
-    /// rather than mixing a call to `lints()` with a separately constructed
-    /// runner.
-    fn lints(&self) -> &[Box<dyn Lint>] {
-        // `OnceLock` (stable since Rust 1.70) gives us a lazily-initialized
-        // static `Vec<Box<dyn Lint>>` whose reference outlives `&self`.
-        static LINTS: std::sync::OnceLock<Vec<Box<dyn Lint>>> = std::sync::OnceLock::new();
-        LINTS.get_or_init(all_lints)
-    }
-
-    /// Allocates a fresh [`LintRunner`] backed by a new set of lint instances
-    /// on each call.
-    ///
-    /// The lint instances inside the returned runner are independent from those
-    /// returned by [`lints()`][Self::lints]: both source their lint types from
-    /// [`all_lints()`], but the objects are distinct allocations. The set of
-    /// lint IDs is identical.
-    ///
-    /// For repeated use, cache the returned [`LintRunner`] at the call site
-    /// rather than calling this method on every evaluation.
-    fn lint_runner(&self) -> LintRunner {
-        LintRunner::new(all_lints())
-    }
 }

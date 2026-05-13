@@ -62,10 +62,12 @@
 //!
 //! ## Modules
 //!
-//! - [`cabf_tls_br`] — CA/B Forum TLS Baseline Requirements lints. Bundles
-//!   SC-081 phased validity caps, SHA-1 prohibition, RSA min-key-size,
-//!   SAN/EKU presence, and `BasicConstraints` cA-flag checks behind
-//!   [`cabf_tls_br::CabfTlsBrProfile`].
+//! - [`cabf_tls_br`] — CA/B Forum TLS Baseline Requirements lints: SC-081
+//!   phased validity caps, SHA-1 prohibition, RSA min-key-size, SAN/EKU
+//!   presence, and `BasicConstraints` cA-flag checks. Individual `Lint`
+//!   impls plus the canonical [`cabf_tls_br::all_lints`] constructor; the
+//!   `LintProfile` bundling lives on
+//!   `pkix_profiles_cabf::WebPkiProfile`.
 //!
 //! ## Stance cross-references
 //!

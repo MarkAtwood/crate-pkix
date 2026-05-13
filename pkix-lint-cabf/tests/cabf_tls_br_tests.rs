@@ -28,7 +28,7 @@ use pkix_lint_cabf::cabf_tls_br::{
     BcCaFlagLint, EkuServerAuthLint, RsaMinKeySizeLint, SanRequiredLint, Sha1ProhibitedLint,
     ValidityMaxLint,
 };
-use pkix_lint::{Lint, LintProfile, LintResult, SubjectKind};
+use pkix_lint::{Lint, LintResult, SubjectKind};
 use x509_cert::Certificate;
 
 // ---------------------------------------------------------------------------
@@ -701,75 +701,11 @@ fn bc_ca_flag_not_applicable_for_leaf() {
     );
 }
 
-// ---------------------------------------------------------------------------
-// CabfTlsBrProfile integration — LintProfile impl
-// ---------------------------------------------------------------------------
-
-#[test]
-fn cabf_tls_br_profile_lint_runner_has_all_six_lints() {
-    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
-    let profile = CabfTlsBrProfile;
-    let runner = profile.lint_runner();
-    let ids: Vec<&str> = runner.lints().iter().map(|l| l.id()).collect();
-    assert!(
-        ids.contains(&"cabf.br.tls.validity.max"),
-        "missing validity.max lint"
-    );
-    assert!(
-        ids.contains(&"cabf.br.tls.alg.sha1_prohibited"),
-        "missing sha1_prohibited lint"
-    );
-    assert!(
-        ids.contains(&"cabf.br.tls.rsa.min_key_size"),
-        "missing rsa.min_key_size lint"
-    );
-    assert!(
-        ids.contains(&"cabf.br.tls.san.required"),
-        "missing san.required lint"
-    );
-    assert!(
-        ids.contains(&"cabf.br.tls.eku.server_auth"),
-        "missing eku.server_auth lint"
-    );
-    assert!(
-        ids.contains(&"cabf.br.tls.bc.ca_flag"),
-        "missing bc.ca_flag lint"
-    );
-    assert_eq!(ids.len(), 6, "expected exactly 6 lints in CabfTlsBrProfile");
-}
-
-#[test]
-fn cabf_tls_br_profile_lints_method_has_all_ids() {
-    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
-    let profile = CabfTlsBrProfile;
-    let lints = profile.lints();
-    let ids: Vec<&str> = lints.iter().map(|l| l.id()).collect();
-    assert!(ids.contains(&"cabf.br.tls.validity.max"));
-    assert!(ids.contains(&"cabf.br.tls.alg.sha1_prohibited"));
-    assert!(ids.contains(&"cabf.br.tls.rsa.min_key_size"));
-    assert!(ids.contains(&"cabf.br.tls.san.required"));
-    assert!(ids.contains(&"cabf.br.tls.eku.server_auth"));
-    assert!(ids.contains(&"cabf.br.tls.bc.ca_flag"));
-}
-
-#[test]
-fn cabf_tls_br_profile_run_chain_webpki_cert_all_pass() {
-    // webpki-self-signed-365d.der evaluated pre-SC-081 (T_2026_JAN_01) should
-    // produce Pass for all cert-scope lints that apply to Leaf.
-    // now = 2026-01-01 (cap = 398 days); cert is 365 days → validity passes.
-    use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
-    let cert = load_cert!("webpki-self-signed-365d.der");
-    let profile = CabfTlsBrProfile;
-    let runner = profile.lint_runner();
-    let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, T_2026_JAN_01);
-
-    // Collect only actionable findings (not Pass / NotApplicable).
-    let errors: Vec<_> = findings.iter().filter(|f| f.result.is_finding()).collect();
-    assert!(
-        errors.is_empty(),
-        "webpki cert at pre-SC-081 time must produce no error findings; got: {errors:?}"
-    );
-}
+// Note: the former `CabfTlsBrProfile integration` test block (three tests
+// covering LintProfile::lints / lint_runner / run_chain pass-on-webpki-cert)
+// migrated to `pkix-profiles-cabf/tests/web_pki_profile_lints.rs` when
+// `CabfTlsBrProfile` was retired in favour of bundling the lint set on
+// `pkix_profiles_cabf::WebPkiProfile` directly (PKIX-9vnx.9.2.2).
 
 // ===========================================================================
 // Standards-body metadata (PKIX-9vnx.6.1; renamed to `spec_*` in pkix-lint 0.6.0)

@@ -8,6 +8,36 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### Added
 
+- **`WebPkiProfile` now implements `pkix_lint::LintProfile`.** The
+  trait impl bundles the six CA/B Forum TLS BR lints from
+  `pkix_lint_cabf::cabf_tls_br` (`ValidityMaxLint`,
+  `Sha1ProhibitedLint`, `RsaMinKeySizeLint`, `SanRequiredLint`,
+  `EkuServerAuthLint`, `BcCaFlagLint`). Callers can now write
+  `WebPkiProfile.lint_runner()` to obtain a ready-to-use
+  `pkix_lint::LintRunner` for end-entity TLS certificate linting. The
+  lint slice from `WebPkiProfile::lints()` is backed by a
+  lazily-initialized `static OnceLock`. (PKIX-9vnx.9.2.2.)
+
+  This replaces the former `pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile`,
+  which has been removed from `pkix-lint-cabf`. The architectural
+  invariant going forward: Profile types live in `-profiles*` crates;
+  Lint types live in `-lint*` crates; dep flow is one-way,
+  `-profiles*` → `-lint*`. See `pkix-lint-cabf`'s CHANGELOG entry for
+  the matching breaking-removal entry.
+
+- New `pkix-lint = { workspace = true }` and
+  `pkix-lint-cabf = { workspace = true }` runtime dependencies, gating
+  the `LintProfile` impl. The new edges complete the trust-domain
+  surface that was previously prevented by the
+  `pkix-lint-cabf → pkix-profiles-cabf` cycle. (PKIX-9vnx.9.2.2.)
+
+- Integration test suite `tests/web_pki_profile_lints.rs` cross-
+  validates `WebPkiProfile`'s `LintProfile` output against
+  `pkix_lint_cabf::cabf_tls_br::all_lints` (the canonical lint-list
+  constructor used as an independent oracle). Includes the
+  webpki-self-signed-365d.der pass-on-pre-SC-081 fixture test moved
+  from `pkix-lint-cabf/tests/cabf_tls_br_tests.rs`. (PKIX-9vnx.9.2.2.)
+
 - Rustdoc annotations linking each Profile and CABF_*_ALLOWED_ALGS
   constant to its canonical CA/B Forum BR source URL on GitHub. The
   crate-level rustdoc gains a `# Reporting divergences` section

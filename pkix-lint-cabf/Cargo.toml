@@ -13,17 +13,17 @@ categories  = ["cryptography"]
 [dependencies]
 # pkix-lint: framework (Lint trait, LintRunner, LintResult, ...).
 pkix-lint          = { workspace = true }
-# pkix-profiles-cabf: WebPkiProfile (delegated to by CabfTlsBrProfile) and the
-# SC-081 phased validity cap helper.
-pkix-profiles-cabf = { workspace = true }
 x509-cert          = { workspace = true }
 der                = { workspace = true }
 
 [dev-dependencies]
 # pkix-path's p256 + std features are required by the integration tests that
-# build a real validated chain to feed CabfTlsBrProfile via LintProfile.
+# build a real validated chain.
 pkix-path          = { workspace = true, features = ["p256", "std"] }
 pkix-lint          = { workspace = true }
+# pkix-profiles-cabf is a dev-only dep: the in-tree integration tests
+# cross-validate the SC-081 cap math against the public-facing copy.
+# Runtime dep flow is one-way: pkix-profiles-cabf -> pkix-lint-cabf.
 pkix-profiles-cabf = { workspace = true }
 x509-cert          = { workspace = true }
 der                = { workspace = true }
