@@ -1280,6 +1280,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-policy-zlint"
+version = "0.0.0"
+dependencies = [
+ "der",
+ "pkix-lint",
+ "pkix-path",
+ "pkix-zlint-bridge",
+ "x509-cert",
+]
+
+[[package]]
 name = "pkix-profiles"
 version = "0.3.0"
 dependencies = [
