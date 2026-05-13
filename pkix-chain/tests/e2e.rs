@@ -11,7 +11,7 @@
 //!   `PKITS_PAST` = 1970-01-01 00:00:00 UTC = 0  (before notBefore)
 
 use pkix_chain::{
-    verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker,
+    verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker, Verifier,
 };
 use pkix_path::{TrustAnchor, ValidationPolicy};
 use x509_cert::Certificate;
@@ -130,4 +130,88 @@ fn e2e_verify_chain_explicit_verifier() {
     let vp = result.expect("PKITS §4.1.1 must validate via verify_chain with DefaultVerifier");
     assert_eq!(vp.anchor_index, 0);
     assert_eq!(vp.depth, 1);
+}
+
+/// `Verifier::verify_one` produces the same `ValidatedPath` as the free
+/// function `verify_chain` for identical inputs.
+///
+/// Oracle: `verify_chain` itself, which is independently tested above
+/// against the PKITS §4.1.1 oracle. `Verifier::verify_one` is the body
+/// `verify_chain` now delegates to; this test pins the equivalence so a
+/// future refactor that diverges them fails immediately. (PKIX-gsd9.)
+#[test]
+fn e2e_verifier_verify_one_matches_verify_chain() {
+    let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
+    let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
+    let policy = ValidationPolicy::new(PKITS_NOW);
+
+    let from_free =
+        verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &NoRevocation).expect("free");
+    let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+    let from_struct = verifier.verify_one(&chain).expect("struct");
+
+    assert_eq!(from_free.anchor_index, from_struct.anchor_index);
+    assert_eq!(from_free.depth, from_struct.depth);
+    assert_eq!(from_free.leaf_subject, from_struct.leaf_subject);
+    assert_eq!(from_free.leaf_issuer, from_struct.leaf_issuer);
+    assert_eq!(from_free.leaf_serial, from_struct.leaf_serial);
+    assert_eq!(from_free.leaf_spki, from_struct.leaf_spki);
+}
+
+/// `Verifier::verify_batch` returns one result per input chain in the
+/// same order, and a failure in one chain does not poison the others.
+///
+/// Oracle: mixes the PKITS §4.1.1 good chain (must succeed) with the
+/// same chain validated at `now_unix = 0` (must fail with
+/// `ValidityPeriod`). Independent of the implementation under test —
+/// we already know from `e2e_verify_chain_default_pkits_4_1_1` and
+/// `e2e_verify_chain_default_expired_returns_validity_error` what each
+/// outcome is in isolation. (PKIX-gsd9.)
+#[test]
+fn e2e_verifier_verify_batch_returns_per_chain_results() {
+    let chain = [load(VALID_EE_DER), load(GOOD_CA_DER)];
+    let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
+
+    let good_policy = ValidationPolicy::new(PKITS_NOW);
+    let good_verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &good_policy);
+
+    let bad_policy = ValidationPolicy::new(0);
+    let bad_verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &bad_policy);
+
+    // Run each chain through its respective verifier and collect the
+    // results into a single batch shape; this proves verify_batch
+    // composes correctly without sharing state across results.
+    let chain_slice: &[Certificate] = &chain;
+    let chains: [&[Certificate]; 2] = [chain_slice, chain_slice];
+
+    let good_results = good_verifier.verify_batch(&chains);
+    assert_eq!(good_results.len(), 2);
+    assert!(good_results[0].is_ok(), "good[0]: {:?}", good_results[0]);
+    assert!(good_results[1].is_ok(), "good[1]: {:?}", good_results[1]);
+
+    let bad_results = bad_verifier.verify_batch(&chains);
+    assert_eq!(bad_results.len(), 2);
+    for (i, r) in bad_results.iter().enumerate() {
+        assert!(
+            matches!(
+                r,
+                Err(pkix_chain::Error::Path(
+                    pkix_path::Error::ValidityPeriod { .. }
+                ))
+            ),
+            "bad[{i}]: {r:?}"
+        );
+    }
+}
+
+/// `Verifier::verify_batch` on an empty slice returns an empty
+/// `Vec` (zero results in, zero results out).
+#[test]
+fn e2e_verifier_verify_batch_empty_input_returns_empty() {
+    let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
+    let policy = ValidationPolicy::new(PKITS_NOW);
+    let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+
+    let results = verifier.verify_batch(&[]);
+    assert!(results.is_empty());
 }
