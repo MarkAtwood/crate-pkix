@@ -6,6 +6,50 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-policy-zlint` 0.0.0: thin Lint adapter over `pkix-zlint-bridge` (2026-05-13)
+
+New crate. Wraps each zlint catalog check (~400 at the time of writing)
+as a workspace `pkix_lint::Lint`, so callers can mix zlint's predicate-
+comprehensive CA/B Forum coverage into a `pkix_lint::LintRunner`
+alongside the workspace's own RFC-conformance and `-cabf` reference
+lints.
+
+Per AGENTS.md non-negotiable #5 (three-mode policy-class model) and the
+spec-taxonomy principle (PKIX-mzsk), this is the principled path for
+**predicate-comprehensive** CA/B Forum coverage. The hand-authored
+`pkix-lint-cabf` reference set covers a small curated subset of marquee
+BR predicates; this crate covers the whole catalog.
+
+Public API:
+
+- `pkix_policy_zlint::ZlintLint` — one `Lint` per zlint check.
+- `pkix_policy_zlint::all_lints(bridge) -> Result<Vec<Box<dyn Lint>>, BridgeError>`
+  — enumerate zlint's catalog and wrap each check.
+
+Design notes:
+
+- `Lint::id()` and `Lint::citation()` return `&'static str`. The bridge's
+  `ZlintLintInfo` is `String`-typed (runtime catalog), so `all_lints`
+  leaks each `ZlintLintInfo` once at construction via `Box::leak`.
+  Bounded leak (~400 small records, one-time at startup); avoids
+  broadening the workspace `Lint` trait to `Cow<'static, str>` or
+  `Box<str>` for the sake of a single adapter.
+- Per-cert subprocess cost is amortised by the bridge's SHA-256 verdict
+  cache; each `ZlintLint::check_cert` looks up its check ID in a
+  per-cert verdict map produced by one underlying `run_on_cert` call.
+- Verdict mapping is fixed: `NotApplicable` → `LintResult::NotApplicable`,
+  `Pass` → `LintResult::Pass`, `Notice` and `Warn` → `LintResult::Warn`,
+  `Error` → `LintResult::Error`, `Fatal` → `LintResult::Fatal`.
+
+Tested round-trip against the real `zlint` binary using PKITS Trust
+Anchor Root Certificate fixture. Integration test auto-skipped when
+`zlint` is not on `PATH`, same pattern as `pkix-zlint-bridge`'s own
+integration tests.
+
+Tracked as [PKIX-jy95.10].
+
+[PKIX-jy95.10]: https://github.com/MarkAtwood/crate-pkix  "pkix-policy-zlint adapter"
+
 ### AGENTS.md: spec-taxonomy principle for `-cabf` crates (2026-05-13)
 
 Articulates what the `-cabf` unprincipled exception in AGENTS.md
