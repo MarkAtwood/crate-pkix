@@ -142,6 +142,15 @@ def main():
     )
     write_der("leaf-san-alice-example.der", leaf_smime)
 
+    # Code-signing leaf: no SAN, EKU codeSigning.
+    leaf_codesign = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=5,
+        eku=[x509.ExtendedKeyUsageOID.CODE_SIGNING],
+    )
+    write_der("leaf-codesigning.der", leaf_codesign)
+
 
 if __name__ == "__main__":
     main()

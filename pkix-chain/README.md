@@ -113,6 +113,26 @@ let result = verify_smime_signer(
 )?;
 ```
 
+### Code-signing identity
+
+`verify_code_signer` is a thin composition of `verify_chain` under a
+`Profile` that requires `id-kp-codeSigning`. Code-signing certificates
+carry no caller-supplied identity target (no hostname, no mailbox), so
+the wrapper does not perform identity binding.
+
+```rust
+use pkix_chain::{verify_code_signer, NoRevocation};
+use pkix_profiles::BasicCodeSigningProfile;
+
+let result = verify_code_signer(
+    &chain,
+    &anchors,
+    &BasicCodeSigningProfile,
+    unix_now(),
+    &NoRevocation,
+)?;
+```
+
 ## What this crate does
 
 `verify_chain` runs two sequential checks:

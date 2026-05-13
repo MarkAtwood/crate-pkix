@@ -344,6 +344,48 @@ where
     Ok(validated)
 }
 
+/// Verify a certificate chain for code-signing use.
+///
+/// Thin composition of [`verify_chain`] under a [`Profile`] that requires
+/// the `id-kp-codeSigning` Extended Key Usage. Code-signing certificates
+/// do not carry a caller-supplied identity target (no hostname, no mailbox)
+/// so the wrapper does not perform identity binding — the EKU requirement
+/// is encoded entirely in `profile.policy(now_unix)`.
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
+/// need a custom verifier should drop down to [`verify_chain`].
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the signer cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   typically [`pkix_profiles::BasicCodeSigningProfile`] or
+///   `pkix_profiles_cabf::CodeSigningProfile` for the CA/B Forum BR overlay
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed (including the
+///   profile's `id-kp-codeSigning` EKU requirement not being met).
+/// - [`Error::Revocation`] — a cert in the chain was revoked or the
+///   revocation source was unusable.
+pub fn verify_code_signer<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
