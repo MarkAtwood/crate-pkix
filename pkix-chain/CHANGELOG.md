@@ -56,6 +56,26 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   with a post-validation check that the leaf's `ExtendedKeyUsage`
   extension is marked critical and contains only `id-kp-timeStamping`
   (RFC 3161 §2.3). (PKIX-fmtv.13.2.)
+- `verify_ocsp_responder` — RFC 6960 §4.2.2.2 delegated-responder
+  wrapper. Composes `verify_chain` under
+  `pkix_profiles::BasicOcspResponderProfile` (which requires
+  `id-kp-OCSPSigning` EKU) with two wrapper-side post-validation
+  checks: (1) the responder cert at `chain[0]` is delegated by the
+  caller-supplied `issuer` cert, verified by RFC 4518 string-prep DN
+  equality between `chain[0].tbs.issuer` and `issuer.tbs.subject`; and
+  (2) when the responder cert carries `id-pkix-ocsp-nocheck`
+  (OID 1.3.6.1.5.5.7.48.1.5, RFC 6960 §4.2.2.2.1), the caller's
+  revocation checker is bypassed for `chain[0]` only via a private
+  `RevocationChecker` shim that identifies the leaf by (issuer DN,
+  serial number). Handles delegated responders only; the CA-direct
+  case is documented in the rustdoc with a worked
+  `verify_chain`-based example. (PKIX-fmtv.13.3.)
+- `Error::OcspDelegation { reason: &'static str }` — new
+  non-exhaustive variant produced only by `verify_ocsp_responder` when
+  the wrapper's RFC 6960 §4.2.2.2 delegation DN-equality check fails.
+  Distinct from `Error::ProfileViolation` so callers can
+  programmatically distinguish responder-delegation failures from
+  other profile-level rejections. (PKIX-fmtv.13.3.)
 - `Error::Identity(IdentityError)` — new non-exhaustive variant wrapping
   `pkix_identity::IdentityError`. Produced by the TLS server and S/MIME
   wrappers when identity binding fails after path validation succeeds.
@@ -103,10 +123,6 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 - `verify_chain` and `verify_chain_default` keep their existing
   `Result<ValidatedPath, Error>` shapes. New wrappers compose on top
   rather than replacing.
-- `verify_ocsp_responder` (from PKIX-fmtv.7's 7-wrapper set) is
-  deferred. Blocked on PKIX-fmtv.13.3 pending design decisions on the
-  issuer parameter shape, self-signed CA-direct responder handling,
-  and `id-pkix-ocsp-nocheck` integration.
 
 ## [0.4.0] — 2026-05-08
 

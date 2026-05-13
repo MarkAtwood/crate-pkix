@@ -14,6 +14,9 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-timestamping.der` | end-entity | EE signed by `root`, EKU=timeStamping (critical, sole) — RFC 3161 §2.3 compliant TSA |
 | `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical) — RFC 3161 §2.3 negative case |
 | `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical) — RFC 3161 §2.3 negative case |
+| `leaf-ocsp-responder.der` | end-entity | EE signed by `root`, EKU=OCSPSigning — RFC 6960 §4.2.2.2 delegated responder |
+| `leaf-ocsp-responder-nocheck.der` | end-entity | EE signed by `root`, EKU=OCSPSigning + `id-pkix-ocsp-nocheck` — RFC 6960 §4.2.2.2.1 |
+| `root-wrong-issuer.der` | trust anchor (alt) | P-256 self-signed CA with a DIFFERENT subject DN than `root` — used to drive the wrapper-level OCSP-delegation DN-mismatch negative test |
 
 PKIX-fmtv.11.2 client-auth fixtures (EKU=clientAuth):
 

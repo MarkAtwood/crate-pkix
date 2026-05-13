@@ -94,8 +94,13 @@ def build_root():
     return key, cert
 
 
-def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=False):
-    """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth, non-critical."""
+def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=False,
+               ocsp_no_check=False):
+    """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth, non-critical.
+
+    When ``ocsp_no_check=True``, attach the RFC 6960 §4.2.2.2.1 OCSPNoCheck
+    extension (OID 1.3.6.1.5.5.7.48.1.5) to the leaf.
+    """
     if eku is None:
         eku = [x509.ExtendedKeyUsageOID.SERVER_AUTH]
     key = ec.generate_private_key(ec.SECP256R1())
@@ -133,6 +138,12 @@ def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=Fals
             x509.SubjectAlternativeName(sans),
             critical=False,
         )
+    if ocsp_no_check:
+        # RFC 6960 §4.2.2.2.1: presence of this extension on an OCSP
+        # responder cert signals "do not check revocation status of this
+        # cert" (avoids infinite OCSP loop). The extension is informational
+        # and SHOULD be non-critical.
+        builder = builder.add_extension(x509.OCSPNoCheck(), critical=False)
     return builder.sign(root_key, hashes.SHA256())
 
 
@@ -211,6 +222,67 @@ def main():
         eku_critical=True,
     )
     write_der("leaf-timestamping-not-sole.der", leaf_tsa_not_sole)
+
+    # OCSP responder leaf: RFC 6960 §4.2.2.2 -- delegated responder
+    # cert MUST carry id-kp-OCSPSigning. The delegation (cert signed
+    # by the same CA whose status it asserts) is enforced at the
+    # wrapper layer by DN equality, not by an extension on the cert.
+    leaf_ocsp_responder = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=9,
+        eku=[x509.ExtendedKeyUsageOID.OCSP_SIGNING],
+    )
+    write_der("leaf-ocsp-responder.der", leaf_ocsp_responder)
+
+    # OCSP responder leaf + id-pkix-ocsp-nocheck (RFC 6960 §4.2.2.2.1).
+    # Same chain shape as above; the wrapper must bypass revocation on
+    # this leaf only.
+    leaf_ocsp_responder_nocheck = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=10,
+        eku=[x509.ExtendedKeyUsageOID.OCSP_SIGNING],
+        ocsp_no_check=True,
+    )
+    write_der("leaf-ocsp-responder-nocheck.der", leaf_ocsp_responder_nocheck)
+
+    # Wrong-issuer root: a SECOND, structurally-valid CA cert with a
+    # DIFFERENT subject DN than `root_cert`. The OCSP responder leaves
+    # above are signed by `root_cert`; passing this cert as the `issuer`
+    # argument to `verify_ocsp_responder` MUST fail the wrapper-level
+    # delegation DN check (Error::OcspDelegation), even though the
+    # chain itself validates fine against `root_cert` as anchor.
+    other_root_key = ec.generate_private_key(ec.SECP256R1())
+    other_root_name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test root OTHER")
+    ])
+    other_root_cert = (
+        x509.CertificateBuilder()
+        .subject_name(other_root_name)
+        .issuer_name(other_root_name)
+        .public_key(other_root_key.public_key())
+        .serial_number(101)
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(other_root_key, hashes.SHA256())
+    )
+    write_der("root-wrong-issuer.der", other_root_cert)
 
     # ------------------------------------------------------------------
     # PKIX-fmtv.23: curated RFC 8398 mailbox corpus.
