@@ -58,6 +58,13 @@ x509-cert         = { workspace = true }
 # Used by tests/serde_round_trip.rs (gated by required-features).
 serde      = { workspace = true }
 serde_json = { workspace = true }
+# End-to-end AIA integration test (`tests/aia_http_e2e.rs`, PKIX-zkjb.8)
+# drives `Verifier::verify_one` through `pkix-aia-http::HttpFetcher`
+# against an in-process `mockito` HTTP server. pkix-aia-http is dev-only
+# here — the runtime crate has no reason to bind to a specific HTTP
+# transport.
+pkix-aia-http = { workspace = true }
+mockito       = "1.7"
 
 [[test]]
 name = "serde_round_trip"

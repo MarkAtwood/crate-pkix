@@ -44,6 +44,14 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   Callers wanting AIA fetching drop down to `verify_chain` or
   `Verifier::new` directly.
 
+### Tested
+
+- End-to-end AIA validation through `pkix-aia-http::HttpFetcher` and a
+  `mockito` HTTP server in new `tests/aia_http_e2e.rs`: positive case
+  (200 + intermediate DER → chain validates), 404 → `Error::Aia(HttpStatus(404))`,
+  `ldap://` URI rewrite → `Error::Aia(UriUnsupported)`, and
+  `NoAiaFetcher` short-circuit baseline. (PKIX-zkjb.8)
+
 ## [1.0.0] — TBD
 
 First stable release.
