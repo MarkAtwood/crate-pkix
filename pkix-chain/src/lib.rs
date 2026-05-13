@@ -34,8 +34,9 @@
 //! # }
 //! ```
 
+pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
-    self, DefaultVerifier, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
+    self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
 };
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
@@ -49,8 +50,9 @@ use x509_cert::Certificate;
 
 /// Combined error type for chain verification.
 ///
-/// Wraps both path validation errors ([`pkix_path::Error`]) and
-/// revocation checking errors ([`pkix_revocation::Error`]).
+/// Wraps path validation errors ([`pkix_path::Error`]),
+/// revocation checking errors ([`pkix_revocation::Error`]), and identity
+/// binding errors ([`pkix_identity::IdentityError`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -58,6 +60,13 @@ pub enum Error {
     Path(pkix_path::Error),
     /// Revocation checking failed.
     Revocation(pkix_revocation::Error),
+    /// Cert-side identity binding failed (hostname or mailbox SAN match).
+    ///
+    /// Only produced by the use-case wrappers (`verify_tls_server`,
+    /// `verify_smime_signer`, …). The lower-level [`verify_chain`] and
+    /// [`verify_chain_default`] entry points do not perform identity
+    /// binding and never return this variant.
+    Identity(pkix_identity::IdentityError),
 }
 
 impl core::fmt::Display for Error {
@@ -65,6 +74,7 @@ impl core::fmt::Display for Error {
         match self {
             Self::Path(e) => write!(f, "path validation: {e}"),
             Self::Revocation(e) => write!(f, "revocation: {e}"),
+            Self::Identity(e) => write!(f, "identity binding: {e}"),
         }
     }
 }
@@ -74,6 +84,7 @@ impl std::error::Error for Error {
         match self {
             Self::Path(e) => Some(e),
             Self::Revocation(e) => Some(e),
+            Self::Identity(e) => Some(e),
         }
     }
 }
@@ -87,6 +98,12 @@ impl From<pkix_path::Error> for Error {
 impl From<pkix_revocation::Error> for Error {
     fn from(e: pkix_revocation::Error) -> Self {
         Self::Revocation(e)
+    }
+}
+
+impl From<pkix_identity::IdentityError> for Error {
+    fn from(e: pkix_identity::IdentityError) -> Self {
+        Self::Identity(e)
     }
 }
 
@@ -180,6 +197,64 @@ where
         }
     }
 
+    Ok(validated)
+}
+
+/// Verify a certificate chain for TLS server use.
+///
+/// Composes [`verify_chain`] with [`pkix_identity::verify_dns_name`] in a
+/// single call. The leaf certificate `chain[0]` must both validate as a
+/// chain against `anchors` under `profile.policy(now_unix)` **and** carry a
+/// Subject Alternative Name entry matching `name`.
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
+/// need a custom verifier should drop down to [`verify_chain`] and call
+/// [`pkix_identity::verify_dns_name`] explicitly.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the server cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `name`       — pre-parsed server identity (construct via
+///   [`ServerName::dns_name`] or [`ServerName::ip_address`])
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   typically [`pkix_profiles::BasicTlsProfile`] or
+///   `pkix_profiles_cabf::WebPkiProfile`
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Order of operations
+///
+/// Path validation runs first. A chain that fails RFC 5280 §6.1 (expired,
+/// broken signature, missing intermediate, policy violation) returns
+/// [`Error::Path`] regardless of whether the leaf's SAN would have matched.
+/// Identity binding runs only after path validation succeeds. This ordering
+/// matches the behaviour callers expect from `rustls`/`webpki` and prevents
+/// leaking SAN-match information about untrusted certificates.
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed.
+/// - [`Error::Revocation`] — a cert in the chain was revoked or the
+///   revocation source was unusable.
+/// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
+///   not contain an entry matching `name` (or the SAN extension was
+///   missing/malformed).
+pub fn verify_tls_server<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    name: &ServerName<'_>,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    pkix_identity::verify_dns_name(&chain[0], name)?;
     Ok(validated)
 }
 

@@ -65,6 +65,31 @@ use pkix_chain::verify_chain;
 let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation)?;
 ```
 
+### TLS server identity (RFC 6125)
+
+`verify_tls_server` composes `verify_chain` with RFC 6125 hostname binding
+in a single call. The caller pre-parses the target hostname with
+`ServerName::dns_name` (or `ServerName::ip_address`) and passes a
+[`Profile`] that supplies the `ValidationPolicy`.
+
+```rust
+use pkix_chain::{verify_tls_server, NoRevocation, ServerName};
+use pkix_profiles::BasicTlsProfile;
+
+let name = ServerName::dns_name("www.example.com")?;
+let result = verify_tls_server(
+    &chain,
+    &anchors,
+    &name,
+    &BasicTlsProfile,
+    unix_now(),
+    &NoRevocation,
+)?;
+```
+
+Path validation runs before identity binding: a chain that fails
+RFC 5280 §6.1 returns `Error::Path(_)`, never `Error::Identity(_)`.
+
 ## What this crate does
 
 `verify_chain` runs two sequential checks:
