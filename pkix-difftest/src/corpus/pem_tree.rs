@@ -212,12 +212,8 @@ mod tests {
         let crls_dir = dir.join("crls");
         std::fs::create_dir_all(&crls_dir)?;
         for (i, payload) in payloads.iter().enumerate() {
-            let pem = pem_rfc7468::encode_string(
-                "X509 CRL",
-                pem_rfc7468::LineEnding::LF,
-                payload,
-            )
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+            let pem = pem_rfc7468::encode_string("X509 CRL", pem_rfc7468::LineEnding::LF, payload)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
             std::fs::write(crls_dir.join(format!("{i}.pem")), pem)?;
         }
         Ok(())
@@ -281,12 +277,8 @@ mod tests {
         let dir = TempDir::new().expect("tempdir");
         let crls_dir = dir.path().join("crls");
         std::fs::create_dir_all(crls_dir.join("subdir")).expect("mkdir");
-        let pem = pem_rfc7468::encode_string(
-            "X509 CRL",
-            pem_rfc7468::LineEnding::LF,
-            b"present",
-        )
-        .expect("encode");
+        let pem = pem_rfc7468::encode_string("X509 CRL", pem_rfc7468::LineEnding::LF, b"present")
+            .expect("encode");
         std::fs::write(crls_dir.join("0.pem"), pem).expect("write");
         let out = load_crls_in_dir(&crls_dir).expect("load");
         assert_eq!(
@@ -328,12 +320,9 @@ mod tests {
         // ordering for in lib.rs's tests; load_one accepts it. That's
         // enough for this test, which only cares about the crls/
         // sibling-dir wiring.
-        let cert_pem = pem_rfc7468::encode_string(
-            "CERTIFICATE",
-            pem_rfc7468::LineEnding::LF,
-            &chain_der,
-        )
-        .expect("PEM encode cert");
+        let cert_pem =
+            pem_rfc7468::encode_string("CERTIFICATE", pem_rfc7468::LineEnding::LF, &chain_der)
+                .expect("PEM encode cert");
         std::fs::write(dir.path().join("chain.pem"), cert_pem).expect("write chain.pem");
 
         let crl_pem = pem_rfc7468::encode_string(
@@ -345,8 +334,8 @@ mod tests {
         std::fs::create_dir(dir.path().join("crls")).expect("mkdir crls");
         std::fs::write(dir.path().join("crls").join("0.pem"), crl_pem).expect("write crl");
 
-        let item = load_one(dir.path(), &dir.path().join("chain.pem"))
-            .expect("load_one must succeed");
+        let item =
+            load_one(dir.path(), &dir.path().join("chain.pem")).expect("load_one must succeed");
         assert_eq!(
             item.chain.crls.len(),
             1,
@@ -372,16 +361,13 @@ mod tests {
         let chain_der = std::fs::read(&chain_pem_path).expect("read root cert DER");
 
         let dir = TempDir::new().expect("tempdir");
-        let cert_pem = pem_rfc7468::encode_string(
-            "CERTIFICATE",
-            pem_rfc7468::LineEnding::LF,
-            &chain_der,
-        )
-        .expect("PEM encode cert");
+        let cert_pem =
+            pem_rfc7468::encode_string("CERTIFICATE", pem_rfc7468::LineEnding::LF, &chain_der)
+                .expect("PEM encode cert");
         std::fs::write(dir.path().join("chain.pem"), cert_pem).expect("write");
 
-        let item = load_one(dir.path(), &dir.path().join("chain.pem"))
-            .expect("load_one must succeed");
+        let item =
+            load_one(dir.path(), &dir.path().join("chain.pem")).expect("load_one must succeed");
         assert!(
             item.chain.crls.is_empty(),
             "absent crls/ must leave chain.crls empty"
