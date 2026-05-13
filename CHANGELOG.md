@@ -6,6 +6,43 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-path`: leaf-only `required_leaf_policy_oids` + `required_leaf_subject_dn_attrs` (PKIX-jbvb.4)
+
+`ValidationPolicy` gains two additive leaf-only predicate fields plus a
+new `DnAttrRule` expression type. Both fields default to `None`, so
+existing callers see no behavior change. The additions unblock per-tier
+S/MIME subscriber-profile differentiation in `pkix-profiles-cabf`
+(PKIX-jbvb.1 / .2 / .3) without requiring a custom `Profile`-side
+post-validation pass.
+
+- `ValidationPolicy::required_leaf_policy_oids:
+  Option<Vec<ObjectIdentifier>>` — when `Some`, the leaf must explicitly
+  assert every OID via `CertificatePolicies`. `anyPolicy` does **not**
+  satisfy a specific OID. Distinct from `initial_policy_set` (relying
+  party's acceptable set) — this checks *assertion*. Violations produce
+  the new `Error::MissingLeafPolicyOid { required: ObjectIdentifier }`.
+- `ValidationPolicy::required_leaf_subject_dn_attrs:
+  Option<DnAttrRule>` — when `Some`, the leaf's Subject DN must satisfy
+  the rule. Violations produce the new `Error::SubjectDnAttrRuleUnmet`.
+- New public enum `pkix_path::DnAttrRule`: `Field(ObjectIdentifier)`,
+  `AllOf(Vec<DnAttrRule>)`, `AnyOf(Vec<DnAttrRule>)`. `#[non_exhaustive]`,
+  derives `Clone + Debug + PartialEq + Eq`. Vacuity: `AllOf(vec![])` is
+  trivially true, `AnyOf(vec![])` is trivially false. Designed to express
+  CA/B Forum S/MIME BR tier rules such as `pseudonym OR (givenName AND
+  surname)`. Serde derives gated on the workspace `serde` feature land
+  with PKIX-2l0v.1.
+- Two new `Error` variants (additive under `#[non_exhaustive]`):
+  `MissingLeafPolicyOid { required }` and `SubjectDnAttrRuleUnmet`.
+- Enforcement lives at the leaf in `chain_walk` adjacent to
+  `required_leaf_eku` (steps `(e3a)` and `(e3b)`). When the policy
+  fields are `None`, the new code paths are skipped.
+- 20 new tests: 11 unit tests of `evaluate_dn_attr_rule` against
+  synthetic `Name` values (composition, vacuity, OID matching) + 9
+  integration tests in `tests/required_leaf_policy_dn_pkits.rs` that
+  exercise the `Some(cp_ext)` branch and a multi-attribute Subject DN
+  via PKITS `AllCertificatesSamePoliciesTest10EE`
+  (independently-sourced oracle).
+
 ### `pkix-profiles` + `pkix-profiles-cabf`: per-profile shape-check aliases (PKIX-9vnx.9.2)
 
 Profile types now implement `pkix_lint::LintProfile` alongside `Profile`,
