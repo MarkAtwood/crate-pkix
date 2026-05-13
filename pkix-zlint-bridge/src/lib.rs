@@ -30,9 +30,11 @@
 //!
 //! # Status
 //!
-//! Version 0.0.0. [`ZlintBridge::enumerate_lints`] is functional;
-//! per-certificate verdicts (`run_on_cert` + cache, `run_on_certs`
-//! batch) arrive via PKIX-jy95.7.3 and PKIX-jy95.7.4.
+//! Version 0.0.0. All four parent-epic children landed:
+//! [`ZlintBridge::enumerate_lints`] (PKIX-jy95.7.2),
+//! [`ZlintBridge::run_on_cert`] with the per-cert SHA-256 verdict
+//! cache (PKIX-jy95.7.3), and [`ZlintBridge::run_on_certs`] batch
+//! via multi-file zlint invocation (PKIX-jy95.7.4).
 //!
 //! # Design decisions (frozen)
 //!
@@ -59,8 +61,24 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+/// Per-certificate verdict map produced by [`ZlintBridge::run_on_cert`]
+/// or stored in [`BatchResults`]: zlint `check_id` → [`Verdict`].
+pub type VerdictMap = HashMap<String, Verdict>;
+
+/// One element of a batch result vector. `Ok` when zlint produced a
+/// verdict map for the corresponding input; `Err` when zlint
+/// rejected the certificate. Bridge-level failures fail the whole
+/// batch via the outer `BridgeError` instead and never appear here.
+pub type CertResult = Result<VerdictMap, PerCertError>;
+
+/// Return shape of [`ZlintBridge::run_on_certs`]: outer
+/// [`BridgeError`] for whole-call failures, inner [`CertResult`]
+/// per-cert.
+pub type BatchResults = Vec<CertResult>;
 
 // ---------------------------------------------------------------------------
 // Verdict
@@ -511,18 +529,13 @@ impl ZlintBridge {
             return Ok(hit);
         }
 
-        let path = write_temp_der(cert_der, &key).map_err(Error::Bridge)?;
+        let scratch = TempDir::new().map_err(Error::Bridge)?;
+        let path = scratch.write_der(cert_der, &key).map_err(Error::Bridge)?;
         let mut cmd = Command::new(&self.config.zlint_path);
         cmd.arg("-format").arg("der").arg(&path);
-        let result = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout);
-
-        // Best-effort cleanup. We do not propagate cleanup errors
-        // because they do not change the call's correctness; a
-        // stale file is at worst a disk-space leak the OS will
-        // reap when /tmp turns over.
-        let _ = std::fs::remove_file(&path);
-
-        let output = result.map_err(Error::Bridge)?;
+        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)
+            .map_err(Error::Bridge)?;
+        // scratch dir cleaned up on drop after this point
 
         if !output.status.success() {
             return Err(Error::Cert(classify_zlint_cert_error(&output.stderr)));
@@ -555,6 +568,180 @@ impl ZlintBridge {
         if let Ok(mut guard) = self.cache.lock() {
             guard.insert(key, value);
         }
+    }
+
+    /// Run every zlint check on a slice of DER-encoded certificates.
+    ///
+    /// Returns one result per input certificate, in input order.
+    /// Per-certificate errors (malformed DER, unsupported cert type)
+    /// are reported in the inner `Result`; they do not poison the
+    /// batch. Bridge-level errors (binary missing, subprocess
+    /// crash, timeout, output parse error) fail the whole call and
+    /// are returned as the outer `Err`.
+    ///
+    /// # Caching
+    ///
+    /// Cache lookups happen first; only uncached inputs are sent to
+    /// zlint. The subprocess invocation cost is therefore amortised
+    /// not just across the batch but across the lifetime of the
+    /// bridge handle.
+    ///
+    /// # zlint partial-failure handling
+    ///
+    /// zlint's multi-file invocation aborts the whole call on the
+    /// first malformed cert — partial output covers only the
+    /// successfully-linted prefix. To preserve the per-cert error
+    /// contract this method may invoke zlint more than once on a
+    /// batch with malformed inputs: each batch invocation processes
+    /// the prefix that succeeds, then records the malformed cert as
+    /// `Err(MalformedDer)`, then recurses on the remainder. For
+    /// typical batches (all valid certs) only one subprocess call is
+    /// made; for batches with N malformed certs at most N + 1
+    /// subprocess calls are made.
+    ///
+    /// # Errors
+    ///
+    /// Outer `Err(BridgeError)` for failure modes that affect the
+    /// whole call (see [`BridgeError`]). The inner `Result` per
+    /// cert reports per-cert outcomes.
+    pub fn run_on_certs(&self, certs_der: &[&[u8]]) -> Result<BatchResults, BridgeError> {
+        // Fast path: empty input. Skip subprocess and caching.
+        if certs_der.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Step 1: hash every input + cache lookup. Indices that
+        // miss the cache go into `pending`.
+        let mut results: Vec<Option<CertResult>> = (0..certs_der.len()).map(|_| None).collect();
+        let mut keys: Vec<[u8; 32]> = Vec::with_capacity(certs_der.len());
+        let mut pending: Vec<usize> = Vec::new();
+        for (i, der) in certs_der.iter().enumerate() {
+            let key = sha256_digest(der);
+            if let Some(cached) = self.cache_get(&key) {
+                results[i] = Some(Ok(cached));
+            } else {
+                pending.push(i);
+            }
+            keys.push(key);
+        }
+
+        // Step 2: walk the pending list, invoking zlint on the
+        // current pending slice; on partial failure, record the
+        // failing index and continue with the remainder.
+        while !pending.is_empty() {
+            self.run_pending_batch(certs_der, &keys, &mut pending, &mut results)?;
+        }
+
+        // Step 3: unwrap all results (every index has been filled).
+        Ok(results
+            .into_iter()
+            .map(|r| r.expect("every index filled"))
+            .collect())
+    }
+
+    /// One iteration of the batch loop. Invokes zlint on the certs
+    /// listed in `pending` (in order), parses successful output
+    /// lines, fills the corresponding entries in `results`,
+    /// records the failing cert (if any) and shrinks `pending` to
+    /// the remainder past the failing index.
+    fn run_pending_batch(
+        &self,
+        certs_der: &[&[u8]],
+        keys: &[[u8; 32]],
+        pending: &mut Vec<usize>,
+        results: &mut [Option<CertResult>],
+    ) -> Result<(), BridgeError> {
+        // Per-invocation scratch directory. Files inside are still
+        // named by SHA-256 (in-batch duplicate handling), but each
+        // call has its own directory so concurrent callers and
+        // sequential cleanup do not race on the same path.
+        let scratch = TempDir::new()?;
+        let mut paths = Vec::with_capacity(pending.len());
+        for &idx in pending.iter() {
+            paths.push(scratch.write_der(certs_der[idx], &keys[idx])?);
+        }
+
+        let mut cmd = Command::new(&self.config.zlint_path);
+        cmd.arg("-format").arg("der");
+        for p in &paths {
+            cmd.arg(p);
+        }
+        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)?;
+        // scratch dir cleaned up on drop after this point
+
+        // Parse however many NDJSON lines zlint produced. Whether
+        // the call succeeded or not, lines for the successful
+        // prefix are present.
+        let lines = parse_per_cert_ndjson(&output.stdout)
+            .map_err(|detail| BridgeError::OutputParseError { detail })?;
+
+        if output.status.success() {
+            // All pending certs succeeded. Sanity: must have one
+            // line per pending entry.
+            if lines.len() != pending.len() {
+                return Err(BridgeError::OutputParseError {
+                    detail: format!(
+                        "zlint succeeded but emitted {} lines for {} inputs",
+                        lines.len(),
+                        pending.len()
+                    ),
+                });
+            }
+            for (slot, line) in pending.iter().zip(lines) {
+                self.cache_put(keys[*slot], line.clone());
+                results[*slot] = Some(Ok(line));
+            }
+            pending.clear();
+            return Ok(());
+        }
+
+        // Non-zero exit. Distinguish per-cert malformed from
+        // bridge-level failure by inspecting stderr.
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
+        let looks_like_malformed = stderr_str.contains("unable to parse input")
+            || stderr_str.contains("parsing as certificate")
+            || stderr_str.contains("malformed");
+        if !looks_like_malformed {
+            return Err(classify_exit(output.status, &output.stderr));
+        }
+
+        // Per-cert malformed. The first N lines belong to the
+        // first N pending indexes (each succeeded). The (N+1)th
+        // pending index is the failing cert.
+        let num_success = lines.len();
+        if num_success > pending.len() {
+            return Err(BridgeError::OutputParseError {
+                detail: format!(
+                    "zlint failed but emitted {} lines for {} inputs",
+                    num_success,
+                    pending.len()
+                ),
+            });
+        }
+        for (line, slot) in lines.into_iter().zip(pending.iter().take(num_success)) {
+            self.cache_put(keys[*slot], line.clone());
+            results[*slot] = Some(Ok(line));
+        }
+
+        if num_success == pending.len() {
+            // Shouldn't happen — zlint exited non-zero but every
+            // input emitted a line. Treat as bridge-level error.
+            return Err(BridgeError::OutputParseError {
+                detail: format!(
+                    "zlint failed but every input produced a line; stderr: {}",
+                    truncate_for_display(&stderr_str)
+                ),
+            });
+        }
+
+        let failing_slot = pending[num_success];
+        results[failing_slot] = Some(Err(PerCertError::MalformedDer {
+            detail: stderr_str.into_owned(),
+        }));
+
+        // Shrink pending to the remainder past the failing index.
+        pending.drain(0..=num_success);
+        Ok(())
     }
 }
 
@@ -812,21 +999,72 @@ fn sha256_digest(bytes: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-/// Write the DER bytes to a temporary file and return its path.
+/// Monotonically-increasing per-process counter used to disambiguate
+/// concurrent [`TempDir`] paths within the same process.
+static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Per-invocation scratch directory.
 ///
-/// The filename is `pkix-zlint-bridge-<sha256-hex>.der` under the
-/// platform temp directory. Same input bytes always produce the same
-/// path, which makes concurrent writes idempotent (both writers
-/// write the same bytes) and the cleanup unambiguous (the caller
-/// removes the file once zlint has read it).
-fn write_temp_der(bytes: &[u8], key: &[u8; 32]) -> Result<PathBuf, BridgeError> {
-    let mut path = std::env::temp_dir();
-    path.push(format!("pkix-zlint-bridge-{}.der", hex_encode(key)));
-    std::fs::write(&path, bytes).map_err(|e| BridgeError::SubprocessFailed {
-        exit_code: None,
-        stderr: format!("temp file write failed at {}: {e}", path.display()),
-    })?;
-    Ok(path)
+/// Each `ZlintBridge` subprocess call writes its input certs into a
+/// fresh sub-directory under [`std::env::temp_dir()`] and removes
+/// the whole subtree on `Drop`. The directory name combines
+/// `pid + atomic-counter + nanosecond-timestamp` so concurrent
+/// callers in the same process never collide, and the cleanup of
+/// one call cannot delete files belonging to another in-flight
+/// call.
+///
+/// The previous design (one stable file path per certificate hash,
+/// shared across calls and across `ZlintBridge` instances) failed
+/// here: concurrent integration tests linting the same trust
+/// anchor wrote to the same file and one test's cleanup deleted
+/// another test's input before zlint could read it. The
+/// per-invocation directory keeps the bridge usable from
+/// multi-threaded callers without coordinating outside the
+/// bridge.
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new() -> Result<Self, BridgeError> {
+        let pid = std::process::id();
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let mut path = std::env::temp_dir();
+        path.push(format!("pkix-zlint-bridge-{pid}-{counter}-{now}"));
+        std::fs::create_dir(&path).map_err(|e| BridgeError::SubprocessFailed {
+            exit_code: None,
+            stderr: format!("temp dir create failed at {}: {e}", path.display()),
+        })?;
+        Ok(Self { path })
+    }
+
+    /// Write DER bytes into the scratch directory. The file is
+    /// named by `SHA-256(bytes)` so duplicate inputs within a
+    /// single batch share a path (idempotent — same bytes overwrite
+    /// the same name with the same content).
+    fn write_der(&self, bytes: &[u8], key: &[u8; 32]) -> Result<PathBuf, BridgeError> {
+        let mut path = self.path.clone();
+        path.push(format!("{}.der", hex_encode(key)));
+        std::fs::write(&path, bytes).map_err(|e| BridgeError::SubprocessFailed {
+            exit_code: None,
+            stderr: format!("temp file write failed at {}: {e}", path.display()),
+        })?;
+        Ok(path)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        // Best-effort cleanup. A stray scratch directory is at
+        // worst a small disk-space leak; we do not surface cleanup
+        // errors because the call's correctness has already been
+        // determined.
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
 }
 
 /// Lowercase hex encoding of a byte slice. Local helper to avoid
@@ -871,8 +1109,36 @@ fn classify_zlint_cert_error(stderr_bytes: &[u8]) -> PerCertError {
 /// Anything else is an output-parse error.
 fn parse_per_cert_output(stdout: &[u8]) -> Result<HashMap<String, Verdict>, String> {
     let text = std::str::from_utf8(stdout).map_err(|e| format!("stdout not valid UTF-8: {e}"))?;
+    parse_per_cert_json_value(text.trim())
+}
+
+/// Parse zlint's multi-cert NDJSON output into a vector of verdict
+/// maps, one per output line in zlint's emit order.
+///
+/// Each line is the same shape `parse_per_cert_output` accepts:
+/// `{<check_id>: {"result": <verdict_str>}, ...}`. Blank lines are
+/// skipped. The returned vector preserves zlint's order, which is
+/// the input-file order (modulo malformed inputs that abort the
+/// batch — those don't emit a line).
+fn parse_per_cert_ndjson(stdout: &[u8]) -> Result<Vec<HashMap<String, Verdict>>, String> {
+    let text = std::str::from_utf8(stdout).map_err(|e| format!("stdout not valid UTF-8: {e}"))?;
+    let mut out = Vec::new();
+    for (lineno, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let parsed =
+            parse_per_cert_json_value(line).map_err(|e| format!("line {}: {e}", lineno + 1))?;
+        out.push(parsed);
+    }
+    Ok(out)
+}
+
+/// Shared inner parser: one JSON object string → verdict map.
+fn parse_per_cert_json_value(text: &str) -> Result<HashMap<String, Verdict>, String> {
     let value: serde_json::Value =
-        serde_json::from_str(text.trim()).map_err(|e| format!("malformed JSON: {e}"))?;
+        serde_json::from_str(text).map_err(|e| format!("malformed JSON: {e}"))?;
     let obj = value
         .as_object()
         .ok_or_else(|| "expected JSON object at top level".to_string())?;
@@ -1387,6 +1653,46 @@ not even close to json\n";
     fn hex_encode_lowercase_round_trip() {
         assert_eq!(hex_encode(&[0x00, 0xff, 0xab, 0xcd]), "00ffabcd");
         assert_eq!(hex_encode(&[]), "");
+    }
+
+    // ---- run_on_certs helpers (PKIX-jy95.7.4) ------------------------
+
+    /// Empty input → empty output.
+    #[test]
+    fn parse_per_cert_ndjson_empty_input_returns_empty_vec() {
+        let parsed = parse_per_cert_ndjson(b"").expect("empty ok");
+        assert!(parsed.is_empty());
+    }
+
+    /// Multiple JSON objects, one per line, parse in order.
+    #[test]
+    fn parse_per_cert_ndjson_handles_typical_batch_output() {
+        let ndjson = br#"{"e_x":{"result":"NA"}}
+{"e_y":{"result":"pass"}}
+{"w_z":{"result":"warn"}}
+"#;
+        let parsed = parse_per_cert_ndjson(ndjson).expect("parse");
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].get("e_x"), Some(&Verdict::NotApplicable));
+        assert_eq!(parsed[1].get("e_y"), Some(&Verdict::Pass));
+        assert_eq!(parsed[2].get("w_z"), Some(&Verdict::Warn));
+    }
+
+    /// Blank lines between entries are tolerated.
+    #[test]
+    fn parse_per_cert_ndjson_tolerates_blank_lines() {
+        let ndjson = b"\n{\"e_x\":{\"result\":\"pass\"}}\n\n{\"e_y\":{\"result\":\"pass\"}}\n";
+        let parsed = parse_per_cert_ndjson(ndjson).expect("parse");
+        assert_eq!(parsed.len(), 2);
+    }
+
+    /// Malformed JSON on any line surfaces a parse error naming the
+    /// line number — important for diagnosing batch failures.
+    #[test]
+    fn parse_per_cert_ndjson_rejects_malformed_with_line_number() {
+        let ndjson = b"{\"e_x\":{\"result\":\"pass\"}}\nthis is garbage\n";
+        let err = parse_per_cert_ndjson(ndjson).expect_err("malformed should fail");
+        assert!(err.contains("line 2"), "expected line number: {err}");
     }
 
     /// A JSON object whose check name has an unrecognised severity
