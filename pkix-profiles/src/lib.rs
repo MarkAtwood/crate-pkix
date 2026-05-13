@@ -31,6 +31,7 @@
 //! | [`Rfc5280Profile`] | [`rfc5280_policy`] | RFC 5280 only | No overlay |
 //! | [`BasicTlsProfile`] | [`basic_tls_policy`] | RFC 5280 + RFC 6125 | id-kp-serverAuth EKU + non-empty SAN |
 //! | [`BasicSmimeProfile`] | [`basic_smime_policy`] | RFC 8551 §3 | id-kp-emailProtection EKU + rfc822Name SAN |
+//! | [`BasicCodeSigningProfile`] | [`basic_code_signing_policy`] | RFC 5280 §4.2.1.12 | id-kp-codeSigning EKU |
 //!
 //! For CA/Browser Forum profile content (TLS BR, S/MIME BR, Code Signing BR,
 //! SC-081 phased validity caps), use [`pkix-profiles-cabf`].
@@ -131,6 +132,7 @@ use der::asn1::ObjectIdentifier;
 // the RFC-baseline profiles depend on; coupling them to a CA/B Forum crate
 // would invert the dependency direction.
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
 const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
 
 // ---------------------------------------------------------------------------
@@ -252,6 +254,49 @@ impl Profile for BasicSmimeProfile {
     }
 }
 
+/// Basic code-signing end-entity profile (RFC 5280 + id-kp-codeSigning EKU).
+///
+/// The minimum structural constraint that any code-signing end-entity
+/// certificate must satisfy: the `id-kp-codeSigning` Extended Key Usage
+/// (1.3.6.1.5.5.7.3.3). Code-signing certificates do not carry a
+/// caller-supplied identity target (no hostname, no mailbox), so there is
+/// no SAN requirement.
+///
+/// **Not** a CA/B Forum profile: no validity caps, no key-size floors, no
+/// timestamp-counter-signature requirement, no signature-algorithm
+/// whitelist. Those constraints are CA/B Forum Code Signing BR overlay —
+/// see [`pkix-profiles-cabf::CodeSigningProfile`][cabf-cs] for the BR overlay.
+///
+/// The free-function alias [`basic_code_signing_policy`] is equivalent to
+/// `BasicCodeSigningProfile.policy(now_unix)`.
+///
+/// [cabf-cs]: https://docs.rs/pkix-profiles-cabf/latest/pkix_profiles_cabf/struct.CodeSigningProfile.html
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct BasicCodeSigningProfile;
+
+impl Profile for BasicCodeSigningProfile {
+    fn id(&self) -> &'static str {
+        "ietf.code-signing-basic"
+    }
+
+    fn version(&self) -> &'static str {
+        // RFC 5280 EKU registry; id-kp-codeSigning has no separate spec doc.
+        "RFC 5280 §4.2.1.12"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        let mut p = ValidationPolicy::new(now_unix);
+        // RFC 5280 §4.2.1.12 + IANA registry: id-kp-codeSigning is the
+        // EKU value for code-signing certificates.
+        p.required_leaf_eku = Some(vec![ID_KP_CODE_SIGNING]);
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Free-function convenience aliases
 // ---------------------------------------------------------------------------
@@ -305,6 +350,24 @@ pub fn basic_smime_policy(now_unix: u64) -> ValidationPolicy {
     BasicSmimeProfile.policy(now_unix)
 }
 
+/// Return a [`ValidationPolicy`] for basic code-signing end-entity validation
+/// (RFC 5280 + `id-kp-codeSigning` EKU).
+///
+/// Convenience alias for `BasicCodeSigningProfile.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `required_leaf_eku` | `id-kp-codeSigning` (1.3.6.1.5.5.7.3.3) | RFC 5280 §4.2.1.12 |
+///
+/// No CA/B Forum Code Signing BR-specific constraints. Use
+/// `pkix-profiles-cabf::code_signing_policy` for the BR overlay.
+#[must_use]
+pub fn basic_code_signing_policy(now_unix: u64) -> ValidationPolicy {
+    BasicCodeSigningProfile.policy(now_unix)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -334,6 +397,7 @@ mod tests {
         assert_eq!(Rfc5280Profile.id(), "ietf.rfc5280");
         assert_eq!(BasicTlsProfile.id(), "ietf.tls-basic");
         assert_eq!(BasicSmimeProfile.id(), "ietf.smime-basic");
+        assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
     }
 
     #[test]
@@ -341,6 +405,18 @@ mod tests {
         assert_eq!(Rfc5280Profile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicTlsProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicSmimeProfile.policy(NOW).current_time_unix, NOW);
+        assert_eq!(BasicCodeSigningProfile.policy(NOW).current_time_unix, NOW);
+    }
+
+    #[test]
+    fn basic_code_signing_policy_requires_code_signing_eku() {
+        let p = BasicCodeSigningProfile.policy(NOW);
+        let eku = p.required_leaf_eku.expect("EKU must be required");
+        assert_eq!(eku.len(), 1, "exactly one EKU expected");
+        assert_eq!(eku[0], ID_KP_CODE_SIGNING);
+        // No SAN requirement (code signing has no caller-supplied identity).
+        assert!(!p.require_subject_alt_name);
+        assert!(!p.require_rfc822_san);
     }
 
     #[test]
@@ -364,6 +440,13 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "BasicSmimeProfile.policy and basic_smime_policy must agree"
+        );
+
+        let via_trait = BasicCodeSigningProfile.policy(NOW);
+        let via_fn = basic_code_signing_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "BasicCodeSigningProfile.policy and basic_code_signing_policy must agree"
         );
     }
 
