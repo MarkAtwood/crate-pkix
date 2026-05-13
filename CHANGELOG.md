@@ -6,6 +6,44 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint` 0.8.0: `Severity::Notice` variant (2026-05-12)
+
+`pkix-lint::Severity` gains a `Notice` variant slotted between `Info`
+and `Warn`. The resulting ordering
+`Info < Notice < Warn < Error < Fatal` aligns with both the zlint
+catalog ranking (`pass(3) < notice(4) < warn(5) < error(6) <
+fatal(7)`) and syslog RFC 5424 §6.2.1 severity ranking
+(Informational > Notice > Warning).
+
+The variant is added in support of the planned `pkix-zlint-bridge`
+adapter (filed as [PKIX-jy95.7]): zlint catalog `notice`-level checks
+need a workspace severity that is distinct from both `Info`
+(advisory / best-practice) and `Warn` (SHOULD/RECOMMENDED violation).
+Lint-metadata severity comes from the zlint catalog ranking, NOT from
+the per-cert verdict level — see the
+[PKIX-jy95.2 decision][PKIX-jy95.2].
+
+Additive change. `Severity` is `#[non_exhaustive]`, so adding a
+variant is non-breaking for callers that already include a wildcard
+arm on external matches. In-tree exhaustive matches in
+`pkix-lint::oscal::emit::severity_label` and
+`pkix-lint::oscal::parse::parse_action` gain a `Notice` arm
+(`"notice"` label, symmetric with the existing
+`info`/`warn`/`error`/`fatal` labels).
+
+A new `severity_ordering_is_info_notice_warn_error_fatal` unit test
+pins the documented ordering contract so a future variant insertion
+cannot silently reorder existing variants.
+
+Out of scope (deferred to [PKIX-jy95.7]): mapping zlint per-cert
+verdict levels (`notice`, `warn`, `error`, `fatal`) into
+`LintResult` — those continue to map to
+`LintResult::error(detail)` regardless of the lint's declared
+severity, per the [PKIX-jy95.2 decision][PKIX-jy95.2].
+
+[PKIX-jy95.7]: https://github.com/MarkAtwood/crate-pkix  "Create pkix-zlint-bridge crate"
+[PKIX-jy95.2]: https://github.com/MarkAtwood/crate-pkix  "Severity-mapping decision for zlint verdicts"
+
 ### `pkix-lint`: RFC-conformance shape-check lints (2026-05-12)
 
 `pkix-lint` gains five new RFC-conformance `Lint` impls covering the

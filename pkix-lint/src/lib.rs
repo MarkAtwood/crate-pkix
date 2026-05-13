@@ -235,12 +235,24 @@ pub mod rfc8551;
 /// Severity is a property of the lint definition, not the result. A lint that
 /// checks a MUST requirement from a normative spec should be [`Severity::Error`].
 /// A lint that checks a SHOULD or advisory requirement should be [`Severity::Warn`].
+///
+/// The ordering `Info < Notice < Warn < Error < Fatal` aligns with both the
+/// zlint catalog ranking (`pass(3) < notice(4) < warn(5) < error(6) <
+/// fatal(7)`, see `~/GIT/zlint/v3/lint/result.go`) and syslog
+/// RFC 5424 §6.2.1 severity ranking (Informational > Notice > Warning).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Severity {
     /// Advisory / best-practice — does not constitute a violation.
     Info,
+    /// Minor observation — not a violation but worth surfacing.
+    ///
+    /// Aligns with zlint's `notice` verdict and syslog RFC 5424 §6.2.1
+    /// severity 5 (Notice). Used by the planned `pkix-zlint-bridge`
+    /// adapter to map zlint catalog notice-level checks into the
+    /// workspace severity model.
+    Notice,
     /// Violation of a SHOULD or RECOMMENDED requirement.
     Warn,
     /// Violation of a MUST or REQUIRED requirement.
@@ -549,6 +561,7 @@ impl core::fmt::Display for Severity {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Info => f.write_str("info"),
+            Self::Notice => f.write_str("notice"),
             Self::Warn => f.write_str("warn"),
             Self::Error => f.write_str("error"),
             Self::Fatal => f.write_str("fatal"),
@@ -1500,6 +1513,25 @@ mod tests {
     #[test]
     fn subject_kind_intermediate_does_not_match_leaf() {
         assert!(!SubjectKind::IntermediateCa.matches(SubjectKind::Leaf));
+    }
+
+    // -----------------------------------------------------------------------
+    // Severity ordering tests
+    //
+    // Oracle: the doc comment on Severity pins
+    // `Info < Notice < Warn < Error < Fatal` to align with zlint catalog
+    // ranking and syslog RFC 5424 §6.2.1. Adding a variant in the middle of
+    // a `#[derive(PartialOrd, Ord)]` enum reorders existing variants, so
+    // this test guards against future variant insertions silently breaking
+    // the documented ordering contract.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn severity_ordering_is_info_notice_warn_error_fatal() {
+        assert!(Severity::Info < Severity::Notice);
+        assert!(Severity::Notice < Severity::Warn);
+        assert!(Severity::Warn < Severity::Error);
+        assert!(Severity::Error < Severity::Fatal);
     }
 
     // -----------------------------------------------------------------------
