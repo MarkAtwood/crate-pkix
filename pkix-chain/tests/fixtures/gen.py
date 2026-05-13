@@ -67,8 +67,8 @@ def build_root():
     return key, cert
 
 
-def build_leaf(root_key, root_cert, *, sans, serial, eku=None):
-    """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth."""
+def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=False):
+    """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth, non-critical."""
     if eku is None:
         eku = [x509.ExtendedKeyUsageOID.SERVER_AUTH]
     key = ec.generate_private_key(ec.SECP256R1())
@@ -98,7 +98,7 @@ def build_leaf(root_key, root_cert, *, sans, serial, eku=None):
         )
         .add_extension(
             x509.ExtendedKeyUsage(eku),
-            critical=False,
+            critical=eku_critical,
         )
     )
     if sans is not None:
@@ -150,6 +150,40 @@ def main():
         eku=[x509.ExtendedKeyUsageOID.CODE_SIGNING],
     )
     write_der("leaf-codesigning.der", leaf_codesign)
+
+    # Time Stamping Authority leaf: RFC 3161 §2.3 -- EKU MUST be critical
+    # and contain ONLY id-kp-timeStamping.
+    leaf_tsa_ok = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=6,
+        eku=[x509.ExtendedKeyUsageOID.TIME_STAMPING],
+        eku_critical=True,
+    )
+    write_der("leaf-timestamping.der", leaf_tsa_ok)
+
+    # Negative: timeStamping EKU but NOT critical.
+    leaf_tsa_not_critical = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=7,
+        eku=[x509.ExtendedKeyUsageOID.TIME_STAMPING],
+        eku_critical=False,
+    )
+    write_der("leaf-timestamping-not-critical.der", leaf_tsa_not_critical)
+
+    # Negative: timeStamping EKU critical but NOT sole (extra EKU value).
+    leaf_tsa_not_sole = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=8,
+        eku=[
+            x509.ExtendedKeyUsageOID.TIME_STAMPING,
+            x509.ExtendedKeyUsageOID.CODE_SIGNING,
+        ],
+        eku_critical=True,
+    )
+    write_der("leaf-timestamping-not-sole.der", leaf_tsa_not_sole)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,9 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-no-san.der` | end-entity | EE signed by `root`, EKU=serverAuth, **no SAN extension** |
 | `leaf-san-alice-example.der` | end-entity | EE signed by `root`, EKU=emailProtection, SAN=rfc822Name:alice@example.com |
 | `leaf-codesigning.der` | end-entity | EE signed by `root`, EKU=codeSigning, no SAN |
+| `leaf-timestamping.der` | end-entity | EE signed by `root`, EKU=timeStamping (critical, sole) — RFC 3161 §2.3 compliant TSA |
+| `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical) — RFC 3161 §2.3 negative case |
+| `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical) — RFC 3161 §2.3 negative case |
 
 Validity 2000-01-01 to 2050-01-01. P-256 ECDSA throughout so the workspace's
 default `DefaultVerifier` covers signature checking.

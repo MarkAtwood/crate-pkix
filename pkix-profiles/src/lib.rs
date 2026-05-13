@@ -32,6 +32,7 @@
 //! | [`BasicTlsProfile`] | [`basic_tls_policy`] | RFC 5280 + RFC 6125 | id-kp-serverAuth EKU + non-empty SAN |
 //! | [`BasicSmimeProfile`] | [`basic_smime_policy`] | RFC 8551 §3 | id-kp-emailProtection EKU + rfc822Name SAN |
 //! | [`BasicCodeSigningProfile`] | [`basic_code_signing_policy`] | RFC 5280 §4.2.1.12 | id-kp-codeSigning EKU |
+//! | [`BasicTimeStampingProfile`] | [`basic_time_stamping_policy`] | RFC 3161 §2.3 | id-kp-timeStamping EKU |
 //!
 //! For CA/Browser Forum profile content (TLS BR, S/MIME BR, Code Signing BR,
 //! SC-081 phased validity caps), use [`pkix-profiles-cabf`].
@@ -134,6 +135,7 @@ use der::asn1::ObjectIdentifier;
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
 const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
 const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
+const ID_KP_TIME_STAMPING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
 
 // ---------------------------------------------------------------------------
 // RFC-baseline profiles
@@ -297,6 +299,46 @@ impl Profile for BasicCodeSigningProfile {
     }
 }
 
+/// Basic Time Stamping Authority (TSA) end-entity profile
+/// (RFC 3161 + `id-kp-timeStamping` EKU).
+///
+/// The minimum structural constraint that any TSA end-entity certificate
+/// must satisfy is the `id-kp-timeStamping` Extended Key Usage
+/// (1.3.6.1.5.5.7.3.8). This profile sets `required_leaf_eku` to enforce
+/// presence; RFC 3161 §2.3 additionally requires that the EKU extension
+/// be **critical** and contain **only** `id-kp-timeStamping`, which
+/// `pkix_chain::verify_time_stamper` enforces post-validation (the
+/// presence check is sufficient for the profile-level requirement).
+///
+/// The free-function alias [`basic_time_stamping_policy`] is equivalent
+/// to `BasicTimeStampingProfile.policy(now_unix)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct BasicTimeStampingProfile;
+
+impl Profile for BasicTimeStampingProfile {
+    fn id(&self) -> &'static str {
+        "ietf.time-stamping-basic"
+    }
+
+    fn version(&self) -> &'static str {
+        "RFC 3161 §2.3"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        let mut p = ValidationPolicy::new(now_unix);
+        // RFC 3161 §2.3: id-kp-timeStamping is the EKU value for TSA
+        // certificates. The critical-and-sole rule is enforced at the
+        // wrapper layer (verify_time_stamper) because ValidationPolicy
+        // does not currently express EKU criticality or singularity.
+        p.required_leaf_eku = Some(vec![ID_KP_TIME_STAMPING]);
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Free-function convenience aliases
 // ---------------------------------------------------------------------------
@@ -368,6 +410,26 @@ pub fn basic_code_signing_policy(now_unix: u64) -> ValidationPolicy {
     BasicCodeSigningProfile.policy(now_unix)
 }
 
+/// Return a [`ValidationPolicy`] for basic Time Stamping Authority validation
+/// (RFC 3161 + `id-kp-timeStamping` EKU).
+///
+/// Convenience alias for `BasicTimeStampingProfile.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `required_leaf_eku` | `id-kp-timeStamping` (1.3.6.1.5.5.7.3.8) | RFC 3161 §2.3 |
+///
+/// RFC 3161 §2.3's additional constraint that the EKU extension be
+/// critical and contain only `id-kp-timeStamping` is enforced at the
+/// wrapper layer (`pkix_chain::verify_time_stamper`); the profile alone
+/// guarantees only EKU presence.
+#[must_use]
+pub fn basic_time_stamping_policy(now_unix: u64) -> ValidationPolicy {
+    BasicTimeStampingProfile.policy(now_unix)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -398,6 +460,7 @@ mod tests {
         assert_eq!(BasicTlsProfile.id(), "ietf.tls-basic");
         assert_eq!(BasicSmimeProfile.id(), "ietf.smime-basic");
         assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
+        assert_eq!(BasicTimeStampingProfile.id(), "ietf.time-stamping-basic");
     }
 
     #[test]
@@ -406,6 +469,7 @@ mod tests {
         assert_eq!(BasicTlsProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicSmimeProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicCodeSigningProfile.policy(NOW).current_time_unix, NOW);
+        assert_eq!(BasicTimeStampingProfile.policy(NOW).current_time_unix, NOW);
     }
 
     #[test]
@@ -415,6 +479,17 @@ mod tests {
         assert_eq!(eku.len(), 1, "exactly one EKU expected");
         assert_eq!(eku[0], ID_KP_CODE_SIGNING);
         // No SAN requirement (code signing has no caller-supplied identity).
+        assert!(!p.require_subject_alt_name);
+        assert!(!p.require_rfc822_san);
+    }
+
+    #[test]
+    fn basic_time_stamping_policy_requires_time_stamping_eku() {
+        let p = BasicTimeStampingProfile.policy(NOW);
+        let eku = p.required_leaf_eku.expect("EKU must be required");
+        assert_eq!(eku.len(), 1, "exactly one EKU expected");
+        assert_eq!(eku[0], ID_KP_TIME_STAMPING);
+        // No SAN requirement (TSA cert has no caller-supplied identity).
         assert!(!p.require_subject_alt_name);
         assert!(!p.require_rfc822_san);
     }
@@ -447,6 +522,13 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "BasicCodeSigningProfile.policy and basic_code_signing_policy must agree"
+        );
+
+        let via_trait = BasicTimeStampingProfile.policy(NOW);
+        let via_fn = basic_time_stamping_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "BasicTimeStampingProfile.policy and basic_time_stamping_policy must agree"
         );
     }
 
