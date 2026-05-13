@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - Initial scaffold (PKIX-zkjb.2). Workspace member; `no_std + alloc`
@@ -61,10 +67,10 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### Not yet shipped
 
-- `pkix-aia-http` HTTP adapter — PKIX-zkjb.5.
-- `pkix-chain::Verifier` 3-generic `A: AiaFetcher` API freeze — PKIX-zkjb.9.
+- `pkix-aia-http` HTTP adapter — PKIX-zkjb.5 (post-1.0).
 
-These are tracked under the PKIX-zkjb umbrella epic. The 1.0 surface
-in this crate (`AiaError` + `AiaFetcher` + `NoAiaFetcher`) is
-complete; the remaining work integrates the trait into `pkix-chain`
-and ships the HTTP transport adapter.
+The 1.0 surface in this crate (`AiaError` + `AiaFetcher` +
+`NoAiaFetcher`) is complete; the `pkix-chain::Verifier` 3-generic
+`A: AiaFetcher` integration shipped via PKIX-zkjb.9. The remaining
+post-1.0 work in `pkix-aia-http` will plug a real HTTP transport
+into the 3-generic surface non-breakingly.

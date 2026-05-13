@@ -6,7 +6,13 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-### Removed (breaking)
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
+### Breaking
 
 - **`cabf_tls_br::CabfTlsBrProfile` has been deleted.** The
   `pkix_lint::LintProfile` bundling of the six CA/B Forum TLS BR lints

@@ -6,7 +6,13 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-### Changed (breaking)
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
+### Breaking
 
 - `Verifier` gains a 3rd generic parameter `A: AiaFetcher = NoAiaFetcher`
   (PKIX-zkjb.9, 1.0 API freeze). New field `aia: &'a A`. The

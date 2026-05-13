@@ -6,6 +6,12 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - CDP and AIA HTTP URL extraction helpers that walk a certificate's

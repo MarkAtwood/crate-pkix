@@ -6,6 +6,12 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - BetterTLS `pathbuilding` fixtures imported under `tests/` with a
