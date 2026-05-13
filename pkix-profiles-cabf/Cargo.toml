@@ -15,6 +15,12 @@ der           = { workspace = true }
 # Default features (rsa, p256) are intentionally enabled: pkix-profiles-cabf tests
 # use EcdsaP256Verifier and the workspace pin already enables them.
 pkix-path     = { workspace = true }
+# pkix-lint provides the LintProfile trait that Profile types implement
+# alongside Profile to expose their canonical lint set (PKIX-9vnx.9.2).
+pkix-lint     = { workspace = true }
+# pkix-lint-cabf supplies the CA/B Forum TLS BR Lint impls that
+# WebPkiProfile's LintProfile impl bundles (PKIX-9vnx.9.2.2).
+pkix-lint-cabf = { workspace = true }
 
 [dev-dependencies]
 x509-cert = { workspace = true }

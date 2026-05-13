@@ -282,6 +282,35 @@ impl Profile for WebPkiProfile {
     }
 }
 
+impl pkix_lint::LintProfile for WebPkiProfile {
+    /// Return the canonical list of CA/B Forum TLS BR lints bundled with this profile.
+    ///
+    /// The returned slice is backed by a lazily-initialized `static OnceLock`,
+    /// so calling `lints()` multiple times is cheap. The lint instances inside
+    /// the slice are different objects from those used inside a [`pkix_lint::LintRunner`]
+    /// produced by [`lint_runner`][Self::lint_runner]: each call to
+    /// `lint_runner()` allocates a fresh set of instances via
+    /// [`pkix_lint_cabf::cabf_tls_br::all_lints`]. Both routes source their
+    /// lint types from the same constructor; the objects are distinct
+    /// allocations. The set of lint IDs is identical.
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        // `OnceLock` (stable since Rust 1.70) gives us a lazily-initialized
+        // static `Vec<Box<dyn Lint>>` whose reference outlives `&self`.
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(pkix_lint_cabf::cabf_tls_br::all_lints)
+    }
+
+    /// Allocate a fresh [`pkix_lint::LintRunner`] backed by a new set of
+    /// CA/B Forum TLS BR lint instances on each call.
+    ///
+    /// For repeated use, cache the returned [`pkix_lint::LintRunner`] at the
+    /// call site rather than calling this method on every evaluation.
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(pkix_lint_cabf::cabf_tls_br::all_lints())
+    }
+}
+
 /// CA/Browser Forum S/MIME Baseline Requirements profile (Mailbox-validated / strict).
 ///
 /// Implements [`Profile`] for the strictest S/MIME BR validation tier.

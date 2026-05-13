@@ -11,6 +11,16 @@ not published.
 
 ## [Unreleased]
 
+### Changed
+
+- `PkixLintCabfOracle` now constructs its `LintRunner` from
+  `pkix_profiles_cabf::WebPkiProfile.lint_runner()` instead of the
+  removed `pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile`. The lint
+  set (six CA/B Forum TLS BR predicates) is identical; only the
+  bundling surface moved. Picks up `pkix-profiles-cabf` as a new
+  optional dependency gated on the `lint-oracles` feature.
+  (PKIX-9vnx.9.2.2.)
+
 ### Added
 
 - Code-signing differential test (`tests/verify_wrapper_codesign.rs`)

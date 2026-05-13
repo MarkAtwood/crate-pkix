@@ -1213,6 +1213,7 @@ dependencies = [
  "pkix-path",
  "pkix-path-builder",
  "pkix-profiles",
+ "pkix-profiles-cabf",
  "pkix-revocation",
  "pkix-zlint-bridge",
  "serde",
@@ -1305,6 +1306,8 @@ name = "pkix-profiles-cabf"
 version = "0.2.0"
 dependencies = [
  "der",
+ "pkix-lint",
+ "pkix-lint-cabf",
  "pkix-path",
  "x509-cert",
 ]

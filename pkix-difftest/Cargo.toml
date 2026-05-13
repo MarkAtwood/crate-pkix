@@ -53,6 +53,7 @@ lint-oracles = [
     "dep:pkix-zlint-bridge",
     "dep:pkix-lint",
     "dep:pkix-lint-cabf",
+    "dep:pkix-profiles-cabf",
 ]
 
 [dependencies]
@@ -109,9 +110,13 @@ serde_json = { workspace = true }
 # Optional lint-domain oracle dependencies. Activated only when the
 # `lint-oracles` cargo feature is on. See the feature definition above for
 # the architectural context (PKIX-hbzo.1.1).
-pkix-zlint-bridge = { workspace = true, optional = true }
-pkix-lint         = { workspace = true, optional = true }
-pkix-lint-cabf    = { workspace = true, optional = true }
+pkix-zlint-bridge  = { workspace = true, optional = true }
+pkix-lint          = { workspace = true, optional = true }
+pkix-lint-cabf     = { workspace = true, optional = true }
+# pkix-profiles-cabf provides WebPkiProfile, which carries the LintProfile impl
+# bundling the six CA/B Forum TLS BR lints from pkix-lint-cabf. The lint oracle
+# consumes the profile rather than reaching for the Lint types directly.
+pkix-profiles-cabf = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Wrapper-level differential test (`tests/verify_wrapper_pyca.rs`, PKIX-fmtv.19)

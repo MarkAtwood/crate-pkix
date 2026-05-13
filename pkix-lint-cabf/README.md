@@ -12,11 +12,15 @@ Maintained on a best-effort basis. If your deployment depends on bit-exact CA/B 
 
 ## Modules
 
-- `cabf_tls_br` — CA/B Forum TLS Baseline Requirements lint bundle. Migrated
+- `cabf_tls_br` — CA/B Forum TLS Baseline Requirements lint set. Migrated
   from `pkix-lint` 0.4.0 (see workspace `CHANGELOG.md` under `pkix-lint
-  0.5.0`). Bundles SC-081 phased validity caps, SHA-1 prohibition, RSA
-  min-key-size, SAN/EKU presence, and `BasicConstraints` cA-flag checks
-  behind `cabf_tls_br::CabfTlsBrProfile`.
+  0.5.0`). Provides individual `Lint` impls for SC-081 phased validity caps,
+  SHA-1 prohibition, RSA min-key-size, SAN/EKU presence, and
+  `BasicConstraints` cA-flag checks, plus a canonical `all_lints()`
+  constructor. The bundling lives on `pkix_profiles_cabf::WebPkiProfile`'s
+  `LintProfile` impl (per the AGENTS.md architectural invariant: Profile
+  types live in `-profiles*` crates, Lint types live in `-lint*` crates;
+  dep flow is profiles → lint, never the reverse).
 
 Future bundles (`cabf_smime_br`, `cabf_cs_br`) and zlint-derived catalog
 content will land via PKIX-amgn.8 and friends. The wire format for the
@@ -27,9 +31,9 @@ one candidate); see the bead for current status.
 
 ```rust,no_run
 use pkix_lint::{LintProfile, SubjectKind};
-use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+use pkix_profiles_cabf::WebPkiProfile;
 
-let profile = CabfTlsBrProfile;
+let profile = WebPkiProfile;
 let runner = profile.lint_runner();
 
 let kinds = vec![SubjectKind::Leaf, SubjectKind::AnchorIssued];

@@ -86,6 +86,10 @@ members = [
 #                              `Sha1ProhibitedLint`, `RsaMinKeySizeLint`,
 #                              `SanRequiredLint`, `EkuServerAuthLint`,
 #                              `BcCaFlagLint`, `all_lints()`. PKIX-amgn.5.
+#                              Note: `CabfTlsBrProfile` was removed in the
+#                              follow-up release (PKIX-9vnx.9.2.2) — the
+#                              `LintProfile` bundling moved to
+#                              `pkix_profiles_cabf::WebPkiProfile`.
 # Earlier pkix-lint at 0.4.0 (DeviationScope kind+props refactor; PKIX-9vnx.11)
 # and 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
 # (not published). Namespace-reservation stubs at 0.1.0:

@@ -75,13 +75,13 @@ cA-flag — are in [`pkix-lint-cabf::cabf_tls_br`].
 
 ## Usage
 
-### Run CA/B Forum TLS BR lints against a chain (via `pkix-lint-cabf`)
+### Run CA/B Forum TLS BR lints against a chain (via `pkix-profiles-cabf`)
 
 ```rust,no_run
 use pkix_lint::{LintProfile, SubjectKind};
-use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+use pkix_profiles_cabf::WebPkiProfile;
 
-let profile = CabfTlsBrProfile;
+let profile = WebPkiProfile;
 let runner = profile.lint_runner();
 
 let kinds = vec![SubjectKind::Leaf, SubjectKind::AnchorIssued];

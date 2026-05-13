@@ -34,12 +34,14 @@
 
 use der::Decode as _;
 use pkix_lint::{LintProfile as _, LintResult, LintRunner, SubjectKind};
-use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;
+use pkix_profiles_cabf::WebPkiProfile;
 use x509_cert::Certificate;
 
 use super::{LintOracle, LintOracleResult, NormalizedFinding, OracleSource};
 
-/// In-process lint oracle backed by `pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile`.
+/// In-process lint oracle backed by `pkix_profiles_cabf::WebPkiProfile`'s
+/// `pkix_lint::LintProfile` impl (which bundles the six CA/B Forum TLS BR
+/// lint types defined in `pkix_lint_cabf::cabf_tls_br`).
 ///
 /// Constructs one `LintRunner` per oracle instance (six lints today) and
 /// reuses it across calls. The runner is `Sync` thanks to pkix-lint's
@@ -64,7 +66,7 @@ impl PkixLintCabfOracle {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            runner: CabfTlsBrProfile.lint_runner(),
+            runner: WebPkiProfile.lint_runner(),
         }
     }
 }

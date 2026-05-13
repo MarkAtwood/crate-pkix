@@ -69,11 +69,10 @@ of `pkix-policy-zlint`.
 
 ### `cabf_tls_br` lints are not gated by a `LintProfile::version`
 
-`CabfTlsBrProfile` delegates `version()` to
-`pkix_profiles_cabf::WebPkiProfile::version()`, which returns
-`"2.2.6"` after the most recent refresh. Lint behavior does not
-branch on the version string — the six checks above evaluate the
-same predicates regardless of which BR version a caller is targeting.
+`pkix_profiles_cabf::WebPkiProfile::version()` returns `"2.2.6"` after
+the most recent refresh. The six lint checks in `cabf_tls_br` evaluate
+the same predicates regardless of which BR version a caller is
+targeting — lint behavior does not branch on the version string.
 Callers needing per-version behavioral differences should layer their
 own profile.
 

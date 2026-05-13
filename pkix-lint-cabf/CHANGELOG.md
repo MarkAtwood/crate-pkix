@@ -6,6 +6,42 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Removed (breaking)
+
+- **`cabf_tls_br::CabfTlsBrProfile` has been deleted.** The
+  `pkix_lint::LintProfile` bundling of the six CA/B Forum TLS BR lints
+  has moved to `pkix_profiles_cabf::WebPkiProfile`'s `LintProfile`
+  impl. This breaks any caller that named `CabfTlsBrProfile` directly;
+  replace `use pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile;` with
+  `use pkix_profiles_cabf::WebPkiProfile;`. The individual Lint impls
+  (`ValidityMaxLint`, `Sha1ProhibitedLint`, `RsaMinKeySizeLint`,
+  `SanRequiredLint`, `EkuServerAuthLint`, `BcCaFlagLint`) and the
+  canonical `all_lints()` constructor remain in
+  `pkix_lint_cabf::cabf_tls_br` unchanged.
+
+  Architectural rationale: Profile types live in `-profiles*` crates;
+  Lint types live in `-lint*` crates. Dep flow must be one-way:
+  `-profiles*` → `-lint*`. Hosting a Profile type in `pkix-lint-cabf`
+  created the back-edge `pkix-lint-cabf → pkix-profiles-cabf` and
+  blocked the natural `pkix-profiles-cabf → pkix-lint-cabf` edge
+  needed for `WebPkiProfile::lints()`. (PKIX-9vnx.9.2.2.)
+
+### Changed (internal)
+
+- `ValidityMaxLint::check_cert` now uses a `pub(crate)` inlined copy
+  of the SC-081 phased-validity-cap math (formerly called
+  `pkix_profiles_cabf::sc081_validity_cap`). The public function in
+  `pkix-profiles-cabf` is unchanged; the two copies are cross-validated
+  by tests in this crate (dev-dep on `pkix-profiles-cabf`) and by
+  `pkix_profiles_cabf::WebPkiProfile`'s integration tests. Removing
+  the runtime dep edge is what enables the cycle-break above.
+  (PKIX-9vnx.9.2.2.)
+
+- `pkix-profiles-cabf` moved from `[dependencies]` to
+  `[dev-dependencies]`. The runtime crate no longer depends on
+  `pkix-profiles-cabf`; the integration tests still do (for cross-
+  validating SC-081 cap math). (PKIX-9vnx.9.2.2.)
+
 ### Added
 
 - Rustdoc annotations linking each Lint to its canonical CA/B Forum
