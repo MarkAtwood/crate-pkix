@@ -107,8 +107,10 @@ type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 /// in the public API. This insulates callers from semver-breaking changes
 /// in the `der` crate's error variants.
 ///
-/// Construction is crate-private. The only way to obtain a `DerError` is
-/// via [`Error::Der`] (and the [`From<der::Error>`] impl on [`Error`]).
+/// Construct via [`DerError::new`] (or implicitly via
+/// [`From<der::Error> for Error`]). Sibling workspace crates that wrap
+/// DER decoding failures in their own `Error` enums (`pkix-revocation`,
+/// `pkix-truststore`) call [`DerError::new`] directly.
 ///
 /// # Serde wire form
 ///
@@ -164,8 +166,21 @@ type BoxStr = alloc::boxed::Box<str>;
 type BoxStr = std::boxed::Box<str>;
 
 impl DerError {
-    /// Construct a `DerError` from a real `der::Error`. Crate-private.
-    pub(crate) fn new(e: der::Error) -> Self {
+    /// Construct a `DerError` from a real `der::Error`.
+    ///
+    /// The original `der::Error` is preserved internally so
+    /// [`std::error::Error::source`] returns it; the rendered
+    /// `Display` message is cached so the diagnostic survives serde
+    /// round-trips. See the type-level rustdoc for the round-trip
+    /// fidelity contract.
+    ///
+    /// Exposed to permit sibling workspace crates (`pkix-revocation`,
+    /// `pkix-truststore`) to construct their own `Error::Der`-equivalent
+    /// variants from `der::Error` results without going through the
+    /// `pkix_path::Error::from(der::Error)` conversion (which would
+    /// produce a `pkix_path::Error`, not the sibling crate's `Error`).
+    #[must_use]
+    pub fn new(e: der::Error) -> Self {
         // Pre-render the Display message so it survives serde round-trips
         // even when `inner` cannot be reconstructed on the deserialize side.
         #[cfg(feature = "std")]

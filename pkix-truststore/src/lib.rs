@@ -83,21 +83,145 @@ use std::{fs, io, vec::Vec};
 use der::Decode;
 use x509_cert::Certificate;
 
-pub use pkix_path::TrustAnchor;
+pub use pkix_path::{DerError, TrustAnchor};
+
+/// Boundary representation of a [`std::io::Error`] suitable for
+/// inclusion in cache-friendly result types.
+///
+/// `std::io::Error` is intentionally not `Clone + PartialEq + Eq +
+/// Serialize + Deserialize`, which prevents it from appearing in
+/// [`Error`] under AGENTS.md non-negotiable #6 (cache-friendly result
+/// types). `IoFailure` is the principled boundary: it captures the
+/// [`io::ErrorKind`] and a rendered message string, dropping the
+/// `os_error` integer code (low-value for callers) but gaining
+/// `Clone`, `Eq`, and `Serialize`.
+///
+/// # Stability
+///
+/// `IoFailure` is `#[non_exhaustive]`; future minor releases may
+/// surface additional context (`std::io::ErrorKind` grows
+/// non-breakingly in the standard library).
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct IoFailure {
+    /// Kind of I/O error.
+    ///
+    /// `io::ErrorKind` is `Copy + Eq + Hash`; we serialize it via
+    /// its `Display` representation for forward compatibility (new
+    /// `ErrorKind` variants land in the standard library without
+    /// breaking the wire form).
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "io_error_kind_serde::serialize",
+            deserialize_with = "io_error_kind_serde::deserialize"
+        )
+    )]
+    pub kind: io::ErrorKind,
+    /// Rendered message string from the original [`io::Error`].
+    pub message: String,
+}
+
+impl IoFailure {
+    /// Construct an `IoFailure` from a real [`io::Error`]. The
+    /// message is captured via `Display`; the OS error code (if any)
+    /// is dropped.
+    #[must_use]
+    pub fn from_io(e: &io::Error) -> Self {
+        Self {
+            kind: e.kind(),
+            message: e.to_string(),
+        }
+    }
+}
+
+impl core::fmt::Display for IoFailure {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for IoFailure {}
+
+#[cfg(feature = "serde")]
+mod io_error_kind_serde {
+    //! `io::ErrorKind` does not implement `Serialize`/`Deserialize`
+    //! (and is `#[non_exhaustive]` upstream). We serialize via its
+    //! `Debug` string ("NotFound", "PermissionDenied", …) which is
+    //! the only stable textual identifier. Deserialize parses the
+    //! same set, falling back to `ErrorKind::Other` for unrecognized
+    //! values so old payloads stay decodable when newer Rust versions
+    //! introduce new kinds.
+
+    use serde::{Deserialize as _, Deserializer, Serializer};
+    use std::io;
+
+    pub fn serialize<S: Serializer>(
+        kind: &io::ErrorKind,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        // `Debug` on `ErrorKind` produces the variant name verbatim
+        // ("NotFound", "PermissionDenied", …); upstream documents this
+        // as the canonical textual identifier.
+        s.serialize_str(&format!("{:?}", kind))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<io::ErrorKind, D::Error> {
+        let s = String::deserialize(d)?;
+        // Map a finite list of known variants. Anything else lands
+        // in `ErrorKind::Other` so round-trip is non-destructive even
+        // when the producer side knew a variant the consumer does not.
+        Ok(match s.as_str() {
+            "NotFound" => io::ErrorKind::NotFound,
+            "PermissionDenied" => io::ErrorKind::PermissionDenied,
+            "ConnectionRefused" => io::ErrorKind::ConnectionRefused,
+            "ConnectionReset" => io::ErrorKind::ConnectionReset,
+            "ConnectionAborted" => io::ErrorKind::ConnectionAborted,
+            "NotConnected" => io::ErrorKind::NotConnected,
+            "AddrInUse" => io::ErrorKind::AddrInUse,
+            "AddrNotAvailable" => io::ErrorKind::AddrNotAvailable,
+            "BrokenPipe" => io::ErrorKind::BrokenPipe,
+            "AlreadyExists" => io::ErrorKind::AlreadyExists,
+            "WouldBlock" => io::ErrorKind::WouldBlock,
+            "InvalidInput" => io::ErrorKind::InvalidInput,
+            "InvalidData" => io::ErrorKind::InvalidData,
+            "TimedOut" => io::ErrorKind::TimedOut,
+            "WriteZero" => io::ErrorKind::WriteZero,
+            "Interrupted" => io::ErrorKind::Interrupted,
+            "Unsupported" => io::ErrorKind::Unsupported,
+            "UnexpectedEof" => io::ErrorKind::UnexpectedEof,
+            "OutOfMemory" => io::ErrorKind::OutOfMemory,
+            _ => io::ErrorKind::Other,
+        })
+    }
+}
 
 /// Errors returned by trust anchor loading.
 ///
 /// `#[non_exhaustive]`: new variants may be added in minor releases.
-#[derive(Debug)]
+///
+/// # Cache-friendliness (AGENTS.md non-negotiable #6)
+///
+/// All variants are `Clone + PartialEq + Eq + Send + Sync`. The
+/// `Pem`/`Der` variants carry an opaque [`DerError`] newtype (rather
+/// than the upstream `der::Error`) so a future major-version bump in
+/// the `der` crate cannot cascade into a semver break here. The `Io`
+/// variant carries an [`IoFailure`] (rather than [`io::Error`]) so the
+/// type can derive `Clone + Eq`; this drops the OS error code but
+/// preserves [`io::ErrorKind`] and the rendered message.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// Filesystem I/O failed while reading a trust anchor file.
-    Io(io::Error),
-    /// PEM decoding failed. The wrapped [`der::Error`] surfaces the underlying
-    /// `der::pem` failure (missing end boundary, bad base64, unknown label).
-    Pem(der::Error),
+    Io(IoFailure),
+    /// PEM decoding failed. The wrapped [`DerError`] preserves the
+    /// underlying `der::pem` failure (missing end boundary, bad base64,
+    /// unknown label) as a Display-renderable string.
+    Pem(DerError),
     /// DER decoding failed for a certificate body.
-    Der(der::Error),
+    Der(DerError),
     /// The input parsed cleanly but contained no certificates.
     ///
     /// Returned by [`from_pem`] and the file/iter variants when zero
@@ -136,7 +260,7 @@ impl std::error::Error for Error {
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
-        Self::Io(e)
+        Self::Io(IoFailure::from_io(&e))
     }
 }
 
@@ -223,7 +347,7 @@ const BEGIN_BOUNDARY: &[u8] = b"-----BEGIN CERTIFICATE-----";
 /// Returns [`Error::Der`] if the bytes do not decode as a single
 /// `Certificate`.
 pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
-    let cert = Certificate::from_der(bytes).map_err(Error::Der)?;
+    let cert = Certificate::from_der(bytes).map_err(|e| Error::Der(DerError::new(e)))?;
     Ok(TrustAnchor::from_cert(cert))
 }
 
@@ -298,8 +422,8 @@ pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor, Error> {
 fn map_pem_chain_error(e: der::Error) -> Error {
     use der::ErrorKind;
     match e.kind() {
-        ErrorKind::Pem(_) => Error::Pem(e),
-        _ => Error::Der(e),
+        ErrorKind::Pem(_) => Error::Pem(DerError::new(e)),
+        _ => Error::Der(DerError::new(e)),
     }
 }
 

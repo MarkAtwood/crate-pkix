@@ -10,10 +10,31 @@ authors.workspace     = true
 keywords    = ["x509", "certificate", "pki", "truststore", "ca"]
 categories  = ["cryptography"]
 
+[features]
+default = []
+
+# Enable serde::Serialize / serde::Deserialize on the public Error and
+# IoFailure types so trust-store load failures can be cached or
+# transferred across processes (AGENTS.md non-negotiable #6, PKIX-2l0v.1).
+# Activates serde on pkix-path so the re-exported DerError carries the
+# matching wire form.
+serde = ["dep:serde", "pkix-path/serde"]
+
 [dependencies]
-pkix-path = { workspace = true }
+# pkix-truststore is std-only (uses std::path::Path, std::fs).
+# `features = ["std"]` is required so the `pkix_path::DerError` type
+# re-exported here satisfies `std::error::Error` (its impl is
+# `cfg(feature = "std")` gated in pkix-path).
+pkix-path = { workspace = true, features = ["std"] }
 der        = { workspace = true, features = ["pem"] }
 x509-cert  = { workspace = true, features = ["pem"] }
+
+# Serde support (optional, gated behind the `serde` feature).
+serde      = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde      = { workspace = true }
+serde_json = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
