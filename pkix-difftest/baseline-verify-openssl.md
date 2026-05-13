@@ -17,7 +17,7 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 | `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_code_signer` | `-purpose codesign` | PKIX-fmtv.18.5 | open |
 | `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | open |
-| `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | open |
+| `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | shipped (chain-only) |
 
 OpenSSL version: tracked at run time — `openssl verify` is invoked from
 `$PATH` (or `$PKIX_DIFFTEST_OPENSSL_BIN`). Reproducing this baseline
@@ -195,7 +195,45 @@ _Open. Will populate when the subbead lands._
 
 ## OCSP responder (PKIX-fmtv.18.7)
 
-_Open. Pending PKIX-fmtv.13.3 design clarification._
+**3 / 3 cases produced a verdict on both sides.**
+**3 / 3 in agreement** (100%). **0 Rust-looser, 0 Rust-stricter.**
+
+| # | Case | Fixture | Time | Rust | OpenSSL | Agreement |
+|---|---|---|---|---|---|---|
+| 1 | `happy_path` | `leaf-ocsp-responder.der` | NOW | Ok | pass | Agree |
+| 2 | `happy_path_with_nocheck` | `leaf-ocsp-responder-nocheck.der` | NOW | Ok | pass | Agree |
+| 3 | `before_not_before` | `leaf-ocsp-responder.der` | 0 | Path | fail | Agree |
+
+### Why the diff is intrinsically narrow
+
+OpenSSL's `-purpose ocsphelper` is **chain-only**. Empirically verified
+against OpenSSL 3.0.13:
+
+- It does NOT enforce `id-kp-OCSPSigning` EKU on the leaf
+  (`host-exact-foo.pem` with serverAuth-only EKU validates fine).
+- It has no CLI flag for RFC 6960 §4.2.2.2 delegation DN matching.
+- It has no notion of RFC 6960 §4.2.2.2.1 `id-pkix-ocsp-nocheck`
+  bypass (and `openssl verify` does not run OCSP checks itself
+  without `-CRLfile` plumbing).
+
+`verify_ocsp_responder` enforces all three semantics (EKU via
+`BasicOcspResponderProfile`, delegation via wrapper-level check, nocheck
+via revocation-checker shim). The OpenSSL oracle therefore covers
+**chain validity only** for this wrapper — anchor binding, signature
+chain, validity period.
+
+Negative cases that fall outside `-purpose ocsphelper`'s surface
+(wrong-issuer DN mismatch → `Error::OcspDelegation`, EKU-mismatch
+under the profile → `Error::Path`) are exercised in
+`pkix-chain/tests/verify_ocsp_responder.rs` and not duplicated here
+because OpenSSL provides no oracle for them.
+
+### Pending design clarification
+
+PKIX-fmtv.13.3 has an open design clarification for the wrapper's
+`issuer` argument shape. The diff harness here intentionally avoids
+exercising that surface so the test stays valid across both possible
+resolutions.
 
 ## Hard invariants enforced by the tests
 
