@@ -73,6 +73,15 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   baseline (22/22) and the strict-RFC-5321 local-part case-sensitivity
   decision are documented in `tests/mailbox_corpus_baseline.md`.
   (PKIX-fmtv.23.)
+- Curated RFC 6125 hostname-binding corpus in
+  `tests/hostname_corpus.rs`, exercising `verify_tls_server` against
+  exact-match / wildcard / partial-label / internal-wildcard /
+  public-suffix-shape / case-folding / IDN A-label / IDN U-label /
+  IPv4 / IPv6 / cross-shape (IPv4-vs-IPv6, DNS-vs-IP) / multi-SAN /
+  SAN-absent cases under both `Rfc5280Profile` and `BasicTlsProfile`.
+  Pass-rate baseline (27/27) and the wildcard / case-folding / IDN
+  / IP-shape decisions are documented in
+  `tests/hostname_corpus_baseline.md`. (PKIX-fmtv.22.)
 - `der` workspace dep added (was previously transitive) for the
   `verify_time_stamper` post-validation EKU parsing.
 

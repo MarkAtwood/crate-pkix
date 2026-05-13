@@ -25,6 +25,7 @@ Run from this directory:
 """
 
 import datetime
+import ipaddress
 from pathlib import Path
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ObjectIdentifier
@@ -338,6 +339,122 @@ def main():
         eku=EMAIL_PROT,
     )
     write_der("mailbox-smtputf8-bad-utf8.der", leaf_mailbox_bad_utf8)
+
+    # ------------------------------------------------------------------
+    # PKIX-fmtv.22: curated RFC 6125 hostname-binding corpus.
+    #
+    # Each leaf carries id-kp-serverAuth so it passes the BasicTlsProfile
+    # EKU check; the SAN varies to exercise verify_tls_server binding
+    # rules per RFC 6125 §6.4.
+    # ------------------------------------------------------------------
+    SERVER_AUTH = [x509.ExtendedKeyUsageOID.SERVER_AUTH]
+
+    # RFC 6125 §6.4.1 exact match: SAN DNS=foo.example.com.
+    leaf_host_exact = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("foo.example.com")],
+        serial=40,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-exact-foo.der", leaf_host_exact)
+
+    # RFC 6125 §6.4.2 leftmost wildcard: SAN DNS=*.example.com.
+    leaf_host_wildcard = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("*.example.com")],
+        serial=41,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-wildcard.der", leaf_host_wildcard)
+
+    # RFC 6125 §7.2 partial-label wildcard rejection: SAN DNS=f*o.example.com.
+    leaf_host_partial = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("f*o.example.com")],
+        serial=42,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-wildcard-partial-label.der", leaf_host_partial)
+
+    # RFC 6125 §6.4.3 leftmost-only wildcard pinning: SAN DNS=foo.*.example.com.
+    leaf_host_internal_wc = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("foo.*.example.com")],
+        serial=43,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-wildcard-internal.der", leaf_host_internal_wc)
+
+    # Public-suffix-shape wildcard rejection: SAN DNS=*.com.
+    # The shipped matcher refuses to honor a wildcard whose remainder
+    # has no label separator (single-label suffix). pyca accepts this
+    # SAN value at the DNSName level — the rejection is consumer-side.
+    leaf_host_wildcard_tld = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("*.com")],
+        serial=44,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-wildcard-tld.der", leaf_host_wildcard_tld)
+
+    # RFC 4343 case folding: SAN DNS=FOO.example.com (uppercase first
+    # label). Matching must be case-insensitive.
+    leaf_host_mixed_case = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("FOO.example.com")],
+        serial=45,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-mixed-case-san.der", leaf_host_mixed_case)
+
+    # IDN A-label SAN (RFC 5891). Real-world CAs only put A-labels in
+    # SANs. Caller-side U-label normalization is the ServerName::dns_name
+    # constructor's job; this fixture proves the matcher's
+    # A-label-to-A-label compare path works end-to-end.
+    leaf_host_idn = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("xn--bcher-kva.example")],
+        serial=46,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-idn-alabel.der", leaf_host_idn)
+
+    # IPv4 SAN (RFC 5280 §4.2.1.6).
+    leaf_host_ipv4 = build_leaf(
+        root_key, root_cert,
+        sans=[x509.IPAddress(ipaddress.IPv4Address("192.0.2.5"))],
+        serial=47,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-ipv4.der", leaf_host_ipv4)
+
+    # IPv6 SAN.
+    leaf_host_ipv6 = build_leaf(
+        root_key, root_cert,
+        sans=[x509.IPAddress(ipaddress.IPv6Address("2001:db8::1"))],
+        serial=48,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-ipv6.der", leaf_host_ipv6)
+
+    # CN-only cert (no SAN extension), CN=foo.example.com. RFC 6125 §6.4.4
+    # deprecated CN-fallback; verify_dns_name refuses to consult the CN.
+    # Re-uses the existing leaf-no-san.der at runtime — this fixture
+    # exercises the same MissingSan path, no separate file needed.
+
+    # Multi-SAN: positive case proving the iteration covers entries past
+    # the first. SAN list: api.example.com, www.example.com, *.cdn.example.com.
+    leaf_host_multi = build_leaf(
+        root_key, root_cert,
+        sans=[
+            x509.DNSName("api.example.com"),
+            x509.DNSName("www.example.com"),
+            x509.DNSName("*.cdn.example.com"),
+        ],
+        serial=49,
+        eku=SERVER_AUTH,
+    )
+    write_der("host-multi-san.der", leaf_host_multi)
 
 
 if __name__ == "__main__":
