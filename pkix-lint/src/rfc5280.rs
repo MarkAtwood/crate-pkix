@@ -25,11 +25,23 @@
 
 use std::borrow::Cow;
 
+use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::Certificate;
 
-use crate::{
-    Lint, LintParameter, LintResult, ParameterError, Scope, Severity, SubjectKind,
-};
+use crate::{Lint, LintParameter, LintResult, ParameterError, Scope, Severity, SubjectKind};
+
+// ---------------------------------------------------------------------------
+// OID constants (RFC 5280 §4.2.1 — standard certificate extensions)
+// ---------------------------------------------------------------------------
+
+/// `BasicConstraints` extension OID — RFC 5280 §4.2.1.9.
+const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
+
+/// `ExtendedKeyUsage` extension OID — RFC 5280 §4.2.1.12.
+const OID_EXTENDED_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.37");
+
+/// id-kp-serverAuth — RFC 5280 §4.2.1.12 (TLS WWW server authentication).
+const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
 
 // ---------------------------------------------------------------------------
 // rfc5280.cert.serial_number.max_octets
@@ -174,6 +186,194 @@ impl Lint for Rfc5280MaxSerialLengthLint {
     }
 }
 
+// ---------------------------------------------------------------------------
+// rfc5280.cert.bc.ca_false_for_leaf
+// ---------------------------------------------------------------------------
+
+/// RFC 5280 §4.2.1.9: end-entity certificates MUST NOT assert `cA=TRUE`.
+///
+/// > The cA boolean indicates whether the certified public key may be used
+/// > to verify certificate signatures.  If the cA boolean is not asserted,
+/// > then the keyCertSign bit in the key usage extension MUST NOT be
+/// > asserted.  If the basic constraints extension is not present in a
+/// > version 3 certificate, or the extension is present but the cA boolean
+/// > is not asserted, then the certified public key MUST NOT be used to
+/// > verify certificate signatures.
+///
+/// The complement of `pkix_lint_cabf::cabf_tls_br::BcCaFlagLint`, which
+/// requires `cA=TRUE` on intermediate CAs. This lint requires `cA=FALSE`
+/// (or `BasicConstraints` absent, which has the same meaning per the spec)
+/// on end-entity (`SubjectKind::Leaf`) certificates.
+///
+/// # Behavior
+///
+/// - `BasicConstraints` extension absent → `Pass` (defaults to cA=FALSE).
+/// - `BasicConstraints` present with cA=FALSE → `Pass`.
+/// - `BasicConstraints` present with cA=TRUE → `Error`.
+/// - `BasicConstraints` extension value is malformed → `Error` (cannot
+///   confirm cA=FALSE).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Rfc5280BasicConstraintsCaLeafLint;
+
+impl Lint for Rfc5280BasicConstraintsCaLeafLint {
+    fn id(&self) -> &'static str {
+        "rfc5280.cert.bc.ca_false_for_leaf"
+    }
+
+    fn citation(&self) -> &'static str {
+        "RFC 5280 §4.2.1.9"
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn scope(&self) -> Scope {
+        Scope::Certificate
+    }
+
+    fn applies_to(&self) -> SubjectKind {
+        SubjectKind::Leaf
+    }
+
+    fn title(&self) -> &str {
+        "End-entity certificate must not assert BasicConstraints.cA=TRUE"
+    }
+
+    fn spec_section_id(&self) -> Option<&str> {
+        Some("rfc5280-4.2.1.9")
+    }
+
+    fn spec_url(&self) -> Option<&str> {
+        Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9")
+    }
+
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        // No extensions at all is fine: BasicConstraints is implicitly absent
+        // and defaults to cA=FALSE per the spec.
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::Pass;
+        };
+
+        // BasicConstraints absent is the same as cA=FALSE.
+        let Some(bc_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
+        else {
+            return LintResult::Pass;
+        };
+
+        match x509_cert::ext::pkix::BasicConstraints::from_der(bc_ext.extn_value.as_bytes()) {
+            Ok(bc) => {
+                if bc.ca {
+                    LintResult::error(
+                        "end-entity certificate asserts BasicConstraints.cA=TRUE; \
+                         only CA certificates may assert cA",
+                    )
+                } else {
+                    LintResult::Pass
+                }
+            }
+            Err(_) => LintResult::error("BasicConstraints extension value is malformed DER"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// rfc5280.cert.eku.server_auth_required
+// ---------------------------------------------------------------------------
+
+/// RFC 5280 §4.2.1.12: TLS server end-entity certificates MUST assert
+/// `id-kp-serverAuth` in `ExtendedKeyUsage`.
+///
+/// > KeyPurposeId ::= OBJECT IDENTIFIER
+/// >
+/// > -- TLS WWW server authentication
+/// > -- Key usage bits that may be consistent: digitalSignature,
+/// > -- keyEncipherment or keyAgreement
+/// > id-kp-serverAuth             OBJECT IDENTIFIER ::= { id-kp 1 }
+///
+/// This is the RFC-conformance variant of the CA/B Forum
+/// [`cabf.br.tls.eku.server_auth`][cabf-eku] lint. Identical logic, RFC
+/// 5280 citation. The lint is leaf-only because EKU on intermediates is
+/// constrained by the chain-walking name-space (RFC 5280 §4.2.1.12 second
+/// paragraph) and is checked at path-validation time, not as a leaf shape
+/// requirement.
+///
+/// [cabf-eku]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/struct.EkuServerAuthLint.html
+///
+/// # Behavior
+///
+/// - `ExtendedKeyUsage` extension absent → `Error`.
+/// - `ExtendedKeyUsage` present and contains `id-kp-serverAuth` → `Pass`.
+/// - `ExtendedKeyUsage` present but does not contain `id-kp-serverAuth` →
+///   `Error`.
+/// - `ExtendedKeyUsage` extension value is malformed → `Error`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Rfc5280EkuServerAuthLint;
+
+impl Lint for Rfc5280EkuServerAuthLint {
+    fn id(&self) -> &'static str {
+        "rfc5280.cert.eku.server_auth_required"
+    }
+
+    fn citation(&self) -> &'static str {
+        "RFC 5280 §4.2.1.12"
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn scope(&self) -> Scope {
+        Scope::Certificate
+    }
+
+    fn applies_to(&self) -> SubjectKind {
+        SubjectKind::Leaf
+    }
+
+    fn title(&self) -> &str {
+        "TLS server certificate must include id-kp-serverAuth EKU"
+    }
+
+    fn spec_section_id(&self) -> Option<&str> {
+        Some("rfc5280-4.2.1.12")
+    }
+
+    fn spec_url(&self) -> Option<&str> {
+        Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.12")
+    }
+
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::error(
+                "leaf certificate has no extensions; ExtendedKeyUsage absent",
+            );
+        };
+
+        let Some(eku_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
+        else {
+            return LintResult::error("ExtendedKeyUsage extension absent from leaf certificate");
+        };
+
+        match x509_cert::ext::pkix::ExtendedKeyUsage::from_der(eku_ext.extn_value.as_bytes()) {
+            Ok(eku) => {
+                if eku.0.contains(&ID_KP_SERVER_AUTH) {
+                    LintResult::Pass
+                } else {
+                    LintResult::error(
+                        "ExtendedKeyUsage does not include id-kp-serverAuth (1.3.6.1.5.5.7.3.1)",
+                    )
+                }
+            }
+            Err(_) => LintResult::error("ExtendedKeyUsage extension value is malformed DER"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     //! Independent oracle for serial-length assertions:
@@ -215,8 +415,8 @@ mod tests {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../pkix-path/tests/fixtures/policy-checks/")
             .join(name);
-        let der = std::fs::read(&path)
-            .unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
+        let der =
+            std::fs::read(&path).unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
         <Certificate as der::Decode>::from_der(&der)
             .unwrap_or_else(|e| panic!("decode fixture {name}: {e}"))
     }
@@ -361,6 +561,138 @@ mod tests {
         assert_eq!(
             lint.spec_url(),
             Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Rfc5280BasicConstraintsCaLeafLint
+    //
+    // Oracle: `openssl x509 -text` reports cA flag for each fixture
+    // (verified 2026-05-12):
+    //
+    // | fixture                              | BC.cA   | cert role |
+    // |--------------------------------------|---------|-----------|
+    // | leaf-p256-365d-san-eku.der           | FALSE   | leaf      |
+    // | webpki-self-signed-365d.der          | TRUE    | self-CA   |
+    // | smime-self-signed-365d.der           | TRUE    | self-CA   |
+    // | codesign-self-signed-365d.der        | TRUE    | self-CA   |
+    //
+    // The CA-flagged fixtures are intentionally self-signed CA certs; we
+    // exercise the lint by passing them with `SubjectKind::Leaf` to test
+    // the lint's negative path, since no all-extensions-set leaf-with-CA
+    // fixture exists. The lint's `check_cert` does not consult `kind`
+    // beyond what the runner's `applies_to` filter does, so this is a
+    // faithful test of the lint's logic.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bc_ca_leaf_lint_accepts_normal_leaf() {
+        let lint = Rfc5280BasicConstraintsCaLeafLint;
+        let cert = load_cert("leaf-p256-365d-san-eku.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn bc_ca_leaf_lint_rejects_cert_with_ca_true() {
+        let lint = Rfc5280BasicConstraintsCaLeafLint;
+        // webpki-self-signed-365d.der has cA=TRUE; passed as Leaf, this
+        // must trigger the lint's error path.
+        let cert = load_cert("webpki-self-signed-365d.der");
+        match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("cA=TRUE"),
+                    "error detail must mention cA=TRUE; got: {detail}"
+                );
+            }
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bc_ca_leaf_lint_metadata_matches_rfc_section() {
+        let lint = Rfc5280BasicConstraintsCaLeafLint;
+        assert_eq!(lint.id(), "rfc5280.cert.bc.ca_false_for_leaf");
+        assert_eq!(lint.citation(), "RFC 5280 §4.2.1.9");
+        assert_eq!(lint.severity(), Severity::Error);
+        assert_eq!(lint.scope(), Scope::Certificate);
+        assert_eq!(lint.applies_to(), SubjectKind::Leaf);
+        assert_eq!(lint.spec_section_id(), Some("rfc5280-4.2.1.9"));
+        assert_eq!(
+            lint.spec_url(),
+            Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Rfc5280EkuServerAuthLint
+    //
+    // Oracle: `openssl x509 -text` reports EKU for each fixture
+    // (verified 2026-05-12):
+    //
+    // | fixture                              | EKU                      |
+    // |--------------------------------------|--------------------------|
+    // | leaf-p256-365d-san-eku.der           | TLS Web Server Auth      |
+    // | leaf-p256-365d-no-eku.der            | (absent)                 |
+    // | leaf-p256-365d-wrong-eku.der         | E-mail Protection        |
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn eku_server_auth_lint_accepts_server_auth_eku() {
+        let lint = Rfc5280EkuServerAuthLint;
+        let cert = load_cert("leaf-p256-365d-san-eku.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn eku_server_auth_lint_rejects_missing_eku() {
+        let lint = Rfc5280EkuServerAuthLint;
+        let cert = load_cert("leaf-p256-365d-no-eku.der");
+        match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("ExtendedKeyUsage extension absent"),
+                    "error detail must mention missing EKU; got: {detail}"
+                );
+            }
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn eku_server_auth_lint_rejects_wrong_eku() {
+        let lint = Rfc5280EkuServerAuthLint;
+        // leaf-p256-365d-wrong-eku.der has E-mail Protection but not Server Auth.
+        let cert = load_cert("leaf-p256-365d-wrong-eku.der");
+        match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("id-kp-serverAuth"),
+                    "error detail must mention id-kp-serverAuth; got: {detail}"
+                );
+            }
+            other => panic!("expected Error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn eku_server_auth_lint_metadata_matches_rfc_section() {
+        let lint = Rfc5280EkuServerAuthLint;
+        assert_eq!(lint.id(), "rfc5280.cert.eku.server_auth_required");
+        assert_eq!(lint.citation(), "RFC 5280 §4.2.1.12");
+        assert_eq!(lint.severity(), Severity::Error);
+        assert_eq!(lint.scope(), Scope::Certificate);
+        assert_eq!(lint.applies_to(), SubjectKind::Leaf);
+        assert_eq!(lint.spec_section_id(), Some("rfc5280-4.2.1.12"));
+        assert_eq!(
+            lint.spec_url(),
+            Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.12")
         );
     }
 }

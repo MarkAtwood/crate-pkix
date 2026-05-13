@@ -6,6 +6,65 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint`: RFC-conformance shape-check lints (2026-05-12)
+
+`pkix-lint` gains five new RFC-conformance `Lint` impls covering the
+shape-check requirements for `BasicTlsProfile` and `BasicSmimeProfile`
+in `pkix-profiles`. These replace what would otherwise be near-empty
+`LintProfile::lints()` methods on those profiles, making
+`check_basic_tls_shape` / `check_basic_smime_shape` (filed under
+[PKIX-9vnx.9.2]) substantive shape-checks once their convenience aliases
+land.
+
+Five new lints across four RFC source modules:
+
+- `rfc5280::Rfc5280BasicConstraintsCaLeafLint` — RFC 5280 §4.2.1.9:
+  end-entity certs MUST NOT assert `BasicConstraints.cA=TRUE`. Complement
+  of `pkix_lint_cabf::cabf_tls_br::BcCaFlagLint` (which requires cA=TRUE
+  on intermediates).
+- `rfc5280::Rfc5280EkuServerAuthLint` — RFC 5280 §4.2.1.12: TLS server
+  end-entity certs MUST assert `id-kp-serverAuth` in `ExtendedKeyUsage`.
+  RFC-conformance variant of
+  `pkix_lint_cabf::cabf_tls_br::EkuServerAuthLint`.
+- `rfc6125::Rfc6125TlsServerSanLint` — RFC 6125 §6.4.1: TLS server certs
+  MUST carry a `subjectAltName` containing at least one `dNSName` or
+  `iPAddress` entry. Tightens the CABF "SAN required" lint with the
+  RFC 6125 type requirement.
+- `rfc8398::Rfc8398SmimeSanLint` — RFC 8398 §3 + RFC 5280 §4.2.1.6:
+  S/MIME certs MUST carry a `subjectAltName` containing at least one
+  `rfc822Name` or `otherName` of type `id-on-SmtpUTF8Mailbox`.
+- `rfc8551::Rfc8551EkuEmailProtectionLint` — RFC 5280 §4.2.1.12 + RFC
+  8551 §3.3: S/MIME certs MUST assert `id-kp-emailProtection` in
+  `ExtendedKeyUsage`.
+
+Two new public modules expose these lints alongside the existing
+`rfc5280` module: `rfc6125`, `rfc8398`, `rfc8551`. Module structure
+mirrors the workspace convention of one module per standards-body source
+(established by `rfc5280`).
+
+Tests use independent oracles: `openssl x509 -text` readings of the
+existing fixtures under `pkix-path/tests/fixtures/policy-checks/`. Each
+new lint has at least one positive test plus one negative per failure
+mode, plus a metadata test pinning `id`, `citation`, `severity`,
+`scope`, `applies_to`, `spec_section_id`, and `spec_url`. 13 new tests
+total (in addition to the existing 91 lib tests; 104 total).
+
+`pkix-lint` minor-bumped to 0.7.0 (additive: new public modules and
+lint impls). No breaking changes; existing 0.6 callers compile
+unchanged.
+
+Three further RFC-conformance lints from the original
+[PKIX-9vnx.9.2.1] candidate list are deferred to follow-on beads:
+
+- RFC 5280 §4.2.1.6 SAN-when-subject-empty (needs RDN-emptiness logic).
+- RFC 5280 §4.1 signatureAlgorithm match between outer `Certificate`
+  and `tbsCertificate.signature` (needs `AlgorithmIdentifier` equality).
+- RFC 8398 §3 rfc822Name / SmtpUTF8Mailbox pair-equivalence (needs
+  cross-SAN-entry semantic comparison).
+
+[PKIX-9vnx.9.2]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-9vnx.9.2.1]: https://github.com/MarkAtwood/crate-pkix
+
 ### `pkix-chain` + `pkix-profiles`: use-case verify wrappers (2026-05-12)
 
 Five of seven canonical use-case wrappers from PKIX-fmtv.7's
