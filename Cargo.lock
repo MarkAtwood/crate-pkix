@@ -1296,6 +1296,7 @@ name = "pkix-profiles"
 version = "0.3.0"
 dependencies = [
  "der",
+ "pkix-lint",
  "pkix-path",
  "pkix-profiles-cabf",
  "x509-cert",

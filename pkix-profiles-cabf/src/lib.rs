@@ -385,6 +385,30 @@ impl Profile for SmimeProfile {
     }
 }
 
+impl pkix_lint::LintProfile for SmimeProfile {
+    /// Return the CA/B Forum S/MIME BR lint set for this profile.
+    ///
+    /// **Currently empty.** `pkix-lint-cabf` does not yet ship a
+    /// `cabf_smime_br` lint module; per AGENTS.md non-negotiable #5, the
+    /// path of least surface area is to wait for either a curated marquee
+    /// set (sibling to `cabf_tls_br`) or to rely on `pkix-policy-zlint` for
+    /// comprehensive predicate coverage. Until those land, this profile's
+    /// `LintProfile` impl returns no lints.
+    ///
+    /// Callers needing RFC-baseline S/MIME shape checks should call
+    /// `pkix_profiles::check_basic_smime_shape` separately, which bundles
+    /// RFC 8551 + RFC 8398 + RFC 5280 baseline lints.
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(Vec::new)
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(Vec::new())
+    }
+}
+
 /// CA/Browser Forum Code Signing Baseline Requirements profile.
 ///
 /// Implements [`Profile`] for code-signing certificate validation.
@@ -450,6 +474,26 @@ impl Profile for CodeSigningProfile {
 
     fn policy_oids(&self) -> &[ObjectIdentifier] {
         &[]
+    }
+}
+
+impl pkix_lint::LintProfile for CodeSigningProfile {
+    /// Return the CA/B Forum CS BR lint set for this profile.
+    ///
+    /// **Currently empty.** `pkix-lint-cabf` does not yet ship a
+    /// `cabf_cs_br` lint module; per AGENTS.md non-negotiable #5, the
+    /// path of least surface area is to wait for either a curated marquee
+    /// set (sibling to `cabf_tls_br`) or to rely on `pkix-policy-zlint` for
+    /// comprehensive predicate coverage. Until those land, this profile's
+    /// `LintProfile` impl returns no lints.
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(Vec::new)
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(Vec::new())
     }
 }
 
@@ -620,6 +664,115 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 #[must_use]
 pub fn code_signing_policy(now_unix: u64) -> ValidationPolicy {
     CodeSigningProfile.policy(now_unix)
+}
+
+// ---------------------------------------------------------------------------
+// Shape-check convenience aliases (PKIX-9vnx.9.2)
+//
+// One-line wrappers over `pkix_lint::check_shape(cert, SubjectKind::Leaf,
+// now_unix, &<Profile>)` for each cabf Profile that ships a LintProfile
+// impl. Sister aliases for the RFC-baseline profiles live in
+// `pkix-profiles` (`check_basic_tls_shape`, `check_basic_smime_shape`).
+//
+// The cabf alias function names mirror each Profile's struct slug
+// (`WebPkiProfile` -> `check_web_pki_shape`, etc.) per Mark's 2026-05-12
+// naming decision recorded in PKIX-9vnx.9.2.
+// ---------------------------------------------------------------------------
+
+/// Run [`WebPkiProfile`]'s lint set against a single CA/B Forum TLS server
+/// certificate as a fast structural shape check.
+///
+/// Returns `Ok(())` when no `Error`/`Fatal` findings are produced; returns
+/// `Err(findings)` with the complete `Vec<Finding>` from
+/// [`pkix_lint::LintRunner::run_cert`] otherwise.
+///
+/// Convenience alias for
+/// `pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &WebPkiProfile)`.
+///
+/// # Constraints checked
+///
+/// See [`WebPkiProfile`]'s `LintProfile` impl. The bundle covers the six
+/// CA/B Forum TLS BR predicates implemented in
+/// `pkix_lint_cabf::cabf_tls_br`: SC-081 phased validity cap, SHA-1
+/// prohibition, RSA min-key-size (2048 bits), SAN presence,
+/// id-kp-serverAuth EKU presence, and `BasicConstraints.cA=TRUE` on
+/// intermediates.
+///
+/// Note: this check covers the CA/B Forum TLS BR overlay only.
+/// RFC 5280 + RFC 6125 baseline checks (e.g. subscriber non-CA,
+/// SAN-when-empty-DN, signatureAlgorithm match) are bundled separately
+/// under `pkix_profiles::check_basic_tls_shape`; callers wanting full
+/// coverage run both.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<Finding>)` containing the full lint runner output if
+/// any cert-scope lint records an `Error` or `Fatal` finding.
+pub fn check_web_pki_shape(
+    cert: &x509_cert::Certificate,
+    now_unix: u64,
+) -> Result<(), Vec<pkix_lint::Finding>> {
+    pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &WebPkiProfile)
+}
+
+/// Run [`SmimeProfile`]'s lint set against a single CA/B Forum S/MIME
+/// end-entity certificate as a fast structural shape check.
+///
+/// Convenience alias for
+/// `pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &SmimeProfile)`.
+///
+/// # Constraints checked
+///
+/// **Currently empty.** [`SmimeProfile`]'s `LintProfile` impl returns
+/// no lints today because `pkix-lint-cabf` has no `cabf_smime_br`
+/// module yet (a curated marquee S/MIME BR lint set, sibling to
+/// `cabf_tls_br`, has not been authored). Until that lands, this alias
+/// will return `Ok(())` for any cert. Callers needing RFC-baseline
+/// S/MIME shape checks should call `pkix_profiles::check_basic_smime_shape`
+/// separately, which bundles RFC 8551 + RFC 8398 + RFC 5280 baseline
+/// lints.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<Finding>)` if and only if the future lint set fires
+/// any `Error` or `Fatal` finding. Today the lint set is empty so this
+/// branch is unreachable.
+pub fn check_smime_shape(
+    cert: &x509_cert::Certificate,
+    now_unix: u64,
+) -> Result<(), Vec<pkix_lint::Finding>> {
+    pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &SmimeProfile)
+}
+
+/// Run [`CodeSigningProfile`]'s lint set against a single CA/B Forum
+/// code-signing end-entity certificate as a fast structural shape check.
+///
+/// Convenience alias for
+/// `pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &CodeSigningProfile)`.
+///
+/// # Constraints checked
+///
+/// **Currently empty.** [`CodeSigningProfile`]'s `LintProfile` impl
+/// returns no lints today because `pkix-lint-cabf` has no `cabf_cs_br`
+/// module yet (a curated marquee CS BR lint set, sibling to
+/// `cabf_tls_br`, has not been authored). Until that lands, this alias
+/// will return `Ok(())` for any cert.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<Finding>)` if and only if the future lint set fires
+/// any `Error` or `Fatal` finding. Today the lint set is empty so this
+/// branch is unreachable.
+pub fn check_code_signing_shape(
+    cert: &x509_cert::Certificate,
+    now_unix: u64,
+) -> Result<(), Vec<pkix_lint::Finding>> {
+    pkix_lint::check_shape(
+        cert,
+        pkix_lint::SubjectKind::Leaf,
+        now_unix,
+        &CodeSigningProfile,
+    )
 }
 
 // ---------------------------------------------------------------------------
