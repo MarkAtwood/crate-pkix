@@ -202,8 +202,7 @@ fn build_spec_json(chain: &Chain) -> io::Result<String> {
 /// `base64` crate dependency to pkix-difftest just for this single call
 /// site — the harness already has no general-purpose base64 use.
 fn base64_encode(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     let chunks = bytes.chunks_exact(3);
     let remainder = chunks.remainder();

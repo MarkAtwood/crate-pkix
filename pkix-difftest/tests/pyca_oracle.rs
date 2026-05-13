@@ -158,7 +158,10 @@ fn revocation_fixture(name: &str) -> Vec<u8> {
 /// supplied CRL DER bytes attached.
 fn crl_chain(leaf_fixture: &str, ca_fixture: &str, crl_fixtures: &[&str], label: &str) -> Chain {
     let mut chain = Chain {
-        certs_der: vec![revocation_fixture(leaf_fixture), revocation_fixture(ca_fixture)],
+        certs_der: vec![
+            revocation_fixture(leaf_fixture),
+            revocation_fixture(ca_fixture),
+        ],
         crls: crl_fixtures.iter().map(|n| revocation_fixture(n)).collect(),
         root_in_chain: true,
         label: label.to_string(),
