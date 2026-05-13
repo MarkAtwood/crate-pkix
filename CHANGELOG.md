@@ -6,6 +6,94 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Workspace: optional `serde` feature on cache-friendly result types (PKIX-2l0v.1)
+
+Five crates gain an optional `serde` feature that derives
+`serde::Serialize` / `serde::Deserialize` on their load-bearing
+public types, satisfying AGENTS.md non-negotiable #6's
+cache-friendliness requirement. The wire form is **format-adaptive**:
+human-readable serializers (JSON, TOML, YAML) emit base64-encoded
+DER for fields backed by foreign DER types; binary serializers
+(postcard, bincode, MessagePack) emit raw DER bytes. Selection is
+driven by `serde::Serializer::is_human_readable`.
+
+* **`pkix-path`**: new `serde` feature. Derives on `ValidatedPath`,
+  `ValidationPolicy`, `TrustAnchor`, `PolicyTreeNode`, `DnAttrRule`,
+  `Error`, `DerError`. New public module `pkix_path::serde_der`
+  exposes the format-adaptive (de)serializer helpers for downstream
+  use. New crate-level dep on `base64ct` (no_std, MSRV-friendly,
+  RustCrypto-family).
+* **`pkix-truststore`**: new `serde` feature. Derives on `Error`
+  and the new `IoFailure` type.
+* **`pkix-revocation`**: new `serde` feature. Derives on `Error`
+  and `OutOfScopeReason`. `Option<CrlReason>` wire form uses the
+  RFC 5280 §5.3.1 numeric codes (`KeyCompromise = 1`, etc.).
+* **`pkix-chain`**: new `serde` feature. Derives on `Error`.
+  Activates `serde` on all three wrapped error sources.
+* **`pkix-identity`**: new `serde` feature. Derives on `IdentityError`.
+
+Additionally, two structural refactors land alongside the serde
+derives because the upstream types they wrap are not
+serde-friendly:
+
+* **`pkix-path::DerError`** is no longer a `pub struct DerError(der::Error)`
+  tuple struct. It now owns a `Box<str>` Display message that
+  survives serde round-trips alongside an `Option<der::Error>` inner
+  value. `std::error::Error::source` returns the inner when present;
+  it is `None` after a deserialize. `PartialEq` compares only the
+  rendered message — two `DerError`s with identical Display output
+  are equal regardless of whether their inner field is populated.
+  Pre-refactor behaviour is preserved in practice because two
+  `der::Error`s with identical `{kind, position}` produce identical
+  Display output. `DerError::new(e: der::Error)` is now `pub` so
+  sibling workspace crates (`pkix-revocation`, `pkix-truststore`)
+  can construct their own `Error::Der`-equivalent variants without
+  defining a duplicate type.
+
+* **`pkix-truststore::Error::Io`** changes payload type from
+  `std::io::Error` to a new `IoFailure { kind: io::ErrorKind,
+  message: String }` struct. This is a **breaking change** —
+  pattern matches that bind the inner value need to update; matches
+  that bind `_` are unaffected. The OS error code is dropped (low
+  value for cache-replay use cases); `io::ErrorKind` and the
+  rendered message are preserved. `pkix-truststore` is at version
+  0.0.0; the next published 0.x release should bump appropriately.
+
+* **`pkix-truststore::Error::Pem`/`Error::Der`** change payload type
+  from `der::Error` to the re-exported `pkix_path::DerError`. Same
+  breaking-change classification.
+
+* **`pkix-revocation::DerError`** is now a re-export of
+  `pkix_path::DerError` rather than an independent type with
+  identical shape. Pattern matches on `pkix_revocation::DerError`
+  still work; constructions via the (formerly tuple) `DerError(e)`
+  syntax are updated to `DerError::new(e)`.
+
+* **`pkix-chain::Error::ProfileViolation::reason`** and
+  **`Error::OcspDelegation::reason`** change field type from
+  `&'static str` to `Cow<'static, str>`. Producer code still
+  supplies `Cow::Borrowed("literal")`; the deserialize path produces
+  `Cow::Owned(String)`. `PartialEq` on `Cow` is content-based, so
+  round-trip preserves equality. Pattern matches that bind `reason`
+  see a `Cow` instead of a `&str` — callers using `reason.contains(...)`,
+  `format!("{reason}")`, or any `Deref`-backed method continue to
+  work unchanged.
+
+Departure from PKIX-2l0v.1 cleanup-note locked-in `serde_with = "3"`:
+the bead-cleanup pass dismissed the bead's own escalation that bare
+`"3"` would draw in a non-MSRV-compatible release. Verified
+empirically — `serde_with = "3"` resolves to 3.20.x which requires
+rustc 1.88; workspace MSRV is 1.73. A hand-written helper module
+(`pkix_path::serde_der`) implements the same format-adaptive wire
+form Mark's D1 decision called for, without the dep and without
+MSRV risk.
+
+Round-trip integration tests land per crate
+(`tests/serde_round_trip.rs`) with independent oracles: hand-computed
+expected JSON for wire-form assertions; per-field DER canonicality
+(every recovered DER-encodable field re-encodes to bytes byte-equal
+to the original) for round-trip assertions.
+
 ### `pkix-path`: leaf-only `required_leaf_policy_oids` + `required_leaf_subject_dn_attrs` (PKIX-jbvb.4)
 
 `ValidationPolicy` gains two additive leaf-only predicate fields plus a

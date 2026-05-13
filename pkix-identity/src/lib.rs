@@ -338,6 +338,7 @@ fn validate_ascii_local_part(s: &str) -> Result<(), IdentityError> {
 /// Variants will grow as PKIX-fmtv.12 lands; this enum is
 /// `#[non_exhaustive]` so additions are not API breaks.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum IdentityError {
     /// Functionality scaffolded but not yet implemented. Currently still

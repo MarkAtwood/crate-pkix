@@ -14,6 +14,11 @@ categories  = ["cryptography", "no-std"]
 default = []
 std     = ["x509-cert/std", "idna/std"]
 
+# Enable serde::Serialize / serde::Deserialize on the IdentityError type
+# so it survives caching/transport when used inside pkix-chain::Error
+# (AGENTS.md non-negotiable #6, PKIX-2l0v.1).
+serde   = ["dep:serde"]
+
 [dependencies]
 # x509-cert exposes the Certificate / GeneralName types we walk.
 x509-cert = { workspace = true }
@@ -23,6 +28,7 @@ der       = { workspace = true }
 # for internationalized DNS hostnames. Pinned no_std + alloc at the
 # workspace level; we never need full `std` here.
 idna      = { workspace = true }
+serde     = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

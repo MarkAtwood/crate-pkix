@@ -16,11 +16,23 @@ rustcrypto  = ["pkix-path/rustcrypto"]
 crl         = ["pkix-revocation/crl"]
 ocsp        = ["pkix-revocation/ocsp"]
 
+# Enable serde::Serialize / serde::Deserialize on the public Error type
+# (AGENTS.md non-negotiable #6, PKIX-2l0v.1). Propagates through to
+# the upstream Error variants and the pkix-identity::IdentityError
+# variant carried by Error::Identity.
+serde = [
+    "dep:serde",
+    "pkix-path/serde",
+    "pkix-revocation/serde",
+    "pkix-identity/serde",
+]
+
 [dependencies]
 pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
 pkix-identity   = { workspace = true, features = ["std"] }
 pkix-profiles   = { workspace = true }
+serde           = { workspace = true, optional = true }
 # pkix-aia ships the AiaFetcher trait that `Verifier` is generic over
 # (3rd generic with NoAiaFetcher default per PKIX-zkjb.9). The
 # `Verifier` API is parameterized; no actual AIA fetching happens
@@ -30,6 +42,15 @@ pkix-profiles   = { workspace = true }
 pkix-aia        = { workspace = true }
 der             = { workspace = true }
 x509-cert       = { workspace = true }
+
+[dev-dependencies]
+# Used by tests/serde_round_trip.rs (gated by required-features).
+serde      = { workspace = true }
+serde_json = { workspace = true }
+
+[[test]]
+name = "serde_round_trip"
+required-features = ["serde"]
 
 [package.metadata.docs.rs]
 all-features = true
