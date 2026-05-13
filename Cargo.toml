@@ -46,7 +46,15 @@ members = [
 #                              and BasicSmimeProfile (RFC 8551 §3 baseline). PKIX-amgn.4.
 #   - pkix-profiles-cabf 0.2.0 First substantive content release. Houses the CA/B Forum
 #                              profiles moved out of pkix-profiles 0.3.0. PKIX-amgn.4.
-#   - pkix-lint        0.8.0  ADDITIVE. `Severity` enum gains a `Notice`
+#   - pkix-lint        0.9.0  ADDITIVE. Three deferred RFC-conformance
+#                              lints land, closing out PKIX-9vnx.9.2.1's
+#                              8-of-8 candidate list:
+#                              `Rfc5280SanRequiredWhenSubjectEmptyLint`,
+#                              `Rfc5280SignatureAlgorithmMatchLint`,
+#                              `Rfc8398SmimeMailboxEquivalenceLint`. New
+#                              dep: `idna` (workspace pin, default-features
+#                              off). (PKIX-9vnx.9.2.1.1.)
+#                              0.8.0: `Severity` enum gains a `Notice`
 #                              variant slotted between `Info` and `Warn`
 #                              to align with the zlint catalog ranking
 #                              (`pass < notice < warn < error < fatal`)
@@ -95,7 +103,7 @@ pkix-revocation       = { path = "pkix-revocation",       version = "0.3.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.1" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.0.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.3.0" }
-pkix-lint             = { path = "pkix-lint",             version = "0.8.0" }
+pkix-lint             = { path = "pkix-lint",             version = "0.9.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.0.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.0.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.0.0" }
