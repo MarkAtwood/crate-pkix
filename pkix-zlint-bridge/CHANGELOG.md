@@ -59,13 +59,31 @@ and [Semantic Versioning](https://semver.org/).
   missing, timeout, output parse error) that have nothing to do with
   the cert itself. `From` impls for both inner types, `Display`
   delegates with a discriminating prefix, `std::error::Error::source`
-  returns the inner. The batch path (PKIX-jy95.7.4) will keep the
-  asymmetric `Result<Vec<Result<_, PerCertError>>, BridgeError>`
-  shape per PKIX-jy95.4. (PKIX-jy95.7.3.)
+  returns the inner. The batch path keeps the asymmetric
+  `Result<Vec<Result<_, PerCertError>>, BridgeError>` shape per
+  PKIX-jy95.4. (PKIX-jy95.7.3.)
 - New workspace dep: `sha2` (only needed for the verdict-cache key;
   same pin used by `pkix-revocation` and `pkix-ct`).
-
-### Not yet shipped
-
-- `run_on_certs()` batch via multi-file zlint invocation —
-  PKIX-jy95.7.4.
+- `ZlintBridge::run_on_certs(certs_der)` lints a slice of
+  certificates and returns one `Result<VerdictMap, PerCertError>`
+  per input, in input order. Bridge-level failures (binary missing,
+  subprocess crash, timeout) fail the whole call as the outer
+  `BridgeError`; per-cert errors live inside the `Vec` so a single
+  malformed cert does not poison the batch. Implementation walks
+  zlint's multi-file invocation pattern with recursive batching:
+  zlint aborts on the first malformed cert and emits partial output
+  covering only the successful prefix, so the bridge records the
+  malformed index and re-invokes zlint on the remainder. Typical
+  batches (all valid) execute one subprocess call; batches with N
+  malformed certs execute at most N + 1 calls. Cache integration:
+  cached certs skip the subprocess entirely; the batch invocation
+  only includes cache misses. New type aliases `VerdictMap`,
+  `CertResult`, `BatchResults` factor out the batch-return shape.
+  (PKIX-jy95.7.4.)
+- Per-invocation temporary directory under `std::env::temp_dir()`
+  named `pkix-zlint-bridge-<pid>-<atomic-counter>-<nanos>`. Each
+  subprocess call gets its own scratch dir cleaned up on `Drop`
+  via `remove_dir_all`. Replaces the earlier stable-per-cert-hash
+  path scheme that raced on concurrent calls linting the same
+  certificate (one call's cleanup deleted another in-flight call's
+  input). (PKIX-jy95.7.4.)
