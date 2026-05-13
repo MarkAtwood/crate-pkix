@@ -52,25 +52,74 @@ use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certific
 
 /// Opaque wrapper around an underlying ASN.1 / DER error.
 ///
-/// Carries a [`Display`] message identical to the wrapped `der::Error` so
-/// diagnostic output is preserved, but does not expose the underlying type
-/// in the public API. This insulates callers from semver-breaking changes
-/// in the `der` crate's error variants.
+/// Re-exported from [`pkix_path::DerError`] so callers can match
+/// [`Error::CrlParseError`] / [`Error::OcspParseError`] against the
+/// same diagnostic type used by `pkix-path::Error::Der`. The wrapped
+/// `der::Error` is internal; only the [`Display`] message is in the
+/// public API. This insulates callers from semver-breaking changes
+/// in the `der` crate's error variants and makes the type
+/// cache-friendly (Clone + PartialEq + Eq + serde-friendly).
 ///
 /// [`Display`]: core::fmt::Display
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DerError(der::Error);
+pub use pkix_path::DerError;
 
-impl core::fmt::Display for DerError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Display::fmt(&self.0, f)
+#[cfg(feature = "serde")]
+mod crl_reason_serde {
+    //! Serde shims for `Option<CrlReason>`. `CrlReason` is `repr(u32)`
+    //! upstream with stable RFC 5280 §5.3.1 numeric codes; we serialize
+    //! via the discriminant value. Unknown codes round-trip as `None`
+    //! so older consumers stay forward-compatible with new revocation
+    //! reasons that upstream adds.
+    use serde::{Deserialize as _, Deserializer, Serializer};
+    use x509_cert::ext::pkix::crl::CrlReason;
+
+    /// Convert a `CrlReason` to its RFC 5280 §5.3.1 numeric code.
+    const fn to_code(r: CrlReason) -> u32 {
+        match r {
+            CrlReason::Unspecified => 0,
+            CrlReason::KeyCompromise => 1,
+            CrlReason::CaCompromise => 2,
+            CrlReason::AffiliationChanged => 3,
+            CrlReason::Superseded => 4,
+            CrlReason::CessationOfOperation => 5,
+            CrlReason::CertificateHold => 6,
+            CrlReason::RemoveFromCRL => 8,
+            CrlReason::PrivilegeWithdrawn => 9,
+            CrlReason::AaCompromise => 10,
+        }
     }
-}
 
-#[cfg(feature = "std")]
-impl std::error::Error for DerError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.0)
+    /// Inverse of [`to_code`]; returns `None` for unrecognised values
+    /// so future reason codes round-trip non-destructively.
+    const fn from_code(c: u32) -> Option<CrlReason> {
+        match c {
+            0 => Some(CrlReason::Unspecified),
+            1 => Some(CrlReason::KeyCompromise),
+            2 => Some(CrlReason::CaCompromise),
+            3 => Some(CrlReason::AffiliationChanged),
+            4 => Some(CrlReason::Superseded),
+            5 => Some(CrlReason::CessationOfOperation),
+            6 => Some(CrlReason::CertificateHold),
+            8 => Some(CrlReason::RemoveFromCRL),
+            9 => Some(CrlReason::PrivilegeWithdrawn),
+            10 => Some(CrlReason::AaCompromise),
+            _ => None,
+        }
+    }
+
+    pub fn serialize_opt<S: Serializer>(
+        v: &Option<CrlReason>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        use serde::Serialize as _;
+        v.map(to_code).serialize(s)
+    }
+
+    pub fn deserialize_opt<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Option<CrlReason>, D::Error> {
+        let opt = Option::<u32>::deserialize(d)?;
+        Ok(opt.and_then(from_code))
     }
 }
 
@@ -87,6 +136,7 @@ impl std::error::Error for DerError {
 /// `CrlOnlyAttributeCerts` as "expected and tolerable" while still hard-failing
 /// on `CrlOnlyCaCerts` when checking a CA certificate).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum OutOfScopeReason {
     /// The CRL's `IssuingDistributionPoint` extension has
@@ -167,14 +217,23 @@ impl core::fmt::Display for OutOfScopeReason {
 /// Renames are a semver break; do not "normalize" these without coordinating
 /// a major version.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate has been revoked.
     Revoked {
         /// Serial number of the revoked certificate (for logging/diagnostics).
+        #[cfg_attr(feature = "serde", serde(with = "pkix_path::serde_der"))]
         serial: SerialNumber,
         /// RFC 5280 §5.3.1 reason code from the CRL/OCSP entry, if present.
         /// `None` means no reason code was provided.
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                serialize_with = "crl_reason_serde::serialize_opt",
+                deserialize_with = "crl_reason_serde::deserialize_opt"
+            )
+        )]
         reason_code: Option<CrlReason>,
     },
 

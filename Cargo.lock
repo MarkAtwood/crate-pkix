@@ -1331,6 +1331,8 @@ version = "0.3.2"
 dependencies = [
  "der",
  "pkix-path",
+ "serde",
+ "serde_json",
  "sha1",
  "sha2",
  "spki",

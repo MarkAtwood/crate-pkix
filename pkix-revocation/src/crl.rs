@@ -207,7 +207,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// with the matching base CRL to get correct coverage.
     pub fn new(crl_der: impl AsRef<[u8]>, now_unix: u64, verifier: V) -> crate::Result<Self> {
         let crl = CertificateList::from_der(crl_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         Ok(Self {
             crl,
             delta_crl: None,
@@ -240,7 +240,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         verifier: V,
     ) -> crate::Result<Self> {
         let crl = CertificateList::from_der(crl_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         Ok(Self {
             crl,
             delta_crl: None,
@@ -330,7 +330,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         verifier: V,
     ) -> crate::Result<Self> {
         let crl = CertificateList::from_der(crl_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
 
         let signer = crate::signer_discovery::discover_crl_signer(bundle, &crl)
             .ok_or(Error::CrlSignerNotFound)?;
@@ -382,9 +382,9 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ) -> crate::Result<Self> {
         // Parse both to validate structure and extract CRL numbers.
         let base_crl = CertificateList::from_der(base_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         let delta_crl = CertificateList::from_der(delta_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
 
         // The base CRL MUST NOT itself be a delta CRL (RFC 5280 §5.2.4: only a
         // full CRL may serve as the base).  Detect by OID presence alone — do not
@@ -405,7 +405,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         // has_delta_crl_indicator confirmed OID presence above; None is unreachable.
         let delta_base_num = base_crl_number(&delta_crl)
             .ok_or(Error::DeltaCrlBaseMismatch)? // can only happen if code invariant broken
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
 
         // The base CRL and delta CRL MUST have the same issuer.
         if !names_match(
@@ -420,7 +420,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         // A malformed or overflowing base CRLNumber is treated as CrlParseError
         // rather than silently skipping the freshness check.
         if let Some(base_num_result) = crl_number(&base_crl) {
-            let base_num = base_num_result.map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            let base_num = base_num_result.map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
             if delta_base_num > base_num {
                 return Err(Error::CrlNumberMismatch);
             }
@@ -600,7 +600,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         let tbs_bytes = crl
             .tbs_cert_list
             .to_der()
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
@@ -806,7 +806,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         let tbs_bytes = crl
             .tbs_cert_list
             .to_der()
-            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         self.verifier
             .verify_signature(
                 crl.signature_algorithm.owned_to_ref(),
@@ -990,7 +990,7 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
     use x509_cert::ext::pkix::name::{GeneralName, GeneralNames};
 
     let general_names = GeneralNames::from_der(ext_value_der)
-        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
     for gn in general_names {
         if let GeneralName::DirectoryName(name) = gn {
             return Ok(name);
@@ -1001,7 +1001,7 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
     // use the directoryName because that is what the cert's `issuer`
     // field carries. A cert-issuer-extension carrying only non-DN
     // GeneralNames is unusable for our (issuer, serial) match.
-    Err(Error::CrlParseError(crate::DerError(der::Error::new(
+    Err(Error::CrlParseError(crate::DerError::new(der::Error::new(
         der::ErrorKind::Failed,
         der::Length::ZERO,
     ))))
@@ -1056,7 +1056,7 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
     let delta_tbs_bytes = delta_crl
         .tbs_cert_list
         .to_der()
-        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
     verifier
         .verify_signature(
             delta_crl.signature_algorithm.owned_to_ref(),
@@ -1184,7 +1184,7 @@ fn check_crl_sign(cert: &Certificate) -> crate::Result<()> {
         return Ok(()); // KeyUsage absent (or no extensions) → no constraint
     };
     let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
-        .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;
+        .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
     if ku.crl_sign() {
         Ok(())
     } else {
@@ -1219,7 +1219,7 @@ fn parse_issuing_dp(
         .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT)
         .map(|e| {
             IssuingDistributionPoint::from_der(e.extn_value.as_bytes())
-                .map_err(|err| Error::CrlParseError(crate::DerError(err)))
+                .map_err(|err| Error::CrlParseError(crate::DerError::new(err)))
         })
         .transpose()
 }
@@ -1244,7 +1244,7 @@ fn cert_crl_distribution_points(
         .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
         .map(|e| {
             CrlDistributionPoints::from_der(e.extn_value.as_bytes())
-                .map_err(|err| Error::CrlParseError(crate::DerError(err)))
+                .map_err(|err| Error::CrlParseError(crate::DerError::new(err)))
         })
         .transpose()
 }

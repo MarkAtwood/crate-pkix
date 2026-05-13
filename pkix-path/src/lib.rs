@@ -134,6 +134,12 @@ pub struct DerError {
     /// only when the `DerError` was reconstructed from serialized form;
     /// in that case [`std::error::Error::source`] returns `None` and the
     /// Display message is taken from the preserved [`Self::message`].
+    ///
+    /// Under `no_std` builds the `std::error::Error::source` impl is
+    /// not available, so this field is only read for its `Debug`
+    /// representation; `#[allow(dead_code)]` silences the lint in
+    /// that configuration.
+    #[cfg_attr(not(feature = "std"), allow(dead_code))]
     inner: Option<der::Error>,
     /// Cached Display rendering of `inner`, preserved across serde
     /// round-trips so that the diagnostic message survives even when

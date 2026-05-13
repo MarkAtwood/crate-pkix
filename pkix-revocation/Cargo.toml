@@ -13,14 +13,21 @@ categories  = ["cryptography"]
 [features]
 default = []
 
-# Enable std::error::Error impl on Error type
-std = ["der/std"]
+# Enable std::error::Error impl on Error type. Propagates to pkix-path so
+# the re-exported DerError satisfies std::error::Error (its impl is gated
+# on the std feature there as well).
+std = ["der/std", "pkix-path/std"]
 
 # Offline CRL validation (no network; you provide the DER-encoded CRL bytes)
 crl  = ["std"]
 
 # OCSP response validation (offline; you provide the DER-encoded response bytes)
 ocsp = ["std", "dep:x509-ocsp", "dep:sha1", "dep:sha2"]
+
+# Enable serde::Serialize / serde::Deserialize on the public Error type
+# (AGENTS.md non-negotiable #6, PKIX-2l0v.1). Activates serde on pkix-path
+# so the re-exported DerError carries the matching wire form.
+serde = ["dep:serde", "pkix-path/serde"]
 
 [dependencies]
 pkix-path = { workspace = true }
@@ -30,11 +37,16 @@ x509-cert  = { workspace = true }
 x509-ocsp  = { workspace = true, optional = true }
 sha1       = { workspace = true, optional = true }
 sha2       = { workspace = true, optional = true }
+serde      = { workspace = true, optional = true }
 
 [dev-dependencies]
-der       = { workspace = true }
-x509-cert = { workspace = true }
-pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
+der        = { workspace = true }
+x509-cert  = { workspace = true }
+pkix-path  = { workspace = true, features = ["rsa", "p256", "std"] }
+# Round-trip tests for the `serde` feature; gated by the test's
+# required-features = ["serde"] declaration below.
+serde      = { workspace = true }
+serde_json = { workspace = true }
 
 [[test]]
 name = "crl_checker_tests"
@@ -51,6 +63,10 @@ required-features = ["crl"]
 [[test]]
 name = "pkits_4_5"
 required-features = ["crl"]
+
+[[test]]
+name = "serde_round_trip"
+required-features = ["serde"]
 
 [package.metadata.docs.rs]
 all-features = true
