@@ -82,9 +82,18 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 
    **No prescribed wire format.** Each policy-adapter crate consumes the upstream tool's natural format (zlint NDJSON, pkilint Python API, OSCAL JSON, etc.). Site-local policy uses the deployer's choice. The OSCAL emit/parse shipped in `pkix-lint/src/oscal/*` is one optional adapter, not a workspace canonical format.
 
-   **Unprincipled exception:** `pkix-lint-cabf` and `pkix-profiles-cabf` exist as hand-authored small curated reference sets for CA/B Forum BR. They *do* contain Rust transcriptions of vendor policy and *do* violate the no-transcription rule. They are bounded, explicitly labeled "reference, not authoritative," and exist because (a) CA/B Forum BR is the most-asked-about industry-forum spec, (b) a small marquee-violation reference is useful for downstream consumers comparing their interpretation against the workspace's. This exception is **not a template** — no equivalent `-mozilla`, `-fedramp`, `-dod`, `-etsi` crates are admitted without explicit human re-decision. The principled path for comprehensive CA/B Forum coverage is `pkix-policy-zlint`.
+   **Unprincipled exception:** `pkix-lint-cabf` and `pkix-profiles-cabf` exist as hand-authored Rust transcriptions of CA/B Forum BR content. They *do* contain Rust transcriptions of vendor policy and *do* violate the no-transcription rule. They are bounded, explicitly labeled "reference, not authoritative," and exist because (a) CA/B Forum BR is the most-asked-about industry-forum spec, and (b) a curated reference is useful for downstream consumers comparing their interpretation against the workspace's.
 
-   Stance / epic: PKIX-amgn. Previous wire-format question (PKIX-apmt) resolved 2026-05-12 by the three-mode model: the question dissolves rather than gets answered, because each mode has different format ownership.
+   **Spec-taxonomy principle for `-cabf` crates** (decided 2026-05-13 per PKIX-mzsk / PKIX-jbvb):
+
+   - **Subscriber-cert taxonomy is in scope.** `-cabf` crates ship idiomatic Rust `Profile` types for each subscriber-certificate profile/tier explicitly named in the underlying CA/B Forum BR. Variant subdivisions within a subscriber profile (e.g., EV vs. non-EV TLS, EV vs. non-EV code signing, Mailbox-/Organization-/Sponsor-/Individual-validated S/MIME) are included.
+   - **CA-cert / Root-cert profiles are out of scope.** Those are path-validator concerns handled by RFC 5280 §6.1 in `pkix-path`, not by per-tier `Profile` shells in `-cabf`.
+   - **Per-predicate Lint enforcement is out of scope.** `pkix-lint-cabf` ships a small curated marquee subset of BR predicates as `Lint` impls; comprehensive predicate coverage is `pkix-policy-zlint`'s job. The intent is operational: a caller writing `verify_smime_signer(..., &SmimeSponsorValidated, ...)` gets correct tier-aware enforcement without ever invoking zlint.
+   - **Maintenance threshold acknowledges AI-grinding.** "Small curated reference set" formerly meant "what one human can author and review by hand." With AI grinding the transcription, the practical threshold is "what AI can grind faithfully from each BR refresh under human review." That widens the subscriber-cert taxonomy in scope but does not relax the CA-cert / per-predicate / horizontal-expansion bars.
+
+   This exception is **not a template** — no equivalent `-mozilla`, `-fedramp`, `-dod`, `-etsi` crates are admitted without explicit human re-decision. Distinguishing the two coverage axes: the `-cabf` crates own **taxonomy coverage** (one `Profile` per BR-named subscriber-cert tier), and `pkix-policy-zlint` owns **predicate coverage** (matching zlint's per-section rule scope per BR family).
+
+   Stance / epic: PKIX-amgn (framework / policy split), PKIX-mzsk (this amendment). Previous wire-format question (PKIX-apmt) resolved 2026-05-12 by the three-mode model: the question dissolves rather than gets answered, because each mode has different format ownership.
 
 6. **Prevalidation, batch validation, and caching must remain possible.** No API in the workspace shall foreclose on these patterns. Specifically:
 
