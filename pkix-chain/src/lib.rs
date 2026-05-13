@@ -692,22 +692,32 @@ where
 
 /// Verify a certificate chain for Time Stamping Authority (TSA) use.
 ///
-/// Composes [`verify_chain`] under the caller-supplied [`Profile`] with the
-/// additional RFC 3161 §2.3 enforcement that the leaf certificate's
-/// `ExtendedKeyUsage` extension is:
+/// Composes [`verify_chain`] under the caller-supplied [`Profile`] with two
+/// additional RFC 3161 post-validation checks on the leaf certificate:
 ///
-/// - **present** (covered by `profile.policy(now_unix).required_leaf_eku`),
-/// - **marked critical**, and
-/// - **contains only** `id-kp-timeStamping` (no other EKU values).
+/// 1. **`ExtendedKeyUsage` shape (RFC 3161 §2.3)** — the EKU extension is:
+///    - **present** (covered by `profile.policy(now_unix).required_leaf_eku`),
+///    - **marked critical**, and
+///    - **contains only** `id-kp-timeStamping` (no other EKU values).
 ///
-/// The presence check is enforced inside [`verify_chain`] via the profile's
-/// `required_leaf_eku`. The criticality and sole-EKU checks run after
+/// 2. **`KeyUsage` shape (RFC 3161 §2.1 #10 / OpenSSL `-purpose
+///    timestampsign`)** — the TSA's key is "generated exclusively for this
+///    purpose," which a signing-only KU shape reflects. When the
+///    `KeyUsage` extension is present it MUST contain only
+///    `digitalSignature` and/or `nonRepudiation`; any of
+///    `keyEncipherment`, `dataEncipherment`, `keyAgreement`,
+///    `keyCertSign`, `cRLSign`, `encipherOnly`, or `decipherOnly` is
+///    forbidden. The check is skipped if `KeyUsage` is absent (RFC 5280
+///    §4.2.1.3 does not require it on EE certs).
+///
+/// The EKU presence check is enforced inside [`verify_chain`] via the
+/// profile's `required_leaf_eku`. The remaining checks run after
 /// `verify_chain` returns and fail with [`Error::ProfileViolation`] when
 /// violated.
 ///
 /// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
 /// need a custom verifier should drop down to [`verify_chain`] and replicate
-/// the post-validation EKU check.
+/// the post-validation EKU and KU checks.
 ///
 /// # Arguments
 ///
@@ -724,8 +734,10 @@ where
 ///   profile's `id-kp-timeStamping` EKU presence requirement).
 /// - [`Error::Revocation`] — a cert in the chain was revoked.
 /// - [`Error::ProfileViolation`] — path validation succeeded but the leaf
-///   cert's EKU extension is not marked critical, or contains EKU values
-///   other than `id-kp-timeStamping`.
+///   cert's EKU extension is not marked critical, contains EKU values
+///   other than `id-kp-timeStamping`, or its `KeyUsage` extension is
+///   present and asserts a bit other than `digitalSignature` or
+///   `nonRepudiation`.
 pub fn verify_time_stamper<P, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -740,6 +752,7 @@ where
     let policy = profile.policy(now_unix);
     let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
     enforce_timestamping_eku_critical_and_sole(&chain[0])?;
+    enforce_timestamping_ku_shape(&chain[0])?;
     Ok(validated)
 }
 
@@ -883,7 +896,8 @@ fn verify_responder_is_delegated_by(
         Ok(())
     } else {
         Err(Error::OcspDelegation {
-            reason: "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
+            reason:
+                "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
                      (RFC 6960 §4.2.2.2 delegation requirement)",
         })
     }
@@ -1037,6 +1051,72 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
             reason: "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
         }),
     }
+}
+
+/// Enforce the RFC 3161 §2.1 (#10) "key generated exclusively for this
+/// purpose" `KeyUsage` shape on a TSA certificate.
+///
+/// RFC 3161 §2.1 requires the TSA to "sign each time-stamp token using a
+/// key generated exclusively for this purpose and have this property of
+/// the key indicated on the corresponding certificate." A signing-only
+/// key is reflected in `KeyUsage` by setting `digitalSignature` and/or
+/// `nonRepudiation` (a.k.a. `contentCommitment`) and **no other** bits.
+/// Any of `keyEncipherment`, `dataEncipherment`, `keyAgreement`,
+/// `keyCertSign`, `cRLSign`, `encipherOnly`, or `decipherOnly` indicates
+/// a key reused for non-signing purposes and is forbidden.
+///
+/// This is OpenSSL's `-purpose timestampsign` interpretation; it is a
+/// stricter reading than the literal text of RFC 3161 §2.3 (which speaks
+/// only of the EKU). The workspace adopts it on the strength of §2.1
+/// (#10) and the consistent practice of OpenSSL and ETSI EN 319 422.
+///
+/// `KeyUsage` is **not** mandatory on EE certs per RFC 5280 §4.2.1.3
+/// (it is "RECOMMENDED to be critical when present"). A TSA cert with
+/// no `KeyUsage` extension passes this check — there are no forbidden
+/// bits to find. This matches OpenSSL's behaviour empirically.
+///
+/// Returns [`Error::ProfileViolation`] with a fixed reason string when
+/// the extension is present and carries any forbidden bit, or when the
+/// extension value fails to decode.
+fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
+    use x509_cert::der::Decode as _;
+    use x509_cert::ext::pkix::KeyUsage;
+
+    const OID_KEY_USAGE: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
+
+    let Some(exts) = leaf.tbs_certificate.extensions.as_ref() else {
+        // No extensions at all → no KeyUsage → no constraint to violate.
+        return Ok(());
+    };
+    let Some(ext) = exts.iter().find(|e| e.extn_id == OID_KEY_USAGE) else {
+        // KeyUsage absent → no constraint to violate.
+        return Ok(());
+    };
+
+    let ku =
+        KeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| Error::ProfileViolation {
+            reason: "TSA KeyUsage extension is malformed",
+        })?;
+
+    // A TSA's key is signing-only. digitalSignature and nonRepudiation
+    // (contentCommitment) are the two permitted bits; every other bit
+    // indicates reuse for non-signing purposes and is rejected.
+    if ku.key_encipherment()
+        || ku.data_encipherment()
+        || ku.key_agreement()
+        || ku.key_cert_sign()
+        || ku.crl_sign()
+        || ku.encipher_only()
+        || ku.decipher_only()
+    {
+        return Err(Error::ProfileViolation {
+            reason: "TSA KeyUsage must contain only digitalSignature and/or nonRepudiation \
+                     (RFC 3161 §2.1 #10; matches OpenSSL `-purpose timestampsign`)",
+        });
+    }
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

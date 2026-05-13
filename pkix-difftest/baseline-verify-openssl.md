@@ -16,7 +16,7 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 | `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_code_signer` | _(no oracle in OpenSSL CLI)_ | PKIX-fmtv.18.5 | escalated (no oracle) |
-| `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | shipped (1 known divergence) |
+| `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | shipped (PKIX-7cac: KU shape) |
 | `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | shipped (chain-only) |
 
 OpenSSL version: tracked at run time — `openssl verify` is invoked from
@@ -213,40 +213,44 @@ the workspace wants substantive differential coverage for
 
 ## Time stamping (PKIX-fmtv.18.6)
 
-**4 / 4 cases produced a verdict on both sides.**
-**3 / 4 in agreement** (75%). **1 known Rust-looser divergence, 0 Rust-stricter.**
+**5 / 5 cases produced a verdict on both sides.**
+**5 / 5 in agreement** (100%). **0 Rust-looser, 0 Rust-stricter.**
 
 | # | Case | Fixture | Time | Rust | OpenSSL | Agreement |
 |---|---|---|---|---|---|---|
-| 1 | `happy_path_rfc3161_ku_violation` | `leaf-timestamping.der` | NOW | Ok | fail | **LooserThanOpenssl** (known) |
+| 1 | `happy_path` | `leaf-timestamping.der` | NOW | Ok | pass | Agree |
 | 2 | `eku_not_critical` | `leaf-timestamping-not-critical.der` | NOW | ProfileViolation | fail | Agree |
 | 3 | `eku_not_sole` | `leaf-timestamping-not-sole.der` | NOW | ProfileViolation | fail | Agree |
-| 4 | `before_not_before` | `leaf-timestamping.der` | 0 | Path | fail | Agree |
+| 4 | `ku_shape_violation` | `leaf-timestamping-bad-ku.der` | NOW | ProfileViolation | fail | Agree |
+| 5 | `before_not_before` | `leaf-timestamping.der` | 0 | Path | fail | Agree |
 
-### Recorded divergence: case 1 (RFC 3161 §2.3 KeyUsage shape)
+### KU-shape enforcement (PKIX-7cac, shipped)
 
-- **OpenSSL behaviour**: `-purpose timestampsign` strictly enforces
-  RFC 3161 §2.3 — the TSA cert's KeyUsage MUST contain ONLY
-  `digitalSignature` and/or `nonRepudiation`. Other bits
-  (`keyEncipherment`, `keyAgreement`, etc.) trigger "unsuitable
-  certificate purpose" rejection. Verified empirically against a
-  hand-issued TSA cert: `digitalSignature` alone passes,
+- **Rule**: a TSA's signing key, per RFC 3161 §2.1 #10, is "generated
+  exclusively for this purpose." The `KeyUsage` shape that reflects
+  this is `digitalSignature` and/or `nonRepudiation` only; any of
+  `keyEncipherment`, `dataEncipherment`, `keyAgreement`,
+  `keyCertSign`, `cRLSign`, `encipherOnly`, or `decipherOnly`
+  indicates key reuse and is forbidden.
+
+- **OpenSSL behaviour**: `-purpose timestampsign` enforces the same
+  rule. Verified empirically: `digitalSignature` alone passes,
   `nonRepudiation` alone passes, `digitalSignature + nonRepudiation`
-  passes, `digitalSignature + keyEncipherment` fails.
+  passes, `digitalSignature + keyEncipherment` fails with
+  "unsuitable certificate purpose."
 
-- **pkix-chain behaviour**: `verify_time_stamper` /
-  `BasicTimeStampingProfile` enforce EKU shape (presence, criticality,
-  sole) but do NOT check KeyUsage shape.
+- **pkix-chain behaviour**: `verify_time_stamper` enforces the same
+  rule as a post-validation check
+  (`enforce_timestamping_ku_shape`); `Error::ProfileViolation` is
+  returned when a forbidden bit is asserted. Absent `KeyUsage` is
+  accepted (no constraint to violate).
 
-- **Fixture state**: `leaf-timestamping.der` (authored by pyca's
-  gen.py for the in-crate smoke surface) carries
-  `digitalSignature + keyEncipherment` in KU. Validates under
-  pkix-chain, rejects under OpenSSL.
-
-- **Follow-up**: tracked in **PKIX-7cac** — "verify_time_stamper
-  should enforce RFC 3161 §2.3 KeyUsage shape". When that bead ships,
-  the diff harness's `known_divergence` flag is removed and the row
-  flips to Agree.
+- **Fixtures**: `leaf-timestamping.der` was regenerated with
+  `digitalSignature` only (was previously `digitalSignature +
+  keyEncipherment`, the divergence trigger). The new fixture
+  `leaf-timestamping-bad-ku.der` carries the original
+  `digitalSignature + keyEncipherment` shape as a negative case for
+  the wrapper-side KU check.
 
 ## OCSP responder (PKIX-fmtv.18.7)
 

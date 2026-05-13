@@ -109,6 +109,45 @@ fn verify_time_stamper_extra_eku_returns_profile_violation() {
 }
 
 // ---------------------------------------------------------------------------
+// RFC 3161 §2.1 #10 KeyUsage shape enforcement (PKIX-7cac)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn verify_time_stamper_bad_ku_returns_profile_violation() {
+    // Fixture has critical+sole id-kp-timeStamping EKU but its KeyUsage
+    // contains digitalSignature + keyEncipherment. RFC 3161 §2.1 #10
+    // forbids reuse of the TSA key for non-signing purposes; OpenSSL's
+    // `-purpose timestampsign` enforces this as a hard reject. The
+    // wrapper must reject with Error::ProfileViolation citing the KU rule.
+    let leaf = load_fixture("leaf-timestamping-bad-ku.der");
+    let root = load_fixture("root.der");
+    let anchors = [TrustAnchor::from_cert(root)];
+    let chain = [leaf];
+
+    let err = verify_time_stamper(
+        &chain,
+        &anchors,
+        &BasicTimeStampingProfile,
+        NOW,
+        &NoRevocation,
+    )
+    .expect_err("KU=digitalSignature+keyEncipherment must fail RFC 3161 §2.1 #10 / KU-shape check");
+    match err {
+        Error::ProfileViolation { reason } => {
+            assert!(
+                reason.contains("KeyUsage"),
+                "reason should mention KeyUsage, got: {reason:?}"
+            );
+            assert!(
+                reason.contains("digitalSignature") || reason.contains("nonRepudiation"),
+                "reason should mention the permitted bits, got: {reason:?}"
+            );
+        }
+        other => panic!("expected Error::ProfileViolation, got: {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Path validation runs before wrapper-side profile check
 // ---------------------------------------------------------------------------
 
