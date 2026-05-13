@@ -11,9 +11,9 @@
 //! | [`cabf.br.tls.validity.max`](ValidityMaxLint) | TLS BR §6.3.2 (SC-081) | Error | Leaf |
 //! | [`cabf.br.tls.alg.sha1_prohibited`](Sha1ProhibitedLint) | TLS BR §7.1.3 | Error | Any |
 //! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | TLS BR §6.1.5 | Error | Any |
-//! | [`cabf.br.tls.san.required`](SanRequiredLint) | TLS BR §7.1.4.2 | Error | Leaf |
-//! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | TLS BR §7.1.2.7.3 | Error | Leaf |
-//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.5 | Error | `IntermediateCa` |
+//! | [`cabf.br.tls.san.required`](SanRequiredLint) | TLS BR §7.1.2.7.12 | Error | Leaf |
+//! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | TLS BR §7.1.2.7.10 | Error | Leaf |
+//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.10.4 | Error | `IntermediateCa` |
 //!
 //! # Using the profile
 //!
@@ -65,7 +65,7 @@ const OID_EXTENDED_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2
 /// `BasicConstraints` extension OID — RFC 5280 §4.2.1.9.
 const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.19");
 
-/// id-kp-serverAuth — RFC 5280 §4.2.1.12, TLS BR §7.1.2.7.3.
+/// id-kp-serverAuth — RFC 5280 §4.2.1.12, TLS BR §7.1.2.7.10.
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
 
 // ---------------------------------------------------------------------------
@@ -392,7 +392,7 @@ fn parse_der_length(input: &[u8]) -> Option<(usize, &[u8])> {
 /// If the extension is absent the lint returns Error.
 /// If the extension is present but contains no general names, the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.4.2
+/// Citation: CA/B Forum TLS BR §7.1.2.7.12 (Subscriber Certificate Subject Alternative Name)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SanRequiredLint;
 
@@ -402,7 +402,7 @@ impl Lint for SanRequiredLint {
     }
 
     fn citation(&self) -> &'static str {
-        "CA/B Forum TLS BR §7.1.4.2"
+        "CA/B Forum TLS BR §7.1.2.7.12"
     }
 
     fn severity(&self) -> Severity {
@@ -422,7 +422,7 @@ impl Lint for SanRequiredLint {
     }
 
     fn spec_section_id(&self) -> Option<&str> {
-        Some("cabf-tls-br-7.1.4.2")
+        Some("cabf-tls-br-7.1.2.7.12")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
@@ -458,7 +458,7 @@ impl Lint for SanRequiredLint {
 /// If the extension is present but does not include `id-kp-serverAuth`
 /// (1.3.6.1.5.5.7.3.1) the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.2.7.3
+/// Citation: CA/B Forum TLS BR §7.1.2.7.10 (Subscriber Certificate Extended Key Usage)
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EkuServerAuthLint;
 
@@ -468,7 +468,7 @@ impl Lint for EkuServerAuthLint {
     }
 
     fn citation(&self) -> &'static str {
-        "CA/B Forum TLS BR §7.1.2.7.3"
+        "CA/B Forum TLS BR §7.1.2.7.10"
     }
 
     fn severity(&self) -> Severity {
@@ -488,7 +488,7 @@ impl Lint for EkuServerAuthLint {
     }
 
     fn spec_section_id(&self) -> Option<&str> {
-        Some("cabf-tls-br-7.1.2.7.3")
+        Some("cabf-tls-br-7.1.2.7.10")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
@@ -530,7 +530,11 @@ impl Lint for EkuServerAuthLint {
 /// If the extension is absent the lint returns Error.
 /// If the extension is present but `cA` is not `true` the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.2.5
+/// Citation: CA/B Forum TLS BR §7.1.2.10.4 (CA Certificate Basic Constraints).
+/// This is the umbrella section cross-referenced by every per-CA-type
+/// Sub CA profile (§7.1.2.2 Cross-Cert, §7.1.2.3 Technically-Constrained
+/// Non-TLS, §7.1.2.5 Technically-Constrained TLS, §7.1.2.6 TLS); the
+/// `IntermediateCa` applies_to scope covers them all.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BcCaFlagLint;
 
@@ -540,7 +544,7 @@ impl Lint for BcCaFlagLint {
     }
 
     fn citation(&self) -> &'static str {
-        "CA/B Forum TLS BR §7.1.2.5"
+        "CA/B Forum TLS BR §7.1.2.10.4"
     }
 
     fn severity(&self) -> Severity {
@@ -560,7 +564,7 @@ impl Lint for BcCaFlagLint {
     }
 
     fn spec_section_id(&self) -> Option<&str> {
-        Some("cabf-tls-br-7.1.2.5")
+        Some("cabf-tls-br-7.1.2.10.4")
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
