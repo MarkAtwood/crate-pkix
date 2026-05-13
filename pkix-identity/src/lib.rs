@@ -71,6 +71,29 @@
 //! variant so future scaffold-then-fill workflows can reuse it without
 //! a breaking API change.
 //!
+//! # Limitations
+//!
+//! - **Cert-side only.** This crate answers "does this leaf authorize this
+//!   name?" given an already-parsed [`Certificate`]. Name-constraint
+//!   matching at intermediate-CA scope is a different problem and lives
+//!   in `pkix-path` (`dns_name_matches_constraint`).
+//! - **No Public Suffix List enforcement.** A wildcard SAN like
+//!   `*.example.com` matches `host.example.com` per RFC 6125 §6.4.3; this
+//!   crate does not block PSL-public-suffix wildcards (`*.co.uk`). The
+//!   `webpki` crate makes the same choice; deployments that need
+//!   eTLD-aware blocking pull in their own PSL crate.
+//! - **No CSR / CertificationRequest parsing.** Identity matching runs on
+//!   already-issued certificates only.
+//! - **No legacy `commonName` fallback.** RFC 6125 §6.4.4 deprecated
+//!   `subject.CN` fallback; this crate matches against `dNSName` /
+//!   `iPAddress` / `rfc822Name` / `SmtpUTF8Mailbox` SAN entries only.
+//!   Certificates that omit a SAN are not bound to any identity by this
+//!   crate.
+//! - **IP-literal SAN matching is byte-exact.** IPv4 (4-byte) and IPv6
+//!   (16-byte) `iPAddress` SAN entries match byte-for-byte against the
+//!   parsed target. No CIDR / range matching; that is not a SAN-binding
+//!   concern.
+//!
 //! [`pkix-chain`]: https://docs.rs/pkix-chain
 //! [`pkix-truststore-system`]: https://docs.rs/pkix-truststore-system
 //! [`pkix-truststore-pkcs11`]: https://docs.rs/pkix-truststore-pkcs11

@@ -57,6 +57,38 @@
 //!
 //! The free function [`verify_chain`] is a thin wrapper around
 //! [`Verifier::verify_one`]; both are zero-cost over the other.
+//!
+//! # Limitations
+//!
+//! - **Caller supplies the chain.** This crate validates a caller-ordered
+//!   `&[Certificate]`. Path building from an unordered bag of certificates
+//!   lives in `pkix-path-builder`.
+//! - **No AIA fetching.** Chains with missing intermediates are not
+//!   reassembled from `AuthorityInfoAccess` URIs at validation time;
+//!   verification fails with the surfaced `pkix-path` / path-builder
+//!   error. The pluggable `AiaFetcher` trait + `NoAiaFetcher` default
+//!   (which keeps the present "you must supply the chain" behaviour) and
+//!   the optional `pkix-aia-http` adapter are tracked under `PKIX-zkjb`.
+//! - **Revocation is caller-supplied.** Online CRL / OCSP fetching is
+//!   handled by `pkix-revocation-http`; this crate accepts any
+//!   `RevocationChecker` impl — including `NoRevocation` for the
+//!   zero-cost "I'll handle revocation myself" path.
+//! - **`std` only.** Uses `pkix-path/std` and `pkix-revocation/std`. For
+//!   `no_std` validation, use `pkix-path` directly with a `no_std`
+//!   `SignatureVerifier`.
+//! - **Algorithm coverage tracks `pkix-path`.** Bundled `SignatureVerifier`
+//!   backends cover RSA-PKCS1v15-SHA-{256,384,512}, ECDSA-P-256-SHA-256,
+//!   and (with the `p384` feature) ECDSA-P-384-SHA-384. Ed25519, P-521,
+//!   and RSA-PSS are tracked under `PKIX-gphz`.
+//! - **Use-case wrappers cover the common cases.** `verify_tls_server`,
+//!   `verify_tls_client_dns`, `verify_tls_client_mailbox`,
+//!   `verify_smime_signer`, `verify_smime_recipient`, `verify_code_signer`,
+//!   `verify_time_stamper`, and `verify_ocsp_responder` compose chain
+//!   validation with the matching `pkix-identity` binding and
+//!   `pkix-profiles` EKU rules. Niche cases (e.g. attribute-certificate
+//!   verification, CT-anchored validation, DANE TLSA matching) are out
+//!   of scope for this crate and live in `pkix-ac`, `pkix-ct`, and
+//!   `pkix-dane` respectively.
 
 pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{

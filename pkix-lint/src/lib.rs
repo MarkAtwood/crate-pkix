@@ -103,6 +103,30 @@
 //!     println!("{}: {:?}", f.lint_id, f.result);
 //! }
 //! ```
+//!
+//! # Limitations
+//!
+//! - **Framework, not a comprehensive rule set.** This crate ships the
+//!   [`Lint`] trait, [`LintRunner`], and a small RFC-conformance lint set
+//!   in the `rfc5280`, `rfc6125`, `rfc8398`, and `rfc8551` modules.
+//!   Comprehensive industry-forum lint coverage is the job of policy
+//!   adapter crates (`pkix-policy-zlint` for zlint's ~700 rules,
+//!   `pkix-policy-pkilint` for pkilint's S/MIME BR + ETSI coverage).
+//!   CA/B Forum reference lints live in the sibling `pkix-lint-cabf`
+//!   crate; that crate is also explicitly small and curated.
+//! - **Advisory-only.** Findings never cause a TLS rejection by themselves
+//!   (see the contract above). Plumbing findings into hard-fail or
+//!   waiver decisions is the integration layer's job.
+//! - **OSCAL adapter is one supported output, not the canonical format.**
+//!   The `oscal` feature emits OSCAL Assessment Results JSON and parses
+//!   OSCAL Risk-based deviations back into [`deviation::DeviationStore`].
+//!   The workspace does not prescribe OSCAL as a canonical inter-tool
+//!   wire format (AGENTS.md non-negotiable #5, three-mode policy
+//!   architecture); each policy-adapter crate consumes its upstream
+//!   tool's natural format.
+//! - **No site-local policy DSL.** Site-local policy is the deployer's
+//!   responsibility; implement [`Lint`] (or load lints from any
+//!   deployer-chosen format) and feed [`LintRunner`].
 
 use std::borrow::Cow;
 use x509_cert::Certificate;

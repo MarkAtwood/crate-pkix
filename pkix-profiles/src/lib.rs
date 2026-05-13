@@ -63,6 +63,32 @@
 //! for a future release; until then, downstream `no_std` crates should construct
 //! [`ValidationPolicy`] directly rather than using this crate.
 //!
+//! # Limitations
+//!
+//! - **RFC-baseline only.** This crate ships profiles derived from IETF
+//!   RFC text only (RFC 5280 §4.2.1.12 EKU rules, RFC 6125 §6.4 SAN
+//!   shape, RFC 8551 §3 S/MIME shape, RFC 3161 §2.3 TSA EKU, RFC 6960
+//!   §4.2.2.2 OCSP-responder EKU). Industry-forum policy (CA/B Forum
+//!   Baseline Requirements, Mozilla / Apple / Microsoft root-program
+//!   rules, ETSI, FedRAMP, DoD) is **not** shipped here. CA/B Forum
+//!   reference profiles live in `pkix-profiles-cabf`; comprehensive
+//!   industry-forum coverage is the job of policy-adapter crates
+//!   (`pkix-policy-zlint`, `pkix-policy-pkilint`).
+//! - **EKU shape, not chain semantics.** The bundled profiles enforce the
+//!   end-entity EKU / SAN / `BasicConstraints` shape required by the RFC.
+//!   They do not enforce chain-wide policy machinery (RFC 5280 §6.1.4
+//!   `PolicyMappings`, `PolicyConstraints`, `InhibitAnyPolicy`) beyond
+//!   what `pkix-path` already does — these profiles add caller-friendly
+//!   structural overlays on top of that core algorithm.
+//! - **Deprecated re-exports drop in 0.4.0.** `WebPkiProfile`,
+//!   `SmimeProfile`, `CodeSigningProfile`, and `sc081_validity_cap`
+//!   moved to `pkix-profiles-cabf` in 0.3.0 and are kept here as
+//!   deprecated aliases for one minor cycle. Migrate to
+//!   `pkix-profiles-cabf` before upgrading past 0.3.x.
+//! - **No site-local extension.** Site-local policy is the caller's
+//!   responsibility; either implement [`pkix_path::Profile`] directly or
+//!   wrap a bundled profile and overlay site-specific rules.
+//!
 //! # Spec references
 //!
 //! - RFC 5280 — Internet X.509 PKI Certificate and CRL Profile
