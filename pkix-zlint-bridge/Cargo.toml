@@ -29,6 +29,11 @@ serde = ["dep:serde", "pkix-lint/serde"]
 [dependencies]
 pkix-lint = { workspace = true }
 
+# Subprocess output parsing. zlint emits NDJSON (one JSON object per
+# line) for both `-list-lints-json` and the per-cert verdict path;
+# serde_json is the workspace-standard parser.
+serde_json = { workspace = true }
+
 # Optional serde support. Enabled by the `serde` cargo feature; the
 # crate's public types use `#[cfg_attr(feature = "serde", derive(...))]`
 # to gate the trait derives.
