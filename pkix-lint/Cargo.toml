@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-lint"
-version           = "0.6.0"  # 0.6 — Additive: Lint trait gains `spec_section_id` and `spec_url`; `rfc_section_id` and `rfc_url` deprecated aliases for one minor (PKIX-ncab.11). 0.5 — BREAKING. CA/B Forum lint bundles (cabf_tls_br) moved to pkix-lint-cabf (PKIX-amgn.5). 0.4 — DeviationScope refactor to open-ended kind + props bag (PKIX-9vnx.11). 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q).
+version           = "0.7.0"  # 0.7 — Additive: RFC-conformance shape-check lints added in rfc5280, rfc6125, rfc8398, rfc8551 modules (PKIX-9vnx.9.2.1, partial). 0.6 — Additive: Lint trait gains `spec_section_id` and `spec_url`; `rfc_section_id` and `rfc_url` deprecated aliases for one minor (PKIX-ncab.11). 0.5 — BREAKING. CA/B Forum lint bundles (cabf_tls_br) moved to pkix-lint-cabf (PKIX-amgn.5). 0.4 — DeviationScope refactor to open-ended kind + props bag (PKIX-9vnx.11). 0.3 — Cow<'static, str> migration + Finding.cert_sha256 (PKIX-ua6q, PKIX-a86q).
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

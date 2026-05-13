@@ -222,6 +222,9 @@ pub mod deviation;
 pub mod oscal;
 pub mod report;
 pub mod rfc5280;
+pub mod rfc6125;
+pub mod rfc8398;
+pub mod rfc8551;
 
 // ---------------------------------------------------------------------------
 // Severity
