@@ -27,7 +27,7 @@ adjacent PKI concerns.
 - **`pkix-identity`** — Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal). Pure function over (cert, identity-string); no chain context, no trust anchors. Scaffold-only at 0.1.0; bodies land via PKIX-fmtv.11 / .12.
 - **`pkix-dane`** — DANE (RFC 6698 + 7218 + 7671) TLSA record parsing and per-usage match logic (PKIX-TA / PKIX-EE / DANE-TA / DANE-EE). No DNS — caller supplies validated TLSA records. Not yet shipped; planned per PKIX-j32w.
 - **`pkix-dane-resolver`** — DNSSEC-validating resolver that fetches TLSA records. Std-only. Default upstream uses system resolv.conf. Not yet shipped; planned per PKIX-j32w.
-- **`pkix-zlint-bridge`** — Shared subprocess + NDJSON-parsing infrastructure for running zlint on certificates. Consumed by `pkix-policy-zlint` (runtime adapter) and `pkix-difftest`'s zlint oracle. Not yet shipped; planned per PKIX-jy95.7.
+- **`pkix-zlint-bridge`** — Shared subprocess + NDJSON-parsing infrastructure for running zlint on certificates. Consumed by `pkix-policy-zlint` (runtime adapter) and `pkix-difftest`'s zlint oracle. Scaffold-only at 0.0.0 (PKIX-jy95.7.1): public types (`Verdict`, `ZlintLintInfo`, `BridgeError`, `PerCertError`, `BridgeConfig`, `ZlintBridge`) shipped; subprocess invocation lands via PKIX-jy95.7.2 / .7.3 / .7.4.
 - **`pkix-pkilint-bridge`** — Shared subprocess + output-parsing infrastructure for running pkilint on certificates. Same shape as `pkix-zlint-bridge` for pkilint. Not yet shipped; planned per PKIX-jy95.8.
 
 **Reference / not authoritative crates** (snapshot-style implementations of industry-forum requirements; fork and adapt to your deployment's current interpretation):
