@@ -179,7 +179,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         let tbs_bytes = basic
             .tbs_response_data
             .to_der()
-            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
         self.verifier
             .verify_signature(
                 basic.signature_algorithm.owned_to_ref(),
@@ -210,7 +210,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .tbs_certificate
             .subject
             .to_der()
-            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
         let key_raw = issuer
             .tbs_certificate
             .subject_public_key_info
@@ -314,7 +314,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         let tbs_bytes = basic
             .tbs_response_data
             .to_der()
-            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
         self.verifier
             .verify_signature(
                 basic.signature_algorithm.owned_to_ref(),
@@ -338,7 +338,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         let anchor_name_der = anchor
             .subject
             .to_der()
-            .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+            .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
         let anchor_key_raw = anchor
             .subject_public_key_info
             .subject_public_key
@@ -401,7 +401,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
 fn parse_basic_response(response_der: &[u8]) -> crate::Result<BasicOcspResponse> {
     // (1) Parse the outer OCSPResponse.
     let resp = OcspResponse::from_der(response_der)
-        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+        .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
 
     // (2) Require responseStatus == successful; any other (TryLater,
     // InternalError, MalformedRequest, SigRequired, Unauthorized) → OcspMalformed.
@@ -420,7 +420,7 @@ fn parse_basic_response(response_der: &[u8]) -> crate::Result<BasicOcspResponse>
 
     // (5) Parse the BasicOCSPResponse.
     BasicOcspResponse::from_der(resp_bytes.response.as_bytes())
-        .map_err(|e| Error::OcspParseError(crate::DerError(e)))
+        .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))
 }
 
 /// Stack-allocated hash output for `CertID` hash comparisons.
@@ -592,7 +592,7 @@ fn validate_delegate_responder_cert<V: SignatureVerifier>(
     let tbs_bytes = delegate
         .tbs_certificate
         .to_der()
-        .map_err(|e| Error::OcspParseError(crate::DerError(e)))?;
+        .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
     verifier
         .verify_signature(
             delegate.signature_algorithm.owned_to_ref(),
