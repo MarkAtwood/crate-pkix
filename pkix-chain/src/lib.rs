@@ -115,6 +115,7 @@ pub use pkix_revocation::CrlChecker;
 pub use pkix_revocation::OcspChecker;
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
+use std::borrow::Cow;
 use x509_cert::Certificate;
 
 /// Combined error type for chain verification.
@@ -123,6 +124,7 @@ use x509_cert::Certificate;
 /// revocation checking errors ([`pkix_revocation::Error`]), and identity
 /// binding errors ([`pkix_identity::IdentityError`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// RFC 5280 path validation failed.
@@ -149,7 +151,13 @@ pub enum Error {
     /// on the variant rather than the inner string.
     ProfileViolation {
         /// Fixed-string description of which profile invariant was violated.
-        reason: &'static str,
+        ///
+        /// `Cow<'static, str>` rather than `&'static str` so the serde
+        /// deserialize path can yield an owned `String` without leaking
+        /// memory. Producers always supply `Cow::Borrowed` from a
+        /// `&'static str` literal; the `Cow::Owned` variant arises only
+        /// on the deserialize path.
+        reason: std::borrow::Cow<'static, str>,
     },
     /// An RFC 6960 §4.2.2.2 OCSP-responder delegation check failed.
     ///
@@ -163,7 +171,10 @@ pub enum Error {
     /// on the variant rather than the inner string.
     OcspDelegation {
         /// Fixed-string description of which delegation invariant was violated.
-        reason: &'static str,
+        ///
+        /// See [`Error::ProfileViolation::reason`] for why the field is
+        /// `Cow<'static, str>` rather than `&'static str`.
+        reason: std::borrow::Cow<'static, str>,
     },
 }
 
@@ -998,7 +1009,7 @@ where
 {
     if chain.is_empty() {
         return Err(Error::OcspDelegation {
-            reason: "OCSP responder chain must contain at least the responder cert",
+            reason: Cow::Borrowed("OCSP responder chain must contain at least the responder cert"),
         });
     }
 
@@ -1051,9 +1062,10 @@ fn verify_responder_is_delegated_by(
         Ok(())
     } else {
         Err(Error::OcspDelegation {
-            reason:
+            reason: Cow::Borrowed(
                 "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
-                     (RFC 6960 §4.2.2.2 delegation requirement)",
+                 (RFC 6960 §4.2.2.2 delegation requirement)",
+            ),
         })
     }
 }
@@ -1175,24 +1187,26 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
         .extensions
         .as_ref()
         .ok_or(Error::ProfileViolation {
-            reason: "TSA certificate has no ExtendedKeyUsage extension",
+            reason: Cow::Borrowed("TSA certificate has no ExtendedKeyUsage extension"),
         })?;
     let ext = exts
         .iter()
         .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
         .ok_or(Error::ProfileViolation {
-            reason: "TSA certificate has no ExtendedKeyUsage extension",
+            reason: Cow::Borrowed("TSA certificate has no ExtendedKeyUsage extension"),
         })?;
 
     if !ext.critical {
         return Err(Error::ProfileViolation {
-            reason: "TSA ExtendedKeyUsage extension must be marked critical (RFC 3161 §2.3)",
+            reason: Cow::Borrowed(
+                "TSA ExtendedKeyUsage extension must be marked critical (RFC 3161 §2.3)",
+            ),
         });
     }
 
     let eku = ExtendedKeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| {
         Error::ProfileViolation {
-            reason: "TSA ExtendedKeyUsage extension is malformed",
+            reason: Cow::Borrowed("TSA ExtendedKeyUsage extension is malformed"),
         }
     })?;
 
@@ -1200,10 +1214,14 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
     match eku.0.as_slice() {
         [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),
         [_] => Err(Error::ProfileViolation {
-            reason: "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+            reason: Cow::Borrowed(
+                "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+            ),
         }),
         _ => Err(Error::ProfileViolation {
-            reason: "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+            reason: Cow::Borrowed(
+                "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+            ),
         }),
     }
 }
@@ -1251,7 +1269,7 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
 
     let ku =
         KeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| Error::ProfileViolation {
-            reason: "TSA KeyUsage extension is malformed",
+            reason: Cow::Borrowed("TSA KeyUsage extension is malformed"),
         })?;
 
     // A TSA's key is signing-only. digitalSignature and nonRepudiation
@@ -1266,8 +1284,10 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
         || ku.decipher_only()
     {
         return Err(Error::ProfileViolation {
-            reason: "TSA KeyUsage must contain only digitalSignature and/or nonRepudiation \
-                     (RFC 3161 §2.1 #10; matches OpenSSL `-purpose timestampsign`)",
+            reason: Cow::Borrowed(
+                "TSA KeyUsage must contain only digitalSignature and/or nonRepudiation \
+                 (RFC 3161 §2.1 #10; matches OpenSSL `-purpose timestampsign`)",
+            ),
         });
     }
 
@@ -1333,10 +1353,10 @@ mod tests {
             Error::Identity(IdentityError::MalformedSan),
             Error::Identity(IdentityError::MalformedInput),
             Error::ProfileViolation {
-                reason: "test violation",
+                reason: Cow::Borrowed("test violation"),
             },
             Error::OcspDelegation {
-                reason: "test delegation failure",
+                reason: Cow::Borrowed("test delegation failure"),
             },
         ];
         for err in cases {

@@ -1170,6 +1170,8 @@ dependencies = [
  "pkix-path",
  "pkix-profiles",
  "pkix-revocation",
+ "serde",
+ "serde_json",
  "x509-cert",
 ]
 
@@ -1237,6 +1239,7 @@ version = "0.1.0"
 dependencies = [
  "der",
  "idna",
+ "serde",
  "x509-cert",
 ]
 
