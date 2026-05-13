@@ -21,6 +21,13 @@ pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
 pkix-identity   = { workspace = true, features = ["std"] }
 pkix-profiles   = { workspace = true }
+# pkix-aia ships the AiaFetcher trait that `Verifier` is generic over
+# (3rd generic with NoAiaFetcher default per PKIX-zkjb.9). The
+# `Verifier` API is parameterized; no actual AIA fetching happens
+# inside this crate at 1.0 (NoAiaFetcher returns FetchingDisabled,
+# preserving the historical "caller supplies the full chain"
+# semantics). Real HTTP fetching lives in `pkix-aia-http` (planned).
+pkix-aia        = { workspace = true }
 der             = { workspace = true }
 x509-cert       = { workspace = true }
 

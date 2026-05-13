@@ -16,7 +16,9 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use pkix_chain::{verify_chain, DefaultVerifier, NoRevocation, TrustAnchor, ValidationPolicy};
+//! use pkix_chain::{
+//!     verify_chain, DefaultVerifier, NoAiaFetcher, NoRevocation, TrustAnchor, ValidationPolicy,
+//! };
 //! use x509_cert::Certificate;
 //!
 //! # fn demo(chain: Vec<Certificate>, anchors: Vec<TrustAnchor>) -> Result<(), pkix_chain::Error> {
@@ -28,6 +30,7 @@
 //!     &policy,
 //!     &DefaultVerifier,   // impl SignatureVerifier
 //!     &NoRevocation,      // or a CrlChecker / OcspChecker
+//!     &NoAiaFetcher,      // or an `AiaFetcher` from `pkix-aia-http`
 //! )?;
 //! # let _ = result;
 //! # Ok(())
@@ -46,7 +49,11 @@
 //!
 //! # fn demo(chains: Vec<Vec<Certificate>>, anchors: Vec<TrustAnchor>) -> Result<(), pkix_chain::Error> {
 //! let policy = ValidationPolicy::new(1_700_000_000);
-//! let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+//! // `new_no_aia` wires `NoAiaFetcher` as the default fetcher,
+//! // matching the historical "caller supplies the complete chain"
+//! // behaviour. For real AIA fetching pass an `AiaFetcher` to
+//! // `Verifier::new` instead.
+//! let verifier = Verifier::new_no_aia(&anchors, &DefaultVerifier, &NoRevocation, &policy);
 //!
 //! let refs: Vec<&[Certificate]> = chains.iter().map(|c| c.as_slice()).collect();
 //! let results = verifier.verify_batch(&refs);
@@ -63,12 +70,17 @@
 //! - **Caller supplies the chain.** This crate validates a caller-ordered
 //!   `&[Certificate]`. Path building from an unordered bag of certificates
 //!   lives in `pkix-path-builder`.
-//! - **No AIA fetching.** Chains with missing intermediates are not
-//!   reassembled from `AuthorityInfoAccess` URIs at validation time;
-//!   verification fails with the surfaced `pkix-path` / path-builder
-//!   error. The pluggable `AiaFetcher` trait + `NoAiaFetcher` default
-//!   (which keeps the present "you must supply the chain" behaviour) and
-//!   the optional `pkix-aia-http` adapter are tracked under `PKIX-zkjb`.
+//! - **No AIA fetching at 1.0.** [`Verifier`] is generic over an
+//!   `A: AiaFetcher` parameter that defaults to [`NoAiaFetcher`], and
+//!   the [`verify_chain`] free function takes an `AiaFetcher` argument.
+//!   [`NoAiaFetcher`] returns `AiaError::FetchingDisabled` for every URI,
+//!   so chains with missing intermediates are not reassembled from
+//!   `AuthorityInfoAccess` URIs at validation time. Verification fails
+//!   with the surfaced `pkix-path` / path-builder error in that case.
+//!   The API surface is locked at 1.0 so a future point release can
+//!   wire `pkix-aia-http` (planned, `PKIX-zkjb.5`) into the chain-build
+//!   path non-breakingly via the [`Verifier`] 3rd generic; tracked
+//!   under `PKIX-zkjb`.
 //! - **Revocation is caller-supplied.** Online CRL / OCSP fetching is
 //!   handled by `pkix-revocation-http`; this crate accepts any
 //!   `RevocationChecker` impl — including `NoRevocation` for the
@@ -90,6 +102,7 @@
 //!   of scope for this crate and live in `pkix-ac`, `pkix-ct`, and
 //!   `pkix-dane` respectively.
 
+pub use pkix_aia::{self, AiaError, AiaFetcher, NoAiaFetcher};
 pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
     self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
@@ -201,10 +214,10 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Verify a certificate chain using the default `RustCrypto` signature backends.
 ///
 /// Convenience wrapper around [`verify_chain`] that uses [`DefaultVerifier`]
-/// (RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256) so callers do not need to
-/// construct a `SignatureVerifier` manually for the common case.
-///
-/// For a custom backend, call [`verify_chain`] directly.
+/// (RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256) for signature verification
+/// and [`NoAiaFetcher`] for AIA fetching (i.e. no fetching — the caller must
+/// supply the complete chain). Callers who want a custom signature backend
+/// or a real [`AiaFetcher`] should call [`verify_chain`] directly.
 ///
 /// # Errors
 ///
@@ -219,7 +232,14 @@ pub fn verify_chain_default<R>(
 where
     R: RevocationChecker,
 {
-    verify_chain(chain, anchors, policy, &DefaultVerifier, revocation)
+    verify_chain(
+        chain,
+        anchors,
+        policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )
 }
 
 /// Verify a certificate chain with signature validation and revocation checking.
@@ -235,6 +255,10 @@ where
 /// - `policy`     — validation policy (time, max depth, key usage enforcement)
 /// - `verifier`   — signature verification backend (`RustCrypto` default or custom)
 /// - `revocation` — revocation checker; use [`NoRevocation`] for offline/embedded
+/// - `aia`        — AIA fetcher; use [`NoAiaFetcher`] for the historical
+///   "caller supplies the complete chain" behaviour. The argument is reserved
+///   for future chain-build integration (`PKIX-zkjb.7`); the present
+///   implementation does not invoke the fetcher.
 ///
 /// # Errors
 ///
@@ -258,18 +282,20 @@ where
 /// `check_revocation_against_anchor`, or include the issuing CA certificate as
 /// the last element of `chain` so it is covered by `check_revocation` as a
 /// normal intermediate.
-pub fn verify_chain<V, R>(
+pub fn verify_chain<V, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     policy: &ValidationPolicy,
     verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
     V: SignatureVerifier,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
-    Verifier::new(anchors, verifier, revocation, policy).verify_one(chain)
+    Verifier::new(anchors, verifier, revocation, policy, aia).verify_one(chain)
 }
 
 /// Reusable verifier holding prepared validation state.
@@ -298,17 +324,43 @@ where
 /// [`SignatureVerifier`] / [`RevocationChecker`] implementations
 /// themselves, both of which preserve the per-call interface needed
 /// for such layering.
-pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker> {
+pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {
     anchors: &'a [TrustAnchor],
     sig_verifier: &'a V,
     rev_checker: &'a R,
     policy: &'a ValidationPolicy,
+    aia: &'a A,
 }
 
-impl<'a, V, R> Verifier<'a, V, R>
+impl<'a, V, R> Verifier<'a, V, R, NoAiaFetcher>
 where
     V: SignatureVerifier,
     R: RevocationChecker,
+{
+    /// Construct a verifier that does not fetch missing intermediates via AIA.
+    ///
+    /// Convenience constructor that wires [`NoAiaFetcher`] as the fetcher,
+    /// matching the historical "caller supplies the complete chain"
+    /// semantics. Callers who want a real [`AiaFetcher`] should use
+    /// [`Verifier::new`] and pass an explicit fetcher reference.
+    pub fn new_no_aia(
+        anchors: &'a [TrustAnchor],
+        sig_verifier: &'a V,
+        rev_checker: &'a R,
+        policy: &'a ValidationPolicy,
+    ) -> Self {
+        // `&NoAiaFetcher` here is static-promoted: the type is `Copy`
+        // and `!Drop` and the value is a constexpr, so the borrow is
+        // `&'static NoAiaFetcher`, which coerces into the generic `'a`.
+        Self::new(anchors, sig_verifier, rev_checker, policy, &NoAiaFetcher)
+    }
+}
+
+impl<'a, V, R, A> Verifier<'a, V, R, A>
+where
+    V: SignatureVerifier,
+    R: RevocationChecker,
+    A: AiaFetcher,
 {
     /// Construct a verifier from its components.
     pub fn new(
@@ -316,13 +368,25 @@ where
         sig_verifier: &'a V,
         rev_checker: &'a R,
         policy: &'a ValidationPolicy,
+        aia: &'a A,
     ) -> Self {
         Self {
             anchors,
             sig_verifier,
             rev_checker,
             policy,
+            aia,
         }
+    }
+
+    /// Borrow the `AiaFetcher` this verifier holds.
+    ///
+    /// Exposed for diagnostic purposes; the present implementation does
+    /// not invoke the fetcher (PKIX-zkjb.9 is API-only). Callers
+    /// debugging chain-build failures may want to inspect which fetcher
+    /// is wired in.
+    pub fn aia(&self) -> &A {
+        self.aia
     }
 
     /// Verify a single certificate chain.
@@ -439,7 +503,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     pkix_identity::verify_dns_name(&chain[0], name)?;
     Ok(validated)
 }
@@ -517,7 +588,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     if let Some(name) = identity {
         pkix_identity::verify_dns_name(&chain[0], name)?;
     }
@@ -587,7 +665,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     if let Some(mailbox) = identity {
         pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     }
@@ -649,7 +734,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
 }
@@ -675,7 +767,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
 }
@@ -719,7 +818,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)
+    verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )
 }
 
 /// Verify a certificate chain for Time Stamping Authority (TSA) use.
@@ -782,7 +888,14 @@ where
     R: RevocationChecker,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        revocation,
+        &NoAiaFetcher,
+    )?;
     enforce_timestamping_eku_critical_and_sole(&chain[0])?;
     enforce_timestamping_ku_shape(&chain[0])?;
     Ok(validated)
@@ -822,7 +935,9 @@ where
 /// # Worked example — CA-direct alternative
 ///
 /// ```rust,no_run
-/// use pkix_chain::{verify_chain, DefaultVerifier, NoRevocation, TrustAnchor};
+/// use pkix_chain::{
+///     verify_chain, DefaultVerifier, NoAiaFetcher, NoRevocation, TrustAnchor,
+/// };
 /// use pkix_profiles::{Profile, Rfc5280Profile};
 /// use x509_cert::Certificate;
 ///
@@ -837,6 +952,7 @@ where
 ///     &policy,
 ///     &DefaultVerifier,
 ///     &NoRevocation,
+///     &NoAiaFetcher,
 /// )?;
 /// # Ok(())
 /// # }
@@ -900,7 +1016,14 @@ where
     };
 
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, &shim)?;
+    let validated = verify_chain(
+        chain,
+        anchors,
+        &policy,
+        &DefaultVerifier,
+        &shim,
+        &NoAiaFetcher,
+    )?;
 
     verify_responder_is_delegated_by(&chain[0], issuer)?;
 
