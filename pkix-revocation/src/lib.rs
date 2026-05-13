@@ -27,6 +27,25 @@
 //! to override it will silently leave the anchor-issued certificate unchecked
 //! with no compile error or runtime warning. See that method's documentation
 //! for details.
+//!
+//! # Limitations
+//!
+//! - **No network I/O.** `CrlChecker` and `OcspChecker` operate on
+//!   caller-supplied DER bytes; this crate never opens a socket. Online
+//!   fetching from `CRLDistributionPoints` / `AuthorityInfoAccess` URIs
+//!   lives in the optional `pkix-revocation-http` adapter crate.
+//! - **OCSP response only.** OCSP request construction (the DER bytes a
+//!   client POSTs to a responder) lives in `pkix-revocation-http` so it can
+//!   stay paired with the HTTP transport. The `OcspChecker` in this crate
+//!   validates already-fetched responses.
+//! - **No OCSP stapling helpers.** TLS-layer parsing of stapled responses
+//!   (RFC 6066 §8, multi-stapling RFC 6961) is a transport-protocol
+//!   concern handled by the TLS stack; once extracted, the response bytes
+//!   feed `OcspChecker` like any other.
+//! - **Algorithm coverage tracks `pkix-path`.** CRL and OCSP-response
+//!   signature verification is delegated to a `SignatureVerifier`; the
+//!   same algorithm gaps documented in `pkix-path` (Ed25519, P-521,
+//!   RSA-PSS — tracked under `PKIX-gphz`) apply here.
 
 use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};

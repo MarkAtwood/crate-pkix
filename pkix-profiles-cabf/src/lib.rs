@@ -74,8 +74,32 @@
 //!   including the unprincipled-exception clause that admits this crate.
 //! - Stance / epic: [PKIX-amgn].
 //!
+//! # Limitations
+//!
+//! - **Reference, not authoritative.** See the unprincipled-exception
+//!   clause above. The BR text is the only canonical source; this crate
+//!   ships a curated subset.
+//! - **Subscriber-cert taxonomy only.** Per the AGENTS.md spec-taxonomy
+//!   principle (`PKIX-mzsk`), this crate ships idiomatic Rust [`Profile`]
+//!   types for each subscriber-certificate profile explicitly named in
+//!   the BR. CA-cert / Root-cert profile machinery is not duplicated
+//!   here — that is the path validator's job (RFC 5280 §6.1, in
+//!   `pkix-path`). Per-predicate Lint enforcement is not in scope —
+//!   that is `pkix-policy-zlint`'s job.
+//! - **S/MIME BR sub-profile families not yet split.** [`SmimeProfile`]
+//!   currently bundles the BR validation shape that applies across the
+//!   four mailbox-validated tiers; Organization-validated,
+//!   Sponsor-validated, and Individual-validated profile types are
+//!   tracked under `PKIX-jbvb` (post-1.0).
+//! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** Cross-spec horizontal
+//!   expansion is barred by the AGENTS.md spec-taxonomy clause. Other
+//!   industry-forum / vendor / government policies must come in via
+//!   policy-adapter crates that defer to upstream tools, not via
+//!   workspace-internal transcription.
+//!
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-profiles`]: https://docs.rs/pkix-profiles
+//! [`Profile`]: https://docs.rs/pkix-path/latest/pkix_path/trait.Profile.html
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]

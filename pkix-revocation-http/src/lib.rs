@@ -66,6 +66,37 @@
 //! fetchers (`clients::ureq::UreqFetcher`,
 //! `clients::reqwest::ReqwestFetcher`) are gated behind their
 //! respective `client-*` features.
+//!
+//! # Limitations
+//!
+//! - **No bundled HTTP client by default.** Enabling the `crl` or `ocsp`
+//!   feature gives you the [`RevocationFetcher`] trait and the wrapper
+//!   structs that implement [`pkix_revocation::RevocationChecker`] over
+//!   that trait. You supply the actual transport. Reference clients are
+//!   gated behind `client-ureq` (sync, rustls-backed HTTPS) and
+//!   `client-reqwest-async` (async, requires `async` feature and an
+//!   async runtime).
+//! - **No retry / backoff policy.** Network failure handling — retry,
+//!   exponential backoff, jitter, circuit-breaking — is the caller's
+//!   choice and lives in the supplied [`RevocationFetcher`] implementation.
+//! - **Async runtime is caller-supplied.** When `client-reqwest-async` is
+//!   enabled, the futures returned by the reference reqwest fetcher are
+//!   not bound to any specific runtime. Callers drive them with tokio,
+//!   async-std, smol, or any other executor.
+//! - **Cache shape is intentionally minimal.** The shipped [`InMemoryCache`]
+//!   is unbounded by design (lint-scope decision is to keep the reference
+//!   cache trivially correct). Production deployments needing eviction
+//!   (LRU, TTL bounded by memory pressure) implement [`RevocationCache`]
+//!   over `moka`, Redis, or any backing store they prefer.
+//! - **No CDP / AIA URI filtering.** This crate fetches whichever URI is
+//!   in the certificate's [`CRLDistributionPoints`] or
+//!   [`AuthorityInfoAccess`] extension. Restrictions on which hosts /
+//!   schemes are acceptable for revocation fetches (e.g., enforcing
+//!   HTTPS or blocking private-network URIs) are a deployment-policy
+//!   decision and stay outside this crate.
+//!
+//! [`CRLDistributionPoints`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13
+//! [`AuthorityInfoAccess`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1
 
 // In-memory cache + cached wrappers (PKIX-a1yc.7). Gated on either
 // `crl` or `ocsp` because the trait itself is shared but the wrapper

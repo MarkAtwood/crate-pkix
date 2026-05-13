@@ -56,6 +56,26 @@
 //!
 //! [`Error`] is `#[non_exhaustive]`. New error variants may be added in minor
 //! releases; do not match it exhaustively.
+//!
+//! # Limitations
+//!
+//! - **No compiled-in CA bundle.** This crate ships zero trust data by
+//!   design. See "Project stance" above. Callers needing the Mozilla CA
+//!   list must download it (e.g., from curl.se/docs/caextract.html) and
+//!   load it with [`from_pem`] / [`from_pem_file`]; this is a
+//!   deployment-configuration decision, not a library decision.
+//! - **No platform integration in this crate.** Loading from the OS-native
+//!   trust store (macOS Security framework, Windows CryptoAPI, iOS, Android)
+//!   is the job of `pkix-truststore-system` (skeleton; substantive content
+//!   tracked under `PKIX-8h87`). Loading from PKCS#11 / HSM / smart card
+//!   tokens is the job of `pkix-truststore-pkcs11` (skeleton; tracked
+//!   under `PKIX-p8vz`). Both adapter crates feed [`from_der_iter`] and
+//!   stay outside the 1.0 release; they ship at their own 0.x cadence.
+//! - **No constraint metadata beyond DER.** This crate loads certificates
+//!   as [`TrustAnchor`] values and does not surface per-anchor policy
+//!   constraints (Mozilla's "websites trust bit", root-program-specific
+//!   EKU restrictions, etc.). Callers needing that machinery layer it on
+//!   top via `pkix-path::ValidationPolicy` and per-anchor filtering.
 
 use std::path::Path;
 use std::{fs, io, vec::Vec};

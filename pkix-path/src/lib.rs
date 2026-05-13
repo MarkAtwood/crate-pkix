@@ -10,10 +10,10 @@
 //! # Architecture
 //!
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
-//! The default feature set (`rustcrypto`) wires in `RustCrypto` backends for
-//! RSA-PKCS1v15-SHA-256 (`rsa` feature), ECDSA-P-256-SHA-256 (`p256` feature),
-//! and ECDSA-P-384-SHA-384 (`p384` feature).
-//! P-384 and Ed25519 are planned for a future release.
+//! The default feature set wires in `RustCrypto` backends for
+//! RSA-PKCS1v15-SHA-{256,384,512} (`rsa` feature) and
+//! ECDSA-P-256-SHA-256 (`p256` feature). The optional `p384` feature adds
+//! ECDSA-P-384-SHA-384; `rustcrypto` enables all three together.
 //! For FIPS-validated crypto, implement [`SignatureVerifier`] against
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
 //!
@@ -23,6 +23,14 @@
 //! # Limitations
 //!
 //! The following are **not** currently implemented:
+//! - **Additional signature algorithms** — Ed25519 (RFC 8032), ECDSA P-521
+//!   (RFC 5480), and RSA-PSS (RFC 4055) are not yet wired into the bundled
+//!   `RustCrypto` backends. Tracked under `PKIX-gphz`. Callers can implement
+//!   [`SignatureVerifier`] for any algorithm they need without waiting for
+//!   the bundled backends; the trait is the only algorithm-specific surface
+//!   in this crate. SHA-1 verifiers (RFC 8017, legacy) are intentionally
+//!   not shipped; deployments requiring legacy SHA-1 trust must implement
+//!   [`SignatureVerifier`] themselves.
 //! - **RFC 4518 full Unicode NFKC DN normalization** — ASCII case-folding
 //!   plus insignificant-whitespace collapsing is applied. `BMPString` AVA
 //!   values are transcoded UCS-2-BE → UTF-8 and then compared via the same
@@ -30,18 +38,24 @@
 //!   code points but differ only in DER string-type (e.g. `BMPString`
 //!   "Foo Co" vs `UTF8String` "Foo Co") compare equal. Full RFC 4518 prep
 //!   (NFKC, non-ASCII Unicode case fold, prohibit/bidi steps) is future
-//!   work; until it lands, two `BMPString` values that contain the same
-//!   Unicode code points but differ in canonical decomposition (e.g.
-//!   precomposed U+00E9 'é' vs decomposed U+0065 U+0301 'e'+ combining
-//!   acute) compare unequal. `UniversalString` AVA values are rejected by
-//!   the `der` crate at parse time (tag 0x1C is not in `der::Tag` in 0.7)
-//!   and never reach the path validator. `TeletexString` AVAs use raw DER
-//!   byte comparison by policy — `pkix-path` deliberately does not transcode
-//!   T.61 to Unicode; see `any_to_str_bytes` rustdoc for the rationale.
+//!   work tracked under `PKIX-l63j`; until it lands, two `BMPString` values
+//!   that contain the same Unicode code points but differ in canonical
+//!   decomposition (e.g. precomposed U+00E9 'é' vs decomposed U+0065 U+0301
+//!   'e'+ combining acute) compare unequal. `UniversalString` AVA values
+//!   are rejected by the `der` crate at parse time (tag 0x1C is not in
+//!   `der::Tag` in 0.7) and never reach the path validator. `TeletexString`
+//!   AVAs use raw DER byte comparison by policy — `pkix-path` deliberately
+//!   does not transcode T.61 to Unicode; see `any_to_str_bytes` rustdoc
+//!   for the rationale.
 //! - **Online revocation** — revocation is handled by `pkix-revocation`
 //!   (CRL/OCSP); this crate is network-free by design.
 //! - **Path building** — converting an unordered bag of certificates into a
-//!   validated chain is handled by `pkix-path-builder`.
+//!   validated chain is handled by `pkix-path-builder`. This crate validates
+//!   a caller-ordered `&[Certificate]` only.
+//! - **AIA fetching** — chains with missing intermediates are not
+//!   reassembled from `AuthorityInfoAccess` URIs. Callers must supply a
+//!   complete chain. The `pkix-aia` crate (trait + `NoAiaFetcher` default)
+//!   and `pkix-aia-http` adapter are tracked under `PKIX-zkjb`.
 
 // For no_std builds, pull in the alloc crate explicitly so `alloc::` paths
 // and the `vec!` macro resolve. `#[macro_use]` re-exports alloc macros

@@ -51,8 +51,29 @@
 //!   including the unprincipled-exception clause that admits this crate.
 //! - Stance / epic: [PKIX-amgn].
 //!
+//! ## Limitations
+//!
+//! - **Reference, not authoritative.** See the unprincipled-exception
+//!   clause above. The BR text is the only canonical source; this crate
+//!   ships a curated subset of marquee BR predicates as Lint impls.
+//! - **Not predicate-comprehensive.** [`cabf_tls_br`] covers SC-081
+//!   phased validity caps, SHA-1 prohibition, RSA min-key-size, SAN/EKU
+//!   presence, and `BasicConstraints` cA-flag checks. Full TLS BR
+//!   predicate coverage (matching zlint's CA/B Forum lints, roughly
+//!   one Lint per BR sub-section) is the job of `pkix-policy-zlint`
+//!   (tracked under `PKIX-jy95.10`).
+//! - **No S/MIME BR or Code Signing BR lint module yet.** The
+//!   `pkix-profiles-cabf` crate ships the corresponding [`Profile`]
+//!   types (`SmimeProfile`, `CodeSigningProfile`); per-predicate Lint
+//!   coverage for those BRs is comprehensive via `pkix-policy-zlint`.
+//! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** The unprincipled
+//!   exception applies to CA/B Forum content only. Other industry-forum,
+//!   government, or vendor policies must come in via policy-adapter
+//!   crates that defer to upstream tools.
+//!
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-lint`]: https://docs.rs/pkix-lint
+//! [`Profile`]: https://docs.rs/pkix-path/latest/pkix_path/trait.Profile.html
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
