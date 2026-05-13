@@ -16,7 +16,10 @@
 //! requirements layer on top of the older RFC 5280 §4.2.1.6 rfc822Name
 //! SAN handling to admit UTF-8 mailbox addresses for S/MIME.
 
-use der::{asn1::ObjectIdentifier, Decode as _};
+use der::{
+    asn1::{ObjectIdentifier, Utf8StringRef},
+    Decode as _,
+};
 use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::Certificate;
 
@@ -140,6 +143,230 @@ impl Lint for Rfc8398SmimeSanLint {
     }
 }
 
+// ---------------------------------------------------------------------------
+// rfc8398.cert.san.smime_mailbox_equivalent
+// ---------------------------------------------------------------------------
+
+/// RFC 8398 §3: when both `rfc822Name` and `SmtpUTF8Mailbox` SAN entries
+/// are present, their address values MUST be identical (modulo IDN
+/// A-label / U-label encoding of internationalized parts).
+///
+/// > If both rfc822Name and SmtpUTF8Mailbox are present in the
+/// > subjectAltName extension, then the address values MUST be identical
+/// > with the following exception: any internationalized parts of the
+/// > email address (such as those rendered using A-labels) MUST be
+/// > encoded per the SmtpUTF8Mailbox specification.
+///
+/// The lint runs only when at least one entry of each kind is present;
+/// when either is missing the equivalence rule is vacuously satisfied
+/// (`Pass`). When both are present, every rfc822Name entry must match at
+/// least one SmtpUTF8Mailbox entry under the equivalence rule, and
+/// vice versa.
+///
+/// # Equivalence rule
+///
+/// Two addresses `local@domain` are equivalent iff:
+///
+/// 1. The local-parts are byte-equal. RFC 822 local-parts are ASCII;
+///    SmtpUTF8Mailbox local-parts may be UTF-8. RFC 8398 §3 says the
+///    addresses MUST be identical except for IDN-encoded domain parts —
+///    i.e. local-parts are the same bytes in both forms.
+/// 2. The domains are equivalent under IDN A-label ↔ U-label
+///    conversion. The rfc822Name carries the A-label form (ASCII
+///    `xn--...` for IDN labels), the SmtpUTF8Mailbox carries the
+///    U-label form (UTF-8). The lint normalizes both to A-label form
+///    via the `idna` crate before comparing byte-wise.
+///
+/// Domain comparison is case-insensitive (DNS domains are
+/// case-insensitive per RFC 5321 §2.4); local-part comparison is
+/// case-sensitive (RFC 5321 §2.4 admits case-sensitive local-parts,
+/// though most providers normalize).
+///
+/// # Behavior
+///
+/// - SAN extension absent → `Pass` (lint does not apply).
+/// - SAN extension malformed → `Error`.
+/// - SAN extension present, < 1 rfc822Name entries → `Pass`.
+/// - SAN extension present, < 1 SmtpUTF8Mailbox entries → `Pass`.
+/// - Both kinds present, every entry matches at least one of the
+///   opposite kind under the equivalence rule → `Pass`.
+/// - Both kinds present with one or more orphan entries → `Error`,
+///   listing the unmatched address.
+/// - An `id-on-SmtpUTF8Mailbox` `OtherName.value` that fails to decode
+///   as a `UTF8String` → `Error`.
+/// - An address that cannot be split on `@` into local-part + domain →
+///   `Error`.
+///
+/// # Provenance
+///
+/// Filed under PKIX-9vnx.9.2.1.1 as the third of three deferred lints
+/// from the PKIX-9vnx.9.2.1 batch. Negative-test fixture (cert with
+/// both rfc822Name and SmtpUTF8Mailbox where they disagree) is not yet
+/// present in the workspace fixture corpus; the equivalence-helper free
+/// function is unit-tested exhaustively against a hand-written oracle
+/// table.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Rfc8398SmimeMailboxEquivalenceLint;
+
+impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
+    fn id(&self) -> &'static str {
+        "rfc8398.cert.san.smime_mailbox_equivalent"
+    }
+
+    fn citation(&self) -> &'static str {
+        "RFC 8398 §3"
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn scope(&self) -> Scope {
+        Scope::Certificate
+    }
+
+    fn applies_to(&self) -> SubjectKind {
+        SubjectKind::Leaf
+    }
+
+    fn title(&self) -> &str {
+        "rfc822Name and SmtpUTF8Mailbox SAN entries must agree on the same address"
+    }
+
+    fn spec_section_id(&self) -> Option<&str> {
+        Some("rfc8398-3")
+    }
+
+    fn spec_url(&self) -> Option<&str> {
+        Some("https://www.rfc-editor.org/rfc/rfc8398#section-3")
+    }
+
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::Pass;
+        };
+
+        let Some(san_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
+        else {
+            return LintResult::Pass;
+        };
+
+        let san =
+            match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
+                Ok(san) => san,
+                Err(_) => {
+                    return LintResult::error("SubjectAltName extension value is malformed DER");
+                }
+            };
+
+        // Collect both kinds. rfc822Name carries an Ia5String (ASCII);
+        // SmtpUTF8Mailbox OtherName.value carries a UTF8String wrapped
+        // in `EXPLICIT [0] ANY` — extract via Utf8StringRef::try_from.
+        let mut rfc822_addrs: Vec<&str> = Vec::new();
+        let mut smtputf8_addrs: Vec<String> = Vec::new();
+        for gn in &san.0 {
+            match gn {
+                GeneralName::Rfc822Name(addr) => {
+                    rfc822_addrs.push(addr.as_str());
+                }
+                GeneralName::OtherName(on) if on.type_id == ID_ON_SMTP_UTF8_MAILBOX => {
+                    match Utf8StringRef::try_from(&on.value) {
+                        Ok(s) => smtputf8_addrs.push(s.to_string()),
+                        Err(_) => {
+                            return LintResult::error(
+                                "SubjectAltName id-on-SmtpUTF8Mailbox otherName value \
+                                 is not a valid UTF8String",
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Equivalence rule applies only when both kinds are present.
+        if rfc822_addrs.is_empty() || smtputf8_addrs.is_empty() {
+            return LintResult::Pass;
+        }
+
+        // Each rfc822Name must match some SmtpUTF8Mailbox, and each
+        // SmtpUTF8Mailbox must match some rfc822Name (set-equality under
+        // the equivalence relation, modulo duplicates which we tolerate).
+        for r in &rfc822_addrs {
+            if !smtputf8_addrs
+                .iter()
+                .any(|u| mailbox_equivalent(r, u).unwrap_or_default())
+            {
+                return LintResult::error(format!(
+                    "rfc822Name SAN entry '{r}' has no matching SmtpUTF8Mailbox; \
+                     RFC 8398 §3 requires byte-identical local-part and \
+                     A-label/U-label-equivalent domain"
+                ));
+            }
+        }
+        for u in &smtputf8_addrs {
+            if !rfc822_addrs
+                .iter()
+                .any(|r| mailbox_equivalent(r, u).unwrap_or_default())
+            {
+                return LintResult::error(format!(
+                    "SmtpUTF8Mailbox SAN entry '{u}' has no matching rfc822Name; \
+                     RFC 8398 §3 requires byte-identical local-part and \
+                     A-label/U-label-equivalent domain"
+                ));
+            }
+        }
+
+        LintResult::Pass
+    }
+}
+
+/// Returns `Ok(true)` iff `rfc822` (ASCII, A-label IDN form) and `smtputf8`
+/// (UTF-8, U-label IDN form) name the same RFC 5322 mailbox address under
+/// the RFC 8398 §3 equivalence rule.
+///
+/// Returns `Err(detail)` if either address is malformed (no `@`, empty
+/// local-part, empty domain) or if IDN conversion fails. Equivalence
+/// requires:
+///
+/// 1. Byte-equal local-parts.
+/// 2. Domains equivalent under A-label conversion (the `smtputf8`
+///    domain is converted to A-label form via [`idna::domain_to_ascii`]
+///    and compared case-insensitively to `rfc822`'s domain).
+fn mailbox_equivalent(rfc822: &str, smtputf8: &str) -> Result<bool, &'static str> {
+    let (r_local, r_domain) = split_mailbox(rfc822).ok_or("rfc822Name has no '@' delimiter")?;
+    let (u_local, u_domain) =
+        split_mailbox(smtputf8).ok_or("SmtpUTF8Mailbox has no '@' delimiter")?;
+
+    if r_local.is_empty() || u_local.is_empty() || r_domain.is_empty() || u_domain.is_empty() {
+        return Err("mailbox address has empty local-part or domain");
+    }
+
+    // RFC 8398 §3: local-parts must be byte-identical.
+    if r_local != u_local {
+        return Ok(false);
+    }
+
+    // Domain comparison: convert smtputf8 domain (U-label form) to
+    // A-label form and compare case-insensitively to rfc822 domain.
+    let u_ascii = idna::domain_to_ascii(u_domain).map_err(|_| "U-label → A-label conversion failed")?;
+    Ok(u_ascii.eq_ignore_ascii_case(r_domain))
+}
+
+/// Split a mailbox address on the rightmost `@` into (local-part, domain).
+///
+/// Returns `None` if the address contains no `@`. RFC 5322 allows
+/// quoted-string local-parts that may themselves contain `@`; splitting
+/// on the rightmost `@` is the conventional handling for unquoted
+/// addresses and is sufficient for the RFC 8398 equivalence check, which
+/// presupposes well-formed mailbox addresses.
+fn split_mailbox(addr: &str) -> Option<(&str, &str)> {
+    let idx = addr.rfind('@')?;
+    Some((&addr[..idx], &addr[idx + 1..]))
+}
+
 #[cfg(test)]
 mod tests {
     //! Independent oracle for SAN content (verified 2026-05-12 via
@@ -218,5 +445,153 @@ mod tests {
             lint.spec_url(),
             Some("https://www.rfc-editor.org/rfc/rfc8398#section-3")
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Rfc8398SmimeMailboxEquivalenceLint
+    //
+    // Two layers of tests:
+    //
+    // 1. The lint itself runs on real fixtures. No fixture in the
+    //    workspace carries both rfc822Name AND id-on-SmtpUTF8Mailbox
+    //    SANs, so on every existing fixture the equivalence rule is
+    //    vacuously satisfied (Pass). We assert Pass on the smime
+    //    fixture (rfc822Name only) and on the no-san fixture
+    //    (extension absent → Pass).
+    //
+    // 2. The equivalence helper (`mailbox_equivalent`) is a pure
+    //    function over two strings. We oracle-test it exhaustively
+    //    against a hand-written table covering: ASCII equivalence,
+    //    IDN A-label/U-label equivalence, local-part case sensitivity,
+    //    domain case insensitivity, mismatched local-parts, mismatched
+    //    domains, malformed input. Independent oracle: RFC 8398 §3 +
+    //    RFC 5321 §2.4 wording, plus IDNA2008 (Punycode) reference
+    //    encodings cross-checked with `python3 -c 'import idna;
+    //    print(idna.encode("café.example").decode())'` →
+    //    `xn--caf-dma.example`.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn smime_mailbox_equiv_lint_passes_on_rfc822_only_fixture() {
+        // smime-self-signed-365d.der has rfc822Name but no
+        // SmtpUTF8Mailbox — equivalence rule does not apply.
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        let cert = load_cert("smime-self-signed-365d.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn smime_mailbox_equiv_lint_passes_when_san_absent() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        let cert = load_cert("leaf-p256-365d-no-san.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn smime_mailbox_equiv_lint_passes_when_only_dns_san() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        let cert = load_cert("leaf-p256-365d-san-eku.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn smime_mailbox_equiv_lint_metadata_matches_rfc_section() {
+        let lint = Rfc8398SmimeMailboxEquivalenceLint;
+        assert_eq!(lint.id(), "rfc8398.cert.san.smime_mailbox_equivalent");
+        assert_eq!(lint.citation(), "RFC 8398 §3");
+        assert_eq!(lint.severity(), Severity::Error);
+        assert_eq!(lint.scope(), Scope::Certificate);
+        assert_eq!(lint.applies_to(), SubjectKind::Leaf);
+        assert_eq!(lint.spec_section_id(), Some("rfc8398-3"));
+        assert_eq!(
+            lint.spec_url(),
+            Some("https://www.rfc-editor.org/rfc/rfc8398#section-3")
+        );
+    }
+
+    // ---- mailbox_equivalent helper tests ----
+
+    #[test]
+    fn mailbox_equiv_ascii_identical() {
+        assert_eq!(
+            mailbox_equivalent("alice@example.com", "alice@example.com"),
+            Ok(true)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_domain_case_insensitive() {
+        // Domain case is irrelevant per RFC 5321 §2.4.
+        assert_eq!(
+            mailbox_equivalent("alice@Example.COM", "alice@example.com"),
+            Ok(true)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_local_part_case_sensitive() {
+        // Local-parts are byte-equal; case differences fail.
+        assert_eq!(
+            mailbox_equivalent("Alice@example.com", "alice@example.com"),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_idn_a_label_matches_u_label() {
+        // A-label "xn--caf-dma.example" decodes to U-label "café.example"
+        // (Punycode encoding of "café" verified via independent
+        // `python3 -c 'import idna; print(idna.encode("café.example"))'`).
+        assert_eq!(
+            mailbox_equivalent("alice@xn--caf-dma.example", "alice@café.example"),
+            Ok(true)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_idn_a_label_matches_u_label_mixed_case() {
+        // A-label form is conventionally lowercase; case differences
+        // in the A-label form still match the U-label after conversion.
+        assert_eq!(
+            mailbox_equivalent("alice@XN--CAF-DMA.example", "alice@café.example"),
+            Ok(true)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_different_local_part_rejects() {
+        assert_eq!(
+            mailbox_equivalent("alice@example.com", "bob@example.com"),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_different_domain_rejects() {
+        assert_eq!(
+            mailbox_equivalent("alice@example.com", "alice@other.com"),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn mailbox_equiv_missing_at_errors() {
+        assert!(mailbox_equivalent("alice", "alice@example.com").is_err());
+        assert!(mailbox_equivalent("alice@example.com", "alice").is_err());
+    }
+
+    #[test]
+    fn mailbox_equiv_empty_local_or_domain_errors() {
+        assert!(mailbox_equivalent("@example.com", "@example.com").is_err());
+        assert!(mailbox_equivalent("alice@", "alice@").is_err());
     }
 }

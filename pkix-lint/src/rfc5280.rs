@@ -40,6 +40,9 @@ const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.
 /// `ExtendedKeyUsage` extension OID — RFC 5280 §4.2.1.12.
 const OID_EXTENDED_KEY_USAGE: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.37");
 
+/// `SubjectAltName` extension OID — RFC 5280 §4.2.1.6.
+const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
+
 /// id-kp-serverAuth — RFC 5280 §4.2.1.12 (TLS WWW server authentication).
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
 
@@ -374,6 +377,207 @@ impl Lint for Rfc5280EkuServerAuthLint {
     }
 }
 
+// ---------------------------------------------------------------------------
+// rfc5280.cert.san.required_when_subject_empty
+// ---------------------------------------------------------------------------
+
+/// RFC 5280 §4.2.1.6: certificates with an empty subject MUST include a
+/// critical `subjectAltName` extension.
+///
+/// > If the subject field contains an empty sequence, then the issuing CA
+/// > MUST include a subjectAltName extension that is marked as critical.
+///
+/// The lint enforces both clauses on certificates whose Subject is the
+/// zero-length `RDNSequence`:
+///
+/// 1. `subjectAltName` MUST be present.
+/// 2. The `subjectAltName` extension MUST be marked `critical`.
+///
+/// Certificates with a non-empty Subject are out of scope (`Pass`) — the
+/// criticality of SAN on those is governed by separate rules (RFC 5280
+/// §4.2.1.6 says SAN SHOULD be marked non-critical when the Subject is
+/// also present; that SHOULD-clause is not covered here).
+///
+/// # Behavior
+///
+/// - Subject non-empty → `Pass` (this lint does not apply).
+/// - Subject empty, `SubjectAltName` extension absent → `Error`.
+/// - Subject empty, `SubjectAltName` present but not critical → `Error`.
+/// - Subject empty, `SubjectAltName` present and critical → `Pass`.
+///
+/// # Provenance
+///
+/// Filed under PKIX-9vnx.9.2.1.1 as one of the three RFC-conformance
+/// lints deferred from the initial PKIX-9vnx.9.2.1 batch. Negative-test
+/// fixture (empty-subject leaf with missing-or-non-critical SAN) is not
+/// yet present in the workspace fixture corpus; the lint ships with a
+/// positive test only (existing fixtures all have non-empty Subjects).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Rfc5280SanRequiredWhenSubjectEmptyLint;
+
+impl Lint for Rfc5280SanRequiredWhenSubjectEmptyLint {
+    fn id(&self) -> &'static str {
+        "rfc5280.cert.san.required_when_subject_empty"
+    }
+
+    fn citation(&self) -> &'static str {
+        "RFC 5280 §4.2.1.6"
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn scope(&self) -> Scope {
+        Scope::Certificate
+    }
+
+    fn applies_to(&self) -> SubjectKind {
+        SubjectKind::Any
+    }
+
+    fn title(&self) -> &str {
+        "Empty-subject certificate must include a critical subjectAltName"
+    }
+
+    fn spec_section_id(&self) -> Option<&str> {
+        Some("rfc5280-4.2.1.6")
+    }
+
+    fn spec_url(&self) -> Option<&str> {
+        Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.6")
+    }
+
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        // The lint is conditional on an empty Subject. Non-empty Subjects
+        // are out of scope here — they Pass even if SAN is absent.
+        if !cert.tbs_certificate.subject.is_empty() {
+            return LintResult::Pass;
+        }
+
+        let Some(extensions) = &cert.tbs_certificate.extensions else {
+            return LintResult::error(
+                "empty-subject certificate has no extensions; \
+                 RFC 5280 §4.2.1.6 requires a critical subjectAltName",
+            );
+        };
+
+        let Some(san_ext) = extensions
+            .iter()
+            .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
+        else {
+            return LintResult::error(
+                "empty-subject certificate omits subjectAltName; \
+                 RFC 5280 §4.2.1.6 requires it to be present and critical",
+            );
+        };
+
+        if !san_ext.critical {
+            return LintResult::error(
+                "empty-subject certificate carries subjectAltName but it is not marked critical; \
+                 RFC 5280 §4.2.1.6 requires the extension to be critical when the Subject is empty",
+            );
+        }
+
+        LintResult::Pass
+    }
+}
+
+// ---------------------------------------------------------------------------
+// rfc5280.cert.signature_algorithm_match
+// ---------------------------------------------------------------------------
+
+/// RFC 5280 §4.1.1.2: outer `signatureAlgorithm` MUST equal inner
+/// `tbsCertificate.signature`.
+///
+/// > This field MUST contain the same algorithm identifier as the
+/// > signature field in the sequence tbsCertificate (Section 4.1.2.3).
+/// > The contents of the optional parameters field will vary according to
+/// > the algorithm identified.  This field is used as a redundant
+/// > consistency check.
+///
+/// The two `AlgorithmIdentifier` values are compared structurally: the
+/// algorithm OID and the optional parameters field must both match. The
+/// comparison uses x509-cert's `AlgorithmIdentifier` `PartialEq` impl,
+/// which compares both the OID and the encoded parameters value.
+///
+/// # Note on NULL vs absent parameters
+///
+/// RFC 4055 §2.1 mandates a NULL parameters value for RSA-PKCS1 signature
+/// algorithms; some real-world certificates omit the parameters entirely.
+/// This lint reports such intra-certificate inconsistency: if the outer
+/// `signatureAlgorithm` has `parameters: NULL` and the inner
+/// `tbsCertificate.signature` has `parameters: absent` (or vice versa),
+/// the lint fires `Error`. That is the correct reading of §4.1.1.2's
+/// "MUST contain the same algorithm identifier" wording — the redundancy
+/// check exists precisely to catch encoder bugs that produce non-matching
+/// outer/inner identifiers.
+///
+/// # Behavior
+///
+/// - Outer and inner `AlgorithmIdentifier` byte-equal → `Pass`.
+/// - Otherwise → `Error` with both OIDs in the detail string.
+///
+/// # Provenance
+///
+/// Filed under PKIX-9vnx.9.2.1.1 as one of three deferred lints from the
+/// PKIX-9vnx.9.2.1 batch. Negative-test fixture (cert with mismatched
+/// outer/inner signature algorithms) is not yet present in the workspace
+/// fixture corpus — well-behaved encoders such as OpenSSL and pyca always
+/// produce matching identifiers. Fixture generation requires custom
+/// DER-level synthesis and is out of scope here.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Rfc5280SignatureAlgorithmMatchLint;
+
+impl Lint for Rfc5280SignatureAlgorithmMatchLint {
+    fn id(&self) -> &'static str {
+        "rfc5280.cert.signature_algorithm_match"
+    }
+
+    fn citation(&self) -> &'static str {
+        "RFC 5280 §4.1.1.2"
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Error
+    }
+
+    fn scope(&self) -> Scope {
+        Scope::Certificate
+    }
+
+    fn applies_to(&self) -> SubjectKind {
+        SubjectKind::Any
+    }
+
+    fn title(&self) -> &str {
+        "Outer signatureAlgorithm must equal tbsCertificate.signature"
+    }
+
+    fn spec_section_id(&self) -> Option<&str> {
+        Some("rfc5280-4.1.1.2")
+    }
+
+    fn spec_url(&self) -> Option<&str> {
+        Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.2")
+    }
+
+    fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
+        let outer = &cert.signature_algorithm;
+        let inner = &cert.tbs_certificate.signature;
+        if outer == inner {
+            LintResult::Pass
+        } else {
+            LintResult::error(format!(
+                "outer signatureAlgorithm ({}) does not match \
+                 tbsCertificate.signature ({}); \
+                 RFC 5280 §4.1.1.2 requires both to be identical",
+                outer.oid, inner.oid
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     //! Independent oracle for serial-length assertions:
@@ -693,6 +897,120 @@ mod tests {
         assert_eq!(
             lint.spec_url(),
             Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.12")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Rfc5280SanRequiredWhenSubjectEmptyLint
+    //
+    // Oracle: `openssl x509 -text` reads Subject and SAN criticality for
+    // each fixture (verified 2026-05-12):
+    //
+    // | fixture                              | Subject empty? | SAN ext? | SAN critical? |
+    // |--------------------------------------|----------------|----------|---------------|
+    // | leaf-p256-365d-san-eku.der           | no             | yes      | no            |
+    // | leaf-p256-365d-no-san.der            | no             | no       | n/a           |
+    // | smime-self-signed-365d.der           | no             | yes      | no            |
+    //
+    // No empty-subject fixture currently exists in the workspace. The
+    // positive paths verified here are: (a) non-empty Subject + SAN
+    // present → Pass (lint does not apply), (b) non-empty Subject + SAN
+    // absent → Pass (still does not apply). The negative path (empty
+    // Subject + missing-or-non-critical SAN → Error) requires fixture
+    // generation (pyca/cryptography `Name([])` + matching SAN
+    // configuration) and is filed as out-of-scope per the bead.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn san_required_when_subject_empty_passes_when_subject_present() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        let cert = load_cert("leaf-p256-365d-san-eku.der");
+        assert!(
+            !cert.tbs_certificate.subject.is_empty(),
+            "fixture must have a non-empty Subject for this test"
+        );
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn san_required_when_subject_empty_passes_with_no_san_when_subject_present() {
+        // Lint must not fire on certs that have a non-empty Subject and
+        // no SAN — those are out of scope for this RFC 5280 §4.2.1.6
+        // clause (which is conditional on an empty Subject).
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        let cert = load_cert("leaf-p256-365d-no-san.der");
+        assert!(!cert.tbs_certificate.subject.is_empty());
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Leaf, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn san_required_when_subject_empty_metadata_matches_rfc_section() {
+        let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
+        assert_eq!(lint.id(), "rfc5280.cert.san.required_when_subject_empty");
+        assert_eq!(lint.citation(), "RFC 5280 §4.2.1.6");
+        assert_eq!(lint.severity(), Severity::Error);
+        assert_eq!(lint.scope(), Scope::Certificate);
+        assert_eq!(lint.applies_to(), SubjectKind::Any);
+        assert_eq!(lint.spec_section_id(), Some("rfc5280-4.2.1.6"));
+        assert_eq!(
+            lint.spec_url(),
+            Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.6")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Rfc5280SignatureAlgorithmMatchLint
+    //
+    // Oracle: `openssl asn1parse -i -in <fixture> -inform DER` reads both
+    // the inner `tbsCertificate.signature` and outer `signatureAlgorithm`
+    // SEQUENCEs. Well-formed certificates produced by OpenSSL and pyca
+    // always have byte-identical outer/inner identifiers, including the
+    // NULL parameters value for RSA-PKCS1 algorithms. Verified
+    // 2026-05-12: all of the policy-checks/*.der fixtures pass the lint.
+    //
+    // The negative path (mismatched outer/inner) requires custom
+    // DER-level synthesis since neither OpenSSL nor pyca will produce a
+    // mismatched cert. Out of scope per the bead.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn signature_algorithm_match_passes_on_well_formed_rsa_fixture() {
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        let cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Any, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn signature_algorithm_match_passes_on_well_formed_ecdsa_fixture() {
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        let cert = load_cert("leaf-p256-365d-san-eku.der");
+        assert_eq!(
+            lint.check_cert(&cert, SubjectKind::Any, 0),
+            LintResult::Pass
+        );
+    }
+
+    #[test]
+    fn signature_algorithm_match_metadata_matches_rfc_section() {
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        assert_eq!(lint.id(), "rfc5280.cert.signature_algorithm_match");
+        assert_eq!(lint.citation(), "RFC 5280 §4.1.1.2");
+        assert_eq!(lint.severity(), Severity::Error);
+        assert_eq!(lint.scope(), Scope::Certificate);
+        assert_eq!(lint.applies_to(), SubjectKind::Any);
+        assert_eq!(lint.spec_section_id(), Some("rfc5280-4.1.1.2"));
+        assert_eq!(
+            lint.spec_url(),
+            Some("https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.2")
         );
     }
 }

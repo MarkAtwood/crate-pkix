@@ -6,6 +6,62 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-lint` 0.9.0: three deferred RFC-conformance lints (2026-05-13)
+
+`pkix-lint` ships the three remaining lints from the PKIX-9vnx.9.2.1
+candidate list ([PKIX-9vnx.9.2.1.1]), closing out the 8-of-8 acceptance
+criterion for the parent [PKIX-9vnx.9.2.1] batch.
+
+Three new public `Lint` impls:
+
+- `rfc5280::Rfc5280SanRequiredWhenSubjectEmptyLint` — RFC 5280 §4.2.1.6:
+  certificates whose Subject is the zero-length `RDNSequence` MUST
+  include a `subjectAltName` extension marked as critical. Lint is a
+  no-op (`Pass`) for certs with a non-empty Subject; on empty-Subject
+  certs it fires `Error` if SAN is absent or not critical.
+- `rfc5280::Rfc5280SignatureAlgorithmMatchLint` — RFC 5280 §4.1.1.2:
+  the outer `Certificate.signatureAlgorithm` MUST equal the inner
+  `tbsCertificate.signature`. Compares both fields structurally using
+  x509-cert's `AlgorithmIdentifier` `PartialEq` impl, which catches
+  both OID mismatches and parameter-encoding inconsistencies (e.g.
+  NULL parameters on one side, absent parameters on the other for
+  RSA-PKCS1 — RFC 4055 §2.1 mandates NULL; real-world encoder bugs
+  produce mismatches).
+- `rfc8398::Rfc8398SmimeMailboxEquivalenceLint` — RFC 8398 §3: when
+  both `rfc822Name` and `id-on-SmtpUTF8Mailbox` `OtherName` SAN
+  entries are present, every entry of one kind must match some entry
+  of the other under byte-equal local-parts and IDN A-label ↔ U-label
+  equivalent domains. Domain conversion uses the workspace `idna`
+  crate. The pure equivalence helper (`mailbox_equivalent`) is
+  unit-tested exhaustively against a hand-written oracle table cross-
+  checked with `python3 -c 'import idna; print(idna.encode(...))'`
+  for IDN reference encodings.
+
+Tests follow the existing module pattern: at least one positive case
+against an existing `pkix-path/tests/fixtures/policy-checks/` fixture,
+plus a metadata test pinning `id`, `citation`, `severity`, `scope`,
+`applies_to`, `spec_section_id`, and `spec_url`. Negative cases for
+all three lints require fixture generation outside the well-behaved
+OpenSSL / pyca production path (empty-subject leaf, mismatched
+outer/inner sigalg, disagreeing rfc822Name/SmtpUTF8Mailbox pair); per
+the bead, those fixtures are explicitly out of scope here and the
+positive-only test coverage is the shippable bar.
+
+19 new tests in total (3 lint positive-path cases per RFC module + 3
+metadata tests + 9 `mailbox_equivalent` helper tests = 19, contributing
+to the lint test count rising from 222 to 241).
+
+One new dependency: `idna` (workspace pin, `default-features = false`,
+`features = ["alloc", "compiled_data"]`) added to `pkix-lint`. The
+workspace already depended on it transitively via `pkix-identity`.
+
+`pkix-lint` minor-bumped to 0.9.0 (additive: new public types and a
+new dependency). No breaking changes; existing 0.8 callers compile
+unchanged.
+
+[PKIX-9vnx.9.2.1]: https://github.com/MarkAtwood/crate-pkix  "RFC-conformance shape-check lints batch"
+[PKIX-9vnx.9.2.1.1]: https://github.com/MarkAtwood/crate-pkix  "Three deferred RFC-conformance lints"
+
 ### `pkix-lint` 0.8.0: `Severity::Notice` variant (2026-05-12)
 
 `pkix-lint::Severity` gains a `Notice` variant slotted between `Info`
