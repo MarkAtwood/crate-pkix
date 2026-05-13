@@ -357,4 +357,62 @@ mod tests {
         let v: pkix_path::DefaultVerifier = DefaultVerifier;
         accepts(v);
     }
+
+    /// `Error::Identity` Display delegates to the inner `IdentityError`'s
+    /// Display, prefixed with `"identity binding: "`. This test pins the
+    /// behaviour so the prefix doesn't drift silently across refactors.
+    #[test]
+    fn error_identity_display_includes_prefix_and_inner() {
+        let err = Error::Identity(IdentityError::NoMatchingSan);
+        let rendered = format!("{err}");
+        assert!(
+            rendered.starts_with("identity binding: "),
+            "expected `identity binding: ` prefix, got: {rendered:?}"
+        );
+        assert!(
+            rendered.contains("no Subject Alternative Name entry matched the identity"),
+            "expected inner IdentityError Display text, got: {rendered:?}"
+        );
+    }
+
+    /// Every `Error` variant must produce non-empty Display output. Guards
+    /// against accidentally adding a variant whose match arm forgets to
+    /// write anything to the formatter.
+    #[test]
+    fn error_display_all_variants_non_empty() {
+        // Constructing one instance of each variant covers the Error
+        // arms; if a new top-level variant is added without updating
+        // this list, the new variant will not be exercised here — but
+        // both source enums are non_exhaustive so adding a new variant
+        // is itself a soft signal to revisit Display coverage.
+        let path_err = pkix_path::Error::NoTrustedPath;
+        let revoc_err = pkix_revocation::Error::CrlExpired;
+        let cases: &[Error] = &[
+            Error::Path(path_err),
+            Error::Revocation(revoc_err),
+            Error::Identity(IdentityError::MissingSan),
+            Error::Identity(IdentityError::MalformedSan),
+            Error::Identity(IdentityError::MalformedInput),
+        ];
+        for err in cases {
+            let s = format!("{err}");
+            assert!(!s.is_empty(), "Display produced empty string for {err:?}");
+        }
+    }
+
+    /// `Error::source()` returns the wrapped error so callers can walk the
+    /// chain with `std::error::Error::source`. Pinned for `Error::Identity`
+    /// specifically because it was added in PKIX-fmtv.11.2 / .12.2 and the
+    /// pattern is easy to forget.
+    #[test]
+    fn error_identity_source_returns_inner() {
+        use std::error::Error as _;
+        let err = Error::Identity(IdentityError::NoMatchingSan);
+        let src = err.source().expect("Error::Identity must report a source");
+        // Source's Display should match IdentityError's Display.
+        assert_eq!(
+            format!("{src}"),
+            format!("{}", IdentityError::NoMatchingSan)
+        );
+    }
 }
