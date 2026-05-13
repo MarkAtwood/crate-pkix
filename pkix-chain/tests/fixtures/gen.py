@@ -95,14 +95,32 @@ def build_root():
 
 
 def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=False,
-               ocsp_no_check=False):
+               ocsp_no_check=False, key_usage=None):
     """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth, non-critical.
 
     When ``ocsp_no_check=True``, attach the RFC 6960 §4.2.2.2.1 OCSPNoCheck
     extension (OID 1.3.6.1.5.5.7.48.1.5) to the leaf.
+
+    When ``key_usage`` is provided, it MUST be an ``x509.KeyUsage`` instance;
+    it replaces the default ``digitalSignature + keyEncipherment`` KU bits.
+    Used by the TSA fixtures to comply with RFC 3161 §2.1 / §2.3 (TSA keys
+    are used only for signing — the corresponding KU shape is
+    ``digitalSignature`` and/or ``nonRepudiation``).
     """
     if eku is None:
         eku = [x509.ExtendedKeyUsageOID.SERVER_AUTH]
+    if key_usage is None:
+        key_usage = x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=True,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=False,
+            crl_sign=False,
+            encipher_only=False,
+            decipher_only=False,
+        )
     key = ec.generate_private_key(ec.SECP256R1())
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test leaf")])
     builder = (
@@ -114,20 +132,7 @@ def build_leaf(root_key, root_cert, *, sans, serial, eku=None, eku_critical=Fals
         .not_valid_before(NOT_BEFORE)
         .not_valid_after(NOT_AFTER)
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(
-            x509.KeyUsage(
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=True,
-                data_encipherment=False,
-                key_agreement=False,
-                key_cert_sign=False,
-                crl_sign=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
+        .add_extension(key_usage, critical=True)
         .add_extension(
             x509.ExtendedKeyUsage(eku),
             critical=eku_critical,
@@ -190,27 +195,46 @@ def main():
     write_der("leaf-codesigning.der", leaf_codesign)
 
     # Time Stamping Authority leaf: RFC 3161 §2.3 -- EKU MUST be critical
-    # and contain ONLY id-kp-timeStamping.
+    # and contain ONLY id-kp-timeStamping. KU is restricted to
+    # digitalSignature (and/or nonRepudiation) — a TSA key only signs
+    # time-stamp tokens (RFC 3161 §2.1 #10). Matches OpenSSL's
+    # `-purpose timestampsign` enforcement.
+    tsa_key_usage = x509.KeyUsage(
+        digital_signature=True,
+        content_commitment=False,
+        key_encipherment=False,
+        data_encipherment=False,
+        key_agreement=False,
+        key_cert_sign=False,
+        crl_sign=False,
+        encipher_only=False,
+        decipher_only=False,
+    )
     leaf_tsa_ok = build_leaf(
         root_key, root_cert,
         sans=None,
         serial=6,
         eku=[x509.ExtendedKeyUsageOID.TIME_STAMPING],
         eku_critical=True,
+        key_usage=tsa_key_usage,
     )
     write_der("leaf-timestamping.der", leaf_tsa_ok)
 
-    # Negative: timeStamping EKU but NOT critical.
+    # Negative: timeStamping EKU but NOT critical. KU is RFC 3161-compliant
+    # so the criticality check is the lone reason for rejection.
     leaf_tsa_not_critical = build_leaf(
         root_key, root_cert,
         sans=None,
         serial=7,
         eku=[x509.ExtendedKeyUsageOID.TIME_STAMPING],
         eku_critical=False,
+        key_usage=tsa_key_usage,
     )
     write_der("leaf-timestamping-not-critical.der", leaf_tsa_not_critical)
 
     # Negative: timeStamping EKU critical but NOT sole (extra EKU value).
+    # KU is RFC 3161-compliant so the sole-EKU check is the lone reason
+    # for rejection.
     leaf_tsa_not_sole = build_leaf(
         root_key, root_cert,
         sans=None,
@@ -220,8 +244,34 @@ def main():
             x509.ExtendedKeyUsageOID.CODE_SIGNING,
         ],
         eku_critical=True,
+        key_usage=tsa_key_usage,
     )
     write_der("leaf-timestamping-not-sole.der", leaf_tsa_not_sole)
+
+    # Negative: TSA-compliant EKU (critical + sole id-kp-timeStamping) but
+    # KU = digitalSignature + keyEncipherment violates the RFC 3161 §2.1 #10
+    # "key generated exclusively for this purpose" requirement
+    # (and OpenSSL `-purpose timestampsign` enforces this as a hard reject).
+    # Used by pkix-chain to verify the wrapper-side KU shape check.
+    leaf_tsa_bad_ku = build_leaf(
+        root_key, root_cert,
+        sans=None,
+        serial=11,
+        eku=[x509.ExtendedKeyUsageOID.TIME_STAMPING],
+        eku_critical=True,
+        key_usage=x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=True,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=False,
+            crl_sign=False,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+    )
+    write_der("leaf-timestamping-bad-ku.der", leaf_tsa_bad_ku)
 
     # OCSP responder leaf: RFC 6960 §4.2.2.2 -- delegated responder
     # cert MUST carry id-kp-OCSPSigning. The delegation (cert signed

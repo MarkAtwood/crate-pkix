@@ -11,9 +11,10 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-no-san.der` | end-entity | EE signed by `root`, EKU=serverAuth, **no SAN extension** |
 | `leaf-san-alice-example.der` | end-entity | EE signed by `root`, EKU=emailProtection, SAN=rfc822Name:alice@example.com |
 | `leaf-codesigning.der` | end-entity | EE signed by `root`, EKU=codeSigning, no SAN |
-| `leaf-timestamping.der` | end-entity | EE signed by `root`, EKU=timeStamping (critical, sole) — RFC 3161 §2.3 compliant TSA |
-| `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical) — RFC 3161 §2.3 negative case |
-| `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical) — RFC 3161 §2.3 negative case |
+| `leaf-timestamping.der` | end-entity | EE signed by `root`, EKU=timeStamping (critical, sole), KU=digitalSignature only — RFC 3161 §2.3 + §2.1 #10 compliant TSA |
+| `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical), KU=digitalSignature — RFC 3161 §2.3 negative case |
+| `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical), KU=digitalSignature — RFC 3161 §2.3 negative case |
+| `leaf-timestamping-bad-ku.der` | end-entity | EE signed by `root`, EKU=timeStamping (critical, sole), KU=digitalSignature+keyEncipherment — RFC 3161 §2.1 #10 negative case (PKIX-7cac) |
 | `leaf-ocsp-responder.der` | end-entity | EE signed by `root`, EKU=OCSPSigning — RFC 6960 §4.2.2.2 delegated responder |
 | `leaf-ocsp-responder-nocheck.der` | end-entity | EE signed by `root`, EKU=OCSPSigning + `id-pkix-ocsp-nocheck` — RFC 6960 §4.2.2.2.1 |
 | `root-wrong-issuer.der` | trust anchor (alt) | P-256 self-signed CA with a DIFFERENT subject DN than `root` — used to drive the wrapper-level OCSP-delegation DN-mismatch negative test |

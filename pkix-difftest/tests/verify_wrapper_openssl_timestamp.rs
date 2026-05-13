@@ -4,28 +4,22 @@
 //! -purpose timestampsign` over the timestamping fixtures in
 //! `pkix-chain/tests/fixtures/`.
 //!
-//! ## Surfaced divergence: RFC 3161 §2.3 KeyUsage shape
+//! ## RFC 3161 KeyUsage shape (PKIX-7cac, shipped)
 //!
-//! OpenSSL's `-purpose timestampsign` strictly enforces RFC 3161
-//! §2.3: the TSA cert's KeyUsage MUST contain ONLY `digitalSignature`
-//! and/or `nonRepudiation`. `keyEncipherment`, `keyAgreement`, etc.
-//! trigger "unsuitable certificate purpose" rejection.
+//! OpenSSL's `-purpose timestampsign` strictly enforces a TSA-specific
+//! KeyUsage shape: only `digitalSignature` and/or `nonRepudiation`
+//! bits may be set. `keyEncipherment`, `keyAgreement`, etc. trigger
+//! "unsuitable certificate purpose" rejection.
 //!
-//! pkix-chain's `leaf-timestamping.der` fixture (authored by pyca's
-//! gen.py for the smoke surface) carries
-//! `digitalSignature + keyEncipherment` in KU. Under
-//! `verify_time_stamper`, the wrapper does NOT check KU shape — only
-//! EKU presence / criticality / sole-EKU — so the fixture validates.
-//! OpenSSL rejects.
+//! `pkix_chain::verify_time_stamper` now enforces the same rule under
+//! the RFC 3161 §2.1 #10 "key generated exclusively for this purpose"
+//! reading (PKIX-7cac). The previous fixture
+//! `leaf-timestamping.der` (KU = digitalSignature + keyEncipherment)
+//! was regenerated to comply, and a new negative fixture
+//! `leaf-timestamping-bad-ku.der` exercises the wrapper's KU-shape
+//! check directly.
 //!
-//! The diff therefore records `happy_path` as **Rust-looser**: this
-//! is a real semantic gap, tracked separately (see baseline-
-//! verify-openssl.md for the follow-up bead). The
-//! `summary.looser == 0` assertion is intentionally lifted here.
-//!
-//! The remaining cases (`eku_not_critical`, `eku_not_sole`,
-//! `before_not_before`) exercise the failure modes where both sides
-//! reject; they agree.
+//! All cases now agree.
 //!
 //! ## Running
 //!
@@ -92,10 +86,9 @@ struct TsCase<'a> {
 fn ts_cases() -> Vec<TsCase<'static>> {
     use RustOutcome::*;
     vec![
-        // KU=digitalSignature+keyEncipherment violates RFC 3161 §2.3.
-        // OpenSSL rejects; verify_time_stamper accepts. Tracked as a
-        // workspace follow-up (see baseline-verify-openssl.md).
-        TsCase { name: "happy_path_rfc3161_ku_violation", fixture: "leaf-timestamping.der",              time: NOW,    expected_rust: Ok,   known_divergence: true },
+        // Happy path: RFC 3161-compliant TSA cert (critical+sole timeStamping
+        // EKU, signing-only KU). Both sides pass.
+        TsCase { name: "happy_path",                      fixture: "leaf-timestamping.der",              time: NOW,    expected_rust: Ok,   known_divergence: false },
 
         // EKU not critical — wrapper rejects with ProfileViolation (RFC 3161 §2.3
         // mandates criticality); OpenSSL also rejects (different reason).
@@ -104,6 +97,11 @@ fn ts_cases() -> Vec<TsCase<'static>> {
         // EKU not sole — wrapper rejects with ProfileViolation (RFC 3161 §2.3
         // mandates sole); OpenSSL also rejects.
         TsCase { name: "eku_not_sole",                    fixture: "leaf-timestamping-not-sole.der",     time: NOW,    expected_rust: ProfileViolation, known_divergence: false },
+
+        // KU shape violation: digitalSignature + keyEncipherment. Wrapper
+        // rejects via PKIX-7cac KU-shape check; OpenSSL rejects via the
+        // same rule under `-purpose timestampsign`.
+        TsCase { name: "ku_shape_violation",              fixture: "leaf-timestamping-bad-ku.der",       time: NOW,    expected_rust: ProfileViolation, known_divergence: false },
 
         // Before notBefore — both sides reject on chain validity.
         TsCase { name: "before_not_before",               fixture: "leaf-timestamping.der",              time: BEFORE, expected_rust: Path, known_divergence: false },
@@ -180,15 +178,11 @@ fn verify_time_stamper_diff_against_openssl_timestampsign() {
         s = if any_known_divergence { "" } else { "s" },
     );
 
-    // The Rust-looser assertion is lifted for this purpose because the
-    // happy-path case has a documented intentional divergence (fixture
-    // violates RFC 3161 §2.3 KU shape, wrapper does not check it). The
-    // test still pins case-by-case Rust outcomes against expected, and
-    // surfaces the divergence visibly in the matrix.
+    // PKIX-7cac shipped: the wrapper now enforces the same KU shape rule
+    // as OpenSSL `-purpose timestampsign`. There are no known divergences.
     //
-    // What we DO assert: every non-`known_divergence` case must agree.
-    // Catches regressions where the wrapper starts behaving differently
-    // on cases where we expect agreement.
+    // Hard assertion: every row agrees. Catches regressions in either
+    // direction (wrapper newly stricter or newly looser).
     let unexpected = rows
         .iter()
         .filter(|r| !r.known_divergence && r.kind != AgreementKind::Agree)
@@ -197,6 +191,20 @@ fn verify_time_stamper_diff_against_openssl_timestampsign() {
         unexpected, 0,
         "timestamp: unexpected disagreement on a row not flagged as \
          known_divergence; investigate"
+    );
+    assert_eq!(
+        summary.looser, 0,
+        "timestamp: Rust-looser cases observed; \
+         verify_time_stamper should match OpenSSL `-purpose timestampsign`"
+    );
+    assert_eq!(
+        summary.stricter, 0,
+        "timestamp: Rust-stricter cases observed; \
+         verify_time_stamper should match OpenSSL `-purpose timestampsign`"
+    );
+    assert!(
+        !any_known_divergence,
+        "timestamp: no rows should be flagged known_divergence anymore (PKIX-7cac shipped)"
     );
 }
 

@@ -6,6 +6,21 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Changed
+
+- `verify_time_stamper` now enforces an RFC 3161 §2.1 #10 KeyUsage
+  shape check on the TSA leaf: when the `KeyUsage` extension is
+  present it MUST contain only `digitalSignature` and/or
+  `nonRepudiation`. Any of `keyEncipherment`, `dataEncipherment`,
+  `keyAgreement`, `keyCertSign`, `cRLSign`, `encipherOnly`, or
+  `decipherOnly` triggers `Error::ProfileViolation`. Absent
+  `KeyUsage` is accepted (RFC 5280 §4.2.1.3 does not require the
+  extension on EE certs). This matches OpenSSL `-purpose
+  timestampsign` behaviour exactly. The wrapper-level differential
+  baseline (`baseline-verify-openssl.md`) now records 5/5 agreement
+  with zero known divergences for the time-stamping wrapper.
+  (PKIX-7cac.)
+
 ### Added
 
 - `Verifier<'a, V, R>` — reusable verifier struct that packages trust
