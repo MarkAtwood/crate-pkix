@@ -106,6 +106,20 @@ pub enum Error {
         /// Fixed-string description of which profile invariant was violated.
         reason: &'static str,
     },
+    /// An RFC 6960 §4.2.2.2 OCSP-responder delegation check failed.
+    ///
+    /// Produced only by [`verify_ocsp_responder`]. Distinct from
+    /// [`Error::ProfileViolation`] so callers can programmatically
+    /// distinguish "the responder cert was not delegated by the
+    /// expected issuer" from other profile-level failures.
+    ///
+    /// `reason` is a fixed-string description suitable for logging and
+    /// diagnostic display. It is not parsed by the engine; pattern-match
+    /// on the variant rather than the inner string.
+    OcspDelegation {
+        /// Fixed-string description of which delegation invariant was violated.
+        reason: &'static str,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -115,6 +129,7 @@ impl core::fmt::Display for Error {
             Self::Revocation(e) => write!(f, "revocation: {e}"),
             Self::Identity(e) => write!(f, "identity binding: {e}"),
             Self::ProfileViolation { reason } => write!(f, "profile violation: {reason}"),
+            Self::OcspDelegation { reason } => write!(f, "ocsp responder delegation: {reason}"),
         }
     }
 }
@@ -125,7 +140,7 @@ impl std::error::Error for Error {
             Self::Path(e) => Some(e),
             Self::Revocation(e) => Some(e),
             Self::Identity(e) => Some(e),
-            Self::ProfileViolation { .. } => None,
+            Self::ProfileViolation { .. } | Self::OcspDelegation { .. } => None,
         }
     }
 }
@@ -728,6 +743,248 @@ where
     Ok(validated)
 }
 
+/// Verify a certificate chain for delegated OCSP responder use.
+///
+/// Composes [`verify_chain`] under a [`Profile`] that requires the
+/// `id-kp-OCSPSigning` Extended Key Usage with two RFC 6960 §4.2.2.2
+/// post-validation checks specific to OCSP responder certs:
+///
+/// 1. **Delegation** — the responder cert at `chain[0]` MUST be issued
+///    by the specific `issuer` argument (RFC 4518 string-prep DN
+///    equality between `chain[0].tbs.issuer` and `issuer.tbs.subject`).
+///    The signature half is already enforced by [`verify_chain`] when
+///    `chain[1]` is supplied; the DN check additionally pins the
+///    delegation to a caller-named CA.
+/// 2. **`id-pkix-ocsp-nocheck`** — when the responder cert at
+///    `chain[0]` carries the `id-pkix-ocsp-nocheck` extension
+///    (OID 1.3.6.1.5.5.7.48.1.5, RFC 6960 §4.2.2.2.1), the caller's
+///    `revocation` checker is bypassed for `chain[0]` only.
+///    Otherwise infinite-loop avoidance would force the caller to ship
+///    a custom checker. Revocation on every other cert in the chain
+///    runs normally.
+///
+/// # Scope: delegated responders only
+///
+/// This wrapper handles delegated OCSP responder certs (RFC 6960
+/// §4.2.2.2: a separate end-entity cert signed by the CA, carrying
+/// `id-kp-OCSPSigning`). The CA-direct case — where the CA signs OCSP
+/// responses with its own CA key, with no separate responder cert —
+/// is not an "OCSP responder validation" problem at the API surface
+/// and is not handled here. CA-direct callers validate the CA cert
+/// itself with [`verify_chain`] using a profile that does not require
+/// `id-kp-OCSPSigning` (a normal CA cert does not carry that EKU).
+///
+/// # Worked example — CA-direct alternative
+///
+/// ```rust,no_run
+/// use pkix_chain::{verify_chain, DefaultVerifier, NoRevocation, TrustAnchor};
+/// use pkix_profiles::{Profile, Rfc5280Profile};
+/// use x509_cert::Certificate;
+///
+/// # fn demo(ca_cert: Certificate, anchors: Vec<TrustAnchor>, now: u64)
+/// #     -> Result<(), pkix_chain::Error> {
+/// // CA-direct OCSP: the CA cert itself signs OCSP responses. Validate
+/// // it as a normal cert with verify_chain (no OCSP-Signing EKU required).
+/// let policy = Rfc5280Profile.policy(now);
+/// let _ = verify_chain(
+///     &[ca_cert],
+///     &anchors,
+///     &policy,
+///     &DefaultVerifier,
+///     &NoRevocation,
+/// )?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
+/// that need a custom verifier should drop down to [`verify_chain`] and
+/// replicate the delegation + nocheck checks.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the responder cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `issuer`     — the CA cert whose status the responder asserts; must DN-match
+///   `chain[0]`'s issuer field
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   typically [`pkix_profiles::BasicOcspResponderProfile`]
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline);
+///   bypassed for `chain[0]` when the responder cert carries
+///   `id-pkix-ocsp-nocheck`
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed (including the
+///   profile's `id-kp-OCSPSigning` EKU presence check).
+/// - [`Error::Revocation`] — a cert in the chain other than `chain[0]`
+///   was revoked, or `chain[0]` was revoked without the
+///   `id-pkix-ocsp-nocheck` extension being present.
+/// - [`Error::OcspDelegation`] — the responder cert was not delegated
+///   by the supplied `issuer` (issuer-DN mismatch).
+pub fn verify_ocsp_responder<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    issuer: &Certificate,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    if chain.is_empty() {
+        return Err(Error::OcspDelegation {
+            reason: "OCSP responder chain must contain at least the responder cert",
+        });
+    }
+
+    // RFC 6960 §4.2.2.2.1: if chain[0] carries id-pkix-ocsp-nocheck, the
+    // responder cert itself MUST NOT be revocation-checked (otherwise a
+    // recursive OCSP loop is required).
+    let bypass_revocation_on_leaf = has_ocsp_no_check(&chain[0]);
+    let shim = NoCheckShim {
+        inner: revocation,
+        leaf_id: if bypass_revocation_on_leaf {
+            Some(LeafIdent::of(&chain[0]))
+        } else {
+            None
+        },
+    };
+
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, &shim)?;
+
+    verify_responder_is_delegated_by(&chain[0], issuer)?;
+
+    Ok(validated)
+}
+
+/// RFC 6960 §4.2.2.2: enforce that the responder cert at `chain[0]` is
+/// delegated by `issuer`.
+///
+/// Specifically, the responder cert's issuer DN must equal the issuer
+/// cert's subject DN under RFC 4518 string prep. The cryptographic
+/// signature check (responder cert signed by `issuer.spki`) is already
+/// covered by [`verify_chain`] when `issuer` appears in the chain;
+/// re-verifying it here would be redundant. The DN equality pins the
+/// delegation to a caller-named CA, which is the assertion the
+/// wrapper's API documents.
+fn verify_responder_is_delegated_by(
+    responder: &Certificate,
+    issuer: &Certificate,
+) -> crate::Result<()> {
+    if pkix_path::names_match(
+        &responder.tbs_certificate.issuer,
+        &issuer.tbs_certificate.subject,
+    ) {
+        Ok(())
+    } else {
+        Err(Error::OcspDelegation {
+            reason: "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
+                     (RFC 6960 §4.2.2.2 delegation requirement)",
+        })
+    }
+}
+
+/// Return `true` iff `cert` carries the `id-pkix-ocsp-nocheck`
+/// extension (OID 1.3.6.1.5.5.7.48.1.5, RFC 6960 §4.2.2.2.1).
+///
+/// The extension is informational and carries no payload (DER `NULL`
+/// is permitted by some implementations, empty `OCTET STRING` value is
+/// the spec-compliant encoding). Presence alone is the signal; this
+/// helper does not parse the value.
+fn has_ocsp_no_check(cert: &Certificate) -> bool {
+    const OID_OCSP_NO_CHECK: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.5");
+
+    cert.tbs_certificate
+        .extensions
+        .as_ref()
+        .is_some_and(|exts| exts.iter().any(|e| e.extn_id == OID_OCSP_NO_CHECK))
+}
+
+/// Stable identifier for the OCSP responder leaf cert, used by
+/// [`NoCheckShim`] to recognize "this is the cert we should bypass
+/// revocation on" inside the [`RevocationChecker`] callback.
+///
+/// The trait receives `&Certificate` without a chain index, so the
+/// shim has to identify the leaf by content. RFC 5280 §4.1.2.2
+/// requires the (issuer DN, serial number) pair to uniquely identify a
+/// certificate within an issuer's scope, which is the strongest
+/// stability guarantee available here without re-serializing the cert
+/// to DER. The pair is compared via cheap derived equality on the
+/// already-parsed `x509-cert` fields.
+struct LeafIdent<'a> {
+    issuer: &'a x509_cert::name::Name,
+    serial: &'a x509_cert::serial_number::SerialNumber,
+}
+
+impl<'a> LeafIdent<'a> {
+    fn of(cert: &'a Certificate) -> Self {
+        Self {
+            issuer: &cert.tbs_certificate.issuer,
+            serial: &cert.tbs_certificate.serial_number,
+        }
+    }
+
+    fn matches(&self, cert: &Certificate) -> bool {
+        // Serial numbers are bytewise opaque (RFC 5280 §4.1.2.2: positive
+        // INTEGER up to 20 octets). Issuer DN is the same `Name` type
+        // pkix_path::names_match operates on; for the leaf-identity check
+        // we use derived `PartialEq` (byte-equal) since both sides come
+        // from the same DER encoder and the issuer in chain[0].issuer ==
+        // chain[0].issuer trivially.
+        self.serial == &cert.tbs_certificate.serial_number
+            && self.issuer == &cert.tbs_certificate.issuer
+    }
+}
+
+/// `RevocationChecker` shim that short-circuits the check for the
+/// designated OCSP responder leaf cert (RFC 6960 §4.2.2.2.1
+/// `id-pkix-ocsp-nocheck`) and delegates every other call to the
+/// caller-supplied checker.
+///
+/// Constructed with `leaf_id = None` to disable the bypass entirely,
+/// which keeps the shim's behavior byte-equivalent to the inner
+/// checker on chains that do not carry `id-pkix-ocsp-nocheck`.
+struct NoCheckShim<'a, R: RevocationChecker> {
+    inner: &'a R,
+    leaf_id: Option<LeafIdent<'a>>,
+}
+
+impl<R: RevocationChecker> RevocationChecker for NoCheckShim<'_, R> {
+    fn check_revocation(
+        &self,
+        cert: &Certificate,
+        issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        if let Some(leaf) = &self.leaf_id {
+            if leaf.matches(cert) {
+                return Ok(());
+            }
+        }
+        self.inner.check_revocation(cert, issuer)
+    }
+
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        // A single-cert chain [responder] reaches this method instead of
+        // check_revocation. Still honor the nocheck bypass.
+        if let Some(leaf) = &self.leaf_id {
+            if leaf.matches(cert) {
+                return Ok(());
+            }
+        }
+        self.inner.check_revocation_against_anchor(cert, anchor)
+    }
+}
+
 /// RFC 3161 §2.3: enforce that the TSA certificate's `ExtendedKeyUsage`
 /// extension is critical and contains only `id-kp-timeStamping`.
 ///
@@ -842,6 +1099,9 @@ mod tests {
             Error::Identity(IdentityError::MalformedInput),
             Error::ProfileViolation {
                 reason: "test violation",
+            },
+            Error::OcspDelegation {
+                reason: "test delegation failure",
             },
         ];
         for err in cases {

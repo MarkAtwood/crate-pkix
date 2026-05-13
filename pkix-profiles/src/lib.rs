@@ -34,6 +34,7 @@
 //! | [`BasicSmimeProfile`] | [`basic_smime_policy`] | RFC 8551 §3 | id-kp-emailProtection EKU + rfc822Name SAN |
 //! | [`BasicCodeSigningProfile`] | [`basic_code_signing_policy`] | RFC 5280 §4.2.1.12 | id-kp-codeSigning EKU |
 //! | [`BasicTimeStampingProfile`] | [`basic_time_stamping_policy`] | RFC 3161 §2.3 | id-kp-timeStamping EKU |
+//! | [`BasicOcspResponderProfile`] | [`basic_ocsp_responder_policy`] | RFC 6960 §4.2.2.2 | id-kp-OCSPSigning EKU |
 //!
 //! For CA/Browser Forum profile content (TLS BR, S/MIME BR, Code Signing BR,
 //! SC-081 phased validity caps), use [`pkix-profiles-cabf`].
@@ -138,6 +139,7 @@ const ID_KP_CLIENT_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
 const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
 const ID_KP_TIME_STAMPING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
+const ID_KP_OCSP_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.9");
 
 // ---------------------------------------------------------------------------
 // RFC-baseline profiles
@@ -384,6 +386,59 @@ impl Profile for BasicTimeStampingProfile {
     }
 }
 
+/// Basic OCSP responder end-entity profile
+/// (RFC 6960 §4.2.2.2 + `id-kp-OCSPSigning` EKU).
+///
+/// The minimum structural constraint that any delegated OCSP responder
+/// end-entity certificate must satisfy is the `id-kp-OCSPSigning`
+/// Extended Key Usage (1.3.6.1.5.5.7.3.9). RFC 6960 §4.2.2.2
+/// additionally requires that the responder cert be signed by the same
+/// CA whose certs the responder asserts revocation status on; that
+/// **delegation** check is enforced at the wrapper layer
+/// (`pkix_chain::verify_ocsp_responder`) — the profile alone guarantees
+/// only EKU presence.
+///
+/// This profile targets the **delegated** responder case. The
+/// CA-direct case (the issuing CA signs OCSP responses with its own
+/// CA key, no separate responder cert) is not an OCSP-responder
+/// validation problem at the API surface — callers in that case
+/// validate the CA cert itself with `pkix_chain::verify_chain`. See
+/// `pkix_chain::verify_ocsp_responder` rustdoc for a worked example.
+///
+/// No SAN requirement: an OCSP responder cert has no caller-supplied
+/// identity target.
+///
+/// The free-function alias [`basic_ocsp_responder_policy`] is
+/// equivalent to `BasicOcspResponderProfile.policy(now_unix)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct BasicOcspResponderProfile;
+
+impl Profile for BasicOcspResponderProfile {
+    fn id(&self) -> &'static str {
+        "ietf.ocsp-responder-basic"
+    }
+
+    fn version(&self) -> &'static str {
+        "RFC 6960 §4.2.2.2"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        let mut p = ValidationPolicy::new(now_unix);
+        // RFC 6960 §4.2.2.2: id-kp-OCSPSigning is the EKU value for
+        // delegated OCSP responder certificates. The delegation check
+        // (responder cert signed by the same issuer whose status it
+        // asserts) is enforced at the wrapper layer because it
+        // requires a caller-supplied `issuer` argument that
+        // ValidationPolicy cannot carry.
+        p.required_leaf_eku = Some(vec![ID_KP_OCSP_SIGNING]);
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Free-function convenience aliases
 // ---------------------------------------------------------------------------
@@ -497,6 +552,27 @@ pub fn basic_time_stamping_policy(now_unix: u64) -> ValidationPolicy {
     BasicTimeStampingProfile.policy(now_unix)
 }
 
+/// Return a [`ValidationPolicy`] for basic OCSP-responder validation
+/// (RFC 6960 §4.2.2.2 + `id-kp-OCSPSigning` EKU).
+///
+/// Convenience alias for `BasicOcspResponderProfile.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `required_leaf_eku` | `id-kp-OCSPSigning` (1.3.6.1.5.5.7.3.9) | RFC 6960 §4.2.2.2 |
+///
+/// RFC 6960 §4.2.2.2's delegation requirement (responder cert signed
+/// by the same issuer whose status it asserts) and §4.2.2.2.1
+/// `id-pkix-ocsp-nocheck` handling are enforced at the wrapper layer
+/// (`pkix_chain::verify_ocsp_responder`); the profile alone guarantees
+/// only EKU presence.
+#[must_use]
+pub fn basic_ocsp_responder_policy(now_unix: u64) -> ValidationPolicy {
+    BasicOcspResponderProfile.policy(now_unix)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -529,6 +605,10 @@ mod tests {
         assert_eq!(BasicSmimeProfile.id(), "ietf.smime-basic");
         assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
         assert_eq!(BasicTimeStampingProfile.id(), "ietf.time-stamping-basic");
+        assert_eq!(
+            BasicOcspResponderProfile.id(),
+            "ietf.ocsp-responder-basic"
+        );
     }
 
     #[test]
@@ -539,6 +619,10 @@ mod tests {
         assert_eq!(BasicSmimeProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicCodeSigningProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicTimeStampingProfile.policy(NOW).current_time_unix, NOW);
+        assert_eq!(
+            BasicOcspResponderProfile.policy(NOW).current_time_unix,
+            NOW
+        );
     }
 
     #[test]
@@ -592,6 +676,29 @@ mod tests {
     }
 
     #[test]
+    fn basic_ocsp_responder_policy_requires_ocsp_signing_eku() {
+        let p = BasicOcspResponderProfile.policy(NOW);
+        let eku = p.required_leaf_eku.expect("EKU must be required");
+        assert_eq!(eku.len(), 1, "exactly one EKU expected");
+        assert_eq!(eku[0], ID_KP_OCSP_SIGNING);
+        // No SAN requirement (OCSP responder cert has no caller-supplied
+        // identity target).
+        assert!(!p.require_subject_alt_name);
+        assert!(!p.require_rfc822_san);
+    }
+
+    /// OID pin: `id-kp-OCSPSigning` is `1.3.6.1.5.5.7.3.9` per RFC 6960
+    /// §4.2.2.2. Locks the OID against accidental drift.
+    #[test]
+    fn id_kp_ocsp_signing_oid_pinned() {
+        assert_eq!(
+            ID_KP_OCSP_SIGNING.to_string(),
+            "1.3.6.1.5.5.7.3.9",
+            "id-kp-OCSPSigning OID must match RFC 6960 §4.2.2.2"
+        );
+    }
+
+    #[test]
     fn profile_policy_matches_free_function() {
         let via_trait = Rfc5280Profile.policy(NOW);
         let via_fn = rfc5280_policy(NOW);
@@ -633,6 +740,13 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "BasicTimeStampingProfile.policy and basic_time_stamping_policy must agree"
+        );
+
+        let via_trait = BasicOcspResponderProfile.policy(NOW);
+        let via_fn = basic_ocsp_responder_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "BasicOcspResponderProfile.policy and basic_ocsp_responder_policy must agree"
         );
     }
 
