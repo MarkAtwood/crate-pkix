@@ -6,6 +6,61 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-chain` + `pkix-profiles`: use-case verify wrappers (2026-05-12)
+
+Five of seven canonical use-case wrappers from PKIX-fmtv.7's
+five-axis resolution ship in `pkix-chain`, with matching RFC-baseline
+profiles in `pkix-profiles`. Implementation beads:
+[PKIX-fmtv.11.2] (TLS server), [PKIX-fmtv.12.2] (S/MIME signer +
+recipient), [PKIX-fmtv.13.1] (code signer), [PKIX-fmtv.13.2] (time
+stamper).
+
+`pkix-chain` additions:
+
+- `verify_tls_server` — composes `verify_chain` with RFC 6125 SAN
+  hostname binding. Caller pre-parses with `ServerName::dns_name` /
+  `ServerName::ip_address`.
+- `verify_smime_signer` and `verify_smime_recipient` — compose
+  `verify_chain` with RFC 5280 §4.2.1.6 / RFC 8398 mailbox binding.
+  Caller pre-parses with `MailboxName::parse`. Distinct names
+  communicate intent at the call site; the KeyUsage distinction
+  (digitalSignature vs keyEncipherment) is encoded in the
+  caller-supplied `Profile`.
+- `verify_code_signer` — thin composition of `verify_chain` under a
+  profile requiring `id-kp-codeSigning`. No identity binding.
+- `verify_time_stamper` — composes `verify_chain` with a
+  post-validation check enforcing the RFC 3161 §2.3 critical-and-sole
+  `id-kp-timeStamping` EKU rule.
+- `Error::Identity(IdentityError)` — additive non-exhaustive variant
+  for identity-binding failures.
+- `Error::ProfileViolation { reason: &'static str }` — additive
+  non-exhaustive variant for wrapper-side spec invariants that
+  `ValidationPolicy` cannot express (used by `verify_time_stamper`
+  for the RFC 3161 §2.3 rule; reusable by future wrappers).
+- Re-exports `ServerName`, `MailboxName`, `IdentityError`, and
+  `Profile` so callers don't need direct deps on the underlying
+  crates.
+
+`pkix-profiles` additions:
+
+- `BasicCodeSigningProfile` + `basic_code_signing_policy` — RFC 5280
+  EKU baseline (id-kp-codeSigning only, no SAN requirement).
+- `BasicTimeStampingProfile` + `basic_time_stamping_policy` — RFC 3161
+  §2.3 EKU baseline (id-kp-timeStamping). The critical-and-sole rule
+  is enforced at the wrapper layer rather than in the profile.
+
+Two wrappers from the seven-set are deferred pending human design
+clarification: `verify_tls_client` ([PKIX-fmtv.11.2.1]) and
+`verify_ocsp_responder` ([PKIX-fmtv.13.3]). Both filed as
+`human`-labeled beads with concrete option enumerations.
+
+[PKIX-fmtv.11.2]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-fmtv.12.2]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-fmtv.13.1]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-fmtv.13.2]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-fmtv.11.2.1]: https://github.com/MarkAtwood/crate-pkix
+[PKIX-fmtv.13.3]: https://github.com/MarkAtwood/crate-pkix
+
 ### `pkix-lint 0.6.0`: `Lint::rfc_section_id` / `rfc_url` renamed to `spec_section_id` / `spec_url` (2026-05-12)
 
 Additive rename of two `Lint` trait default methods to reflect that the
