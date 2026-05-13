@@ -86,6 +86,14 @@ use signature::Error as SignatureError;
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
+/// Helper module for format-adaptive serde serialization of DER-encodable
+/// types. Public so downstream crates (`pkix-chain`, `pkix-revocation`,
+/// `pkix-truststore`) can reuse the same wire form on their own result
+/// types without redefining the helpers.
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+pub mod serde_der;
+
 /// Re-exported for use with [`TrustAnchor::name_constraints`].
 pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
 
@@ -102,22 +110,116 @@ type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 /// Construction is crate-private. The only way to obtain a `DerError` is
 /// via [`Error::Der`] (and the [`From<der::Error>`] impl on [`Error`]).
 ///
+/// # Serde wire form
+///
+/// When the `serde` feature is enabled, `DerError` (de)serializes via its
+/// `Display` message as a single `String` field. Because `der::Error` does
+/// not itself carry a textual message — its `Display` is derived from
+/// `der::ErrorKind` — round-trip is **lossy**: a deserialized `DerError`
+/// preserves the original `Display` output verbatim but its
+/// [`std::error::Error::source`] is `None` because the original
+/// `der::Error` value cannot be reconstructed from a free-form string.
+/// This trade is acceptable for diagnostic error types; the success type
+/// (`ValidatedPath`) round-trips losslessly because all its fields are
+/// canonically DER-encodable.
+///
 /// [`Display`]: core::fmt::Display
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DerError(der::Error);
+pub struct DerError {
+    /// Original `der::Error` value, when available.
+    ///
+    /// Populated by [`DerError::new`] from a real `der::Error`. `None`
+    /// only when the `DerError` was reconstructed from serialized form;
+    /// in that case [`std::error::Error::source`] returns `None` and the
+    /// Display message is taken from the preserved [`Self::message`].
+    inner: Option<der::Error>,
+    /// Cached Display rendering of `inner`, preserved across serde
+    /// round-trips so that the diagnostic message survives even when
+    /// `inner` cannot be reconstructed.
+    message: BoxStr,
+}
+
+// Internal: use a Box<str> so the struct is `Clone` cheaply and we keep
+// the heap allocation small. A type alias keeps the `#[cfg(not(feature
+// = "std"))]` use-statements in the rest of the file unchanged. Defined
+// here to localise the no_std-vs-std import.
+#[cfg(not(feature = "std"))]
+type BoxStr = alloc::boxed::Box<str>;
+#[cfg(feature = "std")]
+type BoxStr = std::boxed::Box<str>;
+
+impl DerError {
+    /// Construct a `DerError` from a real `der::Error`. Crate-private.
+    pub(crate) fn new(e: der::Error) -> Self {
+        // Pre-render the Display message so it survives serde round-trips
+        // even when `inner` cannot be reconstructed on the deserialize side.
+        #[cfg(feature = "std")]
+        let message = e.to_string().into_boxed_str();
+        #[cfg(not(feature = "std"))]
+        let message = {
+            use core::fmt::Write as _;
+            let mut s = alloc::string::String::new();
+            // Display on der::Error is infallible (uses core::fmt::Result
+            // = (), no I/O); write! against a String returns Ok unless
+            // allocation fails.
+            let _ = write!(&mut s, "{}", e);
+            s.into_boxed_str()
+        };
+        Self {
+            inner: Some(e),
+            message,
+        }
+    }
+}
 
 impl core::fmt::Display for DerError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Display::fmt(&self.0, f)
+        f.write_str(&self.message)
     }
 }
 
 #[cfg(feature = "std")]
 impl std::error::Error for DerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.0)
+        self.inner.as_ref().map(|e| e as &dyn std::error::Error)
     }
 }
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+const _: () = {
+    use serde::{Deserializer, Serializer};
+
+    // Local helper struct that carries only the message; both branches
+    // of the serde impl re-use the same field-name shape so wire form
+    // is stable between encoder and decoder.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct Wire<'a> {
+        // Use Cow to avoid allocating on the serialize side. The
+        // deserialize side always owns the recovered String.
+        #[serde(borrow)]
+        message: Cow<'a, str>,
+    }
+
+    impl serde::Serialize for DerError {
+        fn serialize<S: Serializer>(&self, s: S) -> core::result::Result<S::Ok, S::Error> {
+            Wire {
+                message: Cow::Borrowed(&self.message),
+            }
+            .serialize(s)
+        }
+    }
+
+    impl<'de> serde::Deserialize<'de> for DerError {
+        fn deserialize<D: Deserializer<'de>>(d: D) -> core::result::Result<Self, D::Error> {
+            let Wire { message } = Wire::deserialize(d)?;
+            Ok(Self {
+                inner: None,
+                message: message.into_owned().into_boxed_str(),
+            })
+        }
+    }
+};
 
 /// Errors returned by path validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -412,7 +514,7 @@ impl std::error::Error for Error {
 
 impl From<der::Error> for Error {
     fn from(e: der::Error) -> Self {
-        Self::Der(DerError(e))
+        Self::Der(DerError::new(e))
     }
 }
 
@@ -600,7 +702,8 @@ impl TryFrom<Certificate> for TrustAnchor {
     type Error = DerError;
 
     fn try_from(cert: Certificate) -> core::result::Result<Self, Self::Error> {
-        let name_constraints = try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS).map_err(DerError)?;
+        let name_constraints =
+            try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS).map_err(DerError::new)?;
         Ok(Self {
             subject: cert.tbs_certificate.subject,
             subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
@@ -1952,7 +2055,7 @@ pub fn cert_is_ca(cert: &Certificate) -> core::result::Result<bool, DerError> {
         return Ok(false);
     };
 
-    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).map_err(DerError)?;
+    let bc = BasicConstraints::from_der(ext.extn_value.as_bytes()).map_err(DerError::new)?;
     Ok(bc.ca)
 }
 
@@ -2960,7 +3063,7 @@ fn verify_cert_signature<V: SignatureVerifier>(
         let mut buf = Vec::new();
         cert.tbs_certificate
             .encode_to_vec(&mut buf)
-            .map_err(|e| Error::Der(DerError(e)))?;
+            .map_err(|e| Error::Der(DerError::new(e)))?;
         buf
     };
     let tbs_bytes: &[u8] = &tbs_bytes_owned;

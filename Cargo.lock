@@ -1268,10 +1268,13 @@ dependencies = [
 name = "pkix-path"
 version = "0.3.0"
 dependencies = [
+ "base64ct",
  "der",
  "p256",
  "p384",
  "rsa",
+ "serde",
+ "serde_json",
  "sha2",
  "signature",
  "spki",

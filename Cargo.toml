@@ -168,6 +168,17 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # to think about an async runtime they do not use.
 async-trait = "0.1"
 
-# Serialization (used by pkix-lint serde feature)
-serde     = { version = "1", features = ["derive"] }
+# Serialization (used by pkix-lint serde feature and by the
+# `serde` feature on the load-bearing result types in pkix-path,
+# pkix-chain, pkix-revocation, and pkix-truststore per AGENTS.md
+# non-negotiable #6 / PKIX-2l0v.1).
+serde     = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = "1"
+# base64 codec used by `pkix-path::serde_der` (the format-adaptive DER
+# serde helper) when emitting/parsing human-readable wire forms. We
+# rely on `base64ct` rather than `base64` because base64ct is no_std,
+# constant-time, transitively already in our dep tree via spki, and
+# MSRV-friendly (1.x supports rustc 1.60). default-features = false
+# keeps the crate `no_std`; the `alloc` feature enables the heap
+# `encode_string` / `decode_vec` APIs the helper uses.
+base64ct  = { version = "1", default-features = false, features = ["alloc"] }

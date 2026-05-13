@@ -17,6 +17,13 @@ default   = ["rsa", "p256"]
 # Propagate std to all workspace crates that gate behaviour behind it.
 std = ["der/std", "spki/std", "x509-cert/std", "signature/std"]
 
+# Enable serde::Serialize / serde::Deserialize on the load-bearing result
+# types (ValidatedPath, ValidationPolicy, TrustAnchor, PolicyTreeNode,
+# DnAttrRule, Error, DerError). Format-adaptive DER wire form per
+# `serde_der`: base64 in human-readable serializers, raw bytes in binary
+# serializers. See AGENTS.md non-negotiable #6 and PKIX-2l0v.1.
+serde = ["dep:serde", "dep:base64ct"]
+
 # RustCrypto algorithm backends — disable all to bring your own SignatureVerifier.
 # Currently implemented: RSA-PKCS1v15-SHA-256, RSA-PKCS1v15-SHA-384,
 # RSA-PKCS1v15-SHA-512, ECDSA-P-256-SHA-256, and ECDSA-P-384-SHA-384.
@@ -39,8 +46,16 @@ p384 = { workspace = true, optional = true }
 rsa  = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 
+# Serde support (optional, gated behind the `serde` feature).
+serde    = { workspace = true, optional = true }
+base64ct = { workspace = true, optional = true }
+
 [dev-dependencies]
-# PKITS test vectors and external oracle results go here
+# PKITS test vectors and external oracle results go here.
+# serde_json is used by the `serde` round-trip tests; run with
+# `cargo test -p pkix-path --features serde`.
+serde      = { workspace = true }
+serde_json = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
