@@ -90,6 +90,37 @@ let result = verify_tls_server(
 Path validation runs before identity binding: a chain that fails
 RFC 5280 §6.1 returns `Error::Path(_)`, never `Error::Identity(_)`.
 
+### TLS client authentication identity
+
+`verify_tls_client_dns` and `verify_tls_client_mailbox` compose
+`verify_chain` with an *optional* identity binding. Either function
+accepts `None` to skip identity binding and validate the path only —
+useful for client-auth deployments that read the identity elsewhere
+(typically from the Subject DN). When `Some(_)` is supplied, the
+binding mirrors `verify_tls_server` or `verify_smime_signer`
+respectively. The split between the two functions preserves type
+discipline at the call site rather than introducing an `Identity` enum
+(PKIX-fmtv.11.2.1).
+
+```rust
+use pkix_chain::{verify_tls_client_dns, NoRevocation, ServerName};
+use pkix_profiles::Rfc5280Profile;
+
+let name = ServerName::dns_name("client.example.com")?;
+let result = verify_tls_client_dns(
+    &chain,
+    &anchors,
+    Some(&name),
+    &Rfc5280Profile,
+    unix_now(),
+    &NoRevocation,
+)?;
+```
+
+Production callers should supply a profile asserting `id-kp-clientAuth`
+EKU. The workspace does not yet ship a `BasicTlsClientProfile`; see
+the follow-up bead for the missing profile.
+
 ### S/MIME signer / recipient identity (RFC 5280 §4.2.1.6 / RFC 8398)
 
 `verify_smime_signer` and `verify_smime_recipient` compose `verify_chain`

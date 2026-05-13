@@ -15,6 +15,13 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical) — RFC 3161 §2.3 negative case |
 | `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical) — RFC 3161 §2.3 negative case |
 
+PKIX-fmtv.11.2 client-auth fixtures (EKU=clientAuth):
+
+| Fixture | Role | Contents |
+|---|---|---|
+| `leaf-clientauth-dns.der` | end-entity | EKU=clientAuth, SAN dNSName=`client.example.com` |
+| `leaf-clientauth-mailbox.der` | end-entity | EKU=clientAuth, SAN rfc822Name=`client@example.com` |
+
 PKIX-fmtv.22 hostname-binding corpus (EKU=serverAuth throughout):
 
 | Fixture | Role | Contents |
