@@ -30,10 +30,9 @@
 //!
 //! # Status
 //!
-//! Scaffold-only at version 0.0.0 (PKIX-jy95.7.1): public types and
-//! Send/Sync invariants are pinned; subprocess invocation arrives via
-//! child epics PKIX-jy95.7.2 (`enumerate_lints`), .7.3 (`run_on_cert`
-//! + cache), and .7.4 (`run_on_certs` batch).
+//! Version 0.0.0. [`ZlintBridge::enumerate_lints`] is functional;
+//! per-certificate verdicts (`run_on_cert` + cache, `run_on_certs`
+//! batch) arrive via PKIX-jy95.7.3 and PKIX-jy95.7.4.
 //!
 //! # Design decisions (frozen)
 //!
@@ -57,8 +56,9 @@
 //!
 //! [zlint]: https://github.com/zmap/zlint
 
-use std::path::PathBuf;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
 // Verdict
@@ -326,10 +326,15 @@ impl Default for BridgeConfig {
 ///
 /// # Status
 ///
-/// Scaffold only. [`ZlintBridge::new`] accepts any config without
+/// [`ZlintBridge::new`] currently accepts any config without
 /// validating that the zlint binary exists or is executable —
-/// runtime validation lands with the per-method implementations
-/// (PKIX-jy95.7.2 / .7.3 / .7.4).
+/// validation happens lazily on the first
+/// [`ZlintBridge::enumerate_lints`] / `run_on_cert` /
+/// `run_on_certs` call and surfaces as
+/// [`BridgeError::BinaryNotFound`] /
+/// [`BridgeError::BinaryNotExecutable`]. Eager validation may be
+/// added in a future minor version; the fallible `new` signature
+/// allows that to land additively.
 #[derive(Debug)]
 pub struct ZlintBridge {
     config: BridgeConfig,
@@ -353,6 +358,327 @@ impl ZlintBridge {
     /// Useful for diagnostics and round-trip tests.
     pub fn config(&self) -> &BridgeConfig {
         &self.config
+    }
+
+    /// Enumerate every zlint check in the installed catalog.
+    ///
+    /// Spawns `<zlint_path> -list-lints-json` and parses the
+    /// line-delimited JSON output (one object per check, each with
+    /// `name`, `description`, `citation`, `source`). Severity is
+    /// derived from the check name prefix per zlint's catalog
+    /// convention: `e_*` -> [`Severity::Error`], `w_*` ->
+    /// [`Severity::Warn`], `n_*` -> [`Severity::Notice`].
+    ///
+    /// The returned vector preserves zlint's output order. The
+    /// catalog is static across one zlint binary; consumers that
+    /// call this method repeatedly should cache the result
+    /// externally.
+    ///
+    /// # Errors
+    ///
+    /// - [`BridgeError::BinaryNotFound`] — the zlint binary is not
+    ///   on `PATH` or at the configured path.
+    /// - [`BridgeError::BinaryNotExecutable`] — the binary exists
+    ///   but cannot be executed.
+    /// - [`BridgeError::SubprocessTimeout`] — the zlint subprocess
+    ///   exceeded [`BridgeConfig::timeout`] and was killed.
+    /// - [`BridgeError::SubprocessFailed`] — zlint exited with a
+    ///   non-zero status; stderr is captured for diagnostics.
+    /// - [`BridgeError::SubprocessKilled`] — zlint was terminated
+    ///   by a signal (Unix only; expressed as
+    ///   `SubprocessFailed { exit_code: None }` on platforms where
+    ///   signal information is not available).
+    /// - [`BridgeError::OutputParseError`] — a line of zlint's
+    ///   output could not be parsed as JSON, or a check name
+    ///   carried an unrecognised severity prefix.
+    ///
+    /// [`Severity::Error`]: pkix_lint::Severity::Error
+    /// [`Severity::Warn`]: pkix_lint::Severity::Warn
+    /// [`Severity::Notice`]: pkix_lint::Severity::Notice
+    pub fn enumerate_lints(&self) -> Result<Vec<ZlintLintInfo>, BridgeError> {
+        let mut cmd = Command::new(&self.config.zlint_path);
+        cmd.arg("-list-lints-json");
+        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)?;
+
+        if !output.status.success() {
+            return Err(classify_exit(output.status, &output.stderr));
+        }
+
+        parse_list_lints_ndjson(&output.stdout)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Subprocess plumbing helpers (shared with future run_on_cert /
+// run_on_certs methods).
+// ---------------------------------------------------------------------------
+
+/// Map an `io::Error` from `Command::spawn` to a `BridgeError`.
+fn spawn_error(path: &Path, err: std::io::Error) -> BridgeError {
+    match err.kind() {
+        std::io::ErrorKind::NotFound => BridgeError::BinaryNotFound {
+            path: path.to_path_buf(),
+        },
+        std::io::ErrorKind::PermissionDenied => BridgeError::BinaryNotExecutable {
+            path: path.to_path_buf(),
+        },
+        _ => BridgeError::SubprocessFailed {
+            exit_code: None,
+            stderr: err.to_string(),
+        },
+    }
+}
+
+/// Run a subprocess to completion, honouring the bridge's timeout.
+///
+/// stdin is closed; stdout and stderr are captured. Output is
+/// drained on dedicated reader threads to avoid the classic
+/// pipe-buffer deadlock where the child blocks writing to a full
+/// pipe while the parent waits for the child to exit.
+///
+/// On timeout, the child is killed and reaped before this returns
+/// [`BridgeError::SubprocessTimeout`]. Reader threads are joined
+/// after the child exits (or is killed) so we never leak threads
+/// past the function return.
+fn run_subprocess(
+    mut cmd: Command,
+    path: &Path,
+    timeout: Duration,
+) -> Result<std::process::Output, BridgeError> {
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| spawn_error(path, e))?;
+
+    // Take pipe handles before the wait loop so the reader threads
+    // can drain them. If the underlying piped() spec succeeded these
+    // are always Some; treat `take()` returning None as a
+    // bridge-internal invariant violation surfaced as
+    // SubprocessFailed rather than panicking.
+    let stdout_pipe = child
+        .stdout
+        .take()
+        .ok_or_else(|| BridgeError::SubprocessFailed {
+            exit_code: None,
+            stderr: "child stdout pipe missing".into(),
+        })?;
+    let stderr_pipe = child
+        .stderr
+        .take()
+        .ok_or_else(|| BridgeError::SubprocessFailed {
+            exit_code: None,
+            stderr: "child stderr pipe missing".into(),
+        })?;
+
+    let stdout_thread = std::thread::spawn(move || drain_pipe(stdout_pipe));
+    let stderr_thread = std::thread::spawn(move || drain_pipe(stderr_pipe));
+
+    let status = wait_for_child(&mut child, timeout)?;
+
+    // Reader threads exit naturally when the child closes its
+    // stdout/stderr; join collects the buffered bytes.
+    let stdout = stdout_thread
+        .join()
+        .map_err(|_| BridgeError::SubprocessFailed {
+            exit_code: status.code(),
+            stderr: "stdout reader thread panicked".into(),
+        })?
+        .map_err(|e| BridgeError::SubprocessFailed {
+            exit_code: status.code(),
+            stderr: format!("stdout drain io error: {e}"),
+        })?;
+    let stderr = stderr_thread
+        .join()
+        .map_err(|_| BridgeError::SubprocessFailed {
+            exit_code: status.code(),
+            stderr: "stderr reader thread panicked".into(),
+        })?
+        .map_err(|e| BridgeError::SubprocessFailed {
+            exit_code: status.code(),
+            stderr: format!("stderr drain io error: {e}"),
+        })?;
+
+    Ok(std::process::Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+/// Drain a pipe to end-of-file. Returns the buffered bytes or an
+/// `io::Error` on read failure.
+fn drain_pipe<R: std::io::Read>(mut pipe: R) -> std::io::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    pipe.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+/// Wait for a child process with a deadline. On timeout, kills and
+/// reaps the child before returning [`BridgeError::SubprocessTimeout`].
+fn wait_for_child(
+    child: &mut std::process::Child,
+    timeout: Duration,
+) -> Result<std::process::ExitStatus, BridgeError> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(BridgeError::SubprocessTimeout { timeout });
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) => {
+                return Err(BridgeError::SubprocessFailed {
+                    exit_code: None,
+                    stderr: e.to_string(),
+                });
+            }
+        }
+    }
+}
+
+/// Classify a non-zero exit status into the right `BridgeError`.
+fn classify_exit(status: std::process::ExitStatus, stderr_bytes: &[u8]) -> BridgeError {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt as _;
+        if let Some(sig) = status.signal() {
+            return BridgeError::SubprocessKilled { signal: Some(sig) };
+        }
+    }
+    let stderr = String::from_utf8_lossy(stderr_bytes).into_owned();
+    BridgeError::SubprocessFailed {
+        exit_code: status.code(),
+        stderr,
+    }
+}
+
+/// Parse the line-delimited JSON output of `zlint -list-lints-json`
+/// into a `Vec<ZlintLintInfo>`.
+fn parse_list_lints_ndjson(stdout: &[u8]) -> Result<Vec<ZlintLintInfo>, BridgeError> {
+    let text = std::str::from_utf8(stdout).map_err(|e| BridgeError::OutputParseError {
+        detail: format!("zlint stdout is not valid UTF-8: {e}"),
+    })?;
+
+    let mut out = Vec::new();
+    for (lineno, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let info = parse_list_lints_line(line).map_err(|detail| BridgeError::OutputParseError {
+            detail: format!("line {}: {}", lineno + 1, detail),
+        })?;
+        out.push(info);
+    }
+
+    if out.is_empty() {
+        return Err(BridgeError::OutputParseError {
+            detail: "zlint -list-lints-json produced no entries".into(),
+        });
+    }
+
+    Ok(out)
+}
+
+/// Parse one JSON line + derive severity. Returns the per-line
+/// `detail` string on failure for the caller to wrap in
+/// `BridgeError::OutputParseError`.
+///
+/// Parsing is done via `serde_json::Value` field access so the
+/// non-public `RawLintInfo` shape does not need to leak serde
+/// `Derive` impls into the always-on dependency set; the public
+/// types' optional `serde` feature stays orthogonal.
+///
+/// Field requirements track zlint's actual catalog shape:
+/// - `name` is required (we derive `severity` from it; without it
+///   the entry is unusable).
+/// - `description`, `citation`, `source` are optional and default
+///   to the empty string when missing. zlint's catalog has several
+///   entries without `citation` (CRL-shape checks, community-source
+///   checks) and being strict here would refuse to enumerate the
+///   real catalog.
+fn parse_list_lints_line(line: &str) -> Result<ZlintLintInfo, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(line).map_err(|e| format!("malformed JSON: {e}"))?;
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "expected JSON object at top level".to_string())?;
+    let name = json_required_string(obj, "name")?;
+    let description = json_optional_string(obj, "description")?;
+    let citation = json_optional_string(obj, "citation")?;
+    let source = json_optional_string(obj, "source")?;
+    let severity = severity_for_check_name(&name)?;
+    Ok(ZlintLintInfo {
+        check_id: name,
+        description,
+        citation,
+        source,
+        severity,
+    })
+}
+
+/// Extract a required string field from a JSON object. Missing
+/// fields and non-string types are both errors.
+fn json_required_string(
+    obj: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<String, String> {
+    obj.get(key)
+        .ok_or_else(|| format!("missing required field {key:?}"))?
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("field {key:?} is not a string"))
+}
+
+/// Extract an optional string field from a JSON object. Missing
+/// fields and JSON `null` are reported as the empty string. A
+/// present-but-non-string value is still an error so callers can
+/// rely on the returned `String` actually reflecting the JSON
+/// value when it is set.
+fn json_optional_string(
+    obj: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<String, String> {
+    match obj.get(key) {
+        None => Ok(String::new()),
+        Some(serde_json::Value::Null) => Ok(String::new()),
+        Some(v) => v
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| format!("field {key:?} is not a string")),
+    }
+}
+
+/// zlint's catalog convention: every check name starts with a single
+/// underscore-separated prefix that encodes the declared severity.
+/// We accept `e_`, `w_`, and `n_`; anything else is a catalog-shape
+/// violation and surfaces as a parse error so a future upstream
+/// catalog change does not silently mis-severity our findings.
+fn severity_for_check_name(name: &str) -> Result<pkix_lint::Severity, String> {
+    if let Some(rest) = name.strip_prefix("e_") {
+        if rest.is_empty() {
+            return Err(format!("empty check id after e_ prefix: {name:?}"));
+        }
+        Ok(pkix_lint::Severity::Error)
+    } else if let Some(rest) = name.strip_prefix("w_") {
+        if rest.is_empty() {
+            return Err(format!("empty check id after w_ prefix: {name:?}"));
+        }
+        Ok(pkix_lint::Severity::Warn)
+    } else if let Some(rest) = name.strip_prefix("n_") {
+        if rest.is_empty() {
+            return Err(format!("empty check id after n_ prefix: {name:?}"));
+        }
+        Ok(pkix_lint::Severity::Notice)
+    } else {
+        Err(format!(
+            "unrecognised zlint catalog severity prefix in {name:?}; expected e_/w_/n_"
+        ))
     }
 }
 
@@ -493,5 +819,178 @@ mod tests {
         let p = PerCertError::Other { detail: "y".into() };
         takes_error(&b);
         takes_error(&p);
+    }
+
+    /// `severity_for_check_name` covers every documented prefix and
+    /// rejects malformed input. Pins the zlint catalog-prefix
+    /// convention; if upstream changes the convention this test
+    /// flags it.
+    #[test]
+    fn severity_for_check_name_recognises_documented_prefixes() {
+        use pkix_lint::Severity;
+        assert_eq!(
+            severity_for_check_name("e_basic_constraints_not_critical"),
+            Ok(Severity::Error)
+        );
+        assert_eq!(
+            severity_for_check_name("w_some_warning"),
+            Ok(Severity::Warn)
+        );
+        assert_eq!(
+            severity_for_check_name("n_some_notice"),
+            Ok(Severity::Notice)
+        );
+    }
+
+    /// Empty body after a recognised prefix is rejected — catches
+    /// catalog-shape regressions.
+    #[test]
+    fn severity_for_check_name_rejects_empty_body() {
+        assert!(severity_for_check_name("e_").is_err());
+        assert!(severity_for_check_name("w_").is_err());
+        assert!(severity_for_check_name("n_").is_err());
+    }
+
+    /// Unrecognised prefixes (and missing prefix) surface as parse
+    /// errors so a silent upstream change cannot mis-label findings.
+    #[test]
+    fn severity_for_check_name_rejects_unknown_prefix() {
+        for bad in &[
+            "q_invalid_prefix",
+            "info_no_underscore_prefix",
+            "_leading_underscore_only",
+            "noprefix",
+            "",
+        ] {
+            assert!(
+                severity_for_check_name(bad).is_err(),
+                "should reject {bad:?}"
+            );
+        }
+    }
+
+    /// `parse_list_lints_ndjson` handles a small synthetic catalog
+    /// covering each severity prefix and ignoring blank lines.
+    #[test]
+    fn parse_list_lints_ndjson_handles_three_prefixes_and_blank_lines() {
+        let ndjson = b"\
+{\"name\":\"e_x\",\"description\":\"D1\",\"citation\":\"C1\",\"source\":\"S1\"}\n\
+\n\
+{\"name\":\"w_y\",\"description\":\"D2\",\"citation\":\"C2\",\"source\":\"S2\"}\n\
+{\"name\":\"n_z\",\"description\":\"D3\",\"citation\":\"C3\",\"source\":\"S3\"}\n";
+        let parsed = parse_list_lints_ndjson(ndjson).expect("parse");
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0].check_id, "e_x");
+        assert_eq!(parsed[0].severity, pkix_lint::Severity::Error);
+        assert_eq!(parsed[1].check_id, "w_y");
+        assert_eq!(parsed[1].severity, pkix_lint::Severity::Warn);
+        assert_eq!(parsed[2].check_id, "n_z");
+        assert_eq!(parsed[2].severity, pkix_lint::Severity::Notice);
+    }
+
+    /// Empty output (or only-whitespace output) surfaces as a parse
+    /// error — zlint always emits at least one entry.
+    #[test]
+    fn parse_list_lints_ndjson_rejects_empty_output() {
+        assert!(matches!(
+            parse_list_lints_ndjson(b""),
+            Err(BridgeError::OutputParseError { .. })
+        ));
+        assert!(matches!(
+            parse_list_lints_ndjson(b"\n\n   \n"),
+            Err(BridgeError::OutputParseError { .. })
+        ));
+    }
+
+    /// Malformed JSON on a single line surfaces as a parse error.
+    #[test]
+    fn parse_list_lints_ndjson_rejects_malformed_json() {
+        let ndjson = b"\
+{\"name\":\"e_x\",\"description\":\"D1\",\"citation\":\"C1\",\"source\":\"S1\"}\n\
+not even close to json\n";
+        let err = parse_list_lints_ndjson(ndjson).expect_err("malformed should fail");
+        match err {
+            BridgeError::OutputParseError { detail } => {
+                assert!(detail.contains("line 2"), "expected line number: {detail}");
+            }
+            other => panic!("expected OutputParseError, got {other:?}"),
+        }
+    }
+
+    /// A JSON object missing the `name` field is rejected — name
+    /// is the only required field; without it we cannot derive a
+    /// severity or use the entry.
+    #[test]
+    fn parse_list_lints_ndjson_rejects_missing_name_field() {
+        let ndjson = b"{\"description\":\"D\",\"citation\":\"C\",\"source\":\"S\"}\n";
+        let err = parse_list_lints_ndjson(ndjson).expect_err("missing name should fail");
+        assert!(matches!(err, BridgeError::OutputParseError { .. }));
+    }
+
+    /// Missing `citation` is tolerated and defaults to empty —
+    /// zlint's catalog has several entries (CRL checks, community
+    /// checks) that omit citation entirely.
+    #[test]
+    fn parse_list_lints_ndjson_tolerates_missing_optional_fields() {
+        let ndjson = b"{\"name\":\"e_x\",\"description\":\"D\",\"source\":\"S\"}\n";
+        let parsed =
+            parse_list_lints_ndjson(ndjson).expect("optional citation should be tolerated");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].check_id, "e_x");
+        assert_eq!(parsed[0].citation, "");
+        assert_eq!(parsed[0].description, "D");
+        assert_eq!(parsed[0].source, "S");
+    }
+
+    /// A bare `name` field is sufficient — all other fields default
+    /// to empty. Robust against catalog-entry shape regressions.
+    #[test]
+    fn parse_list_lints_ndjson_handles_bare_name_only() {
+        let ndjson = b"{\"name\":\"w_x\"}\n";
+        let parsed = parse_list_lints_ndjson(ndjson).expect("bare name should parse");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].check_id, "w_x");
+        assert_eq!(parsed[0].severity, pkix_lint::Severity::Warn);
+        assert_eq!(parsed[0].description, "");
+        assert_eq!(parsed[0].citation, "");
+        assert_eq!(parsed[0].source, "");
+    }
+
+    /// `null` for an optional field is treated as missing (empty
+    /// string), not a type error.
+    #[test]
+    fn parse_list_lints_ndjson_treats_null_optional_as_empty() {
+        let ndjson = b"{\"name\":\"n_x\",\"description\":null,\"citation\":null,\"source\":null}\n";
+        let parsed = parse_list_lints_ndjson(ndjson).expect("null optionals -> empty");
+        assert_eq!(parsed[0].description, "");
+        assert_eq!(parsed[0].citation, "");
+        assert_eq!(parsed[0].source, "");
+    }
+
+    /// Non-string types in optional fields are still rejected — we
+    /// only relax the missing-field case, not the type contract.
+    #[test]
+    fn parse_list_lints_ndjson_rejects_non_string_optional() {
+        let ndjson = b"{\"name\":\"e_x\",\"citation\":42}\n";
+        let err = parse_list_lints_ndjson(ndjson).expect_err("non-string citation should fail");
+        assert!(matches!(err, BridgeError::OutputParseError { .. }));
+    }
+
+    /// A JSON object whose check name has an unrecognised severity
+    /// prefix surfaces as a parse error.
+    #[test]
+    fn parse_list_lints_ndjson_rejects_unknown_severity_prefix() {
+        let ndjson =
+            b"{\"name\":\"q_oops\",\"description\":\"D\",\"citation\":\"C\",\"source\":\"S\"}\n";
+        let err = parse_list_lints_ndjson(ndjson).expect_err("bad prefix should fail");
+        match err {
+            BridgeError::OutputParseError { detail } => {
+                assert!(
+                    detail.contains("unrecognised") || detail.contains("expected e_/w_/n_"),
+                    "expected severity-prefix detail: {detail}"
+                );
+            }
+            other => panic!("expected OutputParseError, got {other:?}"),
+        }
     }
 }
