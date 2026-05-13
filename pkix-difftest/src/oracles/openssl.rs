@@ -57,7 +57,9 @@ pub const OPENSSL_BIN_ENV: &str = "PKIX_DIFFTEST_OPENSSL_BIN";
 ///
 /// See [`verify_with_bin`] for the same semantics with an explicit binary path
 /// (used by tests that want to exercise the missing-binary error path without
-/// touching process-global env state).
+/// touching process-global env state). See [`verify_with_args`] for the
+/// purpose-aware entry point used by the wrapper-level differential tests
+/// (PKIX-fmtv.18.x).
 ///
 /// Returns:
 /// * `Ok(Verdict::Pass)` when OpenSSL exits 0.
@@ -71,6 +73,55 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
     verify_with_bin(chain, &bin)
 }
 
+/// Per-purpose / per-identity flags for `openssl verify`. Used by the
+/// wrapper-level differential tests (PKIX-fmtv.18.x) so that each
+/// `verify_*` wrapper can be compared against the matching
+/// `openssl verify -purpose ... -verify_hostname/email/ip ...` invocation.
+///
+/// The all-default value (everything `None`) reproduces the chain-shape
+/// behaviour of [`verify`] / [`verify_with_bin`] — those entry points are
+/// kept stable so the existing chain-shape callers (PKITS / x509-limbo /
+/// pem-tree corpora) are unaffected.
+///
+/// At most one of `verify_hostname` / `verify_email` / `verify_ip` should
+/// be set per call; OpenSSL accepts all three but the wrapper-level diff
+/// always binds a single identity. The struct does not enforce this — the
+/// caller's matrix-driver code is responsible for picking the right field.
+#[derive(Clone, Debug, Default)]
+pub struct VerifyArgs<'a> {
+    /// OpenSSL purpose, e.g. `sslserver`, `sslclient`, `smimesign`,
+    /// `smimeencrypt`, `codesign`, `timestampsign`, `ocsphelper`. Passed
+    /// through as `-purpose <value>`.
+    pub purpose: Option<&'a str>,
+    /// Hostname to bind against the leaf's SAN dNSName entries. Passed
+    /// through as `-verify_hostname <value>`. RFC 6125 §6.4 wildcard /
+    /// case / IDN semantics are OpenSSL's responsibility — the diff
+    /// surface is exactly the comparison `verify_tls_server` /
+    /// `verify_tls_client_dns` need.
+    pub verify_hostname: Option<&'a str>,
+    /// Mailbox to bind against rfc822Name SAN entries. Passed through as
+    /// `-verify_email <value>`. RFC 5280 §4.2.1.6 case-folding semantics
+    /// are OpenSSL's responsibility.
+    pub verify_email: Option<&'a str>,
+    /// IP literal to bind against iPAddress SAN entries. Passed through
+    /// as `-verify_ip <value>`. Both v4 dotted-decimal and v6
+    /// colon-hex forms are accepted by OpenSSL.
+    pub verify_ip: Option<&'a str>,
+}
+
+/// `openssl verify` over the chain with per-purpose / per-identity flags.
+///
+/// Picks the binary the same way [`verify`] does
+/// (`$PKIX_DIFFTEST_OPENSSL_BIN`, else `openssl` from `$PATH`).
+///
+/// See [`VerifyArgs`] for the flag set this wraps. The plain [`verify`]
+/// entry point is equivalent to calling this with
+/// `VerifyArgs::default()`.
+pub fn verify_with_args(chain: &Chain, args: &VerifyArgs<'_>) -> io::Result<Verdict> {
+    let bin = std::env::var(OPENSSL_BIN_ENV).unwrap_or_else(|_| "openssl".to_string());
+    verify_with_bin_and_args(chain, &bin, args)
+}
+
 /// Same as [`verify`] but takes the binary path as an explicit argument.
 ///
 /// The chain must end in the trust anchor (`Chain::root_in_chain == true`);
@@ -80,6 +131,20 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 /// Tests use this entry point instead of the env-driven [`verify`] so they
 /// can race-isolate from other tests in the same `cargo test` run.
 pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
+    verify_with_bin_and_args(chain, bin, &VerifyArgs::default())
+}
+
+/// Combined entry point: explicit binary path AND per-purpose args.
+///
+/// Used by the wrapper-level differential test driver
+/// (`tests/verify_wrapper_openssl_*.rs`) where the binary path must be
+/// resolved once and reused across many chains, and where per-case args
+/// vary.
+pub fn verify_with_bin_and_args(
+    chain: &Chain,
+    bin: &str,
+    args: &VerifyArgs<'_>,
+) -> io::Result<Verdict> {
     if !chain.root_in_chain {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -127,6 +192,21 @@ pub fn verify_with_bin(chain: &Chain, bin: &str) -> io::Result<Verdict> {
     // own current clock — same behaviour PKITS / PEM-tree have always had.
     if let Some(secs) = chain.validation_time_unix {
         cmd.arg("-attime").arg(secs.to_string());
+    }
+    // Wrapper-level diff arguments (PKIX-fmtv.18.1). Each is opt-in via the
+    // VerifyArgs struct; the chain-shape callers via verify() /
+    // verify_with_bin() pass VerifyArgs::default() and pay no overhead.
+    if let Some(p) = args.purpose {
+        cmd.arg("-purpose").arg(p);
+    }
+    if let Some(h) = args.verify_hostname {
+        cmd.arg("-verify_hostname").arg(h);
+    }
+    if let Some(e) = args.verify_email {
+        cmd.arg("-verify_email").arg(e);
+    }
+    if let Some(ip) = args.verify_ip {
+        cmd.arg("-verify_ip").arg(ip);
     }
     let output = cmd.arg(dir.path().join("leaf.pem")).output().map_err(|e| {
         // Most useful failure: NotFound → "binary not on PATH". Pass
