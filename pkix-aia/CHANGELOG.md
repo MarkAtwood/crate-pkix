@@ -10,13 +10,24 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 - Initial scaffold (PKIX-zkjb.2). Workspace member; `no_std + alloc`
   by default; `forbid(unsafe_code)`.
-- Public type:
+- Public types:
   - `AiaError` — `#[non_exhaustive]` enum with variants
     `FetchingDisabled`, `HttpStatus(u16)`,
     `ResponseTooLarge { limit, actual }`,
     `MalformedCertificate(String)`, `Timeout`,
     `UriUnsupported(String)`, and (under `std`)
     `IoFailure { kind: std::io::ErrorKind, message: String }`.
+  - `AiaFetcher` trait (PKIX-zkjb.3) with required method
+    `fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError>` and
+    default-impl `batch_fetch(&self, uris: &[&str]) ->
+    Vec<Result<Vec<u8>, AiaError>>` that iterates `fetch`. `&self`
+    receiver admits caching wrappers via interior mutability;
+    rustdoc carries a worked caching-wrapper doctest using
+    `alloc::collections::BTreeMap` + `core::cell::RefCell` so the
+    pattern is demonstrable on `no_std + alloc` targets. Synchronous
+    only — async adapters live in separate crates. Returns raw DER
+    bytes; certificate parsing is the caller's responsibility. No
+    timeout parameter (per-adapter construction concern).
 - Feature flags:
   - `std` — enables `std::error::Error` impl on `AiaError` and
     unlocks the `IoFailure` variant.
@@ -40,7 +51,6 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### Not yet shipped
 
-- `AiaFetcher` trait — PKIX-zkjb.3.
 - `NoAiaFetcher` zero-cost default — PKIX-zkjb.4.
 - `pkix-aia-http` HTTP adapter — PKIX-zkjb.5.
 - `pkix-chain::Verifier` 3-generic `A: AiaFetcher` API freeze — PKIX-zkjb.9.

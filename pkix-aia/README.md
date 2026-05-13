@@ -7,7 +7,7 @@ AIA is the certificate extension that carries `caIssuers` URIs pointing at the c
 This crate ships the trait surface only:
 
 - `AiaError` — failure modes for fetcher implementations. `#[non_exhaustive]`, `Clone + Debug + PartialEq + Eq + Send + Sync`, optional `serde` support.
-- `AiaFetcher` trait — *planned* (PKIX-zkjb.3).
+- `AiaFetcher` trait — synchronous `&self` fetch with `Result<Vec<u8>, AiaError>` return; default-impl `batch_fetch` for multi-URI batches.
 - `NoAiaFetcher` zero-cost default — *planned* (PKIX-zkjb.4).
 
 Real HTTP fetching lives in a separate adapter crate, `pkix-aia-http`, which is also planned (PKIX-zkjb.5).
@@ -28,7 +28,7 @@ The default build is `no_std + alloc`. Enabling `std` unlocks the `AiaError::IoF
 
 ## Status
 
-Initial release: `AiaError` only. `AiaFetcher` and `NoAiaFetcher` land in subsequent point releases under the PKIX-zkjb epic.
+Initial release: `AiaError` + `AiaFetcher` trait. `NoAiaFetcher` zero-cost default lands next under the PKIX-zkjb epic.
 
 ## License
 

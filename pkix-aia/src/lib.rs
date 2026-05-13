@@ -61,6 +61,7 @@
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 // ---------------------------------------------------------------------------
 // AiaError
@@ -401,6 +402,191 @@ mod io_error_kind_serde {
 }
 
 // ---------------------------------------------------------------------------
+// AiaFetcher trait
+// ---------------------------------------------------------------------------
+
+/// Trait for fetching certificate DER bytes by URI.
+///
+/// `AiaFetcher` is the seam where chain-build code asks an adapter to
+/// resolve a `caIssuers` URI from
+/// [RFC 5280 §4.2.2.1](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1)
+/// into the DER-encoded bytes of the referenced certificate.
+///
+/// # Contract
+///
+/// The trait is intentionally minimal: a single required method,
+/// [`fetch`](Self::fetch), and a default-impl batch entry point,
+/// [`batch_fetch`](Self::batch_fetch), that loops to `fetch`.
+///
+/// - **`&self` receiver.** Fetchers take `&self`, not `&mut self`.
+///   This admits caching wrappers using interior mutability (e.g.
+///   `core::cell::RefCell` for single-threaded scenarios,
+///   `std::sync::Mutex` or `std::sync::RwLock` for shared concurrent
+///   access) without the trait surface having to acknowledge them.
+///   See the doctest below for a worked example.
+///
+/// - **Synchronous.** The core trait is synchronous. Async adapters
+///   live in separate crates (e.g. a future async variant in
+///   `pkix-aia-async`) and expose their own trait shape. Keeping
+///   the core trait sync means the workspace stays runtime-agnostic
+///   and avoids forcing every `pkix-chain` consumer to choose a
+///   runtime.
+///
+/// - **Raw bytes, not parsed certificates.** Returns
+///   `Result<Vec<u8>, AiaError>` of certificate DER. Parsing the
+///   bytes into an `x509_cert::Certificate` is the chain-build
+///   layer's job. The fetcher is a dumb-bytes-fetch surface; an
+///   adapter that knows how to parse can still parse internally,
+///   but the trait surface deliberately stays at the byte level so
+///   parser failures can be classified one way (the consumer's
+///   parse step) and transport failures another (this trait).
+///
+/// - **No timeout parameter.** Per-request timeouts are an adapter
+///   concern, configured at construction time on the concrete
+///   fetcher. The trait surface does not expose a deadline argument;
+///   adapters that need one set it via their own builder API.
+///
+/// - **`batch_fetch` may pipeline.** The default-impl is a sequential
+///   loop over `fetch`. Implementers MAY override `batch_fetch` to
+///   pipeline requests (HTTP/2 multiplexing, connection-pool
+///   parallelism, etc.) when doing so produces a real speedup.
+///   The return shape is `Vec<Result<_, _>>` aligned by index with
+///   `uris`: per-URI success/failure is preserved even when some
+///   subset of the batch fails.
+///
+/// # Thread-safety expectation
+///
+/// `AiaFetcher` does not require `Send + Sync` as super-traits; that
+/// would prevent legitimate single-threaded impls (e.g. `RefCell`-
+/// backed caches). Implementers SHOULD be `Send + Sync` whenever
+/// they can — chain-build code in `pkix-chain` calls fetchers
+/// through `&dyn AiaFetcher`, and trait objects stored in a
+/// `Verifier` shared across threads require `Send + Sync` to be
+/// useful in concurrent server code. When this is the intent,
+/// declare the bound at the use site (e.g. `&'a dyn AiaFetcher`
+/// with an inner type that is auto-`Send + Sync`, or
+/// `Arc<dyn AiaFetcher + Send + Sync>` for owned trait objects).
+///
+/// # Errors
+///
+/// All failure modes surface through [`AiaError`]. See its
+/// per-variant rustdoc for adapter semantics.
+///
+/// # Example: caching wrapper
+///
+/// The `&self` receiver admits cache layering without any change
+/// to the trait surface. The example below wraps any
+/// [`AiaFetcher`] in a memoizing cache keyed by URI. It uses
+/// `alloc::collections::BTreeMap` and `core::cell::RefCell` for
+/// portability across `no_std + alloc` targets; production code
+/// targeting `std` should prefer `std::sync::Mutex<HashMap<_, _>>`
+/// (which is `Sync`) for shared concurrent access.
+///
+/// ```
+/// extern crate alloc;
+///
+/// use alloc::collections::BTreeMap;
+/// use alloc::string::{String, ToString};
+/// use alloc::vec::Vec;
+/// use core::cell::RefCell;
+///
+/// use pkix_aia::{AiaError, AiaFetcher};
+///
+/// /// Caching wrapper over any [`AiaFetcher`]. URIs already in the
+/// /// cache return the stored result without delegating to the
+/// /// inner fetcher. The inner result — success or failure — is
+/// /// what gets cached; the wrapper treats every `AiaError` as
+/// /// "the inner fetcher said no for this URI" and records it,
+/// /// which is appropriate for callers who don't want to retry
+/// /// fast-failing URIs.
+/// pub struct CachingFetcher<F: AiaFetcher> {
+///     inner: F,
+///     cache: RefCell<BTreeMap<String, Result<Vec<u8>, AiaError>>>,
+/// }
+///
+/// impl<F: AiaFetcher> CachingFetcher<F> {
+///     pub fn new(inner: F) -> Self {
+///         Self { inner, cache: RefCell::new(BTreeMap::new()) }
+///     }
+/// }
+///
+/// impl<F: AiaFetcher> AiaFetcher for CachingFetcher<F> {
+///     fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError> {
+///         // Interior mutability via `RefCell` keeps `fetch` on
+///         // `&self`. The trait surface never sees the borrow.
+///         if let Some(cached) = self.cache.borrow().get(uri) {
+///             return cached.clone();
+///         }
+///         let fresh = self.inner.fetch(uri);
+///         self.cache.borrow_mut().insert(uri.to_string(), fresh.clone());
+///         fresh
+///     }
+/// }
+///
+/// // Demonstration: a stub inner fetcher and a single cached call.
+/// struct AlwaysDisabled;
+/// impl AiaFetcher for AlwaysDisabled {
+///     fn fetch(&self, _uri: &str) -> Result<Vec<u8>, AiaError> {
+///         Err(AiaError::FetchingDisabled)
+///     }
+/// }
+///
+/// let cache = CachingFetcher::new(AlwaysDisabled);
+/// // First call: delegates to the inner fetcher and records the result.
+/// assert_eq!(cache.fetch("http://ca.example/ca.crt"),
+///            Err(AiaError::FetchingDisabled));
+/// // Second call: returns the cached failure, no inner delegation.
+/// assert_eq!(cache.fetch("http://ca.example/ca.crt"),
+///            Err(AiaError::FetchingDisabled));
+/// ```
+pub trait AiaFetcher {
+    /// Fetch the DER-encoded certificate at `uri`.
+    ///
+    /// Returns the raw response bytes on success. Parsing them as
+    /// an X.509 certificate is the caller's job.
+    ///
+    /// # Errors
+    ///
+    /// All failure modes surface through [`AiaError`]:
+    ///
+    /// - [`AiaError::FetchingDisabled`] for fetchers that are
+    ///   intentionally off (e.g. `NoAiaFetcher`, planned at
+    ///   PKIX-zkjb.4).
+    /// - [`AiaError::UriUnsupported`] for URIs whose scheme this
+    ///   fetcher does not handle.
+    /// - [`AiaError::HttpStatus`], [`AiaError::Timeout`],
+    ///   [`AiaError::ResponseTooLarge`], or
+    ///   [`AiaError::IoFailure`] (under `std`) for transport-level
+    ///   issues.
+    /// - [`AiaError::MalformedCertificate`] if the adapter
+    ///   pre-parsed the response and the bytes do not look like a
+    ///   DER certificate. Adapters that return the bytes verbatim
+    ///   leave that classification to the caller.
+    fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError>;
+
+    /// Fetch multiple URIs in a single call.
+    ///
+    /// Returns a `Vec` aligned with `uris` by index: the `i`-th
+    /// entry is the result for `uris[i]`. Per-URI success or
+    /// failure is preserved.
+    ///
+    /// The default-impl is a sequential loop over [`fetch`](Self::fetch).
+    /// Implementers MAY override this to pipeline requests
+    /// (HTTP/2 multiplexing, connection-pool parallelism, etc.)
+    /// when their transport supports it; the loop is the floor,
+    /// not the ceiling.
+    ///
+    /// Adapters that fail the entire batch on the first error
+    /// SHOULD instead return `Err(...)` in the relevant slot and
+    /// continue processing remaining URIs. Whole-batch atomic
+    /// failure is not a contract anyone relies on; per-URI errors
+    /// are what callers act on.
+    fn batch_fetch(&self, uris: &[&str]) -> Vec<Result<Vec<u8>, AiaError>> {
+        uris.iter().map(|uri| self.fetch(uri)).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Send + Sync invariant (AGENTS.md non-negotiable #6 / PKIX-2l0v.2)
 // ---------------------------------------------------------------------------
 
@@ -543,5 +729,144 @@ mod tests {
             message: "deadline exceeded".into(),
         };
         assert_ne!(a, c);
+    }
+
+    // -----------------------------------------------------------------------
+    // AiaFetcher trait
+    // -----------------------------------------------------------------------
+
+    use alloc::vec;
+    use core::cell::Cell;
+
+    /// Test-only fetcher that records every URI it is asked about
+    /// and returns a deterministic per-URI result. Demonstrates
+    /// that `&self` is sufficient for non-trivial impls.
+    struct RecordingFetcher {
+        /// Increments on every call to `fetch`. Demonstrates &self
+        /// interior mutability via `Cell` without a Mutex.
+        call_count: Cell<usize>,
+    }
+
+    impl RecordingFetcher {
+        fn new() -> Self {
+            Self {
+                call_count: Cell::new(0),
+            }
+        }
+    }
+
+    impl AiaFetcher for RecordingFetcher {
+        fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError> {
+            self.call_count.set(self.call_count.get() + 1);
+            // Echo the URI bytes back as the "DER" — not a real
+            // certificate, but the trait surface is byte-level so
+            // any deterministic mapping is sufficient for behavioural
+            // tests.
+            if uri.starts_with("http://") || uri.starts_with("https://") {
+                Ok(uri.as_bytes().to_vec())
+            } else {
+                Err(AiaError::UriUnsupported(uri.into()))
+            }
+        }
+    }
+
+    #[test]
+    fn fetch_records_each_call() {
+        let f = RecordingFetcher::new();
+        let r = f.fetch("http://ca.example/ca.crt").expect("ok");
+        assert_eq!(r, b"http://ca.example/ca.crt".to_vec());
+        assert_eq!(f.call_count.get(), 1);
+
+        let _ = f.fetch("http://ca.example/ca.crt");
+        let _ = f.fetch("http://ca.example/ca.crt");
+        assert_eq!(f.call_count.get(), 3);
+    }
+
+    #[test]
+    fn fetch_classifies_unsupported_scheme() {
+        let f = RecordingFetcher::new();
+        let r = f.fetch("ldap://ca.example/cn=ca");
+        assert_eq!(
+            r,
+            Err(AiaError::UriUnsupported("ldap://ca.example/cn=ca".into())),
+        );
+        assert_eq!(f.call_count.get(), 1);
+    }
+
+    #[test]
+    fn batch_fetch_default_impl_iterates_each_uri() {
+        let f = RecordingFetcher::new();
+        let uris: &[&str] = &[
+            "http://ca.example/a.crt",
+            "ldap://ca.example/b",
+            "https://ca.example/c.crt",
+        ];
+        let results = f.batch_fetch(uris);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0], Ok(b"http://ca.example/a.crt".to_vec()));
+        assert_eq!(
+            results[1],
+            Err(AiaError::UriUnsupported("ldap://ca.example/b".into())),
+        );
+        assert_eq!(results[2], Ok(b"https://ca.example/c.crt".to_vec()));
+        // Default-impl is sequential: one call per URI.
+        assert_eq!(f.call_count.get(), 3);
+    }
+
+    #[test]
+    fn batch_fetch_empty_input_returns_empty_output() {
+        let f = RecordingFetcher::new();
+        let empty: &[&str] = &[];
+        let results = f.batch_fetch(empty);
+        assert!(results.is_empty());
+        // No calls should have happened.
+        assert_eq!(f.call_count.get(), 0);
+    }
+
+    #[test]
+    fn batch_fetch_preserves_order() {
+        // Per-index alignment is part of the trait contract. A
+        // pipelining override MUST preserve this ordering.
+        let f = RecordingFetcher::new();
+        let uris: &[&str] = &["http://a", "http://b", "http://c"];
+        let results = f.batch_fetch(uris);
+        let expected = vec![
+            Ok(b"http://a".to_vec()),
+            Ok(b"http://b".to_vec()),
+            Ok(b"http://c".to_vec()),
+        ];
+        assert_eq!(results, expected);
+    }
+
+    /// A trivially-overridden `batch_fetch` that records its
+    /// invocation count. Verifies overrides take precedence over
+    /// the default-impl.
+    struct OverriddenBatchFetcher {
+        batch_calls: Cell<usize>,
+    }
+
+    impl AiaFetcher for OverriddenBatchFetcher {
+        fn fetch(&self, _uri: &str) -> Result<Vec<u8>, AiaError> {
+            // Should never be called by tests below; if it is, the
+            // override didn't dispatch.
+            unreachable!("override should not delegate to fetch")
+        }
+
+        fn batch_fetch(&self, uris: &[&str]) -> Vec<Result<Vec<u8>, AiaError>> {
+            self.batch_calls.set(self.batch_calls.get() + 1);
+            uris.iter().map(|_| Err(AiaError::Timeout)).collect()
+        }
+    }
+
+    #[test]
+    fn batch_fetch_override_takes_precedence() {
+        let f = OverriddenBatchFetcher {
+            batch_calls: Cell::new(0),
+        };
+        let results = f.batch_fetch(&["http://a", "http://b"]);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0], Err(AiaError::Timeout));
+        assert_eq!(results[1], Err(AiaError::Timeout));
+        assert_eq!(f.batch_calls.get(), 1);
     }
 }
