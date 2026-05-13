@@ -6,6 +6,37 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Send + Sync compile-time assertions on result types (2026-05-13)
+
+AGENTS.md non-negotiable #6 requires load-bearing result and error types
+to be `Send + Sync` so callers can move values across threads and store
+them in shared caches. The rule was previously aspirational — every type
+satisfied it via auto-derive (no `Rc<T>`, `RefCell<T>`, or raw
+pointers anywhere), but a future field adding `Rc<T>` to an `Error`
+variant would silently regress without any compile-time check.
+
+This change adds a `const _: fn() = || { _assert_send_sync::<T>() }`
+block to each crate that defines such a type, promoting the
+auto-derived `Send + Sync` from happenstance to a compile-time
+invariant. Asserted types:
+
+- `pkix-path`: `ValidatedPath`, `Error`, `TrustAnchor`, `ValidationPolicy`
+- `pkix-chain`: `Error`
+- `pkix-revocation`: `Error`
+- `pkix-truststore`: `Error` (the `TrustAnchor` re-export is covered by
+  the `pkix-path` assertion)
+- `pkix-lint`: `Finding`
+
+No new dependencies (no `static_assertions` crate); the
+`const _: fn() = || { ... }` pattern uses only stable Rust.
+
+No behavior change. No version bumps; the assertions are private
+`const _` items that do not affect any crate's public API.
+
+Tracked as [PKIX-2l0v.2].
+
+[PKIX-2l0v.2]: https://github.com/MarkAtwood/crate-pkix  "Send+Sync compile-time audit"
+
 ### `pkix-lint` 0.9.0: three deferred RFC-conformance lints (2026-05-13)
 
 `pkix-lint` ships the three remaining lints from the PKIX-9vnx.9.2.1

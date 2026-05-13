@@ -510,6 +510,15 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
     }
 }
 
+// ---------------------------------------------------------------------------
+// Send + Sync compile-time assertions (AGENTS.md non-negotiable #6, PKIX-2l0v.2)
+// ---------------------------------------------------------------------------
+
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<Error>();
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

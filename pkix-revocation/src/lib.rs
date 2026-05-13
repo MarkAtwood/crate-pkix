@@ -664,3 +664,12 @@ mod ocsp;
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use ocsp::OcspChecker;
+
+// ---------------------------------------------------------------------------
+// Send + Sync compile-time assertions (AGENTS.md non-negotiable #6, PKIX-2l0v.2)
+// ---------------------------------------------------------------------------
+
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<Error>();
+};

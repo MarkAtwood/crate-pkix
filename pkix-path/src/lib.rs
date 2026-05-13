@@ -3945,6 +3945,27 @@ impl SignatureVerifier for DefaultVerifier {
 }
 
 // ---------------------------------------------------------------------------
+// Send + Sync compile-time assertions
+// ---------------------------------------------------------------------------
+//
+// AGENTS.md non-negotiable #6 requires load-bearing result types to be
+// `Send + Sync` so callers can move values across thread boundaries and
+// store them in shared caches. The auto-derive does the right thing today
+// (no `Rc<T>`, `RefCell<T>`, or raw pointers in any of these types), but
+// the rule is currently aspirational. These `const _:` assertions promote
+// it to a compile-time invariant — a future field that breaks `Send` or
+// `Sync` (e.g. someone adds an `Rc<T>` variant to `Error`) fails the
+// workspace build, not a runtime test. Tracked at PKIX-2l0v.2.
+
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<ValidatedPath>();
+    _assert_send_sync::<Error>();
+    _assert_send_sync::<TrustAnchor>();
+    _assert_send_sync::<ValidationPolicy>();
+};
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
