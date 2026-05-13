@@ -64,6 +64,15 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   positive case, identity-mismatch / EKU-mismatch / criticality
   negatives, and order-of-checks invariants (path validation runs
   before identity / profile checks).
+- Curated RFC 5280 §4.2.1.6 / RFC 8398 mailbox-binding corpus in
+  `tests/mailbox_corpus.rs`, exercising `verify_smime_signer` and
+  `verify_smime_recipient` against rfc822Name and SmtpUTF8Mailbox SAN
+  shapes (ASCII / internationalized / mixed / multi-mailbox /
+  malformed) under both `Rfc5280Profile` and `BasicSmimeProfile`. Each
+  case asserts identical outcomes from the two wrappers. Pass-rate
+  baseline (22/22) and the strict-RFC-5321 local-part case-sensitivity
+  decision are documented in `tests/mailbox_corpus_baseline.md`.
+  (PKIX-fmtv.23.)
 - `der` workspace dep added (was previously transitive) for the
   `verify_time_stamper` post-validation EKU parsing.
 
