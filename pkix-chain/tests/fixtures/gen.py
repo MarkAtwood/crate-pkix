@@ -456,6 +456,35 @@ def main():
     )
     write_der("host-multi-san.der", leaf_host_multi)
 
+    # ------------------------------------------------------------------
+    # PKIX-fmtv.11.2 (client half): clientAuth-EKU fixtures.
+    #
+    # The verify_tls_client_dns + verify_tls_client_mailbox wrappers
+    # test identity binding end-to-end. Tests run under Rfc5280Profile
+    # (no EKU enforcement) for orthogonality with the BasicTls*
+    # profiles, which assert serverAuth — production callers must
+    # supply a profile asserting id-kp-clientAuth.
+    # ------------------------------------------------------------------
+    CLIENT_AUTH = [x509.ExtendedKeyUsageOID.CLIENT_AUTH]
+
+    # clientAuth EKU + DNS SAN — for verify_tls_client_dns identity binding.
+    leaf_client_dns = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("client.example.com")],
+        serial=60,
+        eku=CLIENT_AUTH,
+    )
+    write_der("leaf-clientauth-dns.der", leaf_client_dns)
+
+    # clientAuth EKU + rfc822Name SAN — for verify_tls_client_mailbox.
+    leaf_client_mailbox = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("client@example.com")],
+        serial=61,
+        eku=CLIENT_AUTH,
+    )
+    write_der("leaf-clientauth-mailbox.der", leaf_client_mailbox)
+
 
 if __name__ == "__main__":
     main()

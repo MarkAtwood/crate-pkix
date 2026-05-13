@@ -238,6 +238,12 @@ clarification: `verify_tls_client` ([PKIX-fmtv.11.2.1]) and
 `verify_ocsp_responder` ([PKIX-fmtv.13.3]). Both filed as
 `human`-labeled beads with concrete option enumerations.
 
+**Update 2026-05-12:** [PKIX-fmtv.11.2.1] resolved; the client half
+ships as **two** wrappers — `verify_tls_client_dns(Option<&ServerName>)`
+and `verify_tls_client_mailbox(Option<&MailboxName>)` — preserving
+type discipline at the call site. Both accept `None` to skip identity
+binding (path-only mode). `verify_ocsp_responder` remains deferred.
+
 [PKIX-fmtv.11.2]: https://github.com/MarkAtwood/crate-pkix
 [PKIX-fmtv.12.2]: https://github.com/MarkAtwood/crate-pkix
 [PKIX-fmtv.13.1]: https://github.com/MarkAtwood/crate-pkix

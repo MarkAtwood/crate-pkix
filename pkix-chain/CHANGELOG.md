@@ -27,6 +27,17 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   `ServerName::ip_address`. Generic over `<P: Profile>` so the caller
   picks `BasicTlsProfile`, `WebPkiProfile`, or a custom profile. Baked
   `DefaultVerifier`. (PKIX-fmtv.11.2.)
+- `verify_tls_client_dns` and `verify_tls_client_mailbox` — TLS
+  client-auth wrappers with optional identity binding. Both take
+  `Option<&ServerName>` / `Option<&MailboxName>`; `None` skips identity
+  binding and validates only the path (useful for client-auth flows
+  that read the identity from the Subject DN). `Some(_)` runs the
+  same RFC 6125 / RFC 5280 §4.2.1.6 binding as the server / S/MIME
+  wrappers. The two-function split (over a single `Option<&dyn
+  Identity>` API) was decided in PKIX-fmtv.11.2.1 to preserve type
+  discipline at the call site. The client-vs-server distinction is
+  encoded in the caller-supplied `Profile` (which must require
+  `id-kp-clientAuth` for production use). (PKIX-fmtv.11.2.)
 - `verify_smime_signer` and `verify_smime_recipient` — RFC 5280 §4.2.1.6
   / RFC 8398 mailbox-identity wrappers. Compose `verify_chain` with
   `pkix_identity::verify_mailbox`. Caller pre-parses the target mailbox
@@ -90,13 +101,10 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 - `verify_chain` and `verify_chain_default` keep their existing
   `Result<ValidatedPath, Error>` shapes. New wrappers compose on top
   rather than replacing.
-- `verify_tls_client` and `verify_ocsp_responder` (from PKIX-fmtv.7's
-  7-wrapper set) are deferred. `verify_tls_client` is blocked on
-  PKIX-fmtv.11.2.1 pending a design decision on whether to accept
-  `ServerName` or `MailboxName` (or both) as the client-auth identity
-  shape. `verify_ocsp_responder` is blocked on PKIX-fmtv.13.3 pending
-  design decisions on the issuer parameter shape, self-signed CA-direct
-  responder handling, and `id-pkix-ocsp-nocheck` integration.
+- `verify_ocsp_responder` (from PKIX-fmtv.7's 7-wrapper set) is
+  deferred. Blocked on PKIX-fmtv.13.3 pending design decisions on the
+  issuer parameter shape, self-signed CA-direct responder handling,
+  and `id-pkix-ocsp-nocheck` integration.
 
 ## [0.4.0] — 2026-05-08
 

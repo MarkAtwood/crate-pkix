@@ -115,9 +115,12 @@ S/MIME bindings (PKIX-fmtv.23).
   self-contained inside pkix-chain. Future expansion via x509-limbo
   belongs in pkix-difftest's differential harness, not in this
   per-wrapper corpus.
-- **`verify_tls_client_dns`.** Pending the PKIX-fmtv.11.2.1 design
-  decision on client-auth identity shape (ServerName vs MailboxName).
-  Once it ships it can re-use this corpus.
+- **`verify_tls_client_dns` corpus coverage.** The DNS-name client
+  wrapper shipped under PKIX-fmtv.11.2 with its own smaller
+  smoke-test surface (`tests/verify_tls_client.rs`). Re-running this
+  hostname corpus against `verify_tls_client_dns` would duplicate
+  identical matcher coverage — `verify_dns_name` is shared by both
+  wrappers — and is intentionally not done here.
 - **Mailbox / rfc822Name binding.** That's PKIX-fmtv.23 (shipped) —
   see `tests/mailbox_corpus_baseline.md`.
 - **Public Suffix List enforcement.** Out of scope per the

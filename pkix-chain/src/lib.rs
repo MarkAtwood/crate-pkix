@@ -397,6 +397,156 @@ where
     Ok(validated)
 }
 
+/// Verify a certificate chain for TLS client authentication with an
+/// optional DNS-name identity binding.
+///
+/// Composes [`verify_chain`] with an optional call to
+/// [`pkix_identity::verify_dns_name`] in a single call. The leaf
+/// certificate `chain[0]` must validate as a chain against `anchors`
+/// under `profile.policy(now_unix)`. When `identity` is `Some(name)`,
+/// the leaf must additionally carry a Subject Alternative Name entry
+/// (`dNSName` or `iPAddress`) matching `name`.
+///
+/// `identity` is `Option<&ServerName<'_>>` because TLS client-auth
+/// callers fall into two camps: service-to-service mTLS deployments
+/// that pin a DNS or IP identity in the SAN, and callers that want
+/// path-only validation (e.g. servers willing to accept any client
+/// the trust anchors vouched for, even though the actual identity is
+/// then read elsewhere — typically from the Subject DN). The latter
+/// pass `None`.
+///
+/// The mailbox-flavored sibling [`verify_tls_client_mailbox`] covers
+/// personal-S/MIME-style client certs that bind an RFC 5322 mailbox
+/// in `rfc822Name` SAN entries; see PKIX-fmtv.11.2.1 for the
+/// two-function rationale.
+///
+/// The client-vs-server distinction is encoded in the caller-supplied
+/// [`Profile`]'s `ValidationPolicy` (EKU `id-kp-clientAuth` vs
+/// `id-kp-serverAuth`).
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
+/// that need a custom verifier should drop down to [`verify_chain`]
+/// and call [`pkix_identity::verify_dns_name`] explicitly when an
+/// identity binding is wanted.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the client cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `identity`   — `Some(name)` to bind a DNS or IP identity from the leaf's
+///   SAN; `None` to skip identity binding and validate the path only
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   the profile must require the `id-kp-clientAuth` EKU for production use
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Order of operations
+///
+/// Path validation runs first. A chain that fails RFC 5280 §6.1
+/// (expired, broken signature, missing intermediate, policy violation)
+/// returns [`Error::Path`] regardless of whether the leaf's SAN would
+/// have matched. Identity binding runs only after path validation
+/// succeeds and only when `identity` is `Some(_)`.
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed.
+/// - [`Error::Revocation`] — a cert in the chain was revoked or the
+///   revocation source was unusable.
+/// - [`Error::Identity`] — `identity` was `Some(_)`, path validation
+///   succeeded, but the leaf's SAN did not contain an entry matching
+///   the supplied `ServerName` (or the SAN extension was
+///   missing/malformed).
+pub fn verify_tls_client_dns<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    identity: Option<&ServerName<'_>>,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    if let Some(name) = identity {
+        pkix_identity::verify_dns_name(&chain[0], name)?;
+    }
+    Ok(validated)
+}
+
+/// Verify a certificate chain for TLS client authentication with an
+/// optional mailbox identity binding.
+///
+/// Companion to [`verify_tls_client_dns`] for personal-S/MIME-style
+/// client certificates whose identity binds in `rfc822Name` (RFC 5280
+/// §4.2.1.6) or `otherName(SmtpUTF8Mailbox)` (RFC 8398) SAN entries.
+/// When `identity` is `Some(mailbox)`, the leaf must carry a SAN entry
+/// matching the supplied [`MailboxName`]; when `identity` is `None`,
+/// identity binding is skipped and only the path is validated.
+///
+/// The split between [`verify_tls_client_dns`] and
+/// [`verify_tls_client_mailbox`] was chosen over a single `Option<&dyn
+/// Identity>` API to preserve type discipline at the call site
+/// (PKIX-fmtv.11.2.1). The caller picks the function name that
+/// communicates the binding shape it intends to enforce.
+///
+/// The client-vs-server distinction is encoded in the caller-supplied
+/// [`Profile`]'s `ValidationPolicy` (EKU `id-kp-clientAuth`).
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
+/// that need a custom verifier should drop down to [`verify_chain`]
+/// and call [`pkix_identity::verify_mailbox`] explicitly when an
+/// identity binding is wanted.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the client cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `identity`   — `Some(mailbox)` to bind a mailbox identity from the leaf's
+///   SAN; `None` to skip identity binding and validate the path only
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   the profile must require the `id-kp-clientAuth` EKU for production use
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Order of operations
+///
+/// Path validation runs first (see [`verify_tls_client_dns`] for the
+/// rationale). Identity binding runs only after path validation
+/// succeeds and only when `identity` is `Some(_)`.
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed.
+/// - [`Error::Revocation`] — a cert in the chain was revoked or the
+///   revocation source was unusable.
+/// - [`Error::Identity`] — `identity` was `Some(_)`, path validation
+///   succeeded, but the leaf's SAN did not contain an entry matching
+///   the supplied `MailboxName` (or the SAN extension was
+///   missing/malformed).
+pub fn verify_tls_client_mailbox<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    identity: Option<&MailboxName<'_>>,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    if let Some(mailbox) = identity {
+        pkix_identity::verify_mailbox(&chain[0], mailbox)?;
+    }
+    Ok(validated)
+}
+
 /// Verify a certificate chain for S/MIME signer use.
 ///
 /// Composes [`verify_chain`] with [`pkix_identity::verify_mailbox`] in a
