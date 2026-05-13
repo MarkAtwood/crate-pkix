@@ -65,12 +65,11 @@ First stable release.
   PartialEq + Eq` invariants, and the `io_error_kind_serde` label
   round-trip table.
 
-### Not yet shipped
-
-- `pkix-aia-http` HTTP adapter — PKIX-zkjb.5 (post-1.0).
+### Companion crate status
 
 The 1.0 surface in this crate (`AiaError` + `AiaFetcher` +
 `NoAiaFetcher`) is complete; the `pkix-chain::Verifier` 3-generic
-`A: AiaFetcher` integration shipped via PKIX-zkjb.9. The remaining
-post-1.0 work in `pkix-aia-http` will plug a real HTTP transport
-into the 3-generic surface non-breakingly.
+`A: AiaFetcher` integration shipped via PKIX-zkjb.9. The
+sync HTTP transport `pkix-aia-http` shipped via PKIX-zkjb.5 at
+0.0.0 (post-1.0 cadence). Reaching it from `pkix-chain` requires
+the chain-build integration tracked under PKIX-zkjb.7 (post-1.0).

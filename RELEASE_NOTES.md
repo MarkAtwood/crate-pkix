@@ -42,7 +42,7 @@ the surface. Twelve crates total.
 | Crate                          | Purpose |
 |--------------------------------|---------|
 | [`pkix-revocation-http`]       | Online CRL and OCSP fetching for `pkix-revocation`. |
-| [`pkix-aia`]                   | Authority Information Access fetcher trait + `NoAiaFetcher` default. The trait and types ship at 1.0 so the `pkix-chain::Verifier` 3-generic surface (`A: AiaFetcher = NoAiaFetcher`) is frozen; the real HTTP transport ships post-1.0 in `pkix-aia-http` (planned, PKIX-zkjb.5). |
+| [`pkix-aia`]                   | Authority Information Access fetcher trait + `NoAiaFetcher` default. The trait and types ship at 1.0 so the `pkix-chain::Verifier` 3-generic surface (`A: AiaFetcher = NoAiaFetcher`) is frozen; the real HTTP transport ships in the sibling [`pkix-aia-http`] crate (0.0.0, post-1.0 cadence). |
 
 ## What's not included
 
@@ -51,9 +51,11 @@ The following sibling crates are real ecosystem value but are
 at its own 0.x cadence post-1.0. Crates marked *planned* do not yet
 have source in the workspace.
 
-- **AIA online fetching** — `pkix-aia-http` (planned, PKIX-zkjb.5)
-  will ship the real HTTP transport that plugs into the 1.0
-  `pkix-chain::Verifier` 3-generic surface non-breakingly.
+- **AIA online fetching** — `pkix-aia-http` ships the real HTTP
+  transport (sync `ureq` backend) that plugs into the 1.0
+  `pkix-chain::Verifier` 3-generic surface. The crate is in-tree
+  at 0.0.0; reaching it from `pkix-chain` requires the chain-build
+  integration tracked under PKIX-zkjb.7 (post-1.0).
 - **Attribute Certificates** — [`pkix-ac`] (RFC 5755 skeleton; tracked
   as PKIX-ng0x).
 - **Certificate Transparency** — [`pkix-ct`] (RFC 6962 / RFC 9162 SCT
@@ -219,6 +221,7 @@ detailed per-change history; the per-crate files are the rollup view.
 [`pkix-lint-cabf`]: pkix-lint-cabf/
 [`pkix-revocation-http`]: pkix-revocation-http/
 [`pkix-aia`]: pkix-aia/
+[`pkix-aia-http`]: pkix-aia-http/
 [`pkix-ac`]: pkix-ac/
 [`pkix-ct`]: pkix-ct/
 [`pkix-composite`]: pkix-composite/
