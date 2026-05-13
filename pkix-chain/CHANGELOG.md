@@ -37,7 +37,9 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   Identity>` API) was decided in PKIX-fmtv.11.2.1 to preserve type
   discipline at the call site. The client-vs-server distinction is
   encoded in the caller-supplied `Profile` (which must require
-  `id-kp-clientAuth` for production use). (PKIX-fmtv.11.2.)
+  `id-kp-clientAuth` for production use — see
+  `pkix_profiles::BasicTlsClientProfile`). (PKIX-fmtv.11.2,
+  PKIX-uuiz.)
 - `verify_smime_signer` and `verify_smime_recipient` — RFC 5280 §4.2.1.6
   / RFC 8398 mailbox-identity wrappers. Compose `verify_chain` with
   `pkix_identity::verify_mailbox`. Caller pre-parses the target mailbox

@@ -30,6 +30,7 @@
 //! |--------|--------------------|---------| ----------------|
 //! | [`Rfc5280Profile`] | [`rfc5280_policy`] | RFC 5280 only | No overlay |
 //! | [`BasicTlsProfile`] | [`basic_tls_policy`] | RFC 5280 + RFC 6125 | id-kp-serverAuth EKU + non-empty SAN |
+//! | [`BasicTlsClientProfile`] | [`basic_tls_client_policy`] | RFC 5280 §4.2.1.12 | id-kp-clientAuth EKU |
 //! | [`BasicSmimeProfile`] | [`basic_smime_policy`] | RFC 8551 §3 | id-kp-emailProtection EKU + rfc822Name SAN |
 //! | [`BasicCodeSigningProfile`] | [`basic_code_signing_policy`] | RFC 5280 §4.2.1.12 | id-kp-codeSigning EKU |
 //! | [`BasicTimeStampingProfile`] | [`basic_time_stamping_policy`] | RFC 3161 §2.3 | id-kp-timeStamping EKU |
@@ -133,6 +134,7 @@ use der::asn1::ObjectIdentifier;
 // the RFC-baseline profiles depend on; coupling them to a CA/B Forum crate
 // would invert the dependency direction.
 const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.1");
+const ID_KP_CLIENT_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.2");
 const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
 const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.4");
 const ID_KP_TIME_STAMPING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
@@ -206,6 +208,49 @@ impl Profile for BasicTlsProfile {
         // RFC 5280 §4.2.1.12: id-kp-serverAuth is the universally-required
         // EKU for any certificate intended for TLS server use.
         p.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
+/// Basic TLS client-certificate profile (RFC 5280 + clientAuth EKU).
+///
+/// The minimum structural constraint that any TLS client-authentication
+/// certificate must satisfy: the `id-kp-clientAuth` Extended Key Usage
+/// (1.3.6.1.5.5.7.3.2). Unlike [`BasicTlsProfile`], this profile does NOT
+/// set `require_subject_alt_name` — client-auth deployments commonly read
+/// the identity from the Subject DN rather than the SAN. Callers that
+/// want SAN-bound identity binding should pass an explicit `ServerName`
+/// or `MailboxName` to `pkix_chain::verify_tls_client_dns` /
+/// `verify_tls_client_mailbox`; those wrappers run the SAN check
+/// separately from the profile's path-validation constraints.
+///
+/// **Not** a CA/B Forum profile: no validity caps, no key-size floors,
+/// no signature-algorithm whitelist.
+///
+/// The free-function alias [`basic_tls_client_policy`] is equivalent to
+/// `BasicTlsClientProfile.policy(now_unix)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct BasicTlsClientProfile;
+
+impl Profile for BasicTlsClientProfile {
+    fn id(&self) -> &'static str {
+        "ietf.tls-client-basic"
+    }
+
+    fn version(&self) -> &'static str {
+        // RFC 5280 EKU registry; id-kp-clientAuth is RFC 5280 §4.2.1.12.
+        "RFC 5280 §4.2.1.12"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        let mut p = ValidationPolicy::new(now_unix);
+        // RFC 5280 §4.2.1.12: id-kp-clientAuth is the EKU value for TLS
+        // client-authentication certificates.
+        p.required_leaf_eku = Some(vec![ID_KP_CLIENT_AUTH]);
         p
     }
 
@@ -371,6 +416,28 @@ pub fn basic_tls_policy(now_unix: u64) -> ValidationPolicy {
     BasicTlsProfile.policy(now_unix)
 }
 
+/// Return a [`ValidationPolicy`] for basic TLS client-certificate validation
+/// (RFC 5280 + `id-kp-clientAuth` EKU).
+///
+/// Convenience alias for `BasicTlsClientProfile.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `required_leaf_eku` | `id-kp-clientAuth` (1.3.6.1.5.5.7.3.2) | RFC 5280 §4.2.1.12 |
+///
+/// Unlike [`basic_tls_policy`], this does NOT set
+/// `require_subject_alt_name`. Client-auth deployments commonly read
+/// the identity from the Subject DN rather than the SAN; callers that
+/// want SAN-bound identity binding pass an explicit `ServerName` or
+/// `MailboxName` to `pkix_chain::verify_tls_client_dns` /
+/// `verify_tls_client_mailbox`.
+#[must_use]
+pub fn basic_tls_client_policy(now_unix: u64) -> ValidationPolicy {
+    BasicTlsClientProfile.policy(now_unix)
+}
+
 /// Return a [`ValidationPolicy`] for basic S/MIME end-entity validation
 /// (RFC 8551 §3 baseline).
 ///
@@ -458,6 +525,7 @@ mod tests {
     fn profile_ids_are_stable() {
         assert_eq!(Rfc5280Profile.id(), "ietf.rfc5280");
         assert_eq!(BasicTlsProfile.id(), "ietf.tls-basic");
+        assert_eq!(BasicTlsClientProfile.id(), "ietf.tls-client-basic");
         assert_eq!(BasicSmimeProfile.id(), "ietf.smime-basic");
         assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
         assert_eq!(BasicTimeStampingProfile.id(), "ietf.time-stamping-basic");
@@ -467,9 +535,38 @@ mod tests {
     fn profile_policy_sets_correct_timestamp() {
         assert_eq!(Rfc5280Profile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicTlsProfile.policy(NOW).current_time_unix, NOW);
+        assert_eq!(BasicTlsClientProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicSmimeProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicCodeSigningProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicTimeStampingProfile.policy(NOW).current_time_unix, NOW);
+    }
+
+    #[test]
+    fn basic_tls_client_policy_requires_client_auth_eku() {
+        let p = BasicTlsClientProfile.policy(NOW);
+        let eku = p.required_leaf_eku.expect("EKU must be required");
+        assert_eq!(eku.len(), 1, "exactly one EKU expected");
+        assert_eq!(eku[0], ID_KP_CLIENT_AUTH);
+        // No SAN requirement: client-auth deployments commonly carry the
+        // identity in the Subject DN rather than a SAN. The wrapper layer
+        // (verify_tls_client_dns / verify_tls_client_mailbox) handles
+        // caller-supplied SAN binding independently.
+        assert!(
+            !p.require_subject_alt_name,
+            "BasicTlsClientProfile must not require SAN (unlike BasicTlsProfile)"
+        );
+        assert!(!p.require_rfc822_san);
+    }
+
+    /// OID pin: `id-kp-clientAuth` is `1.3.6.1.5.5.7.3.2` per RFC 5280
+    /// §4.2.1.12. Locks the OID against accidental drift.
+    #[test]
+    fn id_kp_client_auth_oid_pinned() {
+        assert_eq!(
+            ID_KP_CLIENT_AUTH.to_string(),
+            "1.3.6.1.5.5.7.3.2",
+            "id-kp-clientAuth OID must match RFC 5280 §4.2.1.12"
+        );
     }
 
     #[test]
@@ -508,6 +605,13 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "BasicTlsProfile.policy and basic_tls_policy must agree"
+        );
+
+        let via_trait = BasicTlsClientProfile.policy(NOW);
+        let via_fn = basic_tls_client_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "BasicTlsClientProfile.policy and basic_tls_client_policy must agree"
         );
 
         let via_trait = BasicSmimeProfile.policy(NOW);

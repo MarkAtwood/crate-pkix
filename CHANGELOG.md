@@ -232,6 +232,13 @@ stamper).
 - `BasicTimeStampingProfile` + `basic_time_stamping_policy` — RFC 3161
   §2.3 EKU baseline (id-kp-timeStamping). The critical-and-sole rule
   is enforced at the wrapper layer rather than in the profile.
+- `BasicTlsClientProfile` + `basic_tls_client_policy` — RFC 5280
+  §4.2.1.12 EKU baseline (id-kp-clientAuth). Unlike `BasicTlsProfile`
+  this does NOT require a SAN at the path layer; client-auth
+  deployments commonly carry the identity in the Subject DN, and the
+  wrapper layer (`verify_tls_client_dns` / `verify_tls_client_mailbox`)
+  handles caller-supplied SAN binding independently. (PKIX-uuiz,
+  2026-05-12.)
 
 Two wrappers from the seven-set are deferred pending human design
 clarification: `verify_tls_client` ([PKIX-fmtv.11.2.1]) and
