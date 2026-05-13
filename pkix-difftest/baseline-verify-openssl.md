@@ -13,8 +13,8 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 |---|---|---|---|
 | `verify_tls_server` | `-purpose sslserver -verify_hostname/-verify_ip X` | PKIX-fmtv.18.2 | shipped |
 | `verify_tls_client_dns` | `-purpose sslclient -verify_hostname X` | PKIX-fmtv.18.3 | shipped |
-| `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | open |
-| `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | open |
+| `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | shipped |
+| `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_code_signer` | `-purpose codesign` | PKIX-fmtv.18.5 | open |
 | `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | open |
 | `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | open |
@@ -132,7 +132,58 @@ result here is the canonical client-mode comparison.
 
 ## S/MIME signer / recipient (PKIX-fmtv.18.4)
 
-_Open. Will populate when the subbead lands._
+**19 cases × 2 roles = 38 verdicts produced on both sides.**
+**38 / 38 in agreement** (100%). **0 Rust-looser, 0 Rust-stricter.**
+
+The two wrappers `verify_smime_signer` and `verify_smime_recipient`
+share byte-identical bodies (per `mailbox_corpus.rs`) and the OpenSSL
+purposes `smimesign` / `smimeencrypt` produce identical verdicts on
+this corpus. Listed once for both roles:
+
+| # | Case | Fixture | Target | Rust | OpenSSL | Agreement |
+|---|---|---|---|---|---|---|
+| 1 | `rfc822_exact_match` | `mailbox-rfc822-user-example.der` | `user@example.com` | Ok | pass | Agree |
+| 2 | `rfc822_local_part_mismatch` | `mailbox-rfc822-user-example.der` | `other@example.com` | NoMatchingSan | fail | Agree |
+| 3 | `domain_case_insensitive_san_to_target` | `mailbox-rfc822-user-EXAMPLE.der` | `user@example.com` | Ok | pass | Agree |
+| 4 | `domain_case_insensitive_target_to_san` | `mailbox-rfc822-user-example.der` | `user@EXAMPLE.com` | Ok | pass | Agree |
+| 5 | `local_part_case_sensitive_strict` | `mailbox-rfc822-User-example.der` | `user@example.com` | NoMatchingSan | fail | Agree |
+| 6 | `local_part_case_sensitive_strict_inv` | `mailbox-rfc822-user-example.der` | `User@example.com` | NoMatchingSan | fail | Agree |
+| 7 | `smtputf8_only_i18n_match` | `mailbox-smtputf8-only.der` | `用户@example.com` | Ok | pass | Agree |
+| 8 | `smtputf8_only_ascii_target_rejected` | `mailbox-smtputf8-only.der` | `user@example.com` | NoMatchingSan | fail | Agree |
+| 9 | `mixed_san_ascii_target_matches_rfc822` | `mailbox-mixed.der` | `user@example.com` | Ok | pass | Agree |
+| 10 | `mixed_san_i18n_target_matches_smtputf8` | `mailbox-mixed.der` | `用户@example.com` | Ok | pass | Agree |
+| 11 | `mixed_san_unrelated_target_rejected` | `mailbox-mixed.der` | `stranger@example.com` | NoMatchingSan | fail | Agree |
+| 12 | `multi_rfc822_first_match` | `mailbox-multi-rfc822.der` | `alpha@example.com` | Ok | pass | Agree |
+| 13 | `multi_rfc822_middle_match` | `mailbox-multi-rfc822.der` | `beta@example.com` | Ok | pass | Agree |
+| 14 | `multi_rfc822_last_match` | `mailbox-multi-rfc822.der` | `gamma@example.com` | Ok | pass | Agree |
+| 15 | `multi_rfc822_no_match` | `mailbox-multi-rfc822.der` | `delta@example.com` | NoMatchingSan | fail | Agree |
+| 16 | `dns_only_san_rejects_mailbox_under_rfc5280` | `mailbox-dns-only.der` | `user@example.com` | NoMatchingSan | fail | Agree |
+| 17 | `missing_san_extension` | `leaf-no-san.der` | `user@example.com` | MissingSan | fail | Agree |
+| 18 | `rfc822_san_without_at_sign_is_not_a_match` | `mailbox-rfc822-malformed-no-at.der` | `user@example.com` | NoMatchingSan | fail | Agree |
+| 19 | `smtputf8_malformed_utf8_is_not_a_match` | `mailbox-smtputf8-bad-utf8.der` | `用户@example.com` | NoMatchingSan | fail | Agree |
+
+### Notable case-by-case alignment
+
+- **Cases 5, 6 (RFC 5321 §2.4 local-part case sensitivity)**: OpenSSL
+  rejects `User@example.com` vs `user@example.com` — matches our
+  strict-byte-equal local-part policy (per
+  `mailbox_corpus_baseline.md`'s RFC 5321 decision). pyca/cryptography
+  and webpki agree. This is the cross-implementation invariant.
+
+- **Cases 7, 8 (RFC 8398 SmtpUTF8Mailbox)**: OpenSSL's `-verify_email`
+  handles SmtpUTF8 SAN entries — accepts a UTF-8 target against an
+  internationalized SAN, rejects an ASCII target against the same.
+  Matches our implementation exactly.
+
+- **Case 18 (malformed-no-at rfc822Name)**: OpenSSL refuses an
+  rfc822Name SAN that lacks `@`. Matches our matcher's structural
+  validation. (pyca presumably does the same; not differentially
+  tested here.)
+
+- **Case 19 (malformed UTF-8 in SmtpUTF8 SAN)**: OpenSSL surfaces the
+  malformed encoding (`asn1 encoding routines: invalid utf8string`
+  in stderr) and reports email mismatch. Matches our `MailboxName`
+  parser's behaviour of declining to bind a malformed SAN value.
 
 ## Code signing (PKIX-fmtv.18.5)
 
