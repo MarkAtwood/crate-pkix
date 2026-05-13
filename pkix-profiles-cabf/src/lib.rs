@@ -39,6 +39,28 @@
 //! CA/B Forum coverage (matching zlint's ~700-lint scope), use
 //! `pkix-policy-zlint` (PKIX-jy95).
 //!
+//! # Reporting divergences
+//!
+//! This crate is a snapshot interpretation of the CA/B Forum Baseline
+//! Requirements. The canonical source is the CA/B Forum's published BR
+//! text; this crate is reference, not authoritative. See `divergences.md`
+//! in this crate's source tree for the spec versions last refreshed
+//! against and the known intentional divergences.
+//!
+//! If you find that a constraint in this crate differs from what the
+//! current CA/B Forum BR says — wrong section reference, outdated rule,
+//! missing new ballot — please open an issue or PR at
+//! <https://github.com/MarkAtwood/crate-pkix>. Divergence fixes are
+//! welcomed from anyone in the community; you do not need to be a
+//! maintainer.
+//!
+//! Canonical BR sources:
+//!
+//! - TLS BR: <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
+//! - S/MIME BR: <https://github.com/cabforum/smime/blob/main/SBR.md>
+//! - Code Signing BR: <https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md>
+//! - EV Guidelines: <https://github.com/cabforum/servercert/blob/main/docs/EVG.md>
+//!
 //! # Profiles
 //!
 //! | Struct | Free-function alias | Document | Key constraints |
@@ -135,6 +157,8 @@ const ECDSA_WITH_SHA512: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.84
 
 /// CA/B Forum TLS BR §7.1.3 — approved signature algorithms for TLS certificates.
 ///
+/// Canonical source: [TLS BR §7.1.3 Algorithm object identifiers](https://github.com/cabforum/servercert/blob/main/docs/BR.md#713-algorithm-object-identifiers).
+///
 /// SHA-1 (`sha1WithRSAEncryption`, `ecdsa-with-SHA1`) is intentionally absent.
 /// The list currently matches S/MIME BR §7.1.3 and CS BR §7.1.3, but they are
 /// maintained as separate constants because each regime may diverge independently.
@@ -149,6 +173,8 @@ pub const CABF_TLS_BR_ALLOWED_ALGS: &[ObjectIdentifier] = &[
 
 /// CA/B Forum S/MIME BR §7.1.3 — approved signature algorithms for S/MIME certificates.
 ///
+/// Canonical source: [S/MIME BR §7.1.3 Algorithm object identifiers](https://github.com/cabforum/smime/blob/main/SBR.md#713-algorithm-object-identifiers).
+///
 /// Currently identical to [`CABF_TLS_BR_ALLOWED_ALGS`] but maintained independently
 /// because the S/MIME BR algorithm policy may diverge from TLS BR in future ballots.
 pub const CABF_SMIME_BR_ALLOWED_ALGS: &[ObjectIdentifier] = &[
@@ -161,6 +187,8 @@ pub const CABF_SMIME_BR_ALLOWED_ALGS: &[ObjectIdentifier] = &[
 ];
 
 /// CA/B Forum Code Signing BR §7.1.3 — approved signature algorithms for CS certificates.
+///
+/// Canonical source: [CS BR §7.1.3 Algorithm object identifiers](https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md#713-algorithm-object-identifiers).
 ///
 /// Currently identical to TLS BR list. Code Signing BR also requires RSA ≥ 3072 bits;
 /// that is enforced via [`ValidationPolicy::min_rsa_key_bits`], not via this list.
@@ -192,6 +220,14 @@ pub(crate) const ID_KP_CODE_SIGNING: ObjectIdentifier =
 ///
 /// The free-function alias [`web_pki_policy`] is equivalent to
 /// `WebPkiProfile.policy(now_unix)` and is provided for convenience.
+///
+/// # Canonical source
+///
+/// Canonical CA/B Forum TLS BR document:
+/// <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
+///
+/// Specific section anchors for this profile's constraints are listed in
+/// the [`web_pki_policy`] free-function rustdoc.
 ///
 /// ## SC-081 validity enforcement
 ///
@@ -254,6 +290,14 @@ impl Profile for WebPkiProfile {
 ///
 /// The free-function alias [`smime_policy`] is equivalent to
 /// `SmimeProfile.policy(now_unix)`.
+///
+/// # Canonical source
+///
+/// Canonical CA/B Forum S/MIME BR document:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
+/// Specific section anchors for this profile's constraints are listed in
+/// the [`smime_policy`] free-function rustdoc.
 ///
 /// # Limitations
 ///
@@ -319,6 +363,14 @@ impl Profile for SmimeProfile {
 ///
 /// The free-function alias [`code_signing_policy`] is equivalent to
 /// `CodeSigningProfile.policy(now_unix)`.
+///
+/// # Canonical source
+///
+/// Canonical CA/B Forum Code Signing BR document:
+/// <https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md>
+///
+/// Specific section anchors for this profile's constraints are listed in
+/// the [`code_signing_policy`] free-function rustdoc.
 ///
 /// # Limitations
 ///
@@ -430,12 +482,15 @@ pub const fn sc081_validity_cap(not_before_unix: u64) -> u64 {
 ///
 /// # Constraints enforced
 ///
+/// Canonical CA/B Forum TLS BR:
+/// <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
+///
 /// | Field | Value | Normative reference |
 /// |-------|-------|---------------------|
-/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | TLS BR §7.1.3 |
-/// | `min_rsa_key_bits` | 2048 | TLS BR §6.1.5 |
-/// | `require_subject_alt_name` | true | TLS BR §7.1.2.7.12 |
-/// | `required_leaf_eku` | id-kp-serverAuth (1.3.6.1.5.5.7.3.1) | TLS BR §7.1.2.7.10 |
+/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | [TLS BR §7.1.3](https://github.com/cabforum/servercert/blob/main/docs/BR.md#713-algorithm-object-identifiers) |
+/// | `min_rsa_key_bits` | 2048 | [TLS BR §6.1.5](https://github.com/cabforum/servercert/blob/main/docs/BR.md#615-key-sizes) |
+/// | `require_subject_alt_name` | true | [TLS BR §7.1.2.7.12](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712712-subscriber-certificate-subject-alternative-name) |
+/// | `required_leaf_eku` | id-kp-serverAuth (1.3.6.1.5.5.7.3.1) | [TLS BR §7.1.2.7.10](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712710-subscriber-certificate-extended-key-usage) |
 ///
 /// `max_path_len` is intentionally not set. The TLS BR does not impose a
 /// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is
@@ -468,14 +523,17 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// # Constraints enforced
 ///
+/// Canonical CA/B Forum S/MIME BR:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
 /// | Field | Value | Normative reference |
 /// |-------|-------|---------------------|
-/// | `max_validity_secs` | 1185 days (~39 months) | S/MIME BR §6.3.2 |
-/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | S/MIME BR §7.1.3 |
-/// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
+/// | `max_validity_secs` | 1185 days (~39 months) | [S/MIME BR §6.3.2](https://github.com/cabforum/smime/blob/main/SBR.md#632-certificate-operational-periods-and-key-pair-usage-periods) |
+/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | [S/MIME BR §7.1.3](https://github.com/cabforum/smime/blob/main/SBR.md#713-algorithm-object-identifiers) |
+/// | `min_rsa_key_bits` | 2048 | [S/MIME BR §6.1.5](https://github.com/cabforum/smime/blob/main/SBR.md#615-key-sizes) |
 /// | `require_subject_alt_name` | true | non-empty `SubjectAltName` extension required |
 /// | `require_rfc822_san` | true | at least one `rfc822Name` entry required in SAN |
-/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.1.2.3(f) |
+/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | [S/MIME BR §7.1.2.3(f)](https://github.com/cabforum/smime/blob/main/SBR.md#7123-subscriber-certificates) |
 ///
 /// `max_path_len` is intentionally not set. The S/MIME BR does not impose a
 /// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is
@@ -505,13 +563,16 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 ///
 /// # Constraints enforced
 ///
+/// Canonical CA/B Forum Code Signing BR:
+/// <https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md>
+///
 /// | Field | Value | Normative reference |
 /// |-------|-------|---------------------|
-/// | `max_validity_secs` | 460 days | CS BR §6.3.2 (effective 2026-03-01) |
-/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | CS BR §7.1.3 |
-/// | `min_rsa_key_bits` | 3072 | CS BR §6.1.5 (effective 2023-06-01) |
+/// | `max_validity_secs` | 460 days | [CS BR §6.3.2](https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md#632-certificate-operational-periods-and-key-pair-usage-periods) (effective 2026-03-01) |
+/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | [CS BR §7.1.3](https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md#713-algorithm-object-identifiers) |
+/// | `min_rsa_key_bits` | 3072 | [CS BR §6.1.5](https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md#615-key-sizes) (effective 2023-06-01) |
 /// | `require_subject_alt_name` | false | CS certs identify subjects by DN |
-/// | `required_leaf_eku` | id-kp-codeSigning (1.3.6.1.5.5.7.3.3) | CS BR §7.1.2.3(f) |
+/// | `required_leaf_eku` | id-kp-codeSigning (1.3.6.1.5.5.7.3.3) | [CS BR §7.1.2.3(f)](https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md#7123-code-signing-and-timestamp-certificate) |
 ///
 /// `max_path_len` is intentionally not set. The CS BR does not impose a
 /// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is

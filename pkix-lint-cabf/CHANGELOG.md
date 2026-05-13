@@ -6,6 +6,23 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Added
+
+- Rustdoc annotations linking each Lint to its canonical CA/B Forum
+  TLS BR source URL on GitHub. The crate-level rustdoc gains a
+  `## Reporting divergences` section inviting community-contributed
+  citation and behavior fixes. The `cabf_tls_br` module-level lint
+  table includes section anchors pointing into the upstream BR
+  document. Pure documentation; no behavior change. (PKIX-wrkm.)
+
+### Fixed
+
+- Pre-existing broken intra-doc-link `[pkix_path::Profile]` in
+  `CabfTlsBrProfile` rustdoc rewritten to `[pkix_lint::Profile]` (the
+  same type via re-export, resolvable from this crate's dependency
+  graph). `cargo doc -p pkix-lint-cabf --no-deps` now warns clean.
+  (PKIX-wrkm.)
+
 ### Changed (citations and metadata, no behavior impact)
 
 - `SanRequiredLint` citation refreshed from TLS BR §7.1.4.2 to

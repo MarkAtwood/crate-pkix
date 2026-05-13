@@ -38,6 +38,28 @@
 //! coverage (matching zlint's ~700-lint scope), use `pkix-policy-zlint`
 //! (PKIX-jy95).
 //!
+//! ## Reporting divergences
+//!
+//! This crate is a snapshot interpretation of the CA/B Forum Baseline
+//! Requirements. The canonical source is the CA/B Forum's published BR
+//! text; this crate is reference, not authoritative. See `divergences.md`
+//! in this crate's source tree for the spec versions last refreshed
+//! against and the known intentional divergences.
+//!
+//! If you find that a lint in this crate differs from what the current
+//! CA/B Forum BR says — wrong section reference, outdated rule, missing
+//! new ballot — please open an issue or PR at
+//! <https://github.com/MarkAtwood/crate-pkix>. Divergence fixes are
+//! welcomed from anyone in the community; you do not need to be a
+//! maintainer.
+//!
+//! Canonical BR sources:
+//!
+//! - TLS BR: <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
+//! - S/MIME BR: <https://github.com/cabforum/smime/blob/main/SBR.md>
+//! - Code Signing BR: <https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md>
+//! - EV Guidelines: <https://github.com/cabforum/servercert/blob/main/docs/EVG.md>
+//!
 //! ## Modules
 //!
 //! - [`cabf_tls_br`] — CA/B Forum TLS Baseline Requirements lints. Bundles
