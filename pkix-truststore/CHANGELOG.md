@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - Initial Tier-1 PEM/DER trust anchor loading (PKIX-lhm4). Bytes-in,
@@ -41,7 +47,7 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   (`pkix-truststore-system` per PKIX-8h87, `pkix-truststore-pkcs11`
   per PKIX-p8vz).
 
-### Changed (breaking)
+### Breaking
 
 - `Error::Io` payload type changes from `std::io::Error` to a new
   `IoFailure { kind: std::io::ErrorKind, message: String }` struct

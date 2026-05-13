@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - **`WebPkiProfile` now implements `pkix_lint::LintProfile`.** The
@@ -46,7 +52,7 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   pointing into the upstream BR documents. Pure documentation; no
   behavior change. (PKIX-wrkm.)
 
-### Changed (behavior)
+### Breaking
 
 - Removed `max_path_len` enforcement from `WebPkiProfile` (was `2`),
   `SmimeProfile` (was `1`), and `CodeSigningProfile` (was `1`). Audit

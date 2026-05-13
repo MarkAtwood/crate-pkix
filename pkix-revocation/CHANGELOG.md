@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - Optional `serde` feature deriving `Serialize` / `Deserialize` on

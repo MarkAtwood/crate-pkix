@@ -6,6 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — TBD
+
+First stable release.
+
 ### Added
 
 - RFC 6125 §6.4 hostname-binding implementation (PKIX-fmtv.11.1).
@@ -38,12 +44,6 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
   using pyca/cryptography as the independent oracle.
 - `idna` (workspace, no_std + `alloc` + `compiled_data`) and `der`
   (workspace) added as runtime deps.
-
-### Unchanged
-
-- `pkix-chain` `verify_tls_server` / `verify_tls_client` /
-  `verify_smime_signer` / `verify_smime_recipient` wrappers are split
-  out as PKIX-fmtv.11.2 and PKIX-fmtv.12.2 (blocked on PKIX-fmtv.7).
 
 ## [0.1.0] — 2026-05-11
 
