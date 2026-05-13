@@ -9,6 +9,7 @@ RFC 5280 §6.1 path validation before identity binding.
 | `root.der` | trust anchor | P-256 self-signed CA, cA=TRUE, KU=keyCertSign\|cRLSign |
 | `leaf-san-www-example.der` | end-entity | EE signed by `root`, EKU=serverAuth, SAN=DNS:www.example.com |
 | `leaf-no-san.der` | end-entity | EE signed by `root`, EKU=serverAuth, **no SAN extension** |
+| `leaf-san-alice-example.der` | end-entity | EE signed by `root`, EKU=emailProtection, SAN=rfc822Name:alice@example.com |
 
 Validity 2000-01-01 to 2050-01-01. P-256 ECDSA throughout so the workspace's
 default `DefaultVerifier` covers signature checking.

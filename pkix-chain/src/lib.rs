@@ -258,6 +258,92 @@ where
     Ok(validated)
 }
 
+/// Verify a certificate chain for S/MIME signer use.
+///
+/// Composes [`verify_chain`] with [`pkix_identity::verify_mailbox`] in a
+/// single call. The leaf certificate `chain[0]` must both validate as a
+/// chain against `anchors` under `profile.policy(now_unix)` **and** carry a
+/// Subject Alternative Name entry (`rfc822Name` or `otherName(SmtpUTF8Mailbox)`)
+/// matching `mailbox`.
+///
+/// The signer-vs-recipient distinction is encoded in the caller-supplied
+/// [`Profile`]'s `ValidationPolicy`: signer profiles require KeyUsage
+/// `digitalSignature`, recipient profiles require `keyEncipherment`. The
+/// wrapper body is byte-identical to [`verify_smime_recipient`]; the
+/// distinct function name lets callers communicate intent at the call site.
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
+/// need a custom verifier should drop down to [`verify_chain`] and call
+/// [`pkix_identity::verify_mailbox`] explicitly.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the signer cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `mailbox`    — pre-parsed mailbox (construct via [`MailboxName::parse`])
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   typically [`pkix_profiles::BasicSmimeProfile`] or a CA/B-Forum S/MIME tier
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Order of operations
+///
+/// Path validation runs first. A chain that fails RFC 5280 §6.1 returns
+/// [`Error::Path`] regardless of whether the leaf's SAN would have matched.
+/// Identity binding runs only after path validation succeeds.
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed.
+/// - [`Error::Revocation`] — a cert in the chain was revoked or the
+///   revocation source was unusable.
+/// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
+///   not contain an entry matching `mailbox` (or the SAN extension was
+///   missing/malformed).
+pub fn verify_smime_signer<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    mailbox: &MailboxName<'_>,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    pkix_identity::verify_mailbox(&chain[0], mailbox)?;
+    Ok(validated)
+}
+
+/// Verify a certificate chain for S/MIME recipient use.
+///
+/// Identical mechanics to [`verify_smime_signer`]; see that function's
+/// rustdoc for arguments, ordering, and errors. The two wrappers differ
+/// only in name so callers can communicate signer-vs-recipient intent at
+/// the call site. The key-usage distinction (`digitalSignature` for signer,
+/// `keyEncipherment` for recipient) is encoded in the caller-supplied
+/// [`Profile`].
+pub fn verify_smime_recipient<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    mailbox: &MailboxName<'_>,
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    pkix_identity::verify_mailbox(&chain[0], mailbox)?;
+    Ok(validated)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
