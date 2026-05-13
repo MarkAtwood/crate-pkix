@@ -15,7 +15,7 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 | `verify_tls_client_dns` | `-purpose sslclient -verify_hostname X` | PKIX-fmtv.18.3 | shipped |
 | `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | shipped |
-| `verify_code_signer` | `-purpose codesign` | PKIX-fmtv.18.5 | open |
+| `verify_code_signer` | _(no oracle in OpenSSL CLI)_ | PKIX-fmtv.18.5 | escalated (no oracle) |
 | `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | shipped (1 known divergence) |
 | `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | shipped (chain-only) |
 
@@ -187,7 +187,29 @@ this corpus. Listed once for both roles:
 
 ## Code signing (PKIX-fmtv.18.5)
 
-_Open. Will populate when the subbead lands._
+**No OpenSSL oracle available.** Empirically verified against
+OpenSSL 3.0.13: `openssl verify -help` lists exactly these recognized
+purposes:
+
+```
+sslclient, sslserver, nssslserver, smimesign, smimeencrypt,
+crlsign, any, ocsphelper, timestampsign
+```
+
+The bead description named `-purpose codesign` but that purpose
+**does not exist** in OpenSSL's `verify` tool. (`id-kp-codeSigning`
+IS recognized as an EKU OID by OpenSSL elsewhere — `openssl x509
+-ext extendedKeyUsage` will print "Code Signing" for
+`1.3.6.1.5.5.7.3.3` — but `openssl verify -purpose` has no
+code-signing verb.)
+
+**Status: escalated** (PKIX-fmtv.18.5 labeled `human`). The pyca
+diff (PKIX-fmtv.19) also has no oracle for code-signing; the
+workspace's three AGENTS.md-acceptable oracles (OpenSSL,
+pyca/cryptography, Bouncy Castle) do not cover this wrapper. A
+future signtool / osslsigncode oracle could be added separately if
+the workspace wants substantive differential coverage for
+`verify_code_signer`.
 
 ## Time stamping (PKIX-fmtv.18.6)
 
