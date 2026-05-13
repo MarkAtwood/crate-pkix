@@ -16,7 +16,7 @@ oracle, TLS-only). OpenSSL is the broader-coverage oracle because its
 | `verify_smime_signer` | `-purpose smimesign -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_smime_recipient` | `-purpose smimeencrypt -verify_email X` | PKIX-fmtv.18.4 | shipped |
 | `verify_code_signer` | `-purpose codesign` | PKIX-fmtv.18.5 | open |
-| `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | open |
+| `verify_time_stamper` | `-purpose timestampsign` | PKIX-fmtv.18.6 | shipped (1 known divergence) |
 | `verify_ocsp_responder` | `-purpose ocsphelper` | PKIX-fmtv.18.7 | shipped (chain-only) |
 
 OpenSSL version: tracked at run time — `openssl verify` is invoked from
@@ -191,7 +191,40 @@ _Open. Will populate when the subbead lands._
 
 ## Time stamping (PKIX-fmtv.18.6)
 
-_Open. Will populate when the subbead lands._
+**4 / 4 cases produced a verdict on both sides.**
+**3 / 4 in agreement** (75%). **1 known Rust-looser divergence, 0 Rust-stricter.**
+
+| # | Case | Fixture | Time | Rust | OpenSSL | Agreement |
+|---|---|---|---|---|---|---|
+| 1 | `happy_path_rfc3161_ku_violation` | `leaf-timestamping.der` | NOW | Ok | fail | **LooserThanOpenssl** (known) |
+| 2 | `eku_not_critical` | `leaf-timestamping-not-critical.der` | NOW | ProfileViolation | fail | Agree |
+| 3 | `eku_not_sole` | `leaf-timestamping-not-sole.der` | NOW | ProfileViolation | fail | Agree |
+| 4 | `before_not_before` | `leaf-timestamping.der` | 0 | Path | fail | Agree |
+
+### Recorded divergence: case 1 (RFC 3161 §2.3 KeyUsage shape)
+
+- **OpenSSL behaviour**: `-purpose timestampsign` strictly enforces
+  RFC 3161 §2.3 — the TSA cert's KeyUsage MUST contain ONLY
+  `digitalSignature` and/or `nonRepudiation`. Other bits
+  (`keyEncipherment`, `keyAgreement`, etc.) trigger "unsuitable
+  certificate purpose" rejection. Verified empirically against a
+  hand-issued TSA cert: `digitalSignature` alone passes,
+  `nonRepudiation` alone passes, `digitalSignature + nonRepudiation`
+  passes, `digitalSignature + keyEncipherment` fails.
+
+- **pkix-chain behaviour**: `verify_time_stamper` /
+  `BasicTimeStampingProfile` enforce EKU shape (presence, criticality,
+  sole) but do NOT check KeyUsage shape.
+
+- **Fixture state**: `leaf-timestamping.der` (authored by pyca's
+  gen.py for the in-crate smoke surface) carries
+  `digitalSignature + keyEncipherment` in KU. Validates under
+  pkix-chain, rejects under OpenSSL.
+
+- **Follow-up**: tracked in **PKIX-7cac** — "verify_time_stamper
+  should enforce RFC 3161 §2.3 KeyUsage shape". When that bead ships,
+  the diff harness's `known_divergence` flag is removed and the row
+  flips to Agree.
 
 ## OCSP responder (PKIX-fmtv.18.7)
 
