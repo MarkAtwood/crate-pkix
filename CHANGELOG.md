@@ -6,6 +6,42 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### AGENTS.md: spec-taxonomy principle for `-cabf` crates (2026-05-13)
+
+Articulates what the `-cabf` unprincipled exception in AGENTS.md
+non-negotiable #5 actually covers, replacing the ambiguous "small
+curated reference set" / "small marquee-violation reference" language.
+
+Decided principle:
+
+- Subscriber-cert taxonomy is **in scope** — one `Profile` per
+  BR-named subscriber-cert tier (TLS BR `WebPkiProfile`; S/MIME BR
+  four mailbox-binding tiers; Code Signing BR plus EV variant plus
+  Time-Stamping). Variant subdivisions within a subscriber profile
+  (e.g., EV vs. non-EV TLS) are included.
+- CA-cert / Root-cert profiles are **out of scope** — those are
+  path-validator concerns handled by RFC 5280 §6.1 in `pkix-path`.
+- Per-predicate Lint enforcement is **out of scope** —
+  `pkix-policy-zlint` owns predicate-comprehensive coverage. The
+  `-cabf` crates own taxonomy coverage; the adapter crate owns
+  predicate coverage.
+- Maintenance threshold revised: "what AI can grind faithfully from
+  each BR refresh under human review," not "what one human can author
+  by hand."
+
+The "not a template" bar still holds horizontally: no `-mozilla`,
+`-fedramp`, `-dod`, `-etsi` crates without explicit human re-decision.
+The principle decides *what* a hypothetical `-X` crate would cover if
+admitted, not *which* specs get admitted.
+
+No code change in this commit; the principle was already followed in
+practice. The amendment makes the boundary explicit so future agents
+and contributors pick it up at session start.
+
+Tracked as [PKIX-mzsk].
+
+[PKIX-mzsk]: https://github.com/MarkAtwood/crate-pkix  "AGENTS.md spec-taxonomy amendment"
+
 ### Send + Sync compile-time assertions on result types (2026-05-13)
 
 AGENTS.md non-negotiable #6 requires load-bearing result and error types
