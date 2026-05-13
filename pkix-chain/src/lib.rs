@@ -67,6 +67,21 @@ pub enum Error {
     /// [`verify_chain_default`] entry points do not perform identity
     /// binding and never return this variant.
     Identity(pkix_identity::IdentityError),
+    /// A wrapper-side post-validation profile check failed.
+    ///
+    /// Used by use-case wrappers for spec-mandated invariants that the
+    /// lower-level [`ValidationPolicy`] cannot express directly — for
+    /// example, RFC 3161 §2.3's requirement that a TSA certificate's
+    /// `ExtendedKeyUsage` extension be marked critical and contain only
+    /// `id-kp-timeStamping`.
+    ///
+    /// `reason` is a fixed-string description suitable for logging and
+    /// diagnostic display. It is not parsed by the engine; pattern-match
+    /// on the variant rather than the inner string.
+    ProfileViolation {
+        /// Fixed-string description of which profile invariant was violated.
+        reason: &'static str,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -75,6 +90,7 @@ impl core::fmt::Display for Error {
             Self::Path(e) => write!(f, "path validation: {e}"),
             Self::Revocation(e) => write!(f, "revocation: {e}"),
             Self::Identity(e) => write!(f, "identity binding: {e}"),
+            Self::ProfileViolation { reason } => write!(f, "profile violation: {reason}"),
         }
     }
 }
@@ -85,6 +101,7 @@ impl std::error::Error for Error {
             Self::Path(e) => Some(e),
             Self::Revocation(e) => Some(e),
             Self::Identity(e) => Some(e),
+            Self::ProfileViolation { .. } => None,
         }
     }
 }
@@ -386,6 +403,113 @@ where
     verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)
 }
 
+/// Verify a certificate chain for Time Stamping Authority (TSA) use.
+///
+/// Composes [`verify_chain`] under the caller-supplied [`Profile`] with the
+/// additional RFC 3161 §2.3 enforcement that the leaf certificate's
+/// `ExtendedKeyUsage` extension is:
+///
+/// - **present** (covered by `profile.policy(now_unix).required_leaf_eku`),
+/// - **marked critical**, and
+/// - **contains only** `id-kp-timeStamping` (no other EKU values).
+///
+/// The presence check is enforced inside [`verify_chain`] via the profile's
+/// `required_leaf_eku`. The criticality and sole-EKU checks run after
+/// `verify_chain` returns and fail with [`Error::ProfileViolation`] when
+/// violated.
+///
+/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
+/// need a custom verifier should drop down to [`verify_chain`] and replicate
+/// the post-validation EKU check.
+///
+/// # Arguments
+///
+/// - `chain`      — leaf-first certificate chain; `chain[0]` is the TSA cert
+/// - `anchors`    — trust anchors; validation succeeds when the chain reaches one
+/// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
+///   typically [`pkix_profiles::BasicTimeStampingProfile`]
+/// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+///
+/// # Errors
+///
+/// - [`Error::Path`] — RFC 5280 path validation failed (including the
+///   profile's `id-kp-timeStamping` EKU presence requirement).
+/// - [`Error::Revocation`] — a cert in the chain was revoked.
+/// - [`Error::ProfileViolation`] — path validation succeeded but the leaf
+///   cert's EKU extension is not marked critical, or contains EKU values
+///   other than `id-kp-timeStamping`.
+pub fn verify_time_stamper<P, R>(
+    chain: &[Certificate],
+    anchors: &[TrustAnchor],
+    profile: &P,
+    now_unix: u64,
+    revocation: &R,
+) -> crate::Result<ValidatedPath>
+where
+    P: Profile,
+    R: RevocationChecker,
+{
+    let policy = profile.policy(now_unix);
+    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;
+    enforce_timestamping_eku_critical_and_sole(&chain[0])?;
+    Ok(validated)
+}
+
+/// RFC 3161 §2.3: enforce that the TSA certificate's `ExtendedKeyUsage`
+/// extension is critical and contains only `id-kp-timeStamping`.
+///
+/// Returns [`Error::ProfileViolation`] with a fixed reason string on any
+/// failure. Treats a missing extension as "not sole" (it cannot be sole
+/// if it is not present) — but this case is normally caught earlier by
+/// the profile's `required_leaf_eku` check inside `verify_chain`.
+fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Result<()> {
+    use x509_cert::der::Decode as _;
+    use x509_cert::ext::pkix::ExtendedKeyUsage;
+
+    const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("2.5.29.37");
+    const ID_KP_TIME_STAMPING: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
+
+    let exts = leaf
+        .tbs_certificate
+        .extensions
+        .as_ref()
+        .ok_or(Error::ProfileViolation {
+            reason: "TSA certificate has no ExtendedKeyUsage extension",
+        })?;
+    let ext = exts
+        .iter()
+        .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
+        .ok_or(Error::ProfileViolation {
+            reason: "TSA certificate has no ExtendedKeyUsage extension",
+        })?;
+
+    if !ext.critical {
+        return Err(Error::ProfileViolation {
+            reason: "TSA ExtendedKeyUsage extension must be marked critical (RFC 3161 §2.3)",
+        });
+    }
+
+    let eku = ExtendedKeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| {
+        Error::ProfileViolation {
+            reason: "TSA ExtendedKeyUsage extension is malformed",
+        }
+    })?;
+
+    // RFC 3161 §2.3: timeStamping MUST be the sole EKU value.
+    match eku.0.as_slice() {
+        [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),
+        [_] => Err(Error::ProfileViolation {
+            reason: "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+        }),
+        _ => Err(Error::ProfileViolation {
+            reason: "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -435,6 +559,9 @@ mod tests {
             Error::Identity(IdentityError::MissingSan),
             Error::Identity(IdentityError::MalformedSan),
             Error::Identity(IdentityError::MalformedInput),
+            Error::ProfileViolation {
+                reason: "test violation",
+            },
         ];
         for err in cases {
             let s = format!("{err}");

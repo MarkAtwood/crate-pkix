@@ -21,6 +21,7 @@ pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
 pkix-identity   = { workspace = true, features = ["std"] }
 pkix-profiles   = { workspace = true }
+der             = { workspace = true }
 x509-cert       = { workspace = true }
 
 [package.metadata.docs.rs]

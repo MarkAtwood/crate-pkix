@@ -133,6 +133,28 @@ let result = verify_code_signer(
 )?;
 ```
 
+### Time Stamping Authority (RFC 3161)
+
+`verify_time_stamper` composes `verify_chain` with the RFC 3161 §2.3
+post-validation rule: the TSA leaf's `ExtendedKeyUsage` extension must
+be marked critical and contain only `id-kp-timeStamping`.
+
+```rust
+use pkix_chain::{verify_time_stamper, NoRevocation};
+use pkix_profiles::BasicTimeStampingProfile;
+
+let result = verify_time_stamper(
+    &chain,
+    &anchors,
+    &BasicTimeStampingProfile,
+    unix_now(),
+    &NoRevocation,
+)?;
+```
+
+Violations of the critical-and-sole rule surface as
+`Error::ProfileViolation { reason }` after path validation succeeds.
+
 ## What this crate does
 
 `verify_chain` runs two sequential checks:
