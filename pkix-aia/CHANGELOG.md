@@ -28,6 +28,16 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
     only — async adapters live in separate crates. Returns raw DER
     bytes; certificate parsing is the caller's responsibility. No
     timeout parameter (per-adapter construction concern).
+  - `NoAiaFetcher` (PKIX-zkjb.4) — zero-sized unit struct,
+    `#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]`,
+    `impl AiaFetcher` returning `AiaError::FetchingDisabled` for
+    every URI. `batch_fetch` uses the trait default-impl, so a
+    batch of N URIs returns a `Vec` of N `FetchingDisabled` errors.
+    Designed as the placeholder for
+    `pkix-chain::Verifier<'a, V, R, A = NoAiaFetcher>` (PKIX-zkjb.9,
+    planned) so callers who don't want AIA fetching wired up keep
+    the historical "caller supplies the complete chain" semantics.
+    Compile-time asserted `Send + Sync` alongside `AiaError`.
 - Feature flags:
   - `std` — enables `std::error::Error` impl on `AiaError` and
     unlocks the `IoFailure` variant.
@@ -51,9 +61,10 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### Not yet shipped
 
-- `NoAiaFetcher` zero-cost default — PKIX-zkjb.4.
 - `pkix-aia-http` HTTP adapter — PKIX-zkjb.5.
 - `pkix-chain::Verifier` 3-generic `A: AiaFetcher` API freeze — PKIX-zkjb.9.
 
-These are tracked under the PKIX-zkjb umbrella epic. PKIX-zkjb.2 is
-the foundation; the rest land in subsequent point releases.
+These are tracked under the PKIX-zkjb umbrella epic. The 1.0 surface
+in this crate (`AiaError` + `AiaFetcher` + `NoAiaFetcher`) is
+complete; the remaining work integrates the trait into `pkix-chain`
+and ships the HTTP transport adapter.
