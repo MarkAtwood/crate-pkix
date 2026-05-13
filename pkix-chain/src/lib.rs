@@ -33,6 +33,30 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # Reusable verifier
+//!
+//! For workloads that validate many chains against the same trust state,
+//! [`Verifier`] packages the slow-changing inputs once and exposes
+//! [`Verifier::verify_one`] and [`Verifier::verify_batch`]:
+//!
+//! ```rust,no_run
+//! use pkix_chain::{DefaultVerifier, NoRevocation, TrustAnchor, ValidationPolicy, Verifier};
+//! use x509_cert::Certificate;
+//!
+//! # fn demo(chains: Vec<Vec<Certificate>>, anchors: Vec<TrustAnchor>) -> Result<(), pkix_chain::Error> {
+//! let policy = ValidationPolicy::new(1_700_000_000);
+//! let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+//!
+//! let refs: Vec<&[Certificate]> = chains.iter().map(|c| c.as_slice()).collect();
+//! let results = verifier.verify_batch(&refs);
+//! # let _ = results;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The free function [`verify_chain`] is a thin wrapper around
+//! [`Verifier::verify_one`]; both are zero-cost over the other.
 
 pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
@@ -198,23 +222,121 @@ where
     V: SignatureVerifier,
     R: RevocationChecker,
 {
-    // First: full RFC 5280 §6 path validation (signatures, validity, chain linkage).
-    let validated = pkix_path::validate_path(chain, anchors, policy, verifier)?;
+    Verifier::new(anchors, verifier, revocation, policy).verify_one(chain)
+}
 
-    // Then: revocation checking on each cert in the validated chain.
-    // chain[i] was issued by chain[i+1]; the last cert was issued by the trust anchor.
-    for (i, cert) in chain.iter().enumerate() {
-        if i + 1 < chain.len() {
-            revocation.check_revocation(cert, &chain[i + 1])?;
-        } else {
-            // Last cert: issued directly by the trust anchor.
-            // CrlChecker/OcspChecker override this; NoRevocation inherits the
-            // default Ok(()) skip.
-            revocation.check_revocation_against_anchor(cert, &anchors[validated.anchor_index])?;
+/// Reusable verifier holding prepared validation state.
+///
+/// `Verifier` packages the slow-changing inputs to chain verification —
+/// trust anchors, signature verifier, revocation checker, and
+/// validation policy — into a single value that can validate one or
+/// many certificate chains.
+///
+/// This is the primary entry point for callers that validate multiple
+/// chains against the same trust state. The free function
+/// [`verify_chain`] delegates to [`Verifier::verify_one`] and is
+/// preserved for single-call use.
+///
+/// # Lifetimes
+///
+/// All inputs are borrowed; the verifier holds references with the
+/// same lifetime `'a`. Typical use is to construct trust anchors and
+/// the validation policy once, then build a verifier on each batch.
+///
+/// # Cache friendliness
+///
+/// Per workspace policy (AGENTS.md non-negotiable #6) the verifier is
+/// itself a small, stateless handle. Caches and memoisation belong in
+/// caller-side wrappers around [`Verifier::verify_one`] or in the
+/// [`SignatureVerifier`] / [`RevocationChecker`] implementations
+/// themselves, both of which preserve the per-call interface needed
+/// for such layering.
+pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker> {
+    anchors: &'a [TrustAnchor],
+    sig_verifier: &'a V,
+    rev_checker: &'a R,
+    policy: &'a ValidationPolicy,
+}
+
+impl<'a, V, R> Verifier<'a, V, R>
+where
+    V: SignatureVerifier,
+    R: RevocationChecker,
+{
+    /// Construct a verifier from its components.
+    pub fn new(
+        anchors: &'a [TrustAnchor],
+        sig_verifier: &'a V,
+        rev_checker: &'a R,
+        policy: &'a ValidationPolicy,
+    ) -> Self {
+        Self {
+            anchors,
+            sig_verifier,
+            rev_checker,
+            policy,
         }
     }
 
-    Ok(validated)
+    /// Verify a single certificate chain.
+    ///
+    /// Performs full RFC 5280 §6 path validation (signatures, validity,
+    /// chain linkage, policy) followed by revocation checking on every
+    /// cert in the chain, matching the semantics of [`verify_chain`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if path validation fails or revocation indicates a
+    /// revoked certificate.
+    ///
+    /// # Revocation coverage
+    ///
+    /// Identical to [`verify_chain`]:
+    ///
+    /// - `chain[i]` where `chain[i + 1]` exists: checked via
+    ///   [`RevocationChecker::check_revocation`] with `chain[i + 1]` as
+    ///   the issuer.
+    /// - The last cert in `chain` (issued directly by the trust anchor):
+    ///   checked via
+    ///   [`RevocationChecker::check_revocation_against_anchor`].
+    pub fn verify_one(&self, chain: &[Certificate]) -> crate::Result<ValidatedPath> {
+        // First: full RFC 5280 §6 path validation (signatures, validity, chain linkage).
+        let validated =
+            pkix_path::validate_path(chain, self.anchors, self.policy, self.sig_verifier)?;
+
+        // Then: revocation checking on each cert in the validated chain.
+        // chain[i] was issued by chain[i+1]; the last cert was issued by the trust anchor.
+        for (i, cert) in chain.iter().enumerate() {
+            if i + 1 < chain.len() {
+                self.rev_checker.check_revocation(cert, &chain[i + 1])?;
+            } else {
+                // Last cert: issued directly by the trust anchor.
+                // CrlChecker/OcspChecker override this; NoRevocation inherits the
+                // default Ok(()) skip.
+                self.rev_checker
+                    .check_revocation_against_anchor(cert, &self.anchors[validated.anchor_index])?;
+            }
+        }
+
+        Ok(validated)
+    }
+
+    /// Verify many certificate chains, returning per-chain results.
+    ///
+    /// Each chain is verified independently against the same trust
+    /// state; failures in one chain do not abort the others. The
+    /// returned vector has the same length as `chains` with results in
+    /// matching order.
+    ///
+    /// This is a sequential loop over [`Verifier::verify_one`]; the
+    /// chains do not share any per-validation state. Callers requiring
+    /// cross-chain caching (memoised path-builder candidates,
+    /// revocation lookups, etc.) should layer that on top of
+    /// `verify_one` or inside their [`SignatureVerifier`] /
+    /// [`RevocationChecker`] implementations.
+    pub fn verify_batch(&self, chains: &[&[Certificate]]) -> Vec<crate::Result<ValidatedPath>> {
+        chains.iter().map(|chain| self.verify_one(chain)).collect()
+    }
 }
 
 /// Verify a certificate chain for TLS server use.

@@ -8,6 +8,19 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ### Added
 
+- `Verifier<'a, V, R>` — reusable verifier struct that packages trust
+  anchors, signature verifier, revocation checker, and validation
+  policy into a single value, exposing `verify_one` (single chain) and
+  `verify_batch` (slice of chains) methods. The free function
+  `verify_chain` is now a thin wrapper that constructs `Verifier::new`
+  and calls `verify_one`; the two paths are byte-equivalent. Existing
+  use-case wrappers (`verify_tls_server`, `verify_smime_*`,
+  `verify_code_signer`, `verify_time_stamper`) continue to call
+  `verify_chain` and route transparently through the new code path.
+  Generic parameters (not trait objects) match the pre-existing
+  `verify_chain<V, R>` shape; single lifetime `'a`; all fields
+  borrowed. No `AiaFetcher` field yet — the trait is undecided per
+  PKIX-fmtv.2 closure and will be added when it lands. (PKIX-gsd9.)
 - `verify_tls_server` — RFC 6125 server-identity wrapper. Composes
   `verify_chain` with `pkix_identity::verify_dns_name`. Caller pre-parses
   the target hostname with `ServerName::dns_name` /
