@@ -11,7 +11,8 @@
 //!   `PKITS_PAST` = 1970-01-01 00:00:00 UTC = 0  (before notBefore)
 
 use pkix_chain::{
-    verify_chain, verify_chain_default, DefaultVerifier, NoRevocation, RevocationChecker, Verifier,
+    verify_chain, verify_chain_default, DefaultVerifier, NoAiaFetcher, NoRevocation,
+    RevocationChecker, Verifier,
 };
 use pkix_path::{TrustAnchor, ValidationPolicy};
 use x509_cert::Certificate;
@@ -109,7 +110,15 @@ fn e2e_anchor_issued_cert_revocation_check_is_called() {
         anchor_check_called: Cell::new(false),
     };
 
-    verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &spy).expect("chain must validate");
+    verify_chain(
+        &chain,
+        &anchors,
+        &policy,
+        &DefaultVerifier,
+        &spy,
+        &NoAiaFetcher,
+    )
+    .expect("chain must validate");
     assert!(
         spy.anchor_check_called.get(),
         "check_revocation_against_anchor must be called for the anchor-issued cert"
@@ -126,7 +135,14 @@ fn e2e_verify_chain_explicit_verifier() {
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
     let policy = ValidationPolicy::new(PKITS_NOW);
 
-    let result = verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &NoRevocation);
+    let result = verify_chain(
+        &chain,
+        &anchors,
+        &policy,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    );
     let vp = result.expect("PKITS §4.1.1 must validate via verify_chain with DefaultVerifier");
     assert_eq!(vp.anchor_index, 0);
     assert_eq!(vp.depth, 1);
@@ -145,9 +161,22 @@ fn e2e_verifier_verify_one_matches_verify_chain() {
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
     let policy = ValidationPolicy::new(PKITS_NOW);
 
-    let from_free =
-        verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &NoRevocation).expect("free");
-    let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+    let from_free = verify_chain(
+        &chain,
+        &anchors,
+        &policy,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("free");
+    let verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    );
     let from_struct = verifier.verify_one(&chain).expect("struct");
 
     assert_eq!(from_free.anchor_index, from_struct.anchor_index);
@@ -173,10 +202,22 @@ fn e2e_verifier_verify_batch_returns_per_chain_results() {
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
 
     let good_policy = ValidationPolicy::new(PKITS_NOW);
-    let good_verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &good_policy);
+    let good_verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &good_policy,
+        &NoAiaFetcher,
+    );
 
     let bad_policy = ValidationPolicy::new(0);
-    let bad_verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &bad_policy);
+    let bad_verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &bad_policy,
+        &NoAiaFetcher,
+    );
 
     // Run each chain through its respective verifier and collect the
     // results into a single batch shape; this proves verify_batch
@@ -210,7 +251,13 @@ fn e2e_verifier_verify_batch_returns_per_chain_results() {
 fn e2e_verifier_verify_batch_empty_input_returns_empty() {
     let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
     let policy = ValidationPolicy::new(PKITS_NOW);
-    let verifier = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy);
+    let verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    );
 
     let results = verifier.verify_batch(&[]);
     assert!(results.is_empty());
