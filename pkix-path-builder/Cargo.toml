@@ -13,11 +13,17 @@ categories  = ["cryptography", "no-std"]
 [features]
 default = []
 std     = ["der/std", "x509-cert/std"]
+# Optional serde derives on the public `Error` type. Mirrors pkix-path's
+# convention: typed inner errors so consumers can programmatically
+# distinguish "no chain built" from "candidate chain rejected by
+# validate_path". Pulled in by `pkix-chain/serde` (PKIX-zkjb.7).
+serde = ["dep:serde"]
 
 [dependencies]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
+serde      = { workspace = true, optional = true }
 
 [dev-dependencies]
 pkix-path = { path = "../pkix-path", features = ["rsa", "p256", "std"] }

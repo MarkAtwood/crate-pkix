@@ -100,3 +100,46 @@ fn profile_violation_wire_form_is_externally_tagged() {
     let json = serde_json::to_string(&err).expect("serialize");
     assert_eq!(json, r#"{"ProfileViolation":{"reason":"invariant"}}"#);
 }
+
+/// `Error::Aia` forwards a `pkix_aia::AiaError` through serde. Variant
+/// coverage parity with the `Path` / `Revocation` / `Identity` wrapper
+/// tests above. The companion `pkix_aia` crate exercises full per-variant
+/// coverage in its own round-trip suite.
+#[test]
+fn error_aia_forwards_inner_serde() {
+    let inner = pkix_aia::AiaError::FetchingDisabled;
+    let err = Error::Aia(inner);
+    let json = serde_json::to_string(&err).expect("serialize");
+    let back: Error = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(err, back);
+    assert!(matches!(
+        back,
+        Error::Aia(pkix_aia::AiaError::FetchingDisabled)
+    ));
+}
+
+/// `Error::PathBuild` forwards a `pkix_path_builder::Error` through
+/// serde. Coverage parity with the wrapper tests.
+#[test]
+fn error_path_build_forwards_inner_serde() {
+    let inner = pkix_path_builder::Error::NoPathFound;
+    let err = Error::PathBuild(inner);
+    let json = serde_json::to_string(&err).expect("serialize");
+    let back: Error = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(err, back);
+    assert!(matches!(
+        back,
+        Error::PathBuild(pkix_path_builder::Error::NoPathFound)
+    ));
+}
+
+/// `Error::AiaDepthExceeded` is a unit variant; round-trip is a sanity
+/// check that no payload requirements were missed.
+#[test]
+fn error_aia_depth_exceeded_round_trips() {
+    let err = Error::AiaDepthExceeded;
+    let json = serde_json::to_string(&err).expect("serialize");
+    let back: Error = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(err, back);
+    assert_eq!(json, r#""AiaDepthExceeded""#);
+}
