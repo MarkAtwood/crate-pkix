@@ -114,4 +114,12 @@ pkix-lint         = { workspace = true, optional = true }
 pkix-lint-cabf    = { workspace = true, optional = true }
 
 [dev-dependencies]
-# Tests reuse the runtime deps; nothing else is needed at this stage.
+# Wrapper-level differential test (`tests/verify_wrapper_pyca.rs`, PKIX-fmtv.19)
+# drives `pkix_chain::verify_tls_server` and `verify_tls_client_dns` against
+# the pyca/cryptography `PolicyBuilder` sidecar over the curated RFC 6125
+# corpus in `pkix-chain/tests/fixtures/`. pkix-chain is a dev-dep only —
+# pkix-difftest's runtime crate has no reason to pull in the high-level
+# umbrella.
+pkix-chain    = { workspace = true }
+pkix-profiles = { workspace = true }
+pkix-identity = { workspace = true }
