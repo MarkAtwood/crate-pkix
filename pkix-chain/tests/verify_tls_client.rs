@@ -15,7 +15,7 @@ use pkix_chain::{
     verify_tls_client_dns, verify_tls_client_mailbox, Error, IdentityError, MailboxName,
     NoRevocation, ServerName, TrustAnchor,
 };
-use pkix_profiles::Rfc5280Profile;
+use pkix_profiles::{BasicTlsClientProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
 
@@ -260,6 +260,82 @@ fn client_mailbox_identity_none_skips_binding_no_san() {
 // ---------------------------------------------------------------------------
 // verify_tls_client_mailbox — order-of-checks invariant
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// BasicTlsClientProfile wiring smoke
+// ---------------------------------------------------------------------------
+
+/// Pin that `BasicTlsClientProfile` accepts the clientAuth-EKU fixture
+/// when paired with the DNS-name wrapper. The profile sets
+/// `required_leaf_eku = [id-kp-clientAuth]` and does NOT require a SAN
+/// at the path layer; the wrapper's SAN check runs separately for
+/// `Some(name)` callers.
+#[test]
+fn client_dns_with_basic_tls_client_profile() {
+    let leaf = load_fixture("leaf-clientauth-dns.der");
+    let chain = [leaf];
+    let name = ServerName::dns_name("client.example.com").unwrap();
+    let anchors = anchors();
+
+    let vp = verify_tls_client_dns(
+        &chain,
+        &anchors,
+        Some(&name),
+        &BasicTlsClientProfile,
+        NOW,
+        &NoRevocation,
+    )
+    .expect("BasicTlsClientProfile + clientAuth-EKU leaf + matching SAN must succeed");
+    assert_eq!(vp.anchor_index, 0);
+}
+
+/// Companion smoke for the mailbox wrapper under `BasicTlsClientProfile`.
+#[test]
+fn client_mailbox_with_basic_tls_client_profile() {
+    let leaf = load_fixture("leaf-clientauth-mailbox.der");
+    let chain = [leaf];
+    let mailbox = MailboxName::parse("client@example.com").unwrap();
+    let anchors = anchors();
+
+    let vp = verify_tls_client_mailbox(
+        &chain,
+        &anchors,
+        Some(&mailbox),
+        &BasicTlsClientProfile,
+        NOW,
+        &NoRevocation,
+    )
+    .expect("BasicTlsClientProfile + clientAuth-EKU leaf + matching mailbox must succeed");
+    assert_eq!(vp.anchor_index, 0);
+}
+
+/// `BasicTlsClientProfile` does NOT set `require_subject_alt_name`.
+/// A clientAuth-EKU leaf with no SAN extension must still pass path
+/// validation under this profile (with `identity = None`).
+#[test]
+fn client_dns_no_san_passes_under_basic_tls_client_profile() {
+    let leaf = load_fixture("leaf-no-san.der");
+    let chain = [leaf];
+    let anchors = anchors();
+
+    // leaf-no-san.der carries EKU=serverAuth so it will be rejected by
+    // the clientAuth-EKU requirement. We pin the failure mode is the
+    // EKU mismatch, not a SAN miss — proves BasicTlsClientProfile
+    // doesn't import a SAN constraint from BasicTlsProfile by accident.
+    let err = verify_tls_client_dns(
+        &chain,
+        &anchors,
+        None,
+        &BasicTlsClientProfile,
+        NOW,
+        &NoRevocation,
+    )
+    .expect_err("serverAuth-only leaf must fail clientAuth EKU check");
+    assert!(
+        matches!(err, Error::Path(_)),
+        "expected Error::Path(_) for EKU mismatch, got: {err:?}"
+    );
+}
 
 #[test]
 fn client_mailbox_path_validation_runs_before_identity() {
