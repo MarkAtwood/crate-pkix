@@ -21,9 +21,16 @@ pkix-lint     = { workspace = true }
 # pkix-lint-cabf supplies the CA/B Forum TLS BR Lint impls that
 # WebPkiProfile's LintProfile impl bundles (PKIX-9vnx.9.2.2).
 pkix-lint-cabf = { workspace = true }
+# x509-cert's `Certificate` is the per-cert input type for the shape-check
+# convenience aliases (`check_web_pki_shape`, `check_smime_shape`,
+# `check_code_signing_shape`). Already a transitive dep via pkix-path;
+# declared directly so the alias signatures can name `x509_cert::Certificate`
+# without leaning on a re-export.
+x509-cert     = { workspace = true }
 
 [dev-dependencies]
-x509-cert = { workspace = true }
+# x509-cert is already a regular dep; integration tests use it via that
+# edge. No separate dev-dep declaration needed.
 
 [package.metadata.docs.rs]
 all-features = true

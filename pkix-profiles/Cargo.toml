@@ -14,12 +14,20 @@ categories  = ["cryptography"]
 der       = { workspace = true }
 # Default features (rsa, p256) are intentionally enabled: pkix-profiles tests use EcdsaP256Verifier.
 pkix-path = { workspace = true }
+# pkix-lint provides the LintProfile trait that Profile types implement
+# alongside Profile to expose their canonical RFC-conformance lint set
+# (PKIX-9vnx.9.2), and the check_shape() convenience the per-profile
+# shape-check aliases delegate to.
+pkix-lint = { workspace = true }
 # Used solely for the deprecated re-exports of WebPkiProfile, SmimeProfile,
 # CodeSigningProfile, and sc081_validity_cap — moved to pkix-profiles-cabf in
 # the 0.3.0 release. Drops in 0.4.0 alongside removal of the re-exports.
 pkix-profiles-cabf = { workspace = true }
-
-[dev-dependencies]
+# x509-cert's `Certificate` is the per-cert input type for the shape-check
+# convenience aliases (`check_basic_tls_shape`, `check_basic_smime_shape`).
+# Already a transitive dep via pkix-path; declared directly so the alias
+# signatures can name `x509_cert::Certificate` without leaning on a
+# re-export.
 x509-cert = { workspace = true }
 
 [package.metadata.docs.rs]

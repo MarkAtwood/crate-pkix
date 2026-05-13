@@ -6,6 +6,56 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-profiles` + `pkix-profiles-cabf`: per-profile shape-check aliases (PKIX-9vnx.9.2)
+
+Profile types now implement `pkix_lint::LintProfile` alongside `Profile`,
+exposing their canonical lint set, and ship one-line `check_*_shape`
+convenience functions over `pkix_lint::check_shape`.
+
+`pkix-profiles`:
+
+- `BasicTlsProfile` + `impl LintProfile` bundling six RFC 5280 / 6125
+  lints (Rfc6125TlsServerSanLint, Rfc5280EkuServerAuthLint,
+  Rfc5280BasicConstraintsCaLeafLint,
+  Rfc5280SanRequiredWhenSubjectEmptyLint,
+  Rfc5280SignatureAlgorithmMatchLint, Rfc5280MaxSerialLengthLint).
+- `BasicSmimeProfile` + `impl LintProfile` bundling five RFC 8551 /
+  8398 / 5280 lints (Rfc8398SmimeSanLint,
+  Rfc8551EkuEmailProtectionLint, Rfc8398SmimeMailboxEquivalenceLint,
+  Rfc5280SignatureAlgorithmMatchLint, Rfc5280MaxSerialLengthLint).
+- `pub fn check_basic_tls_shape(cert, now_unix) -> Result<(), Vec<Finding>>`.
+- `pub fn check_basic_smime_shape(cert, now_unix) -> Result<(), Vec<Finding>>`.
+- New runtime deps: `pkix-lint`, `x509-cert`.
+
+`pkix-profiles-cabf`:
+
+- `SmimeProfile` + `impl LintProfile` (currently empty Vec: no
+  `cabf_smime_br` module ships in `pkix-lint-cabf` yet).
+- `CodeSigningProfile` + `impl LintProfile` (currently empty Vec: no
+  `cabf_cs_br` module ships in `pkix-lint-cabf` yet).
+- `pub fn check_web_pki_shape(cert, now_unix) -> Result<(), Vec<Finding>>`.
+- `pub fn check_smime_shape(cert, now_unix) -> Result<(), Vec<Finding>>`.
+- `pub fn check_code_signing_shape(cert, now_unix) -> Result<(), Vec<Finding>>`.
+- Already-shipped `WebPkiProfile::impl LintProfile` from PKIX-9vnx.9.2.2
+  remains; `check_web_pki_shape` exposes it as a one-line alias.
+- New runtime dep: `x509-cert`.
+
+Layered semantics across the five aliases:
+
+- `pkix_profiles::check_basic_*_shape` — RFC baseline only (no CA/B
+  Forum overlay).
+- `pkix_profiles_cabf::check_*_shape` — CA/B Forum overlay only (no
+  RFC-baseline lints duplicated). Callers wanting full coverage run
+  both halves.
+
+The cabf S/MIME and CS aliases are intentionally near-no-op today; that
+contract is pinned by tests so adding `cabf_smime_br` / `cabf_cs_br`
+lint modules to `pkix-lint-cabf` later surfaces the contract change
+deliberately rather than silently.
+
+10 new tests across `pkix-profiles/tests/check_shape_aliases.rs` and
+`pkix-profiles-cabf/tests/check_shape_aliases.rs`.
+
 ### `pkix-policy-zlint` 0.0.0: thin Lint adapter over `pkix-zlint-bridge` (2026-05-13)
 
 New crate. Wraps each zlint catalog check (~400 at the time of writing)

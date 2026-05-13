@@ -244,6 +244,46 @@ impl Profile for BasicTlsProfile {
     }
 }
 
+impl pkix_lint::LintProfile for BasicTlsProfile {
+    /// Return the canonical RFC-conformance lint set for a basic TLS server cert.
+    ///
+    /// Bundles RFC 5280 + RFC 6125 baseline checks: SAN with at least one dNSName
+    /// or iPAddress (RFC 6125), id-kp-serverAuth EKU presence (RFC 5280 + RFC 6125),
+    /// subscriber-cert basicConstraints non-CA (RFC 5280 §4.2.1.9), SAN required
+    /// when Subject DN is empty (RFC 5280 §4.2.1.6), outer/inner signatureAlgorithm
+    /// match (RFC 5280 §4.1), and serial-number length cap (RFC 5280 §4.1.2.2).
+    ///
+    /// The returned slice is backed by a lazily-initialized `static OnceLock`.
+    /// CA/B Forum TLS BR overlay lints (SHA-1 prohibition, RSA min-key-size,
+    /// SC-081 validity caps, etc.) are NOT included here — those live on
+    /// `pkix_profiles_cabf::WebPkiProfile`'s `LintProfile` impl.
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(|| {
+            vec![
+                Box::new(pkix_lint::rfc6125::Rfc6125TlsServerSanLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280EkuServerAuthLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280BasicConstraintsCaLeafLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280SanRequiredWhenSubjectEmptyLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
+            ]
+        })
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(vec![
+            Box::new(pkix_lint::rfc6125::Rfc6125TlsServerSanLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280EkuServerAuthLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280BasicConstraintsCaLeafLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280SanRequiredWhenSubjectEmptyLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
+        ])
+    }
+}
+
 /// Basic TLS client-certificate profile (RFC 5280 + clientAuth EKU).
 ///
 /// The minimum structural constraint that any TLS client-authentication
@@ -326,6 +366,45 @@ impl Profile for BasicSmimeProfile {
 
     fn policy_oids(&self) -> &[ObjectIdentifier] {
         &[]
+    }
+}
+
+impl pkix_lint::LintProfile for BasicSmimeProfile {
+    /// Return the canonical RFC-conformance lint set for a basic S/MIME cert.
+    ///
+    /// Bundles RFC 8551 + RFC 8398 + RFC 5280 baseline checks: SAN with at
+    /// least one rfc822Name or SmtpUTF8Mailbox otherName (RFC 8398),
+    /// id-kp-emailProtection EKU presence (RFC 8551 §3.3), rfc822Name /
+    /// SmtpUTF8Mailbox equivalence when both are present (RFC 8398 §3),
+    /// outer/inner signatureAlgorithm match (RFC 5280 §4.1), and
+    /// serial-number length cap (RFC 5280 §4.1.2.2).
+    ///
+    /// The returned slice is backed by a lazily-initialized `static OnceLock`.
+    /// CA/B Forum S/MIME BR overlay lints are NOT included here — those would
+    /// live on `pkix_profiles_cabf::SmimeProfile`'s `LintProfile` impl once
+    /// a S/MIME BR lint module ships in `pkix-lint-cabf`.
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(|| {
+            vec![
+                Box::new(pkix_lint::rfc8398::Rfc8398SmimeSanLint),
+                Box::new(pkix_lint::rfc8551::Rfc8551EkuEmailProtectionLint),
+                Box::new(pkix_lint::rfc8398::Rfc8398SmimeMailboxEquivalenceLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
+                Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
+            ]
+        })
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(vec![
+            Box::new(pkix_lint::rfc8398::Rfc8398SmimeSanLint),
+            Box::new(pkix_lint::rfc8551::Rfc8551EkuEmailProtectionLint),
+            Box::new(pkix_lint::rfc8398::Rfc8398SmimeMailboxEquivalenceLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
+            Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
+        ])
     }
 }
 
@@ -597,6 +676,102 @@ pub fn basic_time_stamping_policy(now_unix: u64) -> ValidationPolicy {
 #[must_use]
 pub fn basic_ocsp_responder_policy(now_unix: u64) -> ValidationPolicy {
     BasicOcspResponderProfile.policy(now_unix)
+}
+
+// ---------------------------------------------------------------------------
+// Shape-check convenience aliases (PKIX-9vnx.9.2)
+//
+// One-line wrappers over `pkix_lint::check_shape(cert, SubjectKind::Leaf,
+// now_unix, &<Profile>)` for each Basic*Profile that ships a LintProfile
+// impl. Sister aliases for the CA/B Forum BR overlays live in
+// `pkix-profiles-cabf` (`check_web_pki_shape`, `check_smime_shape`,
+// `check_code_signing_shape`).
+// ---------------------------------------------------------------------------
+
+/// Run the [`BasicTlsProfile`] lint set against a single TLS server
+/// certificate as a fast structural shape check.
+///
+/// Returns `Ok(())` when no `Error`/`Fatal` findings are produced; returns
+/// `Err(findings)` with the complete `Vec<Finding>` from
+/// [`pkix_lint::LintRunner::run_cert`] otherwise. The returned list may
+/// include `Warn` findings alongside the failing ones — callers can filter
+/// as they need.
+///
+/// Convenience alias for
+/// `pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &BasicTlsProfile)`.
+///
+/// # Constraints checked
+///
+/// See [`BasicTlsProfile`]'s `LintProfile` impl. The bundle covers
+/// RFC 5280 plus RFC 6125 baseline checks: SAN presence,
+/// id-kp-serverAuth EKU, subscriber-cert non-CA basicConstraints,
+/// SAN-when-empty-Subject, signatureAlgorithm match, and serial-number
+/// length cap.
+///
+/// CA/B Forum TLS BR overlay constraints (SHA-1 prohibition, RSA
+/// min-key-size, SC-081 phased validity caps, etc.) are NOT checked here.
+/// For BR-overlay shape checks use
+/// `pkix_profiles_cabf::check_web_pki_shape`.
+///
+/// # Layered semantics
+///
+/// This is a single-cert, no-chain, no-signature-verification structural
+/// check. Use [`pkix_path::validate_path`] for full RFC 5280 §6 path
+/// validation including signature checks.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<Finding>)` containing the full lint runner output if
+/// any cert-scope lint records an `Error` or `Fatal` finding. The error
+/// vector may also include `Warn`, `Pass`, or `NotApplicable` findings.
+pub fn check_basic_tls_shape(
+    cert: &x509_cert::Certificate,
+    now_unix: u64,
+) -> Result<(), Vec<pkix_lint::Finding>> {
+    pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &BasicTlsProfile)
+}
+
+/// Run the [`BasicSmimeProfile`] lint set against a single S/MIME end-entity
+/// certificate as a fast structural shape check.
+///
+/// Returns `Ok(())` when no `Error`/`Fatal` findings are produced; returns
+/// `Err(findings)` with the complete `Vec<Finding>` from
+/// [`pkix_lint::LintRunner::run_cert`] otherwise.
+///
+/// Convenience alias for
+/// `pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &BasicSmimeProfile)`.
+///
+/// # Constraints checked
+///
+/// See [`BasicSmimeProfile`]'s `LintProfile` impl. The bundle covers
+/// RFC 8551 plus RFC 8398 plus RFC 5280 baseline checks:
+/// rfc822Name / SmtpUTF8Mailbox SAN presence (RFC 8398),
+/// id-kp-emailProtection EKU (RFC 8551 §3.3),
+/// rfc822Name / SmtpUTF8Mailbox equivalence (RFC 8398 §3),
+/// signatureAlgorithm match, and serial-number length cap.
+///
+/// No CA/B Forum S/MIME BR overlay checks (no S/MIME BR lint module ships
+/// in `pkix-lint-cabf` yet).
+///
+/// # Layered semantics
+///
+/// This is a single-cert, no-chain, no-signature-verification structural
+/// check. Use [`pkix_path::validate_path`] for full path validation.
+///
+/// # Errors
+///
+/// Returns `Err(Vec<Finding>)` containing the full lint runner output if
+/// any cert-scope lint records an `Error` or `Fatal` finding.
+pub fn check_basic_smime_shape(
+    cert: &x509_cert::Certificate,
+    now_unix: u64,
+) -> Result<(), Vec<pkix_lint::Finding>> {
+    pkix_lint::check_shape(
+        cert,
+        pkix_lint::SubjectKind::Leaf,
+        now_unix,
+        &BasicSmimeProfile,
+    )
 }
 
 // ---------------------------------------------------------------------------
