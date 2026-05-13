@@ -124,7 +124,7 @@ type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 /// canonically DER-encodable.
 ///
 /// [`Display`]: core::fmt::Display
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct DerError {
     /// Original `der::Error` value, when available.
     ///
@@ -138,6 +138,21 @@ pub struct DerError {
     /// `inner` cannot be reconstructed.
     message: BoxStr,
 }
+
+// Hand-written `PartialEq` / `Eq` compare only the cached Display
+// message. Pre-refactor (tuple struct over `der::Error`) PartialEq was
+// structural over `der::Error`'s `{kind, position}` fields; two
+// `der::Error`s with identical `{kind, position}` always produce
+// identical Display output, so comparing on `message` preserves the
+// pre-refactor equality verdicts in practice. This also makes serde
+// round-trip preserve `Eq` even though deserialize drops the `inner`
+// field (it cannot be reconstructed from the rendered message).
+impl PartialEq for DerError {
+    fn eq(&self, other: &Self) -> bool {
+        self.message == other.message
+    }
+}
+impl Eq for DerError {}
 
 // Internal: use a Box<str> so the struct is `Clone` cheaply and we keep
 // the heap allocation small. A type alias keeps the `#[cfg(not(feature
@@ -223,6 +238,7 @@ const _: () = {
 
 /// Errors returned by path validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// Certificate signature verification failed at the given chain index.
@@ -378,6 +394,7 @@ pub enum Error {
     /// assertion check that is independent of the policy tree.
     MissingLeafPolicyOid {
         /// The required policy OID that the leaf does not assert.
+        #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
         required: der::asn1::ObjectIdentifier,
     },
     /// The leaf certificate's Subject DN does not satisfy
@@ -608,15 +625,18 @@ pub trait SignatureVerifier {
 /// versions. Construct via [`TrustAnchor::new`], [`TrustAnchor::from_cert`],
 /// or `TrustAnchor::from`/`try_from`. Do not use struct literal syntax.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct TrustAnchor {
     /// The subject distinguished name of the trust anchor.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub subject: x509_cert::name::Name,
     /// The subject public key info of the trust anchor.
     ///
     /// Must be a valid SPKI for the chosen signature algorithm. An empty or
     /// malformed SPKI will cause signature verification to fail with
     /// `Error::NoTrustedPath` (no anchor matched), not a panic.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub subject_public_key_info: spki::SubjectPublicKeyInfoOwned,
     /// `NameConstraints` from the trust anchor certificate, if present.
     ///
@@ -624,6 +644,7 @@ pub struct TrustAnchor {
     /// `excluded_subtrees` state from this value before walking the chain.
     /// Populated automatically by `from_cert`; `None` for programmatically
     /// constructed anchors unless explicitly set.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::option"))]
     pub name_constraints: Option<x509_cert::ext::pkix::constraints::name::NameConstraints>,
 }
 
@@ -756,10 +777,14 @@ impl TryFrom<Certificate> for TrustAnchor {
 /// ```
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DnAttrRule {
     /// Match when the named attribute OID appears at least once in the
     /// leaf's Subject DN.
-    Field(der::asn1::ObjectIdentifier),
+    Field(
+        #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
+        der::asn1::ObjectIdentifier,
+    ),
     /// Match when every subordinate rule matches. `AllOf(vec![])` is
     /// vacuously true.
     AllOf(Vec<DnAttrRule>),
@@ -829,6 +854,7 @@ fn evaluate_dn_attr_rule(subject: &x509_cert::name::Name, rule: &DnAttrRule) -> 
 #[allow(clippy::struct_excessive_bools)]
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ValidationPolicy {
     /// Maximum chain depth, not counting the trust anchor. Default: 10.
     ///
@@ -907,6 +933,7 @@ pub struct ValidationPolicy {
     ///
     /// Note: this is `pub` but clones the OID set, so prefer constructing once
     /// and reusing the `ValidationPolicy`.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::vec"))]
     pub initial_policy_set: Vec<der::asn1::ObjectIdentifier>,
 
     /// If `Some(n)`, reject any certificate whose (notAfter − notBefore) exceeds
@@ -923,6 +950,7 @@ pub struct ValidationPolicy {
     /// signature verification so the error is diagnostic rather than a confusing
     /// [`Error::SignatureInvalid`].
     /// Violations produce [`Error::AlgorithmNotAllowed`].
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::option_vec"))]
     pub allowed_signature_algs: Option<Vec<der::asn1::ObjectIdentifier>>,
 
     /// If `Some(bits)`, reject any certificate carrying an RSA public key whose
@@ -958,6 +986,7 @@ pub struct ValidationPolicy {
     /// `anyExtendedKeyUsage` (2.5.29.37.0) does **not** satisfy a specific OID
     /// check — each required OID must be listed in the cert's EKU extension.
     /// Violations produce [`Error::MissingEku`].
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::option_vec"))]
     pub required_leaf_eku: Option<Vec<der::asn1::ObjectIdentifier>>,
 
     /// If `Some(oids)`, the leaf certificate must explicitly assert every OID
@@ -978,6 +1007,7 @@ pub struct ValidationPolicy {
     /// precedent: leaf-only, opt-in, additive. Intended for CA/B Forum
     /// subscriber-profile tier disambiguation where a tier mandates assertion
     /// of a specific reserved policy OID.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::option_vec"))]
     pub required_leaf_policy_oids: Option<Vec<der::asn1::ObjectIdentifier>>,
 
     /// If `Some(rule)`, the leaf certificate's Subject DN must satisfy
@@ -1153,6 +1183,7 @@ pub trait Profile {
 /// so dropping the derive is observable but should not require code
 /// changes for any existing user.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
@@ -1186,6 +1217,7 @@ pub struct ValidatedPath {
     /// but threading the chain to every consumer that needs the leaf's DN
     /// is awkward. The clone is owned to free the validated value from any
     /// lifetime tie to the input chain.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub leaf_subject: x509_cert::name::Name,
 
     /// Issuer DN of the validated leaf certificate (`chain[0].issuer`).
@@ -1195,6 +1227,7 @@ pub struct ValidatedPath {
     /// algorithm, so the leaf's `issuer` is the initial value of
     /// `working_issuer_name` before iteration begins; for a successfully
     /// validated chain it identifies the directly-signing CA).
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub leaf_issuer: x509_cert::name::Name,
 
     /// Serial number of the validated leaf certificate
@@ -1204,6 +1237,7 @@ pub struct ValidatedPath {
     /// §4.1.2.2 unique certificate identifier (`{ issuer, serial }`),
     /// which downstream code commonly needs for revocation lookups,
     /// audit logging, or de-duplication.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub leaf_serial: x509_cert::serial_number::SerialNumber,
 
     /// `SubjectPublicKeyInfo` of the validated leaf certificate.
@@ -1219,6 +1253,7 @@ pub struct ValidatedPath {
     /// in the certificate, not a normalized/canonicalized form. PSS
     /// parameters, RSA `parameters: NULL` vs `parameters: absent`
     /// ambiguities, etc. are preserved verbatim.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub leaf_spki: spki::SubjectPublicKeyInfoOwned,
 
     /// The final RFC 5280 §6.1.5 `valid_policy_tree`, or `None` if the
@@ -1251,6 +1286,7 @@ pub struct ValidatedPath {
 /// (which may evolve as the path-validator gains features) is not part
 /// of the public API surface.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct PolicyTreeNode {
     /// Depth at which this node appears in the tree.
@@ -1265,6 +1301,7 @@ pub struct PolicyTreeNode {
     /// May be `id-ce-certificatePolicies-anyPolicy` (2.5.29.32.0) for
     /// nodes that survived an anyPolicy expansion or were not yet
     /// materialized into specific policies.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der"))]
     pub valid_policy: der::asn1::ObjectIdentifier,
 
     /// Set of policies in the next certificate that are consistent with
@@ -1272,6 +1309,7 @@ pub struct PolicyTreeNode {
     ///
     /// Initialized to `{valid_policy}` and updated by `PolicyMappings`
     /// extensions during the walk.
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::vec"))]
     pub expected_policy_set: Vec<der::asn1::ObjectIdentifier>,
 
     /// Policy qualifiers attached to this node, in the upstream
@@ -1285,6 +1323,7 @@ pub struct PolicyTreeNode {
     /// is a `UserNotice`).
     ///
     /// [1]: https://github.com/RustCrypto/formats/issues/x509-cert
+    #[cfg_attr(feature = "serde", serde(with = "crate::serde_der::vec"))]
     pub qualifiers: Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,
 }
 
