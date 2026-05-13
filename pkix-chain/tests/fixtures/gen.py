@@ -67,7 +67,10 @@ def build_root():
     return key, cert
 
 
-def build_leaf(root_key, root_cert, *, sans, serial):
+def build_leaf(root_key, root_cert, *, sans, serial, eku=None):
+    """Build a P-256 EE signed by `root_key`. Defaults EKU to serverAuth."""
+    if eku is None:
+        eku = [x509.ExtendedKeyUsageOID.SERVER_AUTH]
     key = ec.generate_private_key(ec.SECP256R1())
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test leaf")])
     builder = (
@@ -94,7 +97,7 @@ def build_leaf(root_key, root_cert, *, sans, serial):
             critical=True,
         )
         .add_extension(
-            x509.ExtendedKeyUsage([x509.ExtendedKeyUsageOID.SERVER_AUTH]),
+            x509.ExtendedKeyUsage(eku),
             critical=False,
         )
     )
@@ -129,6 +132,15 @@ def main():
         serial=3,
     )
     write_der("leaf-no-san.der", leaf_no_san)
+
+    # S/MIME signer leaf: SAN rfc822Name + EKU emailProtection.
+    leaf_smime = build_leaf(
+        root_key, root_cert,
+        sans=[x509.RFC822Name("alice@example.com")],
+        serial=4,
+        eku=[x509.ExtendedKeyUsageOID.EMAIL_PROTECTION],
+    )
+    write_der("leaf-san-alice-example.der", leaf_smime)
 
 
 if __name__ == "__main__":

@@ -90,6 +90,29 @@ let result = verify_tls_server(
 Path validation runs before identity binding: a chain that fails
 RFC 5280 §6.1 returns `Error::Path(_)`, never `Error::Identity(_)`.
 
+### S/MIME signer / recipient identity (RFC 5280 §4.2.1.6 / RFC 8398)
+
+`verify_smime_signer` and `verify_smime_recipient` compose `verify_chain`
+with RFC 5280 / RFC 8398 mailbox binding. The caller pre-parses the
+mailbox with `MailboxName::parse`. Both wrappers share the same body;
+the signer-vs-recipient distinction is encoded in the caller-supplied
+`Profile`'s KeyUsage requirement (`digitalSignature` vs `keyEncipherment`).
+
+```rust
+use pkix_chain::{verify_smime_signer, MailboxName, NoRevocation};
+use pkix_profiles::BasicSmimeProfile;
+
+let mailbox = MailboxName::parse("alice@example.com")?;
+let result = verify_smime_signer(
+    &chain,
+    &anchors,
+    &mailbox,
+    &BasicSmimeProfile,
+    unix_now(),
+    &NoRevocation,
+)?;
+```
+
 ## What this crate does
 
 `verify_chain` runs two sequential checks:
