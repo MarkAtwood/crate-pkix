@@ -29,6 +29,11 @@ serde = ["dep:serde", "pkix-lint/serde"]
 [dependencies]
 pkix-lint = { workspace = true }
 
+# Per-cert SHA-256 cache key. Same workspace pin as pkix-revocation
+# / pkix-lint / pkix-ct. We only need the Sha256 digest and `Digest`
+# trait, no other features.
+sha2 = { workspace = true, features = ["std"] }
+
 # Subprocess output parsing. zlint emits NDJSON (one JSON object per
 # line) for both `-list-lints-json` and the per-cert verdict path;
 # serde_json is the workspace-standard parser.

@@ -41,10 +41,31 @@ and [Semantic Versioning](https://semver.org/).
   the classic pipe-buffer deadlock. Best-effort timeout enforcement
   via `try_wait` + sleep poll using
   [`BridgeConfig::timeout`]. (PKIX-jy95.7.2.)
+- `ZlintBridge::run_on_cert(cert_der)` lints a single DER-encoded
+  certificate and returns `HashMap<String, Verdict>` keyed by zlint
+  check id. Results are cached on the bridge by `SHA-256(cert_der)`,
+  so the `~400-Lint` adapter pattern from PKIX-jy95.1 pays only one
+  subprocess cost per certificate. Cache lives in
+  `Mutex<HashMap<[u8; 32], HashMap<String, Verdict>>>`; lookups
+  return a clone to keep callers off the lock. Temporary input file
+  is `pkix-zlint-bridge-<sha256-hex>.der` under `std::env::temp_dir()`,
+  cleaned up on drop. Verdict mapping: `NA`/`NE` → `NotApplicable`;
+  `pass`/`notice`/`warn`/`error`/`fatal` → like-named `Verdict`
+  variants. (PKIX-jy95.7.3.)
+- New unified `Error` enum (`Bridge(BridgeError)` /
+  `Cert(PerCertError)`) for the single-certificate `run_on_cert`
+  path. The bead's nominal `Result<_, PerCertError>` shape was
+  incomplete — it could not represent bridge-level failures (binary
+  missing, timeout, output parse error) that have nothing to do with
+  the cert itself. `From` impls for both inner types, `Display`
+  delegates with a discriminating prefix, `std::error::Error::source`
+  returns the inner. The batch path (PKIX-jy95.7.4) will keep the
+  asymmetric `Result<Vec<Result<_, PerCertError>>, BridgeError>`
+  shape per PKIX-jy95.4. (PKIX-jy95.7.3.)
+- New workspace dep: `sha2` (only needed for the verdict-cache key;
+  same pin used by `pkix-revocation` and `pkix-ct`).
 
 ### Not yet shipped
 
-- `run_on_cert()` with per-cert SHA-256 verdict cache —
-  PKIX-jy95.7.3.
 - `run_on_certs()` batch via multi-file zlint invocation —
   PKIX-jy95.7.4.

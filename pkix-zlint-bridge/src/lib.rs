@@ -56,8 +56,10 @@
 //!
 //! [zlint]: https://github.com/zmap/zlint
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
@@ -269,6 +271,67 @@ impl core::fmt::Display for PerCertError {
 
 impl std::error::Error for PerCertError {}
 
+/// Unified error type for single-certificate entry points.
+///
+/// [`ZlintBridge::run_on_cert`] can fail for two distinct reasons:
+/// the bridge could not run (binary missing, subprocess timeout,
+/// output parse error) or the specific certificate is unsuitable
+/// (malformed DER, unsupported type). This enum lets callers
+/// pattern-match on the cause and choose hard-fail vs lenient
+/// behaviour per AGENTS.md non-negotiable #6 (cache friendliness
+/// extends to error introspection).
+///
+/// The batch entry point `ZlintBridge::run_on_certs` (PKIX-jy95.7.4)
+/// uses a different return shape: bridge-level errors fail the whole
+/// batch (`Result<_, BridgeError>` outer), per-certificate errors are
+/// reported per index (`Result<_, PerCertError>` inner). This single
+/// cert API folds both into one error so callers do not have to
+/// double-unwrap for the common one-cert case.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum Error {
+    /// The bridge itself failed (binary missing, subprocess crash,
+    /// timeout, output parse error). The call did not produce a
+    /// verdict because zlint could not be invoked, or did not
+    /// produce parseable output.
+    Bridge(BridgeError),
+    /// The certificate is not something zlint can lint (malformed
+    /// DER, attribute certificate, etc.). The bridge ran but zlint
+    /// rejected the input.
+    Cert(PerCertError),
+}
+
+impl From<BridgeError> for Error {
+    fn from(e: BridgeError) -> Self {
+        Self::Bridge(e)
+    }
+}
+
+impl From<PerCertError> for Error {
+    fn from(e: PerCertError) -> Self {
+        Self::Cert(e)
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Bridge(e) => write!(f, "zlint bridge error: {e}"),
+            Self::Cert(e) => write!(f, "zlint cert error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Bridge(e) => Some(e),
+            Self::Cert(e) => Some(e),
+        }
+    }
+}
+
 // Best-effort truncation of long stderr blobs for human-readable Display.
 // The full string is preserved on the struct; this only affects rendering.
 fn truncate_for_display(s: &str) -> String {
@@ -338,6 +401,17 @@ impl Default for BridgeConfig {
 #[derive(Debug)]
 pub struct ZlintBridge {
     config: BridgeConfig,
+    /// Per-certificate verdict cache keyed by SHA-256 of the DER
+    /// bytes. Architecturally required by PKIX-jy95.1: the runtime
+    /// adapter `pkix-policy-zlint` will spin up one
+    /// [`pkix_lint::Lint`] impl per zlint check (~400 impls), each
+    /// of which calls [`ZlintBridge::run_on_cert`] for its own
+    /// check_id. Without the cache, that triggers 400 subprocess
+    /// invocations per certificate. With the cache, the first
+    /// `Lint` invocation pays the subprocess cost and every
+    /// subsequent invocation on the same cert is an
+    /// in-memory `HashMap` clone.
+    cache: Mutex<HashMap<[u8; 32], HashMap<String, Verdict>>>,
 }
 
 impl ZlintBridge {
@@ -350,7 +424,10 @@ impl ZlintBridge {
     /// checks here; this signature is fallible from the start so
     /// adding those checks is non-breaking.
     pub fn new(config: BridgeConfig) -> Result<Self, BridgeError> {
-        Ok(Self { config })
+        Ok(Self {
+            config,
+            cache: Mutex::new(HashMap::new()),
+        })
     }
 
     /// Return a reference to the bridge's configuration.
@@ -405,6 +482,79 @@ impl ZlintBridge {
         }
 
         parse_list_lints_ndjson(&output.stdout)
+    }
+
+    /// Run every zlint check on a single DER-encoded certificate.
+    ///
+    /// Returns a `HashMap` keyed by the zlint `check_id` (the same
+    /// string [`ZlintLintInfo::check_id`] uses) mapped to the
+    /// per-cert [`Verdict`].
+    ///
+    /// # Caching
+    ///
+    /// Results are cached on the bridge by `SHA-256(cert_der)`.
+    /// Subsequent calls with bytes that hash to the same key return
+    /// the cached map without re-spawning zlint. The cache lives for
+    /// the lifetime of the `ZlintBridge` handle; consumers that
+    /// want cross-handle persistence layer their own.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::Bridge`] — the bridge could not run zlint (binary
+    ///   missing, timeout, subprocess crash, output parse error).
+    /// - [`Error::Cert`] — zlint ran and rejected the input.
+    ///   [`PerCertError::MalformedDer`] for parse failures;
+    ///   [`PerCertError::Other`] for any other non-zero exit.
+    pub fn run_on_cert(&self, cert_der: &[u8]) -> Result<HashMap<String, Verdict>, Error> {
+        let key = sha256_digest(cert_der);
+        if let Some(hit) = self.cache_get(&key) {
+            return Ok(hit);
+        }
+
+        let path = write_temp_der(cert_der, &key).map_err(Error::Bridge)?;
+        let mut cmd = Command::new(&self.config.zlint_path);
+        cmd.arg("-format").arg("der").arg(&path);
+        let result = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout);
+
+        // Best-effort cleanup. We do not propagate cleanup errors
+        // because they do not change the call's correctness; a
+        // stale file is at worst a disk-space leak the OS will
+        // reap when /tmp turns over.
+        let _ = std::fs::remove_file(&path);
+
+        let output = result.map_err(Error::Bridge)?;
+
+        if !output.status.success() {
+            return Err(Error::Cert(classify_zlint_cert_error(&output.stderr)));
+        }
+
+        let verdicts = parse_per_cert_output(&output.stdout)
+            .map_err(|detail| Error::Bridge(BridgeError::OutputParseError { detail }))?;
+
+        self.cache_put(key, verdicts.clone());
+        Ok(verdicts)
+    }
+
+    /// Cache helper: return a clone of the cached entry if present.
+    ///
+    /// Returns by clone so the caller does not hold the cache lock
+    /// across its own work. This is a deliberate space-time tradeoff
+    /// (HashMap clone is O(n) on entry count, ~400 entries) for the
+    /// cache lookup; profiling can revisit if it shows up as a hot
+    /// spot.
+    fn cache_get(&self, key: &[u8; 32]) -> Option<HashMap<String, Verdict>> {
+        self.cache.lock().ok()?.get(key).cloned()
+    }
+
+    /// Cache helper: insert (or overwrite) an entry.
+    ///
+    /// A poisoned mutex is treated as "skip the cache for this call"
+    /// rather than propagating the panic — the caller already has a
+    /// valid verdict map and a future call will recompute.
+    fn cache_put(&self, key: [u8; 32], value: HashMap<String, Verdict>) {
+        if let Ok(mut guard) = self.cache.lock() {
+            guard.insert(key, value);
+        }
     }
 }
 
@@ -654,6 +804,112 @@ fn json_optional_string(
     }
 }
 
+/// Compute SHA-256 of the DER bytes for use as a cache key.
+fn sha256_digest(bytes: &[u8]) -> [u8; 32] {
+    use sha2::Digest as _;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
+/// Write the DER bytes to a temporary file and return its path.
+///
+/// The filename is `pkix-zlint-bridge-<sha256-hex>.der` under the
+/// platform temp directory. Same input bytes always produce the same
+/// path, which makes concurrent writes idempotent (both writers
+/// write the same bytes) and the cleanup unambiguous (the caller
+/// removes the file once zlint has read it).
+fn write_temp_der(bytes: &[u8], key: &[u8; 32]) -> Result<PathBuf, BridgeError> {
+    let mut path = std::env::temp_dir();
+    path.push(format!("pkix-zlint-bridge-{}.der", hex_encode(key)));
+    std::fs::write(&path, bytes).map_err(|e| BridgeError::SubprocessFailed {
+        exit_code: None,
+        stderr: format!("temp file write failed at {}: {e}", path.display()),
+    })?;
+    Ok(path)
+}
+
+/// Lowercase hex encoding of a byte slice. Local helper to avoid
+/// adding a `hex` crate dependency for one 64-character string per
+/// call.
+fn hex_encode(bytes: &[u8]) -> String {
+    use core::fmt::Write as _;
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        // u8 hex is infallible.
+        write!(&mut out, "{b:02x}").expect("write to String is infallible");
+    }
+    out
+}
+
+/// Classify zlint's stderr for a non-zero per-cert exit into the
+/// right `PerCertError` variant.
+///
+/// zlint's malformed-cert error message starts with `level=fatal
+/// msg="unable to parse input as any known type, errors: [...]"`
+/// (verified locally against zlint dev-unknown 2026-05-12). The
+/// embedded `errors:` list itself contains substrings like
+/// `parsing as certificate`. We match on either to be robust
+/// against minor wording drift between zlint releases.
+fn classify_zlint_cert_error(stderr_bytes: &[u8]) -> PerCertError {
+    let stderr = String::from_utf8_lossy(stderr_bytes).into_owned();
+    if stderr.contains("unable to parse input")
+        || stderr.contains("parsing as certificate")
+        || stderr.contains("malformed")
+    {
+        PerCertError::MalformedDer { detail: stderr }
+    } else {
+        PerCertError::Other { detail: stderr }
+    }
+}
+
+/// Parse zlint's per-cert JSON output into a `HashMap<check_id,
+/// Verdict>`.
+///
+/// zlint emits a single top-level JSON object whose keys are check
+/// names and whose values are objects with a `result` string field.
+/// Anything else is an output-parse error.
+fn parse_per_cert_output(stdout: &[u8]) -> Result<HashMap<String, Verdict>, String> {
+    let text = std::str::from_utf8(stdout).map_err(|e| format!("stdout not valid UTF-8: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(text.trim()).map_err(|e| format!("malformed JSON: {e}"))?;
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "expected JSON object at top level".to_string())?;
+
+    let mut out = HashMap::with_capacity(obj.len());
+    for (name, entry) in obj {
+        let result_str = entry
+            .as_object()
+            .and_then(|o| o.get("result"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("entry {name:?} missing 'result' string"))?;
+        let verdict = verdict_from_str(result_str).map_err(|e| format!("entry {name:?}: {e}"))?;
+        out.insert(name.clone(), verdict);
+    }
+    Ok(out)
+}
+
+/// Map a zlint verdict string into a [`Verdict`].
+///
+/// zlint emits one of `NA` (not applicable) / `NE` (not effective)
+/// / `pass` / `notice` / `warn` / `error` / `fatal`. The two
+/// not-applicable forms collapse into [`Verdict::NotApplicable`]
+/// because neither carries a compliance signal.
+fn verdict_from_str(s: &str) -> Result<Verdict, String> {
+    match s {
+        "NA" | "NE" => Ok(Verdict::NotApplicable),
+        "pass" => Ok(Verdict::Pass),
+        "notice" => Ok(Verdict::Notice),
+        "warn" => Ok(Verdict::Warn),
+        "error" => Ok(Verdict::Error),
+        "fatal" => Ok(Verdict::Fatal),
+        other => Err(format!(
+            "unknown zlint verdict {other:?}; expected NA / NE / pass / notice / warn / error / fatal"
+        )),
+    }
+}
+
 /// zlint's catalog convention: every check name starts with a single
 /// underscore-separated prefix that encodes the declared severity.
 /// We accept `e_`, `w_`, and `n_`; anything else is a catalog-shape
@@ -694,6 +950,7 @@ const _: fn() = || {
     _assert_send_sync::<ZlintLintInfo>();
     _assert_send_sync::<BridgeError>();
     _assert_send_sync::<PerCertError>();
+    _assert_send_sync::<Error>();
     _assert_send_sync::<BridgeConfig>();
     _assert_send_sync::<ZlintBridge>();
 };
@@ -974,6 +1231,162 @@ not even close to json\n";
         let ndjson = b"{\"name\":\"e_x\",\"citation\":42}\n";
         let err = parse_list_lints_ndjson(ndjson).expect_err("non-string citation should fail");
         assert!(matches!(err, BridgeError::OutputParseError { .. }));
+    }
+
+    // ---- run_on_cert helpers (PKIX-jy95.7.3) -------------------------
+
+    /// Each documented zlint verdict string maps to the expected
+    /// `Verdict`. `NA` and `NE` collapse to `NotApplicable`.
+    #[test]
+    fn verdict_from_str_recognises_all_documented_verdicts() {
+        assert_eq!(verdict_from_str("NA"), Ok(Verdict::NotApplicable));
+        assert_eq!(verdict_from_str("NE"), Ok(Verdict::NotApplicable));
+        assert_eq!(verdict_from_str("pass"), Ok(Verdict::Pass));
+        assert_eq!(verdict_from_str("notice"), Ok(Verdict::Notice));
+        assert_eq!(verdict_from_str("warn"), Ok(Verdict::Warn));
+        assert_eq!(verdict_from_str("error"), Ok(Verdict::Error));
+        assert_eq!(verdict_from_str("fatal"), Ok(Verdict::Fatal));
+    }
+
+    /// Unknown verdict strings surface as parse errors so future
+    /// zlint additions to the verdict vocabulary fail loudly.
+    #[test]
+    fn verdict_from_str_rejects_unknown_verdicts() {
+        for bad in &["", "PASS", "warning", "info", "unknown"] {
+            assert!(verdict_from_str(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+
+    /// Happy-path per-cert JSON parsing yields a complete map.
+    #[test]
+    fn parse_per_cert_output_handles_typical_layout() {
+        let json = br#"{"e_x":{"result":"NA"},"e_y":{"result":"pass"},"w_z":{"result":"warn"}}"#;
+        let parsed = parse_per_cert_output(json).expect("parse");
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed.get("e_x"), Some(&Verdict::NotApplicable));
+        assert_eq!(parsed.get("e_y"), Some(&Verdict::Pass));
+        assert_eq!(parsed.get("w_z"), Some(&Verdict::Warn));
+    }
+
+    /// Missing `result` field on an entry surfaces a clear parse
+    /// error naming the offending check.
+    #[test]
+    fn parse_per_cert_output_rejects_missing_result() {
+        let json = br#"{"e_x":{"description":"nope"}}"#;
+        let err = parse_per_cert_output(json).expect_err("missing result should fail");
+        assert!(
+            err.contains("e_x"),
+            "error should name offending entry: {err}"
+        );
+        assert!(
+            err.contains("result"),
+            "error should mention 'result': {err}"
+        );
+    }
+
+    /// Unknown verdict string inside an entry's `result` surfaces a
+    /// per-entry parse error.
+    #[test]
+    fn parse_per_cert_output_rejects_unknown_verdict() {
+        let json = br#"{"e_x":{"result":"undocumented_verdict"}}"#;
+        let err = parse_per_cert_output(json).expect_err("unknown verdict should fail");
+        assert!(
+            err.contains("e_x"),
+            "error should name offending entry: {err}"
+        );
+        assert!(
+            err.contains("unknown zlint verdict"),
+            "error should mention unknown verdict: {err}"
+        );
+    }
+
+    /// Non-object top level is rejected.
+    #[test]
+    fn parse_per_cert_output_rejects_non_object_top_level() {
+        for bad in &[b"[]" as &[u8], b"\"string\"", b"42"] {
+            assert!(parse_per_cert_output(bad).is_err());
+        }
+    }
+
+    /// Empty JSON object parses to an empty map. zlint will not
+    /// normally emit this, but it is a defensible non-error edge.
+    #[test]
+    fn parse_per_cert_output_empty_object_returns_empty_map() {
+        let parsed = parse_per_cert_output(b"{}").expect("empty object ok");
+        assert!(parsed.is_empty());
+    }
+
+    /// Whitespace around the JSON object is tolerated (zlint
+    /// sometimes adds a trailing newline).
+    #[test]
+    fn parse_per_cert_output_tolerates_surrounding_whitespace() {
+        let json = b"\n  {\"e_x\":{\"result\":\"pass\"}}  \n\n";
+        let parsed = parse_per_cert_output(json).expect("trim should work");
+        assert_eq!(parsed.get("e_x"), Some(&Verdict::Pass));
+    }
+
+    /// The malformed-cert classifier recognises the documented
+    /// zlint error strings and falls back to `Other` otherwise.
+    #[test]
+    fn classify_zlint_cert_error_recognises_malformed_strings() {
+        let cases: &[(&[u8], bool)] = &[
+            (
+                b"time=\"...\" level=fatal msg=\"unable to parse input as any known type, errors: [parsing as certificate: asn1...]\"",
+                true,
+            ),
+            (b"parsing as certificate: asn1: structure error", true),
+            (b"malformed input", true),
+            (b"some unrelated zlint error message", false),
+        ];
+        for (stderr, expect_malformed) in cases {
+            let err = classify_zlint_cert_error(stderr);
+            match err {
+                PerCertError::MalformedDer { .. } => {
+                    assert!(expect_malformed, "unexpected MalformedDer for {stderr:?}");
+                }
+                PerCertError::Other { .. } => {
+                    assert!(
+                        !expect_malformed,
+                        "expected MalformedDer but got Other for {stderr:?}"
+                    );
+                }
+                other => panic!("unexpected classification {other:?}"),
+            }
+        }
+    }
+
+    /// `Error::Bridge` and `Error::Cert` both Display + source.
+    #[test]
+    fn unified_error_display_and_source() {
+        use std::error::Error as _;
+        let b = Error::Bridge(BridgeError::OutputParseError { detail: "x".into() });
+        let c = Error::Cert(PerCertError::MalformedDer { detail: "y".into() });
+        assert!(format!("{b}").contains("bridge error"));
+        assert!(format!("{c}").contains("cert error"));
+        assert!(b.source().is_some());
+        assert!(c.source().is_some());
+    }
+
+    /// SHA-256 helper produces the well-known empty-input digest.
+    /// Independent oracle: well-known empty SHA-256 from FIPS 180-4
+    /// (and confirmable via `printf '' | sha256sum`).
+    #[test]
+    fn sha256_digest_matches_known_empty_input() {
+        let d = sha256_digest(b"");
+        let expected: [u8; 32] = [
+            0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
+            0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
+            0x78, 0x52, 0xb8, 0x55,
+        ];
+        assert_eq!(d, expected);
+    }
+
+    /// Hex encode round-trips byte values 0x00 through 0xff (with a
+    /// small sample) and produces lowercase output.
+    #[test]
+    fn hex_encode_lowercase_round_trip() {
+        assert_eq!(hex_encode(&[0x00, 0xff, 0xab, 0xcd]), "00ffabcd");
+        assert_eq!(hex_encode(&[]), "");
     }
 
     /// A JSON object whose check name has an unrecognised severity
