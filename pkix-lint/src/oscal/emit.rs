@@ -656,6 +656,7 @@ fn deviation_action_prop_value(a: &DeviationAction) -> String {
 pub(super) fn severity_label(s: crate::Severity) -> &'static str {
     match s {
         crate::Severity::Info => "info",
+        crate::Severity::Notice => "notice",
         crate::Severity::Warn => "warn",
         crate::Severity::Error => "error",
         crate::Severity::Fatal => "fatal",

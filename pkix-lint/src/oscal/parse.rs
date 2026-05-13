@@ -662,6 +662,7 @@ fn parse_action(idx: usize, s: &str) -> Result<DeviationAction, ParseError> {
     if let Some(rest) = s.strip_prefix("downgrade:") {
         let sev = match rest {
             "info" => Severity::Info,
+            "notice" => Severity::Notice,
             "warn" => Severity::Warn,
             "error" => Severity::Error,
             "fatal" => Severity::Fatal,
@@ -1474,6 +1475,10 @@ mod tests {
         assert!(matches!(
             parse_action(0, "downgrade:info"),
             Ok(DeviationAction::DowngradeSeverityTo(Severity::Info))
+        ));
+        assert!(matches!(
+            parse_action(0, "downgrade:notice"),
+            Ok(DeviationAction::DowngradeSeverityTo(Severity::Notice))
         ));
         assert!(matches!(
             parse_action(0, "downgrade:warn"),
