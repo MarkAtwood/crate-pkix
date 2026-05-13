@@ -6,6 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Added
+
+- Rustdoc annotations linking each Profile and CABF_*_ALLOWED_ALGS
+  constant to its canonical CA/B Forum BR source URL on GitHub. The
+  crate-level rustdoc gains a `# Reporting divergences` section
+  inviting community-contributed citation and behavior fixes.
+  Per-Profile and free-function rustdoc tables include section anchors
+  pointing into the upstream BR documents. Pure documentation; no
+  behavior change. (PKIX-wrkm.)
+
 ### Changed (behavior)
 
 - Removed `max_path_len` enforcement from `WebPkiProfile` (was `2`),

@@ -6,14 +6,17 @@
 //!
 //! # Lints provided
 //!
+//! Canonical CA/B Forum TLS BR:
+//! <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
+//!
 //! | ID | Citation | Severity | Applies to |
 //! |----|----------|----------|-----------|
-//! | [`cabf.br.tls.validity.max`](ValidityMaxLint) | TLS BR §6.3.2 (SC-081) | Error | Leaf |
-//! | [`cabf.br.tls.alg.sha1_prohibited`](Sha1ProhibitedLint) | TLS BR §7.1.3 | Error | Any |
-//! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | TLS BR §6.1.5 | Error | Any |
-//! | [`cabf.br.tls.san.required`](SanRequiredLint) | TLS BR §7.1.2.7.12 | Error | Leaf |
-//! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | TLS BR §7.1.2.7.10 | Error | Leaf |
-//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | TLS BR §7.1.2.10.4 | Error | `IntermediateCa` |
+//! | [`cabf.br.tls.validity.max`](ValidityMaxLint) | [TLS BR §6.3.2](https://github.com/cabforum/servercert/blob/main/docs/BR.md#632-certificate-operational-periods-and-key-pair-usage-periods) (SC-081) | Error | Leaf |
+//! | [`cabf.br.tls.alg.sha1_prohibited`](Sha1ProhibitedLint) | [TLS BR §7.1.3](https://github.com/cabforum/servercert/blob/main/docs/BR.md#713-algorithm-object-identifiers) | Error | Any |
+//! | [`cabf.br.tls.rsa.min_key_size`](RsaMinKeySizeLint) | [TLS BR §6.1.5](https://github.com/cabforum/servercert/blob/main/docs/BR.md#615-key-sizes) | Error | Any |
+//! | [`cabf.br.tls.san.required`](SanRequiredLint) | [TLS BR §7.1.2.7.12](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712712-subscriber-certificate-subject-alternative-name) | Error | Leaf |
+//! | [`cabf.br.tls.eku.server_auth`](EkuServerAuthLint) | [TLS BR §7.1.2.7.10](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712710-subscriber-certificate-extended-key-usage) | Error | Leaf |
+//! | [`cabf.br.tls.bc.ca_flag`](BcCaFlagLint) | [TLS BR §7.1.2.10.4](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712104-ca-certificate-basic-constraints) | Error | `IntermediateCa` |
 //!
 //! # Using the profile
 //!
@@ -85,7 +88,10 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 /// the validity period cap that applied when the cert was issued governs that
 /// cert for its lifetime.
 ///
-/// Citation: CA/B Forum TLS BR §6.3.2 (SC-081)
+/// # Canonical source
+///
+/// [TLS BR §6.3.2 Certificate operational periods and key pair usage periods](https://github.com/cabforum/servercert/blob/main/docs/BR.md#632-certificate-operational-periods-and-key-pair-usage-periods)
+/// (SC-081 phased validity caps).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ValidityMaxLint;
 
@@ -168,7 +174,10 @@ impl Lint for ValidityMaxLint {
 /// Both `sha1WithRSAEncryption` (1.2.840.113549.1.1.5) and `ecdsa-with-SHA1`
 /// (1.2.840.10045.4.1) are checked.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.3
+/// # Canonical source
+///
+/// [TLS BR §7.1.3 Algorithm object identifiers](https://github.com/cabforum/servercert/blob/main/docs/BR.md#713-algorithm-object-identifiers)
+/// (umbrella; SHA-1 prohibition is in §7.1.3.2 Signature AlgorithmIdentifier).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Sha1ProhibitedLint;
 
@@ -243,7 +252,9 @@ impl Lint for Sha1ProhibitedLint {
 ///    i.e. the position (1-indexed) of the most-significant set bit.
 /// 3. Reject if the result is less than 2048.
 ///
-/// Citation: CA/B Forum TLS BR §6.1.5
+/// # Canonical source
+///
+/// [TLS BR §6.1.5 Key sizes](https://github.com/cabforum/servercert/blob/main/docs/BR.md#615-key-sizes).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RsaMinKeySizeLint;
 
@@ -392,7 +403,9 @@ fn parse_der_length(input: &[u8]) -> Option<(usize, &[u8])> {
 /// If the extension is absent the lint returns Error.
 /// If the extension is present but contains no general names, the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.2.7.12 (Subscriber Certificate Subject Alternative Name)
+/// # Canonical source
+///
+/// [TLS BR §7.1.2.7.12 Subscriber Certificate Subject Alternative Name](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712712-subscriber-certificate-subject-alternative-name).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct SanRequiredLint;
 
@@ -458,7 +471,9 @@ impl Lint for SanRequiredLint {
 /// If the extension is present but does not include `id-kp-serverAuth`
 /// (1.3.6.1.5.5.7.3.1) the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.2.7.10 (Subscriber Certificate Extended Key Usage)
+/// # Canonical source
+///
+/// [TLS BR §7.1.2.7.10 Subscriber Certificate Extended Key Usage](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712710-subscriber-certificate-extended-key-usage).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EkuServerAuthLint;
 
@@ -530,7 +545,9 @@ impl Lint for EkuServerAuthLint {
 /// If the extension is absent the lint returns Error.
 /// If the extension is present but `cA` is not `true` the lint returns Error.
 ///
-/// Citation: CA/B Forum TLS BR §7.1.2.10.4 (CA Certificate Basic Constraints).
+/// # Canonical source
+///
+/// [TLS BR §7.1.2.10.4 CA Certificate Basic Constraints](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712104-ca-certificate-basic-constraints).
 /// This is the umbrella section cross-referenced by every per-CA-type
 /// Sub CA profile (§7.1.2.2 Cross-Cert, §7.1.2.3 Technically-Constrained
 /// Non-TLS, §7.1.2.5 Technically-Constrained TLS, §7.1.2.6 TLS); the
@@ -602,8 +619,9 @@ impl Lint for BcCaFlagLint {
 
 /// The CA/B Forum TLS Baseline Requirements profile for `pkix-lint`.
 ///
-/// Implements both [`pkix_path::Profile`] (delegating to [`pkix_profiles_cabf::WebPkiProfile`])
-/// and [`LintProfile`] (providing all six CABF TLS BR lints above).
+/// Implements both [`pkix_lint::Profile`] (re-exported from `pkix_path`;
+/// delegating to [`pkix_profiles_cabf::WebPkiProfile`]) and [`LintProfile`]
+/// (providing all six CABF TLS BR lints above).
 ///
 /// # Usage
 ///
