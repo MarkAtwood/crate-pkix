@@ -11,7 +11,7 @@ adjacent PKI concerns.
 
 - **`pkix-path`** — Pure, `no_std` RFC 5280 §6 path validator. Pluggable crypto via `SignatureVerifier` trait.
 - **`pkix-revocation`** — CRL and OCSP revocation checking (offline; caller supplies CRL DER / OCSP response bytes). `RevocationChecker` trait + `NoRevocation` zero-cost default.
-- **`pkix-chain`** — High-level umbrella. Re-exports both; provides `verify_chain()` for the 90% case.
+- **`pkix-chain`** — High-level umbrella. Re-exports both; provides `verify_chain()` plus use-case wrappers (`verify_tls_server`, `verify_smime_signer`/`_recipient`, `verify_code_signer`, `verify_time_stamper`) that compose chain validation with `pkix-identity` SAN binding and profile-supplied EKU rules. `verify_tls_client` and `verify_ocsp_responder` pending design clarification (PKIX-fmtv.11.2.1 / .13.3).
 - **`pkix-path-builder`** — RFC 4158 path building from unordered cert bundles. Output feeds `pkix-path`.
 - **`pkix-truststore`** — Tier-1 trust anchor loading from PEM / DER bytes or files. See the `pkix-truststore` section below.
 
