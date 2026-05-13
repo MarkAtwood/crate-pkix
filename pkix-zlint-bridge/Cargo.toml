@@ -1,0 +1,39 @@
+[package]
+name        = "pkix-zlint-bridge"
+description = "Subprocess + NDJSON-parsing bridge to ZLint for runtime adapters and differential oracles"
+version               = "0.0.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "lint", "zlint", "compliance"]
+categories  = ["cryptography"]
+
+# This crate is std-only by construction (it spawns subprocesses and
+# reads stdin/stdout). There is no `no_std` story here, unlike the
+# core pkix-* crates. Workspace MSRV applies.
+
+[features]
+default = []
+
+# Cargo feature `serde`: derive `serde::Serialize` and
+# `serde::Deserialize` on public result/error types so consumers can
+# cache verdicts to disk or pass them across process boundaries.
+# Activates the matching feature on `pkix-lint` so embedded
+# `pkix_lint::Severity` values participate in serde. Off by default
+# to keep the dependency footprint minimal for callers that only
+# use the in-process types.
+serde = ["dep:serde", "pkix-lint/serde"]
+
+[dependencies]
+pkix-lint = { workspace = true }
+
+# Optional serde support. Enabled by the `serde` cargo feature; the
+# crate's public types use `#[cfg_attr(feature = "serde", derive(...))]`
+# to gate the trait derives.
+serde = { workspace = true, optional = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

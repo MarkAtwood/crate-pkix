@@ -19,6 +19,7 @@ members = [
     "pkix-truststore",
     "pkix-truststore-system",
     "pkix-truststore-pkcs11",
+    "pkix-zlint-bridge",
 ]
 
 [workspace.package]
@@ -114,6 +115,7 @@ pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.2.0" 
 pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.2.0" }
 pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" }
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }
+pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.0.0" }
 
 # RustCrypto core
 der       = "0.7"
