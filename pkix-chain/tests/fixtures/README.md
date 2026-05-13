@@ -15,6 +15,21 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-timestamping-not-critical.der` | end-entity | EE signed by `root`, EKU=timeStamping (NOT critical) — RFC 3161 §2.3 negative case |
 | `leaf-timestamping-not-sole.der` | end-entity | EE signed by `root`, EKU=timeStamping+codeSigning (critical) — RFC 3161 §2.3 negative case |
 
+PKIX-fmtv.22 hostname-binding corpus (EKU=serverAuth throughout):
+
+| Fixture | Role | Contents |
+|---|---|---|
+| `host-exact-foo.der` | end-entity | SAN dNSName=`foo.example.com` |
+| `host-wildcard.der` | end-entity | SAN dNSName=`*.example.com` |
+| `host-wildcard-partial-label.der` | end-entity | SAN dNSName=`f*o.example.com` |
+| `host-wildcard-internal.der` | end-entity | SAN dNSName=`foo.*.example.com` |
+| `host-wildcard-tld.der` | end-entity | SAN dNSName=`*.com` (single-label remainder) |
+| `host-mixed-case-san.der` | end-entity | SAN dNSName=`FOO.example.com` |
+| `host-idn-alabel.der` | end-entity | SAN dNSName=`xn--bcher-kva.example` |
+| `host-ipv4.der` | end-entity | SAN iPAddress=`192.0.2.5` |
+| `host-ipv6.der` | end-entity | SAN iPAddress=`2001:db8::1` |
+| `host-multi-san.der` | end-entity | 3 dNSName entries: `api`, `www`, `*.cdn` @example.com |
+
 PKIX-fmtv.23 mailbox-binding corpus (EKU=emailProtection throughout):
 
 | Fixture | Role | Contents |
