@@ -23,8 +23,10 @@ ocsp        = ["pkix-revocation/ocsp"]
 serde = [
     "dep:serde",
     "pkix-path/serde",
+    "pkix-path-builder/serde",
     "pkix-revocation/serde",
     "pkix-identity/serde",
+    "pkix-aia/serde",
 ]
 
 [dependencies]
@@ -34,14 +36,23 @@ pkix-identity   = { workspace = true, features = ["std"] }
 pkix-profiles   = { workspace = true }
 serde           = { workspace = true, optional = true }
 # pkix-aia ships the AiaFetcher trait that `Verifier` is generic over
-# (3rd generic with NoAiaFetcher default per PKIX-zkjb.9). The
-# `Verifier` API is parameterized; no actual AIA fetching happens
-# inside this crate at 1.0 (NoAiaFetcher returns FetchingDisabled,
-# preserving the historical "caller supplies the full chain"
-# semantics). Real HTTP fetching lives in `pkix-aia-http` (planned).
-pkix-aia        = { workspace = true }
-der             = { workspace = true }
-x509-cert       = { workspace = true }
+# (3rd generic with NoAiaFetcher default per PKIX-zkjb.9). When the
+# caller-supplied chain is missing an intermediate, `Verifier` invokes
+# the fetcher to retrieve candidate certs from `id-ad-caIssuers`
+# AccessDescription URIs and feeds them to `pkix-path-builder` for
+# reassembly. `NoAiaFetcher` short-circuits this path by returning
+# `AiaError::FetchingDisabled`, preserving the historical "caller
+# supplies the full chain" semantics. Real HTTP fetching lives in
+# `pkix-aia-http`.
+pkix-aia          = { workspace = true, features = ["std"] }
+# pkix-path-builder provides the `CertPool` + `build_first_valid_path`
+# entry points used to reassemble an incomplete chain from AIA-fetched
+# intermediates (PKIX-zkjb.7). Note: pkix-path-builder is no_std-friendly
+# by default; we pull the `std` feature so its consumers in this crate
+# get `core::error::Error` impls on the error type.
+pkix-path-builder = { workspace = true, features = ["std"] }
+der               = { workspace = true }
+x509-cert         = { workspace = true }
 
 [dev-dependencies]
 # Used by tests/serde_round_trip.rs (gated by required-features).

@@ -1177,6 +1177,7 @@ dependencies = [
  "pkix-aia",
  "pkix-identity",
  "pkix-path",
+ "pkix-path-builder",
  "pkix-profiles",
  "pkix-revocation",
  "serde",
@@ -1299,6 +1300,7 @@ version = "0.3.1"
 dependencies = [
  "der",
  "pkix-path",
+ "serde",
  "signature",
  "spki",
  "x509-cert",

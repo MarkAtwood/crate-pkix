@@ -6,7 +6,43 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **AIA chain reassembly.** `Verifier::verify_one` and `verify_chain` now
+  follow `id-ad-caIssuers` URIs on the leaf's `AuthorityInfoAccess`
+  extension to fetch missing intermediates when the caller-supplied
+  chain is incomplete. Fetched DER blobs feed `pkix_path_builder::CertPool`
+  and `build_first_valid_path` runs against the augmented pool. The
+  fetch loop walks up to `AIA_MAX_DEPTH` (5) levels of missing
+  intermediates before surfacing `Error::AiaDepthExceeded`. The fast
+  path (positional `pkix_path::validate_path` against a complete chain)
+  is unchanged and never invokes the fetcher. (PKIX-zkjb.7)
+- New `pub const AIA_MAX_DEPTH: usize = 5` documenting the recursion
+  cap.
+- `Error::Aia(pkix_aia::AiaError)` variant carrying the underlying AIA
+  fetch failure. `Error::PathBuild(pkix_path_builder::Error)` variant
+  carrying path-build failures. `Error::AiaDepthExceeded` for the
+  iteration cap. All three variants are added behind the existing
+  `#[non_exhaustive]` annotation; pattern-matches against the prior
+  variants remain valid. (PKIX-zkjb.7)
+- `From<pkix_aia::AiaError>` and `From<pkix_path_builder::Error>` impls
+  on `Error`.
+
+### Changed
+
+- The `serde` feature now also enables `pkix-path-builder/serde` and
+  `pkix-aia/serde` so `Error::PathBuild` and `Error::Aia` round-trip
+  through the same wire form as the other `Error` variants (AGENTS.md
+  non-negotiable #6). `pkix-aia` is now activated with the `std`
+  feature unconditionally so its `core::error::Error` impl on
+  `AiaError` is available behind `Error::Aia`.
+- The use-case wrappers (`verify_tls_server`, `verify_tls_client_dns`,
+  `verify_tls_client_mailbox`, `verify_smime_signer`,
+  `verify_smime_recipient`, `verify_code_signer`,
+  `verify_time_stamper`, `verify_ocsp_responder`) still bake
+  `NoAiaFetcher` internally; their public signatures are unchanged.
+  Callers wanting AIA fetching drop down to `verify_chain` or
+  `Verifier::new` directly.
 
 ## [1.0.0] — TBD
 

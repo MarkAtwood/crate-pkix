@@ -6,7 +6,14 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- Optional `serde` feature gating `Serialize`/`Deserialize` derives on
+  the public `Error` enum. All fields (`tried: usize`,
+  `last_error: String`) are already serde-compatible; the derive
+  passes through unchanged. Enables consumers like `pkix-chain` that
+  carry `Error` in their own serde-supporting result types (AGENTS.md
+  non-negotiable #6). (PKIX-zkjb.7)
 
 ## [1.0.0] — TBD
 

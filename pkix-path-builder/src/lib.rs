@@ -138,6 +138,7 @@ impl<'a> IntoIterator for &'a CertPool {
 
 /// Errors returned by path building.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// No valid path from the target certificate to any trust anchor was found.

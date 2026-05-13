@@ -607,6 +607,118 @@ def main():
     )
     write_der("leaf-clientauth-mailbox.der", leaf_client_mailbox)
 
+    # ------------------------------------------------------------------
+    # PKIX-zkjb.7: AIA-fetched intermediate fixtures.
+    #
+    # Tests verify that `Verifier::verify_one` reassembles an incomplete
+    # chain by following the leaf's `id-ad-caIssuers` AIA URI to fetch
+    # the missing intermediate. Three fixtures:
+    #   - intermediate.der: CA cert issued by root_key (BasicConstraints
+    #     CA=true, KU=keyCertSign|cRLSign). Used as the cert returned by
+    #     a mock AiaFetcher.
+    #   - leaf-via-intermediate.der: EE signed by intermediate_key with
+    #     SAN=DNS:www.example.com (same shape as leaf-san-www-example
+    #     so test policy carries over) and AIA caIssuers URI
+    #     "http://example.test/intermediate.der".
+    #   - leaf-via-intermediate-no-aia.der: same as above but with the
+    #     AIA extension omitted, for the negative test that asserts a
+    #     graceful failure when there are no URIs to follow.
+    # ------------------------------------------------------------------
+    intermediate_key = ec.generate_private_key(ec.SECP256R1())
+    intermediate_name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test intermediate")
+    ])
+    intermediate_cert = (
+        x509.CertificateBuilder()
+        .subject_name(intermediate_name)
+        .issuer_name(root_cert.subject)
+        .public_key(intermediate_key.public_key())
+        .serial_number(100)
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(root_key, hashes.SHA256())
+    )
+    write_der("intermediate.der", intermediate_cert)
+
+    # Helper: build a leaf signed by the *intermediate* (not root). Mirrors
+    # `build_leaf` but inlined here because `build_leaf` hard-codes
+    # `root_key` as the signer.
+    def build_leaf_via_intermediate(*, serial, ca_issuers_uri=None):
+        key = ec.generate_private_key(ec.SECP256R1())
+        subject = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test leaf via intermediate")
+        ])
+        builder = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(intermediate_cert.subject)
+            .public_key(key.public_key())
+            .serial_number(serial)
+            .not_valid_before(NOT_BEFORE)
+            .not_valid_after(NOT_AFTER)
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=True,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .add_extension(
+                x509.ExtendedKeyUsage([x509.ExtendedKeyUsageOID.SERVER_AUTH]),
+                critical=False,
+            )
+            .add_extension(
+                x509.SubjectAlternativeName([x509.DNSName("www.example.com")]),
+                critical=False,
+            )
+        )
+        if ca_issuers_uri is not None:
+            builder = builder.add_extension(
+                x509.AuthorityInformationAccess([
+                    x509.AccessDescription(
+                        access_method=x509.AuthorityInformationAccessOID.CA_ISSUERS,
+                        access_location=x509.UniformResourceIdentifier(ca_issuers_uri),
+                    ),
+                ]),
+                critical=False,
+            )
+        return builder.sign(intermediate_key, hashes.SHA256())
+
+    leaf_via_intermediate = build_leaf_via_intermediate(
+        serial=101,
+        ca_issuers_uri="http://example.test/intermediate.der",
+    )
+    write_der("leaf-via-intermediate.der", leaf_via_intermediate)
+
+    leaf_via_intermediate_no_aia = build_leaf_via_intermediate(
+        serial=102,
+        ca_issuers_uri=None,
+    )
+    write_der("leaf-via-intermediate-no-aia.der", leaf_via_intermediate_no_aia)
+
 
 if __name__ == "__main__":
     main()
