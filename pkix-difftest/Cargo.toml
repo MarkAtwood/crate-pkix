@@ -43,6 +43,18 @@ default = []
 # baseline-limbo-analysis.md.
 rustcrypto = ["pkix-path/rustcrypto"]
 
+# Lint-domain differential oracles (PKIX-hbzo.1.1). Pulls in `pkix-zlint-bridge`
+# (subprocess to zlint) and `pkix-lint-cabf` (in-process reference CA/B Forum
+# TLS BR lints), plus `pkix-lint` directly so the harness can name the shared
+# `Severity` type in its NormalizedFinding vocabulary. Off by default so the
+# baseline path-validation oracle CI does not pay for an unused subprocess
+# dep tree.
+lint-oracles = [
+    "dep:pkix-zlint-bridge",
+    "dep:pkix-lint",
+    "dep:pkix-lint-cabf",
+]
+
 [dependencies]
 # Core path validation under test. Default features ("rsa", "p256") give us
 # DefaultVerifier — exactly what an unsuspecting downstream consumer would get.
@@ -93,6 +105,13 @@ tempfile = "3"
 # table; we just bring them in here.
 serde      = { workspace = true }
 serde_json = { workspace = true }
+
+# Optional lint-domain oracle dependencies. Activated only when the
+# `lint-oracles` cargo feature is on. See the feature definition above for
+# the architectural context (PKIX-hbzo.1.1).
+pkix-zlint-bridge = { workspace = true, optional = true }
+pkix-lint         = { workspace = true, optional = true }
+pkix-lint-cabf    = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Tests reuse the runtime deps; nothing else is needed at this stage.

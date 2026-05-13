@@ -32,6 +32,18 @@ pub mod corpus;
 pub mod oracles;
 pub mod report;
 
+/// Lint-domain differential oracles (PKIX-hbzo.1).
+///
+/// Distinct from [`oracles`], which is the path-validation oracle layer
+/// (each oracle answers `(chain) -> Verdict`). The lint-oracle layer answers
+/// `(cert_der) -> Vec<NormalizedFinding>` instead — different shape, different
+/// vocabulary, different external tools. Feature-gated behind `lint-oracles`
+/// because activating it pulls in `pkix-zlint-bridge` (subprocess plumbing)
+/// and `pkix-lint-cabf` (in-process reference CA/B Forum lints), neither of
+/// which the baseline path-validation CI needs to pay for.
+#[cfg(feature = "lint-oracles")]
+pub mod lint_oracles;
+
 // ---------------------------------------------------------------------------
 // Verdict
 // ---------------------------------------------------------------------------
