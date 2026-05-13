@@ -13,6 +13,21 @@ not published.
 
 ### Added
 
+- Code-signing differential test (`tests/verify_wrapper_codesign.rs`)
+  driven by a composed pyca/cryptography oracle
+  (`python/pyca_codesign_oracle.py`). Resolves the PKIX-fmtv.18.5
+  oracle-coverage gap that closed earlier: OpenSSL's `verify` tool has
+  no `-purpose codesign` verb and pyca's `PolicyBuilder` is TLS-bound,
+  so neither workspace-standard oracle covered `verify_code_signer`.
+  The new oracle decomposes the wrapper's job into two independent
+  checks neither of which uses workspace code: (1) chain walk via
+  pyca's `Certificate.verify_directly_issued_by` primitive plus
+  validity-period overlap, (2) standalone OID-match EKU check
+  asserting `id-kp-codeSigning` on the leaf. 3 / 3 cases in agreement
+  on the seed corpus; hard invariant of zero disagreement in either
+  direction. `baseline-verify-openssl.md` updated to record the
+  resolution. (PKIX-fmtv.24.)
+
 - `lint_oracles` module behind the new `lint-oracles` cargo feature
   (off by default). Houses the lint-domain differential infrastructure
   for `PKIX-hbzo.1`:
