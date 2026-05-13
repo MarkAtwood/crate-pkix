@@ -19,6 +19,8 @@ ocsp        = ["pkix-revocation/ocsp"]
 [dependencies]
 pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
+pkix-identity   = { workspace = true, features = ["std"] }
+pkix-profiles   = { workspace = true }
 x509-cert       = { workspace = true }
 
 [package.metadata.docs.rs]
