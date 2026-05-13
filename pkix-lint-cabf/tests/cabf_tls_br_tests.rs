@@ -509,7 +509,7 @@ fn rsa_min_key_size_not_applicable_for_ecdsa() {
 // Lint 4 — cabf.br.tls.san.required
 // ---------------------------------------------------------------------------
 //
-// Oracle: TLS BR §7.1.4.2 — SAN must be present and non-empty.
+// Oracle: TLS BR §7.1.2.7.12 — SAN must be present and non-empty.
 //
 // leaf-p256-365d-san-eku.der  : has SAN "DNS:test.example.com" → Pass
 //   Oracle: openssl x509 ... | "Subject Alternative Name: DNS:test.example.com"
@@ -569,7 +569,7 @@ fn san_required_not_applicable_for_intermediate() {
 // Lint 5 — cabf.br.tls.eku.server_auth
 // ---------------------------------------------------------------------------
 //
-// Oracle: TLS BR §7.1.2.7.3 — id-kp-serverAuth (1.3.6.1.5.5.7.3.1) must be present.
+// Oracle: TLS BR §7.1.2.7.10 — id-kp-serverAuth (1.3.6.1.5.5.7.3.1) must be present.
 //
 // leaf-p256-365d-san-eku.der   : has EKU = serverAuth → Pass
 //   Oracle: openssl x509 ... | "Extended Key Usage: TLS Web Server Authentication"
@@ -648,7 +648,7 @@ fn eku_server_auth_error_smime_cert() {
 // Lint 6 — cabf.br.tls.bc.ca_flag
 // ---------------------------------------------------------------------------
 //
-// Oracle: TLS BR §7.1.2.5 — BasicConstraints must be present with cA=TRUE
+// Oracle: TLS BR §7.1.2.10.4 — BasicConstraints must be present with cA=TRUE
 //         on every intermediate CA certificate.
 //
 // int-p256.der: has BasicConstraints cA=TRUE → Pass
@@ -820,7 +820,7 @@ fn metadata_san_required() {
     let lint = SanRequiredLint;
     assert_eq!(lint.id(), "cabf.br.tls.san.required");
     assert_eq!(lint.title(), "Leaf certificate must include subjectAltName");
-    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.4.2"));
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.7.12"));
     assert_eq!(lint.spec_url(), None);
 }
 
@@ -832,7 +832,7 @@ fn metadata_eku_server_auth() {
         lint.title(),
         "Leaf certificate must include id-kp-serverAuth EKU"
     );
-    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.7.3"));
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.7.10"));
     assert_eq!(lint.spec_url(), None);
 }
 
@@ -844,7 +844,7 @@ fn metadata_bc_ca_flag() {
         lint.title(),
         "CA certificates must set BasicConstraints.cA=TRUE"
     );
-    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.5"));
+    assert_eq!(lint.spec_section_id(), Some("cabf-tls-br-7.1.2.10.4"));
     assert_eq!(lint.spec_url(), None);
 }
 

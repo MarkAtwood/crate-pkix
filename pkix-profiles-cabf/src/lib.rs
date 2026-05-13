@@ -214,12 +214,10 @@ impl Profile for WebPkiProfile {
     }
 
     fn version(&self) -> &'static str {
-        // SC-081 is the most recent ballot materially changing validity policy.
-        // Note: this string identifies the normative document whose rules were last
-        // incorporated into this profile.  SC-081 validity cap enforcement is
-        // intentionally delegated to `pkix-lint`'s `ValidityMaxLint`; it is NOT
-        // enforced by this profile (see struct-level doc for rationale).
-        "SC-081"
+        // Dotted spec version of the TLS BR document this profile was last
+        // refreshed against. The current BR text is the canonical source;
+        // this string is informational only.
+        "2.2.6"
     }
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
@@ -229,12 +227,15 @@ impl Profile for WebPkiProfile {
         p.allowed_signature_algs = Some(CABF_TLS_BR_ALLOWED_ALGS.to_vec());
         // BR §6.1.5: RSA keys must be at least 2048 bits.
         p.min_rsa_key_bits = Some(2048);
-        // BR §7.1.4.2: SAN must be present and non-empty on the leaf.
+        // BR §7.1.2.7.12 (Subscriber Certificate Subject Alternative Name):
+        // SAN must be present and non-empty on the leaf.
         p.require_subject_alt_name = true;
-        // BR §7.1.2.7.3: id-kp-serverAuth must be asserted in the leaf's EKU.
+        // BR §7.1.2.7.10 (Subscriber Certificate Extended Key Usage):
+        // id-kp-serverAuth must be asserted in the leaf's EKU.
         p.required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH]);
-        // BR §7.1.1: at most 2 non-self-issued intermediates in the path.
-        p.max_path_len = 2;
+        // Note: TLS BR 2.2.6 does not impose a numeric chain-depth cap.
+        // pathLenConstraint enforcement on individual CA certs is handled
+        // by RFC 5280 §4.2.1.9 in pkix-path.
         p
     }
 
@@ -277,8 +278,10 @@ impl Profile for SmimeProfile {
     }
 
     fn version(&self) -> &'static str {
-        // S/MIME BR version 1.0 (first edition).
-        "1.0"
+        // Dotted spec version of the S/MIME BR document this profile was last
+        // refreshed against. The current BR text is the canonical source;
+        // this string is informational only.
+        "1.0.14"
     }
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
@@ -295,10 +298,12 @@ impl Profile for SmimeProfile {
         // Mailbox-validated: non-empty SAN required; must contain an rfc822Name entry.
         p.require_subject_alt_name = true;
         p.require_rfc822_san = true;
-        // S/MIME BR §7.3: id-kp-emailProtection must be asserted.
+        // S/MIME BR §7.1.2.3(f) (Subscriber certificates / extKeyUsage):
+        // id-kp-emailProtection must be asserted.
         p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
-        // S/MIME BR §7.2: at most one Subordinate CA between Root and end-entity.
-        p.max_path_len = 1;
+        // Note: S/MIME BR 1.0.14 does not impose a numeric chain-depth cap.
+        // pathLenConstraint enforcement on individual CA certs is handled
+        // by RFC 5280 §4.2.1.9 in pkix-path.
         p
     }
 
@@ -336,8 +341,10 @@ impl Profile for CodeSigningProfile {
     }
 
     fn version(&self) -> &'static str {
-        // CS BR version 3.0.
-        "3.0"
+        // Dotted spec version of the CS BR document this profile was last
+        // refreshed against. The current BR text is the canonical source;
+        // this string is informational only.
+        "3.10.0"
     }
 
     fn policy(&self, now_unix: u64) -> ValidationPolicy {
@@ -351,10 +358,12 @@ impl Profile for CodeSigningProfile {
         p.min_rsa_key_bits = Some(3072);
         // CS certs identify subjects by DN; SAN is not required.
         p.require_subject_alt_name = false;
-        // CS BR §7.1.2.3: id-kp-codeSigning must be asserted.
+        // CS BR §7.1.2.3(f) (Code signing and Timestamp Certificate / extKeyUsage):
+        // id-kp-codeSigning must be asserted.
         p.required_leaf_eku = Some(vec![ID_KP_CODE_SIGNING]);
-        // CS BR §7.1.1: Root CA issues Subordinate CA directly; at most 1 intermediate.
-        p.max_path_len = 1;
+        // Note: CS BR 3.10.0 does not impose a numeric chain-depth cap.
+        // pathLenConstraint enforcement on individual CA certs is handled
+        // by RFC 5280 §4.2.1.9 in pkix-path.
         p
     }
 
@@ -425,9 +434,12 @@ pub const fn sc081_validity_cap(not_before_unix: u64) -> u64 {
 /// |-------|-------|---------------------|
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | TLS BR §7.1.3 |
 /// | `min_rsa_key_bits` | 2048 | TLS BR §6.1.5 |
-/// | `require_subject_alt_name` | true | TLS BR §7.1.4.2 |
-/// | `required_leaf_eku` | id-kp-serverAuth (1.3.6.1.5.5.7.3.1) | TLS BR §7.1.2.7.3 |
-/// | `max_path_len` | 2 | TLS BR §7.1.1 |
+/// | `require_subject_alt_name` | true | TLS BR §7.1.2.7.12 |
+/// | `required_leaf_eku` | id-kp-serverAuth (1.3.6.1.5.5.7.3.1) | TLS BR §7.1.2.7.10 |
+///
+/// `max_path_len` is intentionally not set. The TLS BR does not impose a
+/// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is
+/// handled by RFC 5280 §4.2.1.9 in `pkix-path`.
 ///
 /// # SC-081 validity enforcement
 ///
@@ -463,8 +475,11 @@ pub fn web_pki_policy(now_unix: u64) -> ValidationPolicy {
 /// | `min_rsa_key_bits` | 2048 | S/MIME BR §6.1.5 |
 /// | `require_subject_alt_name` | true | non-empty `SubjectAltName` extension required |
 /// | `require_rfc822_san` | true | at least one `rfc822Name` entry required in SAN |
-/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.3 |
-/// | `max_path_len` | 1 | S/MIME BR §7.2 |
+/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | S/MIME BR §7.1.2.3(f) |
+///
+/// `max_path_len` is intentionally not set. The S/MIME BR does not impose a
+/// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is
+/// handled by RFC 5280 §4.2.1.9 in `pkix-path`.
 ///
 /// # Limitations
 ///
@@ -496,8 +511,11 @@ pub fn smime_policy(now_unix: u64) -> ValidationPolicy {
 /// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | CS BR §7.1.3 |
 /// | `min_rsa_key_bits` | 3072 | CS BR §6.1.5 (effective 2023-06-01) |
 /// | `require_subject_alt_name` | false | CS certs identify subjects by DN |
-/// | `required_leaf_eku` | id-kp-codeSigning (1.3.6.1.5.5.7.3.3) | CS BR §7.1.2.3 |
-/// | `max_path_len` | 1 | CS BR §7.1.1 |
+/// | `required_leaf_eku` | id-kp-codeSigning (1.3.6.1.5.5.7.3.3) | CS BR §7.1.2.3(f) |
+///
+/// `max_path_len` is intentionally not set. The CS BR does not impose a
+/// numeric chain-depth cap; per-cert `pathLenConstraint` enforcement is
+/// handled by RFC 5280 §4.2.1.9 in `pkix-path`.
 ///
 /// # Limitations
 ///
@@ -877,15 +895,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn smime_policy_max_path_len_is_1() {
-        let p = smime_policy(NOW);
-        assert_eq!(
-            p.max_path_len, 1,
-            "smime_policy: max_path_len must be 1 (S/MIME BR §7.2)"
-        );
-    }
-
     /// Oracle: openssl verify -`CAfile` smime-self-signed-365d.pem smime-self-signed-365d.pem → OK
     #[test]
     fn smime_conforming_cert_passes() {
@@ -955,15 +964,6 @@ mod tests {
         assert!(
             !p.require_subject_alt_name,
             "code_signing_policy: require_subject_alt_name must be false (CS certs use DN)"
-        );
-    }
-
-    #[test]
-    fn code_signing_policy_max_path_len_is_1() {
-        let p = code_signing_policy(NOW);
-        assert_eq!(
-            p.max_path_len, 1,
-            "code_signing_policy: max_path_len must be 1 (CS BR §7.1.1)"
         );
     }
 
