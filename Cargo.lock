@@ -1161,6 +1161,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-aia-http"
+version = "0.0.0"
+dependencies = [
+ "mockito",
+ "pkix-aia",
+ "ureq",
+]
+
+[[package]]
 name = "pkix-chain"
 version = "0.4.0"
 dependencies = [

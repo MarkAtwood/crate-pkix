@@ -22,6 +22,7 @@ members = [
     "pkix-zlint-bridge",
     "pkix-policy-zlint",
     "pkix-aia",
+    "pkix-aia-http",
 ]
 
 [workspace.package]
@@ -125,6 +126,7 @@ pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" 
 pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.0.0" }
 pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.0.0" }
 pkix-aia                = { path = "pkix-aia",                version = "0.0.0" }
+pkix-aia-http           = { path = "pkix-aia-http",           version = "0.0.0" }
 
 # RustCrypto core
 der       = "0.7"

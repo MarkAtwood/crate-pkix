@@ -1,0 +1,33 @@
+[package]
+name        = "pkix-aia-http"
+description = "Synchronous HTTP fetcher for pkix-aia (RFC 5280 §4.2.2.1 caIssuers URIs)"
+version               = "0.0.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "aia", "pki", "rfc5280"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-aia ships the AiaFetcher trait + AiaError type this crate
+# implements. The `std` feature is required because every transport
+# path on real fetchers can surface an io::Error variant.
+pkix-aia = { workspace = true, features = ["std"] }
+
+# Reference HTTP transport. Same pinning rationale as
+# pkix-revocation-http: ureq for the minimal pure-Rust sync footprint,
+# rustls for HTTPS. Async variant is filed as PKIX-zkjb.5.1 when
+# demand surfaces.
+ureq = { workspace = true }
+
+[dev-dependencies]
+# Mock HTTP server for the integration-test suite. MSRV 1.70,
+# comfortably within the workspace's 1.73 MSRV. mockito is sync-only,
+# matching this crate's sync-only scope.
+mockito = "1.7"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
