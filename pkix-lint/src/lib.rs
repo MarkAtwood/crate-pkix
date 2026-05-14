@@ -1878,6 +1878,8 @@ const _: fn() = || {
     _assert_send_sync::<crate::oscal::parse::ParseError>();
     #[cfg(feature = "oscal")]
     _assert_send_sync::<crate::oscal::profile::ResolvedProfile>();
+    #[cfg(feature = "oscal")]
+    _assert_send_sync::<crate::oscal::emit::AssessmentResultsOptions>();
 };
 
 // ---------------------------------------------------------------------------
