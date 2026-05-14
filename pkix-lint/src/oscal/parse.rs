@@ -40,7 +40,7 @@ use serde_json::Value;
 /// Every variant carries enough context (the index of the offending Risk
 /// in the input array, and the field name where applicable) for an
 /// operator to locate the problem in the source JSON.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParseError {
     /// The top-level [`Value`] was not a JSON array.
