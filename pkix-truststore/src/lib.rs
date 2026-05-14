@@ -395,12 +395,15 @@ where
     I: IntoIterator<Item = B>,
     B: AsRef<[u8]>,
 {
-    let mut anchors = Vec::new();
-    for (i, bytes) in iter.into_iter().enumerate() {
-        let cert = Certificate::from_der(bytes.as_ref()).map_err(|_| Error::MalformedAnchor(i))?;
-        let anchor = TrustAnchor::try_from(cert).map_err(|_| Error::MalformedAnchor(i))?;
-        anchors.push(anchor);
-    }
+    let anchors: Vec<TrustAnchor> = iter
+        .into_iter()
+        .enumerate()
+        .map(|(i, bytes)| {
+            let cert = Certificate::from_der(bytes.as_ref())
+                .map_err(|_| Error::MalformedAnchor(i))?;
+            TrustAnchor::try_from(cert).map_err(|_| Error::MalformedAnchor(i))
+        })
+        .collect::<Result<_, _>>()?;
     if anchors.is_empty() {
         return Err(Error::NoCertificates);
     }
