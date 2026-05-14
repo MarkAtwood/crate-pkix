@@ -51,6 +51,14 @@ const CERT1_PEM_PATH: &str = "tests/fixtures/cert1.pem";
 const CERT2_PEM_PATH: &str = "tests/fixtures/cert2.pem";
 const CERT1_DER_PATH: &str = "tests/fixtures/cert1.der";
 
+// TO REFRESH on a fixture update: run
+//   grep -c "-----BEGIN CERTIFICATE-----" tests/fixtures/<file>
+// on a system that has GNU grep (or any POSIX grep). Copy the integer
+// into the matching constant below. **Do not copy the number from the
+// test-failure output**: that defeats the purpose of an independent
+// oracle (the test-derived count uses the same windows() byte scan
+// that the constants are intended to validate).
+
 /// Independent oracle: `grep -c "-----BEGIN CERTIFICATE-----"
 /// debian-ca-certificates.crt` on the fixture at the time it was committed
 /// reported this count. CI re-verifies the count at the start of the

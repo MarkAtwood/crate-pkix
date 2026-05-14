@@ -357,8 +357,19 @@ pub enum Error {
     /// PEM decoding failed. The wrapped [`DerError`] preserves the
     /// underlying `der::pem` failure (missing end boundary, bad base64,
     /// unknown label) as a Display-renderable string.
+    ///
+    /// **Why `DerError`?** Upstream `x509-cert`'s PEM-framing parser
+    /// surfaces all framing failures as `der::Error` values (with
+    /// `der::ErrorKind::Pem`). [`DerError`] is the workspace's opaque
+    /// newtype that insulates callers from `der` crate version churn
+    /// and covers both PEM-framing and DER-body errors. See
+    /// [`DerError::new`] for the rationale.
     Pem(DerError),
-    /// DER decoding failed for a certificate body.
+    /// DER decoding failed for a certificate body or a critical
+    /// extension (e.g., `NameConstraints`) inside an otherwise-parseable
+    /// trust-anchor certificate. The wrapped [`DerError`] is the same
+    /// opaque newtype used by [`Self::Pem`]; see that variant's doc for
+    /// the type-naming rationale.
     Der(DerError),
     /// The input contained no certificates.
     ///
@@ -427,6 +438,9 @@ impl From<io::Error> for Error {
 
 /// UTF-8 byte order mark.
 const UTF8_BOM: &[u8] = b"\xef\xbb\xbf";
+
+/// First-line marker of a PEM-encoded certificate block (RFC 7468).
+const BEGIN_BOUNDARY: &[u8] = b"-----BEGIN CERTIFICATE-----";
 
 /// Strip a leading UTF-8 BOM from `bytes`, if present.
 fn strip_bom(bytes: &[u8]) -> &[u8] {
@@ -510,8 +524,6 @@ pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
         .map(|c| TrustAnchor::try_from(c).map_err(Error::Der))
         .collect()
 }
-
-const BEGIN_BOUNDARY: &[u8] = b"-----BEGIN CERTIFICATE-----";
 
 /// Parse a single DER-encoded certificate into a trust anchor.
 ///
