@@ -250,12 +250,20 @@ pub enum Error {
     /// observed. An empty trust store is almost always a configuration
     /// mistake, so this is a hard error rather than `Ok(vec![])`.
     NoCertificates,
-    /// One certificate in a multi-cert input was malformed. The wrapped
-    /// `usize` is the 0-based position of the offending entry in the
-    /// iterator passed to [`from_der_iter`]. Returned both for entries that
-    /// failed to decode as `Certificate` and for entries that decoded but
-    /// whose `NameConstraints` extension had malformed DER.
-    MalformedAnchor(usize),
+    /// One certificate in a multi-cert input was malformed.
+    ///
+    /// * `index` — 0-based position of the offending entry in the iterator
+    ///   passed to [`from_der_iter`].
+    /// * `source` — the underlying [`DerError`] from `x509-cert` or from
+    ///   `NameConstraints` extension decoding. Returned both for entries
+    ///   that failed to decode as `Certificate` and for entries that
+    ///   decoded but whose `NameConstraints` extension had malformed DER.
+    MalformedAnchor {
+        /// 0-based position of the offending entry in the iterator.
+        index: usize,
+        /// Underlying DER-decode failure.
+        source: DerError,
+    },
 }
 
 impl core::fmt::Display for Error {
@@ -265,7 +273,9 @@ impl core::fmt::Display for Error {
             Self::Pem(e) => write!(f, "PEM decoding failed: {e}"),
             Self::Der(e) => write!(f, "DER decoding failed: {e}"),
             Self::NoCertificates => f.write_str("input contained no certificates"),
-            Self::MalformedAnchor(i) => write!(f, "malformed certificate at position {i}"),
+            Self::MalformedAnchor { index, source } => {
+                write!(f, "malformed certificate at position {index}: {source}")
+            }
         }
     }
 }
@@ -275,7 +285,8 @@ impl std::error::Error for Error {
         match self {
             Self::Io(e) => Some(e),
             Self::Pem(e) | Self::Der(e) => Some(e),
-            Self::NoCertificates | Self::MalformedAnchor(_) => None,
+            Self::MalformedAnchor { source, .. } => Some(source),
+            Self::NoCertificates => None,
         }
     }
 }
@@ -402,11 +413,11 @@ pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
 ///
 /// # Errors
 ///
-/// * [`Error::MalformedAnchor`] — the wrapped index identifies which entry
-///   in the iterator failed to decode, either as a `Certificate` or because
-///   a critical extension (notably `NameConstraints`) had malformed DER.
-///   The underlying [`der::Error`] is not currently surfaced; if you need
-///   it, decode entries one at a time with [`from_der`].
+/// * [`Error::MalformedAnchor`] — carries the 0-based `index` of the entry
+///   that failed plus a [`DerError`] `source` describing the underlying
+///   `x509-cert` or `NameConstraints` decode failure. Returned for entries
+///   that failed to decode as `Certificate` and for entries that decoded
+///   but whose `NameConstraints` extension had malformed DER.
 /// * [`Error::NoCertificates`] — the iterator yielded zero items.
 ///
 /// See [`from_pem`] for the rationale behind fail-closed `NameConstraints`
@@ -419,10 +430,14 @@ where
     let anchors: Vec<TrustAnchor> = iter
         .into_iter()
         .enumerate()
-        .map(|(i, bytes)| {
-            let cert = Certificate::from_der(bytes.as_ref())
-                .map_err(|_| Error::MalformedAnchor(i))?;
-            TrustAnchor::try_from(cert).map_err(|_| Error::MalformedAnchor(i))
+        .map(|(index, bytes)| {
+            let cert = Certificate::from_der(bytes.as_ref()).map_err(|e| {
+                Error::MalformedAnchor {
+                    index,
+                    source: DerError::new(e),
+                }
+            })?;
+            TrustAnchor::try_from(cert).map_err(|source| Error::MalformedAnchor { index, source })
         })
         .collect::<Result<_, _>>()?;
     if anchors.is_empty() {
@@ -531,8 +546,8 @@ mod tests {
         // First entry will be a syntactically-invalid DER blob.
         let bad: &[&[u8]] = &[&[0xff_u8; 16]];
         match from_der_iter(bad.iter().copied()) {
-            Err(Error::MalformedAnchor(i)) => assert_eq!(i, 0),
-            other => panic!("expected MalformedAnchor(0), got {other:?}"),
+            Err(Error::MalformedAnchor { index, source: _ }) => assert_eq!(index, 0),
+            other => panic!("expected MalformedAnchor {{ index: 0, .. }}, got {other:?}"),
         }
     }
 }

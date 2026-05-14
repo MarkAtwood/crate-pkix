@@ -21,17 +21,24 @@ fn error_no_certificates_round_trips() {
     assert!(matches!(back, Error::NoCertificates));
 }
 
-/// `Error::MalformedAnchor(usize)` round-trips, preserving the index.
+/// `Error::MalformedAnchor { index, source }` round-trips, preserving
+/// the index and the cached Display message of the inner `DerError`.
+/// `DerError`'s `inner` field (the original `der::Error`) is dropped on
+/// the deserialize side, but `DerError`'s `PartialEq` compares only the
+/// message, so `Error::MalformedAnchor == Error::MalformedAnchor` holds
+/// across round-trips.
 #[test]
-fn error_malformed_anchor_round_trips_preserving_index() {
+fn error_malformed_anchor_round_trips_preserving_index_and_source() {
     let bad: &[&[u8]] = &[&[0xff_u8; 16]];
     let err = from_der_iter(bad.iter().copied()).expect_err("malformed entry");
+    let original_display = format!("{err}");
     let json = serde_json::to_string(&err).expect("serialize");
     let back: Error = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(err, back);
+    assert_eq!(format!("{back}"), original_display);
     match back {
-        Error::MalformedAnchor(i) => assert_eq!(i, 0),
-        other => panic!("expected MalformedAnchor(0), got {other:?}"),
+        Error::MalformedAnchor { index, source: _ } => assert_eq!(index, 0),
+        other => panic!("expected MalformedAnchor {{ index: 0, .. }}, got {other:?}"),
     }
 }
 
