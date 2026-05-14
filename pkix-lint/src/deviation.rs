@@ -50,6 +50,7 @@
 //!     "FPKIPA waiver memo 2025-11-03; see exception register entry 47",
 //!     "agency-x-ciso@agency.gov",
 //! )
+//! .expect("non-empty justification and authorized_by")
 //! .with_effective_end(1_767_225_600) // 2026-01-01
 //! // Optional: URI to the backing document. Git commit history is the audit trail.
 //! .with_evidence_uri("https://pkipolicy.agency.gov/waivers/2025-11-03");
@@ -234,11 +235,24 @@ impl Deviation {
     /// - [`Self::evidence_uri`] → `None`
     /// - [`Self::priority`] → `0`
     ///
-    /// `id`, `target_lint`, `justification`, and `authorized_by` must
-    /// be non-empty when the deviation is added to a [`DeviationStore`].
-    /// This constructor does not validate them; [`DeviationStore::add`]
-    /// enforces non-emptiness and uniqueness.
-    #[must_use]
+    /// `justification` and `authorized_by` MUST be non-empty.
+    /// Construction fails fast at this entry point, matching the
+    /// non-emptiness check that [`DeviationStore::add`] already
+    /// performed — PKIX-7f92.8 closed the gap where a Deviation
+    /// could be constructed with empty fields, inspected, serialized,
+    /// or OSCAL-round-tripped before the add-time failure surfaced.
+    ///
+    /// # Errors
+    ///
+    /// - [`DeviationAddError::EmptyField`] (`"justification"`) if
+    ///   `justification` is empty.
+    /// - [`DeviationAddError::EmptyField`] (`"authorized_by"`) if
+    ///   `authorized_by` is empty.
+    ///
+    /// `id` and `target_lint` non-emptiness is enforced at
+    /// [`DeviationStore::add`] (via the duplicate-id check, which
+    /// makes the empty-id case effectively unreachable in practice —
+    /// a single store cannot hold two deviations with empty ids).
     pub fn new(
         id: impl Into<String>,
         target_lint: impl Into<String>,
@@ -246,19 +260,27 @@ impl Deviation {
         action: DeviationAction,
         justification: impl Into<String>,
         authorized_by: impl Into<String>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, DeviationAddError> {
+        let justification: String = justification.into();
+        let authorized_by: String = authorized_by.into();
+        if justification.is_empty() {
+            return Err(DeviationAddError::EmptyField("justification".into()));
+        }
+        if authorized_by.is_empty() {
+            return Err(DeviationAddError::EmptyField("authorized_by".into()));
+        }
+        Ok(Self {
             id: id.into(),
             target_lint: target_lint.into(),
             scope,
             effective_start: None,
             effective_end: None,
             action,
-            justification: justification.into(),
-            authorized_by: authorized_by.into(),
+            justification,
+            authorized_by,
             evidence_uri: None,
             priority: 0,
-        }
+        })
     }
 
     /// Builder-style setter for [`Self::effective_start`]. Returns
@@ -2009,6 +2031,57 @@ mod tests {
         assert_eq!(store.all().len(), 2);
     }
 
+    /// Regression test for PKIX-7f92.8: Deviation::new returns
+    /// EmptyField at construction time on empty justification, not at
+    /// store.add() time. Locks the fail-fast contract that closes the
+    /// "config-string-driven builder slips past, gets serialized, fails
+    /// only at add() much later" hazard.
+    #[test]
+    fn new_rejects_empty_justification() {
+        let err = Deviation::new(
+            "d1",
+            "test.lint",
+            DeviationScope::any(),
+            DeviationAction::Suppress,
+            "",
+            "ops@example.com",
+        )
+        .expect_err("empty justification must fail at construction");
+        assert_eq!(err, DeviationAddError::EmptyField("justification".into()));
+    }
+
+    #[test]
+    fn new_rejects_empty_authorized_by() {
+        let err = Deviation::new(
+            "d1",
+            "test.lint",
+            DeviationScope::any(),
+            DeviationAction::Suppress,
+            "valid justification",
+            "",
+        )
+        .expect_err("empty authorized_by must fail at construction");
+        assert_eq!(err, DeviationAddError::EmptyField("authorized_by".into()));
+    }
+
+    /// new() returning Ok for non-empty fields must produce a Deviation
+    /// that store.add() accepts. Locks the symmetry between the two
+    /// entry points.
+    #[test]
+    fn new_accepts_non_empty_fields_and_add_succeeds() {
+        let dev = Deviation::new(
+            "d1",
+            "test.lint",
+            DeviationScope::any(),
+            DeviationAction::Suppress,
+            "valid justification",
+            "ops@example.com",
+        )
+        .expect("non-empty fields");
+        let mut store = DeviationStore::new();
+        store.add(dev).expect("add must succeed");
+    }
+
     #[test]
     fn store_rejects_empty_justification() {
         let mut store = DeviationStore::new();
@@ -2336,6 +2409,7 @@ mod tests {
                     "wildcard waiver",
                     "ops@example.com",
                 )
+                .expect("non-empty fields")
                 .with_priority(0),
             )
             .expect("add wildcard");
@@ -2351,6 +2425,7 @@ mod tests {
                     "lab-specific waiver",
                     "lab-lead@example.com",
                 )
+                .expect("non-empty fields")
                 .with_priority(100),
             )
             .expect("add specific");
