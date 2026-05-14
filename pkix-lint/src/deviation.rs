@@ -501,47 +501,74 @@ impl DeviationScope {
         }
     }
 
-    /// Construct a [`SCOPE_KIND_ISSUER_DN_EXACT`] scope.
+    /// Construct a [`SCOPE_KIND_ISSUER_DN_EXACT`] scope from the DER
+    /// encoding of the issuer Name.
+    ///
+    /// `issuer_der` is the DER encoding of the issuer Name (the value
+    /// of `TBSCertificate.issuer` — equivalently
+    /// `cert.tbs_certificate.issuer.to_der().unwrap()` for callers
+    /// holding an x509-cert `Name`). The bytes are stored verbatim and
+    /// compared byte-equal during matching.
+    ///
+    /// Construction does not validate that the bytes form a valid DER
+    /// Name; malformed scope props fail closed at
+    /// [`DeviationScope::matches`] time. This matches the lazy
+    /// fail-closed contract that already covers raw OSCAL-parsed
+    /// scopes.
     ///
     /// The issuer DN is matched using
     /// [`pkix_path::names_match`] (RFC 4518 normalization).
     ///
-    /// # Errors
+    /// # Migration note (PKIX-7f92.30)
     ///
-    /// Returns [`der::Error`] if `name` fails to DER-encode.
-    pub fn issuer_dn_exact(name: &x509_cert::name::Name) -> Result<Self, der::Error> {
-        use der::Encode as _;
-        let der = name.to_der()?;
-        Ok(Self {
+    /// Previously this constructor took `&x509_cert::name::Name` and
+    /// returned `Result<Self, der::Error>`. Callers holding a `Name`
+    /// now pass `&name.to_der().expect("Name::to_der is infallible")[..]`
+    /// at the call site, which keeps the x509-cert dependency
+    /// off pkix-lint's public surface. Callers holding raw DER bytes
+    /// (the common case for OSCAL-imported policy) save a
+    /// parse-and-re-encode round-trip.
+    #[must_use]
+    pub fn issuer_dn_exact(issuer_der: impl Into<Vec<u8>>) -> Self {
+        Self {
             kind: SCOPE_KIND_ISSUER_DN_EXACT.to_string(),
-            props: vec![(PROP_ISSUER_DN_DER.to_string(), ScopePropValue::Bytes(der))],
-        })
+            props: vec![(
+                PROP_ISSUER_DN_DER.to_string(),
+                ScopePropValue::Bytes(issuer_der.into()),
+            )],
+        }
     }
 
-    /// Construct a [`SCOPE_KIND_SERIAL_RANGE`] scope.
+    /// Construct a [`SCOPE_KIND_SERIAL_RANGE`] scope from the DER
+    /// encoding of the issuer Name plus the inclusive serial range.
     ///
-    /// `issuer` is the CA's subject DN (matched via
-    /// [`pkix_path::names_match`]); `start` and `end` are the serial number
-    /// bounds (inclusive) as raw bytes in DER positive-integer encoding.
+    /// `issuer_der` is the DER encoding of the issuer Name (see
+    /// [`Self::issuer_dn_exact`] for the contract on these bytes).
+    /// `start` and `end` are the serial-number bounds (inclusive) as
+    /// raw bytes in DER positive-integer encoding.
     ///
-    /// # Errors
+    /// # Migration note (PKIX-7f92.30)
     ///
-    /// Returns [`der::Error`] if `issuer` fails to DER-encode.
+    /// Previously this constructor took `&x509_cert::name::Name` and
+    /// returned `Result<Self, der::Error>`. See [`Self::issuer_dn_exact`]
+    /// for the migration rationale.
+    #[must_use]
     pub fn serial_range(
-        issuer: &x509_cert::name::Name,
+        issuer_der: impl Into<Vec<u8>>,
         start: Vec<u8>,
         end: Vec<u8>,
-    ) -> Result<Self, der::Error> {
-        use der::Encode as _;
-        let der = issuer.to_der()?;
-        Ok(Self {
+    ) -> Self {
+        Self {
             kind: SCOPE_KIND_SERIAL_RANGE.to_string(),
             props: vec![
-                (PROP_ISSUER_DN_DER.to_string(), ScopePropValue::Bytes(der)),
+                (
+                    PROP_ISSUER_DN_DER.to_string(),
+                    ScopePropValue::Bytes(issuer_der.into()),
+                ),
                 (PROP_SERIAL_START.to_string(), ScopePropValue::Bytes(start)),
                 (PROP_SERIAL_END.to_string(), ScopePropValue::Bytes(end)),
             ],
-        })
+        }
     }
 
     /// Get a prop value by name, or `None` if no such prop exists.
@@ -1538,10 +1565,15 @@ mod tests {
 
     #[test]
     fn scope_issuer_dn_exact_matches_cert_issuer() {
+        use der::Encode as _;
         let cert = load_cert();
         // Use the cert's own issuer DN as the exact match — must succeed.
-        let scope = DeviationScope::issuer_dn_exact(&cert.tbs_certificate.issuer)
-            .expect("issuer DN must DER-encode");
+        let issuer_der = cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
+        let scope = DeviationScope::issuer_dn_exact(issuer_der);
         assert!(
             scope.matches(&cert),
             "issuer_dn_exact with cert's own issuer must match"
@@ -1550,7 +1582,7 @@ mod tests {
 
     #[test]
     fn scope_issuer_dn_exact_does_not_match_different_dn() {
-        use der::Decode as _;
+        use der::{Decode as _, Encode as _};
         let cert = load_cert();
         // Use the cert's subject DN as the "issuer" — for a self-signed cert subject==issuer,
         // so use a different cert's issuer if available. Since we only have one fixture
@@ -1563,8 +1595,12 @@ mod tests {
         ))
         .expect("fixture is valid DER");
         // Use smime cert's issuer as the scope — should not match the webpki cert.
-        let scope = DeviationScope::issuer_dn_exact(&other_cert.tbs_certificate.issuer)
-            .expect("issuer DN must DER-encode");
+        let other_issuer_der = other_cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
+        let scope = DeviationScope::issuer_dn_exact(other_issuer_der);
         // If both certs have the same issuer DN, the test is vacuous. Check first.
         let same = pkix_path::names_match(
             &cert.tbs_certificate.issuer,
@@ -1624,12 +1660,16 @@ mod tests {
 
     #[test]
     fn scope_serial_range_matches_cert_in_range() {
+        use der::Encode as _;
         let cert = load_cert();
         let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
+        let issuer_der = cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
         // Range is [serial, serial] — cert's own serial, must match.
-        let scope =
-            DeviationScope::serial_range(&cert.tbs_certificate.issuer, serial.clone(), serial)
-                .expect("issuer DN must DER-encode");
+        let scope = DeviationScope::serial_range(issuer_der, serial.clone(), serial);
         assert!(
             scope.matches(&cert),
             "cert's own serial must be within [serial, serial]"
@@ -1638,14 +1678,19 @@ mod tests {
 
     #[test]
     fn scope_serial_range_excludes_cert_outside_range() {
+        use der::Encode as _;
         let cert = load_cert();
         let serial = cert.tbs_certificate.serial_number.as_bytes();
         // Range is [serial+1, serial+2] — cert's serial is below, must not match.
         // Construct a start that is definitely higher: 0xFF repeated.
         let start = vec![0xFF; serial.len() + 1]; // much larger than any fixed serial
         let end = vec![0xFF; serial.len() + 2];
-        let scope = DeviationScope::serial_range(&cert.tbs_certificate.issuer, start, end)
-            .expect("issuer DN must DER-encode");
+        let issuer_der = cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
+        let scope = DeviationScope::serial_range(issuer_der, start, end);
         assert!(
             !scope.matches(&cert),
             "cert serial below range start must not match"
@@ -1654,7 +1699,7 @@ mod tests {
 
     #[test]
     fn scope_serial_range_wrong_issuer_no_match() {
-        use der::Decode as _;
+        use der::{Decode as _, Encode as _};
         let cert = load_cert();
         let other_cert = Certificate::from_der(include_bytes!(
             "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
@@ -1662,12 +1707,16 @@ mod tests {
         .expect("fixture is valid DER");
         let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
         // Use the other cert's issuer — should not match cert.
+        let other_issuer_der = other_cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::serial_range(
-            &other_cert.tbs_certificate.issuer,
+            other_issuer_der,
             vec![0x00],
             vec![0xFF; serial.len() + 2],
-        )
-        .expect("issuer DN must DER-encode");
+        );
         let same_issuer = pkix_path::names_match(
             &cert.tbs_certificate.issuer,
             &other_cert.tbs_certificate.issuer,
@@ -1749,6 +1798,7 @@ mod tests {
 
     #[test]
     fn scope_constructor_kinds_match_constants() {
+        use der::Encode as _;
         // The constructors must produce scopes whose `kind` field matches the
         // corresponding `SCOPE_KIND_*` constant. This is an invariant the OSCAL
         // emit/parse layer relies on.
@@ -1758,12 +1808,14 @@ mod tests {
             SCOPE_KIND_ISSUER_DN_CONTAINS
         );
         let cert = load_cert();
-        let exact = DeviationScope::issuer_dn_exact(&cert.tbs_certificate.issuer)
-            .expect("issuer DN must DER-encode");
+        let issuer_der = cert
+            .tbs_certificate
+            .issuer
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
+        let exact = DeviationScope::issuer_dn_exact(issuer_der.clone());
         assert_eq!(exact.kind, SCOPE_KIND_ISSUER_DN_EXACT);
-        let range =
-            DeviationScope::serial_range(&cert.tbs_certificate.issuer, vec![0x01], vec![0x02])
-                .expect("issuer DN must DER-encode");
+        let range = DeviationScope::serial_range(issuer_der, vec![0x01], vec![0x02]);
         assert_eq!(range.kind, SCOPE_KIND_SERIAL_RANGE);
     }
 
