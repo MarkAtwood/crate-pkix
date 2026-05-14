@@ -168,16 +168,20 @@ impl EvaluationReport {
         self.findings.iter().any(Finding::is_finding)
     }
 
-    /// Return all findings at or above the given severity.
+    /// Return an iterator over all findings at or above the given severity.
     ///
     /// Useful for rendering: show only Error+ findings in a summary panel,
-    /// or Warn+ in a detail view.
-    #[must_use]
-    pub fn findings_at_or_above(&self, min_severity: crate::Severity) -> Vec<&Finding> {
+    /// or Warn+ in a detail view. Returning an iterator avoids allocating
+    /// an intermediate `Vec` for the common case of walking the result
+    /// once. Callers that need a vector can `.collect()` at the call
+    /// site, which documents the allocation cost explicitly.
+    pub fn findings_at_or_above(
+        &self,
+        min_severity: crate::Severity,
+    ) -> impl Iterator<Item = &Finding> + '_ {
         self.findings
             .iter()
-            .filter(|f| severity_of(&f.result).is_some_and(|s| s >= min_severity))
-            .collect()
+            .filter(move |f| severity_of(&f.result).is_some_and(|s| s >= min_severity))
     }
 }
 
@@ -252,7 +256,7 @@ mod tests {
         let mut r = empty_report();
         r.findings.push(error_finding());
         r.findings.push(warn_finding());
-        let at_error = r.findings_at_or_above(Severity::Error);
+        let at_error: Vec<&Finding> = r.findings_at_or_above(Severity::Error).collect();
         assert_eq!(at_error.len(), 1, "only Error findings at Error threshold");
         assert!(matches!(at_error[0].result, LintResult::Error(_)));
     }
@@ -262,8 +266,8 @@ mod tests {
         let mut r = empty_report();
         r.findings.push(error_finding());
         r.findings.push(warn_finding());
-        let at_warn = r.findings_at_or_above(Severity::Warn);
-        assert_eq!(at_warn.len(), 2, "both Error and Warn at Warn threshold");
+        let at_warn_count = r.findings_at_or_above(Severity::Warn).count();
+        assert_eq!(at_warn_count, 2, "both Error and Warn at Warn threshold");
     }
 
     #[test]
