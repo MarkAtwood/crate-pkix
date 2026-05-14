@@ -1761,9 +1761,40 @@ pub fn check_shape(
 // Send + Sync compile-time assertions (AGENTS.md non-negotiable #6, PKIX-2l0v.2)
 // ---------------------------------------------------------------------------
 
+// Every load-bearing public type — results, errors, config carriers,
+// runners, stores — is asserted Send+Sync at compile time. AGENTS.md
+// non-negotiable #6 requires these types to admit cross-thread caching
+// and batch evaluation. The const block fails the workspace build
+// immediately if someone adds Rc<T>, RefCell<T>, or any non-Sync field
+// to a covered type.
 const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
+
+    // Lint-engine surface
     _assert_send_sync::<Finding>();
+    _assert_send_sync::<LintRunner>();
+    _assert_send_sync::<LintResult>();
+    _assert_send_sync::<LintParameter>();
+    _assert_send_sync::<ParameterError>();
+
+    // Deviation surface
+    _assert_send_sync::<crate::deviation::Deviation>();
+    _assert_send_sync::<crate::deviation::DeviationScope>();
+    _assert_send_sync::<crate::deviation::DeviationStore>();
+    _assert_send_sync::<crate::deviation::DeviationAddError>();
+    _assert_send_sync::<crate::deviation::DeviationRunResult>();
+    _assert_send_sync::<crate::deviation::DeviationRunner>();
+    _assert_send_sync::<crate::deviation::ScopePropValue>();
+
+    // Report surface
+    _assert_send_sync::<crate::deviation::DeviatedFinding>();
+    _assert_send_sync::<crate::report::EvaluationReport>();
+
+    // OSCAL surface (oscal feature only — types are #[cfg]-gated).
+    #[cfg(feature = "oscal")]
+    _assert_send_sync::<crate::oscal::parse::ParseError>();
+    #[cfg(feature = "oscal")]
+    _assert_send_sync::<crate::oscal::profile::ResolvedProfile>();
 };
 
 // ---------------------------------------------------------------------------
