@@ -62,31 +62,39 @@ custom lint). See `WebPkiProfile`'s struct-level rustdoc.
 
 ### S/MIME and CS `max_validity_secs` apply to the whole chain
 
-`SmimeProfile::policy().max_validity_secs = 1185 days` and
-`CodeSigningProfile::policy().max_validity_secs = 460 days` apply to
-**every** certificate in the chain, not just the leaf. Typical CA
-certificates have validity periods well above these caps and will fail
-validation. This matches `pkix-path`'s `ValidationPolicy` shape (the
-field is per-cert, not leaf-only) and is called out in each profile's
-rustdoc `# Limitations` section. Callers chaining these profiles
-against real-world CA hierarchies should override
-`max_validity_secs` or use a custom policy.
+`SmimeProfile::policy().max_validity_secs = 825 days` (Strict
+generation per §6.3.2) and `CodeSigningProfile::policy().max_validity_secs
+= 460 days` apply to **every** certificate in the chain, not just the
+leaf. Typical CA certificates have validity periods well above these
+caps and will fail validation. This matches `pkix-path`'s
+`ValidationPolicy` shape (the field is per-cert, not leaf-only) and is
+called out in each profile's rustdoc `# Limitations` section. Callers
+chaining these profiles against real-world CA hierarchies should
+override `max_validity_secs` or use a custom policy.
 
-### Sub-profile families partially split
+### Sub-profile families partially split — Strict generation only
 
-`SmimeProfile` ships the Mailbox-validated / strict tier baseline.
-`SmimeSponsorValidated` ships the Sponsor-validated tier (CA/B Forum
-S/MIME BR §7.5); it adds the reserved policy OID `2.23.140.1.5.3.1` and
-the Subject DN rule
-`organizationName AND ((givenName AND surname) OR pseudonym) AND serialNumber`
-on top of the Mailbox-validated baseline.
-`SmimeIndividualValidated` ships the Individual-validated tier (§7.6); it
-adds the reserved policy OID `2.23.140.1.5.4.1` and the Subject DN rule
-`((givenName AND surname) OR pseudonym) AND serialNumber` on top of the
-Mailbox-validated baseline.
+All S/MIME `Profile` types in this crate target the **Strict
+generation** (`.3` OID suffix). Per S/MIME BR §7.1.6.1 line 2600,
+Legacy generation (`.1`) was banned for new issuance effective
+2025-07-15; the `-cabf` crate intentionally does not ship Legacy-tier
+profile types. Multipurpose generation (`.2`) is a transitional bridge
+profile and is tracked separately as PKIX-jbvb.8 (open architectural
+question on whether to add Multipurpose Profile types). The
+spec-taxonomy principle in AGENTS.md (PKIX-mzsk) ships one canonical
+Profile per validation type, targeting the modern tier (Strict).
 
-The Organization-validated (§7.4) tier profile type remains tracked under
-PKIX-jbvb.
+- `SmimeProfile` — Mailbox-validated baseline, Strict generation.
+  825-day validity cap; rfc822Name SAN; emailProtection EKU.
+- `SmimeSponsorValidated` — Sponsor-validated tier (§7.5),
+  Strict generation. Reserved policy OID `2.23.140.1.5.3.3`. Subject
+  DN rule per §7.1.4.2.5: `organizationName AND organizationIdentifier
+  AND ((givenName AND surname) OR pseudonym)`.
+- `SmimeIndividualValidated` — Individual-validated tier (§7.6),
+  Strict generation. Reserved policy OID `2.23.140.1.5.4.3`. Subject
+  DN rule per §7.1.4.2.6 Note 2: `(givenName AND surname) OR pseudonym`.
+- Organization-validated (§7.4) Profile type remains tracked under
+  PKIX-jbvb.1.
 
 ### Subscriber-cert taxonomy only
 
