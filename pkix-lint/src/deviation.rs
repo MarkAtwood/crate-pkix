@@ -42,18 +42,18 @@
 //! use pkix_lint::Severity;
 //!
 //! let mut store = DeviationStore::new();
-//! store.add(Deviation {
-//!     id: "agency-x-fpki-keyusage-2026-q1".to_string(),
-//!     target_lint: "fpki.common.6.1.5".to_string(),
-//!     scope: DeviationScope::issuer_dn_contains("agency x issuing ca"),
-//!     effective_start: None,
-//!     effective_end: Some(1_767_225_600), // 2026-01-01
-//!     action: DeviationAction::DowngradeSeverityTo(Severity::Info),
-//!     justification: "FPKIPA waiver memo 2025-11-03; see exception register entry 47".to_string(),
-//!     authorized_by: "agency-x-ciso@agency.gov".to_string(),
-//!     // Optional: URI to the backing document. git commit history is the audit trail.
-//!     evidence_uri: Some("https://pkipolicy.agency.gov/waivers/2025-11-03".to_string()),
-//! }).unwrap();
+//! let dev = Deviation::new(
+//!     "agency-x-fpki-keyusage-2026-q1",
+//!     "fpki.common.6.1.5",
+//!     DeviationScope::issuer_dn_contains("agency x issuing ca"),
+//!     DeviationAction::DowngradeSeverityTo(Severity::Info),
+//!     "FPKIPA waiver memo 2025-11-03; see exception register entry 47",
+//!     "agency-x-ciso@agency.gov",
+//! )
+//! .with_effective_end(1_767_225_600) // 2026-01-01
+//! // Optional: URI to the backing document. Git commit history is the audit trail.
+//! .with_evidence_uri("https://pkipolicy.agency.gov/waivers/2025-11-03");
+//! store.add(dev).unwrap();
 //!
 //! // Use a DeviationRunner (wraps LintRunner) to apply deviations automatically.
 //! ```
@@ -92,8 +92,15 @@ impl std::error::Error for DeviationAddError {}
 /// A scoped, time-bounded exception to a specific lint finding.
 ///
 /// See the module-level documentation for the design rationale and usage.
+///
+/// The struct carries `#[non_exhaustive]`: callers outside this crate
+/// must construct via [`Deviation::new`] (plus the `with_*` builder
+/// setters for optional fields) instead of struct-literal syntax, so
+/// future fields (e.g., `revoked_at`, `supersedes_id`, priority for
+/// PKIX-hy2e.10) remain non-breaking additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Deviation {
     /// Unique identifier for this deviation within the operator's store.
     ///
@@ -171,6 +178,69 @@ pub struct Deviation {
 }
 
 impl Deviation {
+    /// Construct a [`Deviation`] with the required fields.
+    ///
+    /// Use this constructor (with the `with_*` builder setters for
+    /// optional fields) instead of struct-literal syntax so future
+    /// fields remain non-breaking additions. The struct carries
+    /// `#[non_exhaustive]`.
+    ///
+    /// Required fields are positional; optional fields default to
+    /// `None` / not-set:
+    /// - [`Self::effective_start`] → `None` (active from epoch)
+    /// - [`Self::effective_end`] → `None` (never expires)
+    /// - [`Self::evidence_uri`] → `None`
+    ///
+    /// `id`, `target_lint`, `justification`, and `authorized_by` must
+    /// be non-empty when the deviation is added to a [`DeviationStore`].
+    /// This constructor does not validate them; [`DeviationStore::add`]
+    /// enforces non-emptiness and uniqueness.
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        target_lint: impl Into<String>,
+        scope: DeviationScope,
+        action: DeviationAction,
+        justification: impl Into<String>,
+        authorized_by: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            target_lint: target_lint.into(),
+            scope,
+            effective_start: None,
+            effective_end: None,
+            action,
+            justification: justification.into(),
+            authorized_by: authorized_by.into(),
+            evidence_uri: None,
+        }
+    }
+
+    /// Builder-style setter for [`Self::effective_start`]. Returns
+    /// `self` for chaining.
+    #[must_use]
+    pub fn with_effective_start(mut self, unix_seconds: u64) -> Self {
+        self.effective_start = Some(unix_seconds);
+        self
+    }
+
+    /// Builder-style setter for [`Self::effective_end`]. Returns
+    /// `self` for chaining.
+    #[must_use]
+    pub fn with_effective_end(mut self, unix_seconds: u64) -> Self {
+        self.effective_end = Some(unix_seconds);
+        self
+    }
+
+    /// Builder-style setter for [`Self::evidence_uri`]. Returns `self`
+    /// for chaining.
+    #[must_use]
+    pub fn with_evidence_uri(mut self, uri: impl Into<String>) -> Self {
+        self.evidence_uri = Some(uri.into());
+        self
+    }
+
     /// Returns `true` if this deviation is active at `now_unix`.
     ///
     /// A deviation is active when:
@@ -318,7 +388,14 @@ pub enum ScopePropValue {
 /// `PolicyOid`) are expressible via new `kind` strings + props without
 /// modifying this struct. [`Self::matches`] short-circuits to `false` for
 /// unknown kinds (fail-closed).
+///
+/// The struct carries `#[non_exhaustive]`: callers outside this crate
+/// must construct via [`Self::any`], [`Self::issuer_dn_contains`],
+/// [`Self::issuer_dn_exact`], or [`Self::serial_range`] instead of
+/// struct-literal syntax. This lets future fields (e.g., normalized
+/// substring cache) be added non-breakingly.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DeviationScope {
     /// The subject-type discriminator. One of the `SCOPE_KIND_*` constants for
     /// the canonical kinds, or a custom kind string for caller-defined axes.
@@ -611,8 +688,16 @@ pub enum DeviationAction {
 /// Display deviated findings as "DEVIATION APPLIED" rather than green/pass.
 /// Show `deviation_id`, `justification`, and `evidence_uri` (when present) so
 /// operators can navigate to the backing waiver document without a second lookup.
+///
+/// The struct carries `#[non_exhaustive]`. External callers consume
+/// `DeviatedFinding` values produced by [`DeviationRunner`]; they do
+/// not construct them directly. Adding `#[non_exhaustive]` documents
+/// this engine-output role and keeps the door open for future fields
+/// (e.g., per-deviation provenance, applied-at timestamp) without
+/// requiring a major version bump.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DeviatedFinding {
     /// The stable lint ID of the lint that produced this finding.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
