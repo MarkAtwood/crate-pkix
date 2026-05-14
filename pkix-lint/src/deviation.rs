@@ -353,9 +353,14 @@ impl DeviationScope {
     /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
     /// [`Self::issuer_dn_exact`] when precise DN identity is required.
     ///
-    /// **Warning**: case folding uses `make_ascii_lowercase()`, which only
-    /// folds ASCII. Non-ASCII DN components (accented letters, CJK, etc.) are
-    /// left unchanged. For non-ASCII issuer DNs, use [`Self::issuer_dn_exact`].
+    /// Case folding uses [`str::to_lowercase`] (Unicode-aware default
+    /// case mapping). Accented Latin, CJK kana, and other non-ASCII
+    /// characters fold according to the Unicode case mapping tables on
+    /// both the stored substring side and the cert-issuer-DN side, so
+    /// scoping a deviation by `"agency müller ca"` matches a cert whose
+    /// issuer DN renders as `"CN=Agency Müller CA"`. The fold allocates
+    /// a fresh `String` per match; caller-side caching is recommended
+    /// for hot paths if profiling shows the cost.
     #[must_use]
     pub fn issuer_dn_contains(substring: impl Into<String>) -> Self {
         Self {
@@ -449,12 +454,25 @@ impl DeviationScope {
                 let Some(substring) = self.get_text(PROP_ISSUER_DN_SUBSTRING) else {
                     return false;
                 };
-                // `substring` is pre-lowercased by `DeviationStore::add`.
-                // Use `make_ascii_lowercase` (in-place) on the cert side too —
-                // CA DN strings are ASCII in practice. Non-ASCII issuer DNs
-                // are documented as unsupported for this scope kind.
-                let mut issuer_str = cert.tbs_certificate.issuer.to_string();
-                issuer_str.make_ascii_lowercase();
+                // `substring` is pre-lowercased by `DeviationStore::add`
+                // using the same `str::to_lowercase` Unicode-aware fold
+                // we apply here. Cross-side consistency is the
+                // correctness invariant.
+                //
+                // `str::to_lowercase` uses Unicode case mapping tables
+                // (default casing per the Unicode standard) and folds
+                // accented Latin, CJK kana, etc. correctly. CA DN
+                // strings in non-Western European jurisdictions
+                // (Bundesdruckerei, Caisse des Dépôts, Polish/Czech
+                // CAs) routinely use non-ASCII characters; ASCII-only
+                // folding silently failed these matches.
+                //
+                // This allocates a fresh String each call. For
+                // realistic deviation-store sizes the cost is
+                // immaterial; a caller-side cache of `(deviation_id,
+                // cert_sha256) → bool` is the recommended remedy if
+                // profiling ever shows otherwise.
+                let issuer_str = cert.tbs_certificate.issuer.to_string().to_lowercase();
                 issuer_str.contains(substring)
             }
             SCOPE_KIND_ISSUER_DN_EXACT => {
@@ -679,13 +697,20 @@ impl DeviationStore {
         // on every call. This prevents a silent no-match when callers pass a
         // mixed-case substring.
         //
-        // Use `make_ascii_lowercase` (in-place, no allocation) consistent with
-        // the matching code in `DeviationScope::matches`.
+        // Use `str::to_lowercase` (Unicode-aware) consistent with the
+        // matching code in `DeviationScope::matches`. Cross-side
+        // consistency is the correctness invariant: any byte sequence
+        // that lowercases to itself on both sides matches; any
+        // sequence that lowercases differently on the two sides
+        // silently no-matches. The pre-fix `make_ascii_lowercase`
+        // call left non-ASCII characters (e.g., 'ü' in 'Müller')
+        // untouched on both sides; lowercase user input 'müller'
+        // could never match cert-side 'Müller'. (PKIX-hy2e.8)
         if deviation.scope.kind == SCOPE_KIND_ISSUER_DN_CONTAINS {
             for (name, value) in &mut deviation.scope.props {
                 if name == PROP_ISSUER_DN_SUBSTRING {
                     if let ScopePropValue::Text(s) = value {
-                        s.make_ascii_lowercase();
+                        *s = s.to_lowercase();
                     }
                 }
             }
@@ -1143,6 +1168,59 @@ mod tests {
             stored.matches(&cert),
             "normalized issuer-dn-contains scope must match cert"
         );
+    }
+
+    /// Regression for PKIX-hy2e.8: case folding must be Unicode-aware
+    /// on both sides (DeviationStore::add and DeviationScope::matches).
+    /// The pre-fix `make_ascii_lowercase` left non-ASCII characters
+    /// untouched on both sides; lowercase user input 'müller' could
+    /// never match cert-side 'Müller' because the cert's 'ü' was not
+    /// folded to match the stored substring's 'ü'. (Well, the bug was
+    /// inverted: stored substring "müller" preserves 'ü'; cert side
+    /// "Müller" leaves 'M' uppercase. With `to_lowercase` both fold to
+    /// the same form.)
+    ///
+    /// Independent oracle: Unicode 15.1 default case mapping table.
+    /// "Müller".to_lowercase() == "müller". "MÜLLER".to_lowercase() ==
+    /// "müller". This is the property `to_lowercase` was designed to
+    /// provide; `make_ascii_lowercase` does not.
+    #[test]
+    fn case_folding_is_unicode_aware_for_store_normalization() {
+        // The store-side normalization happens in DeviationStore::add.
+        let mut store = DeviationStore::new();
+        let deviation = Deviation {
+            scope: DeviationScope::issuer_dn_contains("MÜLLER"),
+            ..make_deviation("muller-test", "test.lint")
+        };
+        store.add(deviation).expect("add must succeed");
+
+        let stored = &store.all()[0].scope;
+        let stored_substring = match stored.get_prop(PROP_ISSUER_DN_SUBSTRING) {
+            Some(ScopePropValue::Text(s)) => s,
+            other => panic!("expected Text substring prop, got {other:?}"),
+        };
+        assert_eq!(
+            *stored_substring, "müller",
+            "DeviationStore::add must Unicode-lowercase the issuer-dn-substring; \
+             pre-fix make_ascii_lowercase produced \"mÜller\" (Ü untouched)"
+        );
+    }
+
+    #[test]
+    fn case_folding_is_unicode_aware_via_to_lowercase() {
+        // Confirm the std::str::to_lowercase oracle behaves as
+        // expected for the worked example in the rustdoc. This is the
+        // independent oracle for the regression — if Rust's
+        // to_lowercase ever changed semantics for "Müller" → "müller"
+        // we would need to revisit the deviation matching strategy.
+        assert_eq!("Müller".to_lowercase(), "müller");
+        assert_eq!("MÜLLER".to_lowercase(), "müller");
+        // ASCII-only fold leaves Ü/ü unchanged — that is the bug shape.
+        let mut s = String::from("MÜLLER");
+        s.make_ascii_lowercase();
+        assert_eq!(s, "mÜller", "ASCII-only fold is documented to leave non-ASCII alone");
+        // The pre-fix code on the cert side did exactly this fold, so
+        // a lowercase stored substring 'müller' could not match 'mÜller'.
     }
 
     // -----------------------------------------------------------------------
