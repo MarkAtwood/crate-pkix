@@ -773,6 +773,40 @@ impl DeviationStore {
             .iter()
             .find(|d| d.target_lint.as_str() == lint_id && d.applies_to(cert, now_unix))
     }
+
+    /// Returns the first active deviation that matches `lint_id` and at
+    /// least one certificate in `chain` at `now_unix`, or `None` if no
+    /// deviation applies.
+    ///
+    /// Used by [`DeviationRunner::run_path`] to apply path-scope
+    /// deviations that target an intermediate CA's properties (rather
+    /// than the leaf's). Per RFC 5280 §6.1, a path-scope finding can
+    /// fire because of any cert in the chain, including intermediate
+    /// CAs; a deviation scoped to an intermediate must be applicable
+    /// even though the path finding has no single "owning" cert.
+    ///
+    /// Resolution order within this method:
+    /// 1. Iterate deviations in store-insertion order (the same
+    ///    "first match wins" rule as [`Self::find_deviation`]).
+    /// 2. For each deviation, test against every cert in `chain` in
+    ///    chain order (leaf first).
+    /// 3. Return on the first (deviation, cert) pair where both
+    ///    `target_lint` and `applies_to(cert)` match.
+    ///
+    /// PKIX-hy2e.11 — the previous behavior of scope-matching only the
+    /// leaf silently dropped deviations scoped to intermediate-CA DNs.
+    #[must_use]
+    pub fn find_deviation_for_chain(
+        &self,
+        lint_id: &str,
+        chain: &[Certificate],
+        now_unix: u64,
+    ) -> Option<&Deviation> {
+        self.deviations.iter().find(|d| {
+            d.target_lint.as_str() == lint_id
+                && chain.iter().any(|cert| d.applies_to(cert, now_unix))
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -934,14 +968,22 @@ impl DeviationRunner {
 
     /// Evaluate path-scope lints and apply deviations.
     ///
-    /// For path-scope lints, scope matching uses the leaf certificate (`chain[0]`).
+    /// Path-scope findings have no single "owning" certificate — they
+    /// fire because of the chain as a whole. For deviation matching,
+    /// this method scans **every certificate in the chain** in chain
+    /// order (leaf first) and applies a deviation if any cert matches
+    /// the deviation's scope. This admits deviations scoped to an
+    /// intermediate CA's DN, which is essential for waiving path
+    /// findings that fire because of intermediate-CA properties
+    /// (chain depth, name constraints, key usage chaining).
     ///
-    /// # Limitations
+    /// Resolution rule: within `store.find_deviation_for_chain`,
+    /// deviations are tested in store-insertion order; for each
+    /// deviation, certs are tested in chain order. The first matching
+    /// (deviation, cert) pair wins.
     ///
-    /// Path-scope deviation matching always uses the leaf certificate (`chain[0]`)
-    /// for scope evaluation. [`DeviationScope::IssuerDnExact`] and
-    /// [`DeviationScope::SerialRange`] must reference the leaf certificate's
-    /// issuer DN — deviations scoped to an intermediate CA's DN will not match.
+    /// PKIX-hy2e.11 — the previous leaf-only scope match silently
+    /// dropped deviations targeting intermediate CAs.
     #[must_use]
     pub fn run_path(
         &self,
@@ -950,19 +992,13 @@ impl DeviationRunner {
         now_unix: u64,
     ) -> DeviationRunResult {
         let raw = self.runner.run_path(chain, path, now_unix);
-        // Use the leaf cert for scope matching on path-level deviations.
-        // If the chain is empty (shouldn't happen after validate_path), fall
-        // back to no scope matching (treat as Any).
-        match chain.first() {
-            Some(leaf) => self.apply_deviations(raw, leaf, now_unix),
-            None => DeviationRunResult {
-                findings: raw,
-                deviated: vec![],
-            },
-        }
+        self.apply_deviations_for_chain(raw, chain, now_unix)
     }
 
-    /// Internal: partition a `Vec<Finding>` by whether a deviation applies.
+    /// Internal: partition a per-cert `Vec<Finding>` by whether a
+    /// deviation applies. Used by [`Self::run_cert`] and
+    /// [`Self::run_chain`] — both fire findings tied to a specific
+    /// cert, so scope matching is against that single cert.
     fn apply_deviations(
         &self,
         raw: Vec<crate::Finding>,
@@ -982,21 +1018,58 @@ impl DeviationRunner {
                     result.findings.push(finding);
                 }
                 Some(dev) => {
-                    result.deviated.push(DeviatedFinding {
-                        lint_id: finding.lint_id,
-                        citation: finding.citation,
-                        original_result: finding.result,
-                        deviation_id: dev.id.clone(),
-                        action: dev.action.clone(),
-                        justification: dev.justification.clone(),
-                        evidence_uri: dev.evidence_uri.clone(),
-                        cert_index: finding.cert_index,
-                        evaluated_at_unix: finding.evaluated_at_unix,
-                    });
+                    result.deviated.push(make_deviated(finding, dev));
                 }
             }
         }
         result
+    }
+
+    /// Internal: partition a path-scope `Vec<Finding>` by whether a
+    /// deviation applies to *any* cert in the chain. Used by
+    /// [`Self::run_path`] (PKIX-hy2e.11). The "any cert in the chain"
+    /// rule is necessary because path-scope findings fire from
+    /// properties of the chain as a whole, including intermediate
+    /// CAs.
+    fn apply_deviations_for_chain(
+        &self,
+        raw: Vec<crate::Finding>,
+        chain: &[Certificate],
+        now_unix: u64,
+    ) -> DeviationRunResult {
+        let mut result = DeviationRunResult::default();
+        for finding in raw {
+            if !finding.result.is_finding() {
+                result.findings.push(finding);
+                continue;
+            }
+            match self
+                .store
+                .find_deviation_for_chain(&finding.lint_id, chain, now_unix)
+            {
+                None => result.findings.push(finding),
+                Some(dev) => result.deviated.push(make_deviated(finding, dev)),
+            }
+        }
+        result
+    }
+}
+
+/// Construct a [`DeviatedFinding`] from a triggered [`crate::Finding`]
+/// and the [`Deviation`] that applied to it. Used by both
+/// `apply_deviations` (per-cert) and `apply_deviations_for_chain`
+/// (path-scope) to keep the construction logic identical.
+fn make_deviated(finding: crate::Finding, dev: &Deviation) -> DeviatedFinding {
+    DeviatedFinding {
+        lint_id: finding.lint_id,
+        citation: finding.citation,
+        original_result: finding.result,
+        deviation_id: dev.id.clone(),
+        action: dev.action.clone(),
+        justification: dev.justification.clone(),
+        evidence_uri: dev.evidence_uri.clone(),
+        cert_index: finding.cert_index,
+        evaluated_at_unix: finding.evaluated_at_unix,
     }
 }
 
@@ -1561,6 +1634,120 @@ mod tests {
             .expect("add should succeed");
         // At now=1000, the deviation has expired.
         assert!(store.find_deviation("test.lint.a", &cert, now).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.11 regression — find_deviation_for_chain scans every cert
+    // in the chain, not just chain[0]. The pre-fix DeviationRunner::run_path
+    // applied scope matching only to the leaf, silently dropping deviations
+    // scoped to intermediate-CA DNs (e.g., "issuer_dn_contains: intermediate-x"
+    // against a path finding triggered by Intermediate-X's properties).
+    // -----------------------------------------------------------------------
+
+    fn load_cert_at(path: &str) -> Certificate {
+        use der::Decode as _;
+        let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+        Certificate::from_der(&bytes).unwrap_or_else(|e| panic!("decode {path}: {e}"))
+    }
+
+    fn cert_webpki() -> Certificate {
+        // Issuer DN: CN=PKIX-webpki-self
+        load_cert_at("../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der")
+    }
+
+    fn cert_smime() -> Certificate {
+        // Issuer DN: CN=PKIX-smime-self
+        load_cert_at("../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der")
+    }
+
+    #[test]
+    fn find_deviation_for_chain_matches_when_intermediate_in_scope() {
+        // Build a deviation scoped to a substring that appears in the
+        // INTERMEDIATE's issuer DN but NOT the leaf's.
+        //
+        // The chain has two distinct certs: chain[0] is the webpki-self
+        // cert (issuer DN contains "webpki"), chain[1] is the smime-self
+        // cert (issuer DN contains "smime"). A deviation scoped
+        // "issuer_dn_contains: smime" must match via chain[1], not via
+        // chain[0]. The pre-fix run_path / find_deviation-only-on-leaf
+        // would have missed this case.
+        let leaf = cert_webpki();
+        let intermediate = cert_smime();
+        let chain = [leaf, intermediate];
+
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                scope: DeviationScope::issuer_dn_contains("smime"),
+                ..make_deviation("dev-intermediate-scope", "test.path.lint")
+            })
+            .expect("add must succeed");
+
+        let found = store.find_deviation_for_chain("test.path.lint", &chain, 1_000_000);
+        let dev = found.expect(
+            "deviation scoped to intermediate-cert issuer DN must match via chain[1]; \
+             pre-fix run_path / find_deviation only on chain[0] would miss this",
+        );
+        assert_eq!(dev.id, "dev-intermediate-scope");
+    }
+
+    #[test]
+    fn find_deviation_for_chain_returns_none_when_no_cert_in_scope() {
+        // Negative control: a deviation whose scope substring matches
+        // none of the chain certs must not fire.
+        let leaf = cert_webpki();
+        let intermediate = cert_smime();
+        let chain = [leaf, intermediate];
+
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                scope: DeviationScope::issuer_dn_contains("xyz-nonexistent-dn"),
+                ..make_deviation("dev-no-match", "test.path.lint")
+            })
+            .expect("add must succeed");
+
+        assert!(
+            store
+                .find_deviation_for_chain("test.path.lint", &chain, 1_000_000)
+                .is_none(),
+            "deviation scoped to a non-matching substring must not fire on any chain cert"
+        );
+    }
+
+    #[test]
+    fn find_deviation_for_chain_first_match_wins_in_store_order() {
+        // Two deviations both targeting the same lint id; both could
+        // theoretically match via the chain. The first added wins (same
+        // rule as find_deviation per-cert). Tests that store order
+        // determines resolution, not chain order.
+        let leaf = cert_webpki();
+        let intermediate = cert_smime();
+        let chain = [leaf, intermediate];
+
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                id: "dev-first".to_string(),
+                scope: DeviationScope::issuer_dn_contains("smime"),
+                ..make_deviation("dev-first", "test.path.lint")
+            })
+            .expect("add must succeed");
+        store
+            .add(Deviation {
+                id: "dev-second".to_string(),
+                scope: DeviationScope::issuer_dn_contains("webpki"),
+                ..make_deviation("dev-second", "test.path.lint")
+            })
+            .expect("add must succeed");
+
+        let found = store
+            .find_deviation_for_chain("test.path.lint", &chain, 1_000_000)
+            .expect("at least one deviation must match");
+        assert_eq!(
+            found.id, "dev-first",
+            "store-insertion order is the tie-breaker, not chain-iteration order"
+        );
     }
 
     #[test]
