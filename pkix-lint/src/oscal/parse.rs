@@ -816,11 +816,14 @@ fn parse_subject(idx: usize, subj: &Value) -> Result<DeviationScope, ParseError>
                 index: idx,
                 prop: PROP_ISSUER_DN_DER,
             })?;
-            let name = decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
-            DeviationScope::issuer_dn_exact(&name).map_err(|_| ParseError::MalformedDer {
-                index: idx,
-                prop: PROP_ISSUER_DN_DER,
-            })
+            // Validate that the bytes parse as a DER Name. The
+            // constructor itself accepts raw bytes verbatim (per the
+            // PKIX-7f92.30 signature change); we keep the
+            // decode-validation here so OSCAL inputs with malformed
+            // DER surface a typed ParseError::MalformedDer rather
+            // than only failing closed at match time.
+            decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
+            Ok(DeviationScope::issuer_dn_exact(der))
         }
 
         SCOPE_KIND_SERIAL_RANGE => {
@@ -829,7 +832,10 @@ fn parse_subject(idx: usize, subj: &Value) -> Result<DeviationScope, ParseError>
                 index: idx,
                 prop: PROP_ISSUER_DN_DER,
             })?;
-            let issuer = decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
+            // See note on the issuer-dn-exact arm above: keep
+            // OSCAL-side DER validation distinct from the constructor's
+            // verbatim-accept contract.
+            decode_name(idx, &der, PROP_ISSUER_DN_DER)?;
             let start_hex = required(PROP_SERIAL_START)?;
             let start = hex_decode(start_hex).ok_or(ParseError::MalformedHex {
                 index: idx,
@@ -840,12 +846,7 @@ fn parse_subject(idx: usize, subj: &Value) -> Result<DeviationScope, ParseError>
                 index: idx,
                 prop: PROP_SERIAL_END,
             })?;
-            DeviationScope::serial_range(&issuer, start, end).map_err(|_| {
-                ParseError::MalformedDer {
-                    index: idx,
-                    prop: PROP_ISSUER_DN_DER,
-                }
-            })
+            Ok(DeviationScope::serial_range(der, start, end))
         }
 
         other => Err(ParseError::UnknownSubjectType {
@@ -1123,17 +1124,22 @@ mod tests {
 
     #[test]
     fn round_trip_issuer_dn_exact() {
+        use der::Encode as _;
         let Some(cert) = load_pkits_good_ca() else {
             eprintln!("PKITS GoodCACert.crt not available — skipping");
             return;
         };
+        let subject_der = cert
+            .tbs_certificate
+            .subject
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
         let mut store = DeviationStore::new();
         store
             .add(Deviation {
                 id: "policy-good-ca-exact".to_string(),
                 target_lint: "rfc5280.bc.ca-true-required".to_string(),
-                scope: DeviationScope::issuer_dn_exact(&cert.tbs_certificate.subject)
-                    .expect("DER encode"),
+                scope: DeviationScope::issuer_dn_exact(subject_der),
                 effective_start: None,
                 effective_end: Some(2_000_000_000),
                 action: DeviationAction::DowngradeSeverityTo(Severity::Info),
@@ -1150,21 +1156,26 @@ mod tests {
 
     #[test]
     fn round_trip_serial_range() {
+        use der::Encode as _;
         let Some(cert) = load_pkits_good_ca() else {
             eprintln!("PKITS GoodCACert.crt not available — skipping");
             return;
         };
+        let subject_der = cert
+            .tbs_certificate
+            .subject
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
         let mut store = DeviationStore::new();
         store
             .add(Deviation {
                 id: "policy-batch-2026-q1".to_string(),
                 target_lint: "rfc5280.serial.unique".to_string(),
                 scope: DeviationScope::serial_range(
-                    &cert.tbs_certificate.subject,
+                    subject_der,
                     vec![0x01, 0x00],
                     vec![0x01, 0xff],
-                )
-                .expect("DER encode"),
+                ),
                 effective_start: Some(1_704_067_200),
                 effective_end: Some(1_711_929_600),
                 action: DeviationAction::DowngradeSeverityTo(Severity::Warn),

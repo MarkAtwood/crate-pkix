@@ -1515,10 +1515,13 @@ mod tests {
                 return;
             }
         };
-        use der::Decode as _;
+        use der::{Decode as _, Encode as _};
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
         let name = cert.tbs_certificate.subject;
-        let scope = DeviationScope::issuer_dn_exact(&name).expect("DER encode");
+        let name_der = name
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
+        let scope = DeviationScope::issuer_dn_exact(name_der);
         let subjects = encode_scope(&scope);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];
@@ -1584,14 +1587,18 @@ mod tests {
             Ok(b) => b,
             Err(_) => return,
         };
-        use der::Decode as _;
+        use der::{Decode as _, Encode as _};
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
+        let issuer_der = cert
+            .tbs_certificate
+            .subject
+            .to_der()
+            .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::serial_range(
-            &cert.tbs_certificate.subject,
+            issuer_der,
             vec![0x01, 0x00],
             vec![0x01, 0xff],
-        )
-        .expect("DER encode");
+        );
         let subjects = encode_scope(&scope);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];
