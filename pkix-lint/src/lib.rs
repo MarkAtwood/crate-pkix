@@ -901,25 +901,37 @@ pub trait Lint: LintClone + Send + Sync {
     /// this to a stable `control.prop` when producing an OSCAL Catalog.
     ///
     /// Renamed from `rfc_section_id` in pkix-lint 0.6.0 because the slot
-    /// was never RFC-specific; the deprecated alias remains for one minor
-    /// version to ease migration.
+    /// was never RFC-specific. The deprecated alias remains, and the
+    /// default impl here delegates to it (PKIX-7f92.7) so pre-0.6.0
+    /// Lint impls that override only the deprecated method continue to
+    /// produce a non-None result through this canonical entry point.
     ///
-    /// Default: `None`.
+    /// Default: `self.rfc_section_id()`. A pre-0.6.0 impl that
+    /// overrides `rfc_section_id` works through this entry point with
+    /// zero source changes; a 0.6.0+ impl that overrides
+    /// `spec_section_id` is the canonical form going forward.
     fn spec_section_id(&self) -> Option<&str> {
-        None
+        #[allow(deprecated)]
+        self.rfc_section_id()
     }
 
     /// Deprecated alias for [`spec_section_id`](Self::spec_section_id).
     ///
     /// Renamed because the slot accepts CA/B Forum, ITU-T, NIST, and other
     /// standards-body section identifiers in addition to IETF RFCs.
-    /// Override `spec_section_id` instead. Callers should also migrate to
-    /// `spec_section_id`; the two methods are independent default impls,
-    /// so calling the deprecated alias on a lint that overrides only
-    /// `spec_section_id` returns `None`.
+    /// Override `spec_section_id` instead. The default impl here returns
+    /// `None` (it is not symmetric with `spec_section_id` — pre-0.6.0
+    /// impls override THIS method, and we cannot delegate back to
+    /// `spec_section_id` without risking infinite recursion when
+    /// neither is overridden).
+    ///
+    /// Scheduled removal target: pkix-lint 0.10.0 (a future minor at
+    /// least four minors after the 0.6.0 introduction). Consumers who
+    /// override this method should migrate to overriding
+    /// `spec_section_id` directly.
     #[deprecated(
         since = "0.6.0",
-        note = "renamed to `spec_section_id` because the slot accepts non-RFC ids (CA/B Forum, ITU-T, NIST); override and call `spec_section_id` instead"
+        note = "renamed to `spec_section_id` because the slot accepts non-RFC ids (CA/B Forum, ITU-T, NIST); override `spec_section_id` instead. Scheduled removal target: 0.10.0."
     )]
     fn rfc_section_id(&self) -> Option<&str> {
         None
@@ -936,23 +948,29 @@ pub trait Lint: LintClone + Send + Sync {
     /// to `control.links[rel=reference]` when producing an OSCAL Catalog.
     ///
     /// Renamed from `rfc_url` in pkix-lint 0.6.0 alongside
-    /// `spec_section_id`; the deprecated alias remains for one minor
-    /// version to ease migration.
+    /// `spec_section_id`. The deprecated alias remains, and the
+    /// default impl here delegates to it (PKIX-7f92.7) so pre-0.6.0
+    /// Lint impls that override only the deprecated method continue
+    /// to produce a non-None result through this canonical entry
+    /// point.
     ///
-    /// Default: `None`.
+    /// Default: `self.rfc_url()`.
     fn spec_url(&self) -> Option<&str> {
-        None
+        #[allow(deprecated)]
+        self.rfc_url()
     }
 
     /// Deprecated alias for [`spec_url`](Self::spec_url).
     ///
-    /// Renamed alongside `spec_section_id` so the standards-body slot is
-    /// consistently named. Override and call `spec_url` instead; the two
-    /// methods are independent default impls, so calling the deprecated
-    /// alias on a lint that overrides only `spec_url` returns `None`.
+    /// Renamed alongside `spec_section_id`. Override `spec_url`
+    /// instead. The default impl here returns `None` (asymmetric with
+    /// `spec_url` for the same anti-recursion reason documented on
+    /// [`rfc_section_id`](Self::rfc_section_id)).
+    ///
+    /// Scheduled removal target: pkix-lint 0.10.0.
     #[deprecated(
         since = "0.6.0",
-        note = "renamed to `spec_url`; override and call `spec_url` instead"
+        note = "renamed to `spec_url`; override `spec_url` instead. Scheduled removal target: 0.10.0."
     )]
     fn rfc_url(&self) -> Option<&str> {
         None
@@ -2266,6 +2284,70 @@ mod tests {
 
     /// Regression test for PKIX-7f92.9: passing a kinds slice shorter
     /// than the chain must panic with a message naming the lengths.
+    /// Regression test for PKIX-7f92.7: a Lint impl that overrides only
+    /// the deprecated `rfc_section_id` (pre-0.6.0 style) must still
+    /// produce a non-None value through the canonical `spec_section_id`
+    /// entry point. The delegation in the default `spec_section_id`
+    /// impl is what closes the silent-divergence hazard.
+    #[test]
+    fn spec_section_id_default_delegates_to_deprecated_rfc_section_id_override() {
+        #[derive(Clone)]
+        struct PreV06Lint;
+        #[allow(deprecated)]
+        impl Lint for PreV06Lint {
+            fn id(&self) -> &'static str { "test.pre-v06" }
+            fn citation(&self) -> &'static str { "RFC 5280 §X.Y" }
+            fn severity(&self) -> Severity { Severity::Warn }
+            fn scope(&self) -> Scope { Scope::Certificate }
+            fn applies_to(&self) -> SubjectKind { SubjectKind::Any }
+            fn title(&self) -> &str { "Pre-v06 lint" }
+            // Only the deprecated method is overridden — the 0.5.x shape.
+            fn rfc_section_id(&self) -> Option<&str> { Some("rfc5280-x.y") }
+            fn rfc_url(&self) -> Option<&str> { Some("https://example/x.y") }
+            fn check_cert(&self, _: &Certificate, _: SubjectKind, _: u64) -> LintResult {
+                LintResult::Pass
+            }
+        }
+        let l = PreV06Lint;
+        // Canonical entry points return the delegated values, NOT None.
+        assert_eq!(l.spec_section_id(), Some("rfc5280-x.y"));
+        assert_eq!(l.spec_url(), Some("https://example/x.y"));
+    }
+
+    /// Symmetric case: a 0.6.0+ Lint impl that overrides only the new
+    /// canonical methods. The deprecated alias returns None (default)
+    /// because it cannot delegate back without infinite recursion;
+    /// callers calling the deprecated alias must have migrated.
+    #[test]
+    fn deprecated_rfc_section_id_returns_none_for_v06_impl_overriding_canonical() {
+        #[derive(Clone)]
+        struct V06Lint;
+        impl Lint for V06Lint {
+            fn id(&self) -> &'static str { "test.v06" }
+            fn citation(&self) -> &'static str { "RFC 5280 §X.Y" }
+            fn severity(&self) -> Severity { Severity::Warn }
+            fn scope(&self) -> Scope { Scope::Certificate }
+            fn applies_to(&self) -> SubjectKind { SubjectKind::Any }
+            fn title(&self) -> &str { "v06 lint" }
+            // Only the canonical method is overridden — the 0.6.0+ shape.
+            fn spec_section_id(&self) -> Option<&str> { Some("rfc5280-x.y") }
+            fn spec_url(&self) -> Option<&str> { Some("https://example/x.y") }
+            fn check_cert(&self, _: &Certificate, _: SubjectKind, _: u64) -> LintResult {
+                LintResult::Pass
+            }
+        }
+        let l = V06Lint;
+        assert_eq!(l.spec_section_id(), Some("rfc5280-x.y"));
+        // The deprecated alias returns None — calling it on a v0.6.0+ impl
+        // is the migration-incomplete state the rustdoc documents.
+        #[allow(deprecated)]
+        let deprecated_value = l.rfc_section_id();
+        assert_eq!(deprecated_value, None);
+        #[allow(deprecated)]
+        let deprecated_url = l.rfc_url();
+        assert_eq!(deprecated_url, None);
+    }
+
     /// Pre-fix, this silently defaulted missing positions to
     /// IntermediateCa, producing the silent-misclassification audit
     /// hazard the bead flagged.
