@@ -79,6 +79,7 @@
 //! use pkix_lint::{Lint, LintResult, LintRunner, Scope, Severity, SubjectKind};
 //! use x509_cert::Certificate;
 //!
+//! #[derive(Clone)]
 //! struct MyLint;
 //! impl Lint for MyLint {
 //!     fn id(&self) -> &'static str { "example.my_lint" }
@@ -655,6 +656,42 @@ impl core::fmt::Display for Finding {
 // Lint trait
 // ---------------------------------------------------------------------------
 
+/// Supertrait of [`Lint`] that lets `Box<dyn Lint>` be cloned.
+///
+/// **Implementors of [`Lint`] do NOT implement `LintClone` directly.**
+/// A blanket impl provides `LintClone` for every type that is
+/// `Lint + Clone + 'static`. Concrete lint types just need to derive
+/// or implement [`Clone`].
+///
+/// The clone is used by [`LintRunner::apply_parameter_overrides`] to
+/// validate parameter values against a fresh copy of the lint before
+/// committing the change to the runner's registered state, giving
+/// atomic application semantics on `set_parameter` failures
+/// (PKIX-hy2e.6).
+pub trait LintClone {
+    /// Clone the lint into a fresh `Box<dyn Lint>`.
+    ///
+    /// The default blanket impl uses [`Clone::clone`] on the concrete
+    /// type; do not override this unless your lint has interior
+    /// mutability that needs special handling.
+    fn clone_box(&self) -> Box<dyn Lint>;
+}
+
+impl<T> LintClone for T
+where
+    T: Lint + Clone + 'static,
+{
+    fn clone_box(&self) -> Box<dyn Lint> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Lint> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
 /// A single, independently evaluable lint check.
 ///
 /// # Implementing `Lint`
@@ -704,7 +741,19 @@ impl core::fmt::Display for Finding {
 /// # Object safety
 ///
 /// The trait is object-safe: `Box<dyn Lint>` and `&dyn Lint` both work.
-pub trait Lint: Send + Sync {
+///
+/// # Cloneability
+///
+/// [`Lint`] requires the [`LintClone`] supertrait so `Box<dyn Lint>`
+/// can be cloned. A blanket impl provides `LintClone` for every
+/// `Lint + Clone + 'static`, so implementors just need to derive or
+/// implement [`Clone`] on their concrete type — they do NOT need to
+/// implement `LintClone` directly. This requirement is necessary for
+/// [`LintRunner::apply_parameter_overrides`] to provide atomic
+/// parameter-application semantics: the runner clones lints, applies
+/// overrides to the clones, and only swaps on success
+/// (PKIX-hy2e.6).
+pub trait Lint: LintClone + Send + Sync {
     /// Globally unique, stable identifier for this lint.
     ///
     /// Format: `<regime>.<section>.<noun>` e.g. `"cabf.br.tls.validity.max"`.
@@ -1334,23 +1383,22 @@ impl LintRunner {
     ///   [`Lint::set_parameter`] rejects the value (wrapping the
     ///   underlying [`ParameterError`]).
     ///
-    /// `InvalidParameterOverride` errors still short-circuit on the
-    /// first failure: overrides applied to earlier lints remain
-    /// mutated. Atomic-on-value-rejection application requires
-    /// `clone_box()` on the registered lints, which the [`Lint`] trait
-    /// does not yet require. Tracked as PKIX-hy2e.6.
+    /// **Atomic on either error variant** (PKIX-hy2e.6): the method
+    /// clones every affected lint, applies `set_parameter` to the
+    /// clones, and swaps the clones into the runner only after every
+    /// override has succeeded. On any error the runner state is
+    /// unchanged. The clone is via the [`LintClone`] supertrait
+    /// (blanket-impl-ed for every `Lint + Clone + 'static`).
     #[cfg(feature = "oscal")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
     pub fn apply_parameter_overrides(
         &mut self,
         overrides: &[crate::oscal::profile::ParameterOverride],
     ) -> Result<(), crate::oscal::parse::ParseError> {
-        // Phase 1: resolve every override to (lint_index, param_id). Fail
-        // fast on any UnknownParameterOverride before applying any
-        // mutation. This bounds the partial-application surface to the
-        // value-validation errors raised by set_parameter itself
-        // (InvalidParameterOverride); see method rustdoc and
-        // PKIX-hy2e.6.
+        // Phase 1: resolve every override to (lint_index, param_id).
+        // Fail fast on any UnknownParameterOverride before touching any
+        // lint state. Phase 2 below then provides atomic application
+        // on InvalidParameterOverride as well via clone-and-swap.
         let mut resolved: Vec<(usize, &str, &crate::oscal::profile::ParameterOverride)> =
             Vec::with_capacity(overrides.len());
         for over in overrides {
@@ -1376,17 +1424,34 @@ impl LintRunner {
             resolved.push((lint_index, param_id, over));
         }
 
-        // Phase 2: apply. set_parameter is side-effecting; partial
-        // application on InvalidParameterOverride is documented above.
+        // Phase 2: clone-and-swap atomicity (PKIX-hy2e.6). Clone every
+        // lint that any override targets, apply set_parameter on the
+        // clones, and only commit on full success. Lints not targeted
+        // by any override are left untouched.
+        //
+        // Memory cost: O(distinct_lint_indices) clones, which is at
+        // most O(overrides.len()). For realistic OSCAL Profile sizes
+        // this is single-digit megabytes worst-case (lints carry a
+        // few hundred bytes of state each); for the typical few-
+        // override case it is a handful of small clones.
+        use std::collections::BTreeMap;
+        let mut clones: BTreeMap<usize, Box<dyn Lint>> = BTreeMap::new();
         for (lint_index, param_id, over) in resolved {
-            self.lints[lint_index]
-                .set_parameter(param_id, &over.value)
-                .map_err(
-                    |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
-                        param_id: over.param_id.clone(),
-                        source,
-                    },
-                )?;
+            let clone = clones
+                .entry(lint_index)
+                .or_insert_with(|| self.lints[lint_index].clone_box());
+            clone.set_parameter(param_id, &over.value).map_err(
+                |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
+                    param_id: over.param_id.clone(),
+                    source,
+                },
+            )?;
+        }
+
+        // All clones accepted every set_parameter call. Commit by
+        // swapping each clone into the registered slot.
+        for (lint_index, clone) in clones {
+            self.lints[lint_index] = clone;
         }
         Ok(())
     }
@@ -1805,6 +1870,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     /// A lint that always passes, used to verify the runner records Pass findings.
+    #[derive(Clone)]
     struct AlwaysPass;
     impl Lint for AlwaysPass {
         fn id(&self) -> &'static str {
@@ -1828,6 +1894,7 @@ mod tests {
     }
 
     /// A lint that always warns, used to verify runner records Warn findings.
+    #[derive(Clone)]
     struct AlwaysWarn;
     impl Lint for AlwaysWarn {
         fn id(&self) -> &'static str {
@@ -1851,6 +1918,7 @@ mod tests {
     }
 
     /// A lint that always returns Fatal, used to test early-exit behavior.
+    #[derive(Clone)]
     struct AlwaysFatal;
     impl Lint for AlwaysFatal {
         fn id(&self) -> &'static str {
@@ -1874,6 +1942,7 @@ mod tests {
     }
 
     /// A lint scoped to leaves only, used to verify kind filtering.
+    #[derive(Clone)]
     struct LeafOnlyLint;
     impl Lint for LeafOnlyLint {
         fn id(&self) -> &'static str {
@@ -1897,6 +1966,7 @@ mod tests {
     }
 
     /// A path-scope lint, used to verify `run_path`.
+    #[derive(Clone)]
     struct PathDepthLint;
     impl Lint for PathDepthLint {
         fn id(&self) -> &'static str {
@@ -2298,6 +2368,7 @@ mod tests {
     /// A lint that always returns Error, used to drive check_shape's Err
     /// branch without triggering the runner's Fatal early-exit (which would
     /// truncate the findings list).
+    #[derive(Clone)]
     struct AlwaysError;
     impl Lint for AlwaysError {
         fn id(&self) -> &'static str {

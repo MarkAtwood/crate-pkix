@@ -2279,6 +2279,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     /// A lint that always returns Error — used to test deviation application.
+    #[derive(Clone)]
     struct AlwaysError;
     impl crate::Lint for AlwaysError {
         fn id(&self) -> &'static str {
@@ -2307,6 +2308,7 @@ mod tests {
     }
 
     /// A lint that always passes — used to verify non-deviated findings stay in findings.
+    #[derive(Clone)]
     struct AlwaysPass;
     impl crate::Lint for AlwaysPass {
         fn id(&self) -> &'static str {

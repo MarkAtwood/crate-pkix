@@ -124,6 +124,13 @@ use x509_cert::Certificate;
 /// [`Lint::citation`] return the underlying `String` slices with the
 /// required `&'static str` lifetime — see the crate-level rustdoc for
 /// the leak-at-construction rationale.
+///
+/// `Clone` is required by the [`pkix_lint::LintClone`] supertrait that
+/// gates `Box<dyn Lint>` cloning (PKIX-hy2e.6). Cloning a `ZlintLint`
+/// duplicates the `&'static ZlintLintInfo` reference and clones the
+/// shared `Arc<ZlintBridge>` — no per-cert subprocess work is
+/// duplicated.
+#[derive(Clone)]
 pub struct ZlintLint {
     info: &'static ZlintLintInfo,
     bridge: Arc<ZlintBridge>,

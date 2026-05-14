@@ -466,6 +466,7 @@ mod tests {
     /// in cross-catalog Profile tests. Mirrors the metadata shape of a
     /// CA/B Forum lint (spec_section_id set, spec_url None) without
     /// depending on pkix-lint-cabf content.
+    #[derive(Clone)]
     struct PolicyShapedLint;
     impl Lint for PolicyShapedLint {
         fn id(&self) -> &'static str {
@@ -1260,6 +1261,7 @@ mod tests {
     /// wraps that as `InvalidParameterOverride`, so a successful
     /// `apply_parameter_overrides` call proves the composite id was split
     /// at the correct boundary.
+    #[derive(Clone)]
     struct DottedParamLint;
     impl Lint for DottedParamLint {
         fn id(&self) -> &'static str {
@@ -1331,6 +1333,7 @@ mod tests {
         use crate::LintRunner;
 
         // First registered: short prefix lint.
+        #[derive(Clone)]
         struct ShortPrefixLint;
         impl Lint for ShortPrefixLint {
             fn id(&self) -> &'static str {
@@ -1372,6 +1375,7 @@ mod tests {
         }
 
         // Second registered: long prefix lint, accepts "knob".
+        #[derive(Clone)]
         struct LongPrefixLint;
         impl Lint for LongPrefixLint {
             fn id(&self) -> &'static str {
@@ -1440,6 +1444,7 @@ mod tests {
         static APPLIED: AtomicBool = AtomicBool::new(false);
         APPLIED.store(false, Ordering::SeqCst);
 
+        #[derive(Clone)]
         struct ObservableLint;
         impl Lint for ObservableLint {
             fn id(&self) -> &'static str {
@@ -1493,5 +1498,210 @@ mod tests {
             !APPLIED.load(Ordering::SeqCst),
             "Phase 1 must surface UnknownParameterOverride before any set_parameter call"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.6 regression — atomic application on
+    // InvalidParameterOverride. apply_parameter_overrides now clones
+    // every affected lint, applies set_parameter on the clones, and
+    // swaps in the clones only after every override has succeeded.
+    // A mid-batch InvalidParameterOverride leaves the runner unchanged.
+    // -----------------------------------------------------------------------
+
+    /// Fixture: a lint whose parameter value is observable through
+    /// `check_cert` — the lint emits an Error finding whose detail
+    /// string echoes the current parameter value. This lets the test
+    /// observe the REGISTERED lint's parameter state (not the clone's)
+    /// after `apply_parameter_overrides` returns.
+    ///
+    /// `set_parameter` accepts any value except "REJECT"; REJECT
+    /// triggers `ParameterError::InvalidValue`.
+    #[derive(Clone)]
+    struct EchoParamLint {
+        value: String,
+    }
+    impl Lint for EchoParamLint {
+        fn id(&self) -> &'static str {
+            "test.echo.param"
+        }
+        fn citation(&self) -> &'static str {
+            "PKIX-hy2e.6 atomicity fixture"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Warn
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Certificate
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Leaf
+        }
+        fn set_parameter(
+            &mut self,
+            id: &str,
+            value: &str,
+        ) -> Result<(), crate::ParameterError> {
+            if id != "knob" {
+                return Err(crate::ParameterError::UnknownParameter(id.to_owned()));
+            }
+            if value == "REJECT" {
+                return Err(crate::ParameterError::InvalidValue {
+                    id: id.to_owned(),
+                    reason: "REJECT is a poison value for this fixture".to_owned(),
+                });
+            }
+            self.value = value.to_owned();
+            Ok(())
+        }
+        fn check_cert(
+            &self,
+            _cert: &x509_cert::Certificate,
+            _kind: crate::SubjectKind,
+            _now_unix: u64,
+        ) -> crate::LintResult {
+            crate::LintResult::error(format!("value={}", self.value))
+        }
+    }
+
+    fn load_atomicity_fixture_cert() -> x509_cert::Certificate {
+        use der::Decode as _;
+        x509_cert::Certificate::from_der(include_bytes!(
+            "../../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ))
+        .expect("fixture is valid DER")
+    }
+
+    #[test]
+    fn apply_parameter_overrides_atomic_on_invalid_value_keeps_default() {
+        // Trigger: a batch of overrides where the LAST one rejects.
+        // The first override would succeed if applied directly; with
+        // atomicity, the runner must roll back to defaults so the
+        // first override's value does NOT appear in subsequent
+        // findings.
+        //
+        // Oracle: EchoParamLint::check_cert emits the current
+        // parameter value verbatim in the Error detail string. We
+        // observe the REGISTERED lint's state by running it against
+        // a cert and reading the finding's detail.
+        use crate::{LintRunner, LintResult, SubjectKind};
+
+        let cert = load_atomicity_fixture_cert();
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {
+            value: "default".to_string(),
+        })];
+        let mut runner = LintRunner::new(lints);
+
+        // Pre-apply state: registered lint emits value=default.
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        match &findings[0].result {
+            LintResult::Error(detail) => assert_eq!(detail.as_ref(), "value=default"),
+            other => panic!("expected Error, got {other:?}"),
+        }
+
+        // Apply a batch where the first override succeeds and the
+        // second rejects. Atomicity requires the first to roll back.
+        let overrides = vec![
+            ParameterOverride::new("test.echo.param.knob", "overridden"),
+            ParameterOverride::new("test.echo.param.knob", "REJECT"),
+        ];
+        let err = runner.apply_parameter_overrides(&overrides).unwrap_err();
+        assert!(
+            matches!(err, ParseError::InvalidParameterOverride { .. }),
+            "REJECT must produce InvalidParameterOverride; got {err:?}"
+        );
+
+        // Post-apply state: the registered lint must still report
+        // value=default. If atomicity were broken (pre-PKIX-hy2e.6
+        // behavior), the first override would have been committed
+        // and the lint would emit value=overridden.
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        match &findings[0].result {
+            LintResult::Error(detail) => assert_eq!(
+                detail.as_ref(), "value=default",
+                "atomicity violation: the registered lint slot was mutated by the \
+                 failed apply. Expected default value preserved; got: {detail:?}"
+            ),
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn apply_parameter_overrides_commits_on_full_success() {
+        // Positive control: a fully-successful apply must commit
+        // every override into the registered slots.
+        use crate::{LintRunner, LintResult, SubjectKind};
+
+        let cert = load_atomicity_fixture_cert();
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {
+            value: "default".to_string(),
+        })];
+        let mut runner = LintRunner::new(lints);
+
+        runner
+            .apply_parameter_overrides(&[ParameterOverride::new(
+                "test.echo.param.knob",
+                "committed-value",
+            )])
+            .expect("valid value must commit");
+
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        match &findings[0].result {
+            LintResult::Error(detail) => {
+                assert_eq!(
+                    detail.as_ref(),
+                    "value=committed-value",
+                    "fully-successful apply must commit the new value into the \
+                     registered slot"
+                );
+            }
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn apply_parameter_overrides_atomic_on_invalid_value_keeps_previous_commit() {
+        // Compound regression: an earlier successful apply committed
+        // "first-value". A later batch where override #2 rejects
+        // must NOT erase "first-value" from the registered lint.
+        // (I.e., atomicity does not regress the lint to its
+        // construction-time default — it preserves the most-recently-
+        // committed value.)
+        use crate::{LintRunner, LintResult, SubjectKind};
+
+        let cert = load_atomicity_fixture_cert();
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {
+            value: "default".to_string(),
+        })];
+        let mut runner = LintRunner::new(lints);
+
+        runner
+            .apply_parameter_overrides(&[ParameterOverride::new(
+                "test.echo.param.knob",
+                "first-value",
+            )])
+            .expect("first apply must succeed");
+
+        let _err = runner
+            .apply_parameter_overrides(&[
+                ParameterOverride::new("test.echo.param.knob", "second-value"),
+                ParameterOverride::new("test.echo.param.knob", "REJECT"),
+            ])
+            .expect_err("second-apply with REJECT must fail");
+
+        // Atomicity assertion: the registered lint still reports
+        // "first-value" (the previously-committed value), not
+        // "default" (the construction-time value) and not
+        // "second-value" (the failed-batch's first override).
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        match &findings[0].result {
+            LintResult::Error(detail) => assert_eq!(
+                detail.as_ref(),
+                "value=first-value",
+                "atomicity: a failed batch must preserve the previously-committed \
+                 value, not regress to default and not commit the failed batch's \
+                 partial state; got: {detail:?}"
+            ),
+            other => panic!("expected Error, got {other:?}"),
+        }
     }
 }
