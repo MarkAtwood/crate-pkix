@@ -543,14 +543,25 @@ impl Lint for Rfc5280SanRequiredWhenSubjectEmptyLint {
 /// - Outer and inner `AlgorithmIdentifier` byte-equal → `Pass`.
 /// - Otherwise → `Error` with both OIDs in the detail string.
 ///
+/// # x509-cert representation
+///
+/// `x509_cert::AlgorithmIdentifier` is `AlgorithmIdentifier<Any>` where
+/// `Any` owns a `(Tag, BytesOwned)` pair. The derived `PartialEq`
+/// compares the OID and the `Option<Any>` field pairwise: `Some(Null)`
+/// and `None` differ at the `Option` discriminant; `Some(Null)` and
+/// `Some(other)` differ in the inner `Any`'s tag/value bytes. Decoding
+/// preserves the `Option` distinction — the field's `DecodeValue` impl
+/// reads the OPTIONAL directly without normalizing absent to `Some(Null)`.
+/// The negative-path tests below lock this behavior in.
+///
 /// # Provenance
 ///
 /// Filed under PKIX-9vnx.9.2.1.1 as one of three deferred lints from the
-/// PKIX-9vnx.9.2.1 batch. Negative-test fixture (cert with mismatched
-/// outer/inner signature algorithms) is not yet present in the workspace
-/// fixture corpus — well-behaved encoders such as OpenSSL and pyca always
-/// produce matching identifiers. Fixture generation requires custom
-/// DER-level synthesis and is out of scope here.
+/// PKIX-9vnx.9.2.1 batch. Negative-path tests added under PKIX-7f92.3
+/// construct mismatched-AlgorithmIdentifier certs in-memory and via DER
+/// round-trip; both lock the lint's `Error` behavior on the three
+/// distinguishable mismatch cases (OID mismatch, parameters absent vs
+/// NULL, parameters NULL vs absent).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Rfc5280SignatureAlgorithmMatchLint;
 
@@ -992,16 +1003,27 @@ mod tests {
     // -----------------------------------------------------------------------
     // Rfc5280SignatureAlgorithmMatchLint
     //
-    // Oracle: `openssl asn1parse -i -in <fixture> -inform DER` reads both
-    // the inner `tbsCertificate.signature` and outer `signatureAlgorithm`
-    // SEQUENCEs. Well-formed certificates produced by OpenSSL and pyca
-    // always have byte-identical outer/inner identifiers, including the
-    // NULL parameters value for RSA-PKCS1 algorithms. Verified
-    // 2026-05-12: all of the policy-checks/*.der fixtures pass the lint.
+    // Positive-path oracle: `openssl asn1parse -i -in <fixture> -inform DER`
+    // reads both the inner `tbsCertificate.signature` and outer
+    // `signatureAlgorithm` SEQUENCEs. Well-formed certificates produced by
+    // OpenSSL and pyca always have byte-identical outer/inner identifiers,
+    // including the NULL parameters value for RSA-PKCS1 algorithms.
+    // Verified 2026-05-12: all of the policy-checks/*.der fixtures pass the
+    // lint.
     //
-    // The negative path (mismatched outer/inner) requires custom
-    // DER-level synthesis since neither OpenSSL nor pyca will produce a
-    // mismatched cert. Out of scope per the bead.
+    // Negative-path oracle: x509-cert's `AlgorithmIdentifier` is
+    // `AlgorithmIdentifier<Any>` with derived `PartialEq` (verified in
+    // RustCrypto/formats spki/src/algorithm.rs at v0.7.x). The derived
+    // impl compares the `oid` field and the `Option<Any>` parameters
+    // field pairwise. `Option<T>: PartialEq where T: PartialEq` discriminates
+    // `Some` from `None` at the discriminant level. `Any` itself derives
+    // `PartialEq` over `(Tag, BytesOwned)`, so `Some(Any::null())` (NULL
+    // tag, empty value) differs from `Some(Any { tag: OctetString, ... })`.
+    // The negative tests below construct mismatched-AlgorithmIdentifier
+    // certs in-memory and via DER round-trip, exercising the three
+    // distinguishable mismatch cases — and lock both the lint's `Error`
+    // behavior and x509-cert's decode preservation of the `Option`
+    // distinction.
     // -----------------------------------------------------------------------
 
     #[test]
@@ -1022,6 +1044,124 @@ mod tests {
             lint.check_cert(&cert, SubjectKind::Any, 0),
             LintResult::Pass
         );
+    }
+
+    /// Negative path: outer `signatureAlgorithm` has `parameters: Some(NULL)`
+    /// (the canonical RSA-PKCS1 shape), inner `tbsCertificate.signature` has
+    /// `parameters: None`. The lint must report `Error`.
+    ///
+    /// Exercises the `Option` discriminant arm of the derived
+    /// `AlgorithmIdentifier` `PartialEq`.
+    #[test]
+    fn signature_algorithm_match_rejects_outer_null_inner_absent() {
+        use der::asn1::Any;
+
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+
+        // Fixture invariant: well-formed RSA cert has matching Some(NULL)
+        // on both sides; mutate only the inner to None.
+        assert!(cert.signature_algorithm.parameters.is_some());
+        assert_eq!(
+            cert.signature_algorithm, cert.tbs_certificate.signature,
+            "fixture must start with matching outer/inner identifiers"
+        );
+
+        cert.tbs_certificate.signature.parameters = None;
+        // Outer still has Some(NULL); confirm the mutation produced the
+        // intended mismatch shape before invoking the lint.
+        assert_eq!(
+            cert.signature_algorithm.parameters.as_ref().unwrap(),
+            &Any::null()
+        );
+        assert!(cert.tbs_certificate.signature.parameters.is_none());
+
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("does not match"),
+                    "error detail must report mismatch; got: {detail}"
+                );
+            }
+            other => panic!("expected Error on outer-NULL/inner-absent mismatch, got: {other:?}"),
+        }
+    }
+
+    /// Negative path: outer has `parameters: None`, inner has `Some(NULL)`.
+    /// Symmetric to the preceding test.
+    #[test]
+    fn signature_algorithm_match_rejects_outer_absent_inner_null() {
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+
+        cert.signature_algorithm.parameters = None;
+        // Inner unchanged — still Some(NULL).
+        assert!(cert.tbs_certificate.signature.parameters.is_some());
+
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("does not match"),
+                    "error detail must report mismatch; got: {detail}"
+                );
+            }
+            other => panic!("expected Error on outer-absent/inner-NULL mismatch, got: {other:?}"),
+        }
+    }
+
+    /// Negative path: outer and inner carry different algorithm OIDs.
+    /// Exercises the OID-mismatch arm of the comparison.
+    #[test]
+    fn signature_algorithm_match_rejects_oid_mismatch() {
+        use der::oid::ObjectIdentifier;
+
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+
+        // ecdsa-with-SHA256 OID (different from RSA fixture's sha256WithRSAEncryption).
+        let ecdsa_with_sha256: ObjectIdentifier = "1.2.840.10045.4.3.2".parse().unwrap();
+        cert.tbs_certificate.signature.oid = ecdsa_with_sha256;
+
+        match lint.check_cert(&cert, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("1.2.840.10045.4.3.2"),
+                    "error detail must name the mutated inner OID; got: {detail}"
+                );
+            }
+            other => panic!("expected Error on OID mismatch, got: {other:?}"),
+        }
+    }
+
+    /// DER round-trip oracle: encode a Certificate whose
+    /// `signature_algorithm.parameters` is `None`, decode it back, and
+    /// confirm the decoded value preserves `None` rather than normalizing
+    /// to `Some(NULL)`. Locks x509-cert's decode behavior — the worry the
+    /// review bead raised — directly.
+    #[test]
+    fn algorithm_identifier_decode_preserves_option_discriminant() {
+        use der::{Decode, Encode};
+
+        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+        cert.signature_algorithm.parameters = None;
+
+        // Re-encode (signature bytes are arbitrary from the lint's POV;
+        // the lint only inspects the algorithm-identifier SEQUENCEs).
+        let der_bytes = cert.to_der().expect("encode mutated cert");
+        let decoded = x509_cert::Certificate::from_der(&der_bytes).expect("decode mutated cert");
+
+        assert!(
+            decoded.signature_algorithm.parameters.is_none(),
+            "x509-cert decode normalized None to Some(NULL); the lint's premise is invalidated"
+        );
+
+        // The lint must fire Error against the round-tripped cert — the
+        // inner (unchanged, Some(NULL)) and outer (now None) differ.
+        let lint = Rfc5280SignatureAlgorithmMatchLint;
+        match lint.check_cert(&decoded, SubjectKind::Any, 0) {
+            LintResult::Error(_) => {}
+            other => panic!("expected Error after DER round-trip, got: {other:?}"),
+        }
     }
 
     #[test]
