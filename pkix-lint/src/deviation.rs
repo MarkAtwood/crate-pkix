@@ -474,13 +474,68 @@ impl DeviationScope {
 
     /// Construct a [`SCOPE_KIND_ISSUER_DN_CONTAINS`] scope.
     ///
-    /// `substring` is matched (case-insensitively) against the RFC 4514 string
-    /// form of the certificate's issuer DN. Pre-lowercase the substring or
-    /// rely on [`DeviationStore::add`] to do so at insertion time; matching
-    /// assumes the stored substring is already lowercase.
+    /// `substring` is matched (case-insensitively) against the RFC 4514
+    /// string form of the certificate's issuer DN, as produced by
+    /// `x509_cert::name::Name::to_string()`.
     ///
-    /// This is a substring match, not an RFC 4518-normalized DN match. Prefer
-    /// [`Self::issuer_dn_exact`] when precise DN identity is required.
+    /// # Matching strategy (pinned contract)
+    ///
+    /// The match is computed as:
+    ///
+    /// ```text
+    /// cert.tbs_certificate.issuer.to_string().to_lowercase().contains(substring)
+    /// ```
+    ///
+    /// where `substring` is also pre-lowercased (via [`DeviationStore::add`]
+    /// at insertion time, or by the caller if invoking
+    /// [`DeviationScope::matches`] directly on a bare scope). The
+    /// matcher is a UTF-8 byte-substring check on the lowercase-folded
+    /// rendering — no parsing of the RDN structure, no RFC 4518
+    /// normalization, no whitespace canonicalization.
+    ///
+    /// # RFC 4514 rendering, in concrete terms
+    ///
+    /// `Name::to_string()` emits attribute-value pairs separated by
+    /// commas, **in RDN-reverse order** (most-specific RDN first). For
+    /// a typical CA DN the rendering looks like:
+    ///
+    /// ```text
+    /// CN=Good CA,O=Test Certificates 2011,C=US
+    /// ```
+    ///
+    /// Operators authoring substrings should:
+    ///
+    /// - Prefer single-RDN substrings (`"good ca"`, `"trust anchor"`)
+    ///   over multi-RDN substrings that span commas. Single-RDN
+    ///   patterns are robust to attribute-order changes in the DN
+    ///   encoding and to x509-cert's RFC 4514 rendering choices.
+    /// - Avoid embedding `,` or `=` in substrings — those are RFC 4514
+    ///   structural delimiters, not free text. A substring like
+    ///   `"good ca,o=test"` makes assumptions about the precise
+    ///   rendering that may not hold across encoder versions.
+    /// - Remember that RFC 4514 escapes certain characters (`,`, `+`,
+    ///   `"`, `\`, `<`, `>`, `;`, leading `#`, leading/trailing space)
+    ///   with backslashes. A CN that literally contains a comma
+    ///   renders as `CN=Comma\, In Name`; a naive substring
+    ///   `"comma, in"` matches but the backslash makes anchored
+    ///   patterns brittle.
+    /// - Use [`Self::issuer_dn_exact`] when precise DN identity matters
+    ///   (RFC 4518 normalized comparison via
+    ///   [`pkix_path::names_match`]) — that path does not depend on
+    ///   `Name::to_string()` at all.
+    ///
+    /// # Stability commitment
+    ///
+    /// The rendering is `x509_cert::name::Name::to_string()`'s output.
+    /// x509-cert is currently pre-1.0; changes there (escape rules,
+    /// attribute display names, RDN ordering) change which certs
+    /// match without a pkix-lint version bump. The pkix-lint workspace
+    /// pins to a specific x509-cert minor; operators tracking match
+    /// behavior across pkix-lint upgrades should treat encoder-level
+    /// rendering changes as a possible cause of newly-included or
+    /// newly-excluded certs.
+    ///
+    /// # Case folding
     ///
     /// Case folding uses [`str::to_lowercase`] (Unicode-aware default
     /// case mapping). Accented Latin, CJK kana, and other non-ASCII
@@ -1447,6 +1502,111 @@ mod tests {
         assert!(
             scope_upper.matches(&cert),
             "lowercased-at-construction match must succeed"
+        );
+    }
+
+    /// Regression test for PKIX-7f92.10: pin the documented matching
+    /// strategy against a multi-RDN issuer DN. The PKITS GoodCACert has
+    /// issuer DN `CN=Trust Anchor,O=Test Certificates 2011,C=US` (CN-first
+    /// RFC 4514 rendering); confirms that:
+    ///
+    /// - Single-RDN-value substrings match (`"trust anchor"`,
+    ///   `"test certificates 2011"`, `"us"`).
+    /// - A cross-RDN substring that happens to span the
+    ///   x509-cert-rendered `,` separator matches if and only if the
+    ///   rendered bytes literally contain it
+    ///   (`"trust anchor,o=test"` works ONLY because x509-cert renders
+    ///   without space after the comma). Document via this test that
+    ///   the renderer's spacing choice is part of the contract.
+    /// - A reordered substring that assumes a different RDN ordering
+    ///   does NOT match (e.g., `"c=us,cn=trust"`) — the renderer is
+    ///   CN-first, not C-first.
+    /// - An attribute name from a non-rendered attribute type (e.g.,
+    ///   `"countryName="`) does NOT match — x509-cert uses short
+    ///   names (`C=`), not long names.
+    #[test]
+    fn scope_issuer_dn_contains_pinned_multi_rdn_behavior() {
+        // Load PKITS GoodCACert — only multi-RDN fixture available.
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../pkix-path/tests/pkits/certs/GoodCACert.crt");
+        let Ok(bytes) = std::fs::read(&path) else {
+            eprintln!("PKITS GoodCACert not available — skipping multi-RDN regression test");
+            return;
+        };
+        use der::Decode as _;
+        let cert = Certificate::from_der(&bytes).expect("decode PKITS GoodCACert");
+
+        // External oracle: the rendered DN is the literal x509-cert
+        // RFC 4514 output. Both sides of the contains() check use this
+        // exact rendering.
+        let rendered = cert.tbs_certificate.issuer.to_string();
+        assert_eq!(
+            rendered, "CN=Trust Anchor,O=Test Certificates 2011,C=US",
+            "test oracle: x509-cert renders the PKITS GoodCACert issuer in CN-first RFC 4514 form"
+        );
+
+        let lower = rendered.to_lowercase();
+
+        // Positive: single-RDN-value substrings match. These are the
+        // operator-author-friendly patterns the rustdoc recommends.
+        for substring in ["trust anchor", "test certificates 2011", "c=us"] {
+            assert!(
+                lower.contains(substring),
+                "rendered lower must contain {substring:?} (oracle)"
+            );
+            let scope = DeviationScope::issuer_dn_contains(substring);
+            assert!(
+                scope.matches(&cert),
+                "single-value substring {substring:?} must match"
+            );
+        }
+
+        // Positive: a cross-RDN substring that LITERALLY appears in
+        // the lowercase rendering matches. Note the no-space-after-comma
+        // — this is x509-cert's rendering choice, and the bead warns
+        // that operators relying on this are coupled to the renderer.
+        let cross = "trust anchor,o=test certificates";
+        assert!(
+            lower.contains(cross),
+            "rendered lower must literally contain {cross:?}"
+        );
+        let scope_cross = DeviationScope::issuer_dn_contains(cross);
+        assert!(
+            scope_cross.matches(&cert),
+            "cross-RDN substring matches when it tracks the renderer literally"
+        );
+
+        // Negative: substring with a space after the comma (a natural
+        // human-author shape) does NOT match because x509-cert renders
+        // without that space.
+        let cross_with_space = "trust anchor, o=test certificates";
+        assert!(
+            !lower.contains(cross_with_space),
+            "rendered lower does NOT contain {cross_with_space:?} — renderer omits space after comma"
+        );
+        let scope_space = DeviationScope::issuer_dn_contains(cross_with_space);
+        assert!(
+            !scope_space.matches(&cert),
+            "space-after-comma substring must not match (renderer-coupling hazard)"
+        );
+
+        // Negative: reordered substring assuming C-first RDN order
+        // (most-significant first per X.500) does NOT match — x509-cert
+        // uses RFC 4514 CN-first order.
+        let reordered = "c=us,o=test certificates 2011,cn=trust anchor";
+        let scope_reordered = DeviationScope::issuer_dn_contains(reordered);
+        assert!(
+            !scope_reordered.matches(&cert),
+            "C-first-ordered substring must not match CN-first rendering"
+        );
+
+        // Negative: long attribute name (`countryName`) does NOT match
+        // because x509-cert renders short names (`C`).
+        let long_name = "countryname=us";
+        let scope_long = DeviationScope::issuer_dn_contains(long_name);
+        assert!(
+            !scope_long.matches(&cert),
+            "long attribute name must not match x509-cert's short-name rendering"
         );
     }
 
