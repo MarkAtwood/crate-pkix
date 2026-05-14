@@ -21,6 +21,12 @@
 //! [`crate::deviation::DeviationStore`] from an OSCAL Risk array. The two
 //! halves form a closed round-trip loop for deviation-policy persistence
 //! (`(parse . emit)` over a non-empty store yields an `Eq`-equal store).
+//! All [`crate::deviation::Deviation`] fields — including the optional
+//! `priority` resolution-ordering hint — round-trip through the OSCAL
+//! Risk array. The priority field is encoded as the optional
+//! `pkix-lint.deviation-priority` prop, emitted only when non-zero so
+//! pre-priority OSCAL files (which lack the prop) round-trip
+//! byte-identically.
 //!
 //! # Feature
 //!
