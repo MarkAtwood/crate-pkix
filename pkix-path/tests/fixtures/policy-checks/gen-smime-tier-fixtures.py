@@ -27,19 +27,43 @@ Fixtures produced (PKIX-jbvb.3, Individual-validated tier):
     - Exercises the `AnyOf(pseudonym, AllOf(givenName, surname))` branch
       of `pkix_path::DnAttrRule` for the Individual-validated tier.
 
+Fixtures produced (PKIX-jbvb.2, Sponsor-validated tier):
+
+  smime-sponsor-validated-self-signed-365d.der
+    Self-signed P-256 cert with:
+    - Subject DN: C=GB, O=Acme Sponsor Ltd, givenName=Alice, surname=Sponsored,
+                  serialNumber=SPON1234, CN=Alice Sponsored
+    - CertificatePolicies: 2.23.140.1.5.3.1 (Sponsor-validated)
+    - rfc822Name SAN: alice.sponsored@acme-sponsor.example.com
+    - emailProtection EKU, 365-day validity, cA=TRUE
+
+  smime-sponsor-pseudonym-self-signed-365d.der
+    Self-signed P-256 cert with:
+    - Subject DN: C=GB, O=Acme Sponsor Ltd, pseudonym=SponsoredAlias,
+                  serialNumber=SPON5678, CN=SponsoredAlias
+    - CertificatePolicies: 2.23.140.1.5.3.1 (Sponsor-validated)
+    - rfc822Name SAN: sponsored.alias@acme-sponsor.example.com
+    - emailProtection EKU, 365-day validity, cA=TRUE
+    - Exercises the AnyOf branch alongside the required organizationName.
+
 # Provenance
 
-Modeled after zlint's `smime_leg1_iv_eff1.pem` (Individual-validated tier
-marker: policy OID 2.23.140.1.5.4.1) but with the BR-mandated Subject DN
-attributes that zlint's published fixture omits. zlint's published fixture
-has only `C=GB, CN=Leon Mandrake`; no givenName/surname/pseudonym/serialNumber.
-The workspace fixtures include the full DN attribute shape required by CA/B
-Forum S/MIME BR §7.6 (Individual Validated) so that pkix-path's
-`required_leaf_subject_dn_attrs` check has the attribute coverage it tests
-for. pkilint's `tests/integration_certificates/cabf/smime/` was checked but
-not cloned at fixture-authoring time; modeling-against parity is documented
-on the assertion that pkilint classifies Individual-validated certs by the
-same policy-OID + DN-attr criteria.
+Individual-tier fixtures modeled after zlint's `smime_leg1_iv_eff1.pem`
+(Individual-validated tier marker: policy OID 2.23.140.1.5.4.1).
+Sponsor-tier fixtures modeled after zlint's `smime_leg1_sv_eff1.pem`
+(Sponsor-validated tier marker: policy OID 2.23.140.1.5.3.1). Both zlint
+published fixtures lack the BR-mandated tier-specific Subject DN attributes
+(zlint's IV fixture has only `C=GB, CN=Leon Mandrake`; zlint's SV fixture
+has `C=US, L=Nowhere, O=Some Company Ltd., CN=Leon Mandrake` — present
+organizationName, but no givenName/surname/pseudonym/serialNumber). The
+workspace fixtures include the full DN attribute shape required by CA/B
+Forum S/MIME BR §7.5 (Sponsor Validated) and §7.6 (Individual Validated)
+so that pkix-path's `required_leaf_subject_dn_attrs` check has the
+attribute coverage it tests for. pkilint's
+`tests/integration_certificates/cabf/smime/` was checked but not cloned
+at fixture-authoring time; modeling-against parity is documented on the
+assertion that pkilint classifies tier-validated certs by the same
+policy-OID + DN-attr criteria.
 
 # Oracle
 
@@ -86,6 +110,7 @@ def next_serial():
 
 # CA/B Forum S/MIME BR reserved policy OIDs (§7.1.6.1 / Appendix A).
 SMIME_INDIVIDUAL_VALIDATED_POLICY = x509.ObjectIdentifier("2.23.140.1.5.4.1")
+SMIME_SPONSOR_VALIDATED_POLICY = x509.ObjectIdentifier("2.23.140.1.5.3.1")
 
 
 def make_tier_cert(filename, subject_attrs, policy_oid, rfc822_san_email):
@@ -179,6 +204,49 @@ make_tier_cert(
     ],
     SMIME_INDIVIDUAL_VALIDATED_POLICY,
     "testbox@example.com",
+)
+
+
+# ---------------------------------------------------------------------------
+# Sponsor-validated tier (PKIX-jbvb.2) — CA/B Forum S/MIME BR §7.5
+#
+# Subject DN rule:
+#   AllOf:
+#     organizationName
+#     AnyOf: pseudonym OR (givenName + surname)
+#     serialNumber
+#
+# Sponsor-validated = Individual-validated + organizationName: an employer
+# or sponsoring organization vouches for the named individual.
+# ---------------------------------------------------------------------------
+
+# Form 1: organizationName + givenName + surname + serialNumber.
+make_tier_cert(
+    "smime-sponsor-validated-self-signed-365d.der",
+    [
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Acme Sponsor Ltd"),
+        x509.NameAttribute(NameOID.GIVEN_NAME, "Alice"),
+        x509.NameAttribute(NameOID.SURNAME, "Sponsored"),
+        x509.NameAttribute(NameOID.SERIAL_NUMBER, "SPON1234"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "Alice Sponsored"),
+    ],
+    SMIME_SPONSOR_VALIDATED_POLICY,
+    "alice.sponsored@acme-sponsor.example.com",
+)
+
+# Form 2: organizationName + pseudonym + serialNumber. Exercises the AnyOf branch.
+make_tier_cert(
+    "smime-sponsor-pseudonym-self-signed-365d.der",
+    [
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Acme Sponsor Ltd"),
+        x509.NameAttribute(NameOID.PSEUDONYM, "SponsoredAlias"),
+        x509.NameAttribute(NameOID.SERIAL_NUMBER, "SPON5678"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "SponsoredAlias"),
+    ],
+    SMIME_SPONSOR_VALIDATED_POLICY,
+    "sponsored.alias@acme-sponsor.example.com",
 )
 
 print("done")

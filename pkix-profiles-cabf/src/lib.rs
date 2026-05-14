@@ -67,6 +67,7 @@
 //! |--------|--------------------|---------| ----------------|
 //! | [`WebPkiProfile`] | [`web_pki_policy`] | CA/B Forum TLS BR | SAN required, SHA-1 prohibited, RSA ≥ 2048 |
 //! | [`SmimeProfile`] | [`smime_policy`] | CA/B Forum S/MIME BR | rfc822Name SAN, emailProtection EKU, max validity 1185 days |
+//! | [`SmimeSponsorValidated`] | [`smime_sponsor_policy`] | CA/B Forum S/MIME BR §7.5 | Mailbox baseline + policy OID 2.23.140.1.5.3.1 + Subject DN organizationName ∧ ((givenName ∧ surname) ∨ pseudonym) ∧ serialNumber |
 //! | [`SmimeIndividualValidated`] | [`smime_individual_policy`] | CA/B Forum S/MIME BR §7.6 | Mailbox baseline + policy OID 2.23.140.1.5.4.1 + Subject DN (givenName+surname ∨ pseudonym) ∧ serialNumber |
 //! | [`CodeSigningProfile`] | [`code_signing_policy`] | CA/B Forum Code Signing BR | codeSigning EKU, RSA ≥ 3072 |
 //!
@@ -110,9 +111,10 @@
 //!   `pkix-path`). Per-predicate Lint enforcement is not in scope —
 //!   that is `pkix-policy-zlint`'s job.
 //! - **S/MIME BR sub-profile families partially split.** [`SmimeProfile`]
-//!   ships the Mailbox-validated tier baseline; [`SmimeIndividualValidated`]
-//!   ships the Individual-validated tier (§7.6); Organization-validated and
-//!   Sponsor-validated tier profiles remain tracked under `PKIX-jbvb`.
+//!   ships the Mailbox-validated tier baseline; [`SmimeSponsorValidated`]
+//!   ships the Sponsor-validated tier (§7.5); [`SmimeIndividualValidated`]
+//!   ships the Individual-validated tier (§7.6); the Organization-validated
+//!   tier profile remains tracked under `PKIX-jbvb`.
 //! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** Cross-spec horizontal
 //!   expansion is barred by the AGENTS.md spec-taxonomy clause. Other
 //!   industry-forum / vendor / government policies must come in via
@@ -216,6 +218,7 @@ pub(crate) const ID_KP_CODE_SIGNING: ObjectIdentifier =
 // `ValidationPolicy` outputs.
 pub(crate) const OID_SURNAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.4");
 pub(crate) const OID_SERIAL_NUMBER: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.5");
+pub(crate) const OID_ORGANIZATION_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.10");
 pub(crate) const OID_GIVEN_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.42");
 pub(crate) const OID_PSEUDONYM: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.65");
 
@@ -224,6 +227,8 @@ pub(crate) const OID_PSEUDONYM: ObjectIdentifier = ObjectIdentifier::new_unwrap(
 // One OID per Mailbox-validated tier identifies the validation level the CA
 // performed when issuing the subscriber certificate. Subscriber certs MUST
 // assert their tier's reserved policy OID in the `CertificatePolicies` extension.
+pub(crate) const CABF_SMIME_SPONSOR_VALIDATED_POLICY: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.23.140.1.5.3.1");
 pub(crate) const CABF_SMIME_INDIVIDUAL_VALIDATED_POLICY: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.23.140.1.5.4.1");
 
@@ -551,6 +556,134 @@ impl pkix_lint::LintProfile for SmimeIndividualValidated {
     }
 }
 
+/// CA/Browser Forum S/MIME Baseline Requirements — Sponsor-validated profile.
+///
+/// Implements [`Profile`] for the S/MIME BR Sponsor-validated subscriber-
+/// certificate tier. Per S/MIME BR §7.5 (Sponsor Validated), an employer or
+/// sponsoring organization vouches for the named individual: the cert
+/// carries BOTH organizational identity (organizationName) AND individual
+/// identity (givenName + surname or pseudonym) plus a unique serialNumber,
+/// and asserts policy OID `2.23.140.1.5.3.1`.
+///
+/// The free-function alias [`smime_sponsor_policy`] is equivalent to
+/// `SmimeSponsorValidated.policy(now_unix)`.
+///
+/// # Canonical source
+///
+/// Canonical CA/B Forum S/MIME BR document:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
+/// Tier-specific section: §7.5 (Sponsor Validated subscriber certificates).
+/// Reserved policy OID: §7.1.6.1 / Appendix A (`2.23.140.1.5.3.1`).
+///
+/// # Tier discrimination
+///
+/// Distinct from [`SmimeProfile`] (Mailbox-validated baseline) and
+/// [`SmimeIndividualValidated`] (Individual-validated tier) by:
+///
+/// - **Asserted policy OID** `2.23.140.1.5.3.1` is required on the leaf's
+///   `CertificatePolicies` extension. Certs asserting a different tier OID
+///   (or no OID) fail with [`pkix_path::Error::MissingLeafPolicyOid`].
+/// - **Subject DN** must satisfy: `organizationName AND
+///   ((givenName AND surname) OR pseudonym) AND serialNumber`. Certs
+///   lacking any of these (e.g. Individual-validated certs without
+///   organizationName) fail with [`pkix_path::Error::SubjectDnAttrRuleUnmet`].
+///
+/// # Limitations
+///
+/// Reference, not authoritative. See the crate-level "Unprincipled
+/// exception" rustdoc. The BR text is the only canonical source.
+///
+/// The validation-side check is structural: the cert *carries* the
+/// tier-marker policy OID and DN attributes. The BR's CA-side sponsorship-
+/// proofing requirements (employment verification, etc.) are not
+/// validator-side concerns — this profile checks the cert AS IF the
+/// issuing CA correctly verified the sponsor-individual relationship.
+///
+/// `max_validity_secs` applies to every certificate in the chain (matches
+/// [`SmimeProfile`]'s shape); see that profile's limitations for the chain
+/// composition implications.
+///
+/// [`SmimeProfile`]: crate::SmimeProfile
+/// [`SmimeIndividualValidated`]: crate::SmimeIndividualValidated
+/// [`pkix_path::Error::MissingLeafPolicyOid`]: https://docs.rs/pkix-path/latest/pkix_path/enum.Error.html#variant.MissingLeafPolicyOid
+/// [`pkix_path::Error::SubjectDnAttrRuleUnmet`]: https://docs.rs/pkix-path/latest/pkix_path/enum.Error.html#variant.SubjectDnAttrRuleUnmet
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct SmimeSponsorValidated;
+
+impl Profile for SmimeSponsorValidated {
+    fn id(&self) -> &'static str {
+        "cabf.smime.sponsor"
+    }
+
+    fn version(&self) -> &'static str {
+        // Dotted spec version of the S/MIME BR document this profile was last
+        // refreshed against; matches `SmimeProfile`'s version per PKIX-d5rh.
+        "1.0.14"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        use pkix_path::DnAttrRule;
+
+        let mut p = ValidationPolicy::new(now_unix);
+        // S/MIME BR §6.3.2: Legacy generation max validity 1185 days.
+        p.max_validity_secs = Some(1185 * SECS_PER_DAY);
+        // S/MIME BR §7.1.3: SHA-1 prohibited.
+        p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
+        // S/MIME BR §6.1.5: RSA ≥ 2048 bits.
+        p.min_rsa_key_bits = Some(2048);
+        // Mailbox-validated baseline: non-empty SAN with at least one rfc822Name.
+        p.require_subject_alt_name = true;
+        p.require_rfc822_san = true;
+        // S/MIME BR §7.1.2.3(f): id-kp-emailProtection EKU.
+        p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
+        // S/MIME BR §7.1.6.1 (Reserved Certificate Policy Identifiers) / Appendix A:
+        //   2.23.140.1.5.3.1 — Sponsor-validated subscriber.
+        p.required_leaf_policy_oids = Some(vec![CABF_SMIME_SPONSOR_VALIDATED_POLICY]);
+        // S/MIME BR §7.5 (Sponsor Validated): Subject DN must carry the
+        // tier-distinguishing attributes:
+        //   AllOf:
+        //     organizationName
+        //     AnyOf: pseudonym OR (givenName + surname)
+        //     serialNumber
+        p.required_leaf_subject_dn_attrs = Some(DnAttrRule::AllOf(vec![
+            DnAttrRule::Field(OID_ORGANIZATION_NAME),
+            DnAttrRule::AnyOf(vec![
+                DnAttrRule::Field(OID_PSEUDONYM),
+                DnAttrRule::AllOf(vec![
+                    DnAttrRule::Field(OID_GIVEN_NAME),
+                    DnAttrRule::Field(OID_SURNAME),
+                ]),
+            ]),
+            DnAttrRule::Field(OID_SERIAL_NUMBER),
+        ]));
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
+impl pkix_lint::LintProfile for SmimeSponsorValidated {
+    /// Return the CA/B Forum S/MIME BR lint set for this profile.
+    ///
+    /// **Currently empty.** Matches [`SmimeProfile`]'s `LintProfile` shape;
+    /// comprehensive predicate coverage belongs to `pkix-policy-zlint` per
+    /// AGENTS.md non-negotiable #5.
+    ///
+    /// [`SmimeProfile`]: crate::SmimeProfile
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(Vec::new)
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(Vec::new())
+    }
+}
+
 /// CA/Browser Forum Code Signing Baseline Requirements profile.
 ///
 /// Implements [`Profile`] for code-signing certificate validation.
@@ -808,6 +941,43 @@ pub fn smime_individual_policy(now_unix: u64) -> ValidationPolicy {
     SmimeIndividualValidated.policy(now_unix)
 }
 
+/// Return a [`ValidationPolicy`] for the CA/Browser Forum S/MIME BR
+/// Sponsor-validated subscriber-certificate profile.
+///
+/// This is a convenience alias for `SmimeSponsorValidated.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// Canonical CA/B Forum S/MIME BR:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `max_validity_secs` | 1185 days | [S/MIME BR §6.3.2](https://github.com/cabforum/smime/blob/main/SBR.md#632-certificate-operational-periods-and-key-pair-usage-periods) |
+/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | [S/MIME BR §7.1.3](https://github.com/cabforum/smime/blob/main/SBR.md#713-algorithm-object-identifiers) |
+/// | `min_rsa_key_bits` | 2048 | [S/MIME BR §6.1.5](https://github.com/cabforum/smime/blob/main/SBR.md#615-key-sizes) |
+/// | `require_subject_alt_name` | true | rfc822Name SAN required |
+/// | `require_rfc822_san` | true | at least one rfc822Name in SAN |
+/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | [S/MIME BR §7.1.2.3(f)](https://github.com/cabforum/smime/blob/main/SBR.md#7123-subscriber-certificates) |
+/// | `required_leaf_policy_oids` | `[2.23.140.1.5.3.1]` | [S/MIME BR §7.1.6.1](https://github.com/cabforum/smime/blob/main/SBR.md#7161-reserved-certificate-policy-identifiers) |
+/// | `required_leaf_subject_dn_attrs` | `organizationName ∧ ((givenName ∧ surname) ∨ pseudonym) ∧ serialNumber` | [S/MIME BR §7.5](https://github.com/cabforum/smime/blob/main/SBR.md#75-sponsor-validated-subscriber-certificates) |
+///
+/// `max_path_len` is intentionally not set; per-cert `pathLenConstraint`
+/// enforcement (RFC 5280 §4.2.1.9) covers the CA chain-depth case.
+///
+/// # Limitations
+///
+/// Reference, not authoritative. See [`SmimeSponsorValidated`].
+///
+/// `max_validity_secs` applies to **every** certificate in the chain, not
+/// just the leaf — same limitation as [`smime_policy`].
+///
+/// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
+#[must_use]
+pub fn smime_sponsor_policy(now_unix: u64) -> ValidationPolicy {
+    SmimeSponsorValidated.policy(now_unix)
+}
+
 /// Return a [`ValidationPolicy`] conforming to the CA/Browser Forum
 /// Code Signing Baseline Requirements.
 ///
@@ -987,6 +1157,7 @@ mod tests {
     fn profile_ids_are_stable() {
         assert_eq!(WebPkiProfile.id(), "cabf.br.tls");
         assert_eq!(SmimeProfile.id(), "cabf.smime");
+        assert_eq!(SmimeSponsorValidated.id(), "cabf.smime.sponsor");
         assert_eq!(SmimeIndividualValidated.id(), "cabf.smime.individual");
         assert_eq!(CodeSigningProfile.id(), "cabf.cs");
     }
@@ -996,6 +1167,7 @@ mod tests {
         // profile.policy(NOW) must set current_time_unix = NOW.
         assert_eq!(WebPkiProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(SmimeProfile.policy(NOW).current_time_unix, NOW);
+        assert_eq!(SmimeSponsorValidated.policy(NOW).current_time_unix, NOW);
         assert_eq!(SmimeIndividualValidated.policy(NOW).current_time_unix, NOW);
         assert_eq!(CodeSigningProfile.policy(NOW).current_time_unix, NOW);
     }
@@ -1016,6 +1188,13 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "SmimeProfile.policy and smime_policy must agree"
+        );
+
+        let via_trait = SmimeSponsorValidated.policy(NOW);
+        let via_fn = smime_sponsor_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "SmimeSponsorValidated.policy and smime_sponsor_policy must agree"
         );
 
         let via_trait = SmimeIndividualValidated.policy(NOW);
@@ -1728,6 +1907,168 @@ mod tests {
                 Err(pkix_path::Error::MissingEku)
             ),
             "WebPKI cert (wrong EKU) must fail smime_individual_policy with MissingEku"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // smime_sponsor_policy — Sponsor-validated tier (PKIX-jbvb.2)
+    //
+    // Oracle: pkix-path/tests/fixtures/policy-checks/
+    //   smime-sponsor-validated-self-signed-365d.der  — org + given+surname + serialNumber form
+    //   smime-sponsor-pseudonym-self-signed-365d.der  — org + pseudonym + serialNumber form
+    //   smime-self-signed-365d.der                    — Mailbox-validated (negative)
+    //   webpki-self-signed-365d.der                   — wrong EKU/SAN (negative)
+    //
+    // Fixture provenance: `gen-smime-tier-fixtures.py` modeled after zlint
+    // smime_leg1_sv_eff1.pem (Sponsor-validated marker, policy OID
+    // 2.23.140.1.5.3.1) with the BR §7.5 Subject DN attributes the zlint
+    // published fixture omits (zlint has organizationName but no
+    // givenName/surname/pseudonym/serialNumber).
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn smime_sponsor_policy_asserts_sponsor_policy_oid() {
+        let p = smime_sponsor_policy(NOW);
+        let oids = p.required_leaf_policy_oids.as_deref().unwrap_or(&[]);
+        assert_eq!(
+            oids,
+            &[CABF_SMIME_SPONSOR_VALIDATED_POLICY],
+            "smime_sponsor_policy: required_leaf_policy_oids must be exactly [2.23.140.1.5.3.1]"
+        );
+    }
+
+    #[test]
+    fn smime_sponsor_policy_sets_dn_attr_rule() {
+        let p = smime_sponsor_policy(NOW);
+        assert!(
+            p.required_leaf_subject_dn_attrs.is_some(),
+            "smime_sponsor_policy: required_leaf_subject_dn_attrs must be set"
+        );
+    }
+
+    #[test]
+    fn smime_sponsor_policy_max_validity_is_1185_days() {
+        // Inherits the Mailbox-validated baseline cap.
+        let p = smime_sponsor_policy(NOW);
+        assert_eq!(
+            p.max_validity_secs,
+            Some(1185 * 86_400),
+            "smime_sponsor_policy: max_validity_secs must be 1185 days"
+        );
+    }
+
+    #[test]
+    fn smime_sponsor_policy_requires_email_protection_eku() {
+        let p = smime_sponsor_policy(NOW);
+        let ekus = p.required_leaf_eku.as_deref().unwrap_or(&[]);
+        assert!(
+            ekus.contains(&ID_KP_EMAIL_PROTECTION),
+            "smime_sponsor_policy: required_leaf_eku must contain id-kp-emailProtection"
+        );
+    }
+
+    /// Positive #1: cert with organizationName + givenName + surname +
+    /// serialNumber form passes.
+    ///
+    /// Oracle: smime-sponsor-validated-self-signed-365d.der has:
+    ///   Subject = C=GB, O=Acme Sponsor Ltd, GN=Alice, SN=Sponsored,
+    ///             serialNumber=SPON1234, CN=Alice Sponsored
+    ///   CertificatePolicies = 2.23.140.1.5.3.1
+    ///   rfc822Name SAN = alice.sponsored@acme-sponsor.example.com
+    ///   emailProtection EKU, cA=TRUE
+    /// Verified via openssl x509 -inform DER -text -noout.
+    #[test]
+    fn smime_sponsor_givenname_surname_form_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-sponsor-validated-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_sponsor_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect(
+            "Sponsor-validated cert with organizationName+givenName+surname+serialNumber \
+             DN, policy OID 2.23.140.1.5.3.1, rfc822 SAN, and emailProtection EKU \
+             must pass smime_sponsor_policy",
+        );
+    }
+
+    /// Positive #2: cert with organizationName + pseudonym + serialNumber
+    /// form passes. Exercises the `AnyOf(pseudonym, AllOf(givenName, surname))`
+    /// branch of the DN rule alongside the required organizationName.
+    #[test]
+    fn smime_sponsor_pseudonym_form_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-sponsor-pseudonym-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_sponsor_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect(
+            "Sponsor-validated cert with organizationName+pseudonym+serialNumber \
+             DN must pass smime_sponsor_policy (AnyOf branch)",
+        );
+    }
+
+    /// Negative #1: Mailbox-validated cert (no policy OID, no tier DN attrs)
+    /// fails with `MissingLeafPolicyOid`.
+    ///
+    /// Oracle: smime-self-signed-365d.der is a Mailbox-validated baseline cert
+    /// — it has emailProtection EKU and rfc822 SAN (passing the (e3)/(e4)
+    /// checks) but no `CertificatePolicies` extension. The (e3a) leaf-policy-OID
+    /// check fires and returns `MissingLeafPolicyOid { required: 2.23.140.1.5.3.1 }`.
+    /// Exercises tier disambiguation: a sibling-tier cert that satisfies
+    /// `smime_policy` does NOT satisfy `smime_sponsor_policy`.
+    #[test]
+    fn smime_sponsor_rejects_mailbox_validated_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let result = pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_sponsor_policy(NOW),
+            &EcdsaP256Verifier,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(pkix_path::Error::MissingLeafPolicyOid { required })
+                    if required == CABF_SMIME_SPONSOR_VALIDATED_POLICY
+            ),
+            "Mailbox-validated cert (no policy OID) must fail smime_sponsor_policy \
+             with MissingLeafPolicyOid {{ required: 2.23.140.1.5.3.1 }}, got {result:?}"
+        );
+    }
+
+    /// Negative #2: WebPKI cert (wrong EKU, no rfc822 SAN) fails with
+    /// `MissingEku` — the (e3) EKU check fires before the tier-specific
+    /// (e3a)/(e3b) checks.
+    #[test]
+    fn smime_sponsor_rejects_webpki_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        assert!(
+            matches!(
+                pkix_path::validate_path(
+                    &[cert],
+                    &anchors,
+                    &smime_sponsor_policy(NOW),
+                    &EcdsaP256Verifier
+                ),
+                Err(pkix_path::Error::MissingEku)
+            ),
+            "WebPKI cert (wrong EKU) must fail smime_sponsor_policy with MissingEku"
         );
     }
 }

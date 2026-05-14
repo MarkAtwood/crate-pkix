@@ -75,14 +75,18 @@ against real-world CA hierarchies should override
 ### Sub-profile families partially split
 
 `SmimeProfile` ships the Mailbox-validated / strict tier baseline.
-`SmimeIndividualValidated` ships the Individual-validated tier (CA/B
-Forum S/MIME BR §7.6); it adds the reserved policy OID
-`2.23.140.1.5.4.1` and the Subject DN rule
-`(givenName AND surname) OR pseudonym, AND serialNumber` on top of the
+`SmimeSponsorValidated` ships the Sponsor-validated tier (CA/B Forum
+S/MIME BR §7.5); it adds the reserved policy OID `2.23.140.1.5.3.1` and
+the Subject DN rule
+`organizationName AND ((givenName AND surname) OR pseudonym) AND serialNumber`
+on top of the Mailbox-validated baseline.
+`SmimeIndividualValidated` ships the Individual-validated tier (§7.6); it
+adds the reserved policy OID `2.23.140.1.5.4.1` and the Subject DN rule
+`((givenName AND surname) OR pseudonym) AND serialNumber` on top of the
 Mailbox-validated baseline.
 
-Organization-validated (§7.4) and Sponsor-validated (§7.5) tier profile
-types remain tracked under PKIX-jbvb.
+The Organization-validated (§7.4) tier profile type remains tracked under
+PKIX-jbvb.
 
 ### Subscriber-cert taxonomy only
 
