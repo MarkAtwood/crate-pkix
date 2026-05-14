@@ -5,13 +5,17 @@ This is a sibling generator to `gen.py`, isolated so that adding a new tier
 fixture does not regenerate the unrelated fixtures in `gen.py`'s output set.
 Same convention as `gen-sc081-fixtures.py` (separate script for SC-081 cases).
 
-Fixtures produced (PKIX-jbvb.3, Individual-validated tier):
+All fixtures target the **Strict generation** (OID suffix `.3`) per
+PKIX-jbvb.6 (Mark 2026-05-13). Legacy generation (`.1`) is BR-banned for
+new issuance effective 2025-07-15 per §7.1.6.1 line 2600 and is not
+represented in `-cabf` Profile types.
+
+Fixtures produced (PKIX-jbvb.7, Individual-validated tier, Strict generation):
 
   smime-individual-validated-self-signed-365d.der
     Self-signed P-256 cert with:
-    - Subject DN: C=GB, givenName=Test, surname=Person,
-                  serialNumber=ABCD1234, CN=Test Person
-    - CertificatePolicies: 2.23.140.1.5.4.1 (Individual-validated)
+    - Subject DN: C=GB, givenName=Test, surname=Person, CN=Test Person
+    - CertificatePolicies: 2.23.140.1.5.4.3 (Individual-validated Strict)
     - rfc822Name SAN: individual@example.com
     - emailProtection EKU
     - 365-day validity (notBefore 2026-01-01)
@@ -19,46 +23,49 @@ Fixtures produced (PKIX-jbvb.3, Individual-validated tier):
 
   smime-individual-pseudonym-self-signed-365d.der
     Self-signed P-256 cert with:
-    - Subject DN: C=GB, pseudonym=TestBox, serialNumber=EFGH5678, CN=TestBox
-    - CertificatePolicies: 2.23.140.1.5.4.1 (Individual-validated)
+    - Subject DN: C=GB, pseudonym=TestBox, CN=TestBox
+    - CertificatePolicies: 2.23.140.1.5.4.3 (Individual-validated Strict)
     - rfc822Name SAN: testbox@example.com
     - emailProtection EKU
     - 365-day validity, cA=TRUE
     - Exercises the `AnyOf(pseudonym, AllOf(givenName, surname))` branch
       of `pkix_path::DnAttrRule` for the Individual-validated tier.
 
-Fixtures produced (PKIX-jbvb.2, Sponsor-validated tier):
+Fixtures produced (PKIX-jbvb.7, Sponsor-validated tier, Strict generation):
 
   smime-sponsor-validated-self-signed-365d.der
     Self-signed P-256 cert with:
-    - Subject DN: C=GB, O=Acme Sponsor Ltd, givenName=Alice, surname=Sponsored,
-                  serialNumber=SPON1234, CN=Alice Sponsored
-    - CertificatePolicies: 2.23.140.1.5.3.1 (Sponsor-validated)
+    - Subject DN: C=GB, O=Acme Sponsor Ltd, organizationIdentifier=VATGB-12345678,
+                  givenName=Alice, surname=Sponsored, CN=Alice Sponsored
+    - CertificatePolicies: 2.23.140.1.5.3.3 (Sponsor-validated Strict)
     - rfc822Name SAN: alice.sponsored@acme-sponsor.example.com
     - emailProtection EKU, 365-day validity, cA=TRUE
 
   smime-sponsor-pseudonym-self-signed-365d.der
     Self-signed P-256 cert with:
-    - Subject DN: C=GB, O=Acme Sponsor Ltd, pseudonym=SponsoredAlias,
-                  serialNumber=SPON5678, CN=SponsoredAlias
-    - CertificatePolicies: 2.23.140.1.5.3.1 (Sponsor-validated)
+    - Subject DN: C=GB, O=Acme Sponsor Ltd, organizationIdentifier=VATGB-87654321,
+                  pseudonym=SponsoredAlias, CN=SponsoredAlias
+    - CertificatePolicies: 2.23.140.1.5.3.3 (Sponsor-validated Strict)
     - rfc822Name SAN: sponsored.alias@acme-sponsor.example.com
     - emailProtection EKU, 365-day validity, cA=TRUE
-    - Exercises the AnyOf branch alongside the required organizationName.
+    - Exercises the AnyOf branch alongside the required organizationName
+      and organizationIdentifier.
 
 # Provenance
 
 Individual-tier fixtures modeled after zlint's `smime_leg1_iv_eff1.pem`
-(Individual-validated tier marker: policy OID 2.23.140.1.5.4.1).
+(Individual-validated tier marker) with the OID rewritten from Legacy
+(2.23.140.1.5.4.1) to Strict (2.23.140.1.5.4.3) per PKIX-jbvb.6.
 Sponsor-tier fixtures modeled after zlint's `smime_leg1_sv_eff1.pem`
-(Sponsor-validated tier marker: policy OID 2.23.140.1.5.3.1). Both zlint
-published fixtures lack the BR-mandated tier-specific Subject DN attributes
-(zlint's IV fixture has only `C=GB, CN=Leon Mandrake`; zlint's SV fixture
-has `C=US, L=Nowhere, O=Some Company Ltd., CN=Leon Mandrake` — present
-organizationName, but no givenName/surname/pseudonym/serialNumber). The
-workspace fixtures include the full DN attribute shape required by CA/B
-Forum S/MIME BR §7.5 (Sponsor Validated) and §7.6 (Individual Validated)
-so that pkix-path's `required_leaf_subject_dn_attrs` check has the
+(Sponsor-validated tier marker) with the same Legacy→Strict OID rewrite.
+Both zlint published fixtures lack the BR-mandated tier-specific Subject
+DN attributes (zlint's IV fixture has only `C=GB, CN=Leon Mandrake`;
+zlint's SV fixture has `C=US, L=Nowhere, O=Some Company Ltd., CN=Leon
+Mandrake` — present organizationName, but no
+organizationIdentifier/givenName/surname/pseudonym). The workspace
+fixtures include the full DN attribute shape required by CA/B Forum
+S/MIME BR §7.1.4.2.5 (Sponsor) and §7.1.4.2.6 (Individual) Note 2 so
+that pkix-path's `required_leaf_subject_dn_attrs` check has the
 attribute coverage it tests for. pkilint's
 `tests/integration_certificates/cabf/smime/` was checked but not cloned
 at fixture-authoring time; modeling-against parity is documented on the
@@ -71,7 +78,7 @@ policy-OID + DN-attr criteria.
   - Subject (multi-attribute DN)
   - X509v3 Subject Alternative Name: email:<addr>
   - X509v3 Extended Key Usage: E-mail Protection
-  - X509v3 Certificate Policies: Policy: 2.23.140.1.5.4.1
+  - X509v3 Certificate Policies: Policy: 2.23.140.1.5.4.3 (or .3.3 for Sponsor)
   - X509v3 Basic Constraints: critical, CA:TRUE
 
 # Re-running
@@ -108,9 +115,15 @@ def next_serial():
     return s
 
 
-# CA/B Forum S/MIME BR reserved policy OIDs (§7.1.6.1 / Appendix A).
-SMIME_INDIVIDUAL_VALIDATED_POLICY = x509.ObjectIdentifier("2.23.140.1.5.4.1")
-SMIME_SPONSOR_VALIDATED_POLICY = x509.ObjectIdentifier("2.23.140.1.5.3.1")
+# CA/B Forum S/MIME BR reserved policy OIDs (§7.1.6.1 / Appendix A) —
+# Strict generation (suffix `.3`).
+SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY = x509.ObjectIdentifier("2.23.140.1.5.4.3")
+SMIME_SPONSOR_VALIDATED_STRICT_POLICY = x509.ObjectIdentifier("2.23.140.1.5.3.3")
+
+# organizationIdentifier (RFC 4519 / X.520 OID 2.5.4.97). pyca's NameOID
+# does not export this; construct from raw OID. Used by Sponsor-validated
+# fixtures (SHALL across all generations per §7.1.4.2.5).
+OID_ORGANIZATION_IDENTIFIER = x509.ObjectIdentifier("2.5.4.97")
 
 
 def make_tier_cert(filename, subject_attrs, policy_oid, rfc822_san_email):
@@ -171,81 +184,82 @@ def make_tier_cert(filename, subject_attrs, policy_oid, rfc822_san_email):
 
 
 # ---------------------------------------------------------------------------
-# Individual-validated tier (PKIX-jbvb.3) — CA/B Forum S/MIME BR §7.6
+# Individual-validated tier, Strict generation (PKIX-jbvb.7)
+# CA/B Forum S/MIME BR §7.6 + §7.1.4.2.6 Note 2 (Strict and Multipurpose).
 #
 # Subject DN rule:
-#   AllOf:
-#     AnyOf: pseudonym OR (givenName + surname)
-#     serialNumber
+#   AnyOf: pseudonym OR (givenName + surname)
+#
+# serialNumber is MAY in all generations (§7.1.4.2.6 table), so the workspace
+# Profile does not require it. Fixtures omit it for minimal DN shape.
 # ---------------------------------------------------------------------------
 
-# Form 1: givenName + surname + serialNumber (most common Individual-validated shape).
+# Form 1: givenName + surname (most common Individual-validated shape).
 make_tier_cert(
     "smime-individual-validated-self-signed-365d.der",
     [
         x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
         x509.NameAttribute(NameOID.GIVEN_NAME, "Test"),
         x509.NameAttribute(NameOID.SURNAME, "Person"),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, "ABCD1234"),
         x509.NameAttribute(NameOID.COMMON_NAME, "Test Person"),
     ],
-    SMIME_INDIVIDUAL_VALIDATED_POLICY,
+    SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY,
     "individual@example.com",
 )
 
-# Form 2: pseudonym + serialNumber. Exercises the AnyOf branch.
+# Form 2: pseudonym only. Exercises the AnyOf branch.
 make_tier_cert(
     "smime-individual-pseudonym-self-signed-365d.der",
     [
         x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
         x509.NameAttribute(NameOID.PSEUDONYM, "TestBox"),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, "EFGH5678"),
         x509.NameAttribute(NameOID.COMMON_NAME, "TestBox"),
     ],
-    SMIME_INDIVIDUAL_VALIDATED_POLICY,
+    SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY,
     "testbox@example.com",
 )
 
 
 # ---------------------------------------------------------------------------
-# Sponsor-validated tier (PKIX-jbvb.2) — CA/B Forum S/MIME BR §7.5
+# Sponsor-validated tier, Strict generation (PKIX-jbvb.7)
+# CA/B Forum S/MIME BR §7.5 + §7.1.4.2.5 Note 2 (Strict and Multipurpose).
 #
 # Subject DN rule:
 #   AllOf:
-#     organizationName
+#     organizationName            (SHALL across all generations)
+#     organizationIdentifier      (SHALL across all generations)
 #     AnyOf: pseudonym OR (givenName + surname)
-#     serialNumber
 #
-# Sponsor-validated = Individual-validated + organizationName: an employer
-# or sponsoring organization vouches for the named individual.
+# Sponsor-validated = Individual-validated + organizationName + organizationIdentifier:
+# an employer or sponsoring organization vouches for the named individual.
 # ---------------------------------------------------------------------------
 
-# Form 1: organizationName + givenName + surname + serialNumber.
+# Form 1: org + orgID + givenName + surname.
 make_tier_cert(
     "smime-sponsor-validated-self-signed-365d.der",
     [
         x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Acme Sponsor Ltd"),
+        x509.NameAttribute(OID_ORGANIZATION_IDENTIFIER, "VATGB-12345678"),
         x509.NameAttribute(NameOID.GIVEN_NAME, "Alice"),
         x509.NameAttribute(NameOID.SURNAME, "Sponsored"),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, "SPON1234"),
         x509.NameAttribute(NameOID.COMMON_NAME, "Alice Sponsored"),
     ],
-    SMIME_SPONSOR_VALIDATED_POLICY,
+    SMIME_SPONSOR_VALIDATED_STRICT_POLICY,
     "alice.sponsored@acme-sponsor.example.com",
 )
 
-# Form 2: organizationName + pseudonym + serialNumber. Exercises the AnyOf branch.
+# Form 2: org + orgID + pseudonym. Exercises the AnyOf branch.
 make_tier_cert(
     "smime-sponsor-pseudonym-self-signed-365d.der",
     [
         x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Acme Sponsor Ltd"),
+        x509.NameAttribute(OID_ORGANIZATION_IDENTIFIER, "VATGB-87654321"),
         x509.NameAttribute(NameOID.PSEUDONYM, "SponsoredAlias"),
-        x509.NameAttribute(NameOID.SERIAL_NUMBER, "SPON5678"),
         x509.NameAttribute(NameOID.COMMON_NAME, "SponsoredAlias"),
     ],
-    SMIME_SPONSOR_VALIDATED_POLICY,
+    SMIME_SPONSOR_VALIDATED_STRICT_POLICY,
     "sponsored.alias@acme-sponsor.example.com",
 )
 
