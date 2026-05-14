@@ -79,7 +79,7 @@
 
 use std::io::Read as _;
 use std::path::Path;
-use std::{fs, io, vec::Vec};
+use std::{fs, io};
 
 use der::Decode;
 use x509_cert::Certificate;
@@ -246,7 +246,7 @@ mod io_error_kind_serde {
         // shipped to date; the format is not contractually stable but
         // is the only textual representation that round-trips through
         // the deserialize match below.
-        s.serialize_str(&format!("{:?}", kind))
+        s.serialize_str(&format!("{kind:?}"))
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<io::ErrorKind, D::Error> {
