@@ -209,21 +209,47 @@ mod serde_helpers {
             let Some(hex) = opt else {
                 return Ok(None);
             };
+            // Operate on the byte view rather than `&str` slicing: the
+            // `hex.len() == 64` check below is a byte-length check, so a
+            // 64-byte string containing multi-byte UTF-8 (e.g., the JSON
+            // input `"\u00fc\u00fc..."` whose UTF-8 encoding happens to be
+            // 64 bytes) passes the length gate. `&hex[i..i+1]` on such an
+            // input would panic at the non-char-boundary inside
+            // `from_str_radix`. Iterate `hex.as_bytes()` instead and route
+            // each byte through `nibble()`, which rejects every non-ASCII-
+            // hex byte as a serde custom error rather than panicking.
             if hex.len() != 64 {
                 return Err(serde::de::Error::invalid_length(
                     hex.len(),
                     &"64 lowercase hex chars (32-byte SHA-256)",
                 ));
             }
+            let bytes = hex.as_bytes();
             let mut out = [0u8; 32];
             for (i, byte) in out.iter_mut().enumerate() {
-                let hi = u8::from_str_radix(&hex[i * 2..i * 2 + 1], 16)
-                    .map_err(|_| serde::de::Error::custom("non-hex char in cert_sha256"))?;
-                let lo = u8::from_str_radix(&hex[i * 2 + 1..i * 2 + 2], 16)
-                    .map_err(|_| serde::de::Error::custom("non-hex char in cert_sha256"))?;
+                let hi = nibble(bytes[i * 2])
+                    .ok_or_else(|| serde::de::Error::custom("non-hex char in cert_sha256"))?;
+                let lo = nibble(bytes[i * 2 + 1])
+                    .ok_or_else(|| serde::de::Error::custom("non-hex char in cert_sha256"))?;
                 *byte = (hi << 4) | lo;
             }
             Ok(Some(out))
+        }
+
+        /// Decode one ASCII hex byte to its 4-bit nibble value. Returns
+        /// `None` for any non-hex input — including non-ASCII bytes from
+        /// a multi-byte UTF-8 sequence, which is the panic surface this
+        /// helper was introduced to close (PKIX-7f92.1).
+        ///
+        /// Duplicates the helper in [`crate::oscal::parse`]; the broader
+        /// consolidation is tracked under PKIX-7f92.14.
+        fn nibble(b: u8) -> Option<u8> {
+            match b {
+                b'0'..=b'9' => Some(b - b'0'),
+                b'a'..=b'f' => Some(b - b'a' + 10),
+                b'A'..=b'F' => Some(b - b'A' + 10),
+                _ => None,
+            }
         }
     }
 }
@@ -2252,6 +2278,32 @@ mod tests {
         // deserialize rather than silently truncating or zero-filling.
         let bad = r#"{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"}"#;
         let err = serde_json::from_str::<Finding>(bad).expect_err("must reject non-hex chars");
+        assert!(
+            err.to_string().to_lowercase().contains("hex")
+                || err.to_string().to_lowercase().contains("cert_sha256"),
+            "error must mention hex / cert_sha256; got: {err}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn finding_cert_sha256_rejects_non_ascii_multibyte_utf8() {
+        // Regression test for PKIX-7f92.1: a 64-BYTE JSON string composed
+        // of multi-byte UTF-8 chars passes the `hex.len() == 64` length
+        // gate but earlier slicing into the &str at non-char-boundary
+        // positions panicked the deserializer. Oracle: 32 copies of the
+        // 2-byte UTF-8 sequence for `ü` (U+00FC = 0xC3 0xBC) = 64 bytes,
+        // 32 chars. The deserializer must return a serde Error, not
+        // panic, on this input.
+        let payload: String = "ü".repeat(32);
+        assert_eq!(payload.len(), 64, "test oracle: payload is 64 bytes");
+        assert_eq!(payload.chars().count(), 32, "test oracle: payload has 32 chars");
+
+        let json = format!(
+            r#"{{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"{payload}"}}"#
+        );
+        let err = serde_json::from_str::<Finding>(&json)
+            .expect_err("must reject multi-byte UTF-8 hex string");
         assert!(
             err.to_string().to_lowercase().contains("hex")
                 || err.to_string().to_lowercase().contains("cert_sha256"),
