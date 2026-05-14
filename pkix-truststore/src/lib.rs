@@ -77,11 +77,75 @@
 //!   EKU restrictions, etc.). Callers needing that machinery layer it on
 //!   top via `pkix-path::ValidationPolicy` and per-anchor filtering.
 
+use std::io::Read as _;
 use std::path::Path;
 use std::{fs, io, vec::Vec};
 
 use der::Decode;
 use x509_cert::Certificate;
+
+/// Default upper bound for [`from_pem_file`] and [`from_der_file`].
+///
+/// Real-world trust bundles top out at a few hundred KB (Debian
+/// `ca-certificates.crt` is ~200 KB; the full Mozilla CA list is
+/// ~250 KB; minimal Alpine and Fedora bundles are smaller still).
+/// 64 MiB is a forgiving cap: it admits any plausible trust store
+/// while bounding the memory and time the loader will spend on a
+/// pathological input (`/dev/zero`, an accidentally-symlinked log
+/// file, an attacker-influenced env-var path).
+///
+/// Use [`from_pem_file_with_cap`] or [`from_der_file_with_cap`] to
+/// pass a different limit explicitly.
+pub const DEFAULT_FILE_SIZE_CAP: u64 = 64 * 1024 * 1024;
+
+/// Open `path`, refuse files larger than `cap`, and read up to `cap`
+/// bytes into a `Vec`.
+///
+/// Two-stage check: (1) `metadata().len()` short-circuits when the file
+/// system already knows the size (fast rejection of multi-GB bundles);
+/// (2) `Read::take(cap).read_to_end(...)` defends against TOCTOU on the
+/// metadata (the file grows between metadata and read) and against
+/// special files like `/dev/zero` (which report 0 bytes in metadata
+/// but stream forever).
+///
+/// `cap + 1` is requested from `take` so the read fills exactly when
+/// the file is at the limit and overshoots by one byte when it is
+/// over — distinguishing "exactly cap bytes" (accepted) from "more
+/// than cap bytes" (rejected).
+fn read_file_capped(path: &Path, cap: u64) -> Result<Vec<u8>, Error> {
+    // `io::ErrorKind::FileTooLarge` exists upstream (stabilised 1.83) but
+    // the workspace MSRV is 1.73, so use `InvalidData` with an explicit
+    // "exceeds N-byte cap" message. Callers that branch on `kind` get a
+    // meaningful but non-confusing signal; callers that read `message`
+    // get the precise cause.
+    let file = fs::File::open(path)?;
+    // Fast-path rejection on metadata. `metadata().len()` is 0 for
+    // unsized streams (FIFOs, /dev/zero) so do not treat 0 as a
+    // pre-passing signal — fall through to the take-bounded read.
+    if let Ok(meta) = file.metadata() {
+        if meta.len() > cap {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "trust-anchor file is {} bytes; exceeds {cap}-byte cap",
+                    meta.len(),
+                ),
+            )
+            .into());
+        }
+    }
+    let mut bytes = Vec::new();
+    let mut limited = file.take(cap.saturating_add(1));
+    limited.read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > cap {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("trust-anchor file exceeds {cap}-byte cap during read"),
+        )
+        .into());
+    }
+    Ok(bytes)
+}
 
 pub use pkix_path::{DerError, TrustAnchor};
 
@@ -448,29 +512,76 @@ where
 
 /// Load PEM-encoded trust anchors from a file.
 ///
-/// Convenience wrapper around [`from_pem`]. The whole file is read into
-/// memory; for very large bundles (tens of MB), call [`from_pem`] on a
-/// caller-managed buffer.
+/// Convenience wrapper around [`from_pem`]. The whole file is read
+/// into memory; the read is bounded by [`DEFAULT_FILE_SIZE_CAP`]
+/// (64 MiB) so a pathological path (`/dev/zero`, an
+/// accidentally-symlinked log file, an oversized junk file) cannot
+/// hang or OOM the process. Callers needing a different limit should
+/// call [`from_pem_file_with_cap`].
 ///
 /// # Errors
 ///
-/// * [`Error::Io`] — the file could not be opened or read.
+/// * [`Error::Io`] — the file could not be opened or read, or its
+///   contents exceed [`DEFAULT_FILE_SIZE_CAP`] bytes (the wrapped
+///   [`IoFailure::kind`] is [`io::ErrorKind::InvalidData`] in the
+///   cap-exceeded case, and the message starts with "trust-anchor
+///   file ... exceeds ...-byte cap"; MSRV 1.73 predates
+///   `ErrorKind::FileTooLarge`).
 /// * Any error returned by [`from_pem`].
 pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>, Error> {
-    let bytes = fs::read(path)?;
+    from_pem_file_with_cap(path, DEFAULT_FILE_SIZE_CAP)
+}
+
+/// Load PEM-encoded trust anchors from a file with an explicit size cap.
+///
+/// Same shape as [`from_pem_file`] but accepts an explicit byte cap.
+/// Pass [`u64::MAX`] to disable the cap entirely; doing so is the
+/// caller's responsibility — see [`DEFAULT_FILE_SIZE_CAP`] for the
+/// rationale behind the default.
+///
+/// # Errors
+///
+/// Same as [`from_pem_file`], substituting `cap` for the default.
+pub fn from_pem_file_with_cap(
+    path: impl AsRef<Path>,
+    cap: u64,
+) -> Result<Vec<TrustAnchor>, Error> {
+    let bytes = read_file_capped(path.as_ref(), cap)?;
     from_pem(&bytes)
 }
 
 /// Load a single DER-encoded trust anchor from a file.
 ///
-/// Convenience wrapper around [`from_der`].
+/// Convenience wrapper around [`from_der`]. The read is bounded by
+/// [`DEFAULT_FILE_SIZE_CAP`]; pass an explicit cap via
+/// [`from_der_file_with_cap`] for unusual deployments.
 ///
 /// # Errors
 ///
-/// * [`Error::Io`] — the file could not be opened or read.
+/// * [`Error::Io`] — the file could not be opened or read, or its
+///   contents exceed [`DEFAULT_FILE_SIZE_CAP`] bytes (the wrapped
+///   [`IoFailure::kind`] is [`io::ErrorKind::InvalidData`] in the
+///   cap-exceeded case; see [`from_pem_file`] for the MSRV
+///   rationale).
 /// * Any error returned by [`from_der`].
 pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor, Error> {
-    let bytes = fs::read(path)?;
+    from_der_file_with_cap(path, DEFAULT_FILE_SIZE_CAP)
+}
+
+/// Load a single DER-encoded trust anchor from a file with an
+/// explicit size cap.
+///
+/// Same shape as [`from_der_file`] but accepts an explicit byte cap.
+/// Pass [`u64::MAX`] to disable the cap entirely.
+///
+/// # Errors
+///
+/// Same as [`from_der_file`], substituting `cap` for the default.
+pub fn from_der_file_with_cap(
+    path: impl AsRef<Path>,
+    cap: u64,
+) -> Result<TrustAnchor, Error> {
+    let bytes = read_file_capped(path.as_ref(), cap)?;
     from_der(&bytes)
 }
 
