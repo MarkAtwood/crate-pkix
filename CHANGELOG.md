@@ -6,6 +6,33 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Workspace: codify temporal-posture non-negotiable in AGENTS.md (PKIX-e3nl)
+
+New non-negotiable #7 in `AGENTS.md`: **current-regime only;
+historical and version-pinned postures go out-of-process.** The
+workspace's fast in-process `Profile` and `Lint` types snapshot the
+current BR text and evaluate "is this cert conforming under today's
+rules?" — including rules the spec itself writes as time-keyed (e.g.
+SC-081 phased validity cap), because the time-keying is part of the
+current rule's definition, not historical replay. The workspace does
+NOT ship validators that evaluate against rules in force at a past
+time (historical-regime replay) or against a caller-pinned spec
+version (version-frozen replay); both postures go through
+`pkix-policy-zlint` with a version-pinned lint set.
+
+The rule cuts on a different axis from non-negotiable #5: #5 governs
+*who owns* the policy specification (standards-body /
+industry-forum / site-local); #7 governs *when* the policy is
+evaluated (current-regime in-process / historical or version-pinned
+out-of-process). Documents an existing ambiguity in
+`ValidationPolicy::new(now_unix)`: the parameter selects the moment
+at which validity-period checks are evaluated, NOT the moment whose
+rules are in force. The corresponding rustdoc clarification on
+`ValidationPolicy::new`, `Profile::policy`, and the
+`pkix-chain` use-case wrappers ships separately (PKIX-kgnk).
+
+Pure docs amendment; no behavior change, no code change.
+
 ### Workspace: optional `serde` feature on cache-friendly result types (PKIX-2l0v.1)
 
 Five crates gain an optional `serde` feature that derives
