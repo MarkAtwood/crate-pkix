@@ -72,11 +72,17 @@ rustdoc `# Limitations` section. Callers chaining these profiles
 against real-world CA hierarchies should override
 `max_validity_secs` or use a custom policy.
 
-### Sub-profile families not yet split
+### Sub-profile families partially split
 
-`SmimeProfile` ships only the Mailbox-validated / strict tier shape.
-Organization-validated, Sponsor-validated, and Individual-validated
-S/MIME sub-profiles are tracked under PKIX-jbvb (post-1.0).
+`SmimeProfile` ships the Mailbox-validated / strict tier baseline.
+`SmimeIndividualValidated` ships the Individual-validated tier (CA/B
+Forum S/MIME BR §7.6); it adds the reserved policy OID
+`2.23.140.1.5.4.1` and the Subject DN rule
+`(givenName AND surname) OR pseudonym, AND serialNumber` on top of the
+Mailbox-validated baseline.
+
+Organization-validated (§7.4) and Sponsor-validated (§7.5) tier profile
+types remain tracked under PKIX-jbvb.
 
 ### Subscriber-cert taxonomy only
 
