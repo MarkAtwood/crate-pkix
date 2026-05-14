@@ -336,7 +336,7 @@ impl pkix_lint::LintProfile for WebPkiProfile {
     /// The returned slice is backed by a lazily-initialized `static OnceLock`,
     /// so calling `lints()` multiple times is cheap. The lint instances inside
     /// the slice are different objects from those used inside a [`pkix_lint::LintRunner`]
-    /// produced by [`lint_runner`][Self::lint_runner]: each call to
+    /// produced by [`lint_runner`](#method.lint_runner): each call to
     /// `lint_runner()` allocates a fresh set of instances via
     /// [`pkix_lint_cabf::cabf_tls_br::all_lints`]. Both routes source their
     /// lint types from the same constructor; the objects are distinct
