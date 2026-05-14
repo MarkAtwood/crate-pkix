@@ -24,7 +24,7 @@ use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::Certificate;
 
-use crate::{Lint, LintResult, Scope, Severity, SubjectKind};
+use crate::{truncate_for_detail, Lint, LintResult, Scope, Severity, SubjectKind};
 
 // ---------------------------------------------------------------------------
 // OID constants
@@ -134,8 +134,10 @@ impl Lint for Rfc6125TlsServerSanLint {
             match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
                 Ok(san) => san,
                 Err(e) => {
+                    let e_str = e.to_string();
+                    let safe_e = truncate_for_detail(&e_str);
                     return LintResult::error(format!(
-                        "SubjectAltName extension value is malformed DER: {e}"
+                        "SubjectAltName extension value is malformed DER: {safe_e}"
                     ));
                 }
             };

@@ -23,7 +23,7 @@ use der::{
 use x509_cert::ext::pkix::name::GeneralName;
 use x509_cert::Certificate;
 
-use crate::{Lint, LintResult, Scope, Severity, SubjectKind};
+use crate::{truncate_for_detail, Lint, LintResult, Scope, Severity, SubjectKind};
 
 // ---------------------------------------------------------------------------
 // OID constants
@@ -132,8 +132,10 @@ impl Lint for Rfc8398SmimeSanLint {
             match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
                 Ok(san) => san,
                 Err(e) => {
+                    let e_str = e.to_string();
+                    let safe_e = truncate_for_detail(&e_str);
                     return LintResult::error(format!(
-                        "SubjectAltName extension value is malformed DER: {e}"
+                        "SubjectAltName extension value is malformed DER: {safe_e}"
                     ));
                 }
             };
@@ -273,8 +275,10 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
             match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
                 Ok(san) => san,
                 Err(e) => {
+                    let e_str = e.to_string();
+                    let safe_e = truncate_for_detail(&e_str);
                     return LintResult::error(format!(
-                        "SubjectAltName extension value is malformed DER: {e}"
+                        "SubjectAltName extension value is malformed DER: {safe_e}"
                     ));
                 }
             };
@@ -319,8 +323,9 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         // (PKIX-hy2e.35).
         for r in &rfc822_addrs {
             if let Err(reason) = validate_mailbox_for_equivalence(r) {
+                let safe_r = truncate_for_detail(r);
                 return LintResult::error(format!(
-                    "rfc822Name SAN entry '{r}' is malformed for equivalence checking \
+                    "rfc822Name SAN entry '{safe_r}' is malformed for equivalence checking \
                      ({reason}); RFC 8398 §3 presupposes well-formed RFC 5322 mailbox \
                      addresses"
                 ));
@@ -328,8 +333,9 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         }
         for u in &smtputf8_addrs {
             if let Err(reason) = validate_mailbox_for_equivalence(u) {
+                let safe_u = truncate_for_detail(u);
                 return LintResult::error(format!(
-                    "SmtpUTF8Mailbox SAN entry '{u}' is malformed for equivalence checking \
+                    "SmtpUTF8Mailbox SAN entry '{safe_u}' is malformed for equivalence checking \
                      ({reason}); RFC 8398 §3 presupposes well-formed RFC 5322 mailbox \
                      addresses"
                 ));
@@ -346,8 +352,9 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
                 mailbox_equivalent(r, u)
                     .expect("pre-validation ensures inputs are well-formed")
             }) {
+                let safe_r = truncate_for_detail(r);
                 return LintResult::error(format!(
-                    "rfc822Name SAN entry '{r}' has no matching SmtpUTF8Mailbox; \
+                    "rfc822Name SAN entry '{safe_r}' has no matching SmtpUTF8Mailbox; \
                      RFC 8398 §3 requires byte-identical local-part and \
                      A-label/U-label-equivalent domain"
                 ));
@@ -358,8 +365,9 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
                 mailbox_equivalent(r, u)
                     .expect("pre-validation ensures inputs are well-formed")
             }) {
+                let safe_u = truncate_for_detail(u);
                 return LintResult::error(format!(
-                    "SmtpUTF8Mailbox SAN entry '{u}' has no matching rfc822Name; \
+                    "SmtpUTF8Mailbox SAN entry '{safe_u}' has no matching rfc822Name; \
                      RFC 8398 §3 requires byte-identical local-part and \
                      A-label/U-label-equivalent domain"
                 ));
