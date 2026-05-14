@@ -142,17 +142,23 @@ pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};
 /// downstream of pkix-lint would produce). For PKITS-style fixtures whose
 /// DER round-trips losslessly through `x509-cert`, this equals the hash
 /// of the original on-disk bytes.
-fn cert_sha256_of(cert: &Certificate) -> [u8; 32] {
+///
+/// Returns `None` when the certificate fails to re-encode to DER. This is
+/// rare but not theoretical — `x509-cert` accepts some inputs through
+/// `Decode` that its `Encode` impl cannot round-trip (DEFAULT-tagged
+/// fields, BMPString edge cases). Returning `None` here is preferable to
+/// silently stamping every finding with `SHA256(empty)`
+/// (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`):
+/// two distinct un-encodable certs would otherwise produce findings that
+/// falsely claim identical provenance. Callers can distinguish
+/// "provenance unavailable" (`None`) from a legitimate hash (`Some(_)`).
+fn cert_sha256_of(cert: &Certificate) -> Option<[u8; 32]> {
     use der::Encode as _;
     use sha2::Digest as _;
-    // The Encode trait is infallible only when the underlying types are
-    // well-formed; a malformed Certificate would have failed to parse before
-    // reaching this function. We fall back to an all-zero hash on the
-    // theoretical encode error to avoid panicking the lint engine.
-    let der = cert.to_der().unwrap_or_default();
+    let der = cert.to_der().ok()?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&der);
-    hasher.finalize().into()
+    Some(hasher.finalize().into())
 }
 
 #[cfg(feature = "serde")]
@@ -635,6 +641,42 @@ impl core::fmt::Display for Finding {
 /// same trait covers both certificate-scoped and path-scoped lints. Implement
 /// whichever method is appropriate for your lint and let the other return
 /// [`LintResult::NotApplicable`] (the default).
+///
+/// # Use-case applicability — operator contract
+///
+/// Many RFC-conformance lints check a property that only applies to a
+/// specific *use case* — e.g., TLS server, S/MIME, code-signing,
+/// OCSP responder. The trait does not encode use case in its type
+/// signature; instead, **use-case selection is the
+/// [`LintProfile`][crate::LintProfile] bundle's responsibility.**
+///
+/// Concretely:
+///
+/// - [`crate::rfc5280::Rfc5280EkuServerAuthLint`] and
+///   [`crate::rfc6125::Rfc6125TlsServerSanLint`] assert TLS-server-only
+///   properties. They are bundled by `pkix_profiles::BasicTlsProfile`.
+/// - [`crate::rfc8398::Rfc8398SmimeSanLint`] and
+///   [`crate::rfc8551::Rfc8551EkuEmailProtectionLint`] assert
+///   S/MIME-only properties. They are bundled by
+///   `pkix_profiles::BasicSmimeProfile`.
+///
+/// **These two bundles are mutually exclusive** — no single leaf
+/// certificate satisfies all four lints simultaneously, because the
+/// EKU requirements (`id-kp-serverAuth` vs `id-kp-emailProtection`) and
+/// SAN requirements (dNSName/iPAddress vs rfc822Name/SmtpUTF8Mailbox)
+/// describe different cert shapes.
+///
+/// **Operators MUST NOT create a single "all rfc-conformance lints"
+/// bundle that mixes TLS-server and S/MIME lints.** Doing so produces
+/// two or more mutually-contradictory `Error` findings on every leaf,
+/// regardless of cert shape. The correct pattern is to choose the
+/// `LintProfile` bundle that matches the cert's intended use case
+/// (`BasicTlsProfile`, `BasicSmimeProfile`, etc.) and call
+/// [`check_shape`][crate::check_shape] with it.
+///
+/// Each affected lint's struct-level rustdoc carries a
+/// `# Use-case applicability — operator contract` section reiterating
+/// this constraint and naming its canonical `LintProfile` bundler.
 ///
 /// # Object safety
 ///
@@ -1248,7 +1290,10 @@ impl LintRunner {
         // Compute the cert hash once per run_cert call, regardless of how
         // many lints fire on it. SHA-256 of the DER re-encoding is the
         // canonical provenance field for evidence packs (PKIX-a86q).
-        let cert_sha256 = Some(cert_sha256_of(cert));
+        // `cert_sha256_of` returns `None` if the cert fails to re-encode;
+        // in that case the finding records "provenance unavailable" rather
+        // than stamping a misleading hash.
+        let cert_sha256 = cert_sha256_of(cert);
         let mut findings = Vec::new();
         for lint in &self.lints {
             if lint.scope() != Scope::Certificate {
@@ -2278,5 +2323,95 @@ mod tests {
             build_pass_plus_warn_runner,
         );
         assert!(check_shape(&cert, SubjectKind::Leaf, 0, &profile).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Use-case mutual-exclusion regression — operator contract on the Lint
+    // trait rustdoc (PKIX-hy2e.1 + PKIX-hy2e.4)
+    //
+    // The Lint trait rustdoc states that the TLS-server lints
+    // (Rfc5280EkuServerAuthLint, Rfc6125TlsServerSanLint) and the S/MIME
+    // lints (Rfc8398SmimeSanLint, Rfc8551EkuEmailProtectionLint) describe
+    // mutually-exclusive cert shapes — no single leaf certificate
+    // satisfies all four simultaneously. This test asserts the claim
+    // empirically on a real fixture so the rustdoc cannot drift.
+    //
+    // Independent oracle: openssl x509 -text on each fixture shows EKU
+    // and SAN exactly as expected. webpki-self-signed-365d.der has EKU=
+    // TLS Web Server Authentication and SAN=DNS:test.example.com (TLS
+    // shape). smime-self-signed-365d.der has EKU=E-mail Protection and
+    // SAN=email:test@example.com (S/MIME shape).
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn use_case_mutual_exclusion_tls_cert_fails_smime_lints() {
+        // TLS-shaped cert: passes TLS lints, fails S/MIME lints.
+        use der::Decode as _;
+        let cert = Certificate::from_der(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ))
+        .expect("fixture is valid DER");
+        let runner = LintRunner::new(vec![
+            Box::new(crate::rfc5280::Rfc5280EkuServerAuthLint),
+            Box::new(crate::rfc6125::Rfc6125TlsServerSanLint),
+            Box::new(crate::rfc8398::Rfc8398SmimeSanLint),
+            Box::new(crate::rfc8551::Rfc8551EkuEmailProtectionLint),
+        ]);
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        let errors_by_id: Vec<&str> = findings
+            .iter()
+            .filter(|f| matches!(f.result, LintResult::Error(_)))
+            .map(|f| f.lint_id.as_ref())
+            .collect();
+        assert!(
+            errors_by_id
+                .iter()
+                .any(|id| id.starts_with("rfc8398.") || id.starts_with("rfc8551.")),
+            "TLS cert must produce Error findings from the S/MIME lints: \
+             found error ids {errors_by_id:?}"
+        );
+        assert!(
+            !errors_by_id
+                .iter()
+                .any(|id| id.starts_with("rfc5280.cert.eku.") || id.starts_with("rfc6125.")),
+            "TLS cert must NOT produce Error findings from the TLS lints: \
+             found error ids {errors_by_id:?}"
+        );
+    }
+
+    #[test]
+    fn use_case_mutual_exclusion_smime_cert_fails_tls_lints() {
+        // S/MIME-shaped cert: passes S/MIME lints, fails TLS lints.
+        use der::Decode as _;
+        let cert = Certificate::from_der(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ))
+        .expect("fixture is valid DER");
+        let runner = LintRunner::new(vec![
+            Box::new(crate::rfc5280::Rfc5280EkuServerAuthLint),
+            Box::new(crate::rfc6125::Rfc6125TlsServerSanLint),
+            Box::new(crate::rfc8398::Rfc8398SmimeSanLint),
+            Box::new(crate::rfc8551::Rfc8551EkuEmailProtectionLint),
+        ]);
+        let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
+        let errors_by_id: Vec<&str> = findings
+            .iter()
+            .filter(|f| matches!(f.result, LintResult::Error(_)))
+            .map(|f| f.lint_id.as_ref())
+            .collect();
+        assert!(
+            errors_by_id
+                .iter()
+                .any(|id| id.starts_with("rfc5280.cert.eku.") || id.starts_with("rfc6125.")),
+            "S/MIME cert must produce Error findings from the TLS lints: \
+             found error ids {errors_by_id:?}"
+        );
+        assert!(
+            !errors_by_id
+                .iter()
+                .any(|id| id.starts_with("rfc8398.") || id.starts_with("rfc8551.")),
+            "S/MIME cert must NOT produce Error findings from the S/MIME lints: \
+             found error ids {errors_by_id:?}"
+        );
     }
 }

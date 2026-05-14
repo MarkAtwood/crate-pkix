@@ -58,6 +58,19 @@ const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5
 ///
 /// [cabf-san]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/struct.SanRequiredLint.html
 ///
+/// # Use-case applicability — operator contract
+///
+/// This lint is **use-case specific** to TLS server certificates. It
+/// asserts a property RFC 6125 requires of TLS server certs and **only**
+/// TLS server certs. Registering it against arbitrary leaves produces
+/// false-positive `Error` findings on S/MIME, code-signing, OCSP-responder,
+/// or any other non-TLS-server end-entity certificate.
+///
+/// **Operators MUST register this lint only through a use-case-specific
+/// [`LintProfile`][crate::LintProfile] that bundles it with other
+/// TLS-server lints.** `pkix_profiles::BasicTlsProfile` is the canonical
+/// bundler. See [`crate::Lint`] trait rustdoc for the contract.
+///
 /// # Behavior
 ///
 /// - `SubjectAltName` extension absent → `Error`.

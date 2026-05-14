@@ -305,6 +305,27 @@ impl Lint for Rfc5280BasicConstraintsCaLeafLint {
 ///
 /// [cabf-eku]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/struct.EkuServerAuthLint.html
 ///
+/// # Use-case applicability — operator contract
+///
+/// This lint is **use-case specific** to TLS server certificates. It
+/// asserts a property the RFC requires of TLS server certs and **only**
+/// TLS server certs. Registering it against arbitrary leaves produces
+/// false-positive `Error` findings on S/MIME, code-signing, OCSP-responder,
+/// or any other non-TLS-server end-entity certificate.
+///
+/// **Operators MUST register this lint only through a use-case-specific
+/// [`LintProfile`][crate::LintProfile] that bundles it with other
+/// TLS-server lints (SAN dNSName, etc.).**
+/// `pkix_profiles::BasicTlsProfile` is the canonical bundler. There is no
+/// "generic rfc5280-conformance" bundle that mixes this lint with
+/// `Rfc8551EkuEmailProtectionLint` or `Rfc8398SmimeSanLint`: those four
+/// lints assert mutually-exclusive shape requirements (no leaf cert
+/// satisfies all four simultaneously) and must be selected by use case.
+///
+/// The lint trait deliberately does not encode use case in its type
+/// signature; use-case selection is the `LintProfile` bundle's
+/// responsibility. See [`crate::Lint`] trait rustdoc for the contract.
+///
 /// # Behavior
 ///
 /// - `ExtendedKeyUsage` extension absent → `Error`.
