@@ -270,12 +270,12 @@ impl Lint for Rfc5280MaxSerialLengthLint {
         // `Encoded-content interpretation` section on this struct's
         // rustdoc, and the DER round-trip negative-path test below.
         let len = cert.tbs_certificate.serial_number.as_bytes().len();
-        if len > self.max_octets {
+        let cap = self.max_octets;
+        if len > cap {
             // Dynamic detail (Cow::Owned): include the actual length so
             // the audit trail attributes the failure to a specific value.
             LintResult::error(format!(
-                "certificate serialNumber is {} octets, exceeds cap of {} octets",
-                len, self.max_octets
+                "certificate serialNumber is {len} octets, exceeds cap of {cap} octets"
             ))
         } else {
             LintResult::Pass

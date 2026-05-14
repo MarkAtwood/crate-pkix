@@ -453,7 +453,8 @@ fn risk_for(df: &DeviatedFinding, report_seed: &[u8], i: usize) -> Value {
     ];
     let mut risk = json!({
         "uuid": uuid,
-        "title": format!("Deviation {} applied to {}", df.deviation_id, df.lint_id),
+        "title": format!("Deviation {deviation_id} applied to {lint_id}",
+            deviation_id = df.deviation_id, lint_id = df.lint_id),
         "description": df.justification.clone(),
         "statement": result_detail(&df.original_result)
             .map(String::from)
@@ -544,7 +545,8 @@ fn risk_for_deviation(d: &Deviation) -> Value {
 
     let mut risk = json!({
         "uuid": uuid,
-        "title": format!("Deviation {} for lint {}", d.id, d.target_lint),
+        "title": format!("Deviation {id} for lint {target}",
+            id = d.id, target = d.target_lint),
         "description": d.justification.clone(),
         // OSCAL Risks may carry a free-form `statement` describing the
         // condition that triggers the risk. For pkix-lint deviations we
@@ -725,7 +727,10 @@ fn decode_name_display(der: &[u8]) -> String {
 fn deviation_action_prop_value(a: &DeviationAction) -> String {
     match a {
         DeviationAction::Suppress => "suppress".to_string(),
-        DeviationAction::DowngradeSeverityTo(s) => format!("downgrade:{}", severity_label(*s)),
+        DeviationAction::DowngradeSeverityTo(s) => {
+            let label = severity_label(*s);
+            format!("downgrade:{label}")
+        }
     }
 }
 
@@ -964,10 +969,7 @@ fn unix_to_rfc3339(unix: u64) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
     let year = if m <= 2 { y + 1 } else { y };
 
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, m, d, hour, minute, second
-    )
+    format!("{year:04}-{m:02}-{d:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
 // ---------------------------------------------------------------------------
