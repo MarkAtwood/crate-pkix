@@ -86,12 +86,79 @@ const NS_OBSERVATION: &str = "pkix-lint.oscal.observation";
 const NS_FINDING: &str = "pkix-lint.oscal.finding";
 const NS_RISK: &str = "pkix-lint.oscal.risk";
 
+/// Options controlling fields of the emitted OSCAL Assessment Results
+/// document that are not derivable from the [`EvaluationReport`]
+/// itself.
+///
+/// OSCAL Assessment Results is part of a larger document family that
+/// references an Assessment Plan via `import-ap.href`. pkix-lint does
+/// not consume an Assessment Plan, but a real OSCAL toolchain
+/// (`oscal-cli validate`, NIST Trestle) rejects documents whose
+/// `import-ap.href` points at a non-existent target. Operators
+/// integrating pkix-lint with such a toolchain must supply a real href
+/// (typically a relative file path or absolute URI to the deployment's
+/// Assessment Plan document).
+///
+/// Use [`AssessmentResultsOptions::default`] to get the placeholder
+/// behavior (suitable for stand-alone test fixtures); use the explicit
+/// constructor when emitting documents that must round-trip through a
+/// validator.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AssessmentResultsOptions {
+    /// Value emitted at `assessment-results.import-ap.href`. Defaults
+    /// to `"#assessment-plan-placeholder"` — invalid against a real
+    /// OSCAL toolchain. Set to a meaningful href before emitting
+    /// documents intended for downstream OSCAL validation.
+    pub import_ap_href: String,
+}
+
+impl Default for AssessmentResultsOptions {
+    fn default() -> Self {
+        Self {
+            // Documented placeholder. PKIX-7f92.4 made the choice
+            // explicit at the call site rather than buried in the
+            // emitter implementation; operators wiring real OSCAL
+            // toolchains override via with_import_ap_href.
+            import_ap_href: "#assessment-plan-placeholder".to_string(),
+        }
+    }
+}
+
+impl AssessmentResultsOptions {
+    /// Convenience setter: replace the `import-ap.href` value.
+    #[must_use]
+    pub fn with_import_ap_href(mut self, href: impl Into<String>) -> Self {
+        self.import_ap_href = href.into();
+        self
+    }
+}
+
 /// Emit an [`EvaluationReport`] as OSCAL Assessment Results JSON.
+///
+/// Convenience wrapper over [`assessment_results_with_options`] using
+/// [`AssessmentResultsOptions::default`] — the
+/// `#assessment-plan-placeholder` shape suitable for stand-alone test
+/// fixtures. For OSCAL documents that must round-trip through a real
+/// validator, use [`assessment_results_with_options`] with an explicit
+/// `import_ap_href`.
 ///
 /// See the module-level docs for the field mapping and round-trip
 /// guarantees.
 #[must_use]
 pub fn assessment_results(report: &EvaluationReport) -> Value {
+    assessment_results_with_options(report, &AssessmentResultsOptions::default())
+}
+
+/// Emit an [`EvaluationReport`] as OSCAL Assessment Results JSON with
+/// explicit options.
+///
+/// See [`AssessmentResultsOptions`] for the option set. The remainder
+/// of the document shape matches [`assessment_results`].
+#[must_use]
+pub fn assessment_results_with_options(
+    report: &EvaluationReport,
+    options: &AssessmentResultsOptions,
+) -> Value {
     let report_seed = report_seed(report);
 
     let last_modified = unix_to_rfc3339(report.evaluated_at_unix);
@@ -180,9 +247,12 @@ pub fn assessment_results(report: &EvaluationReport) -> Value {
             },
             "import-ap": {
                 // Per OSCAL: this references the Assessment Plan. pkix-lint
-                // does not currently consume an AP, so we point at a
-                // self-referential placeholder. Real deployments override.
-                "href": "#assessment-plan-placeholder",
+                // does not currently consume an AP; the href value is
+                // caller-supplied via AssessmentResultsOptions
+                // (PKIX-7f92.4). Default is the placeholder shape that
+                // is invalid against a real OSCAL validator — see the
+                // assessment_results convenience-function rustdoc.
+                "href": options.import_ap_href.clone(),
             },
             "results": [ result ],
         }
@@ -1111,6 +1181,43 @@ mod tests {
             .and_then(Value::as_array)
             .expect("results");
         assert_eq!(results.len(), 1, "exactly one Result per run");
+    }
+
+    /// Regression test for PKIX-7f92.4: the bare assessment_results
+    /// function emits the documented placeholder shape, locking the
+    /// "operator must override" contract. Pre-fix, the placeholder
+    /// was a private string inside the emitter — operators had no
+    /// programmatic way to override.
+    #[test]
+    fn test_assessment_results_default_import_ap_is_placeholder() {
+        let r = sample_report();
+        let v = assessment_results(&r);
+        let href = v
+            .get("assessment-results")
+            .and_then(|a| a.get("import-ap"))
+            .and_then(|i| i.get("href"))
+            .and_then(Value::as_str)
+            .expect("import-ap.href must be present");
+        assert_eq!(href, "#assessment-plan-placeholder");
+    }
+
+    /// Regression test for PKIX-7f92.4: callers wiring real OSCAL
+    /// toolchains override the import-ap.href via
+    /// AssessmentResultsOptions::with_import_ap_href. The value flows
+    /// through unmodified to the emitted document.
+    #[test]
+    fn test_assessment_results_with_options_overrides_import_ap_href() {
+        let r = sample_report();
+        let opts = AssessmentResultsOptions::default()
+            .with_import_ap_href("file:///etc/oscal/plans/2026-q2.json");
+        let v = assessment_results_with_options(&r, &opts);
+        let href = v
+            .get("assessment-results")
+            .and_then(|a| a.get("import-ap"))
+            .and_then(|i| i.get("href"))
+            .and_then(Value::as_str)
+            .expect("import-ap.href must be present");
+        assert_eq!(href, "file:///etc/oscal/plans/2026-q2.json");
     }
 
     #[test]
