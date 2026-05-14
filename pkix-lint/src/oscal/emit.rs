@@ -853,12 +853,28 @@ fn hex_digit(nibble: u8) -> char {
 /// `pkix-path-builder/tests/bettertls.rs`. Inlined here to avoid a chrono
 /// / time dependency.
 ///
-/// # Panics
+/// # Overflow
 ///
-/// Panics if `unix` exceeds [`i64::MAX`] / 86_400 days (year ~292 billion);
-/// in practice the cap is `u64::MAX` and no realistic input triggers it.
+/// For `unix > i64::MAX` (~9.2 × 10^18 seconds — well beyond the heat
+/// death of the universe), saturates to `i64::MAX` and formats the
+/// resulting far-future date normally. The year field exceeds the
+/// usual 4-digit RFC 3339 width and is emitted as additional digits;
+/// the date itself is still ASCII and well-formed.
+///
+/// Saturation rather than panic closes a DOS surface (PKIX-7f92.6):
+/// `EvaluationReport::evaluated_at_unix` is `u64` and flows from
+/// caller-controlled JSON; an attacker that crafts a Finding payload
+/// with `evaluated_at_unix > i64::MAX` would otherwise panic the
+/// emitter mid-OSCAL-write.
+///
+/// # Not panics
+///
+/// This function never panics on any `u64` input.
 fn unix_to_rfc3339(unix: u64) -> String {
-    let unix_i64 = i64::try_from(unix).expect("unix seconds out of i64 range");
+    // Saturating cast: any u64 above i64::MAX clamps to i64::MAX.
+    // The downstream civil_from_days arithmetic is i64 throughout
+    // and stays in range for the entire u64 domain after clamping.
+    let unix_i64 = i64::try_from(unix).unwrap_or(i64::MAX);
     let days_since_epoch = unix_i64.div_euclid(86_400);
     let secs_of_day = unix_i64.rem_euclid(86_400);
     let hour = secs_of_day / 3600;
@@ -988,6 +1004,41 @@ mod tests {
     fn test_rfc3339_leap_year_feb_29() {
         // 2024-02-29T00:00:00Z = 1709164800. Oracle: `date -u -d "@1709164800"`.
         assert_eq!(unix_to_rfc3339(1_709_164_800), "2024-02-29T00:00:00Z");
+    }
+
+    /// Regression test for PKIX-7f92.6: large u64 inputs must not
+    /// panic. Pre-fix, any value > i64::MAX panicked the emitter
+    /// mid-write. Now the function saturates to i64::MAX and emits a
+    /// well-formed (multi-digit-year) RFC 3339 date.
+    ///
+    /// Oracle: i64::MAX seconds = 9_223_372_036_854_775_807. Apply
+    /// the same civil_from_days algorithm externally (or accept
+    /// whatever the saturated value yields) — the requirement here
+    /// is "no panic, ASCII-clean output, deterministic." We assert
+    /// the output is non-empty and ASCII rather than computing the
+    /// exact far-future date.
+    #[test]
+    fn test_rfc3339_u64_overflow_saturates_no_panic() {
+        for unix in [
+            i64::MAX as u64,         // exactly at the boundary
+            i64::MAX as u64 + 1,     // first u64 above the i64 range
+            u64::MAX,                // worst-case input
+        ] {
+            let s = unix_to_rfc3339(unix);
+            assert!(!s.is_empty(), "saturated output must be non-empty");
+            assert!(s.is_ascii(), "saturated output must be ASCII-only");
+            assert!(s.ends_with('Z'), "saturated output must end with Z");
+            // All three inputs saturate to i64::MAX, so all produce
+            // the same output string — locks determinism across the
+            // saturated branch.
+        }
+        // Determinism of the saturated branch: the i64::MAX and
+        // u64::MAX inputs both saturate, both produce the same string.
+        assert_eq!(
+            unix_to_rfc3339(i64::MAX as u64),
+            unix_to_rfc3339(u64::MAX),
+            "saturation must be deterministic across all overflowing u64 inputs"
+        );
     }
 
     // -------------------------------------------------------------------
