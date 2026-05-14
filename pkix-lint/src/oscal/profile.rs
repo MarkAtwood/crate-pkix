@@ -1210,4 +1210,251 @@ mod tests {
         let err = runner.apply_parameter_overrides(&overrides).unwrap_err();
         assert!(matches!(err, ParseError::UnknownParameterOverride { .. }));
     }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.3 regression: dotted parameter ids must resolve via
+    // longest-prefix-match against the registered lints, not via a
+    // rightmost-dot split that assumes parameter ids have no dot.
+    // -----------------------------------------------------------------------
+
+    /// Test fixture: a lint whose only valid parameter id contains a dot.
+    /// `set_parameter` returns `Ok` exclusively when `id == "thresholds.warn"`;
+    /// any other id surfaces `ParameterError::UnknownParameter`. The runner
+    /// wraps that as `InvalidParameterOverride`, so a successful
+    /// `apply_parameter_overrides` call proves the composite id was split
+    /// at the correct boundary.
+    struct DottedParamLint;
+    impl Lint for DottedParamLint {
+        fn id(&self) -> &'static str {
+            "test.dotted.param"
+        }
+        fn citation(&self) -> &'static str {
+            "PKIX-hy2e.3 fixture"
+        }
+        fn severity(&self) -> crate::Severity {
+            crate::Severity::Warn
+        }
+        fn scope(&self) -> crate::Scope {
+            crate::Scope::Certificate
+        }
+        fn applies_to(&self) -> crate::SubjectKind {
+            crate::SubjectKind::Leaf
+        }
+        fn set_parameter(
+            &mut self,
+            id: &str,
+            _value: &str,
+        ) -> Result<(), crate::ParameterError> {
+            if id == "thresholds.warn" {
+                Ok(())
+            } else {
+                Err(crate::ParameterError::UnknownParameter(id.to_owned()))
+            }
+        }
+        fn check_cert(
+            &self,
+            _cert: &x509_cert::Certificate,
+            _kind: crate::SubjectKind,
+            _now_unix: u64,
+        ) -> crate::LintResult {
+            crate::LintResult::Pass
+        }
+    }
+
+    #[test]
+    fn apply_parameter_overrides_resolves_dotted_param_id() {
+        // Regression for PKIX-hy2e.3. Composite param_id =
+        // "test.dotted.param.thresholds.warn". Lint id =
+        // "test.dotted.param". Parameter id = "thresholds.warn" (contains
+        // a dot). Longest-prefix matching against the registered lint id
+        // must yield param_id "thresholds.warn". The pre-fix
+        // rsplit-once-on-dot logic would yield param_id "warn" instead,
+        // which the fixture lint's set_parameter rejects, surfacing as
+        // InvalidParameterOverride.
+        use crate::LintRunner;
+
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(DottedParamLint)];
+        let mut runner = LintRunner::new(lints);
+        let overrides = vec![ParameterOverride {
+            param_id: "test.dotted.param.thresholds.warn".to_owned(),
+            value: "5".to_owned(),
+        }];
+        runner.apply_parameter_overrides(&overrides).expect(
+            "longest-prefix match must split composite id at the lint-id boundary; \
+             rsplit-once-on-dot would have produced param_id='warn' and triggered \
+             InvalidParameterOverride",
+        );
+    }
+
+    #[test]
+    fn apply_parameter_overrides_longest_prefix_wins_on_lint_id_collision() {
+        // Regression: when two registered lint ids overlap by prefix
+        // (one is a strict prefix of the other), the longest prefix
+        // must win.
+        use crate::LintRunner;
+
+        // First registered: short prefix lint.
+        struct ShortPrefixLint;
+        impl Lint for ShortPrefixLint {
+            fn id(&self) -> &'static str {
+                "test.prefix"
+            }
+            fn citation(&self) -> &'static str {
+                "fixture"
+            }
+            fn severity(&self) -> crate::Severity {
+                crate::Severity::Warn
+            }
+            fn scope(&self) -> crate::Scope {
+                crate::Scope::Certificate
+            }
+            fn applies_to(&self) -> crate::SubjectKind {
+                crate::SubjectKind::Leaf
+            }
+            fn set_parameter(
+                &mut self,
+                id: &str,
+                _value: &str,
+            ) -> Result<(), crate::ParameterError> {
+                // The short-prefix lint rejects every id so we can
+                // detect if longest-prefix-match accidentally routed
+                // the override here.
+                Err(crate::ParameterError::UnknownParameter(format!(
+                    "short-prefix lint received id={id} — longest-prefix-match should have \
+                     routed to test.prefix.long instead"
+                )))
+            }
+            fn check_cert(
+                &self,
+                _cert: &x509_cert::Certificate,
+                _kind: crate::SubjectKind,
+                _now_unix: u64,
+            ) -> crate::LintResult {
+                crate::LintResult::Pass
+            }
+        }
+
+        // Second registered: long prefix lint, accepts "knob".
+        struct LongPrefixLint;
+        impl Lint for LongPrefixLint {
+            fn id(&self) -> &'static str {
+                "test.prefix.long"
+            }
+            fn citation(&self) -> &'static str {
+                "fixture"
+            }
+            fn severity(&self) -> crate::Severity {
+                crate::Severity::Warn
+            }
+            fn scope(&self) -> crate::Scope {
+                crate::Scope::Certificate
+            }
+            fn applies_to(&self) -> crate::SubjectKind {
+                crate::SubjectKind::Leaf
+            }
+            fn set_parameter(
+                &mut self,
+                id: &str,
+                _value: &str,
+            ) -> Result<(), crate::ParameterError> {
+                if id == "knob" {
+                    Ok(())
+                } else {
+                    Err(crate::ParameterError::UnknownParameter(id.to_owned()))
+                }
+            }
+            fn check_cert(
+                &self,
+                _cert: &x509_cert::Certificate,
+                _kind: crate::SubjectKind,
+                _now_unix: u64,
+            ) -> crate::LintResult {
+                crate::LintResult::Pass
+            }
+        }
+
+        let lints: Vec<Box<dyn Lint>> =
+            vec![Box::new(ShortPrefixLint), Box::new(LongPrefixLint)];
+        let mut runner = LintRunner::new(lints);
+        let overrides = vec![ParameterOverride {
+            param_id: "test.prefix.long.knob".to_owned(),
+            value: "v".to_owned(),
+        }];
+        runner.apply_parameter_overrides(&overrides).expect(
+            "longest-prefix match must route to test.prefix.long not test.prefix",
+        );
+    }
+
+    #[test]
+    fn apply_parameter_overrides_fails_fast_before_mutation() {
+        // Regression for the Phase 1 / Phase 2 separation in
+        // apply_parameter_overrides (closes part of PKIX-hy2e.3's scope;
+        // PKIX-hy2e.6 covers the InvalidParameterOverride-atomicity
+        // surface). A batch with one valid override followed by one
+        // UnknownParameterOverride must surface the
+        // UnknownParameterOverride WITHOUT calling set_parameter on the
+        // first lint. The pre-fix code applied the valid one and then
+        // errored on the unknown one mid-loop, leaving the runner
+        // partially mutated.
+        use crate::LintRunner;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        // Per-test static. Re-runs in the same process must reset it.
+        static APPLIED: AtomicBool = AtomicBool::new(false);
+        APPLIED.store(false, Ordering::SeqCst);
+
+        struct ObservableLint;
+        impl Lint for ObservableLint {
+            fn id(&self) -> &'static str {
+                "test.observable.lint"
+            }
+            fn citation(&self) -> &'static str {
+                "PKIX-hy2e.3 fail-fast fixture"
+            }
+            fn severity(&self) -> crate::Severity {
+                crate::Severity::Warn
+            }
+            fn scope(&self) -> crate::Scope {
+                crate::Scope::Certificate
+            }
+            fn applies_to(&self) -> crate::SubjectKind {
+                crate::SubjectKind::Leaf
+            }
+            fn set_parameter(
+                &mut self,
+                _id: &str,
+                _value: &str,
+            ) -> Result<(), crate::ParameterError> {
+                APPLIED.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+            fn check_cert(
+                &self,
+                _cert: &x509_cert::Certificate,
+                _kind: crate::SubjectKind,
+                _now_unix: u64,
+            ) -> crate::LintResult {
+                crate::LintResult::Pass
+            }
+        }
+
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(ObservableLint)];
+        let mut runner = LintRunner::new(lints);
+        let overrides = vec![
+            ParameterOverride {
+                param_id: "test.observable.lint.any".to_owned(),
+                value: "v".to_owned(),
+            },
+            ParameterOverride {
+                param_id: "no.such.lint.id.anywhere".to_owned(),
+                value: "v".to_owned(),
+            },
+        ];
+        let err = runner.apply_parameter_overrides(&overrides).unwrap_err();
+        assert!(matches!(err, ParseError::UnknownParameterOverride { .. }));
+        assert!(
+            !APPLIED.load(Ordering::SeqCst),
+            "Phase 1 must surface UnknownParameterOverride before any set_parameter call"
+        );
+    }
 }

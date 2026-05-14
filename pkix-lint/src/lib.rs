@@ -1192,10 +1192,22 @@ impl LintRunner {
     /// [`crate::oscal::profile::ParameterOverride::param_id`] is the
     /// composite id emitted by
     /// [`crate::oscal::catalog::catalog_from_lints`] in the form
-    /// `<lint_id>.<param_id>`. This method splits each composite id at
-    /// the rightmost `.`, finds the owning lint by [`Lint::id`], and
-    /// calls [`Lint::set_parameter`] with the unqualified parameter
-    /// name and override value.
+    /// `<lint_id>.<param_id>`. This method matches each composite id
+    /// against the set of registered lints using **longest-prefix
+    /// matching**: for each override, the registered lint whose
+    /// [`Lint::id`] is the longest prefix of `param_id` followed by `.`
+    /// owns the override; the remainder after the matched prefix and
+    /// dot is the unqualified parameter id passed to
+    /// [`Lint::set_parameter`]. This correctly handles lint ids
+    /// containing dots (`rfc5280.cert.serial_number.max_octets`) AND
+    /// parameter ids containing dots (`thresholds.warn`); the
+    /// resolution depends only on the registered lints, not on a
+    /// fixed convention about which side may contain dots.
+    ///
+    /// Longest-prefix matching disambiguates the (rare) case where one
+    /// registered lint's id is a strict prefix of another. Operators
+    /// are still expected to keep lint ids globally unique, but the
+    /// resolution rule is well-defined when prefixes overlap.
     ///
     /// Overrides are applied in the order supplied. For composed
     /// Profiles where inner and outer layers both target the same
@@ -1203,48 +1215,70 @@ impl LintRunner {
     /// inner overrides first; the outer Profile's value takes effect
     /// because it is applied last.
     ///
-    /// Composite param ids that contain no `.` separator are rejected
-    /// as [`crate::oscal::parse::ParseError::UnknownParameterOverride`]
-    /// — the namespacing is mandatory under
-    /// [`crate::oscal::catalog::catalog_from_lints`]'s contract.
+    /// Composite param ids that contain no `.` separator, or whose
+    /// prefix does not match any registered lint id, are rejected as
+    /// [`crate::oscal::parse::ParseError::UnknownParameterOverride`].
     ///
     /// # Errors
     ///
     /// * [`crate::oscal::parse::ParseError::UnknownParameterOverride`]
     ///   on the first override whose composite id has no matching
-    ///   registered lint.
+    ///   registered lint. **All `UnknownParameterOverride` errors are
+    ///   surfaced before any mutation is applied** — the method
+    ///   resolves every override to a `(lint_index, param_id)` pair
+    ///   first and fails fast if any cannot be resolved.
     /// * [`crate::oscal::parse::ParseError::InvalidParameterOverride`]
     ///   when the matched lint's
     ///   [`Lint::set_parameter`] rejects the value (wrapping the
     ///   underlying [`ParameterError`]).
     ///
-    /// Errors short-circuit on the first failure — overrides applied
-    /// before the failing one remain mutated on the lints. Callers
-    /// that need atomic application should resolve and validate
-    /// overrides against the catalog before installing the lints in a
-    /// runner.
+    /// `InvalidParameterOverride` errors still short-circuit on the
+    /// first failure: overrides applied to earlier lints remain
+    /// mutated. Atomic-on-value-rejection application requires
+    /// `clone_box()` on the registered lints, which the [`Lint`] trait
+    /// does not yet require. Tracked as PKIX-hy2e.6.
     #[cfg(feature = "oscal")]
     #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
     pub fn apply_parameter_overrides(
         &mut self,
         overrides: &[crate::oscal::profile::ParameterOverride],
     ) -> Result<(), crate::oscal::parse::ParseError> {
+        // Phase 1: resolve every override to (lint_index, param_id). Fail
+        // fast on any UnknownParameterOverride before applying any
+        // mutation. This bounds the partial-application surface to the
+        // value-validation errors raised by set_parameter itself
+        // (InvalidParameterOverride); see method rustdoc and
+        // PKIX-hy2e.6.
+        let mut resolved: Vec<(usize, &str, &crate::oscal::profile::ParameterOverride)> =
+            Vec::with_capacity(overrides.len());
         for over in overrides {
-            // Split composite id at the rightmost '.' — lint ids may
-            // contain dots (`rfc5280.cert.serial_number.max_octets`)
-            // while parameter ids by convention do not.
-            let (lint_id, param_id) = over.param_id.rsplit_once('.').ok_or_else(|| {
-                crate::oscal::parse::ParseError::UnknownParameterOverride {
+            let (lint_index, param_id) = self
+                .lints
+                .iter()
+                .enumerate()
+                .filter_map(|(i, l)| {
+                    let lint_id = l.id();
+                    over.param_id
+                        .strip_prefix(lint_id)
+                        .and_then(|rest| rest.strip_prefix('.'))
+                        .map(|param_id| (i, lint_id.len(), param_id))
+                })
+                // Longest-prefix match wins. Stable order across calls
+                // because iter().enumerate() walks lints in registration
+                // order.
+                .max_by_key(|(_, prefix_len, _)| *prefix_len)
+                .map(|(i, _, param_id)| (i, param_id))
+                .ok_or_else(|| crate::oscal::parse::ParseError::UnknownParameterOverride {
                     param_id: over.param_id.clone(),
-                }
-            })?;
-            let target = self.lints.iter_mut().find(|l| l.id() == lint_id);
-            let lint = target.ok_or_else(|| {
-                crate::oscal::parse::ParseError::UnknownParameterOverride {
-                    param_id: over.param_id.clone(),
-                }
-            })?;
-            lint.set_parameter(param_id, &over.value)
+                })?;
+            resolved.push((lint_index, param_id, over));
+        }
+
+        // Phase 2: apply. set_parameter is side-effecting; partial
+        // application on InvalidParameterOverride is documented above.
+        for (lint_index, param_id, over) in resolved {
+            self.lints[lint_index]
+                .set_parameter(param_id, &over.value)
                 .map_err(
                     |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
                         param_id: over.param_id.clone(),
