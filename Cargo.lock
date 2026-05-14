@@ -1184,6 +1184,7 @@ dependencies = [
  "pkix-revocation",
  "serde",
  "serde_json",
+ "spki",
  "x509-cert",
 ]
 

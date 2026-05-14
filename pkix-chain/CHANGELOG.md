@@ -6,6 +6,21 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Fixed
+
+- **OCSP responder delegation: cryptographic binding now enforced.**
+  `verify_ocsp_responder` previously only checked that the responder
+  cert's issuer DN equalled the supplied `issuer.subject`. RFC 6960
+  §4.2.2.2 requires the responder be issued *directly by* the named CA;
+  DN equality alone admits a DN-twin attack in cross-signed CA
+  topologies (two CAs with colliding names but different keys), letting
+  an attacker who controls one such CA mint a responder cert that
+  DN-matches the legitimate issuer but is signed by a different key.
+  The wrapper now verifies the responder cert's signature under
+  `issuer`'s SPKI directly, in addition to the DN gate. Both failure
+  modes still surface as `Error::OcspDelegation` with distinct
+  diagnostic `reason` strings. (PKIX-q9hv.3)
+
 ### Added
 
 - **AIA chain reassembly.** `Verifier::verify_one` and `verify_chain` now

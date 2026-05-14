@@ -187,6 +187,16 @@ pub enum Error {
     /// distinguish "the responder cert was not delegated by the
     /// expected issuer" from other profile-level failures.
     ///
+    /// Two failure modes both surface as this variant:
+    ///
+    /// 1. **DN mismatch** — the responder cert's issuer DN does not
+    ///    equal the supplied `issuer`'s subject DN under RFC 4518.
+    /// 2. **Signature binding failure** — the responder cert's
+    ///    signature does not verify under the supplied `issuer`'s SPKI.
+    ///    The cryptographic binding is required by RFC 6960 §4.2.2.2;
+    ///    DN equality alone admits a DN-twin attack in cross-signed
+    ///    topologies (two CAs with colliding names but different keys).
+    ///
     /// `reason` is a fixed-string description suitable for logging and
     /// diagnostic display. It is not parsed by the engine; pattern-match
     /// on the variant rather than the inner string.
@@ -1231,7 +1241,12 @@ where
 ///   was revoked, or `chain[0]` was revoked without the
 ///   `id-pkix-ocsp-nocheck` extension being present.
 /// - [`Error::OcspDelegation`] — the responder cert was not delegated
-///   by the supplied `issuer` (issuer-DN mismatch).
+///   by the supplied `issuer`. Two failure modes: (a) the responder
+///   cert's issuer DN does not match `issuer.subject`, or (b) the
+///   responder cert's signature does not verify under `issuer`'s SPKI.
+///   The cryptographic binding (b) is required by RFC 6960 §4.2.2.2 —
+///   DN equality alone admits a DN-twin attack in cross-signed
+///   topologies.
 pub fn verify_ocsp_responder<P, R>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -1281,30 +1296,86 @@ where
 /// RFC 6960 §4.2.2.2: enforce that the responder cert at `chain[0]` is
 /// delegated by `issuer`.
 ///
-/// Specifically, the responder cert's issuer DN must equal the issuer
-/// cert's subject DN under RFC 4518 string prep. The cryptographic
-/// signature check (responder cert signed by `issuer.spki`) is already
-/// covered by [`verify_chain`] when `issuer` appears in the chain;
-/// re-verifying it here would be redundant. The DN equality pins the
-/// delegation to a caller-named CA, which is the assertion the
-/// wrapper's API documents.
+/// Two checks, in order:
+///
+/// 1. The responder cert's issuer DN must equal the issuer cert's
+///    subject DN under RFC 4518 string prep. This is a cheap early
+///    rejection — a responder whose name does not even claim to be
+///    delegated by `issuer` is rejected without a signature op.
+///
+/// 2. The responder cert's signature must verify under `issuer`'s
+///    SPKI over the responder's `TBSCertificate` bytes. This is the
+///    cryptographic binding required by RFC 6960 §4.2.2.2 ("This
+///    certificate MUST be issued directly by the CA that is identified
+///    in the request").
+///
+/// DN equality alone is insufficient: in cross-signed CA topologies
+/// (e.g. an intermediate cross-signed by two roots) two distinct CAs
+/// can share an issuer DN, and an attacker who controls one such CA
+/// can mint a responder cert that DN-matches the legitimate
+/// `issuer` but is signed by a different key. Without the
+/// cryptographic check, such a responder would be accepted as
+/// delegated by `issuer` — giving the caller a confident "this
+/// responder speaks for issuer X" answer when in fact it speaks for
+/// issuer-DN-twin Y.
+///
+/// The signature verifier is [`DefaultVerifier`], matching the rest
+/// of [`verify_ocsp_responder`]. If `issuer`'s SPKI uses an algorithm
+/// not covered by [`DefaultVerifier`], the binding check surfaces as
+/// [`Error::OcspDelegation`] — callers needing custom algorithms must
+/// drop down to [`verify_chain`] and replicate the delegation check
+/// against their own verifier.
 fn verify_responder_is_delegated_by(
     responder: &Certificate,
     issuer: &Certificate,
 ) -> crate::Result<()> {
-    if pkix_path::names_match(
+    use der::Encode as _;
+    use spki::der::referenced::OwnedToRef as _;
+
+    // 1. Cheap DN gate.
+    if !pkix_path::names_match(
         &responder.tbs_certificate.issuer,
         &issuer.tbs_certificate.subject,
     ) {
-        Ok(())
-    } else {
-        Err(Error::OcspDelegation {
+        return Err(Error::OcspDelegation {
             reason: Cow::Borrowed(
                 "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
                  (RFC 6960 §4.2.2.2 delegation requirement)",
             ),
-        })
+        });
     }
+
+    // 2. Cryptographic binding: responder.signature must verify under
+    //    issuer.spki over responder.tbs_certificate (re-encoded to
+    //    DER). This is the spec-correct delegation check; DN equality
+    //    alone admits a DN-twin attack in cross-signed topologies.
+    let tbs_der = responder
+        .tbs_certificate
+        .to_der()
+        .map_err(|_| Error::OcspDelegation {
+            reason: Cow::Borrowed(
+                "OCSP responder cert TBSCertificate re-encoding failed \
+                 (cannot verify delegation signature)",
+            ),
+        })?;
+    DefaultVerifier
+        .verify_signature(
+            responder.signature_algorithm.owned_to_ref(),
+            issuer
+                .tbs_certificate
+                .subject_public_key_info
+                .owned_to_ref(),
+            &tbs_der,
+            responder.signature.raw_bytes(),
+        )
+        .map_err(|_| Error::OcspDelegation {
+            reason: Cow::Borrowed(
+                "OCSP responder cert signature does not verify under the supplied issuer's \
+                 public key (RFC 6960 §4.2.2.2: responder must be issued directly by the \
+                 named CA — DN match without cryptographic binding is insufficient)",
+            ),
+        })?;
+    Ok(())
 }
 
 /// Return `true` iff `cert` carries the `id-pkix-ocsp-nocheck`
