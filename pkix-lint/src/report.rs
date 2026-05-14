@@ -179,9 +179,10 @@ impl EvaluationReport {
         &self,
         min_severity: crate::Severity,
     ) -> impl Iterator<Item = &Finding> + '_ {
+        let threshold = min_severity.rank();
         self.findings
             .iter()
-            .filter(move |f| severity_of(&f.result).is_some_and(|s| s >= min_severity))
+            .filter(move |f| severity_of(&f.result).is_some_and(|s| s.rank() >= threshold))
     }
 }
 
