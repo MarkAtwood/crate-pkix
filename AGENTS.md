@@ -108,6 +108,41 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 
    The workspace does not have to BUILD caches. It has to ADMIT them. Caches and batch wrappers are caller-side or sibling-crate concerns.
 
+7. **Current-regime only; historical and version-pinned postures go out-of-process.**
+
+   Workspace `Profile` and `Lint` types snapshot the current rules from
+   the latest BR text. They evaluate "is this cert conforming under
+   today's rules?" — including rules the spec itself writes as
+   time-keyed (SC-081 phased validity cap, future similar). The
+   time-keying is part of the current rule's definition, not historical
+   replay.
+
+   The workspace does NOT ship validators that evaluate against:
+   - rules in force at a past time, with predicates that have since
+     been changed or removed (historical-regime replay), or
+   - a caller-pinned spec version (version-frozen replay).
+
+   For either posture, use `pkix-policy-zlint` with a version-pinned
+   lint set. zlint owns the historian role for vendor policy.
+
+   `ValidationPolicy::new(now_unix)` selects the moment at which
+   validity-period checks are evaluated, NOT the moment whose rules are
+   in force. This is documented on the API (see PKIX-kgnk for the
+   rustdoc clarification).
+
+   This cuts on a different axis from non-negotiable #5: #5 governs
+   *who owns* the policy specification (standards-body / industry-forum /
+   site-local); this rule governs *when* the policy is evaluated
+   (current regime in-process / historical or version-pinned out-of-
+   process). A rule the spec itself writes as time-keyed stays in-
+   process because the time-keying is part of the current rule's
+   definition — it's transcribing what the spec literally says, not
+   maintaining a delta history.
+
+   Stance: PKIX-e3nl (this codification), PKIX-kgnk (the `now_unix`
+   rustdoc half), PKIX-jy95 (`pkix-policy-zlint`, where historical-
+   regime replay lives).
+
 ## What already exists (and why we are not using it)
 
 | Crate | Why not |
