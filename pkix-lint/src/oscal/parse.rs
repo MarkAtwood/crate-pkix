@@ -640,6 +640,16 @@ fn parse_risk(idx: usize, risk: &Value) -> Result<Deviation, ParseError> {
         justification,
         authorized_by,
         evidence_uri,
+        // OSCAL Risk schema does not currently carry a priority axis.
+        // Risks parsed from OSCAL default to priority 0; site-local
+        // priority overrides should be set after import via
+        // Deviation::with_priority.
+        //
+        // PKIX-hy2e.10 — adding an OSCAL extension prop to round-trip
+        // priority through Risk JSON is a separate scope (the OSCAL
+        // Risk extension model uses Risk/Prop with a namespaced key);
+        // for now, priority is in-memory only.
+        priority: 0,
     })
 }
 
@@ -936,6 +946,7 @@ mod tests {
                 .to_string(),
             authorized_by: "agency-x-ciso@agency.gov".to_string(),
             evidence_uri: Some("https://pkipolicy.agency.gov/waivers/2025-11-03".to_string()),
+            priority: 0,
         }
     }
 
@@ -963,6 +974,7 @@ mod tests {
                 justification: "Internal lab CA, never published to relying parties".to_string(),
                 authorized_by: "lab-lead@example.com".to_string(),
                 evidence_uri: None,
+                priority: 0,
             })
             .expect("add");
         let risks = super::super::emit::risks_from_store(&store);
@@ -1001,6 +1013,7 @@ mod tests {
                 justification: "Known intermediate; waiver tracked in eng-pki #42".to_string(),
                 authorized_by: "pki-lead@example.com".to_string(),
                 evidence_uri: None,
+                priority: 0,
             })
             .expect("add");
         let risks = super::super::emit::risks_from_store(&store);
@@ -1034,6 +1047,7 @@ mod tests {
                 evidence_uri: Some(
                     "https://pki.example.com/incidents/2024-q1-serial-coll".to_string(),
                 ),
+                priority: 0,
             })
             .expect("add");
         let risks = super::super::emit::risks_from_store(&store);
@@ -1055,6 +1069,7 @@ mod tests {
                 justification: "Bootstrap root that predates AKI requirement".to_string(),
                 authorized_by: "ops@example.com".to_string(),
                 evidence_uri: None,
+                priority: 0,
             })
             .expect("add");
         let risks = super::super::emit::risks_from_store(&store);
