@@ -218,6 +218,12 @@ fn resolve_profile_inner(
         .get("profile")
         .and_then(|p| p.as_object())
         .ok_or(ParseError::ProfileMissingWrapper)?;
+    // PKIX-7f92.33: validate metadata.oscal-version before walking
+    // the imports list. Profile inheritance has version-dependent
+    // shape (include-controls, modify, set-parameters all gained
+    // fields across versions), so accepting an unknown version risks
+    // silent semantic drift on nested imports.
+    super::parse::check_oscal_version(prof)?;
     let imports = prof
         .get("imports")
         .and_then(|i| i.as_array())
@@ -520,7 +526,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000001",
-                "metadata": { "title": "plain" },
+                "metadata": { "title": "plain", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -544,7 +550,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000002",
-                "metadata": { "title": "explicit" },
+                "metadata": { "title": "explicit", "oscal-version": "1.1.2" },
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -574,7 +580,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000003",
-                "metadata": { "title": "policy-fixture" },
+                "metadata": { "title": "policy-fixture", "oscal-version": "1.1.2" },
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -625,7 +631,7 @@ mod tests {
         let inner = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000abcd",
-                "metadata": { "title": "inner" },
+                "metadata": { "title": "inner", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} },
                     { "href": "#rs.pkix.policy.fixture", "include-all": {} }
@@ -638,7 +644,7 @@ mod tests {
         let outer = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000ef00",
-                "metadata": { "title": "outer-customer-deviation" },
+                "metadata": { "title": "outer-customer-deviation", "oscal-version": "1.1.2" },
                 "imports": [
                     {
                         "href": "#pkix.profile.inner",
@@ -681,7 +687,7 @@ mod tests {
         let inner = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000a1a1",
-                "metadata": { "title": "inner-with-override" },
+                "metadata": { "title": "inner-with-override", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -700,7 +706,7 @@ mod tests {
         let outer = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000a2a2",
-                "metadata": { "title": "outer-with-tighter-override" },
+                "metadata": { "title": "outer-with-tighter-override", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#pkix.profile.inner", "include-all": {} }
                 ],
@@ -743,7 +749,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000ccdd",
-                "metadata": { "title": "exclude-test" },
+                "metadata": { "title": "exclude-test", "oscal-version": "1.1.2" },
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -768,7 +774,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000bbcc",
-                "metadata": { "title": "no-include" },
+                "metadata": { "title": "no-include", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280" }
                 ]
@@ -788,7 +794,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-00000000dd11",
-                "metadata": { "title": "dup" },
+                "metadata": { "title": "dup", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} },
                     { "href": "#rs.pkix.rfc5280.alt", "include-all": {} }
@@ -824,15 +830,70 @@ mod tests {
     #[test]
     fn err_imports_not_array() {
         let sources = HashMap::new();
-        let v = json!({ "profile": { "imports": {} } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": {} } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         assert!(matches!(err, ParseError::ProfileImportsNotArray));
+    }
+
+    /// Profile without metadata.oscal-version must surface
+    /// MissingOscalVersion before any later shape check (PKIX-7f92.33).
+    #[test]
+    fn err_profile_missing_oscal_version() {
+        let sources = HashMap::new();
+        // Bare profile with imports but no metadata.
+        let v = json!({ "profile": { "imports": [] } });
+        let err = resolve_profile(&v, &sources).unwrap_err();
+        assert!(matches!(err, ParseError::MissingOscalVersion));
+    }
+
+    /// Profile declaring oscal-version != 1.1.2 must be rejected
+    /// (PKIX-7f92.33).
+    #[test]
+    fn err_profile_unsupported_oscal_version() {
+        let sources = HashMap::new();
+        for found in ["1.0.4", "1.2.0"] {
+            let v = json!({
+                "profile": {
+                    "metadata": {"oscal-version": found},
+                    "imports": []
+                }
+            });
+            match resolve_profile(&v, &sources) {
+                Err(ParseError::UnsupportedOscalVersion { found: got }) => {
+                    assert_eq!(got, found);
+                }
+                other => panic!(
+                    "expected UnsupportedOscalVersion for version {found}; got: {other:?}"
+                ),
+            }
+        }
+    }
+
+    /// A nested imported Profile whose metadata.oscal-version is
+    /// missing must also surface MissingOscalVersion — version checking
+    /// recurses through profile imports.
+    #[test]
+    fn err_nested_profile_missing_oscal_version() {
+        let mut sources = HashMap::new();
+        sources.insert(
+            "#inner-no-version".to_owned(),
+            // Inner profile without metadata.oscal-version.
+            json!({ "profile": { "imports": [] } }),
+        );
+        let outer = json!({
+            "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
+                "imports": [ { "href": "#inner-no-version" } ]
+            }
+        });
+        let err = resolve_profile(&outer, &sources).unwrap_err();
+        assert!(matches!(err, ParseError::MissingOscalVersion));
     }
 
     #[test]
     fn err_import_missing_href() {
         let sources = HashMap::new();
-        let v = json!({ "profile": { "imports": [ {} ] } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ {} ] } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         assert!(matches!(
             err,
@@ -843,7 +904,7 @@ mod tests {
     #[test]
     fn err_import_href_not_string() {
         let sources = HashMap::new();
-        let v = json!({ "profile": { "imports": [ { "href": 7 } ] } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": 7 } ] } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         assert!(matches!(
             err,
@@ -854,7 +915,7 @@ mod tests {
     #[test]
     fn err_import_href_empty() {
         let sources = HashMap::new();
-        let v = json!({ "profile": { "imports": [ { "href": "" } ] } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "" } ] } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         assert!(matches!(
             err,
@@ -865,7 +926,7 @@ mod tests {
     #[test]
     fn err_import_unresolved() {
         let sources = HashMap::new();
-        let v = json!({ "profile": { "imports": [ { "href": "#nope" } ] } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "#nope" } ] } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         match err {
             ParseError::ProfileImportUnresolved { index: 0, href } => {
@@ -882,7 +943,7 @@ mod tests {
             "#weird".to_owned(),
             json!({ "neither-catalog-nor-profile": {} }),
         );
-        let v = json!({ "profile": { "imports": [ { "href": "#weird" } ] } });
+        let v = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "#weird" } ] } });
         let err = resolve_profile(&v, &sources).unwrap_err();
         match err {
             ParseError::ProfileImportSourceUnknown { index: 0, href } => {
@@ -898,13 +959,13 @@ mod tests {
         // Profile A imports Profile B; Profile B imports Profile A.
         sources.insert(
             "#a".to_owned(),
-            json!({ "profile": { "imports": [ { "href": "#b" } ] } }),
+            json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "#b" } ] } }),
         );
         sources.insert(
             "#b".to_owned(),
-            json!({ "profile": { "imports": [ { "href": "#a" } ] } }),
+            json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "#a" } ] } }),
         );
-        let outer = json!({ "profile": { "imports": [ { "href": "#a" } ] } });
+        let outer = json!({ "profile": { "metadata": {"oscal-version": "1.1.2"}, "imports": [ { "href": "#a" } ] } });
         let err = resolve_profile(&outer, &sources).unwrap_err();
         match err {
             ParseError::ProfileImportCycle { href } => {
@@ -921,6 +982,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-controls": {} }
                 ]
@@ -940,6 +1002,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -963,6 +1026,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -988,6 +1052,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",
@@ -1013,6 +1078,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -1030,6 +1096,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -1050,6 +1117,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -1070,6 +1138,7 @@ mod tests {
 
         let v = json!({
             "profile": {
+                "metadata": {"oscal-version": "1.1.2"},
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],
@@ -1134,7 +1203,7 @@ mod tests {
         let profile = json!({
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000099",
-                "metadata": { "title": "e2e-tighten" },
+                "metadata": { "title": "e2e-tighten", "oscal-version": "1.1.2" },
                 "imports": [
                     { "href": "#rs.pkix.rfc5280", "include-all": {} }
                 ],

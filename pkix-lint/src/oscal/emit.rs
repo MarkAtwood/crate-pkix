@@ -72,12 +72,7 @@ use crate::{Finding, LintResult};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-/// OSCAL version this emitter targets. Encoded as `metadata.oscal-version`.
-///
-/// Tied to NIST OSCAL v1.1.2 — the latest stable release at the time of
-/// this module's introduction. Bumping requires re-checking field-shape
-/// changes in the Assessment Results schema.
-const OSCAL_VERSION: &str = "1.1.2";
+use super::OSCAL_VERSION;
 
 /// Title surfaced in `metadata.title` for any pkix-lint run. Static for
 /// recognisability in OSCAL dashboards.
