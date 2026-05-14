@@ -309,14 +309,43 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
             return LintResult::Pass;
         }
 
+        // Pre-validate every address. RFC 8398 §3 presupposes well-formed
+        // RFC 5322 mailbox addresses on both sides; if either side is
+        // malformed (no '@', empty local-part, empty domain, IDN
+        // conversion failure), surface that as the specific finding
+        // rather than silently treating the address as a non-match
+        // against everything. Separating validation from cross-matching
+        // avoids the "malformed input" / "no match" conflation
+        // (PKIX-hy2e.35).
+        for r in &rfc822_addrs {
+            if let Err(reason) = validate_mailbox_for_equivalence(r) {
+                return LintResult::error(format!(
+                    "rfc822Name SAN entry '{r}' is malformed for equivalence checking \
+                     ({reason}); RFC 8398 §3 presupposes well-formed RFC 5322 mailbox \
+                     addresses"
+                ));
+            }
+        }
+        for u in &smtputf8_addrs {
+            if let Err(reason) = validate_mailbox_for_equivalence(u) {
+                return LintResult::error(format!(
+                    "SmtpUTF8Mailbox SAN entry '{u}' is malformed for equivalence checking \
+                     ({reason}); RFC 8398 §3 presupposes well-formed RFC 5322 mailbox \
+                     addresses"
+                ));
+            }
+        }
+
         // Each rfc822Name must match some SmtpUTF8Mailbox, and each
         // SmtpUTF8Mailbox must match some rfc822Name (set-equality under
         // the equivalence relation, modulo duplicates which we tolerate).
+        // Pre-validation above guarantees mailbox_equivalent returns
+        // Ok(_); the .expect() carries that invariant in the type.
         for r in &rfc822_addrs {
-            if !smtputf8_addrs
-                .iter()
-                .any(|u| mailbox_equivalent(r, u).unwrap_or_default())
-            {
+            if !smtputf8_addrs.iter().any(|u| {
+                mailbox_equivalent(r, u)
+                    .expect("pre-validation ensures inputs are well-formed")
+            }) {
                 return LintResult::error(format!(
                     "rfc822Name SAN entry '{r}' has no matching SmtpUTF8Mailbox; \
                      RFC 8398 §3 requires byte-identical local-part and \
@@ -325,10 +354,10 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
             }
         }
         for u in &smtputf8_addrs {
-            if !rfc822_addrs
-                .iter()
-                .any(|r| mailbox_equivalent(r, u).unwrap_or_default())
-            {
+            if !rfc822_addrs.iter().any(|r| {
+                mailbox_equivalent(r, u)
+                    .expect("pre-validation ensures inputs are well-formed")
+            }) {
                 return LintResult::error(format!(
                     "SmtpUTF8Mailbox SAN entry '{u}' has no matching rfc822Name; \
                      RFC 8398 §3 requires byte-identical local-part and \
@@ -339,6 +368,33 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
 
         LintResult::Pass
     }
+}
+
+/// Validate that `addr` is well-formed enough for the RFC 8398 §3
+/// equivalence rule to be evaluated against it. Performs the same
+/// structural checks as [`mailbox_equivalent`] (presence of `@`,
+/// non-empty local-part and domain, IDN-convertible domain) but does
+/// not compare against a second address. Used by
+/// [`Rfc8398SmimeMailboxEquivalenceLint`] to pre-validate every SAN
+/// entry before the cross-match loop so that a malformed address
+/// surfaces as a specific error rather than silently being treated as
+/// non-matching against every counterpart.
+fn validate_mailbox_for_equivalence(addr: &str) -> Result<(), &'static str> {
+    let (local, domain) = split_mailbox(addr).ok_or("no '@' delimiter")?;
+    if local.is_empty() {
+        return Err("empty local-part");
+    }
+    if domain.is_empty() {
+        return Err("empty domain");
+    }
+    // Validate domain is IDN-convertible. The same call is repeated
+    // inside mailbox_equivalent on the smtputf8 side; calling it here
+    // for both sides catches malformed rfc822 domains as well (which
+    // mailbox_equivalent only catches via the case-insensitive ASCII
+    // compare against the converted u_ascii — a malformed rfc822
+    // domain there silently returns Ok(false) rather than erroring).
+    idna::domain_to_ascii(domain).map_err(|_| "domain failed IDN A-label conversion")?;
+    Ok(())
 }
 
 /// Returns `Ok(true)` iff `rfc822` (ASCII, A-label IDN form) and `smtputf8`
@@ -611,5 +667,40 @@ mod tests {
     fn mailbox_equiv_empty_local_or_domain_errors() {
         assert!(mailbox_equivalent("@example.com", "@example.com").is_err());
         assert!(mailbox_equivalent("alice@", "alice@").is_err());
+    }
+
+    // ---- validate_mailbox_for_equivalence helper (PKIX-hy2e.35) ----
+    //
+    // Oracle: the same RFC 8398 §3 + RFC 5321 §2.4 + IDNA2008 spec text
+    // that drives mailbox_equivalent. validate_mailbox_for_equivalence
+    // is the pre-flight check that mailbox_equivalent's matching logic
+    // runs assuming well-formedness; the two share their validity
+    // predicate so a well-formed input passes both and any malformed
+    // input fails both.
+
+    #[test]
+    fn validate_mailbox_accepts_well_formed_ascii() {
+        assert!(validate_mailbox_for_equivalence("alice@example.com").is_ok());
+    }
+
+    #[test]
+    fn validate_mailbox_accepts_well_formed_u_label() {
+        // U-label form must round-trip through idna::domain_to_ascii.
+        assert!(validate_mailbox_for_equivalence("alice@café.example").is_ok());
+    }
+
+    #[test]
+    fn validate_mailbox_rejects_missing_at() {
+        assert!(validate_mailbox_for_equivalence("alice").is_err());
+    }
+
+    #[test]
+    fn validate_mailbox_rejects_empty_local_part() {
+        assert!(validate_mailbox_for_equivalence("@example.com").is_err());
+    }
+
+    #[test]
+    fn validate_mailbox_rejects_empty_domain() {
+        assert!(validate_mailbox_for_equivalence("alice@").is_err());
     }
 }
