@@ -168,6 +168,22 @@ pub enum ParseError {
         source: DeviationAddError,
     },
 
+    // -- OSCAL schema versioning (PKIX-7f92.33) ----------------------------
+    /// The full OSCAL document was missing `metadata.oscal-version`,
+    /// either because the `metadata` object itself was absent or
+    /// because the version string was missing from a present
+    /// metadata block.
+    MissingOscalVersion,
+    /// The full OSCAL document declared an `oscal-version` that is not
+    /// in [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`]. The pkix-lint
+    /// parsers are pinned to a known schema version; loading a
+    /// different-version document silently could mis-interpret fields
+    /// whose shape changed between versions.
+    UnsupportedOscalVersion {
+        /// The version string carried by the input document.
+        found: String,
+    },
+
     // -- Catalog parsing (PKIX-9vnx.6.3) -----------------------------------
     /// The top-level OSCAL Catalog value was not a JSON object (Catalog
     /// emitters produce `{"catalog": {...}}`).
@@ -418,6 +434,15 @@ impl std::fmt::Display for ParseError {
                 f,
                 "Risk at index {index} could not be added to the store: {source}"
             ),
+            Self::MissingOscalVersion => write!(
+                f,
+                "OSCAL document is missing metadata.oscal-version"
+            ),
+            Self::UnsupportedOscalVersion { found } => write!(
+                f,
+                "unsupported OSCAL version '{found}'; pkix-lint accepts {:?}",
+                crate::oscal::SUPPORTED_OSCAL_VERSIONS
+            ),
             Self::CatalogNotObject => {
                 write!(f, "top-level OSCAL Catalog value is not a JSON object")
             }
@@ -552,6 +577,18 @@ impl std::error::Error for ParseError {
 /// decoded into a single [`Deviation`] and inserted via
 /// [`DeviationStore::add`], which preserves the store's
 /// duplicate-id and substring-normalization invariants.
+///
+/// # OSCAL schema version
+///
+/// This parser consumes a bare Risk array, not a full OSCAL document.
+/// The array carries no `metadata.oscal-version` field, so unlike
+/// [`lint_ids_from_catalog`] and
+/// [`super::profile::resolve_profile`], this function performs no
+/// version validation. Callers wrapping the Risk array in an enclosing
+/// OSCAL document (Assessment Results, Plan of Action and Milestones)
+/// are responsible for validating the document's
+/// `metadata.oscal-version` themselves — use [`check_oscal_version`]
+/// on the enclosing object before feeding the Risk subset here.
 ///
 /// # Errors
 ///
@@ -891,6 +928,49 @@ fn nibble(b: u8) -> Option<u8> {
 }
 
 // ---------------------------------------------------------------------------
+// OSCAL schema-version validation (PKIX-7f92.33)
+// ---------------------------------------------------------------------------
+
+/// Validate the `metadata.oscal-version` field carried by an OSCAL
+/// document against [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`].
+///
+/// `container` is the JSON object that directly carries the
+/// `metadata` field. For an OSCAL Catalog whose shape is
+/// `{"catalog": {"metadata": {"oscal-version": "..."}}}`, the caller
+/// passes the inner `catalog` object. For shapes that put `metadata`
+/// at the document root (Assessment Results), the caller passes the
+/// top-level document. The split keeps each parser site explicit
+/// about which level it expects the metadata at.
+///
+/// Use at the entry of any parser that consumes a full OSCAL document
+/// (Catalog, Profile, Assessment Results). Parsers that consume only a
+/// sub-fragment (e.g. [`deviation_store_from_risks`] which takes a bare
+/// Risk array) cannot validate version metadata — that responsibility
+/// stays with the caller wrapping the fragment.
+///
+/// # Errors
+///
+/// * [`ParseError::MissingOscalVersion`] — the container has no
+///   `metadata.oscal-version`, or `metadata` itself is absent.
+/// * [`ParseError::UnsupportedOscalVersion`] — the version string is
+///   not in [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`].
+pub(crate) fn check_oscal_version(
+    container: &serde_json::Map<String, Value>,
+) -> Result<(), ParseError> {
+    let version = container
+        .get("metadata")
+        .and_then(|m| m.get("oscal-version"))
+        .and_then(Value::as_str)
+        .ok_or(ParseError::MissingOscalVersion)?;
+    if !crate::oscal::SUPPORTED_OSCAL_VERSIONS.contains(&version) {
+        return Err(ParseError::UnsupportedOscalVersion {
+            found: version.to_string(),
+        });
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // OSCAL Catalog parsing (PKIX-9vnx.6.3)
 // ---------------------------------------------------------------------------
 
@@ -909,6 +989,12 @@ fn nibble(b: u8) -> Option<u8> {
 ///
 /// # Errors
 ///
+/// * [`ParseError::MissingOscalVersion`] /
+///   [`ParseError::UnsupportedOscalVersion`] — the input Catalog's
+///   `metadata.oscal-version` is absent or names a version outside
+///   [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`]. The version check
+///   runs before any other shape validation so callers fail fast on
+///   wrong-version input.
 /// * [`ParseError::CatalogNotObject`] — top-level value is not a JSON
 ///   object.
 /// * [`ParseError::CatalogMissingWrapper`] — the required `catalog` key
@@ -926,6 +1012,13 @@ pub fn lint_ids_from_catalog(value: &Value) -> Result<Vec<String>, ParseError> {
         .get("catalog")
         .and_then(|c| c.as_object())
         .ok_or(ParseError::CatalogMissingWrapper)?;
+    // Validate the catalog's metadata.oscal-version before doing any
+    // further shape inspection — the Control encoding under the
+    // `catalog` wrapper has version-dependent shape, so accepting an
+    // unknown version risks silent misinterpretation. The Catalog
+    // shape carries metadata inside the `catalog` wrapper, so the
+    // inner object is the version-check container.
+    check_oscal_version(catalog)?;
     let controls = catalog
         .get("controls")
         .and_then(|c| c.as_array())

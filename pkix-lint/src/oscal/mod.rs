@@ -38,3 +38,26 @@ pub mod catalog;
 pub mod emit;
 pub mod parse;
 pub mod profile;
+
+/// OSCAL schema version this module targets. Encoded as
+/// `metadata.oscal-version` by every emitter and validated against the
+/// same string by every parser that consumes a full OSCAL document.
+///
+/// Tied to NIST OSCAL v1.1.2 — the latest stable release at the time
+/// of this module's introduction. Bumping requires re-checking
+/// field-shape changes in the Assessment Results, Catalog, and Profile
+/// schemas.
+pub(crate) const OSCAL_VERSION: &str = "1.1.2";
+
+/// Set of OSCAL schema versions the parsers in this module accept on
+/// `metadata.oscal-version`. Currently a singleton `[OSCAL_VERSION]`;
+/// expanding the set requires verifying field-shape compatibility for
+/// each additional version.
+///
+/// See [`parse::check_oscal_version`] for the entry-point validator
+/// used by [`parse::lint_ids_from_catalog`] and
+/// [`profile::resolve_profile`]. The bare-Risk-array parser
+/// [`parse::deviation_store_from_risks`] does not consume metadata —
+/// callers wrapping it in a full OSCAL document are responsible for
+/// validating the enclosing document's version separately.
+pub(crate) const SUPPORTED_OSCAL_VERSIONS: &[&str] = &[OSCAL_VERSION];

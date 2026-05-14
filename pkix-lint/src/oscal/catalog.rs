@@ -77,8 +77,7 @@ use crate::Lint;
 /// rustdoc for rationale.
 const CATALOG_LAST_MODIFIED: &str = "1970-01-01T00:00:00Z";
 
-/// OSCAL version this emitter targets. Tied to NIST OSCAL v1.1.2.
-const OSCAL_VERSION: &str = "1.1.2";
+use super::OSCAL_VERSION;
 
 /// UUID-v8 salt namespaces, parallel to those in `emit.rs`. Distinct
 /// namespaces keep Catalog UUIDs from colliding with Assessment Results
@@ -708,7 +707,12 @@ mod tests {
 
     #[test]
     fn lint_ids_from_catalog_rejects_non_array_controls() {
-        let v: Value = serde_json::json!({"catalog": {"controls": "not-an-array"}});
+        let v: Value = serde_json::json!({
+            "catalog": {
+                "metadata": {"oscal-version": "1.1.2"},
+                "controls": "not-an-array",
+            }
+        });
         match lint_ids_from_catalog(&v) {
             Err(ParseError::ControlsNotArray) => {}
             other => panic!("expected ControlsNotArray; got: {other:?}"),
@@ -717,10 +721,65 @@ mod tests {
 
     #[test]
     fn lint_ids_from_catalog_rejects_control_missing_id() {
-        let v: Value = serde_json::json!({"catalog": {"controls": [{"title": "no id here"}]}});
+        let v: Value = serde_json::json!({
+            "catalog": {
+                "metadata": {"oscal-version": "1.1.2"},
+                "controls": [{"title": "no id here"}],
+            }
+        });
         match lint_ids_from_catalog(&v) {
             Err(ParseError::ControlMissingId { index: 0 }) => {}
             other => panic!("expected ControlMissingId; got: {other:?}"),
         }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_missing_oscal_version() {
+        // Bare Catalog without metadata.oscal-version must surface
+        // ParseError::MissingOscalVersion (PKIX-7f92.33).
+        let v: Value = serde_json::json!({"catalog": {"controls": []}});
+        match lint_ids_from_catalog(&v) {
+            Err(ParseError::MissingOscalVersion) => {}
+            other => panic!("expected MissingOscalVersion; got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_rejects_unsupported_oscal_version() {
+        // Catalog declaring oscal-version != 1.1.2 must be rejected
+        // (PKIX-7f92.33). Tests 1.0.4 and 1.2.0 — older and newer
+        // schema versions the bead specifically called out.
+        for found in ["1.0.4", "1.2.0"] {
+            let v: Value = serde_json::json!({
+                "catalog": {
+                    "metadata": {"oscal-version": found},
+                    "controls": [],
+                }
+            });
+            match lint_ids_from_catalog(&v) {
+                Err(ParseError::UnsupportedOscalVersion { found: got }) => {
+                    assert_eq!(got, found);
+                }
+                other => panic!(
+                    "expected UnsupportedOscalVersion for version {found}; got: {other:?}"
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn lint_ids_from_catalog_accepts_supported_oscal_version() {
+        // The supported version (1.1.2) must let the parser proceed
+        // past the version check to per-Control validation; with an
+        // empty controls array it returns an empty Vec rather than
+        // any error.
+        let v: Value = serde_json::json!({
+            "catalog": {
+                "metadata": {"oscal-version": "1.1.2"},
+                "controls": [],
+            }
+        });
+        let ids = lint_ids_from_catalog(&v).expect("parse 1.1.2 catalog");
+        assert!(ids.is_empty());
     }
 }
