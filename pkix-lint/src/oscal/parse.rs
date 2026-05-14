@@ -148,6 +148,16 @@ pub enum ParseError {
         /// The value that failed to parse.
         found: String,
     },
+    /// A signed-integer prop (`pkix-lint.deviation-priority`) was not a
+    /// decimal `i32`.
+    InvalidI32 {
+        /// Position of the offending Risk in the input array.
+        index: usize,
+        /// Name of the offending prop.
+        prop: &'static str,
+        /// The value that failed to parse.
+        found: String,
+    },
     /// The reconstructed [`Deviation`] was rejected by
     /// [`DeviationStore::add`] (duplicate id, or an empty required
     /// field that survived parse-side checks).
@@ -400,6 +410,10 @@ impl std::fmt::Display for ParseError {
                 f,
                 "Risk at index {index} prop '{prop}' is not a decimal u64: '{found}'"
             ),
+            Self::InvalidI32 { index, prop, found } => write!(
+                f,
+                "Risk at index {index} prop '{prop}' is not a decimal i32: '{found}'"
+            ),
             Self::AddFailed { index, source } => write!(
                 f,
                 "Risk at index {index} could not be added to the store: {source}"
@@ -616,6 +630,17 @@ fn parse_risk(idx: usize, risk: &Value) -> Result<Deviation, ParseError> {
         get_prop("pkix-lint.effective-end"),
         "pkix-lint.effective-end",
     )?;
+    // PKIX-7f92.38: Deviation.priority is round-tripped through the
+    // optional `pkix-lint.deviation-priority` prop. A missing prop
+    // decodes to priority=0 (the in-memory default), preserving
+    // byte-for-byte compatibility with OSCAL files emitted before the
+    // priority field existed.
+    let priority = parse_optional_i32(
+        idx,
+        get_prop("pkix-lint.deviation-priority"),
+        "pkix-lint.deviation-priority",
+    )?
+    .unwrap_or(0);
 
     // Subjects → scope.
     let subjects = obj
@@ -640,16 +665,7 @@ fn parse_risk(idx: usize, risk: &Value) -> Result<Deviation, ParseError> {
         justification,
         authorized_by,
         evidence_uri,
-        // OSCAL Risk schema does not currently carry a priority axis.
-        // Risks parsed from OSCAL default to priority 0; site-local
-        // priority overrides should be set after import via
-        // Deviation::with_priority.
-        //
-        // PKIX-hy2e.10 — adding an OSCAL extension prop to round-trip
-        // priority through Risk JSON is a separate scope (the OSCAL
-        // Risk extension model uses Risk/Prop with a namespaced key);
-        // for now, priority is in-memory only.
-        priority: 0,
+        priority,
     })
 }
 
@@ -702,6 +718,24 @@ fn parse_optional_u64(
             .parse::<u64>()
             .map(Some)
             .map_err(|_| ParseError::InvalidU64 {
+                index: idx,
+                prop: prop_name,
+                found: v.to_string(),
+            }),
+    }
+}
+
+fn parse_optional_i32(
+    idx: usize,
+    value: Option<&str>,
+    prop_name: &'static str,
+) -> Result<Option<i32>, ParseError> {
+    match value {
+        None => Ok(None),
+        Some(v) => v
+            .parse::<i32>()
+            .map(Some)
+            .map_err(|_| ParseError::InvalidI32 {
                 index: idx,
                 prop: prop_name,
                 found: v.to_string(),
@@ -1104,6 +1138,174 @@ mod tests {
         assert_eq!(risks.len(), 2);
         let parsed = deviation_store_from_risks(&Value::Array(risks)).expect("parse");
         assert_eq!(parsed, store);
+    }
+
+    /// Regression test for PKIX-7f92.38: Deviation.priority round-trips
+    /// through the optional `pkix-lint.deviation-priority` prop.
+    /// Constructs three deviations spanning positive, negative, and zero
+    /// priorities and confirms each is preserved across emit+parse.
+    /// Without the round-trip encoding the parsed store would have
+    /// priority=0 on every deviation and fail Eq against the original
+    /// for the positive and negative entries.
+    #[test]
+    fn round_trip_preserves_priority() {
+        let mut store = DeviationStore::new();
+        // Positive priority (highest precedence in tie-break).
+        store
+            .add(
+                Deviation {
+                    id: "policy-priority-high".to_string(),
+                    target_lint: "rfc5280.bc.ca-true-required".to_string(),
+                    scope: DeviationScope::any(),
+                    effective_start: None,
+                    effective_end: None,
+                    action: DeviationAction::Suppress,
+                    justification: "High-priority suppression".to_string(),
+                    authorized_by: "lead@example.com".to_string(),
+                    evidence_uri: None,
+                    priority: 1000,
+                },
+            )
+            .expect("add high");
+        // Negative priority (deprioritized resolution).
+        store
+            .add(
+                Deviation {
+                    id: "policy-priority-low".to_string(),
+                    target_lint: "rfc5280.aki.required".to_string(),
+                    scope: DeviationScope::any(),
+                    effective_start: None,
+                    effective_end: None,
+                    action: DeviationAction::Suppress,
+                    justification: "Low-priority suppression".to_string(),
+                    authorized_by: "lead@example.com".to_string(),
+                    evidence_uri: None,
+                    priority: -500,
+                },
+            )
+            .expect("add low");
+        // Zero priority (default; no prop emitted).
+        store
+            .add(
+                Deviation {
+                    id: "policy-priority-zero".to_string(),
+                    target_lint: "rfc5280.ski.required".to_string(),
+                    scope: DeviationScope::any(),
+                    effective_start: None,
+                    effective_end: None,
+                    action: DeviationAction::Suppress,
+                    justification: "Default-priority suppression".to_string(),
+                    authorized_by: "lead@example.com".to_string(),
+                    evidence_uri: None,
+                    priority: 0,
+                },
+            )
+            .expect("add zero");
+
+        let risks = super::super::emit::risks_from_store(&store);
+
+        // Independent oracle: only the non-zero deviations carry the
+        // priority prop. (Defends the "emit only when non-zero" branch
+        // against a regression to "always emit" which would bloat
+        // legacy OSCAL files unnecessarily.)
+        let prop_count: usize = risks
+            .iter()
+            .map(|r| {
+                r.get("props")
+                    .and_then(Value::as_array)
+                    .map(|props| {
+                        props
+                            .iter()
+                            .filter(|p| {
+                                p.get("name").and_then(Value::as_str)
+                                    == Some("pkix-lint.deviation-priority")
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0)
+            })
+            .sum();
+        assert_eq!(
+            prop_count, 2,
+            "expected exactly 2 priority props (one each for +1000 and -500); zero is implicit"
+        );
+
+        let parsed = deviation_store_from_risks(&Value::Array(risks)).expect("parse");
+        assert_eq!(parsed, store, "priority must round-trip exactly");
+    }
+
+    /// Confirms that an OSCAL Risk array missing the
+    /// `pkix-lint.deviation-priority` prop entirely (i.e., legacy
+    /// pre-priority emit output) parses to priority=0. Locks the
+    /// backwards-compatibility behavior.
+    #[test]
+    fn parse_treats_missing_priority_prop_as_zero() {
+        // Hand-craft a Risk array WITHOUT the priority prop (matching
+        // the shape of pre-priority OSCAL files).
+        let risks = json!([{
+            "uuid": "00000000-0000-8000-8000-000000000000",
+            "title": "Legacy deviation",
+            "description": "Pre-priority justification",
+            "statement": "Pre-priority justification",
+            "status": "deviation-approved",
+            "props": [
+                {"name": "pkix-lint.deviation-id", "value": "legacy-id"},
+                {"name": "pkix-lint.target-lint", "value": "rfc5280.aki.required"},
+                {"name": "pkix-lint.action", "value": "suppress"},
+                {"name": "pkix-lint.authorized-by", "value": "legacy@example.com"},
+            ],
+            "subjects": [
+                {
+                    "type": "pkix-lint.scope.any",
+                    "subject-uuid": "00000000-0000-8000-8000-000000000001",
+                    "title": "All certificates",
+                }
+            ],
+        }]);
+
+        let parsed = deviation_store_from_risks(&risks).expect("parse legacy shape");
+        let d = &parsed.all()[0];
+        assert_eq!(
+            d.priority, 0,
+            "missing priority prop must decode to the default value 0"
+        );
+    }
+
+    /// A malformed `pkix-lint.deviation-priority` value (non-numeric)
+    /// must surface as `ParseError::InvalidI32` rather than silently
+    /// defaulting or panicking.
+    #[test]
+    fn rejects_non_numeric_priority_prop() {
+        let risks = json!([{
+            "uuid": "00000000-0000-8000-8000-000000000000",
+            "title": "Malformed-priority deviation",
+            "description": "Justification text",
+            "statement": "Justification text",
+            "status": "deviation-approved",
+            "props": [
+                {"name": "pkix-lint.deviation-id", "value": "bad-priority"},
+                {"name": "pkix-lint.target-lint", "value": "rfc5280.aki.required"},
+                {"name": "pkix-lint.action", "value": "suppress"},
+                {"name": "pkix-lint.authorized-by", "value": "ops@example.com"},
+                {"name": "pkix-lint.deviation-priority", "value": "not-an-i32"},
+            ],
+            "subjects": [
+                {
+                    "type": "pkix-lint.scope.any",
+                    "subject-uuid": "00000000-0000-8000-8000-000000000001",
+                    "title": "All certificates",
+                }
+            ],
+        }]);
+        let err = deviation_store_from_risks(&risks).expect_err("must reject");
+        match err {
+            ParseError::InvalidI32 { index, prop, found } => {
+                assert_eq!(index, 0);
+                assert_eq!(prop, "pkix-lint.deviation-priority");
+                assert_eq!(found, "not-an-i32");
+            }
+            other => panic!("expected InvalidI32, got: {other:?}"),
+        }
     }
 
     // -----------------------------------------------------------------

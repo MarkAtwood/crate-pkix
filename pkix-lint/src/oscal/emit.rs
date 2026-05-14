@@ -465,6 +465,17 @@ fn risk_for_deviation(d: &Deviation) -> Value {
     if let Some(end) = d.effective_end {
         props.push(prop("pkix-lint.effective-end", &end.to_string()));
     }
+    // Emit priority only when non-default so legacy OSCAL files stay
+    // byte-identical for callers that never set priority. The parser
+    // treats a missing prop as priority=0 (matching the in-memory
+    // default established by the builder), so this is round-trip-safe
+    // for both zero and non-zero values.
+    if d.priority != 0 {
+        props.push(prop(
+            "pkix-lint.deviation-priority",
+            &d.priority.to_string(),
+        ));
+    }
 
     let mut risk = json!({
         "uuid": uuid,
