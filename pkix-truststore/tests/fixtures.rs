@@ -186,8 +186,8 @@ fn from_der_iter_reports_index_of_malformed_entry() {
     // Position 1 (0-indexed): first good, second bad.
     let inputs: [&[u8]; 2] = [good.as_slice(), bad.as_slice()];
     match from_der_iter(inputs) {
-        Err(Error::MalformedAnchor(i)) => assert_eq!(i, 1),
-        other => panic!("expected MalformedAnchor(1), got {other:?}"),
+        Err(Error::MalformedAnchor { index, source: _ }) => assert_eq!(index, 1),
+        other => panic!("expected MalformedAnchor {{ index: 1, .. }}, got {other:?}"),
     }
 }
 

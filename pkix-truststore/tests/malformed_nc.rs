@@ -83,13 +83,13 @@ fn from_pem_rejects_malformed_nc_at_second_block() {
 #[test]
 fn from_der_iter_reports_index_of_malformed_nc() {
     // A good anchor at index 0, a malformed-NC anchor at index 1.
-    // from_der_iter must surface MalformedAnchor(1).
+    // from_der_iter must surface MalformedAnchor { index: 1, source }.
     let good = read_fixture(GOOD_NC_DER_PATH);
     let bad = read_fixture(MALFORMED_NC_DER_PATH);
     let inputs: &[&[u8]] = &[good.as_slice(), bad.as_slice()];
     match from_der_iter(inputs.iter().copied()) {
-        Err(Error::MalformedAnchor(i)) => assert_eq!(i, 1),
-        other => panic!("expected MalformedAnchor(1); got {other:?}"),
+        Err(Error::MalformedAnchor { index, source: _ }) => assert_eq!(index, 1),
+        other => panic!("expected MalformedAnchor {{ index: 1, .. }}; got {other:?}"),
     }
 }
 
