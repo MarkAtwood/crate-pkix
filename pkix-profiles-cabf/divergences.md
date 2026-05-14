@@ -72,17 +72,16 @@ called out in each profile's rustdoc `# Limitations` section. Callers
 chaining these profiles against real-world CA hierarchies should
 override `max_validity_secs` or use a custom policy.
 
-### Sub-profile families partially split — Strict generation only
+### Sub-profile families partially split — Strict + Multipurpose
 
-All S/MIME `Profile` types in this crate target the **Strict
-generation** (`.3` OID suffix). Per S/MIME BR §7.1.6.1 line 2600,
-Legacy generation (`.1`) was banned for new issuance effective
-2025-07-15; the `-cabf` crate intentionally does not ship Legacy-tier
-profile types. Multipurpose generation (`.2`) is a transitional bridge
-profile and is tracked separately as PKIX-jbvb.8 (open architectural
-question on whether to add Multipurpose Profile types). The
-spec-taxonomy principle in AGENTS.md (PKIX-mzsk) ships one canonical
-Profile per validation type, targeting the modern tier (Strict).
+S/MIME `Profile` types in this crate target either the **Strict
+generation** (`.3` OID suffix — the modern canonical target per the
+spec-taxonomy principle in AGENTS.md PKIX-mzsk) or the **Multipurpose
+generation** (`.2` OID suffix — sibling profiles per the PKIX-jbvb.9
+implementation epic, decision recorded in PKIX-jbvb.8). Per S/MIME BR
+§7.1.6.1 line 2600, Legacy generation (`.1`) was banned for new
+issuance effective 2025-07-15; the `-cabf` crate intentionally does
+not ship Legacy-tier profile types.
 
 - `SmimeProfile` — Mailbox-validated baseline, Strict generation.
   825-day validity cap; rfc822Name SAN; emailProtection EKU.
@@ -93,8 +92,32 @@ Profile per validation type, targeting the modern tier (Strict).
 - `SmimeIndividualValidated` — Individual-validated tier (§7.6),
   Strict generation. Reserved policy OID `2.23.140.1.5.4.3`. Subject
   DN rule per §7.1.4.2.6 Note 2: `(givenName AND surname) OR pseudonym`.
-- Organization-validated (§7.4) Profile type remains tracked under
-  PKIX-jbvb.1.
+- `SmimeIndividualValidatedMultipurpose` — Individual-validated tier
+  (§7.6), Multipurpose generation. Reserved policy OID
+  `2.23.140.1.5.4.2`. Subject DN rule is identical to Strict per
+  §7.1.4.2.6 Note 2 ("Strict and Multipurpose Generation profiles
+  SHALL include either subject:givenName and/or subject:surname, or
+  the subject:pseudonym").
+- Organization-validated (§7.4) Strict-generation Profile type
+  remains tracked under PKIX-jbvb.1. Mailbox / Sponsor / Organization
+  Multipurpose sibling Profile types remain tracked under PKIX-jbvb.9.
+
+#### Strict vs Multipurpose EKU permissiveness — not validator-enforced
+
+Per §7.1.2.3(f), Strict-generation subscriber certificates may assert
+*only* `id-kp-emailProtection` as their EKU, while Multipurpose-
+generation certificates may additionally assert other EKU values
+(typically `id-kp-codeSigning` for document-signing crossover). The
+workspace `ValidationPolicy::required_leaf_eku` field is a subset-of
+check (the cert's EKU MUST contain each required OID; other OIDs are
+permitted). It does not express "exactly this EKU set" or "this EKU
+is forbidden".
+
+Consequence: at the `ValidationPolicy` level, the Strict and
+Multipurpose Profiles differ only in the asserted policy OID. The
+Strict-generation "emailProtection only" constraint is not enforced
+by the validator. Comprehensive enforcement of that semantic belongs
+to `pkix-policy-zlint` per AGENTS.md non-negotiable #5.
 
 ### Subscriber-cert taxonomy only
 
