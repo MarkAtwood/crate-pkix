@@ -230,9 +230,10 @@ pub enum Error {
     /// mistake, so this is a hard error rather than `Ok(vec![])`.
     NoCertificates,
     /// One certificate in a multi-cert input was malformed. The wrapped
-    /// `usize` is the 0-based position of the offending entry in the input
-    /// stream (PEM block index for [`from_pem`], iterator index for
-    /// [`from_der_iter`]).
+    /// `usize` is the 0-based position of the offending entry in the
+    /// iterator passed to [`from_der_iter`]. Returned both for entries that
+    /// failed to decode as `Certificate` and for entries that decoded but
+    /// whose `NameConstraints` extension had malformed DER.
     MalformedAnchor(usize),
 }
 
@@ -309,8 +310,21 @@ fn strip_bom(bytes: &[u8]) -> &[u8] {
 ///
 /// * [`Error::Pem`] — PEM boundary or base64 was malformed.
 /// * [`Error::Der`] — a PEM block decoded but its DER body was not a valid
-///   `Certificate`.
+///   `Certificate`, or one of its critical extensions (notably
+///   `NameConstraints`) had malformed DER. See "`NameConstraints` strictness"
+///   below.
 /// * [`Error::NoCertificates`] — input contained zero PEM blocks.
+///
+/// # `NameConstraints` strictness
+///
+/// Trust anchors are decoded via [`TrustAnchor::try_from`], which fails closed
+/// on a malformed `NameConstraints` extension (RFC 5280 §4.2: a critical
+/// extension a relying party cannot process must cause rejection — and the
+/// strongest form of "cannot process" is "cannot parse"). For a trust anchor
+/// in particular, accepting an anchor whose `NameConstraints` could not be
+/// parsed would be a fail-open: the deployment asserted "this root may only
+/// sign for these names" via that extension, and silently dropping it would
+/// remove the constraint at validation time.
 pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
     let bytes = strip_bom(bytes);
     // x509-cert 0.2.x's `load_pem_chain` panics on input that is empty after
@@ -331,7 +345,10 @@ pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
     if certs.is_empty() {
         return Err(Error::NoCertificates);
     }
-    Ok(certs.into_iter().map(TrustAnchor::from_cert).collect())
+    certs
+        .into_iter()
+        .map(|c| TrustAnchor::try_from(c).map_err(Error::Der))
+        .collect()
 }
 
 const BEGIN_BOUNDARY: &[u8] = b"-----BEGIN CERTIFICATE-----";
@@ -345,10 +362,11 @@ const BEGIN_BOUNDARY: &[u8] = b"-----BEGIN CERTIFICATE-----";
 /// # Errors
 ///
 /// Returns [`Error::Der`] if the bytes do not decode as a single
-/// `Certificate`.
+/// `Certificate`, or if the certificate has a malformed `NameConstraints`
+/// extension (see [`from_pem`] for rationale).
 pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
     let cert = Certificate::from_der(bytes).map_err(|e| Error::Der(DerError::new(e)))?;
-    Ok(TrustAnchor::from_cert(cert))
+    TrustAnchor::try_from(cert).map_err(Error::Der)
 }
 
 /// Parse an iterator of DER-encoded certificates into trust anchors.
@@ -364,10 +382,14 @@ pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
 /// # Errors
 ///
 /// * [`Error::MalformedAnchor`] — the wrapped index identifies which entry
-///   in the iterator failed to decode. The underlying [`der::Error`] is not
-///   currently surfaced; if you need it, decode entries one at a time with
-///   [`from_der`].
+///   in the iterator failed to decode, either as a `Certificate` or because
+///   a critical extension (notably `NameConstraints`) had malformed DER.
+///   The underlying [`der::Error`] is not currently surfaced; if you need
+///   it, decode entries one at a time with [`from_der`].
 /// * [`Error::NoCertificates`] — the iterator yielded zero items.
+///
+/// See [`from_pem`] for the rationale behind fail-closed `NameConstraints`
+/// handling.
 pub fn from_der_iter<I, B>(iter: I) -> Result<Vec<TrustAnchor>, Error>
 where
     I: IntoIterator<Item = B>,
@@ -376,7 +398,8 @@ where
     let mut anchors = Vec::new();
     for (i, bytes) in iter.into_iter().enumerate() {
         let cert = Certificate::from_der(bytes.as_ref()).map_err(|_| Error::MalformedAnchor(i))?;
-        anchors.push(TrustAnchor::from_cert(cert));
+        let anchor = TrustAnchor::try_from(cert).map_err(|_| Error::MalformedAnchor(i))?;
+        anchors.push(anchor);
     }
     if anchors.is_empty() {
         return Err(Error::NoCertificates);
