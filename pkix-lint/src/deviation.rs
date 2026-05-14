@@ -72,6 +72,21 @@ pub enum DeviationAddError {
     DuplicateId(String),
     /// A required string field (`justification` or `authorized_by`) was empty.
     EmptyField(String),
+    /// The deviation's [`DeviationScope`] is structurally malformed:
+    /// the `kind` is recognized but a required prop is missing or
+    /// wrong-typed for that kind. Returned by [`DeviationStore::add`]
+    /// at insertion time so the operator sees a specific error
+    /// instead of a silent never-matches deviation (PKIX-hy2e.9).
+    ///
+    /// `kind` names the offending scope kind; `reason` describes the
+    /// structural problem (e.g. "missing required prop
+    /// 'pkix-lint.issuer-dn-substring'").
+    MalformedScope {
+        /// The offending scope's `kind` discriminator.
+        kind: String,
+        /// Human-readable description of the structural problem.
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for DeviationAddError {
@@ -82,6 +97,9 @@ impl std::fmt::Display for DeviationAddError {
             }
             Self::EmptyField(field) => {
                 write!(f, "deviation field '{field}' must not be empty")
+            }
+            Self::MalformedScope { kind, reason } => {
+                write!(f, "deviation scope kind '{kind}' is malformed: {reason}")
             }
         }
     }
@@ -590,6 +608,60 @@ impl DeviationScope {
     }
 }
 
+/// Validate that a [`DeviationScope`] is structurally well-formed for
+/// its declared `kind`. Called by [`DeviationStore::add`] so the
+/// operator sees [`DeviationAddError::MalformedScope`] at insertion
+/// time rather than a silent never-match at evaluation time
+/// (PKIX-hy2e.9).
+///
+/// Unknown / custom kinds are accepted without inspection — they
+/// fail-closed at match time, which is the documented contract for
+/// caller-defined scope axes. Callers extending the scope model
+/// should plumb their own validation into this helper.
+fn validate_scope(scope: &DeviationScope) -> Result<(), DeviationAddError> {
+    let missing = |prop: &str| -> DeviationAddError {
+        DeviationAddError::MalformedScope {
+            kind: scope.kind.clone(),
+            reason: format!("missing required prop '{prop}'"),
+        }
+    };
+    let wrong_type = |prop: &str, expected: &str| -> DeviationAddError {
+        DeviationAddError::MalformedScope {
+            kind: scope.kind.clone(),
+            reason: format!("prop '{prop}' has wrong type (expected {expected})"),
+        }
+    };
+
+    match scope.kind.as_str() {
+        SCOPE_KIND_ANY => Ok(()),
+        SCOPE_KIND_ISSUER_DN_CONTAINS => match scope.get_prop(PROP_ISSUER_DN_SUBSTRING) {
+            None => Err(missing(PROP_ISSUER_DN_SUBSTRING)),
+            Some(ScopePropValue::Text(_)) => Ok(()),
+            Some(_) => Err(wrong_type(PROP_ISSUER_DN_SUBSTRING, "Text")),
+        },
+        SCOPE_KIND_ISSUER_DN_EXACT => match scope.get_prop(PROP_ISSUER_DN_DER) {
+            None => Err(missing(PROP_ISSUER_DN_DER)),
+            Some(ScopePropValue::Bytes(_)) => Ok(()),
+            Some(_) => Err(wrong_type(PROP_ISSUER_DN_DER, "Bytes")),
+        },
+        SCOPE_KIND_SERIAL_RANGE => {
+            for prop in [PROP_ISSUER_DN_DER, PROP_SERIAL_START, PROP_SERIAL_END] {
+                match scope.get_prop(prop) {
+                    None => return Err(missing(prop)),
+                    Some(ScopePropValue::Bytes(_)) => {}
+                    Some(_) => return Err(wrong_type(prop, "Bytes")),
+                }
+            }
+            Ok(())
+        }
+        // Custom kinds defined by callers are accepted without
+        // inspection. Per the DeviationScope rustdoc, unknown kinds
+        // fail-closed at DeviationScope::matches time; that's the
+        // documented extensibility contract.
+        _ => Ok(()),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // serde::Serialize for DeviationScope and ScopePropValue
 //
@@ -777,6 +849,17 @@ impl DeviationStore {
         if self.deviations.iter().any(|d| d.id == deviation.id) {
             return Err(DeviationAddError::DuplicateId(deviation.id.clone()));
         }
+        // Validate scope structure (PKIX-hy2e.9). The built-in
+        // constructors (DeviationScope::any/issuer_dn_contains/
+        // issuer_dn_exact/serial_range) always produce well-formed
+        // scopes, but the pre-#[non_exhaustive] code accepted direct
+        // struct literals with missing/wrong-typed props that silently
+        // never matched at runtime. Even with #[non_exhaustive] on the
+        // struct, the public field shape still permits internal
+        // callers (and hand-constructed test fixtures) to assemble
+        // malformed scopes. Rejecting at insertion time gives the
+        // operator a specific error rather than a silent never-match.
+        validate_scope(&deviation.scope)?;
         // Normalize the issuer-dn-contains substring to lowercase at
         // insertion time so that matching logic does not need to re-normalize
         // on every call. This prevents a silent no-match when callers pass a
@@ -1675,6 +1758,146 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             DeviationAddError::DuplicateId("d1".to_string())
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.9 regression — DeviationStore::add rejects structurally
+    // malformed scopes with DeviationAddError::MalformedScope, so the
+    // operator sees a specific error at insertion time rather than a
+    // silent never-match at evaluation time.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn store_rejects_issuer_dn_contains_missing_substring_prop() {
+        let mut store = DeviationStore::new();
+        let bad = Deviation {
+            scope: DeviationScope {
+                kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_string(),
+                props: vec![], // missing PROP_ISSUER_DN_SUBSTRING
+            },
+            ..make_deviation("malformed", "test.lint")
+        };
+        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        match err {
+            DeviationAddError::MalformedScope { kind, reason } => {
+                assert_eq!(kind, SCOPE_KIND_ISSUER_DN_CONTAINS);
+                assert!(
+                    reason.contains(PROP_ISSUER_DN_SUBSTRING),
+                    "reason must name the missing prop; got: {reason}"
+                );
+            }
+            other => panic!("expected MalformedScope, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_rejects_issuer_dn_contains_wrong_typed_substring_prop() {
+        let mut store = DeviationStore::new();
+        let bad = Deviation {
+            scope: DeviationScope {
+                kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_string(),
+                props: vec![(
+                    PROP_ISSUER_DN_SUBSTRING.to_string(),
+                    ScopePropValue::Bytes(vec![0x00]), // wrong type — should be Text
+                )],
+            },
+            ..make_deviation("malformed", "test.lint")
+        };
+        let err = store.add(bad).expect_err("wrong-typed prop must be rejected");
+        match err {
+            DeviationAddError::MalformedScope { kind, reason } => {
+                assert_eq!(kind, SCOPE_KIND_ISSUER_DN_CONTAINS);
+                assert!(
+                    reason.contains("Text"),
+                    "reason must name the expected type; got: {reason}"
+                );
+            }
+            other => panic!("expected MalformedScope, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_rejects_issuer_dn_exact_missing_der_prop() {
+        let mut store = DeviationStore::new();
+        let bad = Deviation {
+            scope: DeviationScope {
+                kind: SCOPE_KIND_ISSUER_DN_EXACT.to_string(),
+                props: vec![], // missing PROP_ISSUER_DN_DER
+            },
+            ..make_deviation("malformed", "test.lint")
+        };
+        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        assert!(matches!(err, DeviationAddError::MalformedScope { .. }));
+    }
+
+    #[test]
+    fn store_rejects_serial_range_missing_serial_end_prop() {
+        let mut store = DeviationStore::new();
+        let bad = Deviation {
+            scope: DeviationScope {
+                kind: SCOPE_KIND_SERIAL_RANGE.to_string(),
+                props: vec![
+                    (
+                        PROP_ISSUER_DN_DER.to_string(),
+                        ScopePropValue::Bytes(vec![0x30, 0x00]),
+                    ),
+                    (
+                        PROP_SERIAL_START.to_string(),
+                        ScopePropValue::Bytes(vec![0x01]),
+                    ),
+                    // missing PROP_SERIAL_END
+                ],
+            },
+            ..make_deviation("malformed", "test.lint")
+        };
+        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        match err {
+            DeviationAddError::MalformedScope { reason, .. } => {
+                assert!(
+                    reason.contains(PROP_SERIAL_END),
+                    "reason must name the missing prop; got: {reason}"
+                );
+            }
+            other => panic!("expected MalformedScope, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn store_accepts_well_formed_scopes_from_constructors() {
+        // Positive control: the canonical scope constructors produce
+        // well-formed scopes that pass validate_scope.
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                scope: DeviationScope::any(),
+                ..make_deviation("d-any", "lint.a")
+            })
+            .expect("any() scope must be well-formed");
+        store
+            .add(Deviation {
+                scope: DeviationScope::issuer_dn_contains("foo"),
+                ..make_deviation("d-contains", "lint.b")
+            })
+            .expect("issuer_dn_contains() scope must be well-formed");
+    }
+
+    #[test]
+    fn store_accepts_custom_scope_kind_without_inspection() {
+        // Per the DeviationScope rustdoc, unknown / custom kinds are
+        // accepted (and fail-closed at match time). Validate that the
+        // store does not reject them at add time.
+        let mut store = DeviationStore::new();
+        let custom = Deviation {
+            scope: DeviationScope {
+                kind: "custom.policy-bundle.org/some-axis".to_string(),
+                props: vec![],
+            },
+            ..make_deviation("d-custom", "lint.c")
+        };
+        store.add(custom).expect(
+            "custom scope kinds are caller-defined extensibility; \
+             validate_scope must not reject them",
         );
     }
 
