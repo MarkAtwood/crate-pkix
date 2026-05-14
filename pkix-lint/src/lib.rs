@@ -1618,10 +1618,23 @@ impl LintRunner {
 
     /// Evaluate all certificate-scope lints against every certificate in `chain`.
     ///
-    /// `kinds` maps chain index to [`SubjectKind`]. If `kinds` is shorter than
-    /// `chain`, remaining certs are treated as [`SubjectKind::IntermediateCa`].
+    /// `kinds` maps chain index to [`SubjectKind`] and MUST have the
+    /// same length as `chain`. Each `kinds[i]` is the classification
+    /// for `chain[i]`.
     ///
     /// Returns a flat `Vec<Finding>` with `cert_index` set for each.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `kinds.len() != chain.len()`. Earlier versions
+    /// silently defaulted missing entries to
+    /// [`SubjectKind::IntermediateCa`], which produced a class of audit
+    /// hazards: a leaf-only lint silently returned `NotApplicable` on
+    /// what was actually a leaf cert, and the compliance report
+    /// looked clean until manual inspection found the misclassification.
+    /// The PKIX-7f92.9 review concluded that a truncated kinds slice is
+    /// almost certainly a caller bug, never a deliberate API use; the
+    /// runner now fails loudly instead.
     ///
     /// # Determining the `AnchorIssued` position
     ///
@@ -1648,9 +1661,19 @@ impl LintRunner {
         kinds: &[SubjectKind],
         now_unix: u64,
     ) -> Vec<Finding> {
+        assert_eq!(
+            kinds.len(),
+            chain.len(),
+            "LintRunner::run_chain requires kinds.len() == chain.len() \
+             (got kinds={}, chain={}); see PKIX-7f92.9. A shorter `kinds` \
+             slice is treated as a caller bug — provide an explicit \
+             SubjectKind for every certificate.",
+            kinds.len(),
+            chain.len(),
+        );
         let mut all = Vec::new();
         for (i, cert) in chain.iter().enumerate() {
-            let kind = kinds.get(i).copied().unwrap_or(SubjectKind::IntermediateCa);
+            let kind = kinds[i];
             all.extend(self.run_cert(cert, kind, i, now_unix));
         }
         all
@@ -2239,6 +2262,31 @@ mod tests {
         assert_eq!(findings[0].cert_index, Some(0));
         assert_eq!(findings[1].cert_index, Some(1));
         assert_eq!(findings[2].cert_index, Some(2));
+    }
+
+    /// Regression test for PKIX-7f92.9: passing a kinds slice shorter
+    /// than the chain must panic with a message naming the lengths.
+    /// Pre-fix, this silently defaulted missing positions to
+    /// IntermediateCa, producing the silent-misclassification audit
+    /// hazard the bead flagged.
+    #[test]
+    #[should_panic(expected = "LintRunner::run_chain requires kinds.len() == chain.len()")]
+    fn runner_run_chain_panics_on_kinds_shorter_than_chain() {
+        let cert = load_fixture_cert();
+        let chain = vec![cert.clone(), cert.clone(), cert];
+        let kinds = vec![SubjectKind::Leaf]; // intentionally short
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let _ = runner.run_chain(&chain, &kinds, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "LintRunner::run_chain requires kinds.len() == chain.len()")]
+    fn runner_run_chain_panics_on_kinds_longer_than_chain() {
+        let cert = load_fixture_cert();
+        let chain = vec![cert.clone()];
+        let kinds = vec![SubjectKind::Leaf, SubjectKind::IntermediateCa];
+        let runner = LintRunner::new(vec![Box::new(AlwaysPass)]);
+        let _ = runner.run_chain(&chain, &kinds, 0);
     }
 
     #[test]

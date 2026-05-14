@@ -1257,8 +1257,16 @@ impl DeviationRunner {
 
     /// Evaluate certificate-scope lints on every cert in `chain` and apply deviations.
     ///
-    /// `kinds` maps chain index to [`crate::SubjectKind`]. If `kinds` is shorter than
-    /// `chain`, remaining certificates are treated as [`crate::SubjectKind::IntermediateCa`].
+    /// `kinds` maps chain index to [`crate::SubjectKind`] and MUST
+    /// have the same length as `chain`. Each `kinds[i]` is the
+    /// classification for `chain[i]`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `kinds.len() != chain.len()`. See
+    /// [`crate::LintRunner::run_chain`] for the rationale — the
+    /// silently-default-to-IntermediateCa behavior was removed under
+    /// PKIX-7f92.9 because it caused silent leaf-cert misclassification.
     #[must_use]
     pub fn run_chain(
         &self,
@@ -1266,12 +1274,17 @@ impl DeviationRunner {
         kinds: &[crate::SubjectKind],
         now_unix: u64,
     ) -> DeviationRunResult {
+        assert_eq!(
+            kinds.len(),
+            chain.len(),
+            "DeviationRunner::run_chain requires kinds.len() == chain.len() \
+             (got kinds={}, chain={}); see PKIX-7f92.9.",
+            kinds.len(),
+            chain.len(),
+        );
         let mut result = DeviationRunResult::default();
         for (i, cert) in chain.iter().enumerate() {
-            let kind = kinds
-                .get(i)
-                .copied()
-                .unwrap_or(crate::SubjectKind::IntermediateCa);
+            let kind = kinds[i];
             let raw = self.runner.run_cert(cert, kind, i, now_unix);
             let partial = self.apply_deviations(raw, cert, now_unix);
             result.findings.extend(partial.findings);
