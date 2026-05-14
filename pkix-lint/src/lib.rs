@@ -293,12 +293,33 @@ pub mod rfc8551;
 /// checks a MUST requirement from a normative spec should be [`Severity::Error`].
 /// A lint that checks a SHOULD or advisory requirement should be [`Severity::Warn`].
 ///
-/// The ordering `Info < Notice < Warn < Error < Fatal` aligns with both the
-/// zlint catalog ranking (`pass(3) < notice(4) < warn(5) < error(6) <
-/// fatal(7)`, see `~/GIT/zlint/v3/lint/result.go`) and syslog
+/// # Ordering
+///
+/// `Severity` deliberately does NOT derive `PartialOrd` / `Ord`. Comparing
+/// severities directly with `<` / `>=` would couple every caller's
+/// comparison semantics to the source-order position of the variants —
+/// inserting a new variant in the middle of the enum (e.g., a future
+/// syslog-aligned `Critical` between `Error` and `Fatal`) would silently
+/// change the meaning of every `>= Severity::Warn` predicate in caller
+/// code. The `#[derive(Ord)] on a public enum` stability trap is a known
+/// hazard in the Rust ecosystem.
+///
+/// Use [`Severity::rank`] for ordering: it returns a documented per-variant
+/// `u8` where higher values are more severe. The ranks are stable across
+/// variant insertions — a new variant picks a free `u8` slot in the right
+/// semantic position without disturbing existing ranks.
+///
+/// Worked example: `if finding.severity.rank() >= Severity::Warn.rank()
+/// { ... }` retains its meaning across pkix-lint versions even if a new
+/// variant lands between `Info` and `Warn`.
+///
+/// The rank scale `Info=10, Notice=20, Warn=30, Error=40, Fatal=50` aligns
+/// with both the zlint catalog ranking (`pass(3) < notice(4) < warn(5) <
+/// error(6) < fatal(7)`, see `~/GIT/zlint/v3/lint/result.go`) and syslog
 /// RFC 5424 §6.2.1 severity ranking (Informational > Notice > Warning).
+/// Ranks are spaced by 10 to leave room for future insertions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Severity {
     /// Advisory / best-practice — does not constitute a violation.
@@ -318,6 +339,27 @@ pub enum Severity {
     ///
     /// For example: malformed DER structure that prevents parsing subsequent fields.
     Fatal,
+}
+
+impl Severity {
+    /// Documented `u8` rank for stable ordering across variant
+    /// insertions. Use this instead of comparing `Severity` values
+    /// directly. See the struct rustdoc for the rationale.
+    ///
+    /// Ranks are spaced by 10 so a future mid-scale insertion can
+    /// claim a free slot without disturbing existing ranks. For
+    /// example, a syslog-aligned `Critical` between `Error` and
+    /// `Fatal` would land at rank 45.
+    #[must_use]
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::Info => 10,
+            Self::Notice => 20,
+            Self::Warn => 30,
+            Self::Error => 40,
+            Self::Fatal => 50,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1852,22 +1894,39 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Severity ordering tests
+    // Severity rank stability tests
     //
-    // Oracle: the doc comment on Severity pins
-    // `Info < Notice < Warn < Error < Fatal` to align with zlint catalog
-    // ranking and syslog RFC 5424 §6.2.1. Adding a variant in the middle of
-    // a `#[derive(PartialOrd, Ord)]` enum reorders existing variants, so
-    // this test guards against future variant insertions silently breaking
-    // the documented ordering contract.
+    // Oracle: the rustdoc on `Severity::rank` pins the documented
+    // per-variant u8 values (Info=10, Notice=20, Warn=30, Error=40,
+    // Fatal=50). These ranks are part of the public API contract — a
+    // caller that wrote `finding.severity.rank() >= 30` is encoding
+    // "Warn or above" by rank value. Changing any rank would silently
+    // break such callers.
+    //
+    // PKIX-7f92.24 dropped `derive(PartialOrd, Ord)` to avoid the
+    // source-position-coupled comparison trap; this test now locks
+    // the explicit rank values instead of the deprecated `<`-based
+    // ordering check.
     // -----------------------------------------------------------------------
 
     #[test]
-    fn severity_ordering_is_info_notice_warn_error_fatal() {
-        assert!(Severity::Info < Severity::Notice);
-        assert!(Severity::Notice < Severity::Warn);
-        assert!(Severity::Warn < Severity::Error);
-        assert!(Severity::Error < Severity::Fatal);
+    fn severity_rank_values_are_pinned() {
+        assert_eq!(Severity::Info.rank(), 10);
+        assert_eq!(Severity::Notice.rank(), 20);
+        assert_eq!(Severity::Warn.rank(), 30);
+        assert_eq!(Severity::Error.rank(), 40);
+        assert_eq!(Severity::Fatal.rank(), 50);
+    }
+
+    #[test]
+    fn severity_rank_ordering_is_info_notice_warn_error_fatal() {
+        // Rank-based ordering must align with the documented semantic
+        // hierarchy. This protects against accidental rank renumbering
+        // that would invert the conceptual relation.
+        assert!(Severity::Info.rank() < Severity::Notice.rank());
+        assert!(Severity::Notice.rank() < Severity::Warn.rank());
+        assert!(Severity::Warn.rank() < Severity::Error.rank());
+        assert!(Severity::Error.rank() < Severity::Fatal.rank());
     }
 
     // -----------------------------------------------------------------------
