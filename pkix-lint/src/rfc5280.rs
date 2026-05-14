@@ -62,6 +62,40 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 /// `max-octets` above 20 is permitted but advertises a deliberate
 /// deviation from RFC 5280 baseline.
 ///
+/// # Encoded-content interpretation
+///
+/// "20 octets" in RFC 5280 §4.1.2.2 is ambiguous between two readings:
+///
+/// 1. **Encoded INTEGER content** (length of the DER INTEGER value
+///    octets, including any leading `0x00` sign-padding byte required
+///    by DER for positive values whose high bit is set).
+/// 2. **Unsigned-value length** (length of the unsigned integer
+///    representation after stripping the sign-padding byte).
+///
+/// These differ by 1 octet when the unsigned high bit is set: a
+/// 20-byte unsigned value of the form `0x80..` encodes to a 21-byte
+/// INTEGER content (`0x00 0x80 ..`). Both readings are defensible, and
+/// x509-cert itself acknowledges the ambiguity — its `SerialNumber`
+/// type rejects 21-byte values on construction (encoder side, the
+/// unsigned-value reading) but accepts up to 21 bytes on decode
+/// (permissive of the encoded-content reading).
+///
+/// **This lint uses the encoded-content reading**, matching the
+/// dominant community interpretation (zlint, pkilint) and the literal
+/// text of the RFC ("serialNumber values" naturally referring to the
+/// encoded field value). Under this reading, a CA that issues a
+/// 20-byte unsigned high-bit-set serial — encoded as 21 octets — is
+/// flagged non-conforming. Operators wanting the unsigned-value
+/// reading can override `max-octets` to 21.
+///
+/// The mechanism is direct: `x509_cert::SerialNumber::as_bytes()` is
+/// backed by `der::asn1::Int::as_bytes()`, which returns the decoded
+/// INTEGER content bytes unchanged (it strips leading `0xFF` sign
+/// extension for negative values but does NOT strip leading `0x00`
+/// sign padding for positive values). The lint compares this length
+/// to `max_octets` directly. The DER round-trip test below empirically
+/// confirms this behavior on a hand-crafted 21-byte-content serial.
+///
 /// # OSCAL parameters
 ///
 /// | id            | label                                            | default |
@@ -72,6 +106,8 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 ///
 /// First parametric Lint added under PKIX-9vnx.6.4. Doubles as the
 /// pkix-lint built-in fixture that tests OSCAL parameter overrides.
+/// Encoded-content interpretation locked in under PKIX-7f92.2 with a
+/// negative-path test that exercises a 21-byte-content serial.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rfc5280MaxSerialLengthLint {
     max_octets: usize,
@@ -169,12 +205,13 @@ impl Lint for Rfc5280MaxSerialLengthLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        // `SerialNumber::as_bytes` returns the canonical big-endian unsigned
-        // bytes (DER content of the INTEGER, with any leading 0x00 sign
-        // padding byte already stripped per the SerialNumber type's invariant
-        // in the x509-cert crate).  The RFC 5280 "20 octets" cap is on the
-        // ENCODED INTEGER content, which is exactly what `as_bytes` reports;
-        // confirmed against the x509-cert SerialNumber rustdoc.
+        // `SerialNumber::as_bytes` is backed by `der::asn1::Int::as_bytes`,
+        // which returns the decoded INTEGER content bytes — including any
+        // leading `0x00` sign-padding byte present in the wire encoding
+        // (positive values whose high bit is set). The lint uses the
+        // encoded-content reading of RFC 5280 §4.1.2.2 "20 octets"; see the
+        // `Encoded-content interpretation` section on this struct's
+        // rustdoc, and the DER round-trip negative-path test below.
         let len = cert.tbs_certificate.serial_number.as_bytes().len();
         if len > self.max_octets {
             // Dynamic detail (Cow::Owned): include the actual length so
@@ -636,15 +673,26 @@ mod tests {
     //! `tbsCertificate.serialNumber` INTEGER content, independent of the
     //! code under test (which uses the `x509-cert` Rust crate's parser).
     //!
-    //! Note on "21-octet" boundary: the `x509-cert` `SerialNumber::new`
-    //! constructor refuses inputs longer than 20 bytes (`Overlength`
-    //! error), and the `Rfc5280` Profile's decode-time check rejects
-    //! anything beyond 21 bytes — so a real-world cert with a > 21-octet
-    //! serial cannot be loaded through this stack at all. We exercise
-    //! the lint's `> max_octets` branch by tightening the parameter (cap
-    //! < the fixture's serial length) rather than constructing an
-    //! oversize synthetic cert; the comparison is the same
-    //! `len > self.max_octets` integer test either way.
+    //! Note on serial-length encoding semantics: `x509_cert::SerialNumber`
+    //! is backed by `der::asn1::Int`, whose `as_bytes()` returns the
+    //! decoded INTEGER content bytes including any leading `0x00`
+    //! sign-padding byte (positive values whose high bit is set). The
+    //! `Rfc5280` profile permits decode of up to 21 bytes of INTEGER
+    //! content (acknowledging the RFC ambiguity between unsigned-value
+    //! and encoded-content readings of "20 octets"); the encoder-side
+    //! `SerialNumber::new` constructor caps at 20 bytes unsigned (which
+    //! refuses 20-byte high-bit-set inputs that would encode to 21
+    //! bytes). See `serial_length_lint_rejects_21_octet_high_bit_set_serial`
+    //! below for the negative-path oracle that locks the lint's chosen
+    //! encoded-content interpretation.
+    //!
+    //! Most tests in this module exercise the `> max_octets` branch by
+    //! tightening the parameter (cap < the fixture's serial length)
+    //! rather than constructing oversize synthetic certs; the
+    //! comparison is the same `len > self.max_octets` integer test
+    //! either way. The 21-byte-content negative test uses a hand-crafted
+    //! serial via DER decode to exercise the high-bit-set encoding case
+    //! that no in-repo fixture provides.
     //!
     //! No test uses the code under test as its own oracle.
 
@@ -725,6 +773,73 @@ mod tests {
             lint.check_cert(&cert, SubjectKind::Leaf, 0),
             LintResult::Pass
         );
+    }
+
+    /// Negative path: a 20-byte unsigned high-bit-set serial encodes to
+    /// 21 octets of INTEGER content (sign-byte prepended). Under the
+    /// encoded-content reading of RFC 5280 §4.1.2.2, this exceeds the
+    /// 20-octet cap.
+    ///
+    /// Oracle: the test constructs the DER INTEGER content
+    /// `0x00 0x80 0x00 0x00 ... 0x00` (21 bytes) externally — the test
+    /// knows by construction that the encoded content is 21 octets and
+    /// that the lint must report 21. This is independent of the code
+    /// under test.
+    ///
+    /// Locks two behaviors simultaneously: (1) x509-cert's `Int::as_bytes`
+    /// does NOT strip the leading `0x00` sign byte (the lint's premise),
+    /// and (2) the lint reports the encoded-content length, not the
+    /// stripped unsigned-value length.
+    #[test]
+    fn serial_length_lint_rejects_21_octet_high_bit_set_serial() {
+        use der::{Decode, Encode};
+        use x509_cert::serial_number::SerialNumber;
+
+        // Hand-craft a DER INTEGER: tag=0x02, length=0x15 (21), content
+        // = 0x00 (sign byte) || 0x80 0x00..0x00 (20 unsigned bytes).
+        let mut serial_der: Vec<u8> = vec![0x02, 0x15, 0x00, 0x80];
+        serial_der.extend(std::iter::repeat(0x00).take(19));
+        assert_eq!(serial_der.len(), 2 + 21, "test oracle: 21 octets of INTEGER content");
+
+        let synthetic_serial: SerialNumber = SerialNumber::from_der(&serial_der)
+            .expect("Rfc5280 profile permits decode of up to 21 octets");
+
+        // Independent length check on the constructed serial value:
+        // this asserts x509-cert's documented behavior (Int::as_bytes
+        // returns encoded content) before we exercise the lint.
+        assert_eq!(
+            synthetic_serial.as_bytes().len(),
+            21,
+            "x509-cert decoded the 21-byte INTEGER content without stripping the sign byte"
+        );
+
+        // Splice the synthetic serial into a real cert and re-decode
+        // through the full Certificate path. The round-trip pins
+        // end-to-end behavior, not just SerialNumber's surface.
+        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+        cert.tbs_certificate.serial_number = synthetic_serial;
+        let cert_der = cert.to_der().expect("re-encode mutated cert");
+        let decoded = <Certificate as der::Decode>::from_der(&cert_der)
+            .expect("decode mutated cert through Rfc5280 profile");
+        assert_eq!(decoded.tbs_certificate.serial_number.as_bytes().len(), 21);
+
+        let lint = Rfc5280MaxSerialLengthLint::default();
+        assert_eq!(lint.max_octets(), 20);
+        match lint.check_cert(&decoded, SubjectKind::Any, 0) {
+            LintResult::Error(detail) => {
+                assert!(
+                    detail.contains("21 octets"),
+                    "error detail must report the actual encoded length 21; got: {detail}"
+                );
+                assert!(
+                    detail.contains("20 octets"),
+                    "error detail must report the cap 20; got: {detail}"
+                );
+            }
+            other => panic!(
+                "encoded-content reading: 21-octet INTEGER content must trigger Error; got: {other:?}"
+            ),
+        }
     }
 
     #[test]
