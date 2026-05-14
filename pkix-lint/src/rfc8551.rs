@@ -132,7 +132,9 @@ impl Lint for Rfc8551EkuEmailProtectionLint {
                     )
                 }
             }
-            Err(_) => LintResult::error("ExtendedKeyUsage extension value is malformed DER"),
+            Err(e) => LintResult::error(format!(
+                "ExtendedKeyUsage extension value is malformed DER: {e}"
+            )),
         }
     }
 }

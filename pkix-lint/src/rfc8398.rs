@@ -131,8 +131,10 @@ impl Lint for Rfc8398SmimeSanLint {
         let san =
             match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
                 Ok(san) => san,
-                Err(_) => {
-                    return LintResult::error("SubjectAltName extension value is malformed DER");
+                Err(e) => {
+                    return LintResult::error(format!(
+                        "SubjectAltName extension value is malformed DER: {e}"
+                    ));
                 }
             };
 
@@ -270,8 +272,10 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         let san =
             match x509_cert::ext::pkix::SubjectAltName::from_der(san_ext.extn_value.as_bytes()) {
                 Ok(san) => san,
-                Err(_) => {
-                    return LintResult::error("SubjectAltName extension value is malformed DER");
+                Err(e) => {
+                    return LintResult::error(format!(
+                        "SubjectAltName extension value is malformed DER: {e}"
+                    ));
                 }
             };
 
