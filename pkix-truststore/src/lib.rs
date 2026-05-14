@@ -107,10 +107,25 @@ pub use pkix_path::{DerError, TrustAnchor};
 pub struct IoFailure {
     /// Kind of I/O error.
     ///
-    /// `io::ErrorKind` is `Copy + Eq + Hash`; we serialize it via
-    /// its `Display` representation for forward compatibility (new
-    /// `ErrorKind` variants land in the standard library without
-    /// breaking the wire form).
+    /// `io::ErrorKind` is `Copy + Eq + Hash` but does not implement
+    /// `serde::Serialize` / `Deserialize` (it is `#[non_exhaustive]`
+    /// upstream and the standard library deliberately does not pick
+    /// a wire form). We serialize it via its `Debug` output
+    /// (`"NotFound"`, `"PermissionDenied"`, …) and parse the same
+    /// set on the way back. Two known costs of this approach:
+    ///
+    /// 1. The `Debug` derive on `io::ErrorKind` is not a contractually
+    ///    stable identifier. The current output happens to be the
+    ///    variant name and has been since the type was added, but the
+    ///    standard library makes no such guarantee. A future Rust
+    ///    release could in principle change the format.
+    /// 2. New `ErrorKind` variants (added non-breakingly by the
+    ///    standard library) round-trip through an older consumer as
+    ///    [`io::ErrorKind::Other`]. The message string is preserved;
+    ///    only the typed `kind` is lossy across version skew.
+    ///
+    /// Use this field for human display and best-effort programmatic
+    /// branching, not as a security-critical input.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -147,12 +162,13 @@ impl std::error::Error for IoFailure {}
 #[cfg(feature = "serde")]
 mod io_error_kind_serde {
     //! `io::ErrorKind` does not implement `Serialize`/`Deserialize`
-    //! (and is `#[non_exhaustive]` upstream). We serialize via its
-    //! `Debug` string ("NotFound", "PermissionDenied", …) which is
-    //! the only stable textual identifier. Deserialize parses the
-    //! same set, falling back to `ErrorKind::Other` for unrecognized
-    //! values so old payloads stay decodable when newer Rust versions
-    //! introduce new kinds.
+    //! (it is `#[non_exhaustive]` upstream and the standard library
+    //! does not pick a wire form). We serialize via its `Debug`
+    //! output (`"NotFound"`, `"PermissionDenied"`, …) and parse the
+    //! same set on the way back. See [`crate::IoFailure::kind`] for
+    //! the two known costs of this approach (Debug-derive is not a
+    //! contractually stable identifier; unknown variants degrade to
+    //! `ErrorKind::Other` on the consumer side).
 
     use serde::{Deserialize as _, Deserializer, Serializer};
     use std::io;
@@ -162,16 +178,21 @@ mod io_error_kind_serde {
         s: S,
     ) -> Result<S::Ok, S::Error> {
         // `Debug` on `ErrorKind` produces the variant name verbatim
-        // ("NotFound", "PermissionDenied", …); upstream documents this
-        // as the canonical textual identifier.
+        // ("NotFound", "PermissionDenied", …) on every stdlib version
+        // shipped to date; the format is not contractually stable but
+        // is the only textual representation that round-trips through
+        // the deserialize match below.
         s.serialize_str(&format!("{:?}", kind))
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<io::ErrorKind, D::Error> {
         let s = String::deserialize(d)?;
         // Map a finite list of known variants. Anything else lands
-        // in `ErrorKind::Other` so round-trip is non-destructive even
-        // when the producer side knew a variant the consumer does not.
+        // in `ErrorKind::Other` — this is lossy: a producer on a
+        // newer Rust that emitted (say) "FilesystemQuotaExceeded"
+        // will reach a consumer on an older Rust as `Other`. The
+        // accompanying `message` field is preserved, so the
+        // diagnostic is not lost, only its typed form.
         Ok(match s.as_str() {
             "NotFound" => io::ErrorKind::NotFound,
             "PermissionDenied" => io::ErrorKind::PermissionDenied,
