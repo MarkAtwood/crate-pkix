@@ -1045,29 +1045,57 @@ impl core::fmt::Debug for LintRunner {
 impl LintRunner {
     /// Create a new runner from a set of lints, with no bundle version string.
     ///
-    /// Lints are evaluated in the order supplied. Duplicate lint IDs interact
-    /// poorly with the deviation mechanism — see the [`LintRunner`] doc for
-    /// details. In debug builds a `debug_assert!` fires if duplicates are found.
+    /// Lints are evaluated in the order supplied.
+    ///
+    /// # Panics
+    ///
+    /// Panics in **both debug and release builds** if any two lints share
+    /// the same [`Lint::id`]. Duplicate IDs interact poorly with the
+    /// deviation mechanism: a deviation keyed on a given ID would apply
+    /// to every finding with that ID, silently halving the visible work
+    /// and producing a false sense of compliance. The check is one sort +
+    /// dedup over the lint id strings — `O(n log n)` over a typically
+    /// small `n`, with no measurable cost for production lint bundles.
     ///
     /// To set a bundle version (recommended for production use), use
     /// [`LintRunner::with_bundle_version`].
     #[must_use]
     pub fn new(lints: Vec<Box<dyn Lint>>) -> Self {
-        #[cfg(debug_assertions)]
-        {
-            let mut ids: Vec<_> = lints.iter().map(|l| l.id()).collect();
-            let original_len = ids.len();
-            ids.sort_unstable();
-            ids.dedup();
-            assert_eq!(
-                ids.len(),
-                original_len,
-                "duplicate lint IDs will produce confusing deviation behavior"
-            );
-        }
+        Self::check_unique_ids(&lints);
         Self {
             lints,
             bundle_version: std::borrow::Cow::Borrowed(""),
+        }
+    }
+
+    /// Panic with a duplicate-ID message if `lints` contains two lints
+    /// sharing the same [`Lint::id`]. Called from [`LintRunner::new`] and
+    /// [`LintRunner::with_bundle_version`] so both constructors enforce
+    /// the same invariant in both debug and release builds.
+    fn check_unique_ids(lints: &[Box<dyn Lint>]) {
+        let mut ids: Vec<&str> = lints.iter().map(|l| l.id()).collect();
+        let original_len = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        if ids.len() != original_len {
+            // Re-walk to find the first duplicate so the panic message
+            // names it.
+            let mut seen: std::collections::HashSet<&str> =
+                std::collections::HashSet::with_capacity(lints.len());
+            for l in lints {
+                let id = l.id();
+                if !seen.insert(id) {
+                    panic!(
+                        "LintRunner constructed with duplicate lint id {id:?}; \
+                         duplicate IDs interact incorrectly with deviation matching \
+                         and silently produce ambiguous audit trails. Deduplicate \
+                         the lint set before constructing the runner."
+                    );
+                }
+            }
+            // Unreachable: ids.len() != original_len implies a duplicate
+            // exists, which the loop above would have found.
+            unreachable!("duplicate detected by dedup but not by HashSet walk");
         }
     }
 
@@ -1096,11 +1124,16 @@ impl LintRunner {
     /// let ver = format!("my-bundle v{}", env!("CARGO_PKG_VERSION"));
     /// let runner2 = LintRunner::with_bundle_version(lints2, ver);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Same duplicate-ID precondition as [`LintRunner::new`].
     #[must_use]
     pub fn with_bundle_version(
         lints: Vec<Box<dyn Lint>>,
         version: impl Into<std::borrow::Cow<'static, str>>,
     ) -> Self {
+        Self::check_unique_ids(&lints);
         Self {
             lints,
             bundle_version: version.into(),
@@ -2447,5 +2480,49 @@ mod tests {
             "S/MIME cert must NOT produce Error findings from the S/MIME lints: \
              found error ids {errors_by_id:?}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.7 regression — duplicate lint IDs must panic at runner
+    // construction in BOTH debug and release builds.
+    //
+    // Previously LintRunner::new used #[cfg(debug_assertions)] to gate the
+    // dup-ID check, so release builds (e.g., every cargo install user)
+    // silently accepted duplicates and produced ambiguous audit trails
+    // when deviations keyed on the duplicated id matched both findings.
+    // The check is now unconditional. We exercise it via #[should_panic]
+    // on a release-flavoured tests path so the test fails if the gate
+    // ever returns.
+    //
+    // Oracle: AGENTS.md test discipline forbids using the code under test
+    // as its own oracle. Here the oracle is the panic mechanism itself
+    // and the message constant; the assertion verifies that the panic
+    // payload names the duplicated id.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    #[should_panic(expected = "duplicate lint id")]
+    fn lint_runner_new_panics_on_duplicate_lint_ids() {
+        // AlwaysPass.id() is "test.always_pass"; registering two copies
+        // must panic.
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(AlwaysPass), Box::new(AlwaysPass)];
+        let _ = LintRunner::new(lints);
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate lint id")]
+    fn lint_runner_with_bundle_version_panics_on_duplicate_lint_ids() {
+        // The duplicate-ID precondition applies to the bundle-version
+        // constructor too.
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(AlwaysPass), Box::new(AlwaysPass)];
+        let _ = LintRunner::with_bundle_version(lints, "x");
+    }
+
+    #[test]
+    fn lint_runner_new_accepts_distinct_ids() {
+        // AlwaysPass.id() = "test.always_pass"; AlwaysWarn.id() =
+        // "test.always_warn". Distinct ids must not panic.
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(AlwaysPass), Box::new(AlwaysWarn)];
+        let _runner = LintRunner::new(lints);
     }
 }

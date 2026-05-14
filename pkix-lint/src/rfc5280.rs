@@ -277,7 +277,9 @@ impl Lint for Rfc5280BasicConstraintsCaLeafLint {
                     LintResult::Pass
                 }
             }
-            Err(_) => LintResult::error("BasicConstraints extension value is malformed DER"),
+            Err(e) => LintResult::error(format!(
+                "BasicConstraints extension value is malformed DER: {e}"
+            )),
         }
     }
 }
@@ -393,7 +395,9 @@ impl Lint for Rfc5280EkuServerAuthLint {
                     )
                 }
             }
-            Err(_) => LintResult::error("ExtendedKeyUsage extension value is malformed DER"),
+            Err(e) => LintResult::error(format!(
+                "ExtendedKeyUsage extension value is malformed DER: {e}"
+            )),
         }
     }
 }
