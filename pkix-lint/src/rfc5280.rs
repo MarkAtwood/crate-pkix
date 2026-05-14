@@ -57,10 +57,16 @@ const ID_KP_SERVER_AUTH: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 /// > serialNumber field.
 ///
 /// This lint enforces the upper-bound clause. The 20-octet cap is the
-/// default; operators may tighten it via the `max-octets` OSCAL parameter
-/// (e.g., to model a more restrictive in-house issuance policy). Setting
-/// `max-octets` above 20 is permitted but advertises a deliberate
-/// deviation from RFC 5280 baseline.
+/// default; operators may tighten it (e.g., to model a more restrictive
+/// in-house issuance policy) or set it to 21 to switch to the
+/// unsigned-value reading documented below. The accepted range is
+/// `1..=21` — anything outside is rejected by both
+/// [`Self::with_max_octets`] (panics) and [`Lint::set_parameter`]
+/// (returns [`ParameterError::InvalidValue`]). PKIX-7f92.5 closed the
+/// path that previously accepted nonsense values (max-octets=64,
+/// max-octets=usize::MAX) and silently weakened the RFC baseline;
+/// operators who genuinely want a wider cap should wire their own
+/// `Lint` impl rather than relaxing this lint's contract.
 ///
 /// # Encoded-content interpretation
 ///
@@ -121,14 +127,64 @@ impl Default for Rfc5280MaxSerialLengthLint {
     }
 }
 
+/// Valid range for `max-octets`: `1..=21`. The lower bound (1) is
+/// mandated by RFC 5280 §4.1.2.2 (positive non-zero serials); a
+/// 0-cap rejects every cert. The upper bound (21) accommodates both
+/// readings of "20 octets" the RFC tolerates (see the
+/// `Encoded-content interpretation` section of the lint rustdoc):
+/// 20 for the encoded-content reading (the lint's default), 21 for
+/// the unsigned-value reading that an operator may prefer.
+///
+/// Values outside this range are rejected by both constructor paths
+/// to prevent silent misconfiguration (PKIX-7f92.5, PKIX-7f92.39).
+/// Operators wanting a substantially wider or narrower cap (an
+/// in-house policy that diverges from RFC 5280) should wire their
+/// own [`Lint`] impl rather than relaxing this lint's contract.
+const MAX_OCTETS_RANGE: std::ops::RangeInclusive<usize> = 1..=21;
+
+/// Shared validator for the `max-octets` parameter. Returns a typed
+/// error reason string suitable for either the
+/// [`ParameterError::InvalidValue`] reason field or a `panic!` message.
+fn validate_max_octets(value: usize) -> Result<(), String> {
+    if MAX_OCTETS_RANGE.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "max-octets must be in the range {}..={} (got {value}); \
+             RFC 5280 §4.1.2.2 mandates serials of 1..=20 octets (encoded-content reading) \
+             or 1..=21 octets (unsigned-value reading). Wire a custom Lint impl for wider/narrower bounds.",
+            MAX_OCTETS_RANGE.start(),
+            MAX_OCTETS_RANGE.end(),
+        ))
+    }
+}
+
 impl Rfc5280MaxSerialLengthLint {
     /// Construct the lint with an explicit `max_octets` cap.
     ///
     /// Equivalent to calling [`Default::default`] followed by
     /// [`Lint::set_parameter`] with id `"max-octets"`; provided as a typed
     /// constructor for callers configuring the lint at compile time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_octets` is outside the valid range `1..=21`
+    /// (see [`MAX_OCTETS_RANGE`] for the rationale on each bound).
+    /// PKIX-7f92.5 / PKIX-7f92.39 closed the two-paths-different-
+    /// validation gap by routing both this constructor and
+    /// [`Lint::set_parameter`] through the same range check. The panic
+    /// here matches [`crate::LintRunner::new`]'s panic-on-duplicate-id
+    /// precedent: an out-of-range constant at compile time is a
+    /// programmer bug, not a runtime input.
+    ///
+    /// Operators who genuinely need a wider or narrower bound should
+    /// wire their own [`Lint`] impl rather than weakening this lint's
+    /// RFC-baseline contract.
     #[must_use]
     pub fn with_max_octets(max_octets: usize) -> Self {
+        if let Err(reason) = validate_max_octets(max_octets) {
+            panic!("Rfc5280MaxSerialLengthLint::with_max_octets: {reason}");
+        }
         let parameters = vec![LintParameter {
             id: Cow::Borrowed("max-octets"),
             label: Cow::Borrowed("Maximum allowed serial number length in octets"),
@@ -191,12 +247,10 @@ impl Lint for Rfc5280MaxSerialLengthLint {
                     id: id.to_owned(),
                     reason: format!("expected non-negative integer, got '{value}'"),
                 })?;
-                if parsed == 0 {
-                    return Err(ParameterError::InvalidValue {
-                        id: id.to_owned(),
-                        reason: "max-octets must be at least 1".to_string(),
-                    });
-                }
+                validate_max_octets(parsed).map_err(|reason| ParameterError::InvalidValue {
+                    id: id.to_owned(),
+                    reason,
+                })?;
                 self.max_octets = parsed;
                 Ok(())
             }
@@ -885,16 +939,75 @@ mod tests {
         }
         // Zero is rejected (a zero cap would reject every serialNumber,
         // including valid ones — almost certainly an operator typo).
+        // Validator emits a "1..=21" range message; assert the range
+        // bounds appear, not a specific phrasing.
         let err_zero = lint
             .set_parameter("max-octets", "0")
             .expect_err("zero value must error");
         match err_zero {
             ParameterError::InvalidValue { id, reason } => {
                 assert_eq!(id, "max-octets");
-                assert!(reason.contains("at least 1"));
+                assert!(
+                    reason.contains("1..=21"),
+                    "error reason must name the valid range; got: {reason}"
+                );
+                assert!(
+                    reason.contains("got 0"),
+                    "error reason must include the offending input; got: {reason}"
+                );
             }
             other => panic!("expected InvalidValue, got: {other:?}"),
         }
+    }
+
+    /// PKIX-7f92.5 regression: max-octets > 21 must be rejected by
+    /// set_parameter (closing the silent-weakening path).
+    #[test]
+    fn set_parameter_rejects_values_above_21() {
+        let mut lint = Rfc5280MaxSerialLengthLint::default();
+        for bogus in ["22", "64", "100", "18446744073709551615" /* usize::MAX */] {
+            let err = lint
+                .set_parameter("max-octets", bogus)
+                .expect_err("out-of-range value must error");
+            match err {
+                ParameterError::InvalidValue { id, reason } => {
+                    assert_eq!(id, "max-octets");
+                    assert!(
+                        reason.contains("1..=21"),
+                        "error reason must name the valid range; got: {reason}"
+                    );
+                }
+                other => panic!("expected InvalidValue, got: {other:?}"),
+            }
+        }
+    }
+
+    /// PKIX-7f92.5 regression: 21 (the unsigned-value reading) is
+    /// the maximum still permitted; 20 (encoded-content reading) is
+    /// the default.
+    #[test]
+    fn set_parameter_accepts_21_for_unsigned_value_reading() {
+        let mut lint = Rfc5280MaxSerialLengthLint::default();
+        lint.set_parameter("max-octets", "21")
+            .expect("21 is permitted (unsigned-value reading)");
+        assert_eq!(lint.max_octets(), 21);
+    }
+
+    /// PKIX-7f92.39 regression: with_max_octets(0) must panic, not
+    /// silently construct a lint that rejects every cert.
+    #[test]
+    #[should_panic(expected = "max-octets must be in the range 1..=21")]
+    fn with_max_octets_zero_panics() {
+        let _ = Rfc5280MaxSerialLengthLint::with_max_octets(0);
+    }
+
+    /// PKIX-7f92.39 regression: with_max_octets(22) must panic, not
+    /// silently weaken the RFC baseline. Matches set_parameter's
+    /// rejection semantics.
+    #[test]
+    #[should_panic(expected = "max-octets must be in the range 1..=21")]
+    fn with_max_octets_above_21_panics() {
+        let _ = Rfc5280MaxSerialLengthLint::with_max_octets(22);
     }
 
     #[test]
