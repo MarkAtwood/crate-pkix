@@ -125,6 +125,56 @@ fn verify_ocsp_responder_wrong_issuer_returns_ocsp_delegation() {
 }
 
 // ---------------------------------------------------------------------------
+// RFC 6960 §4.2.2.2 cryptographic delegation binding: the responder
+// cert must be signed by the supplied `issuer`'s key. A DN-twin issuer
+// (same subject DN as the real signer, different key) must NOT pass.
+//
+// Pre-PKIX-q9hv.3, DN equality alone was checked, so this would have
+// been silently accepted as a valid delegation. With the cryptographic
+// binding in place, the responder signature fails to verify under the
+// twin's SPKI and the wrapper rejects with Error::OcspDelegation,
+// surfacing the trust-misattribution attempt to the caller.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn verify_ocsp_responder_twin_dn_issuer_returns_ocsp_delegation() {
+    let leaf = load_fixture("leaf-ocsp-responder.der");
+    let root = load_fixture("root.der");
+    // Twin root: same DN as `root` (CN=pkix-chain test root) but a
+    // different P-256 key. The chain validates fine against the real
+    // root as anchor; only the delegation binding under `twin` must
+    // reject.
+    let twin = load_fixture("root-twin-dn.der");
+    let anchors = [TrustAnchor::from_cert(root)];
+    let chain = [leaf];
+
+    let err = verify_ocsp_responder(
+        &chain,
+        &anchors,
+        &twin,
+        &BasicOcspResponderProfile,
+        NOW,
+        &NoRevocation,
+    )
+    .expect_err(
+        "DN-twin issuer (same DN as real signer, different key) must fail RFC 6960 §4.2.2.2 \
+         cryptographic delegation binding even though the DN-equality gate passes",
+    );
+    match err {
+        Error::OcspDelegation { reason } => {
+            // The reason must point at the signature-binding failure,
+            // not the DN gate — both surface as OcspDelegation but
+            // mean different things diagnostically.
+            assert!(
+                reason.contains("signature"),
+                "reason should mention signature-binding failure, got: {reason:?}"
+            );
+        }
+        other => panic!("expected Error::OcspDelegation, got: {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Wrong EKU caught by profile (presence) check, NOT by the wrapper.
 //
 // A code-signing leaf has EKU=codeSigning but not OCSPSigning. The

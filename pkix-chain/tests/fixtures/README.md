@@ -18,6 +18,7 @@ RFC 5280 §6.1 path validation before identity binding.
 | `leaf-ocsp-responder.der` | end-entity | EE signed by `root`, EKU=OCSPSigning — RFC 6960 §4.2.2.2 delegated responder |
 | `leaf-ocsp-responder-nocheck.der` | end-entity | EE signed by `root`, EKU=OCSPSigning + `id-pkix-ocsp-nocheck` — RFC 6960 §4.2.2.2.1 |
 | `root-wrong-issuer.der` | trust anchor (alt) | P-256 self-signed CA with a DIFFERENT subject DN than `root` — used to drive the wrapper-level OCSP-delegation DN-mismatch negative test |
+| `root-twin-dn.der` | trust anchor (alt) | P-256 self-signed CA with the SAME subject DN as `root` but a DIFFERENT key — drives the RFC 6960 §4.2.2.2 cryptographic delegation-binding negative test (PKIX-q9hv.3): DN gate passes, signature binding under the twin's SPKI fails |
 
 PKIX-fmtv.11.2 client-auth fixtures (EKU=clientAuth):
 

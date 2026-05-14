@@ -334,6 +334,49 @@ def main():
     )
     write_der("root-wrong-issuer.der", other_root_cert)
 
+    # Twin-DN root: a SECOND CA cert with the SAME subject DN as
+    # `root_cert` but a DIFFERENT key. The OCSP responder leaves above
+    # are signed by `root_cert`; passing this twin as the `issuer`
+    # argument to `verify_ocsp_responder` would PASS the DN-equality
+    # gate (both sides spell "CN=pkix-chain test root") but MUST fail
+    # the cryptographic delegation binding — RFC 6960 §4.2.2.2 requires
+    # the responder be issued *directly* by the named CA, not merely
+    # by a name-twin (PKIX-q9hv.3). Without the binding check, this
+    # fixture would be silently accepted as a valid delegation, giving
+    # an attacker who controls one of two cross-signed CAs with
+    # colliding DNs a trust-misattribution primitive over revocation
+    # status.
+    twin_root_key = ec.generate_private_key(ec.SECP256R1())
+    twin_root_name = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, "pkix-chain test root")
+    ])
+    twin_root_cert = (
+        x509.CertificateBuilder()
+        .subject_name(twin_root_name)
+        .issuer_name(twin_root_name)
+        .public_key(twin_root_key.public_key())
+        .serial_number(102)
+        .not_valid_before(NOT_BEFORE)
+        .not_valid_after(NOT_AFTER)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(twin_root_key, hashes.SHA256())
+    )
+    write_der("root-twin-dn.der", twin_root_cert)
+
     # ------------------------------------------------------------------
     # PKIX-fmtv.23: curated RFC 8398 mailbox corpus.
     #

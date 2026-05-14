@@ -52,6 +52,11 @@ pkix-aia          = { workspace = true, features = ["std"] }
 # get `core::error::Error` impls on the error type.
 pkix-path-builder = { workspace = true, features = ["std"] }
 der               = { workspace = true }
+# spki is used by `verify_responder_is_delegated_by` to call the
+# `SignatureVerifier` directly with the supplied issuer's SPKI — the
+# RFC 6960 §4.2.2.2 delegation check requires a cryptographic
+# binding, not just DN equality (PKIX-q9hv.3).
+spki              = { workspace = true }
 x509-cert         = { workspace = true }
 
 [dev-dependencies]
