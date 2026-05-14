@@ -63,11 +63,12 @@
 //!
 //! # Profiles
 //!
-//! All S/MIME Profile types target the **Strict generation** (`.3` OID
-//! suffix) per the AGENTS.md spec-taxonomy principle (PKIX-mzsk). Legacy
-//! generation (`.1`) is BR-banned for new issuance effective 2025-07-15
-//! per S/MIME BR §7.1.6.1; Multipurpose (`.2`) is a transitional bridge
-//! profile tracked separately (PKIX-jbvb.8).
+//! S/MIME Profile types target either the **Strict generation** (`.3`
+//! OID suffix — the modern canonical target per the AGENTS.md
+//! spec-taxonomy principle PKIX-mzsk) or the **Multipurpose generation**
+//! (`.2` OID suffix — sibling profiles per the PKIX-jbvb.9 epic).
+//! Legacy generation (`.1`) is BR-banned for new issuance effective
+//! 2025-07-15 per S/MIME BR §7.1.6.1 and is not represented here.
 //!
 //! | Struct | Free-function alias | Document | Key constraints |
 //! |--------|--------------------|---------| ----------------|
@@ -75,6 +76,7 @@
 //! | [`SmimeProfile`] | [`smime_policy`] | CA/B Forum S/MIME BR | Mailbox-validated Strict: rfc822Name SAN, emailProtection EKU, max validity 825 days |
 //! | [`SmimeSponsorValidated`] | [`smime_sponsor_policy`] | CA/B Forum S/MIME BR §7.5 | Mailbox baseline + policy OID 2.23.140.1.5.3.3 + Subject DN organizationName ∧ organizationIdentifier ∧ ((givenName ∧ surname) ∨ pseudonym) |
 //! | [`SmimeIndividualValidated`] | [`smime_individual_policy`] | CA/B Forum S/MIME BR §7.6 | Mailbox baseline + policy OID 2.23.140.1.5.4.3 + Subject DN (givenName+surname) ∨ pseudonym |
+//! | [`SmimeIndividualValidatedMultipurpose`] | [`smime_individual_multipurpose_policy`] | CA/B Forum S/MIME BR §7.6 (Multipurpose row) | Mailbox baseline + policy OID 2.23.140.1.5.4.2 + Subject DN (givenName+surname) ∨ pseudonym + additional EKUs permitted |
 //! | [`CodeSigningProfile`] | [`code_signing_policy`] | CA/B Forum Code Signing BR | codeSigning EKU, RSA ≥ 3072 |
 //!
 //! For RFC 5280 baseline and `BasicTlsProfile` / `BasicSmimeProfile` (RFC 8551
@@ -120,9 +122,13 @@
 //!   ships the Mailbox-validated tier baseline targeting the Strict generation;
 //!   [`SmimeSponsorValidated`] ships the Sponsor-validated tier (§7.5) Strict
 //!   generation; [`SmimeIndividualValidated`] ships the Individual-validated
-//!   tier (§7.6) Strict generation; the Organization-validated tier profile
-//!   remains tracked under `PKIX-jbvb`. Legacy (`.1`) and Multipurpose (`.2`)
-//!   generation Profile types are not shipped; see PKIX-jbvb.8.
+//!   tier (§7.6) Strict generation; [`SmimeIndividualValidatedMultipurpose`]
+//!   ships the Individual-validated tier (§7.6) Multipurpose generation;
+//!   the Organization-validated tier (Strict) and the Mailbox / Sponsor /
+//!   Organization Multipurpose siblings remain tracked under `PKIX-jbvb`
+//!   (Org Strict: PKIX-jbvb.1; Multipurpose siblings: PKIX-jbvb.9). Legacy
+//!   generation (`.1`) Profile types are not shipped — Legacy issuance was
+//!   BR-banned effective 2025-07-15 per §7.1.6.1.
 //! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** Cross-spec horizontal
 //!   expansion is barred by the AGENTS.md spec-taxonomy clause. Other
 //!   industry-forum / vendor / government policies must come in via
@@ -234,19 +240,22 @@ pub(crate) const OID_ORGANIZATION_IDENTIFIER: ObjectIdentifier =
 // CA/B Forum S/MIME BR reserved policy OIDs (§7.1.6.1 / Appendix A).
 //
 // Each (validation type, generation) cell has its own OID. The `-cabf` crate
-// ships Profile types targeting the **Strict** generation (`.3` suffix) per
-// the AGENTS.md spec-taxonomy principle (PKIX-mzsk) — one canonical Profile
-// per validation type, picking the modern target tier.
+// ships Profile types targeting the **Strict** generation (`.3` suffix) as
+// the modern canonical target per the AGENTS.md spec-taxonomy principle
+// (PKIX-mzsk), plus **Multipurpose** generation (`.2` suffix) sibling
+// types per PKIX-jbvb.9 (decision recorded in PKIX-jbvb.8).
 //
 // Legacy generation (`.1` suffix) is BR-banned for new issuance effective
 // 2025-07-15 per §7.1.6.1 line 2600 and is intentionally not represented here.
 // Multipurpose generation (`.2` suffix) is a transitional bridge for
-// document-signing crossover use cases; see PKIX-jbvb.8 for the open
-// architectural question on whether to add Multipurpose Profile types.
+// document-signing crossover use cases; Multipurpose Profile types ship as
+// Strict siblings under the PKIX-jbvb.9 implementation epic.
 pub(crate) const CABF_SMIME_SPONSOR_VALIDATED_STRICT_POLICY: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.23.140.1.5.3.3");
 pub(crate) const CABF_SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY: ObjectIdentifier =
     ObjectIdentifier::new_unwrap("2.23.140.1.5.4.3");
+pub(crate) const CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.23.140.1.5.4.2");
 
 // ---------------------------------------------------------------------------
 // Profile structs
@@ -379,10 +388,11 @@ impl pkix_lint::LintProfile for WebPkiProfile {
 ///
 /// **Legacy generation is not represented.** Per S/MIME BR §7.1.6.1 line 2600,
 /// Legacy generation (policy OIDs `.1`) was banned for new issuance effective
-/// 2025-07-15. The `-cabf` crate ships Strict-targeted Profile types only;
-/// callers wanting to validate Legacy-tier certs issued before the ban must
-/// construct a custom [`ValidationPolicy`] or use `pkix-policy-zlint`.
-/// Multipurpose generation (policy OIDs `.2`) is tracked as PKIX-jbvb.8.
+/// 2025-07-15. Callers wanting to validate Legacy-tier certs issued before
+/// the ban must construct a custom [`ValidationPolicy`] or use
+/// `pkix-policy-zlint`. Multipurpose generation (policy OIDs `.2`) sibling
+/// Profile types are shipping incrementally per the PKIX-jbvb.9 epic;
+/// [`SmimeIndividualValidatedMultipurpose`] is the first.
 ///
 /// [`ValidationPolicy::max_validity_secs`] applies to **every** certificate in
 /// the chain, not just the leaf. Typical S/MIME CA certificates have validity
@@ -581,6 +591,183 @@ impl pkix_lint::LintProfile for SmimeIndividualValidated {
     /// AGENTS.md non-negotiable #5.
     ///
     /// [`SmimeProfile`]: crate::SmimeProfile
+    fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
+        static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
+            std::sync::OnceLock::new();
+        LINTS.get_or_init(Vec::new)
+    }
+
+    fn lint_runner(&self) -> pkix_lint::LintRunner {
+        pkix_lint::LintRunner::new(Vec::new())
+    }
+}
+
+/// CA/Browser Forum S/MIME Baseline Requirements — Individual-validated profile (Multipurpose generation).
+///
+/// Implements [`Profile`] for the S/MIME BR Individual-validated subscriber-
+/// certificate tier targeting the **Multipurpose generation**. Per S/MIME BR
+/// §7.6 (Individual Validated), the subscriber's real-world identity is
+/// verified (typically via passport, national ID, driver's license, or
+/// equivalent evidence); the cert asserts policy OID `2.23.140.1.5.4.2` plus
+/// tier-specific Subject DN attributes.
+///
+/// The free-function alias [`smime_individual_multipurpose_policy`] is
+/// equivalent to `SmimeIndividualValidatedMultipurpose.policy(now_unix)`.
+///
+/// # Canonical source
+///
+/// Canonical CA/B Forum S/MIME BR document:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
+/// Tier-specific section: §7.6 (Individual Validated subscriber certificates).
+/// Reserved policy OID: §7.1.6.1 / Appendix A (`2.23.140.1.5.4.2` —
+/// Multipurpose generation).
+///
+/// # Strict vs Multipurpose
+///
+/// Multipurpose generation differs from Strict in two respects:
+///
+/// - **Asserted policy OID** `2.23.140.1.5.4.2` instead of
+///   [`SmimeIndividualValidated`]'s `2.23.140.1.5.4.3`.
+/// - **EKU permissiveness** per §7.1.2.3(f) Multipurpose row: while
+///   Strict-generation subscriber certs are constrained to assert
+///   `id-kp-emailProtection` as the sole EKU, Multipurpose-generation
+///   certs may additionally assert other EKU values (typically
+///   document-signing crossover use cases such as `id-kp-codeSigning`).
+///   The workspace `ValidationPolicy::required_leaf_eku` field is a
+///   subset-of check (cert's EKU MUST contain each required OID; other
+///   OIDs are permitted), so this Profile sets it to
+///   `[ID_KP_EMAIL_PROTECTION]` — the cert must still carry
+///   emailProtection, but additional EKUs are accepted. The "exactly
+///   one EKU" enforcement on Strict-generation certs is a predicate
+///   `ValidationPolicy` does not express; that audit belongs to
+///   `pkix-policy-zlint` per AGENTS.md non-negotiable #5.
+///
+/// Subject DN rule is identical to Strict per §7.1.4.2.6 Note 2
+/// ("Strict and Multipurpose Generation profiles SHALL include either
+/// subject:givenName and/or subject:surname, or the subject:pseudonym").
+/// Same 825-day validity cap per §6.3.2. Same Mailbox-validated baseline
+/// (rfc822Name SAN, emailProtection EKU, SHA-256/384/512 algs, RSA ≥ 2048).
+///
+/// # Tier discrimination
+///
+/// Distinct from [`SmimeProfile`] (Mailbox-validated baseline) and from
+/// [`SmimeIndividualValidated`] (Individual-validated Strict generation) by:
+///
+/// - **Asserted policy OID** `2.23.140.1.5.4.2` (Individual-validated
+///   Multipurpose) is required on the leaf's `CertificatePolicies` extension.
+///   Certs asserting a different tier or generation OID (or no OID) fail
+///   with [`pkix_path::Error::MissingLeafPolicyOid`].
+/// - **Subject DN** must satisfy: `(givenName AND surname) OR pseudonym`
+///   per §7.1.4.2.6 Note 2 (Strict and Multipurpose Generation profiles
+///   SHALL include either givenName and/or surname, or the pseudonym).
+///   Certs asserting the policy OID but lacking the tier-specific DN
+///   attributes fail with [`pkix_path::Error::SubjectDnAttrRuleUnmet`].
+///
+/// # Limitations
+///
+/// Reference, not authoritative. See the crate-level "Unprincipled
+/// exception" rustdoc. The BR text is the only canonical source.
+///
+/// **Legacy generation is not represented.** Per §7.1.6.1 line 2600,
+/// Legacy generation (policy OID `2.23.140.1.5.4.1`) was banned for new
+/// issuance effective 2025-07-15. This struct targets the Multipurpose
+/// generation; [`SmimeIndividualValidated`] targets the Strict generation.
+///
+/// **The "additional EKUs allowed" semantic is not validator-enforced
+/// as a positive predicate.** The §7.1.2.3(f) BR table is structured as
+/// "Strict permits only emailProtection; Multipurpose permits
+/// emailProtection plus crossover EKUs". The Strict half is not
+/// expressed by `ValidationPolicy` (no "forbidden EKU" or "exact EKU
+/// set" field), so the Strict and Multipurpose Profiles only differ in
+/// the asserted policy OID at the validator level. Comprehensive
+/// enforcement of "Strict cert has emailProtection only" belongs to
+/// `pkix-policy-zlint`.
+///
+/// The validation-side check is structural: the cert *carries* the
+/// tier-marker policy OID and DN attributes. The BR's CA-side
+/// identity-proofing requirements (passport / national ID / etc.) are not
+/// validator-side concerns — this profile checks the cert AS IF the issuing
+/// CA correctly proofed the subscriber.
+///
+/// `max_validity_secs` applies to every certificate in the chain (matches
+/// [`SmimeProfile`]'s shape); see that profile's limitations for the chain
+/// composition implications.
+///
+/// [`SmimeProfile`]: crate::SmimeProfile
+/// [`SmimeIndividualValidated`]: crate::SmimeIndividualValidated
+/// [`pkix_path::Error::MissingLeafPolicyOid`]: https://docs.rs/pkix-path/latest/pkix_path/enum.Error.html#variant.MissingLeafPolicyOid
+/// [`pkix_path::Error::SubjectDnAttrRuleUnmet`]: https://docs.rs/pkix-path/latest/pkix_path/enum.Error.html#variant.SubjectDnAttrRuleUnmet
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct SmimeIndividualValidatedMultipurpose;
+
+impl Profile for SmimeIndividualValidatedMultipurpose {
+    fn id(&self) -> &'static str {
+        "cabf.smime.individual.multipurpose"
+    }
+
+    fn version(&self) -> &'static str {
+        // Dotted spec version of the S/MIME BR document this profile was last
+        // refreshed against; matches `SmimeIndividualValidated`'s version.
+        "1.0.14"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        use pkix_path::DnAttrRule;
+
+        let mut p = ValidationPolicy::new(now_unix);
+        // S/MIME BR §6.3.2: Strict and Multipurpose generation max validity 825 days.
+        p.max_validity_secs = Some(825 * SECS_PER_DAY);
+        // S/MIME BR §7.1.3: SHA-1 prohibited.
+        p.allowed_signature_algs = Some(CABF_SMIME_BR_ALLOWED_ALGS.to_vec());
+        // S/MIME BR §6.1.5: RSA ≥ 2048 bits.
+        p.min_rsa_key_bits = Some(2048);
+        // Mailbox-validated baseline: non-empty SAN with at least one rfc822Name.
+        p.require_subject_alt_name = true;
+        p.require_rfc822_san = true;
+        // S/MIME BR §7.1.2.3(f) Multipurpose row: id-kp-emailProtection EKU
+        // is required; additional EKUs (e.g. id-kp-codeSigning) are permitted.
+        // `required_leaf_eku` is a subset-of check, so additional EKUs pass
+        // automatically. See struct rustdoc "Strict vs Multipurpose".
+        p.required_leaf_eku = Some(vec![ID_KP_EMAIL_PROTECTION]);
+        // S/MIME BR §7.1.6.1 (Reserved Certificate Policy Identifiers) / Appendix A:
+        //   2.23.140.1.5.4.2 — Individual-validated subscriber, Multipurpose generation.
+        p.required_leaf_policy_oids =
+            Some(vec![CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY]);
+        // S/MIME BR §7.1.4.2.6 (Subject DN attributes for individual-validated
+        // profile) Note 2: "Strict and Multipurpose Generation profiles SHALL
+        // include either subject:givenName and/or subject:surname, or the
+        // subject:pseudonym."
+        //
+        // serialNumber is MAY in all generations (§7.1.4.2.6 table column),
+        // so we do not require it here. Identical to the Strict generation
+        // DN rule.
+        //
+        // DN rule:
+        //   AnyOf: pseudonym OR (givenName + surname)
+        p.required_leaf_subject_dn_attrs = Some(DnAttrRule::AnyOf(vec![
+            DnAttrRule::Field(OID_PSEUDONYM),
+            DnAttrRule::AllOf(vec![
+                DnAttrRule::Field(OID_GIVEN_NAME),
+                DnAttrRule::Field(OID_SURNAME),
+            ]),
+        ]));
+        p
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
+impl pkix_lint::LintProfile for SmimeIndividualValidatedMultipurpose {
+    /// Return the CA/B Forum S/MIME BR lint set for this profile.
+    ///
+    /// **Currently empty.** Matches [`SmimeIndividualValidated`]'s
+    /// `LintProfile` shape; comprehensive predicate coverage belongs to
+    /// `pkix-policy-zlint` per AGENTS.md non-negotiable #5.
+    ///
+    /// [`SmimeIndividualValidated`]: crate::SmimeIndividualValidated
     fn lints(&self) -> &[Box<dyn pkix_lint::Lint>] {
         static LINTS: std::sync::OnceLock<Vec<Box<dyn pkix_lint::Lint>>> =
             std::sync::OnceLock::new();
@@ -1001,6 +1188,56 @@ pub fn smime_individual_policy(now_unix: u64) -> ValidationPolicy {
 }
 
 /// Return a [`ValidationPolicy`] for the CA/Browser Forum S/MIME BR
+/// Individual-validated subscriber-certificate profile (Multipurpose generation).
+///
+/// This is a convenience alias for
+/// `SmimeIndividualValidatedMultipurpose.policy(now_unix)`.
+///
+/// # Constraints enforced
+///
+/// Canonical CA/B Forum S/MIME BR:
+/// <https://github.com/cabforum/smime/blob/main/SBR.md>
+///
+/// | Field | Value | Normative reference |
+/// |-------|-------|---------------------|
+/// | `max_validity_secs` | 825 days | [S/MIME BR §6.3.2](https://github.com/cabforum/smime/blob/main/SBR.md#632-certificate-operational-periods-and-key-pair-usage-periods) (Strict and Multipurpose) |
+/// | `allowed_signature_algs` | SHA-256/384/512 RSA + ECDSA; SHA-1 excluded | [S/MIME BR §7.1.3](https://github.com/cabforum/smime/blob/main/SBR.md#713-algorithm-object-identifiers) |
+/// | `min_rsa_key_bits` | 2048 | [S/MIME BR §6.1.5](https://github.com/cabforum/smime/blob/main/SBR.md#615-key-sizes) |
+/// | `require_subject_alt_name` | true | rfc822Name SAN required |
+/// | `require_rfc822_san` | true | at least one rfc822Name in SAN |
+/// | `required_leaf_eku` | id-kp-emailProtection (1.3.6.1.5.5.7.3.4) | [S/MIME BR §7.1.2.3(f)](https://github.com/cabforum/smime/blob/main/SBR.md#7123-subscriber-certificates) (Multipurpose row — additional EKUs permitted) |
+/// | `required_leaf_policy_oids` | `[2.23.140.1.5.4.2]` (Individual-validated Multipurpose) | [S/MIME BR §7.1.6.1](https://github.com/cabforum/smime/blob/main/SBR.md#7161-reserved-certificate-policy-identifiers) |
+/// | `required_leaf_subject_dn_attrs` | `(givenName ∧ surname) ∨ pseudonym` | [S/MIME BR §7.1.4.2.6](https://github.com/cabforum/smime/blob/main/SBR.md#71426-subject-dn-attributes-for-individual-validated-profile) Note 2 |
+///
+/// `max_path_len` is intentionally not set; per-cert `pathLenConstraint`
+/// enforcement (RFC 5280 §4.2.1.9) covers the CA chain-depth case.
+///
+/// # Strict vs Multipurpose
+///
+/// At the `ValidationPolicy` level, this policy differs from
+/// [`smime_individual_policy`] only in the asserted policy OID
+/// (`.4.2` vs `.4.3`). The §7.1.2.3(f) "Strict permits only
+/// emailProtection EKU" constraint is not expressed by
+/// `ValidationPolicy` (no "forbidden EKU" or "exact EKU set" field);
+/// comprehensive enforcement of that semantic belongs to
+/// `pkix-policy-zlint` per AGENTS.md non-negotiable #5. See
+/// [`SmimeIndividualValidatedMultipurpose`]'s struct rustdoc for the
+/// full discussion.
+///
+/// # Limitations
+///
+/// Reference, not authoritative. See [`SmimeIndividualValidatedMultipurpose`].
+///
+/// `max_validity_secs` applies to **every** certificate in the chain, not
+/// just the leaf — same limitation as [`smime_policy`].
+///
+/// Revocation checking (OCSP/CRL) is out of scope; use `pkix-revocation`.
+#[must_use]
+pub fn smime_individual_multipurpose_policy(now_unix: u64) -> ValidationPolicy {
+    SmimeIndividualValidatedMultipurpose.policy(now_unix)
+}
+
+/// Return a [`ValidationPolicy`] for the CA/Browser Forum S/MIME BR
 /// Sponsor-validated subscriber-certificate profile (Strict generation).
 ///
 /// This is a convenience alias for `SmimeSponsorValidated.policy(now_unix)`.
@@ -1218,6 +1455,10 @@ mod tests {
         assert_eq!(SmimeProfile.id(), "cabf.smime");
         assert_eq!(SmimeSponsorValidated.id(), "cabf.smime.sponsor");
         assert_eq!(SmimeIndividualValidated.id(), "cabf.smime.individual");
+        assert_eq!(
+            SmimeIndividualValidatedMultipurpose.id(),
+            "cabf.smime.individual.multipurpose"
+        );
         assert_eq!(CodeSigningProfile.id(), "cabf.cs");
     }
 
@@ -1228,6 +1469,12 @@ mod tests {
         assert_eq!(SmimeProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(SmimeSponsorValidated.policy(NOW).current_time_unix, NOW);
         assert_eq!(SmimeIndividualValidated.policy(NOW).current_time_unix, NOW);
+        assert_eq!(
+            SmimeIndividualValidatedMultipurpose
+                .policy(NOW)
+                .current_time_unix,
+            NOW
+        );
         assert_eq!(CodeSigningProfile.policy(NOW).current_time_unix, NOW);
     }
 
@@ -1261,6 +1508,14 @@ mod tests {
         assert_eq!(
             via_trait, via_fn,
             "SmimeIndividualValidated.policy and smime_individual_policy must agree"
+        );
+
+        let via_trait = SmimeIndividualValidatedMultipurpose.policy(NOW);
+        let via_fn = smime_individual_multipurpose_policy(NOW);
+        assert_eq!(
+            via_trait, via_fn,
+            "SmimeIndividualValidatedMultipurpose.policy and \
+             smime_individual_multipurpose_policy must agree"
         );
 
         let via_trait = CodeSigningProfile.policy(NOW);
@@ -2132,6 +2387,229 @@ mod tests {
                 Err(pkix_path::Error::MissingEku)
             ),
             "WebPKI cert (wrong EKU) must fail smime_sponsor_policy with MissingEku"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // smime_individual_multipurpose_policy — Individual-validated tier,
+    // Multipurpose generation (PKIX-jbvb.9.5)
+    //
+    // Oracle: pkix-path/tests/fixtures/policy-checks/
+    //   smime-individual-multipurpose-self-signed-365d.der    — givenName+surname form, policy OID 2.23.140.1.5.4.2
+    //   smime-individual-multipurpose-pseudonym-self-signed-365d.der — pseudonym form, policy OID 2.23.140.1.5.4.2
+    //   smime-individual-validated-self-signed-365d.der       — Strict generation (negative cross-tier oracle)
+    //   smime-self-signed-365d.der                            — Mailbox-validated baseline (negative oracle)
+    //   webpki-self-signed-365d.der                           — wrong EKU/SAN (negative oracle)
+    //
+    // Fixture provenance: `gen-smime-tier-fixtures.py` Multipurpose block;
+    // structurally mirrors the Strict-generation Individual fixtures with
+    // the asserted policy OID changed from `.4.3` to `.4.2`.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn smime_individual_multipurpose_policy_asserts_multipurpose_policy_oid() {
+        let p = smime_individual_multipurpose_policy(NOW);
+        let oids = p.required_leaf_policy_oids.as_deref().unwrap_or(&[]);
+        assert_eq!(
+            oids,
+            &[CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY],
+            "smime_individual_multipurpose_policy: required_leaf_policy_oids must be exactly [2.23.140.1.5.4.2]"
+        );
+    }
+
+    #[test]
+    fn smime_individual_multipurpose_policy_sets_dn_attr_rule() {
+        let p = smime_individual_multipurpose_policy(NOW);
+        assert!(
+            p.required_leaf_subject_dn_attrs.is_some(),
+            "smime_individual_multipurpose_policy: required_leaf_subject_dn_attrs must be set"
+        );
+    }
+
+    #[test]
+    fn smime_individual_multipurpose_policy_max_validity_is_825_days() {
+        // Inherits the Strict-and-Multipurpose-generation cap per §6.3.2.
+        let p = smime_individual_multipurpose_policy(NOW);
+        assert_eq!(
+            p.max_validity_secs,
+            Some(825 * 86_400),
+            "smime_individual_multipurpose_policy: max_validity_secs must be 825 days"
+        );
+    }
+
+    #[test]
+    fn smime_individual_multipurpose_policy_requires_email_protection_eku() {
+        let p = smime_individual_multipurpose_policy(NOW);
+        let ekus = p.required_leaf_eku.as_deref().unwrap_or(&[]);
+        assert!(
+            ekus.contains(&ID_KP_EMAIL_PROTECTION),
+            "smime_individual_multipurpose_policy: required_leaf_eku must contain id-kp-emailProtection"
+        );
+    }
+
+    /// Positive #1: cert with givenName + surname form passes.
+    ///
+    /// Oracle: smime-individual-multipurpose-self-signed-365d.der has:
+    ///   Subject = C=GB, GN=Test, SN=Person, CN=Test Person
+    ///   CertificatePolicies = 2.23.140.1.5.4.2 (Multipurpose)
+    ///   rfc822Name SAN = individual-mp@example.com
+    ///   emailProtection EKU
+    ///   cA=TRUE (self-signed anchor)
+    /// Verified via openssl x509 -inform DER -text -noout.
+    #[test]
+    fn smime_individual_multipurpose_givenname_surname_form_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-individual-multipurpose-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_individual_multipurpose_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect(
+            "Individual-validated Multipurpose cert with givenName+surname DN, \
+             policy OID 2.23.140.1.5.4.2, rfc822 SAN, and emailProtection EKU \
+             must pass smime_individual_multipurpose_policy",
+        );
+    }
+
+    /// Positive #2: cert with pseudonym form passes.
+    ///
+    /// Oracle: smime-individual-multipurpose-pseudonym-self-signed-365d.der has:
+    ///   Subject = C=GB, pseudonym=TestBoxMP, CN=TestBoxMP
+    ///   CertificatePolicies = 2.23.140.1.5.4.2
+    ///   rfc822Name SAN = testbox-mp@example.com
+    /// Exercises the `AnyOf(pseudonym, AllOf(givenName, surname))` branch of
+    /// the DN rule: pseudonym alone (without givenName/surname) satisfies
+    /// the AnyOf clause.
+    #[test]
+    fn smime_individual_multipurpose_pseudonym_form_passes() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-individual-multipurpose-pseudonym-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_individual_multipurpose_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect(
+            "Individual-validated Multipurpose cert with pseudonym DN \
+             must pass smime_individual_multipurpose_policy (AnyOf branch)",
+        );
+    }
+
+    /// Cross-tier negative #1: Strict-generation Individual cert fails the
+    /// Multipurpose policy with `MissingLeafPolicyOid` because the asserted
+    /// OID is `.4.3` but the Multipurpose policy requires `.4.2`.
+    ///
+    /// Oracle: smime-individual-validated-self-signed-365d.der asserts
+    /// policy OID 2.23.140.1.5.4.3 (Strict). The Multipurpose policy's
+    /// (e3a) check requires 2.23.140.1.5.4.2 and rejects.
+    /// Exercises generation disambiguation: a sibling-generation cert that
+    /// satisfies `smime_individual_policy` does NOT satisfy
+    /// `smime_individual_multipurpose_policy`.
+    #[test]
+    fn smime_individual_multipurpose_rejects_strict_generation_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-individual-validated-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let result = pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_individual_multipurpose_policy(NOW),
+            &EcdsaP256Verifier,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(pkix_path::Error::MissingLeafPolicyOid { required })
+                    if required == CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY
+            ),
+            "Strict-generation cert (policy OID 2.23.140.1.5.4.3) must fail \
+             smime_individual_multipurpose_policy with MissingLeafPolicyOid \
+             {{ required: 2.23.140.1.5.4.2 }}, got {result:?}"
+        );
+    }
+
+    /// Cross-tier negative #2: Multipurpose cert fails the Strict policy
+    /// with `MissingLeafPolicyOid`. Symmetric guarantee for the Strict
+    /// direction — the two generations are mutually exclusive at the
+    /// policy-OID level.
+    #[test]
+    fn smime_individual_strict_rejects_multipurpose_generation_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-individual-multipurpose-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let result = pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_individual_policy(NOW),
+            &EcdsaP256Verifier,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(pkix_path::Error::MissingLeafPolicyOid { required })
+                    if required == CABF_SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY
+            ),
+            "Multipurpose-generation cert (policy OID 2.23.140.1.5.4.2) must fail \
+             smime_individual_policy with MissingLeafPolicyOid \
+             {{ required: 2.23.140.1.5.4.3 }}, got {result:?}"
+        );
+    }
+
+    /// Negative #3: Mailbox-validated cert (no policy OID) fails with
+    /// `MissingLeafPolicyOid`.
+    #[test]
+    fn smime_individual_multipurpose_rejects_mailbox_validated_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        let result = pkix_path::validate_path(
+            &[cert],
+            &anchors,
+            &smime_individual_multipurpose_policy(NOW),
+            &EcdsaP256Verifier,
+        );
+        assert!(
+            matches!(
+                result,
+                Err(pkix_path::Error::MissingLeafPolicyOid { required })
+                    if required == CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY
+            ),
+            "Mailbox-validated cert (no policy OID) must fail \
+             smime_individual_multipurpose_policy with MissingLeafPolicyOid \
+             {{ required: 2.23.140.1.5.4.2 }}, got {result:?}"
+        );
+    }
+
+    /// Negative #4: WebPKI cert (wrong EKU, no rfc822 SAN) fails with
+    /// `MissingEku` — the (e3) EKU check fires before the tier-specific
+    /// (e3a)/(e3b) checks.
+    #[test]
+    fn smime_individual_multipurpose_rejects_webpki_cert() {
+        let cert = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/webpki-self-signed-365d.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(cert.clone())];
+        assert!(
+            matches!(
+                pkix_path::validate_path(
+                    &[cert],
+                    &anchors,
+                    &smime_individual_multipurpose_policy(NOW),
+                    &EcdsaP256Verifier
+                ),
+                Err(pkix_path::Error::MissingEku)
+            ),
+            "WebPKI cert (wrong EKU) must fail smime_individual_multipurpose_policy with MissingEku"
         );
     }
 }

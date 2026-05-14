@@ -5,10 +5,13 @@ This is a sibling generator to `gen.py`, isolated so that adding a new tier
 fixture does not regenerate the unrelated fixtures in `gen.py`'s output set.
 Same convention as `gen-sc081-fixtures.py` (separate script for SC-081 cases).
 
-All fixtures target the **Strict generation** (OID suffix `.3`) per
-PKIX-jbvb.6 (Mark 2026-05-13). Legacy generation (`.1`) is BR-banned for
-new issuance effective 2025-07-15 per §7.1.6.1 line 2600 and is not
-represented in `-cabf` Profile types.
+Strict-generation fixtures (OID suffix `.3`) target the canonical modern
+tier per PKIX-jbvb.6 (Mark 2026-05-13). Multipurpose-generation fixtures
+(OID suffix `.2`) target sibling Profile types per PKIX-jbvb.9 (the
+decision to ship Multipurpose siblings was recorded in PKIX-jbvb.8).
+Legacy generation (`.1`) is BR-banned for new issuance effective
+2025-07-15 per §7.1.6.1 line 2600 and is not represented in `-cabf`
+Profile types.
 
 Fixtures produced (PKIX-jbvb.7, Individual-validated tier, Strict generation):
 
@@ -50,6 +53,28 @@ Fixtures produced (PKIX-jbvb.7, Sponsor-validated tier, Strict generation):
     - emailProtection EKU, 365-day validity, cA=TRUE
     - Exercises the AnyOf branch alongside the required organizationName
       and organizationIdentifier.
+
+Fixtures produced (PKIX-jbvb.9.5, Individual-validated tier, Multipurpose generation):
+
+  smime-individual-multipurpose-self-signed-365d.der
+    Self-signed P-256 cert with:
+    - Subject DN: C=GB, givenName=Test, surname=Person, CN=Test Person
+    - CertificatePolicies: 2.23.140.1.5.4.2 (Individual-validated Multipurpose)
+    - rfc822Name SAN: individual-mp@example.com
+    - emailProtection EKU
+    - 365-day validity (notBefore 2026-01-01)
+    - cA=TRUE (self-signed anchor pattern)
+    - Mirrors smime-individual-validated-self-signed-365d.der in every
+      structural respect except the asserted policy OID.
+
+  smime-individual-multipurpose-pseudonym-self-signed-365d.der
+    Self-signed P-256 cert with:
+    - Subject DN: C=GB, pseudonym=TestBoxMP, CN=TestBoxMP
+    - CertificatePolicies: 2.23.140.1.5.4.2 (Individual-validated Multipurpose)
+    - rfc822Name SAN: testbox-mp@example.com
+    - emailProtection EKU, 365-day validity, cA=TRUE
+    - Exercises the AnyOf(pseudonym, AllOf(givenName, surname)) branch
+      of pkix_path::DnAttrRule for the Multipurpose generation.
 
 # Provenance
 
@@ -116,9 +141,10 @@ def next_serial():
 
 
 # CA/B Forum S/MIME BR reserved policy OIDs (§7.1.6.1 / Appendix A) —
-# Strict generation (suffix `.3`).
+# Strict generation (suffix `.3`) and Multipurpose generation (suffix `.2`).
 SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY = x509.ObjectIdentifier("2.23.140.1.5.4.3")
 SMIME_SPONSOR_VALIDATED_STRICT_POLICY = x509.ObjectIdentifier("2.23.140.1.5.3.3")
+SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY = x509.ObjectIdentifier("2.23.140.1.5.4.2")
 
 # organizationIdentifier (RFC 4519 / X.520 OID 2.5.4.97). pyca's NameOID
 # does not export this; construct from raw OID. Used by Sponsor-validated
@@ -261,6 +287,45 @@ make_tier_cert(
     ],
     SMIME_SPONSOR_VALIDATED_STRICT_POLICY,
     "sponsored.alias@acme-sponsor.example.com",
+)
+
+
+# ---------------------------------------------------------------------------
+# Individual-validated tier, Multipurpose generation (PKIX-jbvb.9.5)
+# CA/B Forum S/MIME BR §7.6 + §7.1.4.2.6 Note 2 (Strict and Multipurpose).
+#
+# Subject DN rule:
+#   AnyOf: pseudonym OR (givenName + surname)
+#
+# Identical to the Strict-generation Individual-validated rule, only the
+# asserted policy OID changes (.4.2 vs .4.3). Fixtures mirror the Strict
+# pair to make the OID the sole structural difference observable to the
+# validator.
+# ---------------------------------------------------------------------------
+
+# Form 1: givenName + surname (most common Individual-validated shape).
+make_tier_cert(
+    "smime-individual-multipurpose-self-signed-365d.der",
+    [
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
+        x509.NameAttribute(NameOID.GIVEN_NAME, "Test"),
+        x509.NameAttribute(NameOID.SURNAME, "Person"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "Test Person"),
+    ],
+    SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY,
+    "individual-mp@example.com",
+)
+
+# Form 2: pseudonym only. Exercises the AnyOf branch.
+make_tier_cert(
+    "smime-individual-multipurpose-pseudonym-self-signed-365d.der",
+    [
+        x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
+        x509.NameAttribute(NameOID.PSEUDONYM, "TestBoxMP"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "TestBoxMP"),
+    ],
+    SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY,
+    "testbox-mp@example.com",
 )
 
 print("done")
