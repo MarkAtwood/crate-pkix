@@ -307,12 +307,20 @@ pub enum Error {
     Pem(DerError),
     /// DER decoding failed for a certificate body.
     Der(DerError),
-    /// The input parsed cleanly but contained no certificates.
+    /// The input contained no certificates.
     ///
-    /// Returned by [`from_pem`] and the file/iter variants when zero
-    /// `-----BEGIN CERTIFICATE-----` blocks (or zero DER inputs) were
-    /// observed. An empty trust store is almost always a configuration
+    /// Returned by [`from_pem`] when no `-----BEGIN CERTIFICATE-----`
+    /// marker is found at all (truly empty input, whitespace-only
+    /// input, or non-PEM bytes — the loader cannot distinguish), and
+    /// by [`from_der_iter`] when the supplied iterator yields zero
+    /// items. An empty trust store is almost always a configuration
     /// mistake, so this is a hard error rather than `Ok(vec![])`.
+    ///
+    /// **Diagnostic limitation:** `from_pem` cannot distinguish "valid
+    /// non-cert PEM" (e.g., a `PRIVATE KEY`-only file) from "non-PEM
+    /// bytes" (a JPEG, a JSON config) from "empty input" — all three
+    /// surface as `NoCertificates`. Callers needing that distinction
+    /// must inspect the input themselves before calling.
     NoCertificates,
     /// One certificate in a multi-cert input was malformed.
     ///
@@ -336,7 +344,10 @@ impl core::fmt::Display for Error {
             Self::Io(e) => write!(f, "i/o error: {e}"),
             Self::Pem(e) => write!(f, "PEM decoding failed: {e}"),
             Self::Der(e) => write!(f, "DER decoding failed: {e}"),
-            Self::NoCertificates => f.write_str("input contained no certificates"),
+            Self::NoCertificates => f.write_str(
+                "input contained no certificates (no `-----BEGIN CERTIFICATE-----` marker; \
+                 if the input is non-PEM the loader cannot tell)",
+            ),
             Self::MalformedAnchor { index, source } => {
                 write!(f, "malformed certificate at position {index}: {source}")
             }
@@ -473,7 +484,12 @@ pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
 /// parsing here means every adapter inherits the same validation behaviour and
 /// the same error reporting.
 ///
-/// The iterator is consumed eagerly; all anchors are decoded before returning.
+/// The iterator is consumed eagerly (not lazy) and decoded **fail-fast**:
+/// on the first malformed entry the function returns
+/// `Err(Error::MalformedAnchor { index, source })` where `index` is the
+/// 0-based position of the failing item, and the rest of the iterator
+/// is not polled. Callers wrapping a stream-backed iterator that needs
+/// full draining for resource cleanup must drain it themselves.
 ///
 /// # Errors
 ///
