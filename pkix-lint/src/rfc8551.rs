@@ -50,6 +50,20 @@ const ID_KP_EMAIL_PROTECTION: ObjectIdentifier = ObjectIdentifier::new_unwrap("1
 /// S/MIME usage. This lint is the RFC-conformance analog of
 /// [`crate::rfc5280::Rfc5280EkuServerAuthLint`] for the S/MIME use case.
 ///
+/// # Use-case applicability — operator contract
+///
+/// This lint is **use-case specific** to S/MIME certificates. It asserts
+/// a property RFC 8551 §3.3 requires of S/MIME certs and **only** S/MIME
+/// certs. Registering it against arbitrary leaves produces false-positive
+/// `Error` findings on TLS server, code-signing, OCSP-responder, or any
+/// other non-S/MIME end-entity certificate.
+///
+/// **Operators MUST register this lint only through a use-case-specific
+/// [`LintProfile`][crate::LintProfile] that bundles it with other S/MIME
+/// lints (`Rfc8398SmimeSanLint` etc.).** `pkix_profiles::BasicSmimeProfile`
+/// is the canonical bundler. See [`crate::Lint`] trait rustdoc for the
+/// contract.
+///
 /// # Behavior
 ///
 /// - `ExtendedKeyUsage` extension absent → `Error`.

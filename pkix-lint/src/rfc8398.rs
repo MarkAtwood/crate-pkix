@@ -55,6 +55,20 @@ const ID_ON_SMTP_UTF8_MAILBOX: ObjectIdentifier = ObjectIdentifier::new_unwrap("
 /// "MUST be equivalent if both present" rule — checked in a separate
 /// lint).
 ///
+/// # Use-case applicability — operator contract
+///
+/// This lint is **use-case specific** to S/MIME certificates. It asserts
+/// a property RFC 8398 + RFC 5280 §4.2.1.6 require of S/MIME certs and
+/// **only** S/MIME certs. Registering it against arbitrary leaves
+/// produces false-positive `Error` findings on TLS server, code-signing,
+/// OCSP-responder, or any other non-S/MIME end-entity certificate.
+///
+/// **Operators MUST register this lint only through a use-case-specific
+/// [`LintProfile`][crate::LintProfile] that bundles it with other
+/// S/MIME lints (`Rfc8551EkuEmailProtectionLint` etc.).**
+/// `pkix_profiles::BasicSmimeProfile` is the canonical bundler. See
+/// [`crate::Lint`] trait rustdoc for the contract.
+///
 /// # Behavior
 ///
 /// - `SubjectAltName` extension absent → `Error`.
