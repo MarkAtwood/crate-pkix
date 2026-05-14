@@ -98,8 +98,14 @@ not ship Legacy-tier profile types.
   §7.1.4.2.6 Note 2 ("Strict and Multipurpose Generation profiles
   SHALL include either subject:givenName and/or subject:surname, or
   the subject:pseudonym").
+- `SmimeSponsorValidatedMultipurpose` — Sponsor-validated tier (§7.5),
+  Multipurpose generation. Reserved policy OID `2.23.140.1.5.3.2`.
+  Subject DN rule is identical to Sponsor Strict per §7.1.4.2.5
+  (organizationName + organizationIdentifier SHALL across all
+  generations; Note 2 mandates givenName+surname or pseudonym for
+  Strict and Multipurpose).
 - Organization-validated (§7.4) Strict-generation Profile type
-  remains tracked under PKIX-jbvb.1. Mailbox / Sponsor / Organization
+  remains tracked under PKIX-jbvb.1. Mailbox and Organization
   Multipurpose sibling Profile types remain tracked under PKIX-jbvb.9.
 
 #### Strict vs Multipurpose EKU permissiveness — not validator-enforced
