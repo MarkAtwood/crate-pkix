@@ -57,6 +57,59 @@
 //! [`Error`] is `#[non_exhaustive]`. New error variants may be added in minor
 //! releases; do not match it exhaustively.
 //!
+//! # Contract guarantees
+//!
+//! - **Iteration order is preserved.** The `Vec<TrustAnchor>` returned by
+//!   [`from_pem`], [`from_pem_file`], [`from_pem_file_with_cap`],
+//!   [`from_der_iter`], and any future bulk loader is in the same order as
+//!   the input (PEM block order for `from_pem`, iterator order for
+//!   `from_der_iter`).
+//! - **Duplicates are preserved, not deduplicated.** If the input contains
+//!   the same certificate N times, the output contains N [`TrustAnchor`]
+//!   values. Bundles in the wild sometimes ship a root multiple times
+//!   (e.g., distros that pull the same CA from two upstream packages);
+//!   callers wanting dedup must do it themselves (deriving a key from
+//!   `(subject, subject_public_key_info)` is the canonical approach).
+//!   `TrustAnchor` derives `PartialEq + Eq` so this is straightforward.
+//! - **No signature verification.** These loaders extract
+//!   `(subject, subject_public_key_info, NameConstraints)` from each
+//!   certificate and do **not** verify any signature on the certificate
+//!   itself — not the self-signature on a root, not the signature from
+//!   an offline parent. Trust in the loaded anchors derives entirely from
+//!   trust in the input bytes. This is RFC-conformant (RFC 5280 §6.1
+//!   models trust anchors as `(name, key, optional constraints)` tuples)
+//!   but means deployment authors must ensure trust-anchor files are
+//!   sourced from a trusted channel (signed distro packages, internal
+//!   CMDB, etc.).
+//! - **Send + Sync.** [`Error`], [`IoFailure`], and the re-exported
+//!   [`TrustAnchor`] / [`DerError`] all implement `Send + Sync`. Compile-
+//!   time assertions in this crate and in `pkix-path` pin the guarantee
+//!   across future refactors. The natural use pattern (load anchors at
+//!   startup, share `&[TrustAnchor]` across worker threads, surface
+//!   `Error` from any thread) is supported.
+//! - **No panics on valid Rust input.** All loader entry points return
+//!   [`Result`] for every error category; the only known panic mode in
+//!   the dependency stack is an upstream x509-cert 0.2.x edge case
+//!   (RustCrypto/formats#1965, empty/whitespace-only PEM input causing a
+//!   subtract-with-overflow) which is defended against by an explicit
+//!   guard in [`from_pem`]. The workaround is documented inline and is
+//!   removed once the workspace bumps to x509-cert 0.3.x. Allocation
+//!   failure can panic in `alloc::vec::Vec` and is not specially handled
+//!   (consistent with std behaviour).
+//!
+//! # Features
+//!
+//! - **`serde`** (off by default) — adds `serde::Serialize` and
+//!   `serde::Deserialize` derives to [`Error`] and [`IoFailure`], and
+//!   propagates `pkix-path/serde` so the re-exported [`DerError`] gains
+//!   the matching wire form. Useful for caching load failures across
+//!   processes or persisting them for later replay (AGENTS.md
+//!   non-negotiable #6, PKIX-2l0v.1). Round-trip notes: the [`DerError`]
+//!   inner `der::Error` is dropped on deserialize (its `Display` message
+//!   survives); [`IoFailure::kind`] round-trips via the `Debug` form of
+//!   `io::ErrorKind` and falls back to `io::ErrorKind::Other` on
+//!   variants the consumer does not know.
+//!
 //! # Limitations
 //!
 //! - **No compiled-in CA bundle.** This crate ships zero trust data by
