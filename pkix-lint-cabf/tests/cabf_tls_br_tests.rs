@@ -791,6 +791,7 @@ fn metadata_title_defaults_to_id_when_not_overridden() {
     // default behavior on the trait.
     use pkix_lint::{Lint, LintResult, Scope, Severity, SubjectKind};
 
+    #[derive(Clone)]
     struct MinimalLint;
     impl Lint for MinimalLint {
         fn id(&self) -> &'static str {

@@ -298,6 +298,7 @@ mod tests {
     /// `spec_url` left as `None`. Used to pin the "lint without spec_url
     /// omits the OSCAL links array" contract without depending on
     /// pkix-lint-cabf content.
+    #[derive(Clone)]
     struct PolicyShapedLint {
         id: &'static str,
         section_id: &'static str,
