@@ -57,6 +57,7 @@ use crate::de_cow_static;
 /// `serde_json::from_slice`, or any other.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct EvaluationReport {
     /// The profile ID used for this evaluation (from [`crate::Profile::id`]).
     ///

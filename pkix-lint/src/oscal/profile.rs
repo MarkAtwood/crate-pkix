@@ -98,12 +98,31 @@ use super::parse::{lint_ids_from_catalog, ParseError};
 /// precede outer Profile overrides, so an outer Profile that sets the
 /// same parameter takes effect last.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ResolvedProfile {
     /// Ordered set of OSCAL Control ids selected by the Profile.
     pub control_ids: Vec<String>,
     /// Parameter overrides extracted from `modify.set-parameters`
     /// directives, in resolution order.
     pub parameter_overrides: Vec<ParameterOverride>,
+}
+
+impl ResolvedProfile {
+    /// Construct a [`ResolvedProfile`] with the listed control ids and
+    /// parameter overrides.
+    ///
+    /// Use this constructor instead of struct-literal syntax so future
+    /// fields (the OSCAL Profile model carries `merge.combine`,
+    /// `modify.alters`, `back-matter` that are not interpreted today
+    /// per this crate's rustdoc) remain non-breaking additions. The
+    /// struct carries `#[non_exhaustive]`.
+    #[must_use]
+    pub fn new(control_ids: Vec<String>, parameter_overrides: Vec<ParameterOverride>) -> Self {
+        Self {
+            control_ids,
+            parameter_overrides,
+        }
+    }
 }
 
 /// A single OSCAL `set-parameter` directive resolved against a Catalog.
@@ -113,12 +132,30 @@ pub struct ResolvedProfile {
 /// [`crate::oscal::catalog::catalog_from_lints`]. `value` is the first
 /// entry of the directive's `values` array.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ParameterOverride {
     /// Composite OSCAL Parameter id (`<lint_id>.<param_id>`).
     pub param_id: String,
     /// Override value, rendered as a string per the OSCAL Parameter
     /// model.
     pub value: String,
+}
+
+impl ParameterOverride {
+    /// Construct a [`ParameterOverride`].
+    ///
+    /// Use this constructor instead of struct-literal syntax so future
+    /// fields (the OSCAL Parameter model carries `constraint`,
+    /// `guideline`, `select`, `link` shape mentioned in the
+    /// [`crate::LintParameter`] rustdoc) remain non-breaking additions.
+    /// The struct carries `#[non_exhaustive]`.
+    #[must_use]
+    pub fn new(param_id: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            param_id: param_id.into(),
+            value: value.into(),
+        }
+    }
 }
 
 /// Resolve an OSCAL Profile [`Value`] into a flat list of selected

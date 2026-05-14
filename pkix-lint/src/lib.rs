@@ -384,6 +384,7 @@ impl SubjectKind {
 /// [oscal-cat]: https://pages.nist.gov/OSCAL/concepts/layer/control/catalog/
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct LintParameter {
     /// Stable identifier — used to address the parameter in
     /// [`Lint::set_parameter`] and in OSCAL Profile `modify` directives.
@@ -398,6 +399,28 @@ pub struct LintParameter {
     /// typed state if a caller has not supplied an override via
     /// [`Lint::set_parameter`].
     pub default_value: Cow<'static, str>,
+}
+
+impl LintParameter {
+    /// Construct a [`LintParameter`] with the three required fields.
+    ///
+    /// Use this constructor instead of struct-literal syntax so the
+    /// addition of future fields (OSCAL `constraint`, `guideline`,
+    /// `select`, `link` shape mentioned in the type-level rustdoc)
+    /// remains a non-breaking change. The struct carries
+    /// `#[non_exhaustive]`.
+    #[must_use]
+    pub fn new(
+        id: impl Into<Cow<'static, str>>,
+        label: impl Into<Cow<'static, str>>,
+        default_value: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            default_value: default_value.into(),
+        }
+    }
 }
 
 /// Error reported by [`Lint::set_parameter`].
@@ -921,6 +944,7 @@ pub trait Lint: Send + Sync {
 /// (postcard, MessagePack) emit raw bytes via the same `Option<[u8; 32]>` field.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Finding {
     /// The stable ID of the lint that produced this finding (from [`Lint::id`]).
     #[cfg_attr(feature = "serde", serde(deserialize_with = "de_cow_static"))]
@@ -979,6 +1003,51 @@ impl Finding {
     #[must_use]
     pub const fn is_finding(&self) -> bool {
         self.result.is_finding()
+    }
+
+    /// Construct a [`Finding`] with the required fields.
+    ///
+    /// Use this constructor instead of struct-literal syntax so the
+    /// addition of future fields (e.g., `path_position`,
+    /// `severity_actual`, `evidence_chain_sha256`) remains a
+    /// non-breaking change. The struct carries `#[non_exhaustive]`.
+    ///
+    /// Optional fields ([`Self::cert_index`], [`Self::cert_sha256`])
+    /// default to `None`; set them via the corresponding `with_*`
+    /// methods or via field assignment from within the defining crate.
+    #[must_use]
+    pub fn new(
+        lint_id: impl Into<Cow<'static, str>>,
+        citation: impl Into<Cow<'static, str>>,
+        rule_bundle_version: impl Into<Cow<'static, str>>,
+        result: LintResult,
+        evaluated_at_unix: u64,
+    ) -> Self {
+        Self {
+            lint_id: lint_id.into(),
+            citation: citation.into(),
+            rule_bundle_version: rule_bundle_version.into(),
+            result,
+            cert_index: None,
+            evaluated_at_unix,
+            cert_sha256: None,
+        }
+    }
+
+    /// Builder-style setter for [`Self::cert_index`]. Returns `self`
+    /// for chaining.
+    #[must_use]
+    pub fn with_cert_index(mut self, cert_index: usize) -> Self {
+        self.cert_index = Some(cert_index);
+        self
+    }
+
+    /// Builder-style setter for [`Self::cert_sha256`]. Returns `self`
+    /// for chaining.
+    #[must_use]
+    pub fn with_cert_sha256(mut self, cert_sha256: [u8; 32]) -> Self {
+        self.cert_sha256 = Some(cert_sha256);
+        self
     }
 }
 
