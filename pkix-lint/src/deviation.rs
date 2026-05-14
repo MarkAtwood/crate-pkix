@@ -193,6 +193,30 @@ pub struct Deviation {
     /// `None` is acceptable but discouraged for production deviations in gov/mil
     /// contexts where the IG may ask for the authorizing document.
     pub evidence_uri: Option<String>,
+
+    /// Resolution priority when multiple deviations could apply to the
+    /// same (lint_id, cert) pair.
+    ///
+    /// Among the deviations matching a finding,
+    /// [`DeviationStore::find_deviation`] selects the one with the
+    /// **highest** priority. Ties are broken by store-insertion order
+    /// (the first-added wins). Default is `0`.
+    ///
+    /// # Operator guidance
+    ///
+    /// Use `priority` to express specificity when merging deviation
+    /// files from multiple authors (PKIX-hy2e.10). For example, a
+    /// site-local lab-specific waiver scoped
+    /// `issuer_dn_contains: internal-lab` should set
+    /// `priority = 100`; a workspace-wide waiver scoped
+    /// [`DeviationScope::any`] should leave `priority = 0`. The lab
+    /// waiver then wins for the lab CA's certs, while the wildcard
+    /// waiver applies elsewhere.
+    ///
+    /// Negative priorities are permitted (e.g., `-100` for an
+    /// "fallback" deviation that should only fire when no more
+    /// specific one matches), so the type is `i32` rather than `u32`.
+    pub priority: i32,
 }
 
 impl Deviation {
@@ -208,6 +232,7 @@ impl Deviation {
     /// - [`Self::effective_start`] → `None` (active from epoch)
     /// - [`Self::effective_end`] → `None` (never expires)
     /// - [`Self::evidence_uri`] → `None`
+    /// - [`Self::priority`] → `0`
     ///
     /// `id`, `target_lint`, `justification`, and `authorized_by` must
     /// be non-empty when the deviation is added to a [`DeviationStore`].
@@ -232,6 +257,7 @@ impl Deviation {
             justification: justification.into(),
             authorized_by: authorized_by.into(),
             evidence_uri: None,
+            priority: 0,
         }
     }
 
@@ -256,6 +282,14 @@ impl Deviation {
     #[must_use]
     pub fn with_evidence_uri(mut self, uri: impl Into<String>) -> Self {
         self.evidence_uri = Some(uri.into());
+        self
+    }
+
+    /// Builder-style setter for [`Self::priority`]. Returns `self`
+    /// for chaining.
+    #[must_use]
+    pub fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
         self
     }
 
@@ -925,11 +959,22 @@ impl DeviationStore {
 
     /// Check whether a specific finding should be deviated.
     ///
-    /// Returns the first active deviation that matches `cert` and `lint_id` at
-    /// `now_unix`, or `None` if no deviation applies.
+    /// Returns the active deviation that matches `cert` and `lint_id`
+    /// at `now_unix`, or `None` if no deviation applies.
     ///
-    /// In the case of multiple matching deviations, the first one added to the
-    /// store wins. Deviations should be scoped to avoid unintentional overlap.
+    /// # Resolution rule (PKIX-hy2e.10)
+    ///
+    /// Among all matching deviations, the one with the highest
+    /// [`Deviation::priority`] wins. Ties are broken by
+    /// store-insertion order — the first-added deviation at the
+    /// winning priority wins.
+    ///
+    /// Operators merging deviation files from multiple authors should
+    /// set [`Deviation::priority`] explicitly to express specificity:
+    /// site-local / lab-scoped waivers get higher priorities than
+    /// workspace-wide wildcard waivers. The default priority is `0`,
+    /// so a single-author store behaves identically to the pre-PKIX-
+    /// hy2e.10 "first-match-wins" rule.
     #[must_use]
     pub fn find_deviation(
         &self,
@@ -937,12 +982,25 @@ impl DeviationStore {
         cert: &Certificate,
         now_unix: u64,
     ) -> Option<&Deviation> {
-        self.deviations
-            .iter()
-            .find(|d| d.target_lint.as_str() == lint_id && d.applies_to(cert, now_unix))
+        // max_by_key on (priority, -index) would also work, but
+        // iter().enumerate() lets us tie-break by insertion order
+        // (low index wins for equal priority) via a stable max walk.
+        let mut best: Option<&Deviation> = None;
+        for d in &self.deviations {
+            if d.target_lint.as_str() == lint_id && d.applies_to(cert, now_unix) {
+                match best {
+                    None => best = Some(d),
+                    Some(prev) if d.priority > prev.priority => best = Some(d),
+                    // priority <= prev.priority: keep prev (earlier
+                    // insertion order wins for ties).
+                    Some(_) => {}
+                }
+            }
+        }
+        best
     }
 
-    /// Returns the first active deviation that matches `lint_id` and at
+    /// Returns the active deviation that matches `lint_id` and at
     /// least one certificate in `chain` at `now_unix`, or `None` if no
     /// deviation applies.
     ///
@@ -953,16 +1011,13 @@ impl DeviationStore {
     /// CAs; a deviation scoped to an intermediate must be applicable
     /// even though the path finding has no single "owning" cert.
     ///
-    /// Resolution order within this method:
-    /// 1. Iterate deviations in store-insertion order (the same
-    ///    "first match wins" rule as [`Self::find_deviation`]).
-    /// 2. For each deviation, test against every cert in `chain` in
-    ///    chain order (leaf first).
-    /// 3. Return on the first (deviation, cert) pair where both
-    ///    `target_lint` and `applies_to(cert)` match.
+    /// # Resolution rule (PKIX-hy2e.10 + PKIX-hy2e.11)
     ///
-    /// PKIX-hy2e.11 — the previous behavior of scope-matching only the
-    /// leaf silently dropped deviations scoped to intermediate-CA DNs.
+    /// 1. A deviation matches if [`Deviation::target_lint`] equals
+    ///    `lint_id` AND at least one cert in `chain` is in scope.
+    /// 2. Among all matching deviations, the highest
+    ///    [`Deviation::priority`] wins.
+    /// 3. Priority ties are broken by store-insertion order.
     #[must_use]
     pub fn find_deviation_for_chain(
         &self,
@@ -970,10 +1025,19 @@ impl DeviationStore {
         chain: &[Certificate],
         now_unix: u64,
     ) -> Option<&Deviation> {
-        self.deviations.iter().find(|d| {
-            d.target_lint.as_str() == lint_id
+        let mut best: Option<&Deviation> = None;
+        for d in &self.deviations {
+            if d.target_lint.as_str() == lint_id
                 && chain.iter().any(|cert| d.applies_to(cert, now_unix))
-        })
+            {
+                match best {
+                    None => best = Some(d),
+                    Some(prev) if d.priority > prev.priority => best = Some(d),
+                    Some(_) => {}
+                }
+            }
+        }
+        best
     }
 }
 
@@ -1261,6 +1325,7 @@ mod tests {
             justification: "test justification".to_string(),
             authorized_by: "test-author@example.com".to_string(),
             evidence_uri: None,
+            priority: 0,
         }
     }
 
@@ -2020,6 +2085,114 @@ mod tests {
                 .find_deviation_for_chain("test.path.lint", &chain, 1_000_000)
                 .is_none(),
             "deviation scoped to a non-matching substring must not fire on any chain cert"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // PKIX-hy2e.10 regression — Deviation.priority resolution. Among
+    // matching deviations, the highest priority wins; insertion order
+    // breaks ties. Documented contract on DeviationStore::find_deviation
+    // and DeviationStore::find_deviation_for_chain.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn find_deviation_higher_priority_wins() {
+        let cert = load_cert();
+        let now: u64 = 1_000_000;
+        let mut store = DeviationStore::new();
+        // First-added has priority 0 (default), should lose.
+        store
+            .add(
+                Deviation::new(
+                    "wildcard",
+                    "test.lint",
+                    DeviationScope::any(),
+                    DeviationAction::Suppress,
+                    "wildcard waiver",
+                    "ops@example.com",
+                )
+                .with_priority(0),
+            )
+            .expect("add wildcard");
+        // Second-added has priority 100, should win even though added
+        // later (insertion order is the tie-breaker, not the primary).
+        store
+            .add(
+                Deviation::new(
+                    "specific",
+                    "test.lint",
+                    DeviationScope::any(),
+                    DeviationAction::DowngradeSeverityTo(Severity::Info),
+                    "lab-specific waiver",
+                    "lab-lead@example.com",
+                )
+                .with_priority(100),
+            )
+            .expect("add specific");
+
+        let found = store.find_deviation("test.lint", &cert, now);
+        let dev = found.expect("at least one deviation must match");
+        assert_eq!(
+            dev.id, "specific",
+            "higher priority must win regardless of insertion order; \
+             got dev.id={} priority={}",
+            dev.id, dev.priority
+        );
+    }
+
+    #[test]
+    fn find_deviation_priority_tie_breaks_by_insertion_order() {
+        let cert = load_cert();
+        let now: u64 = 1_000_000;
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                id: "first".to_string(),
+                priority: 50,
+                ..make_deviation("first", "test.lint")
+            })
+            .expect("add first");
+        store
+            .add(Deviation {
+                id: "second".to_string(),
+                priority: 50,
+                ..make_deviation("second", "test.lint")
+            })
+            .expect("add second");
+
+        let found = store.find_deviation("test.lint", &cert, now);
+        assert_eq!(
+            found.expect("at least one match").id,
+            "first",
+            "insertion order is the documented tie-breaker for equal priority"
+        );
+    }
+
+    #[test]
+    fn find_deviation_negative_priority_loses_to_default() {
+        let cert = load_cert();
+        let now: u64 = 1_000_000;
+        let mut store = DeviationStore::new();
+        store
+            .add(Deviation {
+                id: "fallback".to_string(),
+                priority: -100,
+                ..make_deviation("fallback", "test.lint")
+            })
+            .expect("add fallback");
+        store
+            .add(Deviation {
+                id: "normal".to_string(),
+                priority: 0,
+                ..make_deviation("normal", "test.lint")
+            })
+            .expect("add normal");
+
+        let found = store.find_deviation("test.lint", &cert, now);
+        assert_eq!(
+            found.expect("at least one match").id,
+            "normal",
+            "default priority 0 must outrank negative -100"
         );
     }
 

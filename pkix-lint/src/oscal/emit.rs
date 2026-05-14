@@ -1362,6 +1362,7 @@ mod tests {
             justification: "FPKIPA waiver memo 2025-11-03".to_string(),
             authorized_by: "agency-x-ciso@agency.gov".to_string(),
             evidence_uri: Some("https://policy.agency.gov/waivers/2025-11-03".to_string()),
+            priority: 0,
         }
     }
 
