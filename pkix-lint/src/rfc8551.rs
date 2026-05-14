@@ -21,7 +21,7 @@
 use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::Certificate;
 
-use crate::{Lint, LintResult, Scope, Severity, SubjectKind};
+use crate::{truncate_for_detail, Lint, LintResult, Scope, Severity, SubjectKind};
 
 // ---------------------------------------------------------------------------
 // OID constants
@@ -132,9 +132,13 @@ impl Lint for Rfc8551EkuEmailProtectionLint {
                     )
                 }
             }
-            Err(e) => LintResult::error(format!(
-                "ExtendedKeyUsage extension value is malformed DER: {e}"
-            )),
+            Err(e) => {
+                let e_str = e.to_string();
+                let safe_e = truncate_for_detail(&e_str);
+                LintResult::error(format!(
+                    "ExtendedKeyUsage extension value is malformed DER: {safe_e}"
+                ))
+            }
         }
     }
 }

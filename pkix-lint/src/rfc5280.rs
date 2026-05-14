@@ -28,7 +28,10 @@ use std::borrow::Cow;
 use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::Certificate;
 
-use crate::{Lint, LintParameter, LintResult, ParameterError, Scope, Severity, SubjectKind};
+use crate::{
+    truncate_for_detail, Lint, LintParameter, LintResult, ParameterError, Scope, Severity,
+    SubjectKind,
+};
 
 // ---------------------------------------------------------------------------
 // OID constants (RFC 5280 §4.2.1 — standard certificate extensions)
@@ -368,9 +371,13 @@ impl Lint for Rfc5280BasicConstraintsCaLeafLint {
                     LintResult::Pass
                 }
             }
-            Err(e) => LintResult::error(format!(
-                "BasicConstraints extension value is malformed DER: {e}"
-            )),
+            Err(e) => {
+                let e_str = e.to_string();
+                let safe_e = truncate_for_detail(&e_str);
+                LintResult::error(format!(
+                    "BasicConstraints extension value is malformed DER: {safe_e}"
+                ))
+            }
         }
     }
 }
@@ -486,9 +493,13 @@ impl Lint for Rfc5280EkuServerAuthLint {
                     )
                 }
             }
-            Err(e) => LintResult::error(format!(
-                "ExtendedKeyUsage extension value is malformed DER: {e}"
-            )),
+            Err(e) => {
+                let e_str = e.to_string();
+                let safe_e = truncate_for_detail(&e_str);
+                LintResult::error(format!(
+                    "ExtendedKeyUsage extension value is malformed DER: {safe_e}"
+                ))
+            }
         }
     }
 }

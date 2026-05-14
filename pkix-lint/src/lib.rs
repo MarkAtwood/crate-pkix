@@ -273,6 +273,49 @@ where
     Ok(Cow::Owned(s))
 }
 
+/// Documented cap (bytes) for attacker-controlled string content
+/// interpolated into [`LintResult::error`] / [`LintResult::warn`]
+/// detail strings. PKIX-7f92.52 closed a memory-amplification surface:
+/// a malicious cert carrying a 100 MB rfc822Name SAN entry would
+/// otherwise produce 100 MB Findings traveling through every emit
+/// path (OSCAL serialization, evidence-pack persistence, downstream
+/// JSON consumers), turning a single bad cert into N-lints × emit-copies
+/// memory pressure.
+///
+/// 256 bytes is well above any legitimate RFC 5322 mailbox local-part
+/// (max 64), full mailbox address (typical ~100), X.500 DN attribute
+/// (typical ~64-128), or `der::Error` message (typical ~50). Truncated
+/// values are still useful for operator debugging — the leading bytes
+/// usually identify the offender uniquely.
+pub(crate) const DETAIL_MAX_BYTES: usize = 256;
+
+/// Truncate an attacker-controlled string for inclusion in a
+/// [`LintResult`] detail message. Values longer than [`DETAIL_MAX_BYTES`]
+/// are cut at the first valid UTF-8 boundary at or below that limit
+/// and suffixed with `... (truncated, N bytes total)` so operators
+/// can see that truncation happened and what the full size was.
+///
+/// Use for every cert-derived string flowing into a `format!` /
+/// `LintResult::error` / `LintResult::warn` call. See PKIX-7f92.52 for
+/// the threat model rationale.
+pub(crate) fn truncate_for_detail(s: &str) -> Cow<'_, str> {
+    if s.len() <= DETAIL_MAX_BYTES {
+        return Cow::Borrowed(s);
+    }
+    // Find the last UTF-8 char boundary at or below DETAIL_MAX_BYTES.
+    // `str::is_char_boundary` is true at indices 0..=s.len(), so the
+    // loop terminates on the longest valid prefix that fits.
+    let mut cut = DETAIL_MAX_BYTES;
+    while !s.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    Cow::Owned(format!(
+        "{}... (truncated, {} bytes total)",
+        &s[..cut],
+        s.len()
+    ))
+}
+
 pub mod deviation;
 #[cfg(feature = "oscal")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oscal")))]
@@ -1934,6 +1977,78 @@ mod tests {
     #[test]
     fn subject_kind_intermediate_does_not_match_leaf() {
         assert!(!SubjectKind::IntermediateCa.matches(SubjectKind::Leaf));
+    }
+
+    // -----------------------------------------------------------------------
+    // truncate_for_detail tests (PKIX-7f92.52)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn truncate_for_detail_passes_short_strings_through() {
+        let s = "small string";
+        let out = super::truncate_for_detail(s);
+        assert_eq!(out, "small string");
+        // Borrowed Cow — no allocation for the common case.
+        assert!(matches!(out, std::borrow::Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn truncate_for_detail_passes_exact_cap_unchanged() {
+        let s: String = "a".repeat(super::DETAIL_MAX_BYTES);
+        let out = super::truncate_for_detail(&s);
+        assert_eq!(out.len(), super::DETAIL_MAX_BYTES);
+        assert!(matches!(out, std::borrow::Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn truncate_for_detail_truncates_over_cap() {
+        let s: String = "a".repeat(super::DETAIL_MAX_BYTES + 100);
+        let out = super::truncate_for_detail(&s);
+        // Result starts with the prefix, then carries the marker with
+        // the full original size.
+        assert!(out.starts_with(&"a".repeat(super::DETAIL_MAX_BYTES)));
+        assert!(out.contains("... (truncated, "));
+        assert!(out.contains(&format!("{} bytes total)", s.len())));
+        assert!(matches!(out, std::borrow::Cow::Owned(_)));
+    }
+
+    /// Worst-case attacker input: a 100MB string. Must not produce
+    /// a 100MB output; the result is bounded by
+    /// `DETAIL_MAX_BYTES + len(marker + digits)`.
+    #[test]
+    fn truncate_for_detail_bounds_worst_case_attacker_input() {
+        let mb_100: String = "X".repeat(100 * 1024 * 1024);
+        let out = super::truncate_for_detail(&mb_100);
+        // Bounded: prefix (256) + suffix marker (~50 chars).
+        assert!(
+            out.len() < super::DETAIL_MAX_BYTES + 100,
+            "truncated output must be bounded near the cap; got len={}",
+            out.len()
+        );
+        assert!(out.contains("(truncated"));
+    }
+
+    /// Truncation must cut on a UTF-8 char boundary; otherwise the
+    /// returned Cow could contain invalid UTF-8.
+    #[test]
+    fn truncate_for_detail_respects_utf8_char_boundaries() {
+        // 'ü' (U+00FC) is 2 bytes in UTF-8. Build a string where the
+        // 256th byte sits inside a multi-byte sequence.
+        // Start with 255 ASCII bytes, then 'ü' (2 bytes) so position 256
+        // is inside 'ü', then 100 more 'ü'.
+        let mut s = String::with_capacity(super::DETAIL_MAX_BYTES * 2);
+        s.push_str(&"a".repeat(super::DETAIL_MAX_BYTES - 1));
+        s.push('ü'); // 2 bytes at indices DETAIL_MAX_BYTES-1 and DETAIL_MAX_BYTES
+        for _ in 0..100 {
+            s.push('ü');
+        }
+        let out = super::truncate_for_detail(&s);
+        // The fact that this didn't panic during construction proves
+        // the function respects char boundaries.
+        assert!(out.len() < s.len(), "must have truncated");
+        // The truncated prefix must itself be valid UTF-8 (Cow<str> guarantees this,
+        // but assert the leading content is what we expect).
+        assert!(out.starts_with(&"a".repeat(super::DETAIL_MAX_BYTES - 1)));
     }
 
     // -----------------------------------------------------------------------
