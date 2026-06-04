@@ -79,6 +79,23 @@ First stable release.
   references PKIX-l63j (full RFC 4518 DN normalization).
   (PKIX-wlsr.6.)
 
+## [0.3.1] — 2026-06-04
+
+### Added
+
+- ECDSA P-384 + SHA-384 `SignatureVerifier` (`EcdsaP384Verifier`)
+  behind the new `p384` feature (PKIX-gphz.2). `DefaultVerifier`
+  dispatches OID 1.2.840.10045.4.3.3 (ecdsa-with-SHA384, RFC 5758
+  §3.2). The `rustcrypto` umbrella feature now pulls
+  `p256 + p384 + rsa`.
+- RSA-PKCS1v15 SHA-384 and SHA-512 `SignatureVerifier`s
+  (`RsaPkcs1v15Sha384Verifier`, `RsaPkcs1v15Sha512Verifier`) behind
+  the existing `rsa` feature (PKIX-gphz.4). `DefaultVerifier`
+  dispatches OIDs 1.2.840.113549.1.1.12 (sha384WithRSAEncryption)
+  and 1.2.840.113549.1.1.13 (sha512WithRSAEncryption).
+- Integration tests gated by feature attributes matching
+  `DefaultVerifier`'s algorithm dispatch (PKIX-yg2r).
+
 ## [0.3.0] — 2026-05-08
 
 ### Added — RFC 5280 §6.1.2(a) policy qualifier processing
