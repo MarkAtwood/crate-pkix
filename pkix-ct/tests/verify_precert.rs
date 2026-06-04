@@ -66,7 +66,7 @@ fn precert_oracle_log_list() -> CtLogList {
         key_der: log_spki,
         description: "precert-oracle".into(),
         url: "http://example.invalid/ct/".into(),
-        usable_from_ms: None,
+        usable_from_ms: Some(0),
         retired_at_ms: None,
     })
     .expect("oracle log self-consistency");

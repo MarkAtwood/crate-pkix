@@ -839,14 +839,17 @@ fn build_merkle_tree_leaf_precert_entry(
 /// RFC 6962 §3.5 / §6.2 (and CT log lifecycle documentation) describe
 /// `usable_from`/`retired_at` as inclusive lower and upper bounds: SCTs
 /// timestamped at or after `usable_from` and strictly before
-/// `retired_at` are trustworthy. `None` on either bound is treated as
-/// "unbounded" on that side, matching the Chrome log_list.json schema
-/// semantics ("never usable" is encoded by `usable_from_ms = None`).
+/// `retired_at` are trustworthy. `usable_from_ms = None` means the log
+/// has never reached the usable state, so the check always fails.
+/// `retired_at_ms = None` means the log has not been retired, so the
+/// upper bound is unbounded.
 fn log_window_contains(log: &CtLog, timestamp_ms: u64) -> bool {
-    if let Some(lo) = log.usable_from_ms {
-        if timestamp_ms < lo {
-            return false;
-        }
+    let lo = match log.usable_from_ms {
+        Some(lo) => lo,
+        None => return false,
+    };
+    if timestamp_ms < lo {
+        return false;
     }
     if let Some(hi) = log.retired_at_ms {
         if timestamp_ms >= hi {
@@ -1056,13 +1059,31 @@ mod tests {
     }
 
     #[test]
-    fn log_window_unbounded() {
+    fn log_window_never_usable() {
+        // usable_from_ms = None means the log has never reached the
+        // usable state — the window check must always fail.
         let log = CtLog {
             log_id: [0u8; 32],
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
             usable_from_ms: None,
+            retired_at_ms: None,
+        };
+        assert!(!log_window_contains(&log, 0));
+        assert!(!log_window_contains(&log, u64::MAX));
+    }
+
+    #[test]
+    fn log_window_unbounded_upper() {
+        // usable_from_ms = Some(0) with no retirement — the window is
+        // [0, +inf), accepting any timestamp.
+        let log = CtLog {
+            log_id: [0u8; 32],
+            key_der: Vec::new(),
+            description: "test".into(),
+            url: "http://example.com/".into(),
+            usable_from_ms: Some(0),
             retired_at_ms: None,
         };
         assert!(log_window_contains(&log, 0));
@@ -1091,7 +1112,7 @@ mod tests {
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
-            usable_from_ms: None,
+            usable_from_ms: Some(0),
             retired_at_ms: Some(2_000),
         };
         assert!(log_window_contains(&log, 1_999));

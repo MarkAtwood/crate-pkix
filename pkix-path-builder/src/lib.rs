@@ -18,12 +18,15 @@
 //!
 //! # Algorithm
 //!
-//! [`build_path`] and [`build_path_with_config`] use iterative-deepening DFS
-//! (RFC 4158 §2.5): they try increasing maximum path depths from 1 up to
-//! [`PathBuilderConfig::max_depth`] (default [`DEFAULT_MAX_DEPTH`] = 10),
-//! performing a full DFS at each depth. This guarantees that the shortest
-//! valid path is returned while bounding memory to O(depth) stack frames
-//! per attempt.
+//! [`build_path`] and [`build_path_with_config`] perform a single-pass
+//! depth-first search up to [`PathBuilderConfig::max_depth`] (default
+//! [`DEFAULT_MAX_DEPTH`] = 10). At each step, candidates are ranked by
+//! AKI/SKI match tier (RFC 4158 §3.2) so the most-likely issuer is tried
+//! first. Memory is bounded to O(depth) stack frames.
+//!
+//! Shortest-first is **not** guaranteed: for typical pools the first chain
+//! found is the shortest, but adversarial pools may yield a deeper chain
+//! first. See [`PathCandidates`] for the full enumeration contract.
 //!
 //! # Spec references
 //!
@@ -147,11 +150,11 @@ pub enum Error {
     /// the configured maximum (see [`PathBuilderConfig::max_depth`], default
     /// [`DEFAULT_MAX_DEPTH`]).
     DepthExceeded,
-    /// The internal DFS node-visit budget was exhausted in a single round.
+    /// The internal DFS node-visit budget was exhausted.
     ///
     /// This guards against adversarial certificate pools that would otherwise
-    /// cause exponential search time. Each iterative-deepening round and the
-    /// depth probe start with a fresh budget of `DFS_BUDGET` node visits.
+    /// cause exponential search time. The DFS and the depth probe each start
+    /// with a fresh budget of [`PathBuilderConfig::dfs_budget`] node visits.
     BudgetExceeded,
     /// **Reserved for future diagnostic use.** Path building no longer
     /// surfaces this variant: a candidate whose `BasicConstraints` extension
@@ -368,7 +371,7 @@ fn spki_already_in_path(candidate: &Certificate, path: &[Certificate]) -> bool {
     })
 }
 
-/// Default DFS node-visit budget for a single iterative-deepening round.
+/// Default DFS node-visit budget per search pass.
 ///
 /// Sufficient for legitimate chains (real-world PKI hierarchies have at most
 /// a handful of intermediates and small pools); prevents exponential blow-up
@@ -470,8 +473,8 @@ impl Frame {
 /// - `None` — DFS has been exhausted; no more chains exist within the
 ///   configured `max_depth`.
 ///
-/// **Resumable DFS**: candidates are explored in [AKI-ranked
-/// order](rank_candidates); when a chain is yielded, the next call
+/// **Resumable DFS**: candidates are explored in AKI-ranked
+/// order (`rank_candidates`); when a chain is yielded, the next call
 /// resumes from the same DFS state and explores alternate paths. This
 /// is the contract S/MIME callers depend on for build-then-validate
 /// retry loops in adversarial pools (CMS bags, federal-bridge cross-cert
@@ -1057,6 +1060,7 @@ mod tests {
     //! hex bytes into the test expectations. The helpers are *not* used
     //! to compute the expected values — they are checked against the
     //! external openssl-derived ground truth.
+    #[allow(unused_extern_crates)] // load-bearing under #![no_std] default features
     extern crate std;
 
     use super::{cert_aki_key_id, cert_ski_key_id};

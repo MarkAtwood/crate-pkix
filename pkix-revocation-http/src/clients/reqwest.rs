@@ -21,12 +21,24 @@
 
 use crate::{AsyncRevocationFetcher, FetchError, FetchMethod, FetchRequest, FetchResponse};
 use async_trait::async_trait;
+use std::time::Duration;
 
 /// Default cap on a single response body's size in bytes (10 MiB).
 ///
 /// Mirrors [`crate::clients::ureq::UreqFetcher`]'s default cap so the
 /// sync and async backends behave the same out of the box.
 const DEFAULT_MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
+
+/// Default per-request timeout.
+///
+/// 30 seconds. Mirrors [`crate::clients::ureq::DEFAULT_TIMEOUT`] so
+/// the sync and async backends behave the same out of the box. A
+/// hanging CRL or OCSP responder will surface as a transport error
+/// rather than tying up a task indefinitely. Callers needing a
+/// different bound can construct a custom [`reqwest::Client`] with
+/// their preferred timeout and pass it via
+/// [`ReqwestFetcher::with_client`].
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// HTTP transport backed by `reqwest`'s async client.
 ///
@@ -47,11 +59,15 @@ impl Default for ReqwestFetcher {
 }
 
 impl ReqwestFetcher {
-    /// Build a fetcher with a default `reqwest::Client` and a 10 MiB body cap.
+    /// Build a fetcher with a default `reqwest::Client`, a 10 MiB body
+    /// cap, and a 30-second per-request timeout.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: ::reqwest::Client::new(),
+            client: ::reqwest::ClientBuilder::new()
+                .timeout(DEFAULT_TIMEOUT)
+                .build()
+                .unwrap_or_default(),
             max_response_size: DEFAULT_MAX_RESPONSE_SIZE,
         }
     }

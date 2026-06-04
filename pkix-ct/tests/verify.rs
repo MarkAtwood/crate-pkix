@@ -46,7 +46,9 @@ fn read_fixture(name: &str) -> Vec<u8> {
 }
 
 /// Build a `CtLogList` containing exactly the oracle log, with an
-/// open window.
+/// open window. `usable_from_ms = Some(0)` means "usable since epoch"
+/// — the widest valid window. `None` would mean "never usable" per the
+/// `CtLog` doc.
 fn oracle_log_list() -> CtLogList {
     let log_spki = read_fixture("log-spki.der");
     let log_id_bytes = read_fixture("log-id.bin");
@@ -61,7 +63,7 @@ fn oracle_log_list() -> CtLogList {
         key_der: log_spki,
         description: "oracle".into(),
         url: "http://example.invalid/ct/".into(),
-        usable_from_ms: None,
+        usable_from_ms: Some(0),
         retired_at_ms: None,
     })
     .expect("oracle log self-consistency");
@@ -238,7 +240,7 @@ fn rejects_sct_at_or_after_log_retired_at() {
     let cert_der = read_fixture("cert.der");
 
     // Upper bound is exclusive: SCT timestamp == retired_at must fail.
-    let logs = oracle_log_list_with_window(None, Some(sct.timestamp_ms));
+    let logs = oracle_log_list_with_window(Some(0), Some(sct.timestamp_ms));
     let v = SctVerifier::new(logs, DefaultVerifier);
     assert_eq!(
         v.verify_sct_for_cert(&sct, &cert_der),
