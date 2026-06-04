@@ -39,10 +39,16 @@ pub struct CtLog {
     /// (`ct/v1/add-chain`, `ct/v1/get-proof-by-hash`, etc.) are
     /// resolved relative to this URL.
     pub url: String,
-    /// First moment the log is considered usable, in milliseconds
-    /// since the Unix epoch. SCTs with timestamps before this point
-    /// are not trustworthy even if signed by this log's key. `None`
-    /// means the log has never reached the `usable` state.
+    /// When the log became usable, if ever.
+    ///
+    /// - `Some(ts)` — the log became usable at timestamp `ts`
+    ///   (milliseconds since the Unix epoch). SCTs with timestamps
+    ///   before `ts` are not trustworthy even if signed by this
+    ///   log's key.
+    /// - `None` — the log has never reached the usable state. SCTs
+    ///   from this log will fail the
+    ///   [`usable_from_ms`, `retired_at_ms`) window check
+    ///   unconditionally.
     pub usable_from_ms: Option<u64>,
     /// Moment after which the log should not be relied on for new
     /// SCTs, in milliseconds since the Unix epoch. `None` means the

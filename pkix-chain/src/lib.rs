@@ -1450,12 +1450,10 @@ impl<'a> LeafIdent<'a> {
     }
 
     fn matches(&self, cert: &Certificate) -> bool {
-        // Serial numbers are bytewise opaque (RFC 5280 §4.1.2.2: positive
-        // INTEGER up to 20 octets). Issuer DN is the same `Name` type
-        // pkix_path::names_match operates on; for the leaf-identity check
-        // we use derived `PartialEq` (byte-equal) since both sides come
-        // from the same DER encoder and the issuer in chain[0].issuer ==
-        // chain[0].issuer trivially.
+        // Byte-level DER equality via derived `PartialEq`. This is correct
+        // here because both sides originate from the same parsed chain, so
+        // the DER encoding is identical. This would NOT be correct for
+        // cross-origin cert comparison, which requires RFC 4518 DN normalization.
         self.serial == &cert.tbs_certificate.serial_number
             && self.issuer == &cert.tbs_certificate.issuer
     }

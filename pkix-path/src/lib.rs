@@ -1169,6 +1169,10 @@ pub trait Profile {
 
 /// The result of a successful certificate path validation.
 ///
+/// A `ValidatedPath` is only produced when [`validate_path`] succeeds, which
+/// requires the input `chain` to contain at least one certificate. Callers
+/// may therefore rely on `chain[0]` being valid after a successful validation.
+///
 /// Fields are `pub` for direct read access. `#[non_exhaustive]` prevents external
 /// code from constructing `ValidatedPath` directly and from pattern-matching
 /// exhaustively, preserving the ability to add fields in future minor versions
@@ -1398,6 +1402,10 @@ impl ValidatedPath {
 /// the chain (or the matching trust anchor for the last cert).
 ///
 /// # Errors
+///
+/// Returns `Err(Error::NoTrustedPath)` if `chain` is empty or `anchors` is
+/// empty. On success, `chain` is therefore guaranteed to contain at least one
+/// certificate.
 ///
 /// Returns `Err` on the first RFC 5280 §6.1 check failure. The error variant
 /// includes the chain index of the failing certificate where applicable.

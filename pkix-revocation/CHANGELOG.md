@@ -12,16 +12,21 @@ _Nothing yet._
 
 First stable release.
 
+### Changed (breaking)
+
+- `pkix-revocation::DerError` is now a re-export of
+  `pkix_path::DerError` rather than an independent type with identical
+  shape. The variant was renamed/restructured: callers matching on the
+  inner error type or constructing via the former tuple syntax
+  `DerError(e)` must update their match arms and use
+  `DerError::new(e)` instead.
+
 ### Added
 
 - Optional `serde` feature deriving `Serialize` / `Deserialize` on
   `Error` and `OutOfScopeReason` (PKIX-2l0v.1). `Option<CrlReason>`
   wire form uses the RFC 5280 §5.3.1 numeric codes
-  (`KeyCompromise = 1`, etc.). `pkix-revocation::DerError` is now a
-  re-export of `pkix_path::DerError` rather than an independent type
-  with identical shape; pattern matches still work, constructions
-  via the (formerly tuple) `DerError(e)` syntax now use
-  `DerError::new(e)`.
+  (`KeyCompromise = 1`, etc.).
 - Path-level CRL signer discovery per RFC 5280 §6.3.3(f) (PKIX-cqwt).
   New public API for locating a CRL's signer in a caller-supplied
   bundle without inverting the workspace's one-way dep direction

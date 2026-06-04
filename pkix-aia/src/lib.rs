@@ -100,11 +100,11 @@ use alloc::vec::Vec;
 /// | Variant | When |
 /// |---------|------|
 /// | [`FetchingDisabled`](Self::FetchingDisabled) | `NoAiaFetcher` (PKIX-zkjb.4) and any fetcher that has been wired in but is intentionally off. |
-/// | [`HttpStatus`](Self::HttpStatus) | The remote endpoint responded with a non-2xx status. Carries the numeric status. |
+/// | [`HttpStatus`](Self::HttpStatus) | 4xx/5xx after redirects are followed; 3xx never surfaces. Carries the numeric status. |
 /// | [`ResponseTooLarge`](Self::ResponseTooLarge) | Caller-side size cap exceeded. Carries the configured `limit` and the observed `actual` byte count. |
 /// | [`MalformedCertificate`](Self::MalformedCertificate) | Fetched bytes did not parse as a DER X.509 [`Certificate`]. Caller-provided diagnostic in the inner `String`. |
 /// | [`Timeout`](Self::Timeout) | Fetch did not complete within the adapter's configured deadline. |
-/// | [`UriUnsupported`](Self::UriUnsupported) | A `caIssuers` URI used a scheme the fetcher does not handle (e.g. `ldap://` against an HTTP-only fetcher). Carries the offending URI (or its scheme). |
+/// | [`UriUnsupported`](Self::UriUnsupported) | A `caIssuers` URI used a scheme the fetcher does not handle (e.g. `ldap://` against an HTTP-only fetcher). Carries the full offending URI. |
 /// | [`IoFailure`](Self::IoFailure) | (requires `std`) Lower-level transport error from the I/O substrate. `kind` is the `std::io::ErrorKind`; `message` is a human-readable description. |
 ///
 /// [`Certificate`]: https://docs.rs/x509-cert/latest/x509_cert/struct.Certificate.html
@@ -123,7 +123,12 @@ pub enum AiaError {
 
     /// The remote endpoint responded with a non-success HTTP status.
     ///
-    /// Carries the numeric status code (e.g. `404`, `503`).
+    /// Carries the numeric status code (e.g. `404`, `503`). Fired for
+    /// 4xx and 5xx responses; 3xx redirects are followed transparently
+    /// by the HTTP backend (e.g. `ureq`) and never surface here. A 2xx
+    /// response is treated as success regardless of `Content-Type` —
+    /// the raw body bytes are returned without MIME validation.
+    ///
     /// Tuple variant for ergonomic pattern matching:
     ///
     /// ```
@@ -170,11 +175,8 @@ pub enum AiaError {
 
     /// A `caIssuers` URI used a scheme this fetcher cannot handle.
     ///
-    /// The inner `String` is typically the offending URI or its
-    /// scheme (e.g. `"ldap://example.com/cn=ca"` or `"ldap"`).
-    /// Per RFC 5280 §4.2.2.1, AIA `accessLocation` is a `GeneralName`,
-    /// so URI is the most common shape but not the only one. HTTP-only
-    /// fetchers surface non-HTTP URIs through this variant.
+    /// The inner `String` contains the full offending URI as received
+    /// (e.g. `"ldap://ca.example.com/cn=ca"`), not just the scheme.
     UriUnsupported(String),
 
     /// Lower-level transport I/O failure.
