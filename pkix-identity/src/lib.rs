@@ -724,9 +724,14 @@ fn parse_ipv6(s: &str) -> Option<[u8; 16]> {
     }
     while let Some(part) = iter.next() {
         if part.is_empty() {
-            // Empty part = "::" elision.
             if zero_run_at.is_some() {
-                // Multiple "::" runs not allowed.
+                // A second empty segment is valid only as the trailing
+                // artifact of a `::` at the very end (e.g. "fe80::" →
+                // ["fe80", "", ""]). If there are more segments after
+                // this one it is a genuine second "::" which is illegal.
+                if iter.peek().is_none() {
+                    break;
+                }
                 return None;
             }
             zero_run_at = Some(groups.len());
@@ -984,6 +989,39 @@ mod tests {
         match n.repr {
             ServerNameRepr::Ip(IpRepr::V6(b)) => assert_eq!(b, expected),
             _ => panic!("expected V6"),
+        }
+    }
+
+    #[test]
+    fn ip_address_v6_trailing_double_colon_fe80() {
+        // "fe80::" = fe80:0:0:0:0:0:0:0
+        let n = ServerName::ip_address("fe80::").unwrap();
+        let expected = [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        match n.repr {
+            ServerNameRepr::Ip(IpRepr::V6(b)) => assert_eq!(b, expected),
+            _ => panic!("expected V6 for fe80::"),
+        }
+    }
+
+    #[test]
+    fn ip_address_v6_trailing_double_colon_2001_db8() {
+        // "2001:db8::" = 2001:db8:0:0:0:0:0:0
+        let n = ServerName::ip_address("2001:db8::").unwrap();
+        let expected = [0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        match n.repr {
+            ServerNameRepr::Ip(IpRepr::V6(b)) => assert_eq!(b, expected),
+            _ => panic!("expected V6 for 2001:db8::"),
+        }
+    }
+
+    #[test]
+    fn ip_address_v6_loopback() {
+        // "::1" = 0:0:0:0:0:0:0:1
+        let n = ServerName::ip_address("::1").unwrap();
+        let expected = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        match n.repr {
+            ServerNameRepr::Ip(IpRepr::V6(b)) => assert_eq!(b, expected),
+            _ => panic!("expected V6 for ::1"),
         }
     }
 

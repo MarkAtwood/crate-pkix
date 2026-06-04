@@ -19,12 +19,10 @@ let chain = vec![
     Certificate::from_der(leaf_der)?,
     Certificate::from_der(intermediate_der)?,
 ];
-let anchors = vec![TrustAnchor::from_der(root_der)?];
+let root = Certificate::from_der(root_der)?;
+let anchors = vec![TrustAnchor::from_cert(root)];
 
-let policy = ValidationPolicy {
-    current_time_unix: unix_now(),
-    ..Default::default()
-};
+let policy = ValidationPolicy::new(unix_now());
 
 let result = verify_chain_default(&chain, &anchors, &policy, &NoRevocation)?;
 ```
@@ -59,10 +57,10 @@ let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
 ### With a custom signature backend
 
 ```rust
-use pkix_chain::verify_chain;
+use pkix_chain::{verify_chain, NoAiaFetcher};
 
 // Any type implementing pkix_path::SignatureVerifier
-let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation)?;
+let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation, &NoAiaFetcher)?;
 ```
 
 ### TLS server identity (RFC 6125)
@@ -118,8 +116,7 @@ let result = verify_tls_client_dns(
 ```
 
 Production callers should supply a profile asserting `id-kp-clientAuth`
-EKU. The workspace does not yet ship a `BasicTlsClientProfile`; see
-the follow-up bead for the missing profile.
+EKU, such as [`pkix_profiles::BasicTlsClientProfile`].
 
 ### S/MIME signer / recipient identity (RFC 5280 §4.2.1.6 / RFC 8398)
 

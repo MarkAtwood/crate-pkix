@@ -15,6 +15,7 @@
 
 use crate::{FetchError, FetchMethod, FetchRequest, FetchResponse, RevocationFetcher};
 use std::io::Read;
+use std::time::Duration;
 
 /// Default cap on a single response body's size in bytes (10 MiB).
 ///
@@ -24,6 +25,17 @@ use std::io::Read;
 /// with unusually large CRLs can raise the cap via
 /// [`UreqFetcher::with_max_response_size`].
 const DEFAULT_MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
+
+/// Default per-request timeout.
+///
+/// 30 seconds. CRL and OCSP fetches may involve large responses or
+/// slow CA responders, so the default is more generous than
+/// `pkix-aia-http`'s 10-second default. A hanging responder will
+/// surface as a transport error rather than blocking the calling
+/// thread indefinitely. Callers needing a different bound can
+/// construct a custom [`ureq::Agent`] with their preferred timeout
+/// and pass it via [`UreqFetcher::with_agent`].
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// HTTP transport backed by `ureq`.
 ///
@@ -44,11 +56,16 @@ impl Default for UreqFetcher {
 }
 
 impl UreqFetcher {
-    /// Build a fetcher with the default `ureq::Agent` and a 10 MiB body cap.
+    /// Build a fetcher with the default `ureq::Agent`, a 10 MiB body
+    /// cap, and a 30-second per-request timeout.
     #[must_use]
     pub fn new() -> Self {
+        let agent: ::ureq::Agent = ::ureq::Agent::config_builder()
+            .timeout_global(Some(DEFAULT_TIMEOUT))
+            .build()
+            .into();
         Self {
-            agent: ::ureq::agent(),
+            agent,
             max_response_size: DEFAULT_MAX_RESPONSE_SIZE,
         }
     }

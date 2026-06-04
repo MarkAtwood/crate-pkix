@@ -263,9 +263,9 @@ fn aia_fetch_failure_surfaces_underlying_error() {
 }
 
 /// Fetcher returns garbage bytes for the AIA URI. The verifier must
-/// surface `Error::Aia(MalformedCertificate(uri))` after exhausting fetch
-/// attempts — proving that response-parse failures are captured rather
-/// than silently dropped.
+/// surface `Error::Aia(MalformedCertificate(diag))` after exhausting fetch
+/// attempts — proving that response-parse failures are captured (with the
+/// DER parse diagnostic, not the URI) rather than silently dropped.
 #[test]
 fn aia_fetch_returns_garbage_surfaces_malformed_certificate() {
     let leaf = load(LEAF_VIA_INTERMEDIATE_DER);
@@ -283,8 +283,13 @@ fn aia_fetch_returns_garbage_surfaces_malformed_certificate() {
         .verify_one(&chain)
         .expect_err("garbage AIA response must surface");
     match err {
-        pkix_chain::Error::Aia(AiaError::MalformedCertificate(uri)) => {
-            assert_eq!(uri, "http://example.test/intermediate.der");
+        pkix_chain::Error::Aia(AiaError::MalformedCertificate(diag)) => {
+            // The inner string must be a DER parse diagnostic, not a URI.
+            assert!(!diag.is_empty(), "diagnostic must not be empty");
+            assert!(
+                !diag.starts_with("http://"),
+                "diagnostic must be a parse error, not a URI: {diag}",
+            );
         }
         other => panic!("expected Aia(MalformedCertificate), got: {other:?}"),
     }

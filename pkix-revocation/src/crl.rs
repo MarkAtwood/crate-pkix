@@ -260,7 +260,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// revocation-checked. The function:
     ///
     /// 1. Parses the CRL DER.
-    /// 2. Calls [`discover_crl_signer`] to locate the cert in `bundle` that
+    /// 2. Calls [`discover_crl_signer`][crate::discover_crl_signer] to locate the cert in `bundle` that
     ///    signed the CRL (AKI/SKI walk with issuer-DN fallback).
     /// 3. Verifies the discovered signer has `cRLSign` in its `KeyUsage`
     ///    extension (RFC 5280 §6.3.3(f)). A signer with no `KeyUsage`

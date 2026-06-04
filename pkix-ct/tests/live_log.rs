@@ -79,6 +79,8 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// Build a `CtLogList` containing only the captured log, with an open
 /// window (so the SCT's real-world timestamp falls inside).
+/// `usable_from_ms = Some(0)` means "usable since epoch" — the widest
+/// valid window. `None` would mean "never usable" per the `CtLog` doc.
 fn captured_log_list() -> CtLogList {
     let log_id_bytes = fixture("log-id.bin");
     let log_id: [u8; 32] = log_id_bytes
@@ -91,7 +93,7 @@ fn captured_log_list() -> CtLogList {
         key_der: fixture("log-spki.der"),
         description: "live-log".into(),
         url: "http://example.invalid/ct/".into(),
-        usable_from_ms: None,
+        usable_from_ms: Some(0),
         retired_at_ms: None,
     })
     .expect("captured log self-consistency");

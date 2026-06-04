@@ -616,13 +616,25 @@ where
                 Err(pkix_path_builder::Error::NoPathFound) => {
                     // Pool lacks at least one intermediate; try AIA fetching.
                 }
+                Err(pkix_path_builder::Error::NoValidPath { .. }) => {
+                    // Topology was OK but every candidate chain failed
+                    // validate_path (e.g. expired cert, policy violation).
+                    // Use build_path (topology-only, no validation) to
+                    // recover a chain and return it to the caller so that
+                    // verify_one's own validate_path produces a structured
+                    // Error::Path(...) rather than the builder's
+                    // Error::PathBuild(NoValidPath { last_error: String }).
+                    // This preserves programmatic matchability on the
+                    // specific pkix_path::Error variant (PKIX-sqek.1).
+                    let chain = pkix_path_builder::build_path(leaf, &pool, self.anchors)?;
+                    return Ok(chain);
+                }
                 Err(e) => {
-                    // DepthExceeded / BudgetExceeded / NoValidPath /
+                    // DepthExceeded / BudgetExceeded /
                     // MalformedIntermediate cannot be repaired by adding
                     // more candidate certs: depth/budget are pool-size
-                    // problems, NoValidPath means topology was OK but
-                    // every candidate failed validate_path, and
-                    // MalformedIntermediate is reserved/unused.
+                    // problems and MalformedIntermediate is
+                    // reserved/unused.
                     return Err(Error::PathBuild(e));
                 }
             }
@@ -655,21 +667,21 @@ where
             let results = self.aia.batch_fetch(&uri_refs);
 
             let mut added_any = false;
-            for (uri, result) in new_uris.iter().zip(results) {
+            for (_uri, result) in new_uris.iter().zip(results) {
                 match result {
                     Ok(der) => match <Certificate as der::Decode>::from_der(&der) {
                         Ok(cert) => {
                             pool.add(cert);
                             added_any = true;
                         }
-                        Err(_) => {
+                        Err(e) => {
                             // Fetched bytes did not parse as a Certificate.
                             // Capture as the most-recent AIA error so the
                             // final surface is "I tried but the responses
                             // were unusable" rather than the path-builder
                             // saying NoPathFound with no context.
                             last_aia_error =
-                                Some(pkix_aia::AiaError::MalformedCertificate(uri.clone()));
+                                Some(pkix_aia::AiaError::MalformedCertificate(e.to_string()));
                         }
                     },
                     Err(e) => {
@@ -685,6 +697,24 @@ where
                     last_aia_error.unwrap_or(pkix_aia::AiaError::FetchingDisabled),
                 ));
             }
+        }
+
+        // The last iteration fetched new certs into the pool but the loop
+        // exited before trying them. Give the path-builder one final shot
+        // with the fully-augmented pool before declaring depth-exceeded.
+        match pkix_path_builder::build_first_valid_path(
+            leaf,
+            &pool,
+            self.anchors,
+            self.policy,
+            self.sig_verifier,
+        ) {
+            Ok(built) => return Ok(built),
+            Err(pkix_path_builder::Error::NoValidPath { .. }) => {
+                let chain = pkix_path_builder::build_path(leaf, &pool, self.anchors)?;
+                return Ok(chain);
+            }
+            Err(_) => {}
         }
 
         Err(Error::AiaDepthExceeded)

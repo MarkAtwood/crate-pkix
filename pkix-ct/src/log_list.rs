@@ -157,14 +157,31 @@ mod google_schema {
 
     /// `state` is an object with exactly one of `pending`, `qualified`,
     /// `usable`, `readonly`, `retired`, or `rejected` as its key. We
-    /// only need to extract `usable.timestamp` and `retired.timestamp`,
-    /// so we deserialize all six and use whichever is present.
+    /// deserialize all six to determine which state the log is in and
+    /// to extract timestamps from the active variant.
     #[derive(Deserialize, Default)]
     struct LogStateJson {
         #[serde(default)]
+        pending: Option<StateEntryJson>,
+        #[serde(default)]
+        #[allow(dead_code)] // deserialized by serde to distinguish from rejected/pending
+        qualified: Option<StateEntryJson>,
+        #[serde(default)]
         usable: Option<StateEntryJson>,
         #[serde(default)]
+        readonly: Option<StateEntryJson>,
+        #[serde(default)]
         retired: Option<StateEntryJson>,
+        #[serde(default)]
+        rejected: Option<StateEntryJson>,
+    }
+
+    impl LogStateJson {
+        /// Returns `true` if the log is in a state that should be
+        /// excluded from the trusted log list (`rejected` or `pending`).
+        fn is_excluded(&self) -> bool {
+            self.rejected.is_some() || self.pending.is_some()
+        }
     }
 
     #[derive(Deserialize)]
@@ -185,6 +202,24 @@ mod google_schema {
         /// `SHA-256(key)` before insertion; a mismatch causes the
         /// whole parse to fail.
         ///
+        /// # State filtering
+        ///
+        /// Google's schema assigns each log exactly one state:
+        /// `pending`, `qualified`, `usable`, `readonly`, `retired`, or
+        /// `rejected`. This method **skips** logs in the `rejected` and
+        /// `pending` states — they are not trustworthy for SCT
+        /// verification. Logs in all other states are imported:
+        ///
+        /// * `usable` — actively trusted; `usable_from_ms` is set.
+        /// * `readonly` — no longer accepting submissions but still
+        ///   trusted for existing SCTs; the readonly timestamp is
+        ///   stored as `retired_at_ms`.
+        /// * `retired` — no longer operated but historical SCTs remain
+        ///   valid; `retired_at_ms` is set.
+        /// * `qualified` — accepted into the program but pre-usable;
+        ///   imported with `usable_from_ms = None`.
+        /// * Logs with no `state` field are imported as-is.
+        ///
         /// # Errors
         ///
         /// Returns [`Error::ParseError`] on JSON syntax errors,
@@ -195,6 +230,11 @@ mod google_schema {
             let mut out = Self::new();
             for op in parsed.operators {
                 for log in op.logs {
+                    // Skip logs in excluded states (rejected, pending).
+                    if log.state.as_ref().is_some_and(|s| s.is_excluded()) {
+                        continue;
+                    }
+
                     let log_id_bytes = BASE64.decode(&log.log_id).map_err(|_| Error::ParseError)?;
                     let log_id: [u8; 32] = log_id_bytes
                         .as_slice()
@@ -207,10 +247,14 @@ mod google_schema {
                         .and_then(|s| s.usable.as_ref())
                         .map(|e| parse_rfc3339_to_unix_ms(&e.timestamp))
                         .transpose()?;
+                    // A readonly log has stopped accepting submissions;
+                    // treat its timestamp the same as a retirement date.
+                    // If both retired and readonly are somehow present,
+                    // retired takes precedence.
                     let retired_at_ms = log
                         .state
                         .as_ref()
-                        .and_then(|s| s.retired.as_ref())
+                        .and_then(|s| s.retired.as_ref().or(s.readonly.as_ref()))
                         .map(|e| parse_rfc3339_to_unix_ms(&e.timestamp))
                         .transpose()?;
                     out.insert(CtLog {
@@ -338,6 +382,80 @@ mod google_schema {
             assert_eq!(days_from_civil(2000, 1, 1).unwrap(), 10957);
             // 2024-03-04 → 19786 (oracle: python datetime)
             assert_eq!(days_from_civil(2024, 3, 4).unwrap(), 19786);
+        }
+
+        /// Helper: build a minimal Google log_list.json with one log per
+        /// state. Each "key" is a distinct byte string whose SHA-256 we
+        /// pre-compute and encode as the `log_id`.
+        fn synthetic_log_list_json() -> alloc::string::String {
+            use sha2::{Digest, Sha256};
+
+            /// Encode key bytes as a log entry with the given state object.
+            fn entry(key: &[u8], desc: &str, state_json: &str) -> alloc::string::String {
+                let key_b64 = BASE64.encode(key);
+                let id_b64 = BASE64.encode(Sha256::digest(key));
+                alloc::format!(
+                    r#"{{"description":"{desc}","log_id":"{id_b64}","key":"{key_b64}","url":"https://example.com/{desc}/","state":{state_json}}}"#
+                )
+            }
+
+            let usable = entry(b"key-usable", "usable-log",
+                r#"{"usable":{"timestamp":"2024-01-01T00:00:00Z"}}"#);
+            let readonly = entry(b"key-readonly", "readonly-log",
+                r#"{"readonly":{"timestamp":"2025-06-01T00:00:00Z"}}"#);
+            let retired = entry(b"key-retired", "retired-log",
+                r#"{"retired":{"timestamp":"2025-03-01T00:00:00Z"}}"#);
+            let qualified = entry(b"key-qualified", "qualified-log",
+                r#"{"qualified":{"timestamp":"2024-06-01T00:00:00Z"}}"#);
+            let pending = entry(b"key-pending", "pending-log",
+                r#"{"pending":{"timestamp":"2024-02-01T00:00:00Z"}}"#);
+            let rejected = entry(b"key-rejected", "rejected-log",
+                r#"{"rejected":{"timestamp":"2024-05-01T00:00:00Z"}}"#);
+
+            alloc::format!(
+                r#"{{"operators":[{{"name":"test","logs":[{usable},{readonly},{retired},{qualified},{pending},{rejected}]}}]}}"#
+            )
+        }
+
+        #[test]
+        fn filters_rejected_and_pending_logs() {
+            let json = synthetic_log_list_json();
+            let list = CtLogList::from_google_log_list_json(&json).unwrap();
+            // 6 logs in the JSON, but rejected + pending are filtered out → 4
+            assert_eq!(list.len(), 4);
+
+            // Verify the four expected logs are present by description.
+            let descriptions: alloc::vec::Vec<_> =
+                list.iter().map(|l| l.description.as_str()).collect();
+            assert!(descriptions.contains(&"usable-log"));
+            assert!(descriptions.contains(&"readonly-log"));
+            assert!(descriptions.contains(&"retired-log"));
+            assert!(descriptions.contains(&"qualified-log"));
+            // Verify the two excluded logs are absent.
+            assert!(!descriptions.contains(&"pending-log"));
+            assert!(!descriptions.contains(&"rejected-log"));
+        }
+
+        #[test]
+        fn readonly_timestamp_stored_as_retired_at_ms() {
+            let json = synthetic_log_list_json();
+            let list = CtLogList::from_google_log_list_json(&json).unwrap();
+            let readonly_log = list.iter().find(|l| l.description == "readonly-log").unwrap();
+            // 2025-06-01T00:00:00Z = 1748736000000 ms
+            // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2025,6,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
+            assert_eq!(readonly_log.retired_at_ms, Some(1_748_736_000_000));
+            assert_eq!(readonly_log.usable_from_ms, None);
+        }
+
+        #[test]
+        fn usable_log_has_usable_from_ms() {
+            let json = synthetic_log_list_json();
+            let list = CtLogList::from_google_log_list_json(&json).unwrap();
+            let usable_log = list.iter().find(|l| l.description == "usable-log").unwrap();
+            // 2024-01-01T00:00:00Z = 1704067200000 ms
+            // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2024,1,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
+            assert_eq!(usable_log.usable_from_ms, Some(1_704_067_200_000));
+            assert_eq!(usable_log.retired_at_ms, None);
         }
     }
 }

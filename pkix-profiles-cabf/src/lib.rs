@@ -2219,10 +2219,9 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn per_profile_alg_lists_are_independent_constants() {
-        // Verify that TLS, SMIME, and CS each have their own allowed_algs
-        // by checking that the Vec pointers are different objects (not shared).
-        // We do this by modifying one copy and verifying the others are unchanged.
+    fn per_profile_alg_lists_are_independent_owned_copies() {
+        // Verify that TLS, SMIME, and CS each return their own owned allowed_algs
+        // by mutating one copy and verifying the others are unchanged.
         let mut web = web_pki_policy(NOW);
         let smime = smime_policy(NOW);
         let cs = code_signing_policy(NOW);
@@ -2393,7 +2392,7 @@ mod tests {
         )
         .expect(
             "Individual-validated cert with givenName+surname+serialNumber DN, \
-             policy OID 2.23.140.1.5.4.1, rfc822 SAN, and emailProtection EKU \
+             policy OID 2.23.140.1.5.4.3, rfc822 SAN, and emailProtection EKU \
              must pass smime_individual_policy",
         );
     }
@@ -2566,7 +2565,7 @@ mod tests {
         )
         .expect(
             "Sponsor-validated cert with organizationName+givenName+surname+serialNumber \
-             DN, policy OID 2.23.140.1.5.3.1, rfc822 SAN, and emailProtection EKU \
+             DN, policy OID 2.23.140.1.5.3.3, rfc822 SAN, and emailProtection EKU \
              must pass smime_sponsor_policy",
         );
     }

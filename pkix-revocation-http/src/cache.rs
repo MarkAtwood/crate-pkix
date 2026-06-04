@@ -180,11 +180,12 @@ pub struct CachedOcspResponse {
 ///
 /// # Expiry semantics
 ///
-/// `get_crl` / `get_ocsp` MUST return `None` for entries whose
-/// `next_update` is in the past. Entries without a `next_update`
-/// (`None`) MAY be returned indefinitely or treated as expired
-/// immediately depending on the implementation's policy.
-/// The reference [`InMemoryCache`] keeps such entries until invalidated.
+/// `get_crl` / `get_ocsp` return the cached entry if present, WITHOUT
+/// applying freshness filtering. Callers (the wrapper layer) are
+/// responsible for checking `next_update` against their authoritative
+/// time source. This avoids a time-source mismatch between the cache
+/// (which would use `SystemTime::now()`) and the validator (which uses
+/// a caller-supplied `now_unix` epoch timestamp).
 ///
 /// # Rollback
 ///
@@ -247,6 +248,37 @@ impl InMemoryCache {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Atomically insert a CRL only if it does not roll back the existing
+    /// entry.
+    ///
+    /// Acquires a single write lock on the CRL map and, under that lock,
+    /// checks whether the existing entry's `CRLNumber` is strictly greater
+    /// than `new_entry`'s. If so the insert is suppressed (the cache
+    /// retains the newer CRL) and `false` is returned. Otherwise the new
+    /// entry is inserted and `true` is returned.
+    ///
+    /// This eliminates the TOCTOU race in a separate `get_crl` / `put_crl`
+    /// sequence where another thread could insert a newer CRL between the
+    /// two calls.
+    #[cfg(feature = "crl")]
+    pub(crate) fn put_crl_if_not_rollback(
+        &self,
+        key: CrlCacheKey,
+        new_entry: CachedCrl,
+    ) -> bool {
+        let mut guard = match self.crl.write() {
+            Ok(g) => g,
+            Err(_) => return false,
+        };
+        if let Some(existing) = guard.get(&key) {
+            if is_rollback(Some(existing.as_ref()), new_entry.crl_number.as_deref()) {
+                return false;
+            }
+        }
+        guard.insert(key, Arc::new(new_entry));
+        true
+    }
 }
 
 impl fmt::Debug for InMemoryCache {
@@ -262,6 +294,7 @@ impl fmt::Debug for InMemoryCache {
 
 /// Returns `true` if `next_update` is `None` (treat as live) or strictly
 /// after `now`. `next_update <= now` is expired.
+#[cfg(any(feature = "crl", feature = "ocsp", test))]
 fn is_live(next_update: Option<SystemTime>, now: SystemTime) -> bool {
     match next_update {
         None => true,
@@ -271,12 +304,7 @@ fn is_live(next_update: Option<SystemTime>, now: SystemTime) -> bool {
 
 impl RevocationCache for InMemoryCache {
     fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>> {
-        let entry = self.crl.read().ok()?.get(key).cloned()?;
-        if is_live(entry.next_update, SystemTime::now()) {
-            Some(entry)
-        } else {
-            None
-        }
+        self.crl.read().ok()?.get(key).cloned()
     }
 
     fn put_crl(&self, key: CrlCacheKey, entry: CachedCrl) {
@@ -292,12 +320,7 @@ impl RevocationCache for InMemoryCache {
     }
 
     fn get_ocsp(&self, key: &OcspCacheKey) -> Option<Arc<CachedOcspResponse>> {
-        let entry = self.ocsp.read().ok()?.get(key).cloned()?;
-        if is_live(entry.next_update, SystemTime::now()) {
-            Some(entry)
-        } else {
-            None
-        }
+        self.ocsp.read().ok()?.get(key).cloned()
     }
 
     fn put_ocsp(&self, key: OcspCacheKey, entry: CachedOcspResponse) {
@@ -501,6 +524,53 @@ fn crl_number_gt(incoming: &[u8], stored: &[u8]) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// CrlAtomicPut — crate-private rollback-guarded insert
+// ---------------------------------------------------------------------------
+
+/// Crate-private extension: rollback-guarded CRL insert.
+///
+/// [`InMemoryCache`] overrides this to hold a single write lock across the
+/// get-compare-put sequence, eliminating the TOCTOU race in the separate
+/// `get_crl` / `put_crl` path. Other implementations fall back to the
+/// non-atomic get-then-put (identical to the pre-fix behaviour).
+#[cfg(feature = "crl")]
+pub(crate) trait CrlAtomicPut {
+    /// Insert `new_entry` under `key` unless it would roll back a
+    /// newer-numbered CRL already present. Returns `true` if inserted.
+    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool;
+}
+
+/// Atomic path — single write lock covers check + insert.
+#[cfg(feature = "crl")]
+impl CrlAtomicPut for InMemoryCache {
+    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
+        self.put_crl_if_not_rollback(key, new_entry)
+    }
+}
+
+/// Delegate through `Arc<T>` so `Arc<InMemoryCache>` gets the atomic path.
+#[cfg(feature = "crl")]
+impl<T: CrlAtomicPut + ?Sized> CrlAtomicPut for Arc<T> {
+    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
+        (**self).put_crl_guarded(key, new_entry)
+    }
+}
+
+/// Fallback for trait-object caches (`Arc<dyn RevocationCache>`): uses the
+/// non-atomic get-then-put path. This preserves the pre-fix behaviour for
+/// caches whose internal locking is not visible to the wrapper.
+#[cfg(feature = "crl")]
+impl CrlAtomicPut for dyn RevocationCache {
+    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
+        if is_rollback(self.get_crl(&key).as_deref(), new_entry.crl_number.as_deref()) {
+            return false;
+        }
+        self.put_crl(key, new_entry);
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CachedHttpCrlFetcher
 // ---------------------------------------------------------------------------
 
@@ -550,11 +620,12 @@ impl<F, V, C> CachedHttpCrlFetcher<F, V, C> {
 }
 
 #[cfg(feature = "crl")]
+#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
 impl<F, V, C> RevocationChecker for CachedHttpCrlFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache,
+    C: RevocationCache + CrlAtomicPut,
 {
     fn check_revocation(
         &self,
@@ -584,7 +655,11 @@ where
                 issuer_dn_der: der.clone(),
                 distribution_point_uri: Some(url.clone()),
             });
-            if let Some(cached) = key.as_ref().and_then(|k| self.cache.get_crl(k)) {
+            if let Some(cached) = key
+                .as_ref()
+                .and_then(|k| self.cache.get_crl(k))
+                .filter(|e| is_live(e.next_update, SystemTime::now()))
+            {
                 // Cache hit: construct CrlChecker from cached bytes.
                 match CrlChecker::new(
                     cached.bytes.as_slice(),
@@ -644,13 +719,18 @@ where
 }
 
 #[cfg(feature = "crl")]
+#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
 impl<F, V, C> CachedHttpCrlFetcher<F, V, C>
 where
-    C: RevocationCache,
+    C: RevocationCache + CrlAtomicPut,
 {
     /// Parse freshness metadata out of a fetched CRL response and store
     /// it under `key`. Drops the new entry on the floor if `CRLNumber`
     /// monotonicity would be violated.
+    ///
+    /// The rollback check and insert are performed atomically via
+    /// [`CrlAtomicPut::put_crl_guarded`], which eliminates the TOCTOU
+    /// race between a separate `get_crl` / `put_crl` pair.
     ///
     /// Best-effort: any parse failure here is silent (the response is
     /// already known to be a valid CRL — `CrlChecker::new` accepted it —
@@ -664,14 +744,7 @@ where
             return;
         };
 
-        if is_rollback(
-            self.cache.get_crl(&key).as_deref(),
-            meta.crl_number.as_deref(),
-        ) {
-            return;
-        }
-
-        self.cache.put_crl(
+        self.cache.put_crl_guarded(
             key,
             CachedCrl {
                 crl_number: meta.crl_number,
@@ -767,7 +840,11 @@ where
                 responder_url: url.clone(),
             };
 
-            if let Some(cached) = self.cache.get_ocsp(&key) {
+            if let Some(cached) = self
+                .cache
+                .get_ocsp(&key)
+                .filter(|e| is_live(e.next_update, SystemTime::now()))
+            {
                 match OcspChecker::new(
                     cached.bytes.as_slice(),
                     self.inner.now_unix,
@@ -1024,26 +1101,27 @@ mod tests {
     }
 
     #[test]
-    fn in_memory_cache_expired_entry_returns_none() {
-        // Acceptance criterion: TTL respected — expired entries return
-        // None from get_*.
+    fn in_memory_cache_returns_expired_entry_without_filtering() {
+        // The cache layer returns entries regardless of freshness.
+        // Freshness filtering is the wrapper's responsibility (it has
+        // access to the caller's authoritative time source).
         let c = InMemoryCache::new();
         let past = SystemTime::now() - Duration::from_secs(60);
         let k = dummy_crl_key(None);
         c.put_crl(k.clone(), dummy_crl_entry(None, Some(past)));
-        assert!(
-            c.get_crl(&k).is_none(),
-            "entry with past nextUpdate must be treated as expired"
-        );
+        let got = c.get_crl(&k).expect("expired entry must still be returned");
+        assert_eq!(got.bytes, b"crl-bytes");
     }
 
     #[test]
-    fn in_memory_cache_expired_ocsp_entry_returns_none() {
+    fn in_memory_cache_returns_expired_ocsp_entry_without_filtering() {
+        // Same as above for OCSP entries.
         let c = InMemoryCache::new();
         let past = SystemTime::now() - Duration::from_secs(60);
         let k = dummy_ocsp_key("http://x/");
         c.put_ocsp(k.clone(), dummy_ocsp_entry(Some(past)));
-        assert!(c.get_ocsp(&k).is_none());
+        let got = c.get_ocsp(&k).expect("expired OCSP entry must still be returned");
+        assert_eq!(got.bytes, b"ocsp-bytes");
     }
 
     #[test]

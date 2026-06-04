@@ -241,19 +241,24 @@ impl std::error::Error for AiaError {}
 /// `serde` round-trip helper for [`std::io::ErrorKind`].
 ///
 /// Serializes as a string label (e.g. `"NotFound"`, `"TimedOut"`)
-/// drawn from the variant name. Deserializes by matching the label
-/// against a static table; unknown labels round-trip to
+/// drawn from the variant name via `Debug`. `ErrorKind`'s `Debug`
+/// impl emits the variant name as a bare identifier (`NotFound`,
+/// `HostUnreachable`, etc.) and is stable across stdlib releases.
+///
+/// Deserializes by matching the label against a static table of
+/// variants known at compile time; unknown labels resolve to
 /// `std::io::ErrorKind::Other`, which matches the way the standard
 /// library treats unrecognized OS-level errors.
 ///
-/// `std::io::ErrorKind` is `#[non_exhaustive]` upstream, so this
-/// helper covers the variants stable since Rust 1.45 plus the
-/// expansions in 1.74 (`InvalidFilename`, `ArgumentListTooLong`,
-/// etc.). Variants added in newer stdlib releases that the helper
-/// does not yet recognize serialize as `"Other"`. The MSRV floor
-/// for the workspace is 1.73, so we only need to recognize the
-/// variants stable through that release in the serializer; the
-/// deserializer's `_ => Other` fallback handles forward-compat.
+/// `std::io::ErrorKind` is `#[non_exhaustive]` upstream. The
+/// serializer uses `Debug` formatting, so it automatically
+/// preserves the variant name for any `ErrorKind` variant the
+/// consumer's compiler knows about — including variants stabilized
+/// after the workspace MSRV (1.73). The deserializer's explicit
+/// table covers variants stable through 1.73; its `_ => Other`
+/// fallback handles forward-compat for newer variants whose labels
+/// appear in serialized data but whose enum constructors are
+/// unavailable at the MSRV floor.
 #[cfg(all(feature = "std", feature = "serde"))]
 mod io_error_kind_serde {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -263,12 +268,14 @@ mod io_error_kind_serde {
     where
         S: Serializer,
     {
-        // The `Debug` representation for `ErrorKind` is the variant
-        // name (e.g. "NotFound", "PermissionDenied"). It is stable
-        // across stdlib releases — variant names do not change — and
-        // it lines up with the labels we accept in `deserialize`.
-        let label = label_for(*kind);
-        serializer.serialize_str(label)
+        use alloc::format;
+        // `ErrorKind`'s `Debug` impl emits the variant name as a bare
+        // identifier (e.g. "NotFound", "HostUnreachable"). This is
+        // stable across stdlib releases — variant names do not change —
+        // and it covers every variant the consumer's compiler knows
+        // about, including those added after the workspace MSRV.
+        let label = format!("{kind:?}");
+        serializer.serialize_str(&label)
     }
 
     pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<ErrorKind, D::Error>
@@ -277,40 +284,6 @@ mod io_error_kind_serde {
     {
         let s = <&str>::deserialize(deserializer)?;
         Ok(kind_for(s))
-    }
-
-    /// Map an `ErrorKind` to a stable string label.
-    ///
-    /// Variants added after Rust 1.73 (the workspace MSRV floor)
-    /// fall through the wildcard arm to `"Other"`. The catch-all is
-    /// intentional: it preserves forward-compatibility with newer
-    /// stdlib releases, at the cost of folding rare variants into
-    /// the generic bucket on the wire.
-    fn label_for(kind: ErrorKind) -> &'static str {
-        match kind {
-            ErrorKind::NotFound => "NotFound",
-            ErrorKind::PermissionDenied => "PermissionDenied",
-            ErrorKind::ConnectionRefused => "ConnectionRefused",
-            ErrorKind::ConnectionReset => "ConnectionReset",
-            ErrorKind::ConnectionAborted => "ConnectionAborted",
-            ErrorKind::NotConnected => "NotConnected",
-            ErrorKind::AddrInUse => "AddrInUse",
-            ErrorKind::AddrNotAvailable => "AddrNotAvailable",
-            ErrorKind::BrokenPipe => "BrokenPipe",
-            ErrorKind::AlreadyExists => "AlreadyExists",
-            ErrorKind::WouldBlock => "WouldBlock",
-            ErrorKind::InvalidInput => "InvalidInput",
-            ErrorKind::InvalidData => "InvalidData",
-            ErrorKind::TimedOut => "TimedOut",
-            ErrorKind::WriteZero => "WriteZero",
-            ErrorKind::Interrupted => "Interrupted",
-            ErrorKind::Unsupported => "Unsupported",
-            ErrorKind::UnexpectedEof => "UnexpectedEof",
-            ErrorKind::OutOfMemory => "OutOfMemory",
-            ErrorKind::Other => "Other",
-            // Future variants (`#[non_exhaustive]`) round-trip to "Other".
-            _ => "Other",
-        }
     }
 
     /// Map a label back to an `ErrorKind`.
@@ -346,13 +319,15 @@ mod io_error_kind_serde {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use alloc::format;
 
+        /// Verify that `Debug` formatting produces the expected label
+        /// for every variant stable through Rust 1.73 (the workspace
+        /// MSRV), and that `kind_for` maps each label back to the
+        /// original variant. This is the serialize/deserialize
+        /// round-trip contract.
         #[test]
-        fn label_round_trip_covers_recognized_variants() {
-            // For each label this helper produces, deserializing it
-            // back must yield the original kind. Cross-check via the
-            // matching `label_for` -> `kind_for` round-trip; the
-            // table is the oracle.
+        fn debug_label_round_trip_covers_msrv_variants() {
             let cases: &[(ErrorKind, &str)] = &[
                 (ErrorKind::NotFound, "NotFound"),
                 (ErrorKind::PermissionDenied, "PermissionDenied"),
@@ -376,7 +351,15 @@ mod io_error_kind_serde {
                 (ErrorKind::Other, "Other"),
             ];
             for (kind, expected_label) in cases {
-                assert_eq!(label_for(*kind), *expected_label, "label_for({kind:?})");
+                // Serialize side: Debug formatting must produce the
+                // expected label.
+                let debug_label = format!("{kind:?}");
+                assert_eq!(
+                    debug_label, *expected_label,
+                    "Debug format for {kind:?}"
+                );
+                // Deserialize side: kind_for must recover the
+                // original variant.
                 assert_eq!(
                     kind_for(expected_label),
                     *kind,
@@ -398,6 +381,55 @@ mod io_error_kind_serde {
             // mangled labels are out of contract; we still resolve
             // to Other rather than panic.
             assert_eq!(kind_for(" NotFound "), ErrorKind::Other);
+        }
+
+        /// Verify that post-MSRV variants (stabilized in 1.74+ via
+        /// `io_error_more`) serialize with their real variant name
+        /// through Debug formatting, not as "Other". This is the
+        /// core bug this fix addresses.
+        #[test]
+        fn post_msrv_variants_serialize_with_real_name() {
+            // These variants are available on the test compiler
+            // (1.95+) but not at the MSRV floor. The serialize path
+            // uses Debug formatting, so they get their real names.
+            // The deserialize path maps them to Other (graceful
+            // degradation), which is acceptable — the important
+            // thing is that the serialized form preserves the actual
+            // variant name on disk.
+            let post_msrv: &[(ErrorKind, &str)] = &[
+                (ErrorKind::HostUnreachable, "HostUnreachable"),
+                (ErrorKind::NetworkUnreachable, "NetworkUnreachable"),
+                (ErrorKind::NetworkDown, "NetworkDown"),
+                (ErrorKind::NotADirectory, "NotADirectory"),
+                (ErrorKind::IsADirectory, "IsADirectory"),
+                (ErrorKind::DirectoryNotEmpty, "DirectoryNotEmpty"),
+                (ErrorKind::ReadOnlyFilesystem, "ReadOnlyFilesystem"),
+                (ErrorKind::StaleNetworkFileHandle, "StaleNetworkFileHandle"),
+                (ErrorKind::StorageFull, "StorageFull"),
+                (ErrorKind::NotSeekable, "NotSeekable"),
+                (ErrorKind::FileTooLarge, "FileTooLarge"),
+                (ErrorKind::ResourceBusy, "ResourceBusy"),
+                (ErrorKind::ExecutableFileBusy, "ExecutableFileBusy"),
+                (ErrorKind::Deadlock, "Deadlock"),
+                (ErrorKind::CrossesDevices, "CrossesDevices"),
+                (ErrorKind::TooManyLinks, "TooManyLinks"),
+                (ErrorKind::InvalidFilename, "InvalidFilename"),
+                (ErrorKind::ArgumentListTooLong, "ArgumentListTooLong"),
+            ];
+            for (kind, expected_label) in post_msrv {
+                let debug_label = format!("{kind:?}");
+                assert_eq!(
+                    debug_label, *expected_label,
+                    "Debug format for post-MSRV {kind:?}"
+                );
+                // Deserialize falls back to Other — these labels are
+                // not in the kind_for table (MSRV constraint).
+                assert_eq!(
+                    kind_for(expected_label),
+                    ErrorKind::Other,
+                    "kind_for({expected_label:?}) should gracefully degrade to Other"
+                );
+            }
         }
     }
 }
