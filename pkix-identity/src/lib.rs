@@ -61,15 +61,14 @@
 //!
 //! # Versioning
 //!
-//! `0.1.0` (PKIX-fmtv.21) shipped the public API surface with stub
-//! bodies that returned [`IdentityError::NotYetImplemented`]. The
-//! unreleased line on `main` (PKIX-fmtv.11.1, PKIX-fmtv.12.1) fills in
-//! all four public entry points: [`ServerName::dns_name`],
-//! [`ServerName::ip_address`], [`MailboxName::parse`],
-//! [`verify_dns_name`], and [`verify_mailbox`].
-//! [`IdentityError::NotYetImplemented`] is retained as a non-removed
-//! variant so future scaffold-then-fill workflows can reuse it without
-//! a breaking API change.
+//! `0.1.0` (PKIX-fmtv.21) shipped the public API surface with scaffold
+//! bodies that returned [`IdentityError::NotYetImplemented`].
+//! PKIX-fmtv.11.1 and PKIX-fmtv.12.1 filled in all public entry
+//! points: [`ServerName::dns_name`], [`ServerName::ip_address`],
+//! [`MailboxName::parse`], [`verify_dns_name`], and [`verify_mailbox`].
+//! No code path returns [`IdentityError::NotYetImplemented`] any
+//! longer; the variant is retained for API compatibility since the
+//! enum is `#[non_exhaustive]`.
 //!
 //! # Limitations
 //!
@@ -335,15 +334,16 @@ fn validate_ascii_local_part(s: &str) -> Result<(), IdentityError> {
 
 /// Identity-binding errors.
 ///
-/// Variants will grow as PKIX-fmtv.12 lands; this enum is
-/// `#[non_exhaustive]` so additions are not API breaks.
+/// This enum is `#[non_exhaustive]` so new variants can be added
+/// without an API break.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum IdentityError {
-    /// Functionality scaffolded but not yet implemented. Currently still
-    /// returned by [`MailboxName::parse`] and [`verify_mailbox`].
-    /// Tracked by PKIX-fmtv.12.
+    /// Retained for API compatibility but no longer returned by any
+    /// function in this crate. It was used during the scaffold phase
+    /// (PKIX-fmtv.21) before `verify_dns_name` (PKIX-fmtv.11.1) and
+    /// `verify_mailbox` (PKIX-fmtv.12.1) were fully implemented.
     NotYetImplemented,
     /// Input string did not parse as the expected identity form.
     MalformedInput,
