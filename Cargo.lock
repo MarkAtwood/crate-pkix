@@ -1144,7 +1144,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ac"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -1154,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1162,7 +1162,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia-http"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "mockito",
  "pkix-aia",
@@ -1199,7 +1199,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-composite"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -1210,7 +1210,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "base64",
  "der",
@@ -1311,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-policy-zlint"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "der",
  "pkix-lint",
@@ -1359,7 +1359,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation-http"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "der",
@@ -1378,7 +1378,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-truststore"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "der",
  "pkix-path",
@@ -1397,7 +1397,7 @@ version = "0.1.0"
 
 [[package]]
 name = "pkix-zlint-bridge"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "pkix-lint",
  "serde",
