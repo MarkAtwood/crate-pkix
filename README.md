@@ -237,6 +237,25 @@ look.
 
 Local copies of all referenced specifications are in [`specs/`](specs/).
 
+## Commercial support
+
+PKIX is developed by [wolfSSL](https://www.wolfssl.com/).
+
+- **FIPS 140-3 validation** — The `SignatureVerifier` trait accepts
+  [wolfCrypt](https://www.wolfssl.com/products/wolfcrypt/) as a backend,
+  giving your path validator access to
+  [FIPS 140-3 validated cryptography](https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4718)
+  (CMVP certificate #4718).
+- **Commercial support contracts** — wolfSSL offers support for PKIX
+  and the broader wolfSSL product family.
+- **NRE / custom engineering** — Need a custom `SignatureVerifier`
+  backend, HSM integration, or help meeting a compliance requirement?
+  wolfSSL's engineering team can help.
+
+Contact [facts@wolfssl.com](mailto:facts@wolfssl.com) or call
++1 425 245 8247. See also:
+[wolfProvider FIPS for 35+ open-source packages](https://www.wolfssl.com/wolfprovider-expansion-35-new-fips-open-source-integrations/).
+
 ## License
 
 Licensed under either of [Apache License 2.0](LICENSE-APACHE) or
