@@ -31,7 +31,9 @@
 
 use std::path::PathBuf;
 
-use pkix_chain::{verify_time_stamper, Error, NoRevocation, TrustAnchor};
+use pkix_chain::{
+    verify_time_stamper, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+};
 use pkix_difftest::oracles;
 use pkix_difftest::{Chain, Verdict};
 use pkix_profiles::BasicTimeStampingProfile;
@@ -124,7 +126,9 @@ fn verify_time_stamper_diff_against_openssl_timestampsign() {
             &anchors,
             &BasicTimeStampingProfile,
             case.time,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         ));
         assert_eq!(
             rust, case.expected_rust,

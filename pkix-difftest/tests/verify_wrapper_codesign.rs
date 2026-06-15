@@ -35,7 +35,9 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use pkix_chain::{verify_code_signer, Error, NoRevocation, TrustAnchor};
+use pkix_chain::{
+    verify_code_signer, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+};
 use pkix_profiles::BasicCodeSigningProfile;
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -175,7 +177,9 @@ fn verify_wrapper_codesign_diff() {
             &anchors,
             &BasicCodeSigningProfile,
             vtime,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         ));
         assert_eq!(
             rust, case.expected_rust,

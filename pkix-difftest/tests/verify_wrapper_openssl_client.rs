@@ -32,7 +32,8 @@
 use std::path::PathBuf;
 
 use pkix_chain::{
-    verify_tls_client_dns, Error, IdentityError, NoRevocation, ServerName, TrustAnchor,
+    verify_tls_client_dns, DefaultVerifier, Error, IdentityError, NoAiaFetcher, NoRevocation,
+    ServerName, TrustAnchor,
 };
 use pkix_difftest::oracles;
 use pkix_difftest::{Chain, Verdict};
@@ -199,7 +200,9 @@ fn verify_tls_client_dns_diff_against_openssl() {
                 server_name_ref,
                 &Rfc5280Profile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             )),
             Profile::BasicClient => RustOutcome::from_result(verify_tls_client_dns(
                 &chain,
@@ -207,7 +210,9 @@ fn verify_tls_client_dns_diff_against_openssl() {
                 server_name_ref,
                 &BasicTlsClientProfile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             )),
         };
         assert_eq!(

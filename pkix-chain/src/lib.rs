@@ -82,9 +82,9 @@
 //!   [`Error::AiaDepthExceeded`] surfaces. With [`NoAiaFetcher`] the
 //!   first fetch returns [`AiaError::FetchingDisabled`] and the
 //!   verifier surfaces [`Error::Aia`] without performing any I/O. The
-//!   use-case wrappers (`verify_tls_server` and friends) bake
-//!   [`NoAiaFetcher`] internally; callers that want AIA fetching must
-//!   drop down to [`verify_chain`] or construct a [`Verifier`] directly.
+//!   use-case wrappers (`verify_tls_server` and friends) accept an
+//!   `A: AiaFetcher` parameter; pass [`NoAiaFetcher`] to disable fetching
+//!   or supply a real fetcher for automatic chain reassembly.
 //! - **Revocation is caller-supplied.** Online CRL / OCSP fetching is
 //!   handled by `pkix-revocation-http`; this crate accepts any
 //!   `RevocationChecker` impl — including `NoRevocation` for the
@@ -96,7 +96,7 @@
 //!   backends cover RSA-PKCS1v15-SHA-{256,384,512}, ECDSA-P-256-SHA-256,
 //!   and (with the `p384` feature) ECDSA-P-384-SHA-384. Ed25519, P-521,
 //!   and RSA-PSS are tracked under `PKIX-gphz`.
-//! - **Use-case wrappers cover the common cases.** `verify_tls_server`,
+//! - **Use-case wrappers are fully generic.** `verify_tls_server`,
 //!   `verify_tls_client_dns`, `verify_tls_client_mailbox`,
 //!   `verify_smime_signer`, `verify_smime_recipient`, `verify_code_signer`,
 //!   `verify_time_stamper`, and `verify_ocsp_responder` compose chain
@@ -778,26 +778,30 @@ where
 /// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
 ///   not contain an entry matching `name` (or the SAN extension was
 ///   missing/malformed).
-pub fn verify_tls_server<P, R>(
+pub fn verify_tls_server<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     name: &ServerName<'_>,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     pkix_identity::verify_dns_name(&chain[0], name)?;
     Ok(validated)
@@ -830,11 +834,6 @@ where
 /// [`Profile`]'s `ValidationPolicy` (EKU `id-kp-clientAuth` vs
 /// `id-kp-serverAuth`).
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
-/// that need a custom verifier should drop down to [`verify_chain`]
-/// and call [`pkix_identity::verify_dns_name`] explicitly when an
-/// identity binding is wanted.
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the client cert
@@ -844,7 +843,9 @@ where
 /// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
 ///   the profile must require the `id-kp-clientAuth` EKU for production use
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Order of operations
 ///
@@ -863,26 +864,30 @@ where
 ///   succeeded, but the leaf's SAN did not contain an entry matching
 ///   the supplied `ServerName` (or the SAN extension was
 ///   missing/malformed).
-pub fn verify_tls_client_dns<P, R>(
+pub fn verify_tls_client_dns<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     identity: Option<&ServerName<'_>>,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     if let Some(name) = identity {
         pkix_identity::verify_dns_name(&chain[0], name)?;
@@ -909,11 +914,6 @@ where
 /// The client-vs-server distinction is encoded in the caller-supplied
 /// [`Profile`]'s `ValidationPolicy` (EKU `id-kp-clientAuth`).
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
-/// that need a custom verifier should drop down to [`verify_chain`]
-/// and call [`pkix_identity::verify_mailbox`] explicitly when an
-/// identity binding is wanted.
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the client cert
@@ -923,7 +923,9 @@ where
 /// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
 ///   the profile must require the `id-kp-clientAuth` EKU for production use
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Order of operations
 ///
@@ -940,26 +942,30 @@ where
 ///   succeeded, but the leaf's SAN did not contain an entry matching
 ///   the supplied `MailboxName` (or the SAN extension was
 ///   missing/malformed).
-pub fn verify_tls_client_mailbox<P, R>(
+pub fn verify_tls_client_mailbox<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     identity: Option<&MailboxName<'_>>,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     if let Some(mailbox) = identity {
         pkix_identity::verify_mailbox(&chain[0], mailbox)?;
@@ -981,10 +987,6 @@ where
 /// wrapper body is byte-identical to [`verify_smime_recipient`]; the
 /// distinct function name lets callers communicate intent at the call site.
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
-/// need a custom verifier should drop down to [`verify_chain`] and call
-/// [`pkix_identity::verify_mailbox`] explicitly.
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the signer cert
@@ -993,7 +995,9 @@ where
 /// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
 ///   typically [`pkix_profiles::BasicSmimeProfile`] or a CA/B-Forum S/MIME tier
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Order of operations
 ///
@@ -1009,26 +1013,30 @@ where
 /// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
 ///   not contain an entry matching `mailbox` (or the SAN extension was
 ///   missing/malformed).
-pub fn verify_smime_signer<P, R>(
+pub fn verify_smime_signer<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     mailbox: &MailboxName<'_>,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
@@ -1042,26 +1050,30 @@ where
 /// the call site. The key-usage distinction (`digitalSignature` for signer,
 /// `keyEncipherment` for recipient) is encoded in the caller-supplied
 /// [`Profile`].
-pub fn verify_smime_recipient<P, R>(
+pub fn verify_smime_recipient<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     mailbox: &MailboxName<'_>,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
@@ -1075,9 +1087,6 @@ where
 /// so the wrapper does not perform identity binding — the EKU requirement
 /// is encoded entirely in `profile.policy(now_unix)`.
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
-/// need a custom verifier should drop down to [`verify_chain`].
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the signer cert
@@ -1086,7 +1095,9 @@ where
 ///   typically [`pkix_profiles::BasicCodeSigningProfile`] or
 ///   `pkix_profiles_cabf::CodeSigningProfile` for the CA/B Forum BR overlay
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Errors
 ///
@@ -1094,25 +1105,29 @@ where
 ///   profile's `id-kp-codeSigning` EKU requirement not being met).
 /// - [`Error::Revocation`] — a cert in the chain was revoked or the
 ///   revocation source was unusable.
-pub fn verify_code_signer<P, R>(
+pub fn verify_code_signer<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )
 }
 
@@ -1141,10 +1156,6 @@ where
 /// `verify_chain` returns and fail with [`Error::ProfileViolation`] when
 /// violated.
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
-/// need a custom verifier should drop down to [`verify_chain`] and replicate
-/// the post-validation EKU and KU checks.
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the TSA cert
@@ -1152,7 +1163,9 @@ where
 /// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
 ///   typically [`pkix_profiles::BasicTimeStampingProfile`]
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Errors
 ///
@@ -1164,25 +1177,29 @@ where
 ///   other than `id-kp-timeStamping`, or its `KeyUsage` extension is
 ///   present and asserts a bit other than `digitalSignature` or
 ///   `nonRepudiation`.
-pub fn verify_time_stamper<P, R>(
+pub fn verify_time_stamper<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
     let validated = verify_chain(
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         revocation,
-        &NoAiaFetcher,
+        aia,
     )?;
     enforce_timestamping_eku_critical_and_sole(&chain[0])?;
     enforce_timestamping_ku_shape(&chain[0])?;
@@ -1246,10 +1263,6 @@ where
 /// # }
 /// ```
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers
-/// that need a custom verifier should drop down to [`verify_chain`] and
-/// replicate the delegation + nocheck checks.
-///
 /// # Arguments
 ///
 /// - `chain`      — leaf-first certificate chain; `chain[0]` is the responder cert
@@ -1259,9 +1272,11 @@ where
 /// - `profile`    — profile supplying the [`ValidationPolicy`] for `now_unix`;
 ///   typically [`pkix_profiles::BasicOcspResponderProfile`]
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline);
 ///   bypassed for `chain[0]` when the responder cert carries
 ///   `id-pkix-ocsp-nocheck`
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Errors
 ///
@@ -1277,17 +1292,21 @@ where
 ///   The cryptographic binding (b) is required by RFC 6960 §4.2.2.2 —
 ///   DN equality alone admits a DN-twin attack in cross-signed
 ///   topologies.
-pub fn verify_ocsp_responder<P, R>(
+pub fn verify_ocsp_responder<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
     issuer: &Certificate,
     profile: &P,
     now_unix: u64,
+    verifier: &V,
     revocation: &R,
+    aia: &A,
 ) -> crate::Result<ValidatedPath>
 where
+    V: SignatureVerifier,
     P: Profile,
     R: RevocationChecker,
+    A: AiaFetcher,
 {
     if chain.is_empty() {
         return Err(Error::OcspDelegation {
@@ -1313,9 +1332,9 @@ where
         chain,
         anchors,
         &policy,
-        &DefaultVerifier,
+        verifier,
         &shim,
-        &NoAiaFetcher,
+        aia,
     )?;
 
     verify_responder_is_delegated_by(&chain[0], issuer)?;

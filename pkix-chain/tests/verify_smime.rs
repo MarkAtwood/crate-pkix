@@ -7,8 +7,8 @@
 //! under test never participates in fixture creation.
 
 use pkix_chain::{
-    verify_smime_recipient, verify_smime_signer, Error, IdentityError, MailboxName, NoRevocation,
-    TrustAnchor,
+    verify_smime_recipient, verify_smime_signer, DefaultVerifier, Error, IdentityError,
+    MailboxName, NoAiaFetcher, NoRevocation, TrustAnchor,
 };
 use pkix_profiles::Rfc5280Profile;
 use x509_cert::der::Decode as _;
@@ -46,7 +46,9 @@ fn verify_smime_signer_ok() {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("matching mailbox + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -69,7 +71,9 @@ fn verify_smime_signer_domain_case_insensitive() {
             &mailbox,
             &Rfc5280Profile,
             NOW,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         )
         .is_ok(),
         "mixed-case domain must match"
@@ -94,7 +98,9 @@ fn verify_smime_signer_mailbox_mismatch_returns_identity_error() {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("mismatched mailbox must fail");
     assert!(
@@ -117,7 +123,9 @@ fn verify_smime_signer_missing_san_returns_identity_error() {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("leaf without SAN must fail identity check");
     assert!(
@@ -144,7 +152,9 @@ fn verify_smime_signer_path_validation_runs_before_identity() {
         &mailbox,
         &Rfc5280Profile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation, not identity");
     assert!(
@@ -173,7 +183,9 @@ fn verify_smime_recipient_ok() {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("matching mailbox + valid chain must succeed for recipient too");
     assert_eq!(vp.anchor_index, 0);
@@ -193,7 +205,9 @@ fn verify_smime_recipient_mailbox_mismatch_returns_identity_error() {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("mismatched mailbox must fail for recipient too");
     assert!(
@@ -225,7 +239,9 @@ fn verify_smime_signer_with_basic_smime_profile() {
         &mailbox,
         &BasicSmimeProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("BasicSmimeProfile + emailProtection-EKU leaf + rfc822 SAN must succeed");
     assert_eq!(vp.anchor_index, 0);

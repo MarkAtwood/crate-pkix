@@ -12,8 +12,8 @@
 //! follow-up bead.
 
 use pkix_chain::{
-    verify_tls_client_dns, verify_tls_client_mailbox, Error, IdentityError, MailboxName,
-    NoRevocation, ServerName, TrustAnchor,
+    verify_tls_client_dns, verify_tls_client_mailbox, DefaultVerifier, Error, IdentityError,
+    MailboxName, NoAiaFetcher, NoRevocation, ServerName, TrustAnchor,
 };
 use pkix_profiles::{BasicTlsClientProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
@@ -54,7 +54,9 @@ fn client_dns_identity_match_ok() {
         Some(&name),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("matching DNS identity + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -74,7 +76,9 @@ fn client_dns_identity_mismatch_returns_identity_error() {
         Some(&name),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("mismatched DNS identity must fail");
     assert!(
@@ -96,7 +100,9 @@ fn client_dns_missing_san_returns_identity_error() {
         Some(&name),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("leaf without SAN + Some(identity) must fail identity check");
     assert!(
@@ -117,8 +123,17 @@ fn client_dns_identity_none_skips_binding_with_san() {
     let chain = [leaf];
     let anchors = anchors();
 
-    let vp = verify_tls_client_dns(&chain, &anchors, None, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("identity=None must succeed on a valid chain");
+    let vp = verify_tls_client_dns(
+        &chain,
+        &anchors,
+        None,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("identity=None must succeed on a valid chain");
     assert_eq!(vp.anchor_index, 0);
 }
 
@@ -130,8 +145,17 @@ fn client_dns_identity_none_skips_binding_no_san() {
     let chain = [leaf];
     let anchors = anchors();
 
-    let vp = verify_tls_client_dns(&chain, &anchors, None, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("identity=None must succeed even on a leaf with no SAN");
+    let vp = verify_tls_client_dns(
+        &chain,
+        &anchors,
+        None,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("identity=None must succeed even on a leaf with no SAN");
     assert_eq!(vp.anchor_index, 0);
 }
 
@@ -155,7 +179,9 @@ fn client_dns_path_validation_runs_before_identity() {
         Some(&name),
         &Rfc5280Profile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation, not identity");
     assert!(
@@ -181,7 +207,9 @@ fn client_mailbox_identity_match_ok() {
         Some(&mailbox),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("matching mailbox + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -200,7 +228,9 @@ fn client_mailbox_identity_mismatch_returns_identity_error() {
         Some(&mailbox),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("mismatched mailbox must fail");
     assert!(
@@ -222,7 +252,9 @@ fn client_mailbox_missing_san_returns_identity_error() {
         Some(&mailbox),
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("leaf without SAN + Some(identity) must fail identity check");
     assert!(
@@ -241,8 +273,17 @@ fn client_mailbox_identity_none_skips_binding_with_san() {
     let chain = [leaf];
     let anchors = anchors();
 
-    let vp = verify_tls_client_mailbox(&chain, &anchors, None, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("identity=None must succeed on a valid chain");
+    let vp = verify_tls_client_mailbox(
+        &chain,
+        &anchors,
+        None,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("identity=None must succeed on a valid chain");
     assert_eq!(vp.anchor_index, 0);
 }
 
@@ -252,8 +293,17 @@ fn client_mailbox_identity_none_skips_binding_no_san() {
     let chain = [leaf];
     let anchors = anchors();
 
-    let vp = verify_tls_client_mailbox(&chain, &anchors, None, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("identity=None must succeed even on a leaf with no SAN");
+    let vp = verify_tls_client_mailbox(
+        &chain,
+        &anchors,
+        None,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("identity=None must succeed even on a leaf with no SAN");
     assert_eq!(vp.anchor_index, 0);
 }
 
@@ -283,7 +333,9 @@ fn client_dns_with_basic_tls_client_profile() {
         Some(&name),
         &BasicTlsClientProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("BasicTlsClientProfile + clientAuth-EKU leaf + matching SAN must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -303,7 +355,9 @@ fn client_mailbox_with_basic_tls_client_profile() {
         Some(&mailbox),
         &BasicTlsClientProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("BasicTlsClientProfile + clientAuth-EKU leaf + matching mailbox must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -328,7 +382,9 @@ fn client_dns_no_san_passes_under_basic_tls_client_profile() {
         None,
         &BasicTlsClientProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("serverAuth-only leaf must fail clientAuth EKU check");
     assert!(
@@ -350,7 +406,9 @@ fn client_mailbox_path_validation_runs_before_identity() {
         Some(&mailbox),
         &Rfc5280Profile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation, not identity");
     assert!(

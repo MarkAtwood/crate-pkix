@@ -9,7 +9,10 @@
 //!
 //! Tracks PKIX-fmtv.22.
 
-use pkix_chain::{verify_tls_server, Error, IdentityError, NoRevocation, ServerName, TrustAnchor};
+use pkix_chain::{
+    verify_tls_server, DefaultVerifier, Error, IdentityError, NoAiaFetcher, NoRevocation,
+    ServerName, TrustAnchor,
+};
 use pkix_profiles::{BasicTlsProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -58,7 +61,16 @@ fn run(fixture: &str, target: Target<'_>, expected: Outcome) {
     };
     let anchors = anchors();
 
-    let result = verify_tls_server(&chain, &anchors, &name, &Rfc5280Profile, NOW, &NoRevocation);
+    let result = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    );
     assert_outcome(fixture, &target_label(&target), &result, expected);
 }
 
@@ -391,7 +403,9 @@ fn basictls_profile_exact_match() {
         &name,
         &BasicTlsProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     );
     assert!(
         result.is_ok(),

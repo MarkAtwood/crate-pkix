@@ -44,8 +44,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use pkix_chain::{
-    verify_tls_client_dns, verify_tls_server, Error, IdentityError, NoRevocation, ServerName,
-    TrustAnchor,
+    verify_tls_client_dns, verify_tls_server, DefaultVerifier, Error, IdentityError, NoAiaFetcher,
+    NoRevocation, ServerName, TrustAnchor,
 };
 use pkix_profiles::{BasicTlsClientProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
@@ -252,7 +252,9 @@ fn verify_wrapper_pyca_diff() {
             &server_name,
             &Rfc5280Profile,
             NOW,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         ));
         assert_eq!(
             rust, case.expected_rust,
@@ -301,7 +303,9 @@ fn verify_wrapper_pyca_diff() {
                 server_name_ref,
                 &BasicTlsClientProfile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             ))
         } else {
             RustOutcome::from_result(verify_tls_client_dns(
@@ -310,7 +314,9 @@ fn verify_wrapper_pyca_diff() {
                 server_name_ref,
                 &Rfc5280Profile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             ))
         };
         assert_eq!(

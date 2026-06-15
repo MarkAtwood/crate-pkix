@@ -44,7 +44,9 @@
 
 use std::path::PathBuf;
 
-use pkix_chain::{verify_ocsp_responder, Error, NoRevocation, TrustAnchor};
+use pkix_chain::{
+    verify_ocsp_responder, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+};
 use pkix_difftest::oracles;
 use pkix_difftest::{Chain, Verdict};
 use pkix_profiles::BasicOcspResponderProfile;
@@ -122,7 +124,9 @@ fn verify_ocsp_responder_diff_against_openssl_ocsphelper() {
             &issuer,
             &BasicOcspResponderProfile,
             case.time,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         ));
         assert_eq!(
             rust, case.expected_rust,

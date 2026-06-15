@@ -9,7 +9,9 @@
 //! extension be marked critical and contain only `id-kp-timeStamping`.
 //! `verify_time_stamper` enforces this post-validation.
 
-use pkix_chain::{verify_time_stamper, Error, NoRevocation, TrustAnchor};
+use pkix_chain::{
+    verify_time_stamper, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+};
 use pkix_profiles::BasicTimeStampingProfile;
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -41,7 +43,9 @@ fn verify_time_stamper_ok() {
         &anchors,
         &BasicTimeStampingProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("RFC 3161-compliant TSA cert + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -64,7 +68,9 @@ fn verify_time_stamper_non_critical_eku_returns_profile_violation() {
         &anchors,
         &BasicTimeStampingProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("non-critical EKU must fail RFC 3161 §2.3 check");
     match err {
@@ -94,7 +100,9 @@ fn verify_time_stamper_extra_eku_returns_profile_violation() {
         &anchors,
         &BasicTimeStampingProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("timeStamping+codeSigning EKU must fail RFC 3161 §2.3 sole check");
     match err {
@@ -129,7 +137,9 @@ fn verify_time_stamper_bad_ku_returns_profile_violation() {
         &anchors,
         &BasicTimeStampingProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("KU=digitalSignature+keyEncipherment must fail RFC 3161 §2.1 #10 / KU-shape check");
     match err {
@@ -163,7 +173,9 @@ fn verify_time_stamper_path_validation_runs_before_profile_check() {
         &anchors,
         &BasicTimeStampingProfile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation, not profile");
     assert!(
@@ -189,7 +201,9 @@ fn verify_time_stamper_wrong_eku_returns_path_error() {
         &anchors,
         &BasicTimeStampingProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("non-timeStamping leaf must fail profile EKU requirement");
     // Caught by verify_chain's profile.required_leaf_eku check, returns

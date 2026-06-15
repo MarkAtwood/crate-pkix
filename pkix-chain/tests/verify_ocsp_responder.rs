@@ -17,7 +17,10 @@
 //! handling via a `RevocationChecker` shim that bypasses the
 //! caller's checker for the responder leaf only.
 
-use pkix_chain::{verify_ocsp_responder, Error, NoRevocation, RevocationChecker, TrustAnchor};
+use pkix_chain::{
+    verify_ocsp_responder, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, RevocationChecker,
+    TrustAnchor,
+};
 use pkix_profiles::BasicOcspResponderProfile;
 use pkix_revocation::Error as RevocationError;
 use x509_cert::der::Decode as _;
@@ -80,7 +83,9 @@ fn verify_ocsp_responder_ok() {
         &root,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("RFC 6960-compliant delegated responder + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -110,7 +115,9 @@ fn verify_ocsp_responder_wrong_issuer_returns_ocsp_delegation() {
         &wrong_issuer,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("issuer-DN mismatch must fail RFC 6960 §4.2.2.2 delegation check");
     match err {
@@ -154,7 +161,9 @@ fn verify_ocsp_responder_twin_dn_issuer_returns_ocsp_delegation() {
         &twin,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err(
         "DN-twin issuer (same DN as real signer, different key) must fail RFC 6960 §4.2.2.2 \
@@ -196,7 +205,9 @@ fn verify_ocsp_responder_missing_eku_returns_path_error() {
         &root,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("non-OCSPSigning leaf must fail profile EKU requirement");
     // Caught by verify_chain's profile.required_leaf_eku check, returns
@@ -230,7 +241,9 @@ fn verify_ocsp_responder_nocheck_bypasses_revoking_oracle() {
         &root,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &AlwaysRevoking,
+        &NoAiaFetcher,
     )
     .expect("id-pkix-ocsp-nocheck must bypass revocation on the responder leaf");
     assert_eq!(vp.anchor_index, 0);
@@ -255,7 +268,9 @@ fn verify_ocsp_responder_without_nocheck_honors_revoking_oracle() {
         &root,
         &BasicOcspResponderProfile,
         NOW,
+        &DefaultVerifier,
         &AlwaysRevoking,
+        &NoAiaFetcher,
     )
     .expect_err("without nocheck, AlwaysRevoking must surface Error::Revocation");
     match err {
