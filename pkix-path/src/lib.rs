@@ -324,6 +324,14 @@ pub enum Error {
     /// RFC 5280 §6.1 does not mandate this check; it is an opt-in policy that
     /// restores PKITS §4.7.4 / §4.7.5 conformance for callers who treat a CA
     /// cert without `cRLSign` as non-issuable. Default is off.
+    ///
+    /// **Disambiguation:** [`pkix_revocation::Error::CrlSignMissing`] (same
+    /// variant name, different crate) fires during CRL verification when the
+    /// CRL *signer* cert lacks `cRLSign` (RFC 5280 §6.3.3(f)). This variant
+    /// fires during *path validation* when an intermediate CA cert in the
+    /// chain lacks `cRLSign` and the caller opted into the policy check.
+    ///
+    /// [`pkix_revocation::Error::CrlSignMissing`]: https://docs.rs/pkix-revocation/latest/pkix_revocation/enum.Error.html#variant.CrlSignMissing
     CrlSignMissing {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
