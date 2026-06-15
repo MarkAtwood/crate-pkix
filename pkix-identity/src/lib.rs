@@ -202,6 +202,35 @@ impl<'a> ServerName<'a> {
         }
     }
 
+    /// Convert this `ServerName` into an owned (`'static`) version.
+    ///
+    /// If the inner DNS name is borrowed, this allocates. IP-literal
+    /// names are `Copy` and never allocate.
+    pub fn into_owned(self) -> ServerName<'static> {
+        ServerName {
+            repr: match self.repr {
+                ServerNameRepr::Dns(cow) => ServerNameRepr::Dns(Cow::Owned(cow.into_owned())),
+                ServerNameRepr::Ip(ip) => ServerNameRepr::Ip(ip),
+            },
+        }
+    }
+
+    /// Clone this `ServerName` into an owned (`'static`) version.
+    ///
+    /// Equivalent to `.clone().into_owned()` but avoids the intermediate
+    /// clone when the inner data is borrowed.
+    #[must_use]
+    pub fn to_owned(&self) -> ServerName<'static> {
+        ServerName {
+            repr: match &self.repr {
+                ServerNameRepr::Dns(cow) => {
+                    ServerNameRepr::Dns(Cow::Owned(cow.clone().into_owned()))
+                }
+                ServerNameRepr::Ip(ip) => ServerNameRepr::Ip(*ip),
+            },
+        }
+    }
+
     /// Parse an IP address literal (IPv4 dotted-quad or IPv6, with or
     /// without surrounding brackets).
     ///
@@ -273,6 +302,32 @@ impl MailboxName<'_> {
     /// SAN entries, never `rfc822Name` entries (which are IA5String, ASCII-only).
     pub fn is_internationalized(&self) -> bool {
         self.is_internationalized
+    }
+}
+
+impl MailboxName<'_> {
+    /// Convert this `MailboxName` into an owned (`'static`) version.
+    ///
+    /// If either the local-part or the domain borrows from the input,
+    /// this allocates.
+    pub fn into_owned(self) -> MailboxName<'static> {
+        MailboxName {
+            local: Cow::Owned(self.local.into_owned()),
+            domain_a_label: Cow::Owned(self.domain_a_label.into_owned()),
+            is_internationalized: self.is_internationalized,
+        }
+    }
+
+    /// Clone this `MailboxName` into an owned (`'static`) version.
+    ///
+    /// Equivalent to `.clone().into_owned()`.
+    #[must_use]
+    pub fn to_owned(&self) -> MailboxName<'static> {
+        MailboxName {
+            local: Cow::Owned(self.local.clone().into_owned()),
+            domain_a_label: Cow::Owned(self.domain_a_label.clone().into_owned()),
+            is_internationalized: self.is_internationalized,
+        }
     }
 }
 

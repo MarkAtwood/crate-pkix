@@ -658,7 +658,11 @@ where
             if let Some(cached) = key
                 .as_ref()
                 .and_then(|k| self.cache.get_crl(k))
-                .filter(|e| is_live(e.next_update, SystemTime::now()))
+                .filter(|e| {
+                    let now = SystemTime::UNIX_EPOCH
+                        + core::time::Duration::from_secs(self.inner.now_unix);
+                    is_live(e.next_update, now)
+                })
             {
                 // Cache hit: construct CrlChecker from cached bytes.
                 match CrlChecker::new(
@@ -843,7 +847,11 @@ where
             if let Some(cached) = self
                 .cache
                 .get_ocsp(&key)
-                .filter(|e| is_live(e.next_update, SystemTime::now()))
+                .filter(|e| {
+                    let now = SystemTime::UNIX_EPOCH
+                        + core::time::Duration::from_secs(self.inner.now_unix);
+                    is_live(e.next_update, now)
+                })
             {
                 match OcspChecker::new(
                     cached.bytes.as_slice(),

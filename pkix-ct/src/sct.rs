@@ -54,6 +54,7 @@ use crate::{Error, Result};
 /// require changes here. Signature interpretation lives one layer up
 /// (see [`crate::SctVerifier`]).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct SignedCertificateTimestamp {
     /// SCT version. Always 0 for the v1 protocol defined in RFC 6962. v2
     /// (RFC 9162) is not yet deployed and parsing rejects non-zero
@@ -83,6 +84,33 @@ pub struct SignedCertificateTimestamp {
 }
 
 impl SignedCertificateTimestamp {
+    /// Construct a `SignedCertificateTimestamp` from its constituent fields.
+    ///
+    /// Field values are stored as-is; no validation is performed beyond
+    /// what the type system enforces. Use [`Self::from_bytes`] or
+    /// [`SctList::from_serialized_list`] to parse from wire format with
+    /// validation.
+    #[must_use]
+    pub fn new(
+        version: u8,
+        log_id: [u8; 32],
+        timestamp_ms: u64,
+        extensions: Vec<u8>,
+        hash_alg: u8,
+        sig_alg: u8,
+        signature: Vec<u8>,
+    ) -> Self {
+        Self {
+            version,
+            log_id,
+            timestamp_ms,
+            extensions,
+            hash_alg,
+            sig_alg,
+            signature,
+        }
+    }
+
     /// Parse a single `SignedCertificateTimestamp` from `input`.
     ///
     /// `input` must contain exactly one SCT — trailing bytes cause

@@ -566,6 +566,7 @@ const SIG_TYPE_TREE_HASH: u8 = 1;
 /// `get-sth` API is log-specific transport); the caller constructs
 /// this struct from whichever source they fetch STHs from.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct SignedTreeHead {
     /// Tree size at the time the STH was signed.
     pub tree_size: u64,
@@ -582,6 +583,28 @@ pub struct SignedTreeHead {
     pub signature: alloc::vec::Vec<u8>,
 }
 
+impl SignedTreeHead {
+    /// Construct a `SignedTreeHead` from its constituent fields.
+    #[must_use]
+    pub fn new(
+        tree_size: u64,
+        timestamp_ms: u64,
+        root_hash: [u8; 32],
+        hash_alg: u8,
+        sig_alg: u8,
+        signature: alloc::vec::Vec<u8>,
+    ) -> Self {
+        Self {
+            tree_size,
+            timestamp_ms,
+            root_hash,
+            hash_alg,
+            sig_alg,
+            signature,
+        }
+    }
+}
+
 /// An audit path proving a single leaf's inclusion in an RFC 6962 §2
 /// Merkle tree at some `tree_size`.
 ///
@@ -590,6 +613,7 @@ pub struct SignedTreeHead {
 /// type does not currently carry parser methods — `pkix-ct` is
 /// transport-agnostic.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct MerkleAuditPath {
     /// 0-based index of the leaf in the tree.
     pub leaf_index: u64,
@@ -600,6 +624,22 @@ pub struct MerkleAuditPath {
     /// Sibling hashes from leaf-to-root, ordered RFC 6962 §2.1.1-style
     /// (innermost sibling first, root's-direct-child sibling last).
     pub audit_path: alloc::vec::Vec<[u8; 32]>,
+}
+
+impl MerkleAuditPath {
+    /// Construct a `MerkleAuditPath` from its constituent fields.
+    #[must_use]
+    pub fn new(
+        leaf_index: u64,
+        tree_size: u64,
+        audit_path: alloc::vec::Vec<[u8; 32]>,
+    ) -> Self {
+        Self {
+            leaf_index,
+            tree_size,
+            audit_path,
+        }
+    }
 }
 
 /// Hash-only worker for [`SctVerifier::verify_inclusion`].
