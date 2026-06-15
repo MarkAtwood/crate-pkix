@@ -718,7 +718,7 @@ fn test_iterator_max_depth_zero_respects_trivial_chain() {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// PKIX-qgw1: skip-not-fail on MalformedIntermediate
+// PKIX-qgw1: skip-not-fail on malformed BasicConstraints
 //
 // A candidate intermediate whose `BasicConstraints` extension is present
 // but cannot be DER-decoded must be silently skipped rather than poison
@@ -765,7 +765,7 @@ fn test_build_path_skips_malformed_bc_when_valid_alternative_exists() {
 
 /// Pool contains ONLY a malformed-`BasicConstraints` intermediate.
 /// `build_path` must return [`pkix_path_builder::Error::NoPathFound`],
-/// not [`pkix_path_builder::Error::MalformedIntermediate`].
+/// not a structural-error variant.
 ///
 /// This is the negative half of the contract: skip-not-fail must
 /// produce a chain-not-found verdict, not a structural-error verdict,

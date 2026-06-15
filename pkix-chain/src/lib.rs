@@ -630,11 +630,9 @@ where
                     return Ok(chain);
                 }
                 Err(e) => {
-                    // DepthExceeded / BudgetExceeded /
-                    // MalformedIntermediate cannot be repaired by adding
-                    // more candidate certs: depth/budget are pool-size
-                    // problems and MalformedIntermediate is
-                    // reserved/unused.
+                    // DepthExceeded / BudgetExceeded cannot be repaired
+                    // by adding more candidate certs: these are
+                    // pool-size problems.
                     return Err(Error::PathBuild(e));
                 }
             }
