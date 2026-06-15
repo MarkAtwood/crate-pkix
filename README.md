@@ -250,6 +250,68 @@ decisions requiring human judgment — mostly breaking API changes
 and security design choices (CertPool size cap, AIA byte cap, SSRF URI
 filtering). These are deferred, not forgotten.
 
+## Roadmap
+
+Our goal is to become the standard PKIX library for Rust — the way
+`rustls` is the standard TLS library but for the certificate validation
+layer underneath. Here is what is shipping and what is next.
+
+### Shipping today
+
+- **RFC 5280 §6 path validation** with full policy tree, name constraints,
+  and policy mappings (`pkix-path`, `no_std`)
+- **CRL + OCSP revocation checking** with delta CRL and indirect CRL
+  support (`pkix-revocation`, offline)
+- **Path building** from unordered certificate bundles (`pkix-path-builder`)
+- **High-level chain verification** with use-case wrappers for TLS server,
+  TLS client, S/MIME, code signing, timestamping, and OCSP responder
+  delegation (`pkix-chain`)
+- **Pluggable crypto** — swap `DefaultVerifier` (RustCrypto) for wolfCrypt
+  FIPS, a hardware HSM, or any custom backend
+- **RFC 6125 hostname + RFC 8398 mailbox identity binding** (`pkix-identity`)
+- **Trust anchor loading** from PEM/DER files and bytes (`pkix-truststore`)
+- **Advisory lint engine** with RFC-conformance lints and CA/B Forum
+  reference bundles (`pkix-lint`, `pkix-lint-cabf`)
+- **Profile framework** with RFC-baseline and CA/B Forum reference
+  profiles (`pkix-profiles`, `pkix-profiles-cabf`)
+- **Certificate Transparency** SCT parsing and verification (`pkix-ct`)
+- **AIA chain reassembly** — automatic intermediate fetching via
+  `id-ad-caIssuers` (`pkix-aia`, `pkix-aia-http`)
+- **External lint adapters** — zlint and pkilint integration via
+  subprocess bridges (`pkix-zlint-bridge`, `pkix-policy-zlint`)
+- **Differential testing** against OpenSSL and pyca/cryptography on the
+  NIST PKITS corpus (`pkix-difftest`)
+
+### Critical path to standard-library status
+
+| Priority | Workstream | What it unblocks |
+|----------|-----------|-----------------|
+| **P1** | **Algorithm coverage** — RSA-PSS, Ed25519, P-521, legacy SHA-1 | Real-world chain validation (Let's Encrypt ISRG Root X2, government PKIs, modern CAs) |
+| **P1** | **OS trust store integration** — `pkix-truststore-system` for Linux, macOS, Windows | The #1 adopter question: "how do I use the system trust store?" |
+| **P1** | **Online revocation hardening** — cache eviction, stale-response fixes, async footguns | Production deployment with CRL/OCSP fetching that actually works |
+| **P1** | **Rust TLS ecosystem integration** — `pkix-rustls-provider`, ring backend, reqwest/hyper examples | Lets the existing Rust TLS stack use PKIX as the certificate verifier |
+| **P1** | **CT correctness** — precert entry type, re-encoder bit-exactness, diagnostic errors | CT-mandatory deployments (browsers, monitors) |
+| **P2** | **Documentation** — getting started guide, cookbook, migration guides from rustls-webpki and openssl | 30-minutes-to-working adoption experience |
+
+### Future work
+
+| Crate | What | Status |
+|-------|------|--------|
+| `pkix-dane` | DANE / TLSA (RFC 6698 + 7671) | name reserved |
+| `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | name reserved |
+| `pkix-composite` | Post-quantum + classical composite signatures | stub |
+| `pkix-ac` | RFC 5755 attribute certificate validation | stub |
+| `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |
+| `pkix-policy-pkilint` | pkilint → pkix-lint adapter | name reserved |
+| `pkix-truststore-pkcs11` | HSM / smart card trust store adapter | stub |
+
+### Contributing
+
+Contributions are welcome. The critical-path items above are tracked as
+beads epic `PKIX-77k9` in the repository's issue tracker. The ecosystem
+integration work (`pkix-rustls-provider`) may involve upstream PRs to
+other projects — we are happy to collaborate.
+
 ## Interoperability
 
 `pkix-path`'s verdict behaviour is differential-tested against
