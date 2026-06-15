@@ -5,7 +5,9 @@
 //! Oracle: pyca/cryptography produced the DER fixtures; the Rust verifier
 //! under test never participates in fixture creation.
 
-use pkix_chain::{verify_code_signer, Error, NoRevocation, TrustAnchor};
+use pkix_chain::{
+    verify_code_signer, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+};
 use pkix_profiles::{BasicCodeSigningProfile, Rfc5280Profile};
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -38,7 +40,9 @@ fn verify_code_signer_ok() {
         &anchors,
         &BasicCodeSigningProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("code-signing leaf + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
@@ -63,7 +67,9 @@ fn verify_code_signer_wrong_eku_returns_path_error() {
         &anchors,
         &BasicCodeSigningProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("serverAuth leaf must fail BasicCodeSigningProfile EKU check");
     assert!(
@@ -82,8 +88,16 @@ fn verify_code_signer_with_rfc5280_profile_skips_eku_check() {
     let anchors = [TrustAnchor::from_cert(root)];
     let chain = [leaf];
 
-    let vp = verify_code_signer(&chain, &anchors, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("Rfc5280Profile imposes no EKU constraint");
+    let vp = verify_code_signer(
+        &chain,
+        &anchors,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("Rfc5280Profile imposes no EKU constraint");
     assert_eq!(vp.anchor_index, 0);
 }
 
@@ -103,7 +117,9 @@ fn verify_code_signer_expired_chain_returns_path_error() {
         &anchors,
         &BasicCodeSigningProfile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation");
     assert!(

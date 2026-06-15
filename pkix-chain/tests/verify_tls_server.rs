@@ -7,7 +7,10 @@
 //! by the `MissingSan` negative path is a NIST-published cert with no
 //! SAN extension — independent of both pyca and pkix-chain.
 
-use pkix_chain::{verify_tls_server, Error, IdentityError, NoRevocation, ServerName, TrustAnchor};
+use pkix_chain::{
+    verify_tls_server, DefaultVerifier, Error, IdentityError, NoAiaFetcher, NoRevocation,
+    ServerName, TrustAnchor,
+};
 use pkix_profiles::Rfc5280Profile;
 use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
@@ -40,8 +43,17 @@ fn verify_tls_server_ok() {
     let chain = [leaf];
     let name = ServerName::dns_name("www.example.com").unwrap();
 
-    let vp = verify_tls_server(&chain, &anchors, &name, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect("matching SAN + valid chain must succeed");
+    let vp = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect("matching SAN + valid chain must succeed");
     assert_eq!(vp.anchor_index, 0);
     assert_eq!(vp.depth, 0, "leaf directly issued by trust anchor");
 }
@@ -60,7 +72,17 @@ fn verify_tls_server_case_insensitive_target() {
     let name = ServerName::dns_name("WWW.Example.COM").unwrap();
 
     assert!(
-        verify_tls_server(&chain, &anchors, &name, &Rfc5280Profile, NOW, &NoRevocation,).is_ok(),
+        verify_tls_server(
+            &chain,
+            &anchors,
+            &name,
+            &Rfc5280Profile,
+            NOW,
+            &DefaultVerifier,
+            &NoRevocation,
+            &NoAiaFetcher,
+        )
+        .is_ok(),
         "mixed-case target must match lowercase SAN"
     );
 }
@@ -79,8 +101,17 @@ fn verify_tls_server_hostname_mismatch_returns_identity_error() {
     let chain = [leaf];
     let name = ServerName::dns_name("api.example.com").unwrap();
 
-    let err = verify_tls_server(&chain, &anchors, &name, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect_err("mismatched hostname must fail");
+    let err = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect_err("mismatched hostname must fail");
     assert!(
         matches!(err, Error::Identity(IdentityError::NoMatchingSan)),
         "expected Error::Identity(NoMatchingSan), got: {err:?}"
@@ -97,8 +128,17 @@ fn verify_tls_server_missing_san_returns_identity_error() {
     let chain = [leaf];
     let name = ServerName::dns_name("www.example.com").unwrap();
 
-    let err = verify_tls_server(&chain, &anchors, &name, &Rfc5280Profile, NOW, &NoRevocation)
-        .expect_err("leaf without SAN must fail identity check");
+    let err = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect_err("leaf without SAN must fail identity check");
     assert!(
         matches!(err, Error::Identity(IdentityError::MissingSan)),
         "expected Error::Identity(MissingSan), got: {err:?}"
@@ -130,7 +170,9 @@ fn verify_tls_server_path_validation_runs_before_identity() {
         &name,
         &Rfc5280Profile,
         BEFORE,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect_err("before notBefore must fail at path validation, not identity");
     assert!(
@@ -163,7 +205,9 @@ fn verify_tls_server_with_basic_tls_profile() {
         &name,
         &BasicTlsProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     )
     .expect("BasicTlsProfile + serverAuth-EKU leaf + matching SAN must succeed");
     assert_eq!(vp.anchor_index, 0);

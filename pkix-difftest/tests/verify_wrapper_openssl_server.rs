@@ -32,7 +32,10 @@
 
 use std::path::PathBuf;
 
-use pkix_chain::{verify_tls_server, Error, IdentityError, NoRevocation, ServerName, TrustAnchor};
+use pkix_chain::{
+    verify_tls_server, DefaultVerifier, Error, IdentityError, NoAiaFetcher, NoRevocation,
+    ServerName, TrustAnchor,
+};
 use pkix_difftest::oracles;
 use pkix_difftest::{Chain, Verdict};
 use pkix_profiles::Rfc5280Profile;
@@ -154,7 +157,9 @@ fn verify_tls_server_diff_against_openssl() {
             &server_name,
             &Rfc5280Profile,
             NOW,
+            &DefaultVerifier,
             &NoRevocation,
+            &NoAiaFetcher,
         ));
         assert_eq!(
             rust, case.expected_rust,

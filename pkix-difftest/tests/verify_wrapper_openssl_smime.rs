@@ -23,8 +23,8 @@
 use std::path::PathBuf;
 
 use pkix_chain::{
-    verify_smime_recipient, verify_smime_signer, Error, IdentityError, MailboxName, NoRevocation,
-    TrustAnchor,
+    verify_smime_recipient, verify_smime_signer, DefaultVerifier, Error, IdentityError,
+    MailboxName, NoAiaFetcher, NoRevocation, TrustAnchor,
 };
 use pkix_difftest::oracles;
 use pkix_difftest::{Chain, Verdict};
@@ -155,7 +155,9 @@ fn run_diff(role: Role) {
                 &mailbox,
                 &Rfc5280Profile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             )),
             Role::Recipient => RustOutcome::from_result(verify_smime_recipient(
                 &chain,
@@ -163,7 +165,9 @@ fn run_diff(role: Role) {
                 &mailbox,
                 &Rfc5280Profile,
                 NOW,
+                &DefaultVerifier,
                 &NoRevocation,
+                &NoAiaFetcher,
             )),
         };
         assert_eq!(

@@ -16,8 +16,8 @@
 //! Tracks PKIX-fmtv.23.
 
 use pkix_chain::{
-    verify_smime_recipient, verify_smime_signer, Error, IdentityError, MailboxName, NoRevocation,
-    TrustAnchor,
+    verify_smime_recipient, verify_smime_signer, DefaultVerifier, Error, IdentityError,
+    MailboxName, NoAiaFetcher, NoRevocation, TrustAnchor,
 };
 use pkix_path::Error as PathError;
 use pkix_profiles::{BasicSmimeProfile, Rfc5280Profile};
@@ -68,7 +68,9 @@ fn run_rfc5280(fixture: &str, target_mailbox: &str, expected: Outcome) {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     );
     let recipient_result = verify_smime_recipient(
         &chain,
@@ -76,7 +78,9 @@ fn run_rfc5280(fixture: &str, target_mailbox: &str, expected: Outcome) {
         &mailbox,
         &Rfc5280Profile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     );
 
     assert_outcome(fixture, target_mailbox, "signer", &signer_result, expected);
@@ -107,7 +111,9 @@ fn run_basic_smime(fixture: &str, target_mailbox: &str, expected: Outcome) {
         &mailbox,
         &BasicSmimeProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     );
     let recipient_result = verify_smime_recipient(
         &chain,
@@ -115,7 +121,9 @@ fn run_basic_smime(fixture: &str, target_mailbox: &str, expected: Outcome) {
         &mailbox,
         &BasicSmimeProfile,
         NOW,
+        &DefaultVerifier,
         &NoRevocation,
+        &NoAiaFetcher,
     );
 
     assert_outcome(fixture, target_mailbox, "signer", &signer_result, expected);
