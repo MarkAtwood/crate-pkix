@@ -692,7 +692,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         check_revocation_status_indirect(
             cert_issuer,
             cert_serial,
-            &delta_entries,
+            delta_entries,
             crl,
             crl_default_issuer,
             is_indirect,
@@ -873,7 +873,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         check_revocation_status_indirect(
             cert_issuer,
             cert_serial,
-            &delta_entries,
+            delta_entries,
             crl,
             crl_default_issuer,
             is_indirect,

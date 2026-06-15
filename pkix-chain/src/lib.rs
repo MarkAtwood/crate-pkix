@@ -788,6 +788,7 @@ where
 /// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
 ///   not contain an entry matching `name` (or the SAN extension was
 ///   missing/malformed).
+#[allow(clippy::too_many_arguments)]
 pub fn verify_tls_server<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -875,6 +876,7 @@ where
 ///   succeeded, but the leaf's SAN did not contain an entry matching
 ///   the supplied `ServerName` (or the SAN extension was
 ///   missing/malformed).
+#[allow(clippy::too_many_arguments)]
 pub fn verify_tls_client_dns<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -954,6 +956,7 @@ where
 ///   succeeded, but the leaf's SAN did not contain an entry matching
 ///   the supplied `MailboxName` (or the SAN extension was
 ///   missing/malformed).
+#[allow(clippy::too_many_arguments)]
 pub fn verify_tls_client_mailbox<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -1026,6 +1029,7 @@ where
 /// - [`Error::Identity`] — path validation succeeded but the leaf's SAN did
 ///   not contain an entry matching `mailbox` (or the SAN extension was
 ///   missing/malformed).
+#[allow(clippy::too_many_arguments)]
 pub fn verify_smime_signer<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -1064,6 +1068,7 @@ where
 /// the call site. The key-usage distinction (`digitalSignature` for signer,
 /// `keyEncipherment` for recipient) is encoded in the caller-supplied
 /// [`Profile`].
+#[allow(clippy::too_many_arguments)]
 pub fn verify_smime_recipient<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
@@ -1308,6 +1313,7 @@ where
 ///   The cryptographic binding (b) is required by RFC 6960 §4.2.2.2 —
 ///   DN equality alone admits a DN-twin attack in cross-signed
 ///   topologies.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_ocsp_responder<V, P, R, A>(
     chain: &[Certificate],
     anchors: &[TrustAnchor],
