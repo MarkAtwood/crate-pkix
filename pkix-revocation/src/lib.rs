@@ -368,8 +368,22 @@ pub enum Error {
     /// be loaded via [`crate::CrlChecker::new`] / `with_delta`.
     IndirectCrlIssuerUnexpected,
 
-    /// The CRL issuer certificate does not have the `cRLSign` bit set in `KeyUsage`
-    /// (RFC 5280 §6.3.3(f)).
+    /// The CRL issuer certificate does not have the `cRLSign` bit set in
+    /// its `KeyUsage` extension (RFC 5280 §6.3.3(f)).
+    ///
+    /// Returned when the certificate used to verify a CRL's signature has
+    /// a `KeyUsage` extension present but the `cRLSign` bit (bit 6) is not
+    /// asserted. If the `KeyUsage` extension is absent entirely, this
+    /// error is **not** raised (no extension = no constraint).
+    ///
+    /// **Disambiguation:** [`pkix_path::Error::CrlSignMissing`] (same
+    /// variant name, different crate) fires during *path validation* when
+    /// an intermediate CA cert in the chain lacks `cRLSign` and the caller
+    /// opted into [`pkix_path::ValidationPolicy::require_crl_sign_on_cas`].
+    /// This variant fires during *CRL verification* when the CRL signer
+    /// cert itself lacks `cRLSign`.
+    ///
+    /// [`pkix_path::Error::CrlSignMissing`]: https://docs.rs/pkix-path/latest/pkix_path/enum.Error.html#variant.CrlSignMissing
     CrlSignMissing,
 
     /// Path-level CRL signer discovery (RFC 5280 §6.3.3(f)) could not

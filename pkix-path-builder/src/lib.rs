@@ -139,6 +139,15 @@ impl<'a> IntoIterator for &'a CertPool {
     }
 }
 
+impl IntoIterator for CertPool {
+    type Item = x509_cert::Certificate;
+    type IntoIter = alloc::vec::IntoIter<x509_cert::Certificate>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.certs.into_iter()
+    }
+}
+
 /// Errors returned by path building.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -246,6 +255,11 @@ const OID_SUBJECT_KEY_IDENTIFIER: der::asn1::ObjectIdentifier =
 /// the issuer's `subjectPublicKey` BIT STRING (method 1). This is compared
 /// byte-for-byte against candidate certs' `SubjectKeyIdentifier`; we do
 /// not recompute hashes here — only opaque-byte equality matters.
+///
+/// **Note:** Returns `Vec<u8>` (owned) rather than `&[u8]` because
+/// `AuthorityKeyIdentifier::from_der` produces an owned intermediate
+/// whose lifetime cannot be tied to the input `cert` reference; the
+/// inner `OctetString` bytes do not borrow from the cert's DER.
 fn cert_aki_key_id(cert: &Certificate) -> Option<Vec<u8>> {
     use x509_cert::ext::pkix::AuthorityKeyIdentifier;
 
@@ -268,6 +282,10 @@ fn cert_aki_key_id(cert: &Certificate) -> Option<Vec<u8>> {
 /// RFC 5280 §4.2.1.2: SKI is conventionally the SHA-1 hash of the cert's
 /// own `subjectPublicKey` BIT STRING; we do not recompute, we only return
 /// the bytes the cert claims.
+///
+/// **Note:** Returns `Vec<u8>` (owned) for the same reason as
+/// [`cert_aki_key_id`]: `SubjectKeyIdentifier::from_der` produces an
+/// owned `OctetString` that does not borrow from the cert's DER.
 fn cert_ski_key_id(cert: &Certificate) -> Option<Vec<u8>> {
     use x509_cert::ext::pkix::SubjectKeyIdentifier;
 

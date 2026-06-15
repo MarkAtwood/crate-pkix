@@ -162,21 +162,32 @@ pub struct CrlChecker<V> {
     /// responsible for any chain validation of the cert.
     /// `None` ⇔ direct CRL: the `issuer` argument's identity is used.
     crl_issuer_cert: Option<Certificate>,
-    /// Tracks whether the stored `crl_issuer_cert` came from path-level
-    /// discovery (true) vs. the legacy `_with_crl_issuer` indirect-CRL
-    /// constructors (false).
+    /// Whether the stored `crl_issuer_cert` was located by path-level
+    /// signer discovery rather than supplied explicitly via an indirect-CRL
+    /// constructor.
     ///
-    /// When `true`, `check_revocation` accepts the stored cert as the
-    /// effective signer regardless of whether the CRL declares itself
-    /// indirect via `IDP.indirectCRL`. This is required to support PKITS
-    /// §4.5 chains where the CRL is a direct (non-indirect) CRL whose
-    /// signer happens to differ from the EE's stated issuer cert because
-    /// of a self-issued key-rollover bridge — the §4.5 CRLs do **not**
-    /// set `IDP.indirectCRL`, so the legacy `_with_crl_issuer` path
-    /// would (correctly) reject them with `IndirectCrlIssuerUnexpected`.
+    /// The two cases:
     ///
-    /// When `false`, the legacy `IndirectCrlIssuerMissing/Unexpected`
-    /// cross-check applies.
+    /// - `true` — **signer from bundle**: the cert was discovered by
+    ///   [`CrlChecker::new_with_signer_discovery`] via AKI/SKI or
+    ///   issuer-DN matching against the caller-supplied certificate
+    ///   bundle. `check_revocation` accepts the stored cert as the
+    ///   effective signer regardless of whether the CRL declares itself
+    ///   indirect via `IDP.indirectCRL`. This bypasses the indirect-CRL
+    ///   cross-check, which is required to support PKITS §4.5 chains
+    ///   where the CRL is a direct (non-indirect) CRL whose signer
+    ///   happens to differ from the EE's stated issuer cert because of a
+    ///   self-issued key-rollover bridge — the §4.5 CRLs do **not** set
+    ///   `IDP.indirectCRL`, so the legacy `_with_crl_issuer` path would
+    ///   (correctly) reject them with `IndirectCrlIssuerUnexpected`.
+    ///
+    /// - `false` — **normal signer selection**: either no `crl_issuer_cert`
+    ///   is stored (direct CRL, signer is the `issuer` argument) or one
+    ///   was supplied explicitly via `new_with_crl_issuer` /
+    ///   `with_delta_and_crl_issuer` (indirect CRL). The legacy
+    ///   `IndirectCrlIssuerMissing` / `IndirectCrlIssuerUnexpected`
+    ///   cross-check between the constructor choice and the CRL's
+    ///   `IDP.indirectCRL` flag applies.
     signer_discovered: bool,
     now_unix: u64,
     verifier: V,
@@ -1000,8 +1011,12 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
     // use the directoryName because that is what the cert's `issuer`
     // field carries. A cert-issuer-extension carrying only non-DN
     // GeneralNames is unusable for our (issuer, serial) match.
+    //
+    // The error uses `ErrorKind::Value` + `Tag::Sequence` to signal
+    // "structurally valid extension but no directoryName GeneralName
+    // found", distinguishing it from a DER parse failure.
     Err(Error::CrlParseError(crate::DerError::new(der::Error::new(
-        der::ErrorKind::Failed,
+        der::ErrorKind::Value { tag: der::Tag::Sequence },
         der::Length::ZERO,
     ))))
 }
@@ -1285,17 +1300,19 @@ fn dpn_to_general_names<'a>(
 /// Compare two `GeneralName`s for equivalence.
 ///
 /// `DirectoryName` uses [`pkix_path::names_match`] (RFC 4518-style DN
-/// equivalence). Other variants compare by byte-exact DER encoding, which
-/// is correct for `Rfc822Name`, `DnsName`, `UniformResourceIdentifier`,
-/// `IpAddress`, `RegisteredId`, and `OtherName` because their values are
-/// either ASCII subsets, IP address bytes, OIDs, or opaque DER (no
-/// canonicalization ambiguity).
+/// equivalence). Other variants use the upstream-derived `PartialEq`
+/// implementation on `GeneralName`, which compares the inner values
+/// directly (e.g., `Ia5String` for URI/dNSName/rfc822Name, `OctetString`
+/// for iPAddress, `ObjectIdentifier` for registeredID). This avoids
+/// heap-allocating DER bytes for a comparison that the type system
+/// already supports natively.
 ///
-/// `EdiPartyName` and `X400Address` also fall into the byte-equal bucket;
+/// `EdiPartyName` and `OtherName` also use the derived `PartialEq`;
 /// they have no canonicalization specified for IDP/CDP matching purposes
 /// and are extremely rare in modern PKI.
 ///
-/// Mismatched variants always return `false` (no cross-variant matching).
+/// Mismatched variants always return `false` (no cross-variant matching;
+/// the derived `PartialEq` handles this correctly).
 fn general_name_matches(
     a: &x509_cert::ext::pkix::name::GeneralName,
     b: &x509_cert::ext::pkix::name::GeneralName,
@@ -1304,15 +1321,10 @@ fn general_name_matches(
 
     match (a, b) {
         (GN::DirectoryName(a_dn), GN::DirectoryName(b_dn)) => names_match(a_dn, b_dn),
-        // Same variant on both sides, non-DN: byte-exact DER comparison.
-        // Different variants: to_der() will succeed on both but produce
-        // different bytes (different context-specific tags), so this also
-        // correctly fails for cross-variant pairs.
-        _ => match (a.to_der(), b.to_der()) {
-            (Ok(a_der), Ok(b_der)) => a_der == b_der,
-            // If either side fails to encode, fail-closed.
-            _ => false,
-        },
+        // Non-DN variants: use the upstream-derived PartialEq, which
+        // compares inner fields directly without DER re-encoding.
+        // Mismatched variants return false via the derived impl.
+        _ => a == b,
     }
 }
 
