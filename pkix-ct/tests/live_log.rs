@@ -88,14 +88,14 @@ fn captured_log_list() -> CtLogList {
         .try_into()
         .expect("log-id.bin is 32 bytes");
     let mut logs = CtLogList::new();
-    logs.insert(CtLog {
+    logs.insert(CtLog::new(
         log_id,
-        key_der: fixture("log-spki.der"),
-        description: "live-log".into(),
-        url: "http://example.invalid/ct/".into(),
-        usable_from_ms: Some(0),
-        retired_at_ms: None,
-    })
+        fixture("log-spki.der"),
+        "live-log".into(),
+        "http://example.invalid/ct/".into(),
+        Some(0),
+        None,
+    ))
     .expect("captured log self-consistency");
     logs
 }
@@ -133,14 +133,14 @@ fn captured_sth() -> ([u8; 32], SignedTreeHead) {
     assert_eq!(54 + sig_len, buf.len(), "sth.bin had trailing bytes");
     (
         log_id,
-        SignedTreeHead {
+        SignedTreeHead::new(
             tree_size,
             timestamp_ms,
             root_hash,
             hash_alg,
             sig_alg,
             signature,
-        },
+        ),
     )
 }
 
@@ -167,11 +167,7 @@ fn captured_audit_path() -> ([u8; 32], MerkleAuditPath) {
     assert_eq!(off, buf.len(), "audit-path.bin had trailing bytes");
     (
         leaf_hash,
-        MerkleAuditPath {
-            leaf_index,
-            tree_size,
-            audit_path,
-        },
+        MerkleAuditPath::new(leaf_index, tree_size, audit_path),
     )
 }
 

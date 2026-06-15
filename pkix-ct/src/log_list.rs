@@ -23,6 +23,7 @@ use crate::{Error, Result};
 
 /// Metadata for one CT log.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct CtLog {
     /// Log identifier — SHA-256 of `key_der` per RFC 6962 §3.2.
     pub log_id: [u8; 32],
@@ -56,6 +57,32 @@ pub struct CtLog {
     /// still valid; SCTs issued at or after it should be treated as
     /// untrusted.
     pub retired_at_ms: Option<u64>,
+}
+
+impl CtLog {
+    /// Construct a `CtLog` from its constituent fields.
+    ///
+    /// No validation is performed here — callers using
+    /// [`CtLogList::insert`] get `log_id == SHA-256(key_der)`
+    /// consistency checked at insertion time.
+    #[must_use]
+    pub fn new(
+        log_id: [u8; 32],
+        key_der: Vec<u8>,
+        description: String,
+        url: String,
+        usable_from_ms: Option<u64>,
+        retired_at_ms: Option<u64>,
+    ) -> Self {
+        Self {
+            log_id,
+            key_der,
+            description,
+            url,
+            usable_from_ms,
+            retired_at_ms,
+        }
+    }
 }
 
 /// A set of trusted CT logs indexed by `log_id`.

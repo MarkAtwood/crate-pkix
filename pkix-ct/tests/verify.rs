@@ -58,14 +58,14 @@ fn oracle_log_list() -> CtLogList {
         .expect("log-id.bin is 32 bytes");
 
     let mut logs = CtLogList::new();
-    logs.insert(CtLog {
+    logs.insert(CtLog::new(
         log_id,
-        key_der: log_spki,
-        description: "oracle".into(),
-        url: "http://example.invalid/ct/".into(),
-        usable_from_ms: Some(0),
-        retired_at_ms: None,
-    })
+        log_spki,
+        "oracle".into(),
+        "http://example.invalid/ct/".into(),
+        Some(0),
+        None,
+    ))
     .expect("oracle log self-consistency");
     logs
 }
@@ -81,14 +81,14 @@ fn oracle_log_list_with_window(
     let log_id: [u8; 32] = log_id_bytes.as_slice().try_into().unwrap();
 
     let mut logs = CtLogList::new();
-    logs.insert(CtLog {
+    logs.insert(CtLog::new(
         log_id,
-        key_der: log_spki,
-        description: "oracle".into(),
-        url: "http://example.invalid/ct/".into(),
+        log_spki,
+        "oracle".into(),
+        "http://example.invalid/ct/".into(),
         usable_from_ms,
         retired_at_ms,
-    })
+    ))
     .unwrap();
     logs
 }

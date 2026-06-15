@@ -117,11 +117,7 @@ fn every_leaf_verifies(n: u32) {
     let v = empty_verifier();
     for (idx, leaf_bytes, audit) in &fx.proofs {
         let leaf_hash = pkix_ct::merkle_leaf_hash(leaf_bytes);
-        let proof = MerkleAuditPath {
-            leaf_index: *idx,
-            tree_size: fx.tree_size,
-            audit_path: audit.clone(),
-        };
+        let proof = MerkleAuditPath::new(*idx, fx.tree_size, audit.clone());
         v.verify_inclusion(&leaf_hash, &proof, &fx.root)
             .unwrap_or_else(|e| panic!("verify N={n} m={idx}: {e:?}"));
     }
@@ -145,11 +141,7 @@ fn rejects_tampered_root() {
     let v = empty_verifier();
     let (idx, leaf, audit) = &fx.proofs[3];
     let leaf_hash = pkix_ct::merkle_leaf_hash(leaf);
-    let proof = MerkleAuditPath {
-        leaf_index: *idx,
-        tree_size: fx.tree_size,
-        audit_path: audit.clone(),
-    };
+    let proof = MerkleAuditPath::new(*idx, fx.tree_size, audit.clone());
     let mut bad_root = fx.root;
     bad_root[7] ^= 0x01;
     assert_eq!(
@@ -164,11 +156,7 @@ fn rejects_wrong_leaf_index_within_range() {
     let v = empty_verifier();
     let (idx, leaf, audit) = &fx.proofs[3];
     let leaf_hash = pkix_ct::merkle_leaf_hash(leaf);
-    let mut proof = MerkleAuditPath {
-        leaf_index: *idx,
-        tree_size: fx.tree_size,
-        audit_path: audit.clone(),
-    };
+    let mut proof = MerkleAuditPath::new(*idx, fx.tree_size, audit.clone());
     proof.leaf_index = (proof.leaf_index + 1) % fx.tree_size;
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &fx.root),
@@ -182,11 +170,7 @@ fn rejects_out_of_range_leaf_index() {
     let v = empty_verifier();
     let (_, leaf, audit) = &fx.proofs[0];
     let leaf_hash = pkix_ct::merkle_leaf_hash(leaf);
-    let proof = MerkleAuditPath {
-        leaf_index: fx.tree_size, // == tree_size: just past the end
-        tree_size: fx.tree_size,
-        audit_path: audit.clone(),
-    };
+    let proof = MerkleAuditPath::new(fx.tree_size, fx.tree_size, audit.clone()); // leaf_index == tree_size: just past the end
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &fx.root),
         Err(Error::MerkleProofInvalid)
@@ -202,11 +186,7 @@ fn rejects_tampered_audit_path_node() {
     assert!(!audit.is_empty(), "fixture m=5 has at least one path elem");
     let mut tampered = audit.clone();
     tampered[0][0] ^= 0x80;
-    let proof = MerkleAuditPath {
-        leaf_index: *idx,
-        tree_size: fx.tree_size,
-        audit_path: tampered,
-    };
+    let proof = MerkleAuditPath::new(*idx, fx.tree_size, tampered);
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &fx.root),
         Err(Error::MerkleProofInvalid)
@@ -217,11 +197,7 @@ fn rejects_tampered_audit_path_node() {
 fn rejects_empty_tree() {
     let v = empty_verifier();
     let leaf_hash = [0u8; 32];
-    let proof = MerkleAuditPath {
-        leaf_index: 0,
-        tree_size: 0,
-        audit_path: Vec::new(),
-    };
+    let proof = MerkleAuditPath::new(0, 0, Vec::new());
     let root = [0u8; 32];
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &root),
@@ -239,11 +215,7 @@ fn rejects_overlong_audit_path() {
     // Build a path of length 4 by appending an extra hash.
     let mut bloated = audit.clone();
     bloated.push([0xFFu8; 32]);
-    let proof = MerkleAuditPath {
-        leaf_index: *idx,
-        tree_size: fx.tree_size,
-        audit_path: bloated,
-    };
+    let proof = MerkleAuditPath::new(*idx, fx.tree_size, bloated);
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &fx.root),
         Err(Error::MerkleProofMalformed)
@@ -262,11 +234,7 @@ fn rejects_short_audit_path() {
     assert!(audit.len() > 1, "fixture m=0 has multiple path elements");
     let truncated = audit[..audit.len() - 1].to_vec();
     let leaf_hash = pkix_ct::merkle_leaf_hash(leaf);
-    let proof = MerkleAuditPath {
-        leaf_index: *idx,
-        tree_size: fx.tree_size,
-        audit_path: truncated,
-    };
+    let proof = MerkleAuditPath::new(*idx, fx.tree_size, truncated);
     assert_eq!(
         v.verify_inclusion(&leaf_hash, &proof, &fx.root),
         Err(Error::MerkleProofMalformed)
@@ -283,11 +251,7 @@ fn single_leaf_tree_zero_path_verifies() {
     let v = empty_verifier();
     let leaf = b"single";
     let leaf_h = pkix_ct::merkle_leaf_hash(leaf);
-    let proof = MerkleAuditPath {
-        leaf_index: 0,
-        tree_size: 1,
-        audit_path: Vec::new(),
-    };
+    let proof = MerkleAuditPath::new(0, 1, Vec::new());
     v.verify_inclusion(&leaf_h, &proof, &leaf_h)
         .expect("single-leaf inclusion proof verifies");
 }
@@ -297,11 +261,7 @@ fn single_leaf_tree_rejects_wrong_root() {
     let v = empty_verifier();
     let leaf = b"single";
     let leaf_h = pkix_ct::merkle_leaf_hash(leaf);
-    let proof = MerkleAuditPath {
-        leaf_index: 0,
-        tree_size: 1,
-        audit_path: Vec::new(),
-    };
+    let proof = MerkleAuditPath::new(0, 1, Vec::new());
     let mut wrong_root = leaf_h;
     wrong_root[0] ^= 0x01;
     assert_eq!(
@@ -357,14 +317,14 @@ mod sth {
             .try_into()
             .expect("sth-log-id.bin is 32 bytes");
         let mut logs = CtLogList::new();
-        logs.insert(CtLog {
+        logs.insert(CtLog::new(
             log_id,
-            key_der: spki,
-            description: "sth-oracle".into(),
-            url: "http://example.invalid/ct/".into(),
-            usable_from_ms: None,
-            retired_at_ms: None,
-        })
+            spki,
+            "sth-oracle".into(),
+            "http://example.invalid/ct/".into(),
+            None,
+            None,
+        ))
         .unwrap();
         logs
     }
@@ -384,14 +344,14 @@ mod sth {
     fn load_sth() -> ([u8; 32], SignedTreeHead) {
         let log_id_bytes = fixture("sth-log-id.bin");
         let log_id: [u8; 32] = log_id_bytes.as_slice().try_into().unwrap();
-        let sth = SignedTreeHead {
-            tree_size: STH_TREE_SIZE,
-            timestamp_ms: STH_TIMESTAMP_MS,
-            root_hash: read_root_from_tree(),
-            hash_alg: STH_HASH_ALG,
-            sig_alg: STH_SIG_ALG,
-            signature: fixture("sth-signature.bin"),
-        };
+        let sth = SignedTreeHead::new(
+            STH_TREE_SIZE,
+            STH_TIMESTAMP_MS,
+            read_root_from_tree(),
+            STH_HASH_ALG,
+            STH_SIG_ALG,
+            fixture("sth-signature.bin"),
+        );
         (log_id, sth)
     }
 
@@ -522,11 +482,7 @@ mod sth {
             }
             if m == target_m {
                 let leaf_h = merkle_leaf_hash(leaf_bytes);
-                let proof = MerkleAuditPath {
-                    leaf_index: m,
-                    tree_size: sth.tree_size,
-                    audit_path,
-                };
+                let proof = MerkleAuditPath::new(m, sth.tree_size, audit_path);
                 v.verify_inclusion(&leaf_h, &proof, &sth.root_hash)
                     .expect("inclusion proof against STH root");
                 return;
