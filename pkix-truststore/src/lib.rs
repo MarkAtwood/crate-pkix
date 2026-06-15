@@ -165,7 +165,7 @@ pub const DEFAULT_FILE_SIZE_CAP: u64 = 64 * 1024 * 1024;
 /// the file is at the limit and overshoots by one byte when it is
 /// over — distinguishing "exactly cap bytes" (accepted) from "more
 /// than cap bytes" (rejected).
-fn read_file_capped(path: &Path, cap: u64) -> Result<Vec<u8>, Error> {
+fn read_file_capped(path: &Path, cap: u64) -> Result<Vec<u8>> {
     // `io::ErrorKind::FileTooLarge` exists upstream (stabilised 1.83) but
     // the workspace MSRV is 1.73, so use `InvalidData` with an explicit
     // "exceeds N-byte cap" message. Callers that branch on `kind` get a
@@ -276,6 +276,8 @@ impl core::fmt::Display for IoFailure {
 
 impl std::error::Error for IoFailure {}
 
+// NOTE: This module is duplicated in pkix-aia.
+// Keep them in sync until a shared crate is extracted.
 #[cfg(feature = "serde")]
 mod io_error_kind_serde {
     //! `io::ErrorKind` does not implement `Serialize`/`Deserialize`
@@ -436,6 +438,9 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Result alias for this crate.
+pub type Result<T> = core::result::Result<T, Error>;
+
 /// UTF-8 byte order mark.
 const UTF8_BOM: &[u8] = b"\xef\xbb\xbf";
 
@@ -499,7 +504,7 @@ fn strip_bom(bytes: &[u8]) -> &[u8] {
 /// parsed would be a fail-open: the deployment asserted "this root may only
 /// sign for these names" via that extension, and silently dropping it would
 /// remove the constraint at validation time.
-pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
+pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>> {
     let bytes = strip_bom(bytes);
     // x509-cert 0.2.x's `load_pem_chain` panics on input that is empty after
     // its internal trailing-whitespace strip (subtract-with-overflow at
@@ -536,7 +541,7 @@ pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error> {
 /// Returns [`Error::Der`] if the bytes do not decode as a single
 /// `Certificate`, or if the certificate has a malformed `NameConstraints`
 /// extension (see [`from_pem`] for rationale).
-pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
+pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor> {
     let cert = Certificate::from_der(bytes).map_err(|e| Error::Der(DerError::new(e)))?;
     TrustAnchor::try_from(cert).map_err(Error::Der)
 }
@@ -567,7 +572,7 @@ pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error> {
 ///
 /// See [`from_pem`] for the rationale behind fail-closed `NameConstraints`
 /// handling.
-pub fn from_der_iter<I, B>(iter: I) -> Result<Vec<TrustAnchor>, Error>
+pub fn from_der_iter<I, B>(iter: I) -> Result<Vec<TrustAnchor>>
 where
     I: IntoIterator<Item = B>,
     B: AsRef<[u8]>,
@@ -584,7 +589,7 @@ where
             })?;
             TrustAnchor::try_from(cert).map_err(|source| Error::MalformedAnchor { index, source })
         })
-        .collect::<Result<_, _>>()?;
+        .collect::<core::result::Result<_, _>>()?;
     if anchors.is_empty() {
         return Err(Error::NoCertificates);
     }
@@ -609,7 +614,7 @@ where
 ///   file ... exceeds ...-byte cap"; MSRV 1.73 predates
 ///   `ErrorKind::FileTooLarge`).
 /// * Any error returned by [`from_pem`].
-pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>, Error> {
+pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>> {
     from_pem_file_with_cap(path, DEFAULT_FILE_SIZE_CAP)
 }
 
@@ -626,7 +631,7 @@ pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>, Error> 
 pub fn from_pem_file_with_cap(
     path: impl AsRef<Path>,
     cap: u64,
-) -> Result<Vec<TrustAnchor>, Error> {
+) -> Result<Vec<TrustAnchor>> {
     let bytes = read_file_capped(path.as_ref(), cap)?;
     from_pem(&bytes)
 }
@@ -645,7 +650,7 @@ pub fn from_pem_file_with_cap(
 ///   cap-exceeded case; see [`from_pem_file`] for the MSRV
 ///   rationale).
 /// * Any error returned by [`from_der`].
-pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor, Error> {
+pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor> {
     from_der_file_with_cap(path, DEFAULT_FILE_SIZE_CAP)
 }
 
@@ -661,7 +666,7 @@ pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor, Error> {
 pub fn from_der_file_with_cap(
     path: impl AsRef<Path>,
     cap: u64,
-) -> Result<TrustAnchor, Error> {
+) -> Result<TrustAnchor> {
     let bytes = read_file_capped(path.as_ref(), cap)?;
     from_der(&bytes)
 }

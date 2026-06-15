@@ -2805,8 +2805,8 @@ mod tests {
         fn version(&self) -> &'static str {
             "0.0.0"
         }
-        fn policy(&self, _now_unix: u64) -> ValidationPolicy {
-            ValidationPolicy::default()
+        fn policy(&self, now_unix: u64) -> ValidationPolicy {
+            ValidationPolicy::new(now_unix)
         }
         fn policy_oids(&self) -> &[der::asn1::ObjectIdentifier] {
             &[]

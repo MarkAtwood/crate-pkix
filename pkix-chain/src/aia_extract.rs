@@ -41,27 +41,24 @@ const OID_AD_CA_ISSUERS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 /// rather than an error — a malformed AIA on the orphan cert is not itself
 /// a chain-validation failure; the caller treats "no URIs to try" the same
 /// way it treats "every fetch returned `FetchingDisabled`".
-pub(crate) fn ca_issuers_http_uris(cert: &Certificate) -> Vec<String> {
-    let Some(extn_value) = find_extension_value(cert, &OID_AUTHORITY_INFO_ACCESS) else {
-        return Vec::new();
-    };
-    let Ok(aia) = AuthorityInfoAccessSyntax::from_der(extn_value) else {
-        return Vec::new();
-    };
-
-    let mut out = Vec::new();
-    for ad in &aia.0 {
-        if ad.access_method != OID_AD_CA_ISSUERS {
-            continue;
-        }
-        if let GeneralName::UniformResourceIdentifier(uri) = &ad.access_location {
-            let uri_str = uri.as_str();
-            if is_http_scheme(uri_str) {
-                out.push(uri_str.to_owned());
-            }
-        }
-    }
-    out
+pub(crate) fn ca_issuers_http_uris(cert: &Certificate) -> impl Iterator<Item = String> {
+    find_extension_value(cert, &OID_AUTHORITY_INFO_ACCESS)
+        .and_then(|v| AuthorityInfoAccessSyntax::from_der(v).ok())
+        .into_iter()
+        .flat_map(|aia| {
+            aia.0.into_iter().filter_map(|ad| {
+                if ad.access_method != OID_AD_CA_ISSUERS {
+                    return None;
+                }
+                if let GeneralName::UniformResourceIdentifier(uri) = ad.access_location {
+                    let uri_str = uri.as_str();
+                    if is_http_scheme(uri_str) {
+                        return Some(uri_str.to_owned());
+                    }
+                }
+                None
+            })
+        })
 }
 
 fn find_extension_value<'a>(cert: &'a Certificate, oid: &ObjectIdentifier) -> Option<&'a [u8]> {

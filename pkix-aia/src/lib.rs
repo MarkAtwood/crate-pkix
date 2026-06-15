@@ -260,6 +260,8 @@ impl std::error::Error for AiaError {}
 /// fallback handles forward-compat for newer variants whose labels
 /// appear in serialized data but whose enum constructors are
 /// unavailable at the MSRV floor.
+// NOTE: This module is duplicated in pkix-truststore.
+// Keep them in sync until a shared crate is extracted.
 #[cfg(all(feature = "std", feature = "serde"))]
 mod io_error_kind_serde {
     use serde::{Deserialize, Deserializer, Serializer};

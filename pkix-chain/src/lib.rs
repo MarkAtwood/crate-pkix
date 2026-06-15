@@ -812,6 +812,7 @@ where
         revocation,
         aia,
     )?;
+    debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_dns_name(&chain[0], name)?;
     Ok(validated)
 }
@@ -899,6 +900,7 @@ where
         aia,
     )?;
     if let Some(name) = identity {
+        debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
         pkix_identity::verify_dns_name(&chain[0], name)?;
     }
     Ok(validated)
@@ -977,6 +979,7 @@ where
         aia,
     )?;
     if let Some(mailbox) = identity {
+        debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
         pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     }
     Ok(validated)
@@ -1047,6 +1050,7 @@ where
         revocation,
         aia,
     )?;
+    debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
 }
@@ -1084,6 +1088,7 @@ where
         revocation,
         aia,
     )?;
+    debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
 }
@@ -1210,6 +1215,7 @@ where
         revocation,
         aia,
     )?;
+    debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     enforce_timestamping_eku_critical_and_sole(&chain[0])?;
     enforce_timestamping_ku_shape(&chain[0])?;
     Ok(validated)

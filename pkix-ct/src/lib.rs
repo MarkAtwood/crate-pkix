@@ -65,6 +65,7 @@ pub use verify::{
 
 /// Errors returned by SCT parsing and verification.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// The certificate contains no SCT extension.
