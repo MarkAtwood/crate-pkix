@@ -13,7 +13,7 @@
 //! parse the extensions themselves.
 
 use crate::ExtractError;
-use der::{asn1::Ia5String, Decode};
+use der::Decode;
 use x509_cert::{
     ext::pkix::{
         name::{DistributionPointName, GeneralName},
@@ -206,13 +206,6 @@ fn is_http_uri(s: &str) -> bool {
     };
     starts_with_ci(b"http://") || starts_with_ci(b"https://")
 }
-
-// Compile-time bridge so the unused-import lint doesn't fire if the
-// `Ia5String` reference becomes purely documentary in a refactor.
-#[allow(dead_code)]
-const _: fn() = || {
-    let _: fn(Ia5String) -> Ia5String = core::convert::identity;
-};
 
 #[cfg(test)]
 mod tests {

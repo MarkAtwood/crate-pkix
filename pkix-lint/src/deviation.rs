@@ -249,10 +249,9 @@ impl Deviation {
     /// - [`DeviationAddError::EmptyField`] (`"authorized_by"`) if
     ///   `authorized_by` is empty.
     ///
-    /// `id` and `target_lint` non-emptiness is enforced at
-    /// [`DeviationStore::add`] (via the duplicate-id check, which
-    /// makes the empty-id case effectively unreachable in practice —
-    /// a single store cannot hold two deviations with empty ids).
+    /// `id` and `target_lint` non-emptiness is enforced here:
+    /// passing an empty string for either returns
+    /// [`DeviationAddError::EmptyField`].
     pub fn new(
         id: impl Into<String>,
         target_lint: impl Into<String>,
@@ -261,8 +260,16 @@ impl Deviation {
         justification: impl Into<String>,
         authorized_by: impl Into<String>,
     ) -> Result<Self, DeviationAddError> {
+        let id: String = id.into();
+        let target_lint: String = target_lint.into();
         let justification: String = justification.into();
         let authorized_by: String = authorized_by.into();
+        if id.is_empty() {
+            return Err(DeviationAddError::EmptyField("id".into()));
+        }
+        if target_lint.is_empty() {
+            return Err(DeviationAddError::EmptyField("target_lint".into()));
+        }
         if justification.is_empty() {
             return Err(DeviationAddError::EmptyField("justification".into()));
         }
@@ -270,8 +277,8 @@ impl Deviation {
             return Err(DeviationAddError::EmptyField("authorized_by".into()));
         }
         Ok(Self {
-            id: id.into(),
-            target_lint: target_lint.into(),
+            id,
+            target_lint,
             scope,
             effective_start: None,
             effective_end: None,

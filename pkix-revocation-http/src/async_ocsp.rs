@@ -11,15 +11,12 @@
 
 use crate::{
     build_ocsp_request, extract_aia_http_urls, AsyncHttpOcspFetcher, AsyncRevocationChecker,
-    AsyncRevocationFetcher, FetchRequest,
+    AsyncRevocationFetcher, FetchRequest, OCSP_REQUEST_CT,
 };
 use async_trait::async_trait;
 use pkix_path::SignatureVerifier;
 use pkix_revocation::{Error as RevError, OcspChecker, RevocationChecker};
 use x509_cert::Certificate;
-
-/// `Content-Type` for an OCSP request body, per RFC 6960 §A.1.
-const OCSP_REQUEST_CT: &str = "application/ocsp-request";
 
 #[async_trait]
 impl<F, V> AsyncRevocationChecker for AsyncHttpOcspFetcher<F, V>
