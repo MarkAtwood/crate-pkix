@@ -182,6 +182,26 @@ impl<'a> ServerName<'a> {
         })
     }
 
+    /// Return the normalized DNS hostname if this is a DNS-typed identity,
+    /// or `None` if it is an IP literal.
+    pub fn as_dns_name(&self) -> Option<&str> {
+        match &self.repr {
+            ServerNameRepr::Dns(cow) => Some(cow.as_ref()),
+            ServerNameRepr::Ip(_) => None,
+        }
+    }
+
+    /// Return the canonical IP address bytes if this is an IP-typed identity,
+    /// or `None` if it is a DNS hostname.
+    ///
+    /// IPv4 addresses return a 4-byte slice; IPv6 addresses return 16 bytes.
+    pub fn as_ip_bytes(&self) -> Option<&[u8]> {
+        match &self.repr {
+            ServerNameRepr::Dns(_) => None,
+            ServerNameRepr::Ip(ip) => Some(ip.as_bytes()),
+        }
+    }
+
     /// Parse an IP address literal (IPv4 dotted-quad or IPv6, with or
     /// without surrounding brackets).
     ///
@@ -229,6 +249,31 @@ pub struct MailboxName<'a> {
     /// the mailbox can only match an `otherName(SmtpUTF8Mailbox)` SAN
     /// entry, never an `rfc822Name` (which is IA5String, ASCII-only).
     is_internationalized: bool,
+}
+
+impl MailboxName<'_> {
+    /// Return the local-part of the mailbox (the portion before `@`).
+    ///
+    /// Case is preserved exactly as supplied to [`MailboxName::parse`].
+    pub fn local_part(&self) -> &str {
+        self.local.as_ref()
+    }
+
+    /// Return the domain in lowercase ASCII A-label form.
+    ///
+    /// Non-ASCII (U-label) domains are converted to A-label form during
+    /// parsing; this accessor always returns the A-label representation.
+    pub fn domain(&self) -> &str {
+        self.domain_a_label.as_ref()
+    }
+
+    /// Return `true` if the local-part contains non-ASCII bytes.
+    ///
+    /// An internationalized mailbox can only match `otherName(SmtpUTF8Mailbox)`
+    /// SAN entries, never `rfc822Name` entries (which are IA5String, ASCII-only).
+    pub fn is_internationalized(&self) -> bool {
+        self.is_internationalized
+    }
 }
 
 impl<'a> MailboxName<'a> {

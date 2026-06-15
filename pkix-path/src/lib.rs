@@ -1047,38 +1047,20 @@ pub struct ValidationPolicy {
 impl ValidationPolicy {
     /// Construct a policy with the given time and sensible defaults.
     ///
-    /// Equivalent to `ValidationPolicy { current_time_unix: now_unix, ..Default::default() }`.
-    /// This is the preferred constructor: it forces the caller to supply a timestamp,
-    /// preventing the silent validity failures caused by `Default`'s `current_time_unix = 0`.
+    /// This is the only constructor: it forces the caller to supply a timestamp,
+    /// preventing the silent validity failures that a `Default` with
+    /// `current_time_unix = 0` would cause.
     #[must_use]
     pub fn new(now_unix: u64) -> Self {
         Self {
-            current_time_unix: now_unix,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for ValidationPolicy {
-    /// Returns a default policy with `current_time_unix = 0` (1970-01-01).
-    ///
-    /// This is **not** safe for production use because every certificate
-    /// issued after the Unix epoch will fail [`Error::ValidityPeriod`].
-    /// Prefer [`ValidationPolicy::new`] (which takes `now_unix` explicitly).
-    /// `Default` is provided only for `..Default::default()` ergonomics on
-    /// this `#[non_exhaustive]` struct.
-    fn default() -> Self {
-        Self {
             max_path_len: 10,
-            current_time_unix: 0, // caller must set to avoid silent clock skew
+            current_time_unix: now_unix,
             enforce_key_usage: true,
             require_crl_sign_on_cas: false,
             initial_explicit_policy: false,
             initial_any_policy_inhibit: false,
             initial_policy_mapping_inhibit: false,
             initial_policy_set: Vec::new(),
-            // New profile-enforcement fields: all disabled by default so that
-            // existing callers get unconstrained behavior (backward compatible).
             max_validity_secs: None,
             allowed_signature_algs: None,
             min_rsa_key_bits: None,
@@ -4748,7 +4730,7 @@ mod tests_rsa {
 
         let policy = ValidationPolicy {
             current_time_unix: NOW,
-            ..Default::default()
+            ..ValidationPolicy::new(0)
         };
         let result = validate_path(&[cert], &[anchor], &policy, &RsaPkcs1v15Sha256Verifier);
         // The guard must not skip the anchor (which would return NoTrustedPath).
@@ -5044,10 +5026,7 @@ mod tests_validate_path {
     }
 
     fn policy_at(t: u64) -> ValidationPolicy {
-        ValidationPolicy {
-            current_time_unix: t,
-            ..Default::default()
-        }
+        ValidationPolicy::new(t)
     }
 
     /// Happy-path 1-cert chain: self-signed cert is both chain and anchor.
@@ -5256,7 +5235,7 @@ mod tests_validate_path {
         let policy = ValidationPolicy {
             current_time_unix: GRY_NOW,
             max_path_len: 0,
-            ..Default::default()
+            ..ValidationPolicy::new(0)
         };
         assert!(
             matches!(
@@ -5400,7 +5379,7 @@ mod tests_validate_path {
         let now: u64 = 1_720_000_000; // 2024-07-03, within nku-int validity (2024-2030)
         let policy = ValidationPolicy {
             current_time_unix: now,
-            ..Default::default()
+            ..ValidationPolicy::new(0)
         };
         validate_path(&[leaf, int_cert], &anchors, &policy, &EcdsaP256Verifier).expect(
             "intermediate with absent KeyUsage must be accepted when enforce_key_usage=true",
@@ -5526,10 +5505,7 @@ mod tests_chain_walk {
     }
 
     fn policy_at(t: u64) -> ValidationPolicy {
-        ValidationPolicy {
-            current_time_unix: t,
-            ..Default::default()
-        }
+        ValidationPolicy::new(t)
     }
 
     /// 1-cert chain: self-signed P-256 cert as both chain and anchor.
