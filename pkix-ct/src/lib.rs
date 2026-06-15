@@ -166,5 +166,10 @@ impl core::fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<Error>();
+};
+
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;

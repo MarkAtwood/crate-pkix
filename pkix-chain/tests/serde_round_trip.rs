@@ -27,7 +27,6 @@ fn error_identity_round_trips() {
         IdentityError::MalformedSan,
         IdentityError::MalformedInput,
         IdentityError::NoMatchingSan,
-        IdentityError::NotYetImplemented,
     ];
     for inner in cases {
         let err = Error::Identity(inner.clone());

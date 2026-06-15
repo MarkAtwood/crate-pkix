@@ -66,18 +66,17 @@ const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
 ///
 /// # Return value semantics
 ///
-/// [`RevocationChecker::check_revocation`] returns `Ok(())` in two distinct cases:
+/// [`RevocationChecker::check_revocation`] returns `Ok(())` when the CRL covers
+/// the certificate type and the serial number was not found in the revoked list
+/// (**not revoked**).
 ///
-/// 1. **Not revoked**: the CRL covers this certificate type and the serial number
-///    was not found in the revoked list.
-/// 2. **Not covered**: the CRL's `IssuingDistributionPoint` scope flags
-///    (`onlyContainsUserCerts`, `onlyContainsCACerts`, `onlyContainsAttributeCerts`)
-///    indicate the CRL does not apply to this certificate type.
-///
-/// These two outcomes are indistinguishable from the caller's perspective.
-/// Callers enforcing a **hard-fail** revocation policy must separately verify
-/// that at least one CRL or OCSP response actually covers the certificate
-/// in question; receiving `Ok(())` alone is not sufficient.
+/// When the CRL's `IssuingDistributionPoint` scope flags
+/// (`onlyContainsUserCerts`, `onlyContainsCACerts`, `onlyContainsAttributeCerts`)
+/// indicate the CRL does not apply to this certificate type, the checker returns
+/// `Err(`[`Error::OutOfScope`]`)` with a variant describing the mismatch.
+/// Callers enforcing a **hard-fail** revocation policy should treat `OutOfScope`
+/// as a non-determination and require that at least one CRL or OCSP response
+/// actually covers the certificate in question.
 ///
 /// # Indirect CRLs (RFC 5280 §5.2.6)
 ///

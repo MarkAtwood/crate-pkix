@@ -62,13 +62,9 @@
 //! # Versioning
 //!
 //! `0.1.0` (PKIX-fmtv.21) shipped the public API surface with scaffold
-//! bodies that returned [`IdentityError::NotYetImplemented`].
-//! PKIX-fmtv.11.1 and PKIX-fmtv.12.1 filled in all public entry
-//! points: [`ServerName::dns_name`], [`ServerName::ip_address`],
+//! bodies. PKIX-fmtv.11.1 and PKIX-fmtv.12.1 filled in all public
+//! entry points: [`ServerName::dns_name`], [`ServerName::ip_address`],
 //! [`MailboxName::parse`], [`verify_dns_name`], and [`verify_mailbox`].
-//! No code path returns [`IdentityError::NotYetImplemented`] any
-//! longer; the variant is retained for API compatibility since the
-//! enum is `#[non_exhaustive]`.
 //!
 //! # Limitations
 //!
@@ -340,11 +336,6 @@ fn validate_ascii_local_part(s: &str) -> Result<(), IdentityError> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum IdentityError {
-    /// Retained for API compatibility but no longer returned by any
-    /// function in this crate. It was used during the scaffold phase
-    /// (PKIX-fmtv.21) before `verify_dns_name` (PKIX-fmtv.11.1) and
-    /// `verify_mailbox` (PKIX-fmtv.12.1) were fully implemented.
-    NotYetImplemented,
     /// Input string did not parse as the expected identity form.
     MalformedInput,
     /// The certificate's Subject Alternative Name extension was present
@@ -360,9 +351,6 @@ pub enum IdentityError {
 impl core::fmt::Display for IdentityError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::NotYetImplemented => {
-                f.write_str("pkix-identity functionality not yet implemented")
-            }
             Self::MalformedInput => f.write_str("malformed identity input"),
             Self::NoMatchingSan => {
                 f.write_str("no Subject Alternative Name entry matched the identity")
@@ -1084,7 +1072,6 @@ mod tests {
     #[test]
     fn identity_error_display_covers_all_variants() {
         for err in [
-            IdentityError::NotYetImplemented,
             IdentityError::MalformedInput,
             IdentityError::NoMatchingSan,
             IdentityError::MissingSan,

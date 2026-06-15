@@ -538,6 +538,7 @@ impl LintParameter {
 /// Error reported by [`Lint::set_parameter`].
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ParameterError {
     /// The lint does not expose a parameter with the supplied id.
     UnknownParameter(String),

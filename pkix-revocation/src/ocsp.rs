@@ -484,6 +484,10 @@ fn responder_id_matches(
     match id {
         ResponderId::ByName(name) => names_match(name, subject),
         ResponderId::ByKey(key_hash) => {
+            // SHA-1 is mandated by RFC 6960 §2.3 for byKey ResponderId
+            // computation. This is a key-identifier lookup, not an
+            // authentication primitive — pre-image resistance suffices,
+            // collision resistance is not required.
             use sha1::Digest as _;
             let expected: [u8; 20] = sha1::Sha1::digest(spki_raw).into();
             key_hash.as_bytes() == expected.as_ref()
