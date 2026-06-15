@@ -129,7 +129,7 @@ pkix-chain                 (umbrella: combines path + revocation)
   │                             │
   DefaultVerifier          (your backend)
   (RustCrypto: RSA,         wolfCrypt, FIPS,
-   ECDSA P-256)             hardware HSM
+   ECDSA P-256/P-384)       hardware HSM
 ```
 
 The `SignatureVerifier` trait is the crypto seam. Swap it to change the
@@ -191,12 +191,64 @@ Encoded as workspace stance in [`AGENTS.md`] non-negotiable #6 (PKIX-amgn).
 - **CRL checking** — RFC 5280 §5 offline CRL with delta CRL support
 - **OCSP checking** — RFC 6960 offline OCSP response with CertID hash verification
 
-## Not yet implemented
+## Gaps
+
+### Must harden before 1.0
+
+**pkix-ct API shape.** The Certificate Transparency crate has correctness issues
+that will fossilize if shipped: `verify_sct_for_cert` silently treats every SCT
+as an `x509_entry` (wrong for precerts, surfaces as `InvalidSignature`);
+`SignedCertificateTimestamp`, `CtLog`, `SignedTreeHead`, and `MerkleAuditPath`
+all lack `#[non_exhaustive]` with every field public; `SctList`'s inner `Vec`
+is public, letting callers bypass parser invariants; and
+`verify_embedded_scts` coalesces all SCT failures into `count=0` with no
+diagnostic. Tracked as epic **PKIX-d4h** (8 items).
+
+**pkix-revocation-http cache and async.** The HTTP fetcher crate's cache uses
+`SystemTime::now()` for freshness checks while the validator uses
+caller-supplied `now_unix` — the two can disagree on whether a CRL/OCSP
+response is fresh. The cache has no expired-entry eviction (unbounded memory
+growth), the async path replicates the `RevocationChecker` default-skip
+footgun, and `InMemoryCache` silently swallows lock poisoning. Tracked as
+epic **PKIX-cr8** (10 items).
+
+**pkix-identity edge cases.** `ServerName` and `MailboxName` have no
+`into_owned()` escape hatch (the `'a` lifetime forces callers to hold the
+borrow forever); an ASCII `MailboxName` incorrectly matches
+`SmtpUTF8Mailbox` SAN entries contradicting the rustdoc; and `find_san`
+returns the first SAN extension only, silently ignoring duplicates. Tracked
+as epic **PKIX-bue** (3 items).
+
+### Algorithm coverage
+
+`DefaultVerifier` handles RSA-PKCS1v15-SHA-{256,384,512} and
+ECDSA-P-{256,384}. Missing: **RSA-PSS** (increasingly common — Let's
+Encrypt ISRG Root X2, government PKIs), **Ed25519**, **P-521**, and
+**legacy SHA-1** (feature-gated, off by default, for validating old chains).
+This is the single feature addition that most expands the set of real-world
+certificate chains the library can validate. Tracked as epic **PKIX-qws**
+(4 items).
+
+### Not yet implemented
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
-- CRL Distribution Points — caller supplies the CRL DER directly
-- Online CRL/OCSP fetching (`pkix-revocation-http`, planned)
-- Delegated OCSP responders
+- CRL Distribution Points fetching — caller supplies the CRL DER directly today
+- DANE / TLSA (RFC 6698 + 7671) — `pkix-dane` and `pkix-dane-resolver` planned but not yet shipped
+- Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
+- RFC 5755 attribute certificate validation (`pkix-ac`, stub only)
+- OS-native trust store loading (`pkix-truststore-system`, stub only)
+- PKCS#11 / HSM trust store adapter (`pkix-truststore-pkcs11`, stub only)
+
+Stub crates are tracked as epic **PKIX-ljt** (4 items).
+
+### Review debt
+
+The workspace has been through 30+ review passes. The current review
+(**PKIX-rm8**, June 2025) closed 59 findings and flagged 16 design
+decisions requiring human judgment — mostly breaking API changes
+(error type wrapping, `Cow<str>` → typed enums, inverted dependencies)
+and security design choices (CertPool size cap, AIA byte cap, SSRF URI
+filtering). These are deferred, not forgotten.
 
 ## Interoperability
 
