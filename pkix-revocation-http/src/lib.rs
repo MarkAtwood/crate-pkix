@@ -155,7 +155,7 @@ pub use ocsp_request::{build_ocsp_request, BuildError, OcspHashAlg, OcspRequestB
 /// Lives at the crate root so future helpers (e.g., the OCSP request
 /// builder in PKIX-a1yc.4) can share the same error type without forcing
 /// callers to import a sub-module.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ExtractError {
     /// The certificate had the requested extension but its value did not

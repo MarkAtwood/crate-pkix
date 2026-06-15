@@ -266,6 +266,7 @@ const _: () = assert!(
 
 /// Errors returned by [`verify_simple`].
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// `chain` slice is empty; there is no certificate to validate.

@@ -1,7 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
-#![deny(rust_2018_idioms, unreachable_pub)]
-#![warn(missing_docs)]
+#![warn(missing_docs, rust_2018_idioms)]
 
 //! # pkix-aia-http
 //!

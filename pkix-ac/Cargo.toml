@@ -14,9 +14,13 @@ categories  = ["cryptography", "no-std"]
 default = []
 std     = ["der/std", "x509-cert/std", "pkix-path/std"]
 
+# Enable serde::Serialize / serde::Deserialize on the public Error type.
+serde = ["dep:serde", "pkix-path/serde"]
+
 [dependencies]
 pkix-path = { workspace = true }
 der        = { workspace = true }
+serde      = { workspace = true, optional = true }
 x509-cert  = { workspace = true }
 spki       = { workspace = true }
 

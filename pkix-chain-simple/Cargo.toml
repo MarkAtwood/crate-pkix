@@ -15,10 +15,15 @@ categories  = ["cryptography"]
 # If you need a custom verifier or revocation, use pkix-chain instead.
 default = []
 
+# Enable serde::Serialize / serde::Deserialize on the public Error type.
+serde = ["dep:serde", "pkix-path/serde"]
+
 [dependencies]
 pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 der        = { workspace = true }
+serde      = { workspace = true, optional = true }
 x509-cert  = { workspace = true }
 
 [package.metadata.docs.rs]
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
