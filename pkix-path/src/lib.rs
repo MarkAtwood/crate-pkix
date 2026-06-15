@@ -1213,10 +1213,13 @@ pub trait Profile {
 pub struct ValidatedPath {
     /// Index into the `anchors` slice of the trust anchor that terminated the path.
     pub anchor_index: usize,
-    /// Number of certificates in the validated chain minus one (`chain.len() - 1`).
+    /// Number of intermediate certificates in the validated chain, excluding
+    /// both the leaf and the trust anchor.
     ///
-    /// For a single self-signed certificate, `depth == 0`. For a leaf + one
-    /// intermediate, `depth == 1`. This equals `chain.len().saturating_sub(1)`.
+    /// Computed as `chain.len().saturating_sub(1)` where `chain` is the
+    /// `[leaf, intermediate_0, ..., intermediate_n]` slice passed to
+    /// [`validate_path`]. A single leaf certificate yields `depth == 0`;
+    /// a leaf plus one intermediate yields `depth == 1`.
     ///
     /// Note: this counts all certificates except the trust anchor — including
     /// self-issued intermediates that RFC 5280 §4.2.1.9 excludes from the

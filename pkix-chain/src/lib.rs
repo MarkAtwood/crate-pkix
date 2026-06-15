@@ -431,6 +431,17 @@ pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetche
     aia: &'a A,
 }
 
+impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> core::fmt::Debug
+    for Verifier<'_, V, R, A>
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Verifier")
+            .field("anchors_len", &self.anchors.len())
+            .field("policy", self.policy)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'a, V, R> Verifier<'a, V, R, NoAiaFetcher>
 where
     V: SignatureVerifier,
@@ -1453,6 +1464,7 @@ fn has_ocsp_no_check(cert: &Certificate) -> bool {
 /// stability guarantee available here without re-serializing the cert
 /// to DER. The pair is compared via cheap derived equality on the
 /// already-parsed `x509-cert` fields.
+#[derive(Debug, Clone)]
 struct LeafIdent<'a> {
     issuer: &'a x509_cert::name::Name,
     serial: &'a x509_cert::serial_number::SerialNumber,
@@ -1484,6 +1496,7 @@ impl<'a> LeafIdent<'a> {
 /// Constructed with `leaf_id = None` to disable the bypass entirely,
 /// which keeps the shim's behavior byte-equivalent to the inner
 /// checker on chains that do not carry `id-pkix-ocsp-nocheck`.
+#[derive(Debug, Clone)]
 struct NoCheckShim<'a, R: RevocationChecker> {
     inner: &'a R,
     leaf_id: Option<LeafIdent<'a>>,

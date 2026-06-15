@@ -122,13 +122,13 @@ const DNS_LABEL_MAX_LEN: usize = 63;
 /// The `'a` lifetime borrows from the caller's input only when no
 /// normalization was required (pure-ASCII lower-case DNS name, IP literal
 /// whose canonical encoding is independent of the textual form).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ServerName<'a> {
     repr: ServerNameRepr<'a>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ServerNameRepr<'a> {
     /// Lower-cased, possibly A-label-converted DNS hostname.
     Dns(Cow<'a, str>),
@@ -214,7 +214,7 @@ impl<'a> ServerName<'a> {
 /// domain used to compare against `rfc822Name` SAN entries. The `'a`
 /// lifetime borrows from the caller's input only when no allocation
 /// was required.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct MailboxName<'a> {
     /// Original local-part. Case-preserving. May contain non-ASCII for

@@ -76,6 +76,7 @@ pub struct IssuerSerial {
 
 /// Errors returned by attribute certificate validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
     /// DER parsing of the attribute certificate failed.
@@ -108,6 +109,11 @@ impl std::error::Error for Error {
         }
     }
 }
+
+const _: fn() = || {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    _assert_send_sync::<Error>();
+};
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
