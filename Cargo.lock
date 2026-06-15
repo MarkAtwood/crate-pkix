@@ -1226,6 +1226,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-dane"
+version = "0.1.0"
+
+[[package]]
+name = "pkix-dane-resolver"
+version = "0.1.0"
+
+[[package]]
 name = "pkix-difftest"
 version = "0.2.1"
 dependencies = [
@@ -1310,6 +1318,14 @@ dependencies = [
  "spki",
  "x509-cert",
 ]
+
+[[package]]
+name = "pkix-pkilint-bridge"
+version = "0.1.0"
+
+[[package]]
+name = "pkix-policy-pkilint"
+version = "0.1.0"
 
 [[package]]
 name = "pkix-policy-zlint"
