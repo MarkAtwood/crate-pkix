@@ -260,20 +260,19 @@ pub mod option_vec {
     {
         match value {
             Some(values) => {
-                let is_hr = serializer.is_human_readable();
-                let mut bytes_buf: Vec<Vec<u8>> = Vec::with_capacity(values.len());
-                let mut str_buf: Vec<String> = Vec::with_capacity(values.len());
-                for v in values {
-                    let der_bytes = v.to_der().map_err(serde::ser::Error::custom)?;
-                    if is_hr {
+                if serializer.is_human_readable() {
+                    let mut str_buf: Vec<String> = Vec::with_capacity(values.len());
+                    for v in values {
+                        let der_bytes = v.to_der().map_err(serde::ser::Error::custom)?;
                         str_buf.push(Base64::encode_string(&der_bytes));
-                    } else {
-                        bytes_buf.push(der_bytes);
                     }
-                }
-                if is_hr {
                     serializer.serialize_some(&str_buf)
                 } else {
+                    let mut bytes_buf: Vec<Vec<u8>> = Vec::with_capacity(values.len());
+                    for v in values {
+                        let der_bytes = v.to_der().map_err(serde::ser::Error::custom)?;
+                        bytes_buf.push(der_bytes);
+                    }
                     // Serialize the outer Some(Vec<Vec<u8>>) via a custom
                     // wrapper so each element is emitted as a byte string
                     // rather than a generic sequence-of-u8.

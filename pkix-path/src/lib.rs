@@ -691,17 +691,20 @@ impl TrustAnchor {
     /// Prefer [`TrustAnchor::from`] (i.e. `TrustAnchor::from(&cert)`) when you
     /// need to keep `cert` alive after building the anchor.
     ///
-    /// # `NameConstraints` and malformed extensions
+    /// # Warning: malformed `NameConstraints` are silently dropped
     ///
     /// If the anchor certificate contains a malformed or unparseable
     /// `NameConstraints` extension, `from_cert` silently sets
-    /// `name_constraints = None` and continues. The resulting anchor
-    /// will not enforce NC constraints from that extension.
+    /// `name_constraints = None` and continues. **The resulting anchor
+    /// will not enforce any name-constraint restrictions from that
+    /// extension**, which may widen the trust scope beyond what the
+    /// certificate intended.
     ///
     /// For strict RFC 5280 §4.2 compliance — where a critical extension
     /// that cannot be parsed MUST cause rejection — use
-    /// [`TrustAnchor::try_from`] instead. That path propagates the
-    /// `der::Error` to the caller.
+    /// [`TrustAnchor::try_from`] instead. That path returns
+    /// `Err(`[`DerError`]`)` so the caller can reject the malformed anchor
+    /// rather than silently operating without name constraints.
     #[must_use]
     pub fn from_cert(cert: Certificate) -> Self {
         let name_constraints = find_cert_ext(&cert, OID_NAME_CONSTRAINTS);
