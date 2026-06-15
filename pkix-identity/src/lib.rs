@@ -241,10 +241,8 @@ impl<'a> ServerName<'a> {
         }
     }
 
-    /// Clone this `ServerName` into an owned (`'static`) version.
-    ///
-    /// Equivalent to `.clone().into_owned()` but avoids the intermediate
-    /// clone when the inner data is borrowed.
+    /// Clone this `ServerName` into an owned (`'static`) version without
+    /// consuming `self`.
     #[must_use]
     pub fn to_owned(&self) -> ServerName<'static> {
         ServerName {
@@ -302,6 +300,32 @@ impl core::str::FromStr for ServerName<'static> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         ServerName::parse(s).map(ServerName::into_owned)
+    }
+}
+
+impl core::fmt::Display for ServerName<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match &self.repr {
+            ServerNameRepr::Dns(name) => f.write_str(name),
+            ServerNameRepr::Ip(IpRepr::V4(b)) => {
+                write!(f, "{}.{}.{}.{}", b[0], b[1], b[2], b[3])
+            }
+            ServerNameRepr::Ip(IpRepr::V6(b)) => {
+                // Bracket-wrapped colon-hex per RFC 5952 §5 for use in URIs.
+                write!(
+                    f,
+                    "[{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}]",
+                    u16::from_be_bytes([b[0], b[1]]),
+                    u16::from_be_bytes([b[2], b[3]]),
+                    u16::from_be_bytes([b[4], b[5]]),
+                    u16::from_be_bytes([b[6], b[7]]),
+                    u16::from_be_bytes([b[8], b[9]]),
+                    u16::from_be_bytes([b[10], b[11]]),
+                    u16::from_be_bytes([b[12], b[13]]),
+                    u16::from_be_bytes([b[14], b[15]]),
+                )
+            }
+        }
     }
 }
 
@@ -475,6 +499,12 @@ impl core::str::FromStr for MailboxName<'static> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         MailboxName::parse(s).map(MailboxName::into_owned)
+    }
+}
+
+impl core::fmt::Display for MailboxName<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}@{}", self.local, self.domain_a_label)
     }
 }
 
