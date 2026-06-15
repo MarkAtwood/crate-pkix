@@ -189,6 +189,7 @@ pub enum Error {
     ///
     /// [`SignatureVerifier`]: pkix_path::SignatureVerifier
     /// [`pkix_path::Error::Display`]: pkix_path::Error
+    #[non_exhaustive]
     NoValidPath {
         /// Number of candidate chains that were tried and rejected.
         tried: usize,

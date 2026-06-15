@@ -168,7 +168,7 @@ fn pkits_no_valid_path_when_verifier_rejects_everything() {
     .expect_err("AlwaysRejectVerifier must cause NoValidPath, not Ok");
 
     match err {
-        Error::NoValidPath { tried, last_error } => {
+        Error::NoValidPath { tried, last_error, .. } => {
             assert!(
                 tried >= 1,
                 "NoValidPath.tried must be >= 1 (got {tried}); zero-yield exhaustion \

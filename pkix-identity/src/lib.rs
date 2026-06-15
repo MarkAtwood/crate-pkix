@@ -89,6 +89,16 @@
 //!   parsed target. No CIDR / range matching; that is not a SAN-binding
 //!   concern.
 //!
+//! # Thread-safety and panic contract
+//!
+//! - All public types ([`ServerName`], [`MailboxName`], [`IdentityError`])
+//!   are `Send + Sync`. Compile-time assertions enforce this.
+//! - No public function panics on valid input. The only reachable panics
+//!   are in `OID::new_unwrap` (const-evaluated at compile time, never at
+//!   runtime).
+//! - All errors are returned as [`IdentityError`] values — no `abort`,
+//!   `exit`, or `process::exit` paths exist.
+//!
 //! [`pkix-chain`]: https://docs.rs/pkix-chain
 //! [`pkix-truststore-system`]: https://docs.rs/pkix-truststore-system
 //! [`pkix-truststore-pkcs11`]: https://docs.rs/pkix-truststore-pkcs11
@@ -102,8 +112,21 @@ use der::{asn1::ObjectIdentifier, Decode as _};
 use x509_cert::ext::pkix::{name::GeneralName, SubjectAltName};
 use x509_cert::Certificate;
 
+// Compile-time Send + Sync assertions (crate-level contract).
+const _: () = {
+    fn _assert_send_sync<T: Send + Sync>() {}
+    fn _assertions() {
+        _assert_send_sync::<ServerName<'static>>();
+        _assert_send_sync::<MailboxName<'static>>();
+        _assert_send_sync::<IdentityError>();
+    }
+};
+
 /// OID of the Subject Alternative Name extension (RFC 5280 §4.2.1.6).
 const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
+
+/// RFC 8398 SmtpUTF8Mailbox OID (`id-on-SmtpUTF8Mailbox`).
+const OID_SMTP_UTF8_MAILBOX: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.8.9");
 
 /// Maximum length of a DNS name (RFC 1035 §2.3.4: 255 octets including
 /// length bytes, ≤ 253 characters as a dotted string).
@@ -123,12 +146,14 @@ const DNS_LABEL_MAX_LEN: usize = 63;
 /// normalization was required (pure-ASCII lower-case DNS name, IP literal
 /// whose canonical encoding is independent of the textual form).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ServerName<'a> {
     repr: ServerNameRepr<'a>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum ServerNameRepr<'a> {
     /// Lower-cased, possibly A-label-converted DNS hostname.
     Dns(Cow<'a, str>),
@@ -137,6 +162,7 @@ enum ServerNameRepr<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum IpRepr {
     V4([u8; 4]),
     V6([u8; 16]),
@@ -254,6 +280,63 @@ impl<'a> ServerName<'a> {
             repr: ServerNameRepr::Ip(parsed),
         })
     }
+
+    /// Parse a server identity from a string, trying IP literal first,
+    /// then DNS hostname.
+    ///
+    /// This is a convenience wrapper: if the input parses as an IP address
+    /// (via [`ServerName::ip_address`]) that form is used; otherwise it is
+    /// treated as a DNS hostname (via [`ServerName::dns_name`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IdentityError::MalformedInput`] if the input is valid as
+    /// neither an IP literal nor a DNS hostname.
+    pub fn parse(input: &'a str) -> Result<Self, IdentityError> {
+        Self::ip_address(input).or_else(|_| Self::dns_name(input))
+    }
+}
+
+impl core::str::FromStr for ServerName<'static> {
+    type Err = IdentityError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        ServerName::parse(s).map(ServerName::into_owned)
+    }
+}
+
+/// Construct a `ServerName` from an [`Ipv4Addr`](std::net::Ipv4Addr).
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl From<std::net::Ipv4Addr> for ServerName<'static> {
+    fn from(addr: std::net::Ipv4Addr) -> Self {
+        ServerName {
+            repr: ServerNameRepr::Ip(IpRepr::V4(addr.octets())),
+        }
+    }
+}
+
+/// Construct a `ServerName` from an [`Ipv6Addr`](std::net::Ipv6Addr).
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl From<std::net::Ipv6Addr> for ServerName<'static> {
+    fn from(addr: std::net::Ipv6Addr) -> Self {
+        ServerName {
+            repr: ServerNameRepr::Ip(IpRepr::V6(addr.octets())),
+        }
+    }
+}
+
+/// Construct a `ServerName` from an [`IpAddr`](std::net::IpAddr).
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl From<std::net::IpAddr> for ServerName<'static> {
+    fn from(addr: std::net::IpAddr) -> Self {
+        match addr {
+            std::net::IpAddr::V4(v4) => v4.into(),
+            std::net::IpAddr::V6(v6) => v6.into(),
+        }
+    }
 }
 
 /// Parsed RFC 5322 / RFC 8398 mailbox.
@@ -264,6 +347,7 @@ impl<'a> ServerName<'a> {
 /// lifetime borrows from the caller's input only when no allocation
 /// was required.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct MailboxName<'a> {
     /// Original local-part. Case-preserving. May contain non-ASCII for
@@ -383,6 +467,14 @@ impl<'a> MailboxName<'a> {
             domain_a_label,
             is_internationalized,
         })
+    }
+}
+
+impl core::str::FromStr for MailboxName<'static> {
+    type Err = IdentityError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        MailboxName::parse(s).map(MailboxName::into_owned)
     }
 }
 
@@ -581,9 +673,6 @@ fn san_entry_matches_mailbox(entry: &GeneralName, target: &MailboxName<'_>) -> b
         _ => false,
     }
 }
-
-/// RFC 8398 SmtpUTF8Mailbox OID (`id-on-SmtpUTF8Mailbox`).
-const OID_SMTP_UTF8_MAILBOX: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.8.9");
 
 /// Decode an [`der::Any`] that wraps a `UTF8String` into its contained
 /// string. Used to extract the inner mailbox bytes from an

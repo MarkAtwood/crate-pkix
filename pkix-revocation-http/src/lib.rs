@@ -145,6 +145,10 @@ pub use cache::{
     CachedCrl, CachedOcspResponse, CrlCacheKey, InMemoryCache, OcspCacheKey, RevocationCache,
 };
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
+
+/// `Content-Type` for an OCSP request body, per RFC 6960 §A.1.
+#[cfg(feature = "ocsp")]
+pub(crate) const OCSP_REQUEST_CT: &str = "application/ocsp-request";
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use ocsp_request::{build_ocsp_request, BuildError, OcspHashAlg, OcspRequestBytes};
