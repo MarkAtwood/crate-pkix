@@ -156,21 +156,6 @@ pub enum Error {
     /// cause exponential search time. The DFS and the depth probe each start
     /// with a fresh budget of [`PathBuilderConfig::dfs_budget`] node visits.
     BudgetExceeded,
-    /// **Reserved for future diagnostic use.** Path building no longer
-    /// surfaces this variant: a candidate whose `BasicConstraints` extension
-    /// is present but cannot be DER-decoded is silently skipped, just like
-    /// candidates with `cA = FALSE` or no `BasicConstraints` extension at
-    /// all. This skip-not-fail behaviour is required so that a single
-    /// malformed certificate in a CMS `SignedData.certificates` bag (or any
-    /// other unsolicited-cert pool) cannot poison verification of an
-    /// otherwise-valid chain.
-    ///
-    /// The variant is retained because [`Error`] is `#[non_exhaustive]` and
-    /// a future diagnostic mode may want to surface decode failures
-    /// explicitly. Build_path itself returns [`Error::NoPathFound`] when no
-    /// chain can be built — including when the only available intermediates
-    /// have a malformed `BasicConstraints` extension.
-    MalformedIntermediate,
     /// [`build_first_valid_path`] exhausted [`build_path_candidates`] without
     /// finding a candidate that [`pkix_path::validate_path`] accepted.
     ///
@@ -213,9 +198,6 @@ impl core::fmt::Display for Error {
             Self::BudgetExceeded => f.write_str(
                 "DFS node-visit budget exceeded; pool may be adversarially large",
             ),
-            Self::MalformedIntermediate => f.write_str(
-                "a candidate intermediate's BasicConstraints extension is present but cannot be decoded",
-            ),
             Self::NoValidPath { tried, last_error } => write!(
                 f,
                 "tried {tried} candidate path(s); none validated. Last validation error: {last_error}"
@@ -230,24 +212,15 @@ impl std::error::Error for Error {}
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
 
-/// Returns `Ok(true)` if `cert` has `BasicConstraints` with `cA = TRUE`,
-/// `Ok(false)` if the extension is absent or has `cA = FALSE`, and
-/// [`Error::MalformedIntermediate`] if the extension is present but
-/// cannot be DER-decoded.
+/// Returns `true` if `cert` has `BasicConstraints` with `cA = TRUE`,
+/// `false` if the extension is absent, has `cA = FALSE`, or cannot be
+/// DER-decoded.
 ///
-/// Thin wrapper over [`pkix_path::cert_is_ca`] that maps the opaque
-/// [`pkix_path::DerError`] to this crate's [`Error::MalformedIntermediate`].
-///
-/// **Caller responsibility for skip-not-fail.** The single in-crate caller
-/// (the candidate-evaluation loop in [`PathCandidates::next`]) treats
-/// `Err(_)` identically to `Ok(false)`: skip the candidate and keep
-/// searching. The wrapper preserves the explicit
-/// [`Error::MalformedIntermediate`] mapping so that a future diagnostic
-/// mode can distinguish "wasn't a CA" from "couldn't tell whether it was
-/// a CA". See the variant doc for the rationale behind not surfacing
-/// this error from `build_path`.
-fn cert_is_ca(cert: &Certificate) -> Result<bool> {
-    pkix_path::cert_is_ca(cert).map_err(|_| Error::MalformedIntermediate)
+/// Malformed `BasicConstraints` is treated as `false` (skip-not-fail):
+/// a single malformed certificate in a CMS `SignedData.certificates` bag
+/// must not poison verification of an otherwise-valid chain.
+fn cert_is_ca(cert: &Certificate) -> bool {
+    pkix_path::cert_is_ca(cert).unwrap_or(false)
 }
 
 /// OID `id-ce-authorityKeyIdentifier` (RFC 5280 §4.2.1.1).
@@ -699,9 +672,8 @@ impl<'a> Iterator for PathCandidates<'a> {
             // from any other no-path case. Callers that want diagnostic
             // detail ("why didn't this path build?") need a future
             // diagnostic mode; that is out of scope for skip-not-fail.
-            match cert_is_ca(candidate) {
-                Err(_) | Ok(false) => continue,
-                Ok(true) => {}
+            if !cert_is_ca(candidate) {
+                continue;
             }
 
             // SPKI cycle guard.
