@@ -23,6 +23,10 @@ members = [
     "pkix-policy-zlint",
     "pkix-aia",
     "pkix-aia-http",
+    "pkix-dane",
+    "pkix-dane-resolver",
+    "pkix-pkilint-bridge",
+    "pkix-policy-pkilint",
 ]
 
 [workspace.package]
@@ -127,6 +131,10 @@ pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.1.0" 
 pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.1.0" }
 pkix-aia                = { path = "pkix-aia",                version = "0.1.0" }
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.1.0" }
+pkix-dane               = { path = "pkix-dane",               version = "0.1.0" }
+pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.1.0" }
+pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
+pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
 
 # RustCrypto core
 der       = "0.7"

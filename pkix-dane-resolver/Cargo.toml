@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-dane-resolver"
+description = "DNSSEC-validating resolver for DANE TLSA records — std-only companion to pkix-dane"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "dane", "tlsa", "dnssec", "pki"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-dane + DNS resolver + DNSSEC validation deps added when real
+# impl is wired.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

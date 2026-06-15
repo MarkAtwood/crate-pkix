@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-dane"
+description = "DANE (RFC 6698 / RFC 7671) TLSA record parsing and per-usage match logic — no DNS, caller supplies validated TLSA records"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "dane", "tlsa", "certificate", "pki"]
+categories  = ["cryptography"]
+
+[dependencies]
+# x509-cert + TLSA record parsing + match logic added when real
+# impl is wired.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-pkilint-bridge"
+description = "Shared subprocess and output-parsing infrastructure for running pkilint on certificates"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "lint", "pkilint", "compliance"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-lint + subprocess plumbing + pkilint output parsing added when
+# real impl is wired.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

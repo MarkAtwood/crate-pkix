@@ -1,0 +1,19 @@
+[package]
+name        = "pkix-policy-pkilint"
+description = "Thin Lint adapter exposing pkilint verdicts as pkix-lint Lints (via pkix-pkilint-bridge)"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["x509", "certificate", "lint", "pkilint", "compliance"]
+categories  = ["cryptography"]
+
+[dependencies]
+# pkix-lint + pkix-pkilint-bridge + x509-cert + der added when real
+# impl is wired.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
