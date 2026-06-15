@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-identity"
 description = "Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal)"
-version               = "0.1.0"
+version               = "0.1.1"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
