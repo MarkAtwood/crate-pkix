@@ -67,6 +67,8 @@
 //! - No cross-certificate path building (RFC 4158).
 //! - Signature backend is always `RustCrypto`; for a custom backend use `pkix_path` directly.
 
+pub use pkix_path;
+
 use der::asn1::ObjectIdentifier;
 use der::Decode;
 use pkix_path::{

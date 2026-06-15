@@ -644,7 +644,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     and the primary issuer-name check.  The extra checks below are
         //     defense-in-depth: they guard against any future code path that bypasses
         //     the with_delta() constructor and against subtle cross-name mismatches.
-        let delta_entries: Vec<RevokedCert> = if let Some(delta_crl) = &self.delta_crl {
+        let delta_entries: &[RevokedCert] = if let Some(delta_crl) = &self.delta_crl {
             // Reuse the pre-parsed delta CRL (parsed once at construction).
 
             // Extra check: delta CRL issuer must also match the base CRL issuer
@@ -663,7 +663,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 self.now_unix,
             )?
         } else {
-            Vec::new()
+            &[]
         };
 
         // (7) Search for the certificate's (issuer, serial) in the delta and base
@@ -838,7 +838,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         }
 
         // (7) Delta CRL merge.
-        let delta_entries: Vec<RevokedCert> = if let Some(delta_crl) = &self.delta_crl {
+        let delta_entries: &[RevokedCert] = if let Some(delta_crl) = &self.delta_crl {
             if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
                 return Err(Error::CrlIssuerMismatch);
             }
@@ -850,7 +850,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 self.now_unix,
             )?
         } else {
-            Vec::new()
+            &[]
         };
 
         // (8) Look up the cert's (issuer, serial) in delta then base entries,
@@ -958,9 +958,9 @@ fn find_matching_entry<'a>(
     crl_default_issuer: &x509_cert::name::Name,
     is_indirect: bool,
 ) -> crate::Result<Option<&'a RevokedCert>> {
-    use x509_cert::name::Name;
+    use std::borrow::Cow;
 
-    let mut effective: Name = crl_default_issuer.clone();
+    let mut effective: Cow<'_, x509_cert::name::Name> = Cow::Borrowed(crl_default_issuer);
     for entry in entries {
         // Only honor certificateIssuer in indirect CRLs (where it has
         // defined semantics per RFC 5280 §5.2.5/§5.3.3). Direct CRLs
@@ -970,7 +970,7 @@ fn find_matching_entry<'a>(
         if is_indirect {
             if let Some(exts) = entry.crl_entry_extensions.as_deref() {
                 if let Some(ce_ext) = exts.iter().find(|e| e.extn_id == OID_CERTIFICATE_ISSUER) {
-                    effective = parse_certificate_issuer_dn(ce_ext.extn_value.as_bytes())?;
+                    effective = Cow::Owned(parse_certificate_issuer_dn(ce_ext.extn_value.as_bytes())?);
                 }
             }
         }
@@ -1022,13 +1022,13 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
 /// additional issuer-name cross-checks needed by the calling context (e.g.,
 /// checking the delta issuer against the base CRL issuer or the subject
 /// certificate's issuer).
-fn verify_delta_crl_and_collect<V: SignatureVerifier>(
-    delta_crl: &CertificateList,
+fn verify_delta_crl_and_collect<'a, V: SignatureVerifier>(
+    delta_crl: &'a CertificateList,
     verifier: &V,
     issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
     expected_issuer_name: &x509_cert::name::Name,
     now_unix: u64,
-) -> crate::Result<Vec<RevokedCert>> {
+) -> crate::Result<&'a [RevokedCert]> {
     if !names_match(&delta_crl.tbs_cert_list.issuer, expected_issuer_name) {
         return Err(Error::CrlIssuerMismatch);
     }
@@ -1066,19 +1066,11 @@ fn verify_delta_crl_and_collect<V: SignatureVerifier>(
         // Verifier returns an opaque error; no additional context available.
         .map_err(|_| Error::CrlSignatureInvalid)?;
 
-    // NOTE: The clone produces an owned `Vec<RevokedCert>` to keep the function
-    // signature simple; both call sites currently consume the result by-value.
-    // After the parse-once cache landed (delta_crl is now borrowed from
-    // `self.delta_crl`), a borrow-based design returning `Option<&[RevokedCert]>`
-    // is feasible — it would require updating both call sites and `check_revocation`
-    // / `check_revocation_against_anchor` to consume the slice in-scope. Deferred
-    // as a low-priority perf cleanup; the clone is bounded by the size of the
-    // revoked list and occurs at most once per call.
     Ok(delta_crl
         .tbs_cert_list
         .revoked_certificates
-        .clone()
-        .unwrap_or_default())
+        .as_deref()
+        .unwrap_or(&[]))
 }
 
 // ---------------------------------------------------------------------------

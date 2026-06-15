@@ -111,6 +111,7 @@ pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
     self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
 };
+pub use pkix_path_builder;
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use pkix_revocation::CrlChecker;

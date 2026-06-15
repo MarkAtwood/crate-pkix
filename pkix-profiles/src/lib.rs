@@ -273,14 +273,7 @@ impl pkix_lint::LintProfile for BasicTlsProfile {
     }
 
     fn lint_runner(&self) -> pkix_lint::LintRunner {
-        pkix_lint::LintRunner::new(vec![
-            Box::new(pkix_lint::rfc6125::Rfc6125TlsServerSanLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280EkuServerAuthLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280BasicConstraintsCaLeafLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280SanRequiredWhenSubjectEmptyLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
-        ])
+        pkix_lint::LintRunner::new(self.lints().to_vec())
     }
 }
 
@@ -398,13 +391,7 @@ impl pkix_lint::LintProfile for BasicSmimeProfile {
     }
 
     fn lint_runner(&self) -> pkix_lint::LintRunner {
-        pkix_lint::LintRunner::new(vec![
-            Box::new(pkix_lint::rfc8398::Rfc8398SmimeSanLint),
-            Box::new(pkix_lint::rfc8551::Rfc8551EkuEmailProtectionLint),
-            Box::new(pkix_lint::rfc8398::Rfc8398SmimeMailboxEquivalenceLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280SignatureAlgorithmMatchLint),
-            Box::new(pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint::default()),
-        ])
+        pkix_lint::LintRunner::new(self.lints().to_vec())
     }
 }
 
