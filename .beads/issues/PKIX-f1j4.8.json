@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0a2aead9ac14a38dbe9ad0e8977c1c70a11cdffb804d623196d895d86325dd6e",
+  "created_at": "2026-05-14T18:57:40Z",
+  "created_by": "Mark Atwood",
+  "description": "Constraint #6 (non-negotiable in AGENTS.md) says: 'Batch APIs where setup cost is non-trivial. Policy-adapter crates with subprocess overhead MUST expose batch APIs.' This crate's setup cost is one HTTP connection per fetch \u2014 high enough that batching becomes valuable when validating many chains.\n\nCurrently CachedHttpCrlFetcher / CachedHttpOcspFetcher are one-cert-at-a-time. A consumer validating a batch of 1000 chains hitting the same issuer's CRL gets 1000 cache lookups (good) but 1000 separate trait invocations (fine, but no opportunity to coalesce in-flight network fetches). The single-flight pattern \u2014 'one cert's fetch in flight per (issuer, url) tuple, other concurrent waiters wait for that one fetch' \u2014 would be a significant additional win and is the canonical caching pattern for HTTP caches in this shape.\n\nScenario: 1000 concurrent OCSP checks against the same responder URL for the same issuer (e.g., 1000 client certs from the same root). With current code: cache-miss path runs concurrently 1000 times \u2192 1000 HTTP POSTs \u2192 the responder hits rate-limit and starts dropping requests \u2192 most checks fail with RevocationFetchFailed.\n\nMaintenance consequence: every consumer that hits this will either (a) build their own single-flight wrapper above CachedHttpCrlFetcher, fragmenting the cache abstraction, or (b) file an issue against this crate asking for single-flight. The principled answer is (b); the design space for the wrapper is documented enough that (a) shouldn't be needed.\n\nNot blocking, but a 1.0-shape question: should the cache trait surface admit single-flight (e.g. a future inflight_get_or_fetch method), or stay strictly key\u2192value and force single-flight into a separate composition layer?",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Caller-side caching API design: callbacks are right, but consumers will reinvent batch wrappers",
+  "updated_at": "2026-05-14T18:57:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

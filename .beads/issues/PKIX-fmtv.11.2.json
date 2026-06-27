@@ -1,0 +1,53 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T04:59:17Z",
+  "compaction_level": 0,
+  "content_hash": "d8e23c63f8a069fd596ff2da7347b6835e8715b1422e1a976cb714cf2a89bcc1",
+  "created_at": "2026-05-12T05:19:19Z",
+  "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "description": "Ship the TLS ergonomic wrappers in pkix-chain that compose existing chain validation with the new pkix-identity hostname binding.\n\n## Blocks on\n\n- **PKIX-fmtv.7** (human-labeled): decides the v0.x wrapper set \u2014 specifically whether BOTH server and client wrappers ship, or only server, or both gated behind separate feature flags.\n- **PKIX-fmtv.11.1**: pkix-identity `verify_dns_name` body must be implemented first so the wrappers have something to call.\n\n## Deliverable\n\nAdd to pkix-chain public API:\n\n```rust\npub fn verify_tls_server(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    name:       &ServerName<'_>,    // re-exported from pkix-identity\n    policy:     &ValidationPolicy,  // typically BasicTlsProfile.policy(now)\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n\npub fn verify_tls_client(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    identity:   Option<&ClientIdentity<'_>>,  // typically &MailboxName for rfc822 identity\n    policy:     &ValidationPolicy,\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n```\n\nBodies:\n1. `verify_chain(chain, anchors, policy, verifier, revocation)?` (existing).\n2. `pkix_identity::verify_dns_name(&chain[0], name)?` (new, for server).\n3. Optional identity binding for client (`pkix_identity::verify_mailbox` if `identity` is a `MailboxName` \u2014 requires PKIX-fmtv.12.1).\n4. `Ok(ValidatedPath)`.\n\nThe server/client distinction is encoded in the caller-supplied `ValidationPolicy` (keyUsage / EKU id-kp-serverAuth vs id-kp-clientAuth \u2014 set via `BasicTlsProfile` or downstream profiles).\n\n`ClientIdentity` shape is open; could be an enum over the few identity types TLS-client-auth typically uses (mailbox via rfc822Name SAN, DN via subject, custom otherName) \u2014 exact decision lives in PKIX-fmtv.7.\n\n## VerifyError changes\n\nAdd variants `HostnameMismatch(IdentityError)`, `MalformedSan(IdentityError)` or similar, wrapping `pkix_identity::IdentityError`. Exact shape depends on PKIX-fmtv.7's decision.\n\n## Tests\n\n- Positive: cert with matching SAN + valid chain \u2192 `Ok(ValidatedPath)`.\n- Identity-mismatch: cert with non-matching hostname + valid chain \u2192 `VerifyError::HostnameMismatch`.\n- Chain-invalid: cert with matching SAN + broken chain \u2192 `VerifyError::PathInvalid` (existing).\n- Path-validation runs first: cert with matching SAN + expired chain \u2192 path error, not identity error (assertion on error ordering).\n- bettertls integration test through the wrapper (already pulled in by PKIX-fmtv.11.1, run a slice through verify_tls_server).\n\n## Out of scope\n\n- Body of `pkix_identity::verify_dns_name` \u2014 that is PKIX-fmtv.11.1.\n- Wrapper-set decision \u2014 that is PKIX-fmtv.7.\n- `verify_tls_client` body if PKIX-fmtv.7 decides server-only for v0.x \u2014 ship only `verify_tls_server` in that case.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.11.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: verify_tls_server / verify_tls_client wrappers (composes verify_chain + pkix_identity::verify_dns_name)",
+  "updated_at": "2026-05-13T04:59:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:19:19Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.11",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T22:19:25Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.11.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-12T18:51:54Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-fmtv.11.2.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T22:19:24Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

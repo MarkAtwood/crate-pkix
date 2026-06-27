@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added corrupt-bc-{root,int,leaf}.der fixtures and basic_constraints_corrupt_der_returns_malformed_certificate test",
+  "closed_at": "2026-05-07T01:57:12Z",
+  "compaction_level": 0,
+  "content_hash": "1b801f3c52593a47bfac3619dde63a73c0440f99833f9bd1c599aef3e8aa016d",
+  "created_at": "2026-05-07T01:49:45Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2273-2277 \u2014 The commit 'fix: fail-closed BasicConstraints decode on intermediates' changed cert_basic_constraints (fail-open) to try_find_cert_ext (fail-closed). There is no test that exercises this new path: an intermediate certificate that HAS the BasicConstraints extension (so the OID is present in the TBS extensions list) but whose extension VALUE is malformed DER. Without such a test, a regression back to fail-open would not be caught. The existing nca-int fixture has NO BasicConstraints extension at all (returns None), which exercises the NotCA path, not the MalformedCertificate path. A fixture with BasicConstraints OID present but value = 0xFF (invalid DER) would cover this.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "no test for MalformedCertificate on DER-invalid BasicConstraints in intermediate",
+  "updated_at": "2026-05-07T01:57:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:49:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

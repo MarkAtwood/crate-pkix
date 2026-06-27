@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "62948d8434e34377b1de1e0e31242b53f1574bd79a0735d800d8f4b672de346e",
+  "created_at": "2026-05-14T16:03:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/catalog.rs:101 \u2014 catalog_from_lints signature:\n\n  pub fn catalog_from_lints(\n      lints: &[Box<dyn Lint>],\n      catalog_id: &str,\n      catalog_version: &str,\n  ) -> Value\n\nThe function iterates `lints` and emits one OSCAL Control per lint, using `lint.id()` as the Control id. There is no duplicate-id check.\n\nLintRunner::new (lib.rs:1181) panics in debug AND release on duplicate lint IDs (per PKIX-7f92.20). The two functions take the same Box<dyn Lint> slice as input and have opposite duplicate-handling: LintRunner::new panics, catalog_from_lints silently produces an OSCAL-schema-invalid Catalog (two Controls with the same id is invalid OSCAL).\n\nCALLER IMPACT: A caller building a Catalog from a runner's lint set is fine \u2014 they got the lints through LintRunner which already panicked on dups. A caller building a Catalog from an arbitrary &[Box<dyn Lint>] (e.g., a static array, a programmatically constructed test fixture) gets a silent OSCAL-invalid output. The Catalog parses through serde_json fine; only at OSCAL-schema-validation time does the duplicate-Control-id error appear \u2014 and OSCAL-schema-aware validators are rare.\n\nWorse: lint_ids_from_catalog (the parse side) will silently produce a Vec<String> with duplicate entries. apply_parameter_overrides with that Vec will then apply overrides to the duplicated lint multiple times (or to \"the\" lint with the matching id, but since LintRunner panics on dup IDs, the runner side already rejected the configuration; this is only reachable if catalog and runner were built from different lint sets).\n\nREMEDIATION: Make catalog_from_lints' duplicate-handling explicit. Options:\n\n1. Match LintRunner::new semantics \u2014 panic on duplicate IDs:\n\n   pub fn catalog_from_lints(...) -> Value {\n       // Detect duplicate lint ids \u2014 matches LintRunner::new behavior\n       let mut seen = std::collections::HashSet::new();\n       for lint in lints {\n           if !seen.insert(lint.id()) {\n               panic!(\"catalog_from_lints: duplicate lint id {:?}\", lint.id());\n           }\n       }\n       ...\n   }\n\n   Add # Panics section to rustdoc.\n\n2. Return Result and let the caller handle:\n\n   pub fn catalog_from_lints(...) -> Result<Value, CatalogEmitError>\n   #[non_exhaustive]\n   pub enum CatalogEmitError { DuplicateLintId(String) }\n\n   Breaking change; pre-1.0 free.\n\n3. Silently deduplicate (first occurrence wins) and document the behavior.\n\nOption 1 is the most consistent with the rest of the crate (same contract as LintRunner::new). Option 2 is more flexible. Option 3 hides errors.\n\nPre-1.0 free for any choice. Pick one and commit.\n\nRELATED: PKIX-7f92.20 (LintRunner::new dup-id panics in both debug+release). Same family of concerns; consistent treatment across the API is part of the fix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.37",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "catalog_from_lints does not check for duplicate lint IDs and silently emits an OSCAL-schema-invalid Catalog with two Controls sharing one id; LintRunner::new panics on dups for the same input set",
+  "updated_at": "2026-05-14T16:03:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:03:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

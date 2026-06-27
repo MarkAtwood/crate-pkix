@@ -1,0 +1,43 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d5d0053d298311dd50b8dd6ea2250371c1b7e76c8217cfb5c60e2256e4618320",
+  "created_at": "2026-05-08T05:45:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAfter all H1\u2013H11 + N1\u2013N3 land:\n\n1. Verify `chain_walk` LOC < 100. If not, file a follow-up bead identifying which extraction(s) need to go further.\n2. Verify `check_name_constraints` LOC < 100. Same fallback.\n3. If `#[allow(clippy::too_many_lines)]` was added at any point during the refactor, remove it.\n4. Run `cargo clippy --all-features -p pkix-path -- -W clippy::too_many_lines -D warnings` to confirm both functions pass even with the lint enabled.\n5. Update the 2017\u20132024 doc-comment that argued AGAINST decomposition (per design \u00a70: \"any refactor must retire that comment honestly\"). Replace with a concise pointer to the helper structure and the RFC \u00a76.1 step map.\n6. Update CHANGELOG.md with a summary of the decomposition under the next minor-version section.\n7. Close PKIX-als9 with a summary referencing all completed child beads.\n\n## Dependencies\n\n- H11 (last sequenced helper).\n- N3 (independent of H1\u2013H11 but blocks check_name_constraints LOC verification).\n\n## Acceptance\n\n- chain_walk and check_name_constraints both under 100 lines.\n- clippy --warn=too_many_lines clean.\n- 2017\u20132024 doc comment retired.\n- CHANGELOG.md updated.\n- PKIX-als9 closed.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: cleanup \u2014 verify <100 lines, retire monolith doc-comment, close epic",
+  "updated_at": "2026-05-08T05:45:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-07T22:46:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.15",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.16",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

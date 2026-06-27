@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:10Z",
+  "compaction_level": 0,
+  "content_hash": "40c4fe289814d185f7589509d85dfad5d066647d62d680c9ef4070385df306c5",
+  "created_at": "2026-05-06T21:30:24Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs lines 543-557: CabfTlsBrProfile implements LintProfile with two methods that behave differently:\n- lints() (line 543) returns &[Box<dyn Lint>] backed by a static OnceLock<Vec<Box<dyn Lint>>> \u2014 always the same instance.\n- lint_runner() (line 555) calls LintRunner::new(all_lints()) \u2014 allocates a fresh Vec<Box<dyn Lint>> on every call, from which LintRunner holds owned lints.\n\nThe LintProfile trait doc (lib.rs line 773) says \"Implementors should document whether this method caches the runner or allocates fresh on each call.\" The doc comment on lint_runner() at line 550 does say \"Allocates a fresh LintRunner on each call.\" So it is documented.\n\nBut there is an inconsistency: lints() returns references into the OnceLock-backed Vec, while lint_runner() owns a completely separate set of lint instances. If a caller calls both lints() and then lint_runner().lints(), they get two independent lint instances with the same IDs but different allocations. This violates the implied invariant that lints() and lint_runner().lints() represent the same logical set.\n\nMore importantly: LintRunner::new(all_lints()) in lint_runner() is called with owned Boxes from all_lints(), not from the OnceLock cache. This means lint_runner() is not using the cached lint instances at all \u2014 if lints() has a bug in the OnceLock initialization path and lint_runner() has a different code path, they could diverge. The safer design is for lint_runner() to construct from the same OnceLock instances used by lints(), but since LintRunner::new takes Vec<Box<dyn Lint>> (owned), this requires either cloning (not possible for Box<dyn Lint> without adding Clone bounds) or constructing separately.\n\nThe practical risk: in production, two different LintRunner instances with different allocations produce findings with the same lint IDs but from different instances. This is fine functionally but could cause confusion if callers assume identity. File as P2 API inconsistency.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: CabfTlsBrProfile::lints() and lint_runner() are inconsistent \u2014 OnceLock vs fresh alloc",
+  "updated_at": "2026-05-06T21:42:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:30:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

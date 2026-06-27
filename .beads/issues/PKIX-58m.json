@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Delta CRL merging + IDP scope checking implemented. 22/25 \u00a74.14/4.15 tests pass (3 ignored: CDP name matching deferred to v0.2).",
+  "closed_at": "2026-05-05T15:25:22Z",
+  "compaction_level": 0,
+  "content_hash": "1f9b8df4de88df75d4109e127c2fae4f2dba51f72e31ac8b67dfa17ff43210d6",
+  "created_at": "2026-05-02T15:29:30Z",
+  "created_by": "Mark Atwood",
+  "description": "Extend pkix-revocation::CrlChecker with delta CRL support and CRL Distribution Points processing.\n\nSpec references:\n- RFC 5280 \u00a74.2.1.13 \u2014 CRLDistributionPoints extension\n- RFC 5280 \u00a74.2.1.15 \u2014 FreshestCRL extension (delta CRL pointer)\n- RFC 5280 \u00a75.2.4 \u2014 Delta CRL Indicator extension\n- RFC 5280 \u00a75.2.6 \u2014 Issuing Distribution Point extension\n- RFC 5280 \u00a76.3 \u2014 CRL validation algorithm (full, including delta CRL combination)\n- RFC 5280 \u00a76.3.3 \u2014 CRL path validation\n- PKITS section 4.5 \u2014 CRL distribution points test vectors\n- PKITS section 4.7 \u2014 delta CRL test vectors",
+  "ephemeral": 0,
+  "id": "PKIX-58m",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Revocation completeness (delta CRLs, CDP)",
+  "updated_at": "2026-05-05T15:25:22Z"
+}

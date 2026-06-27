@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done in commit.",
+  "closed_at": "2026-05-14T08:09:54Z",
+  "compaction_level": 0,
+  "content_hash": "3386f0ead757101aaa3811e2b4ec27e9e1e7b887a44a220d64f39a1707c3a8a2",
+  "created_at": "2026-05-14T05:16:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:81 \u2014 `use std::{fs, io, vec::Vec};` imports `Vec` from `std::vec`. The workspace uses `edition = \"2021\"`, which includes `Vec` in the prelude. The explicit import is redundant noise. Fix: `use std::{fs, io};` (or split as `use std::fs;` / `use std::io;` if preferred). Confirmed no semantic change \u2014 `Vec` in the prelude resolves to the same `std::vec::Vec`. What goes wrong if it stays: extra import to skim past; mildly suggests the author either copy-pasted from a no_std crate or wasn't certain about the prelude (neither is true based on the rest of the diff, which uses no_std-flavored `core::fmt::*` imports \u2014 but `Vec` is a different layer).",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.21",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "use std::{fs, io, vec::Vec} imports Vec redundantly (already in 2021 prelude)",
+  "updated_at": "2026-05-14T08:09:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:16:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

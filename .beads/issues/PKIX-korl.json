@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:07Z",
+  "compaction_level": 0,
+  "content_hash": "1ffb490d2585c1364ed709874b0a55d8057909cc2f59be54ecce1e08b28cbbe7",
+  "created_at": "2026-05-07T20:27:57Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-chain/src/lib.rs:188-190`:\n\n```rust\nfn _accepts(_v: &DefaultVerifier) {}\nlet _v: &pkix_path::DefaultVerifier = &DefaultVerifier;\n_accepts(_v);\n```\n\nTwo clippy issues:\n\n1. `clippy::used_underscore_binding` \u2014 `_v` is bound with leading underscore (signaling \"intentionally unused\") and then immediately used.\n2. `clippy::trivially_copy_pass_by_ref` \u2014 `&DefaultVerifier` is a 0-byte ZST passed by reference.\n\n## Context\n\nThis is a `#[test]` that exists only to assert at compile time that `pkix_chain::DefaultVerifier == pkix_path::DefaultVerifier` (re-export type identity). The pattern is a deliberate smoke test, but the names are misleading.\n\n## Fix\n\n```rust\n#[test]\nfn default_verifier_reexport_type_identity() {\n    fn accepts(_: &DefaultVerifier) {}\n    let v: &pkix_path::DefaultVerifier = &DefaultVerifier;\n    accepts(v);\n}\n```\n\nOr inline as a const-eval check:\n\n```rust\nconst _: fn(&DefaultVerifier) = |_: &pkix_path::DefaultVerifier| {};\n```\n\n## Priority\n\nP4 \u2014 test-only clarity nit.\n",
+  "ephemeral": 0,
+  "id": "PKIX-korl",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: underscore-prefixed binding _v used in pkix-chain test (clippy::used_underscore_binding)",
+  "updated_at": "2026-05-07T21:49:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1947320a0e1194bede1b6ea95329aeb374b9ed4124f3e4ff8b3e49ed56c9eea3",
+  "created_at": "2026-05-14T14:26:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs is 1359 lines in one file. Contains 6 distinct concerns:\n1. SCT signature verification (x509_entry + precert_entry) \u2014 verify_sct_for_cert, verify_sct_for_precert, build_signed_input_* helpers\n2. SCT batch verification \u2014 verify_embedded_scts\n3. Merkle inclusion proof \u2014 verify_inclusion, verify_inclusion_inner, inner_hash, merkle_leaf_hash\n4. MerkleTreeLeaf builders \u2014 merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert, build_merkle_tree_leaf_*\n5. STH verification \u2014 verify_sth, build_signed_input_tree_head, SignedTreeHead struct\n6. Helpers \u2014 tbs_without_sct_list, issuer_key_hash_from_cert, tls_alg_to_x509_oid, log_window_contains\n\nModule is navigable today (well-organized + sectioned) but at this size, future contributors will struggle to add the next feature (RFC 9162 v2, SCT-list signature, etc.) without scrolling. Pre-1.0 is the moment to split.\n\nSuggested split:\n- pkix-ct/src/verify/sct.rs \u2014 SCT signature verification (concerns 1, 2)\n- pkix-ct/src/verify/merkle.rs \u2014 Merkle inclusion + tree leaf builders (concerns 3, 4)\n- pkix-ct/src/verify/sth.rs \u2014 STH verification (concern 5)\n- pkix-ct/src/verify/mod.rs \u2014 re-exports + SctVerifier type\n- pkix-ct/src/verify/internal.rs \u2014 shared helpers (concern 6)\n\nMarked opinion because the file works as-is and the split is genuinely a style preference. But pre-1.0 is the cheap time to do it.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.19",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Module verify.rs is 1359 lines; merge inner_hash/merkle_leaf_hash/inclusion logic into a merkle submodule",
+  "updated_at": "2026-05-14T14:26:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:26:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

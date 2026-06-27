@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T19:57:35Z",
+  "compaction_level": 0,
+  "content_hash": "f802a08b15bd02a0a3c6f5e0f1ef2505e039c0b92e7466b81511cc14af57c51d",
+  "created_at": "2026-05-07T17:23:09Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1939 chain_walk is 489 lines; lib.rs:2786 check_name_constraints is 109 lines. Clippy pedantic too_many_lines fires. chain_walk monolithic structure is documented. check_name_constraints could be split. At minimum add allow with rationale comment.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] over-long chain_walk and check_name_constraints",
+  "updated_at": "2026-05-07T19:57:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

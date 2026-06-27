@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ab0c122457c4ce3c0530f89839b7c9b224138b00f02e357e98c4f9a2ad7e932f",
+  "created_at": "2026-05-14T17:44:23Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/Cargo.toml, all public types\n\nNon-negotiable #6 in AGENTS.md:\n\n> They [public result/error types] SHOULD support `serde::Serialize +\n> Deserialize` behind a `serde` feature flag for cross-process /\n> persistent caches.\n\n`pkix-ct` already has `serde` as an optional dep (gated on\n`log-list-json` for the input JSON parsing). It does NOT expose\n`Serialize/Deserialize` on its public types behind a `serde` feature\nflag for caller use.\n\nPublic types that should support serde behind a feature:\n\n- `Error` \u2014 for cross-process error reporting\n- `SignedCertificateTimestamp` \u2014 for cache keys, audit logs, replay\n- `SctList` \u2014 for the same\n- `CtLog` and `CtLogList` \u2014 for caller-side trust store\n  persistence\n- `MerkleAuditPath` \u2014 for proof persistence (a caller cached a\n  proof and wants to replay it)\n- `SignedTreeHead` \u2014 for STH cache (extremely common: a TLS server\n  caches the latest STH it has verified)\n\nToday none of these derive Serialize/Deserialize. Caller wanting to\ncache a parsed SCT has to:\n\n- Re-parse from the wire bytes on every cache lookup (slow), OR\n- Define their own caller-side mirror struct with serde + a\n  conversion impl on both sides (boilerplate), OR\n- Cache the SCT wire bytes and re-parse on hit (acceptable, but\n  silly given the struct is already in memory).\n\nRecommendation: add a `serde` feature:\n\n```toml\n[features]\nserde = [\"dep:serde\", \"der/serde\", ...]\n```\n\nDerive `Serialize + Deserialize` on every public data type behind\n`#[cfg_attr(feature = \"serde\", derive(...))]`. This is a one-line\nchange per type plus a feature in Cargo.toml.\n\nCost: ~10 derive lines, one new feature, zero runtime cost (only\ncompile-time and dep-graph cost for opted-in callers).\n\nBenefit: cross-process caches, persistent STH stores, audit logs,\nreplay testing all become trivial.\n\nPriority P1 because adding `Serialize/Deserialize` derives later is\ntechnically non-breaking but the cache-key contract has implications\nfor which fields are present and what their types are; deciding\nthis BEFORE callers have built workarounds is a lot easier than\nafter.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "No serde feature on cache-friendly result types \u2014 non-negotiable #6 says SHOULD support serde behind a feature flag",
+  "updated_at": "2026-05-14T17:44:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:44:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

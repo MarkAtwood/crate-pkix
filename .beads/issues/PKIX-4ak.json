@@ -1,0 +1,22 @@
+{
+  "close_reason": "pkix-profiles reframed as bundled examples in crate doc; Profile trait lives in pkix-path",
+  "closed_at": "2026-05-06T18:54:50Z",
+  "compaction_level": 0,
+  "content_hash": "c95fa6f68df413b06c359d2d6e43d7fe19cbda8f09458b36001e82f9d2c2afa8",
+  "created_at": "2026-05-06T18:44:12Z",
+  "created_by": "Mark Atwood",
+  "description": "The crate name 'pkix-profiles' and its flat structure imply it is the authoritative home for all PKI profiles. This is CABF-centered by accident of naming.\n\nChanges needed:\n1. Rename or reorganize so it is clear this crate ships 'the profiles that came with the library' not 'all profiles that can exist'. The crate description should say something like 'Reference profile implementations for CABF TLS BR, S/MIME BR, code signing, and RFC 5280 using the Profile trait from pkix-profile-core' (or similar).\n2. The Profile trait (PKIX-8c6) should live in a minimal crate (pkix-profile-core or in pkix-path itself) that pkix-profiles, pkix-fpki, pkix-etsi etc. all depend on \u2014 not in pkix-profiles, which would make pkix-profiles a forced dependency for anyone building a custom profile.\n3. Document explicitly that pkix-profiles is one set of regime implementations, not the extension point.\n\nThis may or may not require a crate rename (which is a breaking change); at minimum it requires doc changes and restructuring the trait location. Decide whether to extract pkix-profile-core or put the trait in pkix-path.",
+  "ephemeral": 0,
+  "id": "PKIX-4ak",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: reframe crate as bundled examples, not the canonical profiles namespace",
+  "updated_at": "2026-05-06T18:54:50Z"
+}

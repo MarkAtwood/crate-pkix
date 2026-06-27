@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Trait widened: fetch(&FetchRequest) -> FetchResponse; FetchMethod::{Get, Post{body, content_type}}; HttpCrlFetcher<F,V> and HttpOcspFetcher<F,V> gained V generic. All feature combos test green; clippy + rustdoc clean. Stale PKIX-58m references replaced. Committed at d52c830c.",
+  "closed_at": "2026-05-08T23:33:34Z",
+  "compaction_level": 0,
+  "content_hash": "013e6d1b70af2e0aeda7868e26e0d8fca6a1f0d41916777c4316f68a208e0fb0",
+  "created_at": "2026-05-08T23:27:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nCurrent trait surface in pkix-revocation-http/src/lib.rs:36-49 is:\n\n```rust\npub trait RevocationFetcher {\n    fn fetch(&self, url: &str) -> Result<Vec<u8>, FetchError>;\n}\n```\n\nThis is sufficient for HTTP GET (CRL fetch from CDP URL) but inadequate for OCSP, which is HTTP POST with:\n- a DER-encoded OCSPRequest body\n- Content-Type 'application/ocsp-request'\n- response Content-Type expected to be 'application/ocsp-response'\n\n## What\n\nWiden the trait to express request method + body + content-type. Two viable shapes:\n\n### Option A: enum-input\n```rust\npub trait RevocationFetcher {\n    fn fetch(&self, req: &FetchRequest) -> Result<FetchResponse, FetchError>;\n}\n\npub struct FetchRequest<'a> {\n    pub url: &'a str,\n    pub method: FetchMethod,\n}\npub enum FetchMethod<'a> {\n    Get,\n    Post { body: &'a [u8], content_type: &'a str },\n}\npub struct FetchResponse {\n    pub bytes: Vec<u8>,\n    pub content_type: Option<String>,\n}\n```\n\n### Option B: two methods\n```rust\npub trait RevocationFetcher {\n    fn get(&self, url: &str) -> Result<Vec<u8>, FetchError>;\n    fn post(&self, url: &str, body: &[u8], content_type: &str)\n        -> Result<Vec<u8>, FetchError>;\n}\n```\n\nRecommend **Option A** \u2014 closer to standard HTTP request shape, easier to extend with headers later (size limits, accept types, custom user-agent). Response carries content-type so callers can validate (OCSP response Content-Type sanity check).\n\n## Acceptance\n\n- [ ] Trait widened with structured request/response types.\n- [ ] Existing FetchError variants preserved; add Status to FetchResponse if non-2xx surfacing is needed at this layer (vs. as-error).\n- [ ] Plumb `V: SignatureVerifier` generic through HttpCrlFetcher<F, V> and HttpOcspFetcher<F, V> structs (currently only carry F + now_unix).\n- [ ] No code changes to pkix-revocation or pkix-chain. The trait widening is fully internal to pkix-revocation-http.\n- [ ] Stale 'PKIX-58m' tracking-issue references in the stub doc-comments updated to PKIX-a1yc.\n\n## Out of scope\n\n- Async variant (PKIX-a1yc.10).\n- Header-level customization beyond content-type (future-extension).\n- Size limits on response bytes (configurable, separate child if needed).\n\n## Effort\n\n~80 lines of trait/type definitions + doc comments + one or two compile-only test impls (e.g., a NullFetcher unit-test stub) to prove the trait shape works.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Widen RevocationFetcher trait for OCSP POST (body + content-type)",
+  "updated_at": "2026-05-08T23:33:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:27:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

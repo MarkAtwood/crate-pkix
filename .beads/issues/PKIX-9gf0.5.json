@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:09:33Z",
+  "compaction_level": 0,
+  "content_hash": "2755486d53947234bb3ec77dd1b3e47a4768ef44caf9de6a1e5b67816077ed75",
+  "created_at": "2026-05-07T16:09:32Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2429-2431 \u2014 when updating nc_constrained_types during NC state update, only entries from new_permitted are ORed in:\n  `for entry in new_permitted.iter() { nc_constrained_types |= name_type_bit(&entry.base); }`\n\nThis is correct for each CA that asserts a permittedSubtrees constraint. Each CA contributes its own types. The invariant says bits are only ORed in \u2014 once constrained, always constrained. This is the correct RFC 5280 \u00a76.1.4(b) behavior.\n\nHowever there is a subtle issue in the intersection logic at lines 2457-2505: when computing the intersection of current and new_permitted, if a type appears in new_permitted but NOT in current, the code adds it directly (line 2465-2466: 'Type not previously constrained \u2192 add directly'). This is correct \u2014 a new CA is adding a constraint for a type not previously constrained.\n\nBut the code also adds entries from current when same_type_in_new is empty (line 2484-2486: 'Type not in new_permitted \u2192 keep unchanged'). This is also correct \u2014 new_permitted doesn't constrain that type, so current's constraint is preserved.\n\nThe intersection is correct. Not a real bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC permitted intersection: type-tracking bits set only from new_permitted, not current",
+  "updated_at": "2026-05-07T16:09:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:09:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

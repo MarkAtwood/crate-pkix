@@ -1,0 +1,51 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "5b45ba1828142a55543e94866a94bd0d50de4d8a2d90c8390fd0ae50a8c8c0db",
+  "created_at": "2026-05-08T18:57:38Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-path` currently does only ASCII-whitespace + case-fold DN normalization. BMPString, UniversalString, and TeletexString DNs fall back to raw DER byte comparison (documented at `lib.rs:22-31` and `lib.rs:1347-1354`).\n\nReal-world consequence: international CA chains where Subject DN uses BMPString or UniversalString encoding for non-ASCII characters will fail `pkix-path` chain validation even when the certs are otherwise valid. OpenSSL handles RFC 4518 properly. This is documented as a known limitation but is a real interop gap for non-Latin-script CAs (gov.cn, gov.jp, etc.).\n\n## What\n\nImplement RFC 4518 'LDAP: Internationalized String Preparation' in full for use during DN comparison:\n\n1. **BMPString \u2192 Unicode**: decode BMPString DER (UTF-16BE-encoded code points) to a Unicode string. RustCrypto's `der` crate may already provide this; verify or implement.\n2. **UniversalString \u2192 Unicode**: decode UniversalString DER (UCS-4 / UTF-32BE) to Unicode. Same as above.\n3. **Teletex/T61String \u2192 Unicode**: this is the hard one. T.61 has multiple regional variants and ambiguous mapping. RFC 4518 \u00a71.6 punts on this. **Decision required**: either (a) implement a reasonable T.61 \u2192 Unicode mapping (e.g. ISO 6937 subset like OpenSSL does), or (b) document that Teletex remains byte-equal-only and explicitly reject T61String DNs in strict modes. Track as part of this epic; recommend (b) initially with (a) as a follow-up.\n4. **RFC 4518 6-step prep pipeline**:\n   * Step 1: Transcode (each string type \u2192 Unicode).\n   * Step 2: Map (case fold via Unicode CaseFolding.txt, kill control chars, etc).\n   * Step 3: Normalize (Unicode NFKC).\n   * Step 4: Prohibit (reject certain code points).\n   * Step 5: Bidi check.\n   * Step 6: Insignificant character handling (whitespace collapse rules, depending on the matching rule used).\n5. **Wire into `names_match`** (`lib.rs:1347`) so that during chain walks the prep pipeline is applied to both sides before comparison.\n\n## Recommended decomposition (file children when work starts)\n\n1. **BMPString and UniversalString decoders** (P2, ~50 lines) \u2014 pure transcoding, no Unicode tables.\n2. **Unicode case-folding + NFKC** (P2, ~100 lines + ~50KB of static tables) \u2014 pull in or vendor a small Unicode-3.2 case-fold table; consider `unicode-normalization` crate (no_std-capable) for NFKC.\n3. **RFC 4518 6-step pipeline assembly** (P2, ~80 lines) \u2014 wire steps 2-6 atop steps 1.\n4. **Hook into `names_match`** (P2, ~20 lines + tests).\n5. **Teletex policy decision + implementation OR strict-rejection** (P3, ~40 lines).\n6. **Test corpus**: chains with non-ASCII DNs in BMPString and UniversalString encodings, with and without trivial mismatches (whitespace, case). Bouncy Castle test corpus or generate via openssl.\n\n## Acceptance\n\n- [ ] Chains where Subject DN of intermediate uses BMPString or UniversalString encoding for non-ASCII chars are validated correctly when the bytes-decode-to-the-same-Unicode-string-after-prep.\n- [ ] `names_match` test with adversarial inputs: chain where issuer DN says PrintableString `Foo Co` and subject says BMPString `Foo Co` \u2014 must compare equal.\n- [ ] No `unsafe`. `pkix-path` stays `no_std` (`unicode-normalization` is no_std-capable).\n- [ ] PKITS baseline regression-tested: every chain that passed before still passes; class movement only goes Agreement \u2192 Agreement or one of the divergence buckets shrinks (no new regressions).\n- [ ] x509-limbo (PKIX-g9vc dependent \u2014 once integrated) demonstrates BMP/Universal handling.\n- [ ] INTEROP.md updated to remove the 'pyca DN comparison stricter than RFC 4518' divergence (or update it if pyca's behaviour also moves).\n\n## Out of scope\n\n- ldapPrep / nameprep beyond what RFC 4518 references.\n- Stringprep RFC 3454 (superseded by 4518).\n- Custom matching rules beyond `caseIgnoreMatch` and `distinguishedNameMatch`.\n\n## Effort\n\nEstimated ~200 lines + Unicode tables (vendored or via crate). 1\u20132 days of focused work.\n\n## Filed as\n\nv1.0 'bar' item per gap audit. High-impact for international CA interop. Currently documented as a planned RFC 4518 work item in pkix-path/README.md and the lib.rs Limitations section.\n",
+  "ephemeral": 0,
+  "id": "PKIX-l63j",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path: full RFC 4518 DN normalization (BMP/Universal/Teletex transcoding + 6-step prep)",
+  "updated_at": "2026-05-14T03:12:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T13:49:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T13:49:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T13:49:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T13:49:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

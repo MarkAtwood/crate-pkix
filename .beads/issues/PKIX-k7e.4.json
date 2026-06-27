@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:49:13Z",
+  "compaction_level": 0,
+  "content_hash": "eb3782b5d3af0768816510a55d94f4c1ac41cba0e8d5e1eb50bf7d6e985323c5",
+  "created_at": "2026-05-06T15:45:48Z",
+  "created_by": "Mark Atwood",
+  "description": "CrlChecker::new, CrlChecker::with_delta, and OcspChecker::new are missing #[must_use]. The first-pass review (PKIX-kwd) added #[must_use] to constructors in pkix-path (TrustAnchor::new, TrustAnchor::from_cert, ValidationPolicy::new, names_match). The same convention should apply to the new revocation crate constructors introduced in the commits covered by this epic.\n\nFiles:\n- pkix-revocation/src/crl.rs:86 \u2014 CrlChecker::new\n- pkix-revocation/src/crl.rs:107 \u2014 CrlChecker::with_delta\n- pkix-revocation/src/ocsp.rs:69 \u2014 OcspChecker::new",
+  "ephemeral": 0,
+  "id": "PKIX-k7e.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: missing #[must_use] on constructors",
+  "updated_at": "2026-05-06T15:49:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:45:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-k7e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c84099d78482741f36826703831d89ea765d1414a887d17ea7977dcca85eaac1",
+  "created_at": "2026-05-11T04:44:42Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 2 of 6. Key-rollover topology: a trust anchor\nrotates its signing key; the old TA self-signs a cross-cert that asserts the\nnew TA. End-entity certs signed by the new key must validate through the\ncross-cert when the verifier only knows the old key as anchor.\n\n## What\n\nPool topology:\n\n```\nOldRootSelf  (TA, SKI=oldkey, signs with oldkey)\nNewRootCross (subject=NewRoot, issued by OldRoot, signed with oldkey,\n              SPKI=newkey)\nRolloverEE   (signed with newkey, AKI=newkey)\n```\n\nBuild steps:\n\n1. Generator issues:\n   - `OldRootSelf.crt` (anchor, self-signed with oldkey).\n   - `NewRootCross.crt` (issued by OldRoot, signed with oldkey, subject DN\n     same as NewRoot, SPKI = newkey).\n   - `RolloverEE.crt` (signed by newkey, AKI keyIdentifier = newkey SKI).\n2. Test (`tests/key_rollover.rs`):\n   - Anchor list: `[OldRootSelf]`.\n   - Pool: `[NewRootCross]`.\n   - `build_path(&ee, &pool, &anchors)` must succeed and return a chain\n     ending at NewRootCross, with the verifier walking via oldkey to\n     anchor OldRootSelf.\n   - `validate_path(...)` must succeed.\n3. Oracle: cert SKIs / AKIs extracted by hard-coded hex literals captured\n   from `openssl x509 -text` at fixture-creation time, compared independently\n   of the path builder.\n\n## Acceptance\n\n- [ ] Three DER fixtures committed.\n- [ ] Generation reproducible via `generate.sh`.\n- [ ] One integration test verifying the rollover path is found and\n      validated.\n\n## Depends on\n\nPKIX-xj81.1 (shared generator + helpers).",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: key-rollover (old key signs new key cert) fixture+test",
+  "updated_at": "2026-05-11T04:44:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:44:42Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:28Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

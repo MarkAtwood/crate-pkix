@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:19Z",
+  "compaction_level": 0,
+  "content_hash": "c17575f80ddcb2ae703f35e964ac58f7dde05b55ddce1f354d09a691b847b414",
+  "created_at": "2026-05-07T16:10:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:94-96 \u2014 verify_scts always returns Err(Error::NoTrustedSct):\n  `pub fn verify_scts(_cert: &Certificate, _logs: &CtLogList) -> Result<()> { Err(Error::NoTrustedSct) }`\n\nThe crate-level doc comment says 'Not yet implemented' and the README shows pkix-ct as 'planned'. However:\n\n1. The function signature is public and exported \u2014 callers can call it and will always get an error. There is no #[deprecated] or compile-time indication it is a stub.\n2. A caller who calls verify_scts trusting it does something will get a false error on all certs.\n\nSuggested fix: Add #[deprecated = \"pkix-ct is not yet implemented\"] to the verify_scts function, or make it return a specific error variant (Error::NotImplemented) and document that variant as the stub indicator. The README already says 'planned' so this is just an in-code disambiguation.\n\nP3 \u2014 misleading public API.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct verify_scts always returns NoTrustedSct \u2014 unimplemented stub not documented in README",
+  "updated_at": "2026-05-07T16:36:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:10:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

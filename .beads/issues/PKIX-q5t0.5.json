@@ -1,0 +1,31 @@
+{
+  "close_reason": "Positive finding",
+  "closed_at": "2026-06-15T19:15:43Z",
+  "compaction_level": 0,
+  "content_hash": "94105d183908fb9097f6e467e6334fccf525bbfdc7ee43f18aad4abdf09e9c40",
+  "created_at": "2026-06-15T19:05:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs: Removing `Default for ValidationPolicy` forces every caller to supply a timestamp via `ValidationPolicy::new(now_unix)`. This eliminates the footgun where `Default::default()` silently creates a policy with `current_time_unix = 0` (1970-01-01), causing every modern certificate to fail validity checks. The struct-update idiom `..ValidationPolicy::new(0)` in tests (where `current_time_unix` is overridden anyway) is slightly awkward but acceptable \u2014 the dead `0` is immediately overwritten and the alternative is duplicating all fields.",
+  "ephemeral": 0,
+  "id": "PKIX-q5t0.5",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Good: ValidationPolicy Default removal",
+  "updated_at": "2026-06-15T19:15:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:05:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q5t0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

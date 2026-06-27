@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e0d0ab39f11f69d346e9a474075aafc7386bc9edce9b0238e508a2e258997111",
+  "created_at": "2026-05-14T19:44:38Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/signer_discovery.rs:60-75 (rustdoc on discover_crl_signer), and the helper functions at 219-258.\n\nThe rustdoc says (lines 71-75):\n  - 'Malformed AKI / SKI extensions are treated as \"extension absent\" for the purposes of discovery.'\n\nThis is a documented intent. But the helpers cert_subject_key_id and cert_authority_key_id silently do this via `.ok()?` on each from_der call. The behavior is:\n\n- Bundle cert with a malformed AKI extension is treated as having no AKI; its SKI is still used in the AKI-walk if its SKI extension is valid.\n- Bundle cert with a malformed SKI extension is treated as having no SKI; it cannot match the AKI walk at all.\n- Bundle cert with a malformed AKI extension during reaches_self_signed: cert_authority_key_id returns None; find_parent falls back to DN matching. So a corrupted AKI on an intermediate causes a SILENT FALLBACK to DN matching. That can pick up the wrong parent.\n\nWhat's underdocumented in the public API:\n\n1. The reaches_self_signed contract does not specify what happens for malformed AKI on bundle certs encountered DURING the anchor walk. The module-level rustdoc covers the discover_crl_signer entry point ('treated as absent') but doesn't propagate that promise to the walking phase. A reader cannot tell that 'CrlSignerNotTrusted' might be returned for a bundle that has all-correct-but-AKI-malformed certs.\n\n2. From the caller's perspective: discovering 'why didn't my bundle reach an anchor?' requires knowing about the silent malformed-AKI fall-back. They will spend hours suspecting their bundle is incomplete when in fact one cert has a slightly-off AKI encoding.\n\n3. The defense-in-depth angle: an attacker who can include a cert with a malformed AKI in a bundle (e.g., a CRL-supplied bundle from an AIA fetch) can influence the parent-finding heuristic to pick a different cert. This is currently within the design ('discovery is a heuristic'), but the implications are not stated.\n\nThis is api-contract,docs because the existing rustdoc says 'treated as extension absent' as if that fully describes the behavior, but does not describe the DOWNSTREAM consequence (DN-fallback in the walk).\n\nOptions:\n(A) Expand rustdoc on discover_crl_signer and on the (newly-public, if PKIX-lnnl.16 goes that way) reaches_self_signed to specify: 'malformed AKI on any cert encountered during the walk falls back to DN matching; the walk may therefore select a structurally-different parent than the AKI-pristine case would have.'\n\n(B) Tighten behavior: treat 'extension present but malformed' differently from 'extension absent.' A malformed extension on a critical extension is a hint of either bug or attack and could be fail-closed (return CrlSignerNotFound on malformed AKI/SKI on the CRL or on any cert visited).\n\n(B) is the safer behavior but is a behavior change (PKIX-lnnl mass test PKITS data has well-formed AKI/SKI). (A) is the cheaper api-contract fix.\n\nAcceptance: rustdoc expanded as in (A), or behavior change (B) shipped with a regression test using a synthetic malformed-AKI fixture.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "discover_crl_signer: rustdoc does not document behavior for malformed AKI on cert (silent skip)",
+  "updated_at": "2026-05-14T19:44:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:44:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

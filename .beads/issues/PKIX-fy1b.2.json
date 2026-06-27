@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: RFC 5280 \u00a73.3 says CRL valid up to-and-including nextUpdate; now > nextUpdate is correct (not >=)",
+  "closed_at": "2026-05-07T04:48:50Z",
+  "compaction_level": 0,
+  "content_hash": "a9050cbe6056c6d9101b7e407ee8fcebd3f87111242f8cb2e74fa37f3247f60f",
+  "created_at": "2026-05-07T04:36:09Z",
+  "created_by": "Mark Atwood",
+  "description": "In crl.rs:check_revocation() line 242, the nextUpdate check is: 'if self.now_unix > next_update.to_unix_duration().as_secs()'. This returns CrlExpired when now > nextUpdate, meaning a CRL is treated as valid at exactly its nextUpdate timestamp. RFC 5280 \u00a73.3 defines nextUpdate as 'the time by which the next CRL will be issued'; a CRL at exactly nextUpdate is still technically valid per the standard ('the indicated time or later'), so this is consistent with common practice. However the same boundary is inconsistently applied to delta CRL in verify_delta_crl_and_collect (line 527). Both use strictly-greater, so they are consistent, but the doc comment says 'now > nextUpdate: the CRL has expired' \u2014 this is correct. No bug, but worth documenting as a deliberate boundary choice (not an error).",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CRL validity check uses > for nextUpdate but CRL expired boundary should be >=",
+  "updated_at": "2026-05-07T04:48:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

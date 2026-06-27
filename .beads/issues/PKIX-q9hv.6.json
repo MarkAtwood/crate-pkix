@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e0f96a5d3e2aca9b2a2fbbb20109b954e57f18943169a5a0e86bdb724f779c49",
+  "created_at": "2026-05-14T14:37:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:594-633: tried_uris HashSet uses String key equality (case-sensitive). An adversarial cert could publish 'http://example.test/i' AND 'http://EXAMPLE.test/i' as caIssuers entries to force two fetches against the same logical endpoint. Practical impact is low (DNS is case-insensitive, path is case-sensitive per RFC 3986) and the AIA_MAX_DEPTH cap bounds total fetches at 5*number_of_uris, but the dedup intent is to amortize fetches across iterations. Minimal fix: normalize the scheme+authority portion to ASCII-lowercase before insertion. Alternatively: split URI parsing properly and dedup on a canonical form. Not a correctness bug \u2014 every URI is HTTP/HTTPS by line 89's filter \u2014 but it's a small efficiency / consistency issue worth tightening.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_with_aia: tried_uris dedup is case-sensitive",
+  "updated_at": "2026-05-14T14:37:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:37:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

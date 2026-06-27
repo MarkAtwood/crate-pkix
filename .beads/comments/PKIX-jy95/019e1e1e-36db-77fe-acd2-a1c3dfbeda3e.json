@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:35:57Z",
+  "id": "019e1e1e-36db-77fe-acd2-a1c3dfbeda3e",
+  "issue_id": "PKIX-jy95",
+  "text": "ARCHITECTURE UPDATE 2026-05-12 (decision PKIX-jy95.6 = A): the workspace adapter pattern for external policy tools is now TWO-LAYER: bridge crates own subprocess plumbing + parsing + verdict normalization; thin Lint-trait adapters wrap bridge findings as workspace Lint impls. Newly filed children: PKIX-jy95.7 pkix-zlint-bridge (subprocess infra for zlint), PKIX-jy95.8 pkix-pkilint-bridge (subprocess infra for pkilint). The previously-framed adapter crates pkix-policy-zlint and pkix-policy-pkilint will land as thin wrappers in follow-on beads. Cross-cutting consumer: pkix-difftest's zlint+pkilint differential oracles (PKIX-hbzo.1) also depend on the bridge crates. Open shape decisions .1 / .2 / .3 / .4 now scope to the BRIDGE crate API (see scope-note comments on each)."
+}

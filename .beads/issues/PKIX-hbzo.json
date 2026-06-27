@@ -1,0 +1,22 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "compaction_level": 0,
+  "content_hash": "8d5bd594adc426978a713c34f9e63fd17cbeb007cbb0e4fcf46706f75b317c75",
+  "created_at": "2026-05-11T06:29:50Z",
+  "created_by": "Mark Atwood",
+  "description": "## Scope\n\nBring `pkix-difftest` to first-class shape: realistic corpora, real revocation coverage, and CI integration. Tracks the orphan diff-harness work that did not previously have an epic parent.\n\n## Children (reparented)\n\n- **PKIX-emf1** \u2014 CRL revocation in the differential harness (was orphan)\n- **PKIX-g9vc** \u2014 x509-limbo corpus integration (Tier 2 for real) (was orphan)\n- **PKIX-t0w4** \u2014 PKITS CertPath includes non-signing certs (path-building integration) (was orphan)\n- **PKIX-klku** \u2014 diff harness CI integration (was orphan)\n- **PKIX-5bab** \u2014 Tier-3 CT log scrape corpus (was orphan)\n\n## Goal\n\nAfter this epic closes:\n\n- The differential harness exercises CRL revocation paths against OpenSSL and pyca/cryptography (not just chain validation).\n- x509-limbo is a real Tier-2 corpus consumed by the harness (currently only PKITS is fully wired).\n- PKITS path-building integration uses the full CertPath including non-signing certs (currently positional only).\n- CI runs the differential harness on every push and reports divergences.\n- Tier-3 (live CT log scrape) corpus is at least scaffolded so it can be extended later without re-architecture.\n\n## Out of scope\n\n- Adding new oracles beyond OpenSSL + pyca (no Bouncy Castle, no Go crypto/x509). File separately.\n- Browser-equivalent path validation (rustls-webpki shape). The harness is RFC-conformance shaped.",
+  "ephemeral": 0,
+  "id": "PKIX-hbzo",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Escalating to human (do-beads loop, 2026-05-11): this epic surfaces as ready because it has no direct dependencies, but it's a pure container. 5 of 6 children are closed; the remaining child PKIX-hbzo.1 (zlint + pkilint cross-validation oracles) is related-to PKIX-amgn.8 (zlint OSCAL catalog vendoring), which is itself open and a P2 human-decision item. PKIX-hbzo.1 only makes sense AFTER PKIX-amgn.8's vendored catalog exists (you can't cross-validate against a catalog that doesn't exist yet). So the epic is effectively human-blocked through that chain. Marking human-labeled so it stops appearing in autonomous ready queue. Reopen the autonomous path by either (a) advancing PKIX-amgn.8, (b) reparenting PKIX-hbzo.1 elsewhere, or (c) closing PKIX-hbzo.1 + closing the epic.\nDependency made explicit 2026-05-11 (Mark): PKIX-amgn.8 (vendor zlint catalog as OSCAL Catalog JSON) now blocks PKIX-hbzo.1 (zlint + pkilint cross-validation oracles) via a real blocks edge, replacing the informational relates-to link. Human label removed from this umbrella \u2014 the gating is now expressed in the dependency graph, not as a phantom \"pending maintainer decision.\" When PKIX-amgn.8 closes, PKIX-hbzo.1 naturally unblocks; when .1 closes, this umbrella auto-closes as completed-molecule.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: differential harness completeness (revocation, x509-limbo, CI, CT)",
+  "updated_at": "2026-05-11T23:09:59Z"
+}

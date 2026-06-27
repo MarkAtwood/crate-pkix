@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-12T18:59:04Z",
+  "compaction_level": 0,
+  "content_hash": "b9e0f222ed7a6471c758ac054957a4668542af3a90672060b97ff666d39442be",
+  "created_at": "2026-05-11T05:44:18Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nProject stance (decided 2026-05-11): the workspace ships standards-based **mechanisms** for implementing, testing, enforcing, and linting PKI policy. It does NOT ship canonical encodings of any single organization's policy \u2014 CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, or individual CA CPSs.\n\nToday, `pkix-profiles` ships `TlsBrProfile` and a CA/B-Forum-flavoured `SmimeProfile` (Mailbox-validated / strict tier with SC-081 validity caps). `pkix-lint` ships `cabf.br.tls` lint bundles. Both blur the line between framework and policy.\n\nRealign: framework + RFC-baseline content stays in the main crates. CA/B Forum specifics move to sibling reference crates (`pkix-profiles-cabf`, `pkix-lint-cabf`) clearly marked as 'reference / not authoritative \u2014 fork and adapt to your deployment's current CA/B Forum interpretation.'\n\n## The line\n\n**Stays in `pkix-profiles` / `pkix-lint`** (standards bodies / universal industry consensus):\n\n- The `Profile` trait, `ValidationPolicy` struct, framework helpers.\n- The `Lint` trait, `LintRunner`, `Finding`, `EvaluationReport`, `DeviationStore`.\n- `BasicSmimeProfile` \u2014 RFC 8551 \u00a73 cert-profile baseline (id-kp-emailProtection EKU + rfc822Name SAN). Mailbox-binding logic, no validity caps, no key-size floors, no identity-tier policy OIDs.\n- `BasicTlsProfile` \u2014 RFC 5280 + RFC 6125 server identity verification + universally-required id-kp-serverAuth EKU. No validity caps, no key-size floors.\n- RFC-conformance lints (RFC 5280, RFC 6960, RFC 4518, etc.). Standards-body content.\n\n**Moves to `pkix-profiles-cabf`** (CA/B Forum-specific reference):\n\n- `TlsBrProfile` and SC-081 validity caps.\n- `SmimeProfile` Mailbox-validated / strict, Organization-validated, Sponsor-validated, Individual-validated tiers (PKIX-jbvb scope reparents here).\n- CA/B Forum policy OIDs and per-tier required-field tables.\n\n**Moves to `pkix-lint-cabf`** (CA/B Forum-specific reference):\n\n- `cabf.br.tls` / `cabf.br.smime` lint bundles.\n- Anything keyed off a CA/B Forum ballot number (SC-081, etc.).\n\n## Acceptance\n\n- [ ] AGENTS.md encodes the framework-not-policy stance as a non-negotiable.\n- [ ] `pkix-profiles-cabf` exists as a workspace crate, depending on `pkix-profiles` framework.\n- [ ] `pkix-lint-cabf` exists as a workspace crate, depending on `pkix-lint` framework.\n- [ ] Both new crates carry a prominent rustdoc + README header: 'Reference implementation of CA/B Forum requirements \u2014 not authoritative. Fork and adapt to your deployment's current CA/B Forum interpretation. See https://cabforum.org/ for the current Baseline Requirements text.'\n- [ ] `pkix-profiles` keeps `BasicSmimeProfile` + `BasicTlsProfile` as RFC-baseline references.\n- [ ] `pkix-lint` keeps only RFC-conformance lints.\n- [ ] PKIX-jbvb (S/MIME BR sub-profile families) reparented to `pkix-profiles-cabf` scope, with the reference-not-authoritative framing baked into its acceptance criteria.\n- [ ] Top-level README + CHANGELOG migration notes for downstream consumers.\n\n## Out of scope\n\n- Maintaining `pkix-profiles-cabf` / `pkix-lint-cabf` long-term \u2014 Mark or another maintainer commits to keeping them current with CA/B Forum ballots; they may also choose to move them out of the workspace later.\n- Encoding DoD / federal PKI policies (out-of-tree concern entirely).\n- Encoding individual root-program policies (Mozilla, Apple, Microsoft) \u2014 out-of-tree.\n\n## Children\n\n- `.1` AGENTS.md stance update (anchor)\n- `.2` Create `pkix-profiles-cabf` crate\n- `.3` Create `pkix-lint-cabf` crate\n- `.4` Refactor `pkix-profiles` to framework + BasicSmime + BasicTls\n- `.5` Refactor `pkix-lint` to framework + RFC-conformance lints\n- `.6` Reparent PKIX-jbvb to pkix-profiles-cabf\n- `.7` README + CHANGELOG migration docs",
+  "ephemeral": 0,
+  "id": "PKIX-amgn",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked human 2026-05-11: PKIX-amgn.2 (create pkix-profiles-cabf crate \u2014 labeled human) is the foundational gate. PKIX-amgn.3 also depends on PKIX-9vnx.7 (transitively human via the OSCAL chain). All remaining children (.4, .5, .6, .7) transitively block on these. The umbrella cannot make autonomous progress until the crate-creation decisions land. Re-evaluate when PKIX-amgn.2 closes.\nDecisions recorded 2026-05-11 (Mark):\n\n- PKIX-amgn.2 scope: X (empty-skeleton crate, no code move). publish = true at 0.1.0.\n- PKIX-amgn.4 scope: includes the actual move out of pkix-profiles, plus CodeSigningProfile (which was missing from the original epic body), plus deprecation shims in pkix-profiles for one minor version.\n\nPKIX-amgn.2 now unblocked. PKIX-amgn.3 stays deep-downstream behind PKIX-9vnx.7.\n\ndo-beads loop hygiene 2026-05-11: applying the human label. Notes already record 'Marked human 2026-05-11' but the label itself was missing \u2014 without it, the umbrella keeps surfacing at the top of bd ready. PKIX-amgn.4 just closed, but the remaining children (.3, .5, .7) transitively block on PKIX-9vnx.7 (OSCAL Profile composition, human-labeled). Re-evaluate when PKIX-9vnx.7 closes or the autonomous frontier of PKIX-amgn descendants reopens via other paths.\nHuman label removed 2026-05-11 (Mark): label hygiene. The original decision gate (PKIX-amgn.2 \"create pkix-profiles-cabf\") closed; all remaining children (.5, .7, .8) are downstream-blocked by the OSCAL cascade (PKIX-9vnx.6/.7), not pending on maintainer decisions. The umbrella now naturally unblocks as the OSCAL chain unwinds.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Realign pkix-profiles + pkix-lint: framework + RFC-baseline in main crates, CA/B Forum policy in -cabf reference crates",
+  "updated_at": "2026-05-12T18:59:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:41:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8qz1",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

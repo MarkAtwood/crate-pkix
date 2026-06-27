@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Rewrote find_cert_ext doc to use 'from cert' phrasing, eliminating ambiguous 'this' referent.",
+  "closed_at": "2026-05-05T04:52:39Z",
+  "compaction_level": 0,
+  "content_hash": "e5b1f01fe131ecb099c3ae37f55f4761a5d2c98269df198e07774a2a1046fc2f",
+  "created_at": "2026-05-03T13:15:55Z",
+  "created_by": "Mark Atwood",
+  "description": "The doc comment on find_cert_ext (lines 602-606 of pkix-path/src/lib.rs) reads: 'callers that need to distinguish parse errors from absence should call this directly and inspect the error.' The word 'this' is ambiguous \u2014 it looks like it refers to find_cert_ext itself (which swallows the error), when it actually means callers should use try_find_cert_ext instead. Replace 'call this directly' with 'call try_find_cert_ext instead' to eliminate the ambiguity.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_cert_ext doc: 'this' referent is ambiguous",
+  "updated_at": "2026-05-05T04:52:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

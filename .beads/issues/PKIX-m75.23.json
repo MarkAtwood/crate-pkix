@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:13:49Z",
+  "compaction_level": 0,
+  "content_hash": "33606a85fe36ed226bc1612618914406e4f95e69df183bf4ec6cc4df12c4f750",
+  "created_at": "2026-05-06T20:51:15Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-revocation/src/lib.rs RevocationChecker trait, check_revocation() at line 194. The #[must_use] attribute is on the trait method. In Rust, #[must_use] on a trait method is respected by the compiler for direct calls, but the real enforcement here is that Result<()> is already #[must_use] as a type. The annotation is redundant but harmless. The actual important issue: check_revocation_against_anchor() has a DEFAULT IMPLEMENTATION that returns Ok(()) silently. The doc comment at lines 162-169 explicitly warns 'Implementors that want full-chain revocation coverage MUST also override check_revocation_against_anchor. The default implementation skips the check silently; forgetting to override it will leave the anchor-issued certificate unchecked with no compile error or runtime warning.' This is a security-relevant silent skip that cannot be enforced at compile time. There is no mechanism (marker trait, type-state, etc.) to require implementors to override this method. Fix: Consider a two-trait design where RevocationChecker only handles cert-to-cert and a separate FullRevocationChecker requires the anchor case, or add a runtime assertion option. Priority: P2 (security design gap \u2014 easy to silently miss anchor revocation).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: check_revocation_against_anchor default is silent Ok() with no enforcement",
+  "updated_at": "2026-05-06T21:13:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

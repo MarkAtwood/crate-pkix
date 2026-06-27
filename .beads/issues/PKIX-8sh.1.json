@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:36:38Z",
+  "compaction_level": 0,
+  "content_hash": "e58b9b4346dec6e995e690bee6f39cae3f15dfd4797cf9132122b8361e45b590",
+  "created_at": "2026-05-02T18:29:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs: verify_scts always returns Err(Error::NoScts). NoScts means the cert contains no SCT extension \u2014 a meaningful, actionable status. A caller who passes a cert that DOES have SCTs will get NoScts back, which is factually false. The function is unimplemented; it should return a distinct variant or panic with 'not implemented', not a status code that callers will misinterpret as a real cert evaluation. Future integration code that branches on this error will silently behave incorrectly when the function is eventually implemented.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_scts returns NoScts instead of NotImplemented",
+  "updated_at": "2026-05-02T18:36:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:29:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

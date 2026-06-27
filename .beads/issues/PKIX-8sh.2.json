@@ -1,0 +1,31 @@
+{
+  "close_reason": "Err(Error::NoPathFound) is the least misleading of available variants for an unimplemented path builder \u2014 an unimplemented builder genuinely finds no paths. Distinct from PKIX-8sh.1 and PKIX-8sh.3 where the error implied malformed input. Doc already says 'Not yet implemented (PKIX-y2j)'. No code change warranted.",
+  "closed_at": "2026-05-02T18:39:11Z",
+  "compaction_level": 0,
+  "content_hash": "946fce7f16cc75ba892fa6fb1ec7d053886898b2785395da296432c8e63a827b",
+  "created_at": "2026-05-02T18:30:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs: build_path always returns Err(Error::NoPathFound). NoPathFound is a real operational outcome (genuinely no path through the pool). Returning it from an unimplemented stub means callers who call build_path with a valid, constructible chain will receive NoPathFound, which is factually wrong and misleading. When this is later implemented, downstream code that already handles NoPathFound will silently start working differently. The stub should either panic!('not implemented') or the error enum needs a NotImplemented variant.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path returns NoPathFound instead of not-implemented signal",
+  "updated_at": "2026-05-02T18:39:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:30:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

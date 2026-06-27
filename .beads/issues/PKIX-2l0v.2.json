@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T03:02:34Z",
+  "compaction_level": 0,
+  "content_hash": "1feb44e9289ac4228206841d6dcd6f55d4456636a27820ecf2bc0f5d03e5c3ce",
+  "created_at": "2026-05-12T19:16:01Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAGENTS.md non-negotiable #6 requires that result/error types be `Send + Sync`. Almost certainly true today because no current load-bearing type contains `Rc<T>`, `RefCell<T>`, or raw pointers \u2014 Send+Sync auto-derives for owned-data types. But the rule is currently aspirational; a one-shot audit makes it compile-enforced.\n\n## Targets\n\n- pkix-path: ValidatedPath, Error, TrustAnchor, ValidationPolicy\n- pkix-chain: Error\n- pkix-revocation: Error\n- pkix-truststore: Error, TrustAnchor (re-exported)\n- pkix-lint: Finding\n- pkix-identity: types as they land\n\n## Implementation\n\nFor each target, add a compile-time assertion. Easiest pattern is the `static_assertions` crate (or a hand-rolled `fn _assert_send_sync<T: Send + Sync>() {}` + `_assert_send_sync::<ValidatedPath>();` at module scope).\n\nExample:\n\n```rust\n#[cfg(test)]\nfn _assert_traits() {\n    fn _send_sync<T: Send + Sync>() {}\n    _send_sync::<ValidatedPath>();\n    _send_sync::<Error>();\n    _send_sync::<TrustAnchor>();\n    _send_sync::<ValidationPolicy>();\n}\n```\n\nOr under the unit test module:\n\n```rust\nconst _: fn() = || {\n    fn _assert<T: Send + Sync>() {}\n    _assert::<ValidatedPath>();\n    // ...\n};\n```\n\n## Acceptance\n\n- [ ] Compile-time Send+Sync assertions on every load-bearing result type\n- [ ] cargo check / cargo test succeeds across workspace\n- [ ] If any type fails the assertion, fix is in scope (likely Box / Arc / replace Rc with Arc, etc.)\n- [ ] CHANGELOG entries if any types had to change\n\n## Out of scope\n\n- Adding Send+Sync to types that aren't user-facing result types (internal scratch state, builder intermediates)\n- Documenting Send+Sync in rustdoc (rustdoc auto-shows trait impls)\n\n## Why\n\nAGENTS.md non-negotiable #6 requires Send+Sync as a MUST. Compile-time assertions prevent regression as new fields land (especially in Error enums where someone could add a variant carrying Rc<T> by accident).",
+  "ephemeral": 0,
+  "id": "PKIX-2l0v.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Audit Send+Sync on load-bearing result types; add static_assertions to prevent regression",
+  "updated_at": "2026-05-13T03:02:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:16:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2l0v",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

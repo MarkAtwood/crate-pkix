@@ -1,0 +1,38 @@
+{
+  "close_reason": "Wiring completed within PKIX-xji (check call site) and PKIX-9jg (state update call site) \u2014 both already committed to chain_walk",
+  "closed_at": "2026-05-02T23:33:15Z",
+  "compaction_level": 0,
+  "content_hash": "51fa35b1cb2c566135e70d27a225ee267ead73961e8922d6ab5199ff96da0377",
+  "created_at": "2026-05-02T23:21:29Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nConnect the NC state variables, per-cert constraint check, and state-update logic into the chain_walk loop in pkix-path/src/lib.rs.\n\n## Algorithm\nIn the main chain_walk loop, for each cert at index i:\n1. BEFORE processing cert i: run per-cert NC check (PKIX-xji) against current permitted/excluded state\n   - If Err \u2192 return early with NameConstraintViolation { index: i }\n2. AFTER processing cert i (if it's a CA, not the leaf): run NC state update (PKIX-9jg)\n   - Update permitted_subtrees and excluded_subtrees from this cert's NC extension\n\nOrdering: RFC 5280 \u00a76.1.4 applies the name check at step (b)(1) and state update at (b)(2) per cert.\n\n## Defensive programming\n- Do not wire in if either PKIX-xji or PKIX-9jg are not yet merged \u2014 this is the final orchestration step\n- Verify loop iteration order matches chain semantics (cert[0]=leaf, cert[n-1]=root-issued CA)\n\n## Acceptance criteria\n- Full chain with permitted=[.example.com], EE SAN=foo.example.com \u2192 passes\n- Full chain with permitted=[.example.com], EE SAN=foo.other.com \u2192 Err(NameConstraintViolation)\n- chain_walk compiles cleanly with no dead-code warnings\n- Depends on: PKIX-9jg (state update), PKIX-xji (per-cert check)",
+  "ephemeral": 0,
+  "id": "PKIX-fr4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Wire NC check+update into chain_walk orchestration",
+  "updated_at": "2026-05-02T23:33:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9jg",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-02T16:21:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-xji",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T19:57:02Z",
+  "compaction_level": 0,
+  "content_hash": "71020acd7bad7e2dbcb4c66d921f4e4efc41183fe12f9e4f9022501f88ca30d1",
+  "created_at": "2026-05-07T17:22:33Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/pkits_helper.rs:44 \u2014 `panic!(\"...path: {path:?}\")` uses Debug formatting for a PathBuf where Display (path.display()) is clearer. Clippy pedantic unnecessary_debug_formatting fires. Fix: change `{path:?}` to `{}` with `path.display()`.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] unnecessary {path:?} Debug in pkits_helper panic message",
+  "updated_at": "2026-05-07T19:57:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

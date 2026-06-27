@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:18:25Z",
+  "compaction_level": 0,
+  "content_hash": "b433d6583f198311e4d17134c99e9b64b37bc733e90f1328b2024157e082b5f5",
+  "created_at": "2026-05-07T20:14:34Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`ls /home/mark/PROJECT/PKIX/rust_out\\` shows a 3.9 MB executable file in the repo root. It is gitignored (\\`/.gitignore:rust_out\\`) and not tracked, but its presence is noise.\n\nThe file looks like a stray rust binary, possibly from \\`cargo run\\` outside the workspace target/ dir or a test debug emit.\n\n## Why P3\n- Cosmetic \u2014 does not affect builds or correctness.\n- Confusing for fresh checkouts where this file is absent \u2014 readers seeing it on Mark's machine may assume it's a build artifact they should reproduce.\n\n## Fix\nDelete \\`rust_out\\` from the working tree. Investigate where it came from (likely a stray output from a one-off compile). The pattern \\`rust_out\\` in \\`.gitignore\\` suggests it has happened before; consider broader pattern \\`/rust_out*\\` to cover variants.\n\n## Scope reference\n\\`/home/mark/PROJECT/PKIX/rust_out\\` (untracked but present).",
+  "ephemeral": 0,
+  "id": "PKIX-vjr1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: stray rust_out binary in repo root not gitignored properly",
+  "updated_at": "2026-05-07T21:18:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

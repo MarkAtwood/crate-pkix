@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T03:42:53Z",
+  "compaction_level": 0,
+  "content_hash": "810df956b53da8baf666fec6c1a3893025fa4f13d84c196a6d6395e123bb7665",
+  "created_at": "2026-05-13T03:28:11Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "## What\n\nImplement `ZlintBridge::enumerate_lints() -> Result<Vec<ZlintLintInfo>, BridgeError>` against `zlint -list-lints-json`.\n\nzlint emits one JSON object per line: `{\"name\", \"description\", \"citation\", \"source\"}`. The bridge:\n\n1. Spawns `<zlint_path> -list-lints-json` once per call\n2. Reads stdout as NDJSON (line-delimited)\n3. Maps each line into `ZlintLintInfo`\n4. Derives `severity` from the check name prefix per zlint convention: `e_` -> `Severity::Error`, `w_` -> `Severity::Warn`, `n_` -> `Severity::Notice`, anything else -> `BridgeError::OutputParseError` (defensive \u2014 zlint catalog hygiene says all checks have one of those three prefixes)\n5. Returns the populated `Vec`\n\n## Surface\n\n`impl ZlintBridge { pub fn enumerate_lints(&self) -> Result<Vec<ZlintLintInfo>, BridgeError>; }`\n\n## Implementation notes\n\n- Subprocess timeout: applies. Use `BridgeConfig::timeout`.\n- Subprocess failure modes: `BinaryNotFound` (io::ErrorKind::NotFound), `SubprocessTimeout` (kill on deadline), `SubprocessFailed` (non-zero exit), `OutputParseError` (malformed JSON line or unrecognized severity prefix).\n- Encoding: zlint emits UTF-8.\n- Empty stdout is `OutputParseError` (zlint always emits at least one line).\n\n## Tests\n\n- Integration test invokes zlint via the bridge against the real binary. Asserts:\n  - Returned `Vec` is non-empty (zlint ships ~400 lints).\n  - Every entry has a non-empty `check_id`.\n  - At least one entry each with severity `Error`, `Warn`, `Notice` (zlint catalog hygiene; if zlint upstream changes this we want to know).\n  - Specific known-good entry pinned: `e_basic_constraints_not_critical` exists with source `RFC5280` (or wherever zlint puts it; verify against `zlint -list-lints-json | grep`).\n- Unit test for the severity-derivation helper against synthetic name strings (`e_x`, `w_y`, `n_z`, malformed `q_x`).\n\n## Acceptance\n\n- [ ] `enumerate_lints()` implementation in `pkix-zlint-bridge/src/lib.rs`\n- [ ] Severity derivation helper covered by unit tests with positive + malformed inputs\n- [ ] Integration test invokes real zlint and pins catalog shape\n- [ ] cargo build / clippy --all-features -D warnings / fmt --check / doc --no-deps clean\n- [ ] CHANGELOG entry under Unreleased citing PKIX-jy95.7.2\n\n## Out of scope\n\n- `run_on_cert` / `run_on_certs` (PKIX-jy95.7.3 / .7.4)\n- Caching enumerate_lints output across calls (the catalog is static; one call per bridge instance per session is acceptable)\n\n## Cross-references\n\n- PKIX-jy95.7.1 (scaffold; types this implementation populates)\n- PKIX-jy95.1 (runtime-enumerated lint granularity decision)\n- PKIX-jy95.2 (severity mapping decision; zlint catalog severity flow)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.7.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-zlint-bridge: enumerate_lints() against zlint -list-lints-json",
+  "updated_at": "2026-05-13T03:42:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T20:28:10Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T20:28:49Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

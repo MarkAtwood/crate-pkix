@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:22:56Z",
+  "compaction_level": 0,
+  "content_hash": "4626a90bb819e6a4597939390bb7ccd045fc16d4f151ca91198e8ab5bbda4f10",
+  "created_at": "2026-05-07T15:20:44Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:2109-2124: matched_via_i uses .fold(false, |_, _parent| { new_nodes.push(...); true }). This is a side-effecting fold: the accumulator is discarded, new_nodes is mutated as a side effect of the iteration, and the result is just 'was the iterator non-empty?'. The Rust idiomatic form is: 'let mut matched_via_i = false; for parent in tree.iter().filter(...) { matched_via_i = true; new_nodes.push(...); }'. The fold form is both unidiomatic and confusing \u2014 it obscures that (a) the iterator is consumed twice conceptually (once for flag, once for push) and (b) the accumulator is intentionally discarded.",
+  "ephemeral": 0,
+  "id": "PKIX-rn4k",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path (rusty): fold-with-side-effect in policy tree d(1)(i) \u2014 use for-loop + flag",
+  "updated_at": "2026-05-07T15:22:56Z"
+}

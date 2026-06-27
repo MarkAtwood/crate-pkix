@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:53Z",
+  "compaction_level": 0,
+  "content_hash": "bd7d43810f431c7ab874c404e9ea73e4089967c7c527a31c89102fec0c0f0729",
+  "created_at": "2026-05-02T22:20:46Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 711\u2013712: 'UniversalString (UCS-4 BE) \u2014 decode + normalize in v0.2' assumes character-by-character decode. UCS-4 can encode surrogates (U+D800\u2013U+DFFF, invalid in Unicode) and out-of-range codepoints (>U+10FFFF). The v0.2 implementer needs: (1) explicit handling rules for invalid codepoints (reject, replace with U+FFFD, skip?), (2) clarification that BMP subset check doesn't apply to UniversalString (unlike BMPString). Add: 'Note: reject or replace invalid UCS-4 sequences per [policy TBD].'",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: UniversalString edge cases (surrogates, invalid codepoints) not addressed",
+  "updated_at": "2026-05-02T22:35:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

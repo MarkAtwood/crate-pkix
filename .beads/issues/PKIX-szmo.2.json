@@ -1,0 +1,38 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "09ae195177d155857656d83fde164daa436825deffd306b5752fa016adf6af3d",
+  "created_at": "2026-06-04T17:28:09Z",
+  "created_by": "Mark Atwood",
+  "description": "Run 'skoll rfc' from ~/PROJECT/PKIX. This is the highest-signal scan for this project \u2014 it checks MUST/SHOULD/MAY conformance against specifications. PKIX implements RFC 5280 path validation, RFC 6125 hostname binding, RFC 8398 S/MIME mailbox binding, RFC 3161 timestamping, RFC 6960 OCSP, and RFC 6962 CT. The scan should surface any spec-text deviations. Save output: 'skoll rfc --out ~/PROJECT/PKIX/reports/skoll-rfc.md'. Also run scoped variants: 'skoll rfc --full pkix-path/src/' and 'skoll rfc --full pkix-chain/src/' for deeper coverage of the core crates.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "2026-06-04 third attempt: same Credit balance is too low failure. Skoll spawns its own Claude API session; that account has zero credits. Cannot proceed until the API account is funded. Raw stream at /tmp/skoll-stream-0bOG6G.jsonl contains only session-hook boilerplate, zero scan content.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Skoll rfc scan \u2014 RFC conformance audit",
+  "updated_at": "2026-06-04T18:20:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

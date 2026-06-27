@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-d4h.1",
+  "title": "SignedCertificateTimestamp lacks #[non_exhaustive]",
+  "description": "All fields public, breaking changes locked. Old: PKIX-ppbr.13",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:53:40Z",
+  "updated_at": "2026-06-15T17:53:40Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-d4h",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:53:40"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added Eq to DeviationRunResult's derives. All contained types are already Eq.",
+  "closed_at": "2026-05-07T22:33:49Z",
+  "compaction_level": 0,
+  "content_hash": "1033795cdb431eb7f8be2ef59c6c993a67c5e8cbdba7d758bdec1320939c08cd",
+  "created_at": "2026-05-07T22:15:52Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\n`pkix-lint/src/deviation.rs:649-651`:\n```rust\n#[non_exhaustive]\n#[derive(Clone, Debug, Default, PartialEq)]\npub struct DeviationRunResult {\n    pub findings: Vec<crate::Finding>,\n    pub deviated: Vec<DeviatedFinding>,\n}\n```\n\nBoth `Finding` (`pkix-lint/src/lib.rs:514`: `#[derive(Clone, Debug, PartialEq, Eq)]`)\nand `DeviatedFinding` (`pkix-lint/src/deviation.rs`: `#[derive(Clone, Debug, PartialEq, Eq)]`)\nderive `Eq`. There is no field that is `PartialEq` but not `Eq`, so `Eq` is\ntrivially derivable.\n\nIdiomatic Rust: when every field implements `Eq`, the containing struct should\nalso derive `Eq`. The Rust API guidelines (C-COMMON-TRAITS) name `Eq` as part\nof the standard set when `PartialEq` is present and total equality holds.\n\nFix: add `Eq` to the derive: `#[derive(Clone, Debug, Default, PartialEq, Eq)]`.\n\nThis is part of the broader pattern flagged in PKIX-qwzx.15 (workspace-wide\ninconsistent derives on public types).",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.24",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: DeviationRunResult derives PartialEq but not Eq; both contained types are Eq",
+  "updated_at": "2026-05-07T22:33:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:15:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

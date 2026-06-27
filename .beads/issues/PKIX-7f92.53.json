@@ -1,0 +1,31 @@
+{
+  "closed_at": "2026-05-14T16:18:13Z",
+  "compaction_level": 0,
+  "content_hash": "32b973fa0acdeea8549d1c50261580cddaa2241fbafd47493f038b77e9471ba6",
+  "created_at": "2026-05-14T16:16:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs's `finding_seed` (lines 776-793) and `risk_seed` (lines 797-807) build UUID v8 seed bytes by concatenating variable-length byte fields with only single-byte 0x00 separators:\n\n```rust\nfn finding_seed(report_seed: &[u8], i: usize, f: &Finding) -> Vec<u8> {\n    let mut buf = ...;\n    buf.extend_from_slice(report_seed);\n    buf.extend_from_slice(&i.to_le_bytes());\n    buf.extend_from_slice(f.lint_id.as_bytes());   // variable length, no length prefix\n    buf.push(0);                                   // separator\n    buf.push(severity_label[0]);\n    if let Some(d) = result_detail(&f.result) {\n        buf.extend_from_slice(d.as_bytes());       // variable length, no length prefix, no trailing separator\n    }\n    ...\n}\n```\n\n`risk_seed` has the same pattern with `lint_id` and `deviation_id`.\n\nSection G (algorithm and parameter choice \u2014 seed canonicalization). What goes wrong: integrity. Two distinct logical Findings or Deviations can be constructed to produce the same UUID v8 if the variable-length fields can carry a 0x00 byte.\n\nConcrete construction:\n- Finding A: `lint_id = \"a\"`, severity = w, detail = \"X\"\n- Finding B: `lint_id = \"a\\x00wX\"`, severity = ?, detail = ...\n\nThe discriminator \"0x00 || severity_byte\" written by A becomes part of B's lint_id when B claims a longer lint_id. Whether a *natural* collision exists depends on which severity_label byte values can appear in attacker-supplied lint_ids; the structural defect is the absence of length prefixing or canonical encoding.\n\n`lint_id` is `Cow<'static, str>` populated either from static literals (safe) or from deserialized JSON (attacker-controlled). `Finding` derives Deserialize behind the `serde` feature, so a JSON Finding can carry arbitrary bytes including 0x00 in `lint_id`.\n\nPractical impact: low. UUIDs are audit identifiers, not access tokens. Two Findings sharing a UUID v8 in OSCAL output causes observation/finding key collision in downstream tooling \u2014 a confusing audit trail, not a security boundary breach. Hence P3 rather than P1.\n\nDefense-in-depth fix:\n- Length-prefix every variable-length field (write `len.to_le_bytes()` before `as_bytes()`)\n- Or hash a canonical serialization (CBOR/postcard) of the (i, lint_id, severity, detail, cert_index, cert_sha256) tuple\n\n`EvidenceKey::seed` (lines 228-246) already does this correctly using tag bytes for Option discriminators. The fix is to apply the same discipline to finding_seed and risk_seed.\n\nNote: `uuid_v8(NS, seed)` itself (lines 733-753) computes `SHA-256(namespace || 0x00 || seed)`. `namespace` is always a static literal containing no 0x00, so the namespace/seed boundary is safe; the defect is purely within the seed-construction helpers.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.53",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Duplicate of PKIX-hy2e.41 (open, P3) filed in the prior crypto-security pass on pkix-lint. Same finding shape: finding_seed and risk_seed in oscal/emit.rs concatenate variable-length fields with single-byte separators rather than length-prefixing. hy2e.41 captured this 8 days ago; my pass independently identified it confirming the structural issue persists. Closing this issue as duplicate; the live tracking lives at PKIX-hy2e.41.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "UUID v8 seed construction concatenates variable-length attacker-controllable fields without length prefixes",
+  "updated_at": "2026-05-14T16:18:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:16:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

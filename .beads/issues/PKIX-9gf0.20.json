@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:25:44Z",
+  "compaction_level": 0,
+  "content_hash": "b4857e88e5a8cb768c8ed7a4f605a37f71525790bb8bbba25dcc5a6e68d690d3",
+  "created_at": "2026-05-07T16:12:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1157-1168 \u2014 find_cert_ext uses .ok() to discard parse errors:\n  `.and_then(|e| T::from_der(e.extn_value.as_bytes()).ok())`\n\nThis function is correctly marked 'fail-open' and the comment says: 'Use this for extensions where a parse failure is tolerable. For security-critical extensions, use try_find_cert_ext instead.'\n\nHowever, find_cert_ext is used for:\n1. cert_subject_alt_names (line 1201) \u2014 used in NC checking and leaf SAN checks\n2. TrustAnchor::from_cert (line 435) \u2014 for NameConstraints\n\nIf a CA cert has a critical NameConstraints extension that is malformed:\n- TrustAnchor::from_cert (line 434-441) uses find_cert_ext, so the NC is silently dropped\n- The doc says 'for strict RFC 5280 \u00a74.2.1.6 compliance, use TrustAnchor::try_from'\n\nFor SubjectAltName in NC enforcement (cert_subject_alt_names), a malformed SAN is silently treated as absent. If the NC state requires an rfc822Name entry in SAN, a malformed SAN would pass the NC check (no names to check against). This is a security bypass:\n- Set up: trust anchor with rfc822Name permitttedSubtree\n- Attack cert: a cert with a malformed (not-parse-able) SAN extension \u2014 the malformed SAN is treated as absent, and the NC check passes\n\ncert_name_constraints() at line 1212 correctly uses try_find_cert_ext for NC on certs. But cert_subject_alt_names at line 1200-1202 uses find_cert_ext (fail-open) for the SAN that is CHECKED against NC constraints.\n\nA malformed SAN \u2192 None from find_cert_ext \u2192 no SAN names to check against NC \u2192 NC check passes even though the cert may have been trying to assert names.\n\nP1 \u2014 security bypass via malformed SAN in NC enforcement.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_cert_ext is fail-open: silently swallows decode errors on security-critical extensions",
+  "updated_at": "2026-05-07T16:25:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:12:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

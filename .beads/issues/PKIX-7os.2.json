@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:37Z",
+  "compaction_level": 0,
+  "content_hash": "df14ac4ac19dd0e3f35b548f06531a5d4da5c3064602eb76a8f3ffeea40833db",
+  "created_at": "2026-05-02T14:38:52Z",
+  "created_by": "Mark Atwood",
+  "description": "ALLOWED_LEAF_EXTENSIONS includes OID_EXT_EXTENDED_KEY_USAGE, OID_EXT_SUBJECT_KEY_ID, and OID_EXT_AUTHORITY_KEY_ID. pkix-path's HANDLED_CRITICAL_OIDS only covers KeyUsage, BasicConstraints, and SubjectAltName. If a cert has critical EKU (common in code-signing profiles), check_extensions passes it through the whitelist, then validate_path rejects it with PathError::UnhandledCriticalExtension, which surfaces as Error::Path(PathError::UnhandledCriticalExtension). The simplicity-gate error type (pkix_chain_simple::Error::UnhandledCriticalExtension) is never returned and the user gets a confusing wrapped Path error.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: critical EKU in whitelist causes Error::Path not gate error",
+  "updated_at": "2026-05-02T14:48:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:38:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

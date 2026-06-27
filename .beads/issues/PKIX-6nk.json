@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:50:17Z",
+  "compaction_level": 0,
+  "content_hash": "e8a4f20cb8418ceb0597a67c34681e7744ccf4059d2fb60bf18a3ee90898e10f",
+  "created_at": "2026-05-06T21:47:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs: Steps 1-5 of check_revocation (parse outer response, check Successful, extract responseBytes, check responseType, parse BasicOcspResponse, verify signature) are ~40 lines duplicated nearly verbatim in check_revocation_against_anchor.\n\nExtract a helper: fn parse_and_verify_basic_response<V>(response_der, verifier, issuer_spki) -> Result<BasicOcspResponse>\n\nBoth callers then diverge only for the ResponderId verification and CertID hash check.",
+  "ephemeral": 0,
+  "id": "PKIX-6nk",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M6: OCSP parse+verify steps duplicated between check_revocation and check_revocation_against_anchor",
+  "updated_at": "2026-05-06T21:50:17Z"
+}

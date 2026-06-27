@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "21e6eacfed8c610d753b52c426ff930f6c787b1ebc63fe5ff07d85b6df4611f1",
+  "created_at": "2026-05-06T16:49:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1784, 2013, 2088, 2111, 2367\n\nMultiple hot-path policy checks use `Vec::contains()` for OID lookups, which is O(n) per call. Specifically:\n\n- `allowed_signature_algs` check (line 1784): `!allowed.contains(&cert.signature_algorithm.oid)` \u2014 called once per cert per chain walk\n- `required_leaf_eku` check (line 2013): `!eku.0.iter().any(|e| e == req_oid)` \u2014 called for each required OID\n- `mapped_policies` construction (line 2110): collected into Vec, then checked with `contains`\n- Initial policy set filtering (line 2367): `!policy.initial_policy_set.contains(&tree[idx].valid_policy)`\n\nFor the common case (a handful of OIDs, short chains) this is practically negligible. However, the `allowed_signature_algs` field is documented as a slice of OIDs and is used in every cert in the chain. Since `ObjectIdentifier` implements `Hash`, callers could pass `&[ObjectIdentifier]` backed by a `HashSet`-sorted structure, OR the internal loop could build a `HashSet` once per chain walk rather than per cert.\n\nThis is a P3 style/performance note, not a correctness issue. A simpler approach: document that `allowed_signature_algs` is typically small (2\u20136 OIDs) and the O(n) cost is irrelevant in practice, and add a comment to that effect. Alternatively, the internal check could use a small stack-based linear search with an early exit.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "O(n) Vec::contains is negligible for typical 2-6 OID lists. Deferred as a micro-optimization. Comment added at allowed_signature_algs check.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Replace linear Vec contains() with HashSet for policy OID lookups in hot path",
+  "updated_at": "2026-05-06T17:02:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:49:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

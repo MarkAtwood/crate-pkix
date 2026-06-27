@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:26:17Z",
+  "compaction_level": 0,
+  "content_hash": "f35fe38920569d9a8062aa7560c2b714707c858976e4861436f7fb394bf51ab5",
+  "created_at": "2026-05-06T15:13:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs build_path(): The Error::DepthExceeded variant is documented as being returned 'when the path would require more than 10 intermediate certificates' but the function always returns Err(Error::NoPathFound) when no path is found (line 244). The DepthExceeded variant is dead code \u2014 it is defined and documented but never constructed or returned. This prevents callers from distinguishing between 'truly no path exists in the pool' and 'path exists but requires more than MAX_DEPTH intermediates.' Fix: after the loop completes without finding a path, determine if there was any candidate issuer beyond depth MAX_DEPTH to distinguish NoPathFound from DepthExceeded.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path never returns Error::DepthExceeded \u2014 dead variant",
+  "updated_at": "2026-05-06T15:26:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:13:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

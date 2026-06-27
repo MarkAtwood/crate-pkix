@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T23:10:00Z",
+  "id": "019e194d-f5f4-7e1a-8333-0a9ef5607f92",
+  "issue_id": "PKIX-hbzo",
+  "text": "do-beads loop hygiene 2026-05-11: only open child is .1 (zlint+pkilint cross-validation oracles), blocked on PKIX-amgn.5 + PKIX-amgn.8, both human-labeled. Other harness completeness work (revocation oracle, x509-limbo Tier-2 baseline, CI integration, CT) all shipped (PKIX-emf1, PKIX-g9vc, PKIX-klku, PKIX-baac). No autonomous frontier; relabeling human to stop bd ready from surfacing it. Re-evaluate when PKIX-amgn.5/.8 resolve."
+}

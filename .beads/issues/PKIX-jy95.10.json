@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "close_reason": "Shipped pkix-policy-zlint 0.0.0 at workspace root. Public API: ZlintLint struct + all_lints(bridge) function. Box::leak-based bounded leak strategy resolves the &'static str impedance between Lint trait and runtime-enumerated ZlintLintInfo. Verdict mapping fixed; per-cert subprocess cost amortised via bridge SHA-256 cache. Round-trip integration tests pass against real zlint binary on PATH using PKITS TrustAnchorRootCertificate fixture (test auto-skips when zlint absent). cargo fmt + clippy --all-targets -D warnings + rustdoc --no-deps -D warnings all clean. Workspace builds. Committed as 81026ae5. PKIX-jy95.11 (pkilint sibling) blocks on PKIX-jy95.8 (pkix-pkilint-bridge) which is in 'blocked' status \u2014 not autonomous-ready yet.",
+  "closed_at": "2026-05-13T17:37:21Z",
+  "compaction_level": 0,
+  "content_hash": "4e4801bb1afdb89eb4081aef216f5d852c38d4d413dcaf92f2017f039483270b",
+  "created_at": "2026-05-13T16:23:43Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nThin adapter crate wrapping `pkix-zlint-bridge` (PKIX-jy95.7) findings as workspace `Lint` impls.\n\nPer PKIX-jy95.1 decision (A2: per-check, runtime-enumerated): the adapter creates ~700 dynamic `Lint` instances, one per zlint check the bridge enumerates. Each Lint carries `(check_id: &'static str, bridge: Arc<ZlintBridge>)` and reads from the bridge's per-cert result cache.\n\n## Shape\n\n```rust\npub struct ZlintLint {\n    info: ZlintLintInfo,         // from pkix_zlint_bridge::enumerate_lints()\n    bridge: Arc<ZlintBridge>,\n}\n\nimpl Lint for ZlintLint {\n    fn id(&self) -> &str { self.info.check_id }\n    fn citation(&self) -> &str { /* from info */ }\n    fn check(&self, cert: &Certificate, ctx: &LintContext) -> LintResult {\n        // call bridge.run_on_cert(cert) \u2014 cached per cert across all ~700 Lint reads\n        // look up self.info.check_id in the returned per-check verdicts\n        // translate Verdict \u2192 LintResult per .2 severity mapping decision (already in bridge)\n    }\n    // ... applies_to, etc.\n}\n\npub fn all_lints(bridge: Arc<ZlintBridge>) -> Vec<Box<dyn Lint>> {\n    bridge.enumerate_lints()\n        .into_iter()\n        .map(|info| Box::new(ZlintLint { info, bridge: bridge.clone() }) as Box<dyn Lint>)\n        .collect()\n}\n```\n\n## Acceptance\n\n- [ ] `pkix-policy-zlint` crate added to workspace\n- [ ] One `Lint` per zlint check (~700)\n- [ ] Per-cert subprocess cost amortized via bridge cache\n- [ ] Round-trip test against zlint's own `testdata/` (Apache-2.0; cite zlint upstream)\n- [ ] CHANGELOG entry\n- [ ] AGENTS.md updated to mention `pkix-policy-zlint` ships\n\n## Out of scope\n\n- Bridge crate implementation (PKIX-jy95.7)\n- Umbrella-per-profile-family option (rejected in PKIX-jy95.1)\n\n## Blocks on\n\n- PKIX-jy95.7 \u2014 pkix-zlint-bridge ships first\n- PKIX-jy95.8 \u2014 only for pattern parity check; not a strict dep\n\n## Cross-references\n\n- PKIX-jy95 (parent, closed after .10/.11 filed per .9 closure cascade)\n- PKIX-jy95.1 (lint granularity = A2 per-check)\n- PKIX-jy95.2 (severity mapping = decided at bridge layer)\n- PKIX-jy95.6 (two-layer adapter pattern)\n- AGENTS.md non-negotiable #5 (industry-forum policy via adapter crates)\n- AGENTS.md non-negotiable #6 (cache-friendliness \u2014 bridge owns the per-cert cache)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.10",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-policy-zlint: thin Lint-adapter over pkix-zlint-bridge findings",
+  "updated_at": "2026-05-13T17:37:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:23:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

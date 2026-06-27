@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d3aceeee12a2475d8024a765bc0c574286a0c63166a77ee09f82d4924feafd5a",
+  "created_at": "2026-05-14T19:14:20Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_ascii_label at pkix-identity/src/lib.rs:601 accepts underscore. The inline comment at lines 602-606 justifies this as 'widely tolerated' and 'symmetry'.\n\nThe module-level rustdoc on ServerName::dns_name (lines 165-168) advertises 'LDH (letter / digit / hyphen) rule of RFC 1035 \u00a72.3.1'. RFC 1035 LDH does NOT include underscore. A reader of the public doc would not expect 'host_name.example' to be accepted.\n\nEither:\n- Tighten the validator to strict LDH (reject _), and document that some legacy SANs with underscores cannot be matched as targets.\n- Update the rustdoc to say 'LDH plus underscore, matching common SAN-in-the-wild tolerance'. Both choices are valid; the doc and code should agree publicly.\n\nCurrently the doc says strict-LDH and the code is permissive. A user submitting a bug report 'why does dns_name accept host_name.example' will get pointed at the lines 602-606 comment they can't see from rustdoc.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.9",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Underscore in DNS labels accepted with comment, but inconsistent with strict-LDH framing in module doc",
+  "updated_at": "2026-05-14T19:14:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

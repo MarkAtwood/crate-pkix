@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added policy fields to ValidationPolicy, PolicyViolation error variant, 5 OID constants, 4 OIDs to HANDLED_CRITICAL_OIDS.",
+  "closed_at": "2026-05-05T14:41:10Z",
+  "compaction_level": 0,
+  "content_hash": "e821d2903148a6e4816a6d4cc04c2848522575d214faf0c66d3003b6ea30055a",
+  "created_at": "2026-05-05T14:33:33Z",
+  "created_by": "Mark Atwood",
+  "description": "Add initial_explicit_policy, initial_any_policy_inhibit, initial_policy_mapping_inhibit, initial_policy_set fields to ValidationPolicy. Add OID constants for CertificatePolicies(2.5.29.32), PolicyMappings(2.5.29.33), PolicyConstraints(2.5.29.36), InhibitAnyPolicy(2.5.29.54), anyPolicy(2.5.29.32.0). Add all four to HANDLED_CRITICAL_OIDS.",
+  "ephemeral": 0,
+  "id": "PKIX-mi3.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add policy fields to ValidationPolicy + OIDs + critical-ext list",
+  "updated_at": "2026-05-05T14:41:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

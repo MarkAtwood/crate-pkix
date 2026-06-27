@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d893c00350a646072f588feea60c71e15b0cb6d1fb59b89bece8ad85d47a9295",
+  "created_at": "2026-05-14T19:05:17Z",
+  "created_by": "Mark Atwood",
+  "description": "\\`CachedCrl.bytes: Vec<u8>\\`, \\`CachedOcspResponse.bytes: Vec<u8>\\`,\n\\`CrlCacheKey.issuer_dn_der: Vec<u8>\\`, \\`CrlCacheKey.distribution_point_uri: Option<String>\\`,\n\\`OcspCacheKey.cert_serial: Vec<u8>\\`, \\`OcspCacheKey.issuer_key_hash: Vec<u8>\\`, and\n\\`OcspCacheKey.responder_url: String\\` are all \\`pub\\` fields (cache.rs:88-117,\n137-170).\n\nThis pins the storage representation. Once these ship, switching to\n\\`Arc<[u8]>\\`, \\`Bytes\\`, an \\`smallvec\\`, an interned-string type, or any\nzero-copy alternative is a breaking change. Cache backends that already\nhold the bytes in a more efficient representation (mmapped CRL files, an\nArc-shared blob in a Redis client, etc.) must allocate \\`Vec<u8>\\` for\nevery \\`put_crl\\` and the cache trait cannot return zero-copy refs without\nbreaking the field types.\n\nSame constraint locks \\`Vec<u8>\\` as the key-byte representation in\n\\`HashMap\\` storage, forcing custom \\`RevocationCache\\` impls to coerce\nto/from \\`Vec<u8>\\` on every operation even when they natively hold\nkeys in a different shape.\n\nFix shape: make the fields private and expose getters that return\n\\`&[u8]\\` and \\`&str\\`. Add private \\`new(...)\\` constructors. The\nconstructors become the only way to populate the values, which is\nwhat cache impls already do via the parsing helpers.\n\nSame argument applies to \\`FetchResponse.bytes\\`, \\`FetchResponse.content_type\\`,\n\\`FetchRequest.url\\`, \\`AiaUrls.ocsp\\`, \\`AiaUrls.ca_issuers\\`,\n\\`OcspRequestBytes.body\\`, and \\`OcspRequestBytes.content_type\\`.\n\nPre-1.0 this is the right window to make these private. Post-1.0\nthe cost of every \\`Vec<u8>\\` allocation in the per-request hot path\nmultiplied by the number of CRL/OCSP checks per validation per RPS\nadds up.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Public Vec<u8> / String fields on CachedCrl / CachedOcspResponse / *CacheKey lock storage representation",
+  "updated_at": "2026-05-14T19:05:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:05:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

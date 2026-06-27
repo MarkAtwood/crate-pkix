@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "93cb4a62d9a7340c3b2dc2bfa73c677c71dba1b147ed986573e327bffd848dbd",
+  "created_at": "2026-05-14T19:19:29Z",
+  "created_by": "Mark Atwood",
+  "description": "verify_dns_name(cert: &Certificate, ...) and verify_mailbox(cert: &Certificate, ...) take &x509_cert::Certificate directly in the public signature. The pkix-identity crate does not re-export Certificate, so callers must:\n\n  pkix-identity = \"0.1\"\n  x509-cert     = \"...\"   // must match what pkix-identity uses\n\nIf x509-cert cuts a major version, every pkix-identity dependent must coordinate the upgrade in lockstep, even if their direct use of x509-cert is only via pkix-identity. This is the textbook 'public dep' problem.\n\nMitigations (pick one before 1.0):\n\n1. Re-export: `pub use x509_cert;` at the crate root, so callers can do `use pkix_identity::x509_cert::Certificate;` and stay coupled to whatever pkix-identity is built against.\n\n2. Trait abstraction: define a small `IdentityCertSource` trait that exposes only the SAN-extension-bytes accessor pkix-identity actually needs. Implement it for x509_cert::Certificate (gated by an x509-cert feature). This lets callers using a different cert representation (yasna, picky, custom parser) plug in.\n\n3. Take &[u8] DER directly and parse internally. Re-parsing per call is the wrong default for the batch-validation pattern (non-negotiable #6), so this is the worst option.\n\nMost likely (1) is sufficient. The decision is whether to also offer (2) for callers wanting representation-independence.\n\nThis is currently the *only* upstream type in the public surface. der::Decode (used in tests) is on the std::error::Error blanket impl; ObjectIdentifier and Any are not in the public surface.\n\nSeverity P2: adding a re-export is non-breaking, so this is fixable later \u2014 but only by the maintainer remembering to add it; calling it out for explicit 1.0-gate decision.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Public Certificate type from x509-cert leaks upstream major-version pin into pkix-identity API",
+  "updated_at": "2026-05-14T19:19:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:19:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

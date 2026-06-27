@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:24Z",
+  "compaction_level": 0,
+  "content_hash": "5b2428db8b3f6ca72ecfe4127d4317f69276ee5e10989895291dcf3d13507cd0",
+  "created_at": "2026-05-06T23:17:59Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs lines 73-91: the struct-level doc comment for CrlChecker has a Limitations section where the first bullet (line 74) has an extra leading space (' /// -') while all other bullets use the standard '/// -' prefix without the leading space. This causes rustdoc to render the first limitation item outside the bullet list, appearing as a separate paragraph. It's a cosmetic but visible doc rendering bug. Suggested fix: remove the extra leading space on line 74 to align with the other bullet items.",
+  "ephemeral": 0,
+  "id": "PKIX-3jz",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: CRL doc comment: indentation/formatting inconsistency in Limitations",
+  "updated_at": "2026-05-06T23:47:24Z"
+}

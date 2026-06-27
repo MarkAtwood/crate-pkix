@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fa49027a368654f437b455d9e24d5120986d67e153fad14d216e7e5b19000c14",
+  "created_at": "2026-05-14T18:57:45Z",
+  "created_by": "Mark Atwood",
+  "description": "src/async_crl.rs:64 / src/async_ocsp.rs:64: `return checker.check_revocation(cert, issuer)` is a synchronous call to OcspChecker::check_revocation / CrlChecker::check_revocation from inside an async fn. The check includes DER parsing AND signature verification (RSA-2048: ~1ms; RSA-4096: ~5ms; ECDSA-P256: ~0.5ms; PKCS-1.5 with SHA-512: similar).\n\nOn a multi-threaded tokio runtime this is acceptable \u2014 the worker thread blocks for a few ms, other workers continue. On a single-threaded runtime (current_thread, smol's single executor, embedded async runtimes), this stalls ALL tasks for the same duration. A consumer choosing tokio's current_thread for a memory-tight build (no work-stealing scheduler overhead) discovers latency cliffs under concurrent revocation checks.\n\nThe module rustdoc acknowledges this: 'CRL parsing and signature verification stay synchronous because they do no I/O.' That justifies the design (don't introduce CPU-bound futures via spawn_blocking on a hot path that doesn't need it), but the cost is invisible to consumers who don't read the rationale.\n\nRecommendation: add a Limitations note to the crate-level docstring naming this explicitly. Something like 'Signature verification runs on the calling task. On single-threaded async runtimes, callers should expect per-cert latency of a few ms; if this is a problem, wrap the call in tokio::task::spawn_blocking.' This is a documentation fix, not an API change.\n\nThe deeper fix \u2014 make signature verification a separate async-friendly callback \u2014 is out of scope: it would force every SignatureVerifier impl to wrap synchronous primitives in Future-returning machinery, for no benefit on multi-threaded runtimes.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Sync verifier.check_revocation called inside async fn blocks executor thread for ms-scale CPU",
+  "updated_at": "2026-05-14T18:57:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

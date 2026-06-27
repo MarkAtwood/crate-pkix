@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented iterative-deepening DFS in pkix-path-builder. NotYetImplemented variant removed.",
+  "closed_at": "2026-05-05T14:41:08Z",
+  "compaction_level": 0,
+  "content_hash": "4f4897c6bb3e0e0a5c8a69d6a0c85cac01be71be9e7f82bddea86a4c9c38c0c6",
+  "created_at": "2026-05-05T14:33:07Z",
+  "created_by": "Mark Atwood",
+  "description": "Replace Err(NotYetImplemented) with a working iterative-deepening DFS over CertPool, anchored to pkix_path::validate_path for final verification. Use names_match for candidate filtering. Guard against cycles.",
+  "ephemeral": 0,
+  "id": "PKIX-y2j.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement build_path DFS in pkix-path-builder",
+  "updated_at": "2026-05-05T14:41:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-y2j",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-y2j.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

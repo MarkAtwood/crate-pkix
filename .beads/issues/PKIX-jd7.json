@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "OCSP ResponderId verified: byName via names_match, byKey via SHA-1(SPKI); 6 new tests",
+  "closed_at": "2026-05-06T19:01:43Z",
+  "compaction_level": 0,
+  "content_hash": "2050087a003784e257741e18014697e48b29071a351f1e81c9145dccb8a5a1a3",
+  "created_at": "2026-05-06T18:11:46Z",
+  "created_by": "Mark Atwood",
+  "description": "The ResponderId field in OCSP responses is not verified against the issuer identity. A response from a different responder identity could be accepted.",
+  "ephemeral": 0,
+  "id": "PKIX-jd7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP: ResponderId not verified against issuer identity",
+  "updated_at": "2026-05-06T19:01:43Z"
+}

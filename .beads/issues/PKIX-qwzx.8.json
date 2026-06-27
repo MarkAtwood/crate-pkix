@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated crate-level //! docstring to reference build_path_with_config and PathBuilderConfig::max_depth (default DEFAULT_MAX_DEPTH = 10).",
+  "closed_at": "2026-05-07T22:23:20Z",
+  "compaction_level": 0,
+  "content_hash": "4ad4cd3da352d590989b15064bb35726269adced9592979c1291bae222a28155",
+  "created_at": "2026-05-07T22:01:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs Algorithm doc, line 22:\n  > [build_path] uses iterative-deepening DFS (RFC 4158 \u00a72.5): it tries\n  > increasing maximum path depths from 1 to 10 ...\n\nAfter P3 commit ff707564 (PKIX-1uxb) added PathBuilderConfig + build_path_with_config, the constant '1 to 10' is no longer accurate when callers use the new entry point. The actual loop is `for max_depth in 1..=config.max_depth` (line 430). For build_path the bound is DEFAULT_MAX_DEPTH=10, so the doc is true for that single function, but the crate-level Algorithm section reads as if 10 is hard-coded.\n\nFix: in the crate-level //! docstring, say 'depths from 1 up to PathBuilderConfig::max_depth (default DEFAULT_MAX_DEPTH = 10)'.\n\nSeverity: P3 doc accuracy. Pass-1 attribution: a side effect of PKIX-1uxb that wasn't propagated to the crate-level prose.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.8",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder doc 'tries 1..10' is stale for build_path_with_config (depth comes from config)",
+  "updated_at": "2026-05-07T22:23:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

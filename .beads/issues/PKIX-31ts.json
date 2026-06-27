@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:11Z",
+  "compaction_level": 0,
+  "content_hash": "cab52ce4c1db545ca88dcea4aa1e15c0a5cb9472f5df26a8f74e44f99fd6c783",
+  "created_at": "2026-05-07T20:28:41Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`ValidationPolicy::default()` produces `current_time_unix: 0`. The doc warns about this:\n\n```\npkix-path/src/lib.rs:528-531\n/// **Warning \u2014 the default is 0 (1970-01-01):** Any certificate issued\n/// after 1970 has `notBefore > 0` and will fail the validity check with\n/// [`Error::ValidityPeriod`]. If you see unexpected `ValidityPeriod`\n/// errors, check that `current_time_unix` is set to the current time.\n```\n\nThe crate also provides `ValidationPolicy::new(now_unix)` as the preferred constructor (line 637), and the doc says:\n\n```\n/// This is the preferred constructor: it forces the caller to supply a timestamp,\n/// preventing the silent validity failures caused by `Default`'s `current_time_unix = 0`.\n```\n\nBut `Default` is still public. Anyone who writes `ValidationPolicy::default()` or `ValidationPolicy { ..Default::default() }` (a common idiom) gets the footgun.\n\n## Why this matters\n\n`#[non_exhaustive]` on the struct means the only sound way to construct one *with* a default is `..Default::default()`. So removing `Default` would force a different constructor pattern, e.g. `..ValidationPolicy::new(now)`. That's actually fine.\n\nThe current tension is: doc says \"use new()\", but the type system's idiomatic path is `Default`.\n\n## Suggestions (in increasing intrusiveness)\n\n1. **Deprecate `Default`** with `#[deprecated(note = \"use ValidationPolicy::new(now_unix) \u2014 the default current_time_unix=0 is a footgun\")]`. Compatible.\n2. **Remove the `Default` impl** in v0.3. Breaking but the safer API.\n3. **Make `current_time_unix` an `Option<u64>`** with `None` meaning \"skip validity check\". Bigger surface change.\n\n## Priority\n\nP4 \u2014 opinion. The current code documents the trap loudly. Deprecating `Default` is cheap and would prevent the trap entirely.\n",
+  "ephemeral": 0,
+  "id": "PKIX-31ts",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: ValidationPolicy::default() current_time_unix=0 footgun; consider deprecating Default in favour of new(now)",
+  "updated_at": "2026-05-07T21:49:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

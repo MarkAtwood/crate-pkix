@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:52:11Z",
+  "compaction_level": 0,
+  "content_hash": "bf3317ab95a317469b4b39400d07db4d97affd12864fd1aad9e0d360a11697c3",
+  "created_at": "2026-05-06T23:15:03Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-3yj.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: find_cert_ext / cert_basic_constraints fail-open on security-relevant extension decode error",
+  "updated_at": "2026-05-06T23:52:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:15:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-3yj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

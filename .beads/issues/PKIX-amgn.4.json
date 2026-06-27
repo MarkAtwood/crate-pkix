@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T18:14:34Z",
+  "compaction_level": 0,
+  "content_hash": "fb51aae872c77c77bb2d4825bbc71eb8ed5f98364f33c7b5580395db4787e759",
+  "created_at": "2026-05-11T05:45:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAfter PKIX-amgn.2 lands `pkix-profiles-cabf`, the original `pkix-profiles` crate keeps only:\n\n1. The `Profile` trait, `ValidationPolicy` struct, framework helpers (`sc081_validity_cap` and similar move OUT).\n2. `BasicSmimeProfile` \u2014 RFC 8551 \u00a73 baseline only.\n3. `BasicTlsProfile` \u2014 RFC 5280 + RFC 6125 + universally-required `id-kp-serverAuth` EKU.\n\nThis is a **breaking change** for downstream consumers of `TlsBrProfile` / `SmimeProfile`; they will need to add `pkix-profiles-cabf` to their Cargo.toml and update imports.\n\n## What\n\n### BasicSmimeProfile (new)\n\nImplements `Profile` with the RFC 8551 \u00a73 mandatory cert-profile bits:\n\n```rust\npub struct BasicSmimeProfile;\n\nimpl Profile for BasicSmimeProfile {\n    fn policy(&self, _now_unix: u64) -> ValidationPolicy {\n        ValidationPolicy {\n            required_leaf_eku: Some(OID_ID_KP_EMAIL_PROTECTION),\n            require_subject_alt_name: true,\n            require_rfc822_san: true,\n            // No validity caps, no key-size floors, no policy-OID requirements.\n            // Those are CA/B Forum overlay \u2014 see pkix-profiles-cabf::SmimeBrProfile.\n            ..Default::default()\n        }\n    }\n}\n```\n\n### BasicTlsProfile (new)\n\nImplements `Profile` with the universally-applicable TLS server-cert hygiene:\n\n```rust\npub struct BasicTlsProfile;\n\nimpl Profile for BasicTlsProfile {\n    fn policy(&self, _now_unix: u64) -> ValidationPolicy {\n        ValidationPolicy {\n            required_leaf_eku: Some(OID_ID_KP_SERVER_AUTH),\n            require_subject_alt_name: true,\n            // RFC 6125 hostname matching is on by default in pkix-path; nothing\n            // extra needed here. No validity caps, no key-size floors \u2014 those\n            // are CA/B Forum overlay (pkix-profiles-cabf::TlsBrProfile).\n            ..Default::default()\n        }\n    }\n}\n```\n\n### Strip from pkix-profiles\n\n- `SmimeProfile` (Mailbox-validated / strict) \u2014 moves to `pkix-profiles-cabf::SmimeBrProfile` (composed atop `BasicSmimeProfile` + CA/B Forum overlay).\n- `TlsBrProfile` \u2014 moves to `pkix-profiles-cabf::TlsBrProfile`.\n- `sc081_validity_cap()` and any other ballot-keyed helpers \u2014 move to `pkix-profiles-cabf`.\n- `SC081_VALIDITY_CAP_DAYS` and similar constants \u2014 move.\n\n### Stay in pkix-profiles\n\n- `Profile` trait.\n- `ValidationPolicy` struct.\n- Anything that composes profiles (`combine_profiles`, etc., if any).\n- Generic helpers that are framework-shaped.\n\n## Acceptance\n\n- [ ] `BasicSmimeProfile` + `BasicTlsProfile` implemented with RFC-baseline ValidationPolicy.\n- [ ] No `Tls` or `Smime` types with CA/B Forum-specific fields remain in pkix-profiles.\n- [ ] cargo check + tests clean across workspace.\n- [ ] Crate version bumped to next major (breaking change).\n- [ ] CHANGELOG entry documenting the migration.\n\n## Depends on\n\nPKIX-amgn.1 (stance anchor), PKIX-amgn.2 (target crate for moved content).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Scope clarification 2026-05-11 (Mark): per the PKIX-amgn.2 scope-X decision, the actual move of CA/B Forum content out of `pkix-profiles` into `pkix-profiles-cabf` happens HERE in .4, not in .2 (which is empty-skeleton only).\n\nMove list (explicit, includes CodeSigningProfile which was missing from the original amgn epic body):\n\n- `WebPkiProfile` (currently named in code; bead prose refers to it as `TlsBrProfile`)\n- `SmimeProfile`\n- `CodeSigningProfile` \u2190 added per Mark 2026-05-11\n- `CABF_TLS_BR_ALLOWED_ALGS`, `CABF_SMIME_BR_ALLOWED_ALGS`, `CABF_CS_BR_ALLOWED_ALGS` tables\n- Their corresponding `_policy()` free functions\n- SC-081 helpers (validity cap math, etc.)\n- Their tests\n\nDeprecation shim plan: keep `pub use pkix_profiles_cabf::{WebPkiProfile, SmimeProfile, CodeSigningProfile, ...}` re-exports in `pkix-profiles` for one minor version, marked `#[deprecated = \"moved to pkix-profiles-cabf\"]`. Drop the re-exports in the next major bump.\n\nRenaming question (WebPkiProfile \u2192 TlsBrProfile to match bead prose): leave as a follow-up; consistent rename can happen during the deprecation period in pkix-profiles-cabf without affecting the move itself.\n\nThis bead also adds BasicSmime/BasicTls to what's LEFT in pkix-profiles after the move \u2014 that part of .4's original description is unchanged.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Refactor pkix-profiles: strip CA/B Forum content, add BasicSmimeProfile (RFC 8551) and BasicTlsProfile (RFC 5280 + RFC 6125 + serverAuth EKU)",
+  "updated_at": "2026-05-11T18:14:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:45:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

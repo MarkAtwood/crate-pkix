@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:33Z",
+  "compaction_level": 0,
+  "content_hash": "b24ae4a8a475ac29cc710fb53ce9870dfb355acd7ab740df601012693f42771f",
+  "created_at": "2026-05-06T20:49:50Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: DeviationStore::active_at (pkix-lint/src/deviation.rs:454), active_for_lint (line 461), and expired_at (line 474) all return impl Iterator but are not annotated with #[must_use]. Calling these methods without consuming the returned iterator is a silent no-op \u2014 the compiler emits no warning. This is particularly dangerous for expired_at, which is described as 'used by corpus-reporting tools to surface deviations that need renewal': if a caller writes 'store.expired_at(now);' thinking it performs a side effect, the bug is invisible. Fix: add #[must_use] to all three methods. This is consistent with Rust stdlib Iterator-returning methods (e.g., slice::iter(), HashMap::values()) which have #[must_use] or inherit it from the Iterator type. Also affected: DeviationStore::all() (line 449) lacks #[must_use] but returns a slice reference, which is also silently discardable.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: DeviationStore iterator methods missing #[must_use]",
+  "updated_at": "2026-05-06T20:58:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:49:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T22:00:28Z",
+  "id": "019e190e-4e0d-7c77-8ea6-5930acc31a1a",
+  "issue_id": "PKIX-lwr9.5",
+  "text": "Closed as superseded 2026-05-11 by PKIX-lwr9.6, which performed the harness wiring AND the re-baseline + analysis-MD update in a single integrated change."
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:30:13Z",
+  "compaction_level": 0,
+  "content_hash": "be9f8b40a71f8912a484cc048ebda9c172b08cf51a085ba8deecdd572b8c9fe9",
+  "created_at": "2026-05-07T17:23:54Z",
+  "created_by": "Mark Atwood",
+  "description": "clippy::doc_markdown fires on 16+ locations in pkix-lint. Specific sites: cabf_tls_br.rs:16 IntermediateCa, :55 SubjectPublicKeyInfo, :59 SubjectAltName, :63 ExtendedKeyUsage, :67 BasicConstraints, :335 SubjectAltName, :388 ExtendedKeyUsage, :446 BasicConstraints; lib.rs:227 BasicConstraints, :781 cert_index, :1086 run_path; deviation.rs:1404 evidence_uri/DeviatedFinding, :1406 field refs, :1437 evidence_uri/DeviatedFinding. Tests: cabf_tls_br_tests.rs:10-12 epoch numerics, :23 BasicConstraints. Fix: wrap each flagged identifier in backticks.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.39",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-lint] doc_markdown backtick gaps across all src files",
+  "updated_at": "2026-05-07T17:30:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

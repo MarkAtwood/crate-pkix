@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bafd71980b993fb0b8d721f292c8a537dfcba43af73e8edcc3eadc8d8627e05c",
+  "created_at": "2026-05-14T12:41:57Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: oscal/emit.rs:619-632. scope_text returns &str (empty string fallback); scope_bytes returns &[u8] (empty slice fallback). Comment says: 'Used by encode_scope for canonical kinds whose schema is enforced by constructors (so missing/wrong-typed props indicate a code-side bug, not caller misuse).' That's an internal-invariant claim, but the public DeviationScope::props is a Vec<(String, ScopePropValue)> that any caller can construct directly via struct literal (kind and props are pub). When a hand-constructed scope is missing the prop, encode_scope emits an OSCAL Subject with an empty title field ('Issuer DN contains \\'\\'') and empty props. The Risk emitter then produces a JSON document that is structurally valid but semantically meaningless. Cleaner: scope_text/scope_bytes return Option, and encode_scope returns Result<Vec<Value>, EncodeError>; the call site in risk_for_deviation propagates the error. Or: validate at DeviationScope construction time that the expected props for the kind are present (already done in constructors, but not for direct struct literals). The current shape silently produces a non-round-trippable OSCAL artifact for an invariant-breaking scope, which is a debugging-time tax.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "scope_text / scope_bytes silently return empty defaults instead of returning Option",
+  "updated_at": "2026-05-14T12:41:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

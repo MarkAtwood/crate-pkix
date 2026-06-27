@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-03T02:46:38Z",
+  "compaction_level": 0,
+  "content_hash": "9fcebf9ea1d8477982541912168770a58359d31e4e0900fff44df2dcaf0c2023",
+  "created_at": "2026-05-03T02:41:26Z",
+  "created_by": "Mark Atwood",
+  "description": "OID_EMAIL_ADDRESS (line ~1390 in pkix-path/src/lib.rs) is declared between the section separator comment and the check_name_constraints fn. All other OID constants (OID_SUBJECT_ALT_NAME, OID_NAME_CONSTRAINTS, etc.) are grouped near line 500. A contributor adding a new OID will not find this one unless they grep \u2014 and will either define a duplicate or miss it entirely. Move OID_EMAIL_ADDRESS to the OID constant block near the other OIDs.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.6",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID_EMAIL_ADDRESS constant buried inside NC enforcement section, not with other OID constants",
+  "updated_at": "2026-05-03T02:46:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

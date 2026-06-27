@@ -1,0 +1,31 @@
+{
+  "close_reason": "Replaced match has_key_cert_sign { Some(true) => {} _ => return Err(...) } with if \\!matches\\!(...) { return Err(...) }.",
+  "closed_at": "2026-05-02T17:46:58Z",
+  "compaction_level": 0,
+  "content_hash": "ca1466ae4cd7293c5ef2846bef750a62afccb36b303274bf6cbde4f6e5146461",
+  "created_at": "2026-05-02T17:32:51Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk uses 'match has_key_cert_sign(cert) { Some(true) => {} _ => return Err(...) }'. This is the clippy::match_like_matches_macro pattern. Idiomatic replacement: 'if !matches!(has_key_cert_sign(cert), Some(true)) { return Err(...) }' \u2014 or equivalently '!has_key_cert_sign(cert).is_some_and(|v| v)'. The match-with-empty-arm signals a missed simplification to any experienced Rust reader.",
+  "ephemeral": 0,
+  "id": "PKIX-841.28",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "match has_key_cert_sign(cert) { Some(true) => {} _ => ... } should use matches!()",
+  "updated_at": "2026-05-02T17:46:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:32:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

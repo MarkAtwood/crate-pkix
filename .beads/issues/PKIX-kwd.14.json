@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:26:18Z",
+  "compaction_level": 0,
+  "content_hash": "e1f4a115f0bf9b57268e60898cf7409e4c4f6f57b8ba74200bd500a35804a1a8",
+  "created_at": "2026-05-06T15:18:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs line 72: CertPool implements IntoIterator for &CertPool but does not expose an iter() method. Rust convention (and clippy::pedantic lint 'iter_without_into_iter') says that when you implement IntoIterator for a reference type, you should also provide an iter() method returning the same iterator type.\n\nWithout iter(), users who want to iterate must write either for c in &pool or pool.into_iter() \u2014 the latter being unusual for references. The idiomatic &pool.iter() pattern does not compile.\n\nFix: add pub fn iter(&self) -> core::slice::Iter<'_, x509_cert::Certificate> to CertPool that delegates to self.certs.iter().\n\nClippy pedantic fires: 'IntoIterator implemented for a reference type without an iter method'",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CertPool: IntoIterator for &CertPool missing companion iter() method",
+  "updated_at": "2026-05-06T15:26:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:18:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

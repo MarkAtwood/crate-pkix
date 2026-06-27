@@ -1,0 +1,53 @@
+{
+  "close_reason": "Re-baseline (PKIX-lwr9.6, 2026-05-11) eliminated this entire bucket. Zero of the 8 'path length exceeds maximum' cases this bead was framed around are present in the post-.6 StricterThanWild residuals. Like PKIX-lwr9.2, the failures were the harness bypassing pkix-path-builder, not a missing pathLenConstraint backtracking feature. Closing as phantom problem per the empirical re-baseline.",
+  "closed_at": "2026-05-11T21:58:55Z",
+  "compaction_level": 0,
+  "content_hash": "9223bdd497c8f8f02bda51dea15a7cb55f27188feea8f1b23ef8b6c7ea17cded",
+  "created_at": "2026-05-11T16:29:56Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n8 bettertls::pathbuilding cases fail with 'path length exceeds maximum.' pkix-path-builder currently builds a candidate chain, hands it to pkix-path, and pkix-path errors on pathLen \u2014 but pkix-path-builder doesn't backtrack to try an alternative chain that would satisfy pathLen.\n\nRFC 5280 \u00a74.2.1.9 (BasicConstraints pathLenConstraint) is enforced by pkix-path correctly. The fix is in pkix-path-builder: when a candidate chain would violate pathLen, try a shorter alternative path if one exists in the bundle.\n\n## What\n\n1. Augment pkix-path-builder's candidate-selection logic to check pathLenConstraint against the depth-from-anchor metric BEFORE handing the chain to pkix-path.\n2. If a candidate intermediate at depth D would violate the anchor's (or an upstream CA's) pathLen, try the next candidate at that hop (typically a shorter alternative path through a different intermediate). Self-issued certs are exempt from pathLen counting per RFC 5280 \u00a74.2.1.9.\n3. Surface pathLen-aware path selection as part of the cross-signed-candidate-selection machinery from PKIX-lwr9.2 \u2014 same backtracking mechanism, different filter.\n\n## Acceptance\n\n- [ ] The 8 'path length exceeds maximum' bettertls cases flip to Pass.\n- [ ] Self-issued-cert exemption from pathLen counting is implemented and tested.\n- [ ] No regression on PKITS \u00a74.6 pathLen tests.\n- [ ] No regression on baseline limbo cases.\n\n## Depends on\n\nPKIX-lwr9.1 (fixtures + test scaffolding), PKIX-lwr9.2 (backtracking mechanism \u2014 pathLen-aware path selection layers on top of candidate-selection).\n\n## Filed by\n\nPKIX-lwr9 decomposition decision 2026-05-11 (Mark).",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Inherited human label removed 2026-05-11 (Mark): the human label was inherited from PKIX-lwr9 at creation time, not a per-bead pending decision. These children are blocked by PKIX-lwr9.6 (limbo harness wiring) and will either become genuine builder bugs to fix or close as superseded once .6 re-baselines.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: pathLenConstraint-aware backtracking",
+  "updated_at": "2026-05-11T21:58:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:29:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:30:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:30:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T12:45:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

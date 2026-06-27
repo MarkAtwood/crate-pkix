@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:24Z",
+  "compaction_level": 0,
+  "content_hash": "7b161ed8e2b24f3a59a1caf6d8961031e05a16a691f908422a70dee10732bf8a",
+  "created_at": "2026-05-02T13:42:02Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple/src/lib.rs line 150: MAX_INTERMEDIATES=2 is a public const with rustdoc. The value and its use in the ChainTooLong check are documented. However, the interaction between MAX_INTERMEDIATES and the overall maximum chain depth (1 + MAX_INTERMEDIATES = 3 certs) is documented in the crate-level doc but not on the constant itself. A caller who sets chain.len() = 3 (leaf + 2 intermediates) and reads MAX_INTERMEDIATES = 2 may expect room for 2 more intermediates. The constant's rustdoc should say 'maximum total chain length is 1 + MAX_INTERMEDIATES = 3 certificates'.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "MAX_INTERMEDIATES is public and documented but its impact on chain[0] LeafIsCA check is not",
+  "updated_at": "2026-05-02T14:19:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "close_reason": "Fixed in rm8.72/73: wrappers now generic over V: SignatureVerifier + A: AiaFetcher",
+  "closed_at": "2026-06-15T18:30:21Z",
+  "compaction_level": 0,
+  "content_hash": "1d8908d776dca992221fdeb54d11e5ae3fc43e945890cce6a4098be96fd82676",
+  "created_at": "2026-05-14T14:39:18Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:754, 839, 916, 985, 1018, 1069, 1139, 1267: every use-case wrapper hardcodes `&NoAiaFetcher` in its internal verify_chain call. Callers who want AIA fetching with the convenience of verify_tls_server (correct EKU profile, identity binding, etc.) have no path forward except drop down to verify_chain and re-implement identity binding manually. This is a real friction point: the wrappers exist BECAUSE doing chain+identity by hand is error-prone, so forcing AIA users to do it by hand defeats the wrapper's purpose. AGENTS.md prelaunch framing applies: design for the eventual complete shape. Two options: (1) add an A: AiaFetcher=NoAiaFetcher generic to each wrapper (zero-cost for callers using default; opt-in for AIA users), (2) ship a parallel set verify_tls_server_with_aia / etc. (function-count explosion, scales badly). Option (1) is the principled answer and matches the Verifier struct's design pattern. Concrete signature: pub fn verify_tls_server<P, R, A: AiaFetcher = NoAiaFetcher>(..., aia: &A) \u2014 though Rust default generic params on free functions are a known footgun, so a generic without a default is also acceptable if callers ALSO have to pass &NoAiaFetcher explicitly. Pre-1.0 is the time to settle this.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Crypto-security framing (from /review-crypto-security pass, 2026-05-14): the hardcoded `NoAiaFetcher` is the safer-by-default choice \u2014 it bypasses the SSRF + fan-out attack surface (see PKIX-q9hv.31, PKIX-q9hv.32) entirely. Adding an opt-in for AIA fetching in use-case wrappers must come with rustdoc that exposes the attacker-controlled-URI surface, not just the convenience. The friction this finding describes is real, but the answer is 'opt-in plus a doc paragraph that scares the right callers' not 'default to fetching'.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Use-case wrappers (verify_tls_server, etc.) hardcode NoAiaFetcher with no opt-in",
+  "updated_at": "2026-06-15T18:30:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:39:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:39Z",
+  "compaction_level": 0,
+  "content_hash": "8a44a857d3d5b4c4119a339e9c1a12d751a2211b865f16d1c37b02f396246d8e",
+  "created_at": "2026-05-14T05:21:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs module rustdoc, from_cert / from_pem / from_der / from_der_iter / from_pem_file / from_der_file rustdoc \u2014 none of these surfaces explicitly state that the loader does NOT verify any signature on the trust-anchor certificate. Self-signed roots are the typical input, and a caller might reasonably (but incorrectly) assume that loading verifies the cert's own self-signature as a basic sanity check.\n\nWhat actually happens: from_cert extracts subject + SPKI + name_constraints and discards the rest of the certificate including the signature. A trust-anchor file with arbitrary tampering \u2014 a swapped SPKI inside an otherwise-syntactically-valid TBS \u2014 loads cleanly and is then trusted by validate_path.\n\nThis is correct per RFC 5280 \u00a76.1 (trust anchors are just (name, key, optional constraints) tuples; they need not be self-signed certs and the signature is not part of the path-validation algorithm). The crate's behavior is RFC-conformant. The concern is doc-level: a security reviewer or a downstream user reading only pkix-truststore (without first reading pkix-path) will not see this stated.\n\nDefense-in-depth fix: add a paragraph to the module-level rustdoc and to from_pem / from_pem_file:\n\n> # Trust-anchor file integrity\n>\n> These loaders extract (subject, SPKI, NameConstraints) from each certificate\n> in the input and do NOT verify any signature on the certificate itself.\n> A trust-anchor certificate's self-signature (or signature from an offline\n> root) is not checked here. Trust in the loaded anchors derives entirely\n> from trust in the input bytes: ensure the trust-anchor file is sourced from\n> an authenticated channel (signed package, code-signed installer, IaC\n> with file-hash pinning, etc.).\n\nWhat goes wrong if undocumented: a deployer assumes \"I'm loading from a CA bundle, the library will tell me if any cert is bad\" and skips out-of-band integrity checks on the file. Attacker swaps the bundle, all bytes parse, validation proceeds against attacker's anchors. The loader behaved correctly per its contract; the contract was not communicated.\n\nAdjacent to PKIX-tit4.1 but a different class: that one is fail-open on a parsed-but-malformed extension; this one is the broader observation that no integrity check on the file itself is part of the contract.\n\nEngineering basis: principled crypto-API documentation states what is NOT done as well as what is done. rustls-pemfile, openssl::x509, and pyca/cryptography all make this explicit.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rustdoc does not state that loaders do NOT verify trust-anchor self-signatures; file integrity is implicit caller responsibility",
+  "updated_at": "2026-05-14T08:14:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:21:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

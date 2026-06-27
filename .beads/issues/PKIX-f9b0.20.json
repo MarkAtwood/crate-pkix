@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:12Z",
+  "compaction_level": 0,
+  "content_hash": "b8bb1d6661d73c20b65f41b6dd62c407bf41b049fc00b2e5d281c5cb84c55b35",
+  "created_at": "2026-05-07T17:22:48Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:339 \u2014 build_path bypasses CertPool's public IntoIterator API with pool.certs.as_slice() accessing the private field directly. This creates internal coupling: if the field is renamed or the storage representation changes, build_path silently breaks. Replace with a dedicated CertPool::as_slice() method (or use the existing iter() method and collect, though passing a slice to dfs is preferable for performance). The field certs is not pub, so this only works because build_path is in the same module \u2014 but the design intent of CertPool as an opaque type is violated.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] build_path accesses pool.certs directly",
+  "updated_at": "2026-05-07T18:44:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

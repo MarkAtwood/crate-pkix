@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fd5ffba012dd20df4064269aced64aba51976288ec276b441e5efb6763fb548d",
+  "created_at": "2026-05-14T19:28:39Z",
+  "created_by": "Mark Atwood",
+  "description": "What is awkward: pkix-aia/src/lib.rs:289-314 (label_for) and 321-344 (kind_for) implement the same 20-variant table in opposite directions. Adding or removing a variant requires editing both arms; the build does not check that they stay paired.\n\nSuggested rewrite: a macro_rules! that emits both directions from a single list, OR a single const VARIANTS: &[(ErrorKind, &str)] table that both functions iterate.\n\nExample shape (illustrative, not a strict prescription):\n\nconst VARIANTS: &[(ErrorKind, &str)] = &[\n    (ErrorKind::NotFound, \"NotFound\"),\n    // ... 19 more\n];\nfn label_for(k: ErrorKind) -> &'static str {\n    VARIANTS.iter().find(|(kk, _)| *kk == k).map(|(_, s)| *s).unwrap_or(\"Other\")\n}\nfn kind_for(s: &str) -> ErrorKind {\n    VARIANTS.iter().find(|(_, ss)| *ss == s).map(|(k, _)| *k).unwrap_or(ErrorKind::Other)\n}\n\nThe cost in lookup performance (20-element linear scan vs match jump) is irrelevant \u2014 this code runs at most once per serde call on an error path.\n\nTagged 'opinion': the duplication is readable and grep-friendly as-is, so this is on the line between elegance and bikeshedding. Calling it explicitly. The find-and-fix would be more compelling if PKIX-o3op.1 is resolved by extending the table (option a) \u2014 at 35+ variants, the duplication becomes a real maintenance issue.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.9",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "label_for and kind_for duplicate the same 20-variant table verbatim",
+  "updated_at": "2026-05-14T19:28:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:28:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

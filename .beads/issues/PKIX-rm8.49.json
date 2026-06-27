@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.49",
+  "title": "pkix-identity IdentityError retains dead NotYetImplemented variant",
+  "description": "In pkix-identity/src/lib.rs:347, IdentityError::NotYetImplemented is documented as 'Retained for API compatibility but no longer returned by any function in this crate.' Since the crate is pre-1.0 and the enum is #[non_exhaustive], removing dead variants is a semver-valid change.\n\nWhat goes wrong: The dead variant is noise in the documentation and in exhaustive match arms callers write for this type. The AGENTS.md says 'breaking changes are free' pre-1.0 and this is the mechanism for getting the design right.\n\nLocation: pkix-identity/src/lib.rs:347\n\nRecommendation: Remove NotYetImplemented in the next 0.x release. The pre-1.0 semver window is exactly when this cleanup should happen.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:14Z",
+  "updated_at": "2026-06-15T16:30:40Z",
+  "closed_at": "2026-06-15T16:30:40Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:13"
+    }
+  ]
+}

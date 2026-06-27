@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added names_match check for issuer.subject vs crl.issuer at step (2b) in crl.rs check_revocation",
+  "closed_at": "2026-05-06T16:26:44Z",
+  "compaction_level": 0,
+  "content_hash": "e3191e0b887699873db305833b25907ea320825cb40f0fd7768d67a60220a82d",
+  "created_at": "2026-05-06T16:25:58Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/src/crl.rs. Step (2) verifies crl.issuer matches cert.issuer, but does NOT verify that the passed-in issuer Certificate's subject DN matches crl.issuer. The cRLSign check at (3) and sig verify at (3b) both operate on issuer before its identity is confirmed against the CRL. Sig verify is the ultimate backstop but the correct fix is to add: names_match(&issuer.tbs_certificate.subject, &crl.tbs_cert_list.issuer) check between step (2) and step (3).",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: CRL checker: issuer Certificate subject not verified against CRL issuer before cRLSign check",
+  "updated_at": "2026-05-06T16:26:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:25:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

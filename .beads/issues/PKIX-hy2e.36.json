@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "019ae7df72b797a5471e8b9c2ab394fd5eae90dcb4d4218976456f577ca9606d",
+  "created_at": "2026-05-14T12:57:37Z",
+  "created_by": "Mark Atwood",
+  "description": "The pkix-lint crate contains four separate hex encode/decode implementations:\\n\\n1. lib.rs serde_helpers::cert_sha256_hex \u2014 uses `char::from_digit` + push (allocation-light).\\n2. deviation.rs hex_encode (line 537) \u2014 uses `format!(\"{:02x}\", b)` in a loop with push_str (per-byte heap allocation).\\n3. oscal/emit.rs hex (line 822) + hex_digit (line 831) \u2014 hand-rolled with explicit ASCII offset math.\\n4. oscal/parse.rs hex_decode (line 824) + nibble (line 840) \u2014 the only decoder.\\n\\nFour implementations of essentially the same algorithm is a maintenance drift risk: the lib.rs serde helper enforces lowercase, deviation.rs enforces lowercase via format!, emit.rs enforces lowercase explicitly, and parse.rs accepts mixed case. If any rule changes (e.g., a future canonical hex spec requires uppercase, or strips/inserts separators), four spots need updating. \\n\\nIdiomatic Rust: either (a) add a small `hex` crate-private module exposing `encode_lower(bytes: &[u8]) -> String` and `decode(s: &str) -> Result<Vec<u8>, _>` and have all four sites use it, or (b) pull in the well-known `hex` crate dependency (already MIT-licensed, zero-dep itself, used widely in RustCrypto). Option (a) keeps the dep tree light; option (b) follows the workspace convention of preferring published crates over hand-rolled cryptography-adjacent utilities. Either way, deviation.rs's per-byte format!-based encoder is the worst of the four (heap allocation per byte) and should be replaced regardless.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Hex encode/decode logic duplicated four times across the crate",
+  "updated_at": "2026-05-14T12:57:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:57:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

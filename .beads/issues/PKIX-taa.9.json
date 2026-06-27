@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1cdf45f3f89465a889dac10e8d70e3a6751b4113355adb804b2f5b7ecfc8ab2b",
+  "created_at": "2026-05-06T16:52:12Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path/src/lib.rs:613-622\n\nThe doc comment on ValidatedPath.depth (line 619-622) explicitly notes:\n'this counts all certificates except the trust anchor \u2014 including self-issued intermediates that RFC 5280 \u00a74.2.1.9 excludes from the pathLenConstraint count.'\n\nThis means depth is NOT the RFC 5280 path length \u2014 it is chain.len() - 1. A caller comparing ValidatedPath.depth against their own pathLenConstraint-based business logic would get an incorrect count for chains with self-issued intermediates.\n\nThe warning is in the doc comment, but the field name 'depth' suggests it measures chain depth uniformly. A caller expecting RFC 5280 path length semantics will be misled.\n\nFix option: rename depth to chain_depth (or cert_count) and add a separate rfc5280_path_len() method or a separate field that computes non-self-issued intermediate count. Alternatively, since this is #[non_exhaustive], document that an addition of rfc5280_path_len is planned.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Renaming ValidatedPath.depth is a breaking API change. Deferred to v0.2 with a doc note already present on the field.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "pkix-path ValidatedPath.depth includes self-issued intermediates, differing from RFC 5280 pathLenConstraint count",
+  "updated_at": "2026-05-11T05:18:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:52:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

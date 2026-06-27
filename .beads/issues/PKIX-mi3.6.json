@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:19Z",
+  "compaction_level": 0,
+  "content_hash": "5b25b5b40e7ed667219745e5135de92130825fcfab4249f6695fbde39795ad46",
+  "created_at": "2026-05-05T14:33:36Z",
+  "created_by": "Mark Atwood",
+  "description": "Add pkix-path/tests/pkits_4_8_to_4_12.rs. Read InitialPolicySet, InitialExplicitPolicy, InitialPolicyMappingInhibit, InitialAnyPolicyInhibit from vectors.json per test case. Wire them into ValidationPolicy. Run all 63 vectors from \u00a74.8-4.12. Add PolicyViolation to Error enum and Display impl.",
+  "ephemeral": 0,
+  "id": "PKIX-mi3.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Write PKITS \u00a74.8-4.12 policy tests",
+  "updated_at": "2026-05-05T15:25:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:25Z",
+  "compaction_level": 0,
+  "content_hash": "667e8790c4b476cdb7b1784d5db1b1e46d62c15ab2ffbbf35b5ca82524049271",
+  "created_at": "2026-05-07T20:27:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\nEvery workspace crate enables `#![cfg_attr(docsrs, feature(doc_cfg))]` at the top of `lib.rs`, but **no item in the workspace uses `#[cfg_attr(docsrs, doc(cfg(feature = ...)))]`**. The feature gate is enabled for nothing.\n\n```\n$ rg \"doc(cfg\" pkix-*/src/\n(no matches)\n\n$ rg \"cfg_attr(docsrs\" pkix-*/src/lib.rs\npkix-ac/src/lib.rs:2:#![cfg_attr(docsrs, feature(doc_cfg))]\npkix-chain-simple/src/lib.rs:2:... (every crate)\n```\n\n## Impact\n\nFeature-gated public items in `pkix-path` (`EcdsaP256Verifier` behind `p256`, `RsaPkcs1v15Sha256Verifier` behind `rsa`, the entire `std::error::Error` impl behind `std`) are not visually labeled on docs.rs. Users browsing the rendered docs do not see \"Available on crate feature `p256` only.\" badges.\n\nSame issue in pkix-revocation: `CrlChecker` (behind `crl`), `OcspChecker` (behind `ocsp`).\n\n## Fix\n\nEither:\n\n1. Add the doc-cfg attribute to each feature-gated public item:\n\n```rust\n#[cfg(feature = \"p256\")]\n#[cfg_attr(docsrs, doc(cfg(feature = \"p256\")))]\npub struct EcdsaP256Verifier;\n```\n\n2. Or \u2014 easier on MSRV 1.73 \u2014 switch to `#![cfg_attr(docsrs, feature(doc_auto_cfg))]` (also nightly-only) which infers the badges automatically. This is what most RustCrypto crates do now.\n\n3. Or remove the unused `feature(doc_cfg)` line from every crate.\n\n## Priority\n\nP3 \u2014 docs.rs UX. The unused `feature(...)` is also a minor code smell (says one thing, does another).\n",
+  "ephemeral": 0,
+  "id": "PKIX-1z05",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: feature(doc_cfg) enabled in every crate but no #[doc(cfg(...))] attribute exists; feature-gated items unlabelled on docs.rs",
+  "updated_at": "2026-05-07T21:25:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

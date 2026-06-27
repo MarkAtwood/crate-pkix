@@ -1,0 +1,39 @@
+{
+  "close_reason": "OpenSSL cannot directly oracle codesign (no -purpose codesign verb); superseded by pyca-composition approach in new bead under PKIX-fmtv parent. See notes for full decision rationale.",
+  "closed_at": "2026-05-13T15:46:51Z",
+  "compaction_level": 0,
+  "content_hash": "08d326621fb32460e84b418991ff2e433bac844511c8dbbe1e491d8c2fdf72b4",
+  "created_at": "2026-05-13T05:30:46Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Wrapper-level differential test for pkix_chain::verify_code_signer against 'openssl verify -purpose codesign'.\n\nSource corpus: pkix-chain/tests/fixtures/leaf-codesigning.der. No subject binding (code-signing wrapper doesn't bind hostname/mailbox); the diff is on EKU enforcement and chain validity only.\n\nAcceptance:\n- pkix-difftest/tests/verify_wrapper_openssl_codesign.rs covers the codesigning fixtures.\n- baseline-verify-openssl.md gets a code-signing section.\n\nBlocks on PKIX-fmtv.18.1.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 decision: superseded, not an OpenSSL diff]\n\nOpenSSL CLI's purpose list ('sslclient, sslserver, nssslserver, smimesign, smimeencrypt, crlsign, any, ocsphelper, timestampsign') has no 'codesign' verb. Confirmed by bd-spin 2026-05-13.\n\nRejected resolutions:\n- Chain-only diff with -purpose any: would say 'agree' even when verify_code_signer has purpose-specific bugs (false confidence on the wrapper's core job)\n- Custom -verify_name policy: OpenSSL has no codesign policy name\n- Third-party signing-binary oracle (osslsigncode/signtool): wrong tool category, signs binaries, not cert chains\n- Accept gap, close: leaves a coverage hole on the wrapper's purpose-specific behavior\n\nAdopted resolution: **compose pyca chain primitives + standalone hand-rolled id-kp-codeSigning EKU check** as an independent oracle. Pyca's PolicyBuilder is TLS-bound, but Certificate.verify_directly_issued_by() + extensions.get_extension_for_class(ExtendedKeyUsage) cover chain walk + EKU check. The hand-rolled EKU check lives in pkix-difftest/oracles/, not in workspace code under test \u2014 this is independent cross-validation per AGENTS.md test discipline, not workspace-code-as-own-oracle.\n\nThe chosen approach is **not an OpenSSL diff**, which is what this bead's title/scope said. Closing as superseded; new bead filed for the actual work (see below).\n\nClosing reason: scope changed from 'OpenSSL -purpose codesign diff' to 'pyca composition diff'; new bead filed under PKIX-fmtv as a sibling of .18 and .19.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: verify_code_signer vs -purpose codesign",
+  "updated_at": "2026-05-13T15:46:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:45Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T22:30:59Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

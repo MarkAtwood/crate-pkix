@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T00:35:46Z",
+  "compaction_level": 0,
+  "content_hash": "e5dea23c81c08f273c3f68bbdcf0263810d00fe0f5c88a69ea9132b749631a7d",
+  "created_at": "2026-05-12T00:11:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nConsumer pattern surfaced by PKIX-lwr9.4 / tc60 diagnosis: build_path() is a single-shot wrapper that returns only the first DFS candidate from build_path_candidates(). It has no SignatureVerifier dependency, so it cannot know in advance which candidates will fail signature checks. Adversarial pools (cross-signed graphs with mixed signature algorithms, expired alternatives, etc.) frequently require iterating candidates.\n\nThe current pattern forces every consumer to write the iteration loop themselves: pkix-difftest does it on the PKITS side (PKIX-t0w4) and will do it on the limbo side (PKIX-lwr9.4.1); downstream consumers face the same gap.\n\n## What\n\nAdd to pkix-path-builder (signature subject to review during impl):\n\n```rust\npub fn build_first_valid_path<V: SignatureVerifier>(\n    target: &Certificate,\n    pool: &[Certificate],\n    anchors: &[TrustAnchor],\n    policy: &ValidationPolicy,\n    verifier: &V,\n) -> Result<Vec<Certificate>, PathBuildError>;\n```\n\nSemantics:\n1. Iterate build_path_candidates(target, pool, anchors).\n2. For each candidate, run validate_path(candidate, anchors, policy, verifier).\n3. Return Ok(chain) on first candidate that validates.\n4. Return Err(PathBuildError::NoValidPath { tried: usize, last_error: ... }) when iterator is exhausted.\n\n## Acceptance\n\n- [ ] build_first_valid_path<V> exists in pkix-path-builder with the semantics above.\n- [ ] Unit test: cross-signed pool with one valid + one invalid signature alternative; helper picks the valid one.\n- [ ] Unit test: pool with no valid path returns NoValidPath with tried count.\n- [ ] Rustdoc clearly distinguishes build_path (single-shot, no verifier), build_path_candidates (iterator, no verifier), build_first_valid_path (iterator + verifier, returns first valid).\n- [ ] Existing build_path / build_path_candidates signatures unchanged (no breaking changes).\n- [ ] CHANGELOG entry under pkix-path-builder.\n\n## Relationship\n\nDoes NOT replace the PKIX-lwr9.4.1 harness fix. The harness fix is the immediate corpus-flip; this helper is the durable API ergonomics fix that downstream consumers can adopt. pkix-difftest may later adopt this helper internally, but that's a follow-up.\n\n## Out of scope\n\n- Async / parallel candidate evaluation.\n- Caching of validate_path failures across candidates (each candidate is fresh).\n- Promoting build_path itself to iterate (rejected as breaking change per PKIX-lwr9.4 diagnosis).\n\n## Filed by\n\nSplit from PKIX-lwr9.4 after Mark chose 'both' (harness fix + helper API) 2026-05-11.",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.4.2",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: add build_first_valid_path<V> helper (candidates + validate_path)",
+  "updated_at": "2026-05-12T00:35:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:11:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

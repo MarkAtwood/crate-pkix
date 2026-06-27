@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9d20a2f47ccb985c310120f47a6366c77ca5a352882df647c7d18c7c3f9c65e6",
+  "created_at": "2026-05-14T12:41:25Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: oscal/emit.rs:256-266. EvidenceIndex::build deduplicates EvidenceKey using Vec::contains, which is O(n) per insertion \u2192 O(n^2) overall, where n = number of findings. Today (~50 RFC-conformance lints per cert, ~3 certs per chain) n is small and the cost is invisible. But the workspace's stated roadmap is pkix-policy-zlint adapting ~700 zlint checks, plus pkilint, plus custom lint bundles. A run against a typical CT log batch (10k certs \u00d7 100 lints each = 1M findings) hits O(1e12) comparisons. Fix: replace EvidenceKey-dedup Vec with HashSet<EvidenceKey> (EvidenceKey already derives Hash via Eq/PartialEq, but isn't actually Hash \u2014 it would need a derive). Keep the ordered Vec for output order, but skip Vec::contains in favor of HashSet::insert returning bool. O(n) overall. Net cost: one extra hash per finding, one extra HashSet allocation per report. Filed P2 because the present scale doesn't hurt; this is forward-looking.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "EvidenceIndex::build is O(n*m) for evidence-key dedup, scales badly with zlint-grade rule sets",
+  "updated_at": "2026-05-14T12:41:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

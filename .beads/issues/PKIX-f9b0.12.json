@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:05Z",
+  "compaction_level": 0,
+  "content_hash": "1b4690517fd29c4feca2895c9efc351916d9d0236532de2b93ffbd82b16c1d8e",
+  "created_at": "2026-05-07T17:22:34Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:196 \u2014 The match path.last() { Some(c) => ..., None => { debug_assert!...; return Ok(false); } } construct handles a single interesting arm; Clippy pedantic flags this as collapsible. Replace with if let Some(c) = path.last() { ... } with the debug_assert!/return as an else branch or prior guard. Cleaner, idiomatic, and avoids the misleading implication that None is a real code path.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] replace match-on-Option with if let in dfs()",
+  "updated_at": "2026-05-07T18:44:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

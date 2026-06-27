@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:23:24Z",
+  "compaction_level": 0,
+  "content_hash": "78659a30b19ef37a2c4ddecd9aee2f8fb793612de2e42d009721142d85797d3a",
+  "created_at": "2026-05-11T05:53:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint::Finding` carries lint result metadata: which lint, severity, citation, evaluated_at, rule_bundle_version. OSCAL splits this across two models: **Finding** (the conclusion: 'this control failed') and **Observation** (the raw evidence: 'this cert had property X'). The split exists because one Observation can support multiple Findings, and Findings reference Observations rather than embedding them.\n\n## What\n\nReshape `Finding` to OSCAL Finding + emit accompanying Observations:\n\n**OSCAL Finding fields:**\n- `uuid` \u2014 generated per finding.\n- `title`, `description` \u2014 human-readable summary.\n- `target` \u2014 what the finding is about (e.g., a Control's objective). `target.type` = `objective-id`; `target.target-id` = the lint's OSCAL Control ID; `target.status.state` = `not-satisfied` (when `LintResult::Error/Fatal`) or `satisfied-but-other-than-planned` (when `Warn`).\n- `related-observations[]` \u2014 references to Observations carrying the evidence.\n- `related-risks[]` \u2014 references to Risks if this finding produced one (e.g., a deviation-approved finding).\n- `props` \u2014 extension point. Lands `cert_sha256` (PKIX-a86q) here as a `prop` with `name=cert-sha256`.\n- `links` \u2014 extension point for evidence pointers.\n\n**OSCAL Observation fields:**\n- `uuid` \u2014 generated.\n- `title`, `description` \u2014 what was observed.\n- `subjects[]` \u2014 which cert / chain / SAN entry the observation concerns.\n- `collected` \u2014 timestamp.\n- `methods[]` \u2014 how the observation was made (e.g., `EXAMINE` for static lint).\n\nThe original `Finding.detail` string becomes the Observation's `description`. `LintResult::Warn/Error/Fatal` enum encodes into `Finding.target.status.state` according to a small mapping table.\n\n## Acceptance\n\n- [ ] `Finding` and `Observation` Rust types match OSCAL field-for-field.\n- [ ] PKIX-a86q's `cert_sha256` lands as a Finding `prop`.\n- [ ] One Observation may support multiple Findings (1:N relationship preserved).\n- [ ] Serde round-trips against the NIST OSCAL JSON Schema.\n- [ ] LintResult \u2192 Finding.target.status.state mapping documented.\n\n## Depends on\n\nPKIX-9vnx.2 (binding), PKIX-9vnx.3 (Assessment Results structure for the parent context).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Reframed 2026-05-11 (Arch 2 \u2014 see PKIX-ztmr / PKIX-9vnx notes):\n\n- Title intent shifts from 'realign Finding TO OSCAL Finding + Observation' to 'add OSCAL Finding + Observation serializer for Finding.'\n- Finding's Rust shape stays lean (whatever pkix-lint internally wants). The serializer projects it into OSCAL Finding + Observation JSON.\n- PKIX-a86q's `cert_sha256` evidence pointer: add a field to Finding (or a sibling Observation struct) holding the digest. The serializer emits it as an OSCAL Observation prop (`name=cert-sha256`) or link.\n- LintResult \u2192 Finding.target.status.state mapping documented in the serializer module.\n- No `pkix_lint::Observation` Rust type unless internally useful \u2014 Observations can be synthesized at serialization time from Finding fields.\n- No longer blocked by PKIX-9vnx.2 (closed).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Realign Finding to OSCAL Finding + Observation",
+  "updated_at": "2026-05-11T17:23:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:53:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

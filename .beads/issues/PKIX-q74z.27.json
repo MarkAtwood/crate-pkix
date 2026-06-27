@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b403087d5275f9639d0444b293f2b59962e04265c3961df014df6bf8ea8389b8",
+  "created_at": "2026-05-14T14:33:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Direct contradiction between documented contract and implemented behavior.\n\nThe CtLog field doc (pkix-ct/src/log_list.rs:46):\n\\`\\`\\`\n/// First moment the log is considered usable, in milliseconds\n/// since the Unix epoch. SCTs with timestamps before this point\n/// are not trustworthy even if signed by this log's key. \\`None\\`\n/// means the log has never reached the \\`usable\\` state.\n\\`\\`\\`\n\nThe implementation (pkix-ct/src/verify.rs:845-857):\n\\`\\`\\`\nfn log_window_contains(log: &CtLog, timestamp_ms: u64) -> bool {\n    if let Some(lo) = log.usable_from_ms {\n        if timestamp_ms < lo {\n            return false;\n        }\n    }\n    // ... if None, fall through and treat all timestamps as in-window\n\\`\\`\\`\n\nIf a log has \\`usable_from_ms = None\\` (\\\"never reached usable state\\\"), then by the docstring NO SCT from that log should be trusted. But \\`log_window_contains\\` returns \\`true\\` for any timestamp, so \\`verify_sct_for_cert\\` / \\`verify_sct_for_precert\\` will accept SCTs from never-usable logs.\n\nThis is the same class of issue PKIX-q74z.10 flagged for the Google JSON parser (silent acceptance of pending/qualified/rejected logs), but with the bug surfaced one layer deeper: the field-semantics doc contradicts the validation primitive.\n\nCaller-impact: a caller who manually constructs a \\`CtLog\\` with \\`usable_from_ms = None\\` (per the doc, intending \\\"do not trust\\\") will find that pkix-ct trusts SCTs from that log anyway. This is a verifier-soundness gap, not just a documentation paper-cut.\n\nFix shape, one of:\n1. \\`log_window_contains\\` returns \\`false\\` when \\`usable_from_ms == None\\` (matches docstring intent).\n2. Change the CtLog docstring to say \\`None\\` means \\\"unbounded \u2014 log is usable for all timestamps\\\" (matches code). This is dangerous because it silently widens trust.\n3. Use a more explicit type \u2014 \\`enum LogWindow { Bounded { from_ms, until_ms: Option<u64> }, NeverUsable }\\` \u2014 and force the construction to be unambiguous.\n\nRecommend (1): per the docstring, the soundness-preserving choice is to reject when \\`None\\`.\n\nRelates to PKIX-q74z.10 (parser-side cousin) and PKIX-q74z.16 (window-bounds semantics).",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "(api-contract) log_window_contains treats usable_from_ms=None as 'unbounded usable' but CtLog docstring says None means 'never reached usable state'",
+  "updated_at": "2026-05-14T14:33:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:33:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

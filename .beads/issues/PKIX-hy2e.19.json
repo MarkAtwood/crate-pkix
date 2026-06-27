@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2f1ed9942822b3e4706c7bf327e575970df48558d1dbe2570c1e62b45c74b277",
+  "created_at": "2026-05-14T12:42:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: oscal/parse.rs:42-334. ParseError carries 40+ variants, one per malformed-input shape, each with structured fields (index, name, found). A contributor will eventually look at the size and propose collapsing into a single Generic { kind: ErrorKind, context: String } variant 'for simplicity.' Don't. The current shape lets every error site emit a typed error that a downstream OSCAL renderer or CI parser can interpret without parsing English error strings. The structured fields (index of offending Risk in the input array, exact prop name missing, exact value that failed to parse) are what makes 'why did my OSCAL parse fail?' a 5-second answer instead of a 5-minute debugging session. Round-trip tests at parse.rs:1102+ exercise every error variant with hand-built fixtures \u2014 they would degrade in quality if collapsed to string matching. The 4 separate ProfileImportNotObject / Missing/HrefNotString / Empty variants are slightly redundant on the surface (could be one VariantInvalidImport with a sub-enum), but the current shape makes it trivial to match-arm on a specific malformed case in tests. The size is the right cost.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.19",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "ParseError variant-per-shape-error pattern is the right abstraction \u2014 defend against 'collapse to one Generic variant'",
+  "updated_at": "2026-05-14T12:42:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:42:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

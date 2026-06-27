@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "created_at": "2026-05-12T05:39:44Z",
+  "id": "019e1ab2-c686-7d52-83e9-f4843ed5208e",
+  "issue_id": "PKIX-fmtv.12",
+  "text": "Parent epic for the mailbox-binding work. The pkix-identity half (PKIX-fmtv.12.1) shipped 2026-05-11 with 73 tests covering RFC 5280 \u00a74.2.1.6 + RFC 8398. The pkix-chain wrapper half (PKIX-fmtv.12.2) is blocked on PKIX-fmtv.7 (wrapper-set decision, human-labeled). Labeling this epic 'human' so it does not re-surface at the top of bd ready every session \u2014 the remaining work is gated on the PKIX-fmtv.7 design decision, which only the human can make. Once .7 resolves, drop the 'human' label and the loop will pick up .12.2 automatically. Alternatively, if .12.1 is deemed sufficient (i.e. pkix-chain wrappers ship later as a separate epic), close this epic and PKIX-fmtv.12.2 directly."
+}

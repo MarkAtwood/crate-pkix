@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-qws",
+  "title": "Signature algorithm coverage",
+  "description": "Expand DefaultVerifier dispatch table. P-384+SHA-384 and RSA-PKCS1v15-SHA384/512 already shipped. Remaining: RSA-PSS, Ed25519, P-521, legacy SHA-1. Old epic: PKIX-gphz",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:52:24Z",
+  "updated_at": "2026-06-15T17:52:24Z"
+}

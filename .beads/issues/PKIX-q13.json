@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "changed SignatureVerifier::verify_signature return type to core::result::Result<(), SignatureError>; updated RustCryptoVerifier stub in pkix-chain-simple; added signature workspace dep to pkix-chain-simple/Cargo.toml",
+  "closed_at": "2026-05-02T06:28:43Z",
+  "compaction_level": 0,
+  "content_hash": "4c6185809b74b2fe4f90ce909fa14547696054cebf85f035bf0ac7a9d8764255",
+  "created_at": "2026-05-02T05:45:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:120-126 -- SignatureVerifier::verify_signature returns pkix_path::Result<()>, meaning the verifier is responsible for constructing pkix_path::Error::SignatureInvalid { index }. But the verifier has no idea what chain index it is being called for -- only validate_path knows that. The example in the docs shows index: 0 as a placeholder, which is wrong for any cert other than the leaf. Fix: change verify_signature return type to Result<(), signature::Error> (signature crate is already a workspace dep). validate_path wraps any Err as Error::SignatureInvalid { index } using the correct loop index. The verifier's responsibility is cryptographic pass/fail only.",
+  "ephemeral": 0,
+  "id": "PKIX-q13",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SignatureVerifier::verify_signature return type forces wrong error index",
+  "updated_at": "2026-05-02T06:28:43Z"
+}

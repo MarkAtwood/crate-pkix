@@ -1,0 +1,30 @@
+{
+  "assignee": "bd-spin/bd-spin-20260514T024333Z-3287470",
+  "compaction_level": 0,
+  "content_hash": "15cf7b931de3a976789627f51acb3c166c54da727378001c2ee8fda90f4e6906",
+  "created_at": "2026-05-14T02:39:18Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nRename `SmimeProfile` (currently the Mailbox-validated Strict baseline)\nto `SmimeMailboxValidated` so that the four S/MIME validation-tier\nProfile types follow a single consistent naming pattern:\n\n- `SmimeMailboxValidated` (renamed from `SmimeProfile`)\n- `SmimeOrganizationValidated` (pending PKIX-jbvb.1)\n- `SmimeSponsorValidated` (shipped, PKIX-jbvb.7)\n- `SmimeIndividualValidated` (shipped, PKIX-jbvb.7)\n\nCurrently `SmimeProfile` is a one-off naming inconsistency \u2014 every\nother tier-specific S/MIME Profile follows `Smime{Type}Validated`.\nThe Multipurpose addition (PKIX-jbvb.9.1) would otherwise force an\neven uglier name (`SmimeProfileMultipurpose` or\n`SmimeMailboxValidatedMultipurpose` alongside `SmimeProfile`).\n\nPre-1.0 breaking change \u2014 free per AGENTS.md prelaunch framing.\n\n## Scope\n\n### `pkix-profiles-cabf/src/lib.rs`\n\n- Struct rename: `SmimeProfile` \u2192 `SmimeMailboxValidated`.\n- Free-function rename: `smime_policy` \u2192 `smime_mailbox_policy`.\n- Shape-check alias rename: `check_smime_shape` \u2192 `check_smime_mailbox_shape`.\n- Update all internal references (rustdoc cross-links, the lib.rs\n  top-level table, the `LintProfile` impl, the inline tests).\n- `id()` value: `\"cabf.smime\"` \u2192 `\"cabf.smime.mailbox\"` for parity\n  with `cabf.smime.sponsor` / `cabf.smime.individual`. This is a\n  separate breaking change for any consumer reading the id string;\n  call out in CHANGELOG.\n\n### Other crates\n\nGrep workspace-wide for `SmimeProfile`, `smime_policy`, `check_smime_shape`,\n`\"cabf.smime\"` references:\n\n- `pkix-chain` use-case wrappers: `verify_smime_signer`, etc. \u2014 likely\n  imports `SmimeProfile` or `smime_policy` for default Profile.\n- `pkix-profiles` (if it imports \u2014 should not, but verify).\n- Doc tests and examples.\n\nUpdate all sites.\n\n### Deprecated aliases\n\nOptional: ship deprecated type aliases `pub use SmimeMailboxValidated as SmimeProfile;`\nand `pub use smime_mailbox_policy as smime_policy;` with `#[deprecated]`\nattributes, so any external consumer (none yet, but documented exception\nfor the brief pre-1.0 window before this lands) gets a clean migration\nwarning. Probably overkill pre-1.0; defer unless requested.\n\n## Acceptance\n\n- All renames land in `pkix-profiles-cabf/src/lib.rs`.\n- Workspace-wide grep for old names returns zero hits.\n- `cargo test --workspace --all-features` passes.\n- `cargo clippy -p pkix-profiles-cabf --all-features --all-targets -- -D warnings` clean.\n- CHANGELOG entry in `pkix-profiles-cabf/CHANGELOG.md` under `[Unreleased]`\n  documents the rename(s) under `### Breaking`.\n- Commit message: `refactor(pkix-profiles-cabf): rename SmimeProfile \u2192 SmimeMailboxValidated`.\n\n## Blocks\n\n- **Blocks PKIX-jbvb.9.1** (Mailbox Multipurpose) \u2014 the Multipurpose\n  sibling name (`SmimeMailboxValidatedMultipurpose`) requires the\n  renamed Strict sibling to land first.\n\n## Cross-references\n\n- PKIX-jbvb.9 (epic \u2014 Multipurpose surface)\n- PKIX-jbvb.7 (the Strict-naming pattern this aligns with)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: rename SmimeProfile \u2192 SmimeMailboxValidated for naming consistency",
+  "updated_at": "2026-05-14T03:12:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:39:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:13Z",
+  "compaction_level": 0,
+  "content_hash": "5c92de81ce25bf01da6960e25bd9feb75fd032fc6fb97e2a11288da36843f3ee",
+  "created_at": "2026-05-06T15:19:31Z",
+  "created_by": "Mark Atwood",
+  "description": "Multiple technical identifiers appear unquoted in doc comments, triggering clippy::doc_markdown warnings. Affects pkix-path/src/lib.rs and pkix-revocation/src/crl.rs:\n\npkix-path/src/lib.rs:\n- line 87: 'BasicConstraints cA=TRUE' \u2014 BasicConstraints, cA\n- line 92: 'KeyUsage keyCertSign' \u2014 KeyUsage, keyCertSign  \n- line 120: 'TBSCertificate' should be backtick-quoted\n- line 153: 'SubjectAltName' should be backtick-quoted\n- line 288: 'TBSCertificate' in trait doc\n- line 289: 'BitString' in trait doc\n- line 621: 'TBSCertificate' in validate_path doc\n\npkix-revocation/src/crl.rs:\n- line 330: 'CRLNumber', line 362: 'BaseCRLNumber'\n- lines 384-388: 'cRLSign', 'KeyUsage' repeatedly\n- line 407: 'CRLReason', line 417: 'IssuingDistributionPoint', line 420: 'SubjectInfoAccess'\n- line 435: 'BasicConstraints'\n\nFix: wrap each technical term in backticks. This is a rustdoc convention that enables in-doc linking and improves readability.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "doc_markdown: technical terms not backtick-quoted across all in-scope files",
+  "updated_at": "2026-05-06T15:35:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:19:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

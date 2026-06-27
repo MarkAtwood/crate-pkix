@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "657e323d632a0c4aa6c23a2e8867291ceba0ec028fffad76666a527fbb68392c",
+  "created_at": "2026-05-14T14:22:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:416-423 \u2014 verify_embedded_scts() runs each SCT through verify_sct_for_precert() inside an is_ok() check. Per-SCT failures (InvalidSignature, UnknownLog, SctTimestampOutsideLogWindow, UnsupportedSignatureAlgorithm, UnsupportedVersion) correctly fold into 0-count. But verify_sct_for_precert() also returns Error::ParseError when issuer_cert_der cannot be parsed and Error::CertDerTooLong when leaf TBS exceeds 2^24-1 \u2014 these are programmer/input errors, not per-SCT trust outcomes, yet the helper silently maps them to 0.\n\nTriggering scenario: caller passes well-formed leaf + 2 SCTs + a corrupted issuer cert. Current behavior: Ok(0), indistinguishable from 'SCTs are from untrusted logs.' Caller has no way to tell their input was bad.\n\nThe docstring (verify.rs:359) explicitly enumerates which failures fold into 0: 'wrong signature, unknown log, retired log, unsupported algorithm.' It does NOT list ParseError or CertDerTooLong. Behavior diverges from documentation.\n\nSuggested fix: short-circuit the per-SCT loop with these two error variants surfacing as errors from verify_embedded_scts, OR document them as folded-into-0. Either way the docstring and behavior must agree.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts swallows hard input errors (malformed issuer cert) as Ok(0)",
+  "updated_at": "2026-05-14T14:22:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:22:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

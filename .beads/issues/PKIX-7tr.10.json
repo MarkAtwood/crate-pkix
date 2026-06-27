@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:02:59Z",
+  "compaction_level": 0,
+  "content_hash": "a9ed2b07d0d90f5f2bc6f3c1aac6d47a3d6cc88352de9daf1f6c80d36c07e5ce",
+  "created_at": "2026-05-02T13:40:59Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs: CrlChecker verifies the CRL signature using issuer.tbs_certificate.subject_public_key_info but never checks that the CRL's issuer field (crl.tbs_cert_list.issuer) matches the certificate's issuer field (cert.tbs_certificate.issuer). A CRL from a completely different CA signed by a key in issuer's chain would pass the signature check (because the signature is verified against issuer's SPKI) and would then be used to determine revocation status. This is acknowledged in the rustdoc Limitations block but it is a correctness defect: the CRL could be for an entirely different population of certificates.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.10",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker does not verify CRL issuer name matches cert issuer",
+  "updated_at": "2026-05-02T14:02:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

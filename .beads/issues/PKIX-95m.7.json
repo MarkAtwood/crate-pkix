@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:23:47Z",
+  "compaction_level": 0,
+  "content_hash": "a4e17f3af430401ced7f2c6003c125df4fdc85a3dc6e456796ed13ccf0a84f17",
+  "created_at": "2026-05-06T20:15:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:274-279 \u2014 DeviationScope::IssuerDnContains(substring) match calls cert.tbs_certificate.issuer.to_string() then .to_lowercase() (two allocations) and substring.to_lowercase() (one allocation) for every deviation check. Fix: store the substring pre-lowercased in IssuerDnContains at construction time (Deviation::add can enforce this). Then only one to_lowercase allocation per check.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains substring match allocates two String copies per check",
+  "updated_at": "2026-05-06T20:23:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:15:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

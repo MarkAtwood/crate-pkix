@@ -1,0 +1,21 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T05:05:56Z",
+  "compaction_level": 0,
+  "content_hash": "8d85dfe98e693cd28ad7cf66d569014870280efd317c76e0c638254bfe5efe07",
+  "created_at": "2026-05-07T05:01:43Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-kimp",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 20260506 round2",
+  "updated_at": "2026-05-07T05:05:56Z"
+}

@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --test anchor_nc_tests passes all 5 tests; cargo clippy -p pkix-path -- -D warnings clean; cargo fmt -- --check clean.",
+  "assignee": "Mark Atwood",
+  "close_reason": "5 integration tests in pkix-path/tests/anchor_nc.rs: valid pass, permitted violation fail, excluded violation fail, TryFrom malformed NC returns Err, from_cert malformed NC gives None; all pass",
+  "closed_at": "2026-05-03T13:13:07Z",
+  "compaction_level": 0,
+  "content_hash": "ffc50d8f127515d703b59fead35e53827d15d5c091f446ff836492be20b023ae",
+  "created_at": "2026-05-03T13:04:30Z",
+  "created_by": "Mark Atwood",
+  "description": "Write Rust tests verifying that trust anchor NC seeding works correctly end-to-end.\n\n**What:** Integration tests covering: valid leaf passes anchor NC; violating leaf fails; excluded leaf fails; malformed anchor NC DER surfaces an error via TryFrom.\n\n**Algorithm (one test file pkix-path/tests/anchor_nc_tests.rs):**\n\nHelper: load DER bytes from pkix-path/tests/fixtures/anchor-nc/<name>.der.\n\nTests:\n1. test_anchor_nc_permitted_valid_leaf:\n   - Load anchor-nc-permitted-dns CA cert \u2192 TrustAnchor::from_cert(...)\n   - Load leaf-good-dns cert (SAN=good.example.com)\n   - Call validate_path(&[leaf], &[anchor], policy, &DefaultVerifier::default())\n   - Assert Ok \u2014 PKITS_NOW timestamp (2020-01-01)\n   - Oracle: pyca generated the leaf within .example.com; our NC check must accept it.\n\n2. test_anchor_nc_permitted_violating_leaf:\n   - Same anchor, load leaf-evil-dns cert (SAN=evil.other.com)\n   - Assert Err(Error::NameConstraintViolation { index: 0 })\n   - Oracle: evil.other.com is not within .example.com per RFC 5280 \u00a74.2.1.10.\n\n3. test_anchor_nc_excluded_leaf:\n   - Load anchor-nc-excluded-dns CA cert \u2192 TrustAnchor::from_cert(...)\n   - Load leaf-excluded-dns cert (SAN=bad.example.com)\n   - Assert Err(Error::NameConstraintViolation { index: 0 })\n   - Oracle: bad.example.com is within the excluded subtree .example.com.\n\n4. test_anchor_try_from_cert_malformed_nc:\n   - Construct a Certificate whose NC extension value is invalid DER bytes (e.g., 0xFF 0xFF)\n   - TrustAnchor::try_from(cert) \u2192 assert Err(Error::Der(_))\n   - Oracle: the DER bytes 0xFFFF are invalid per DER spec; try_find_cert_ext must surface this.\n\n5. test_anchor_from_cert_malformed_nc_silent:\n   - Same malformed cert as test 4\n   - TrustAnchor::from_cert(cert) \u2192 assert name_constraints == None (silently dropped)\n   - Oracle: find_cert_ext converts decode error to None.\n\n**Defensive programming rules:**\n- All fixtures loaded from committed DER files \u2014 no inline cert generation.\n- No test derives expected behavior from the code under test.\n- Test 4 constructs the malformed cert programmatically (not from a file) since it is testing error handling of our own code.\n\n**Note on test 4/5:** to construct a Certificate with a malformed NC extension, use x509_cert builders or manipulate a valid cert's extension bytes directly. The test must build the cert in a way that pkix-path can parse the outer Certificate structure but finds malformed bytes in the NC extension value.",
+  "ephemeral": 0,
+  "id": "PKIX-aoe.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Tests: anchor NC enforcement \u2014 permitted, excluded, malformed",
+  "updated_at": "2026-05-03T13:13:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:04:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-03T06:06:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-03T06:06:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

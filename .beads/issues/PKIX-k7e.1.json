@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:49:09Z",
+  "compaction_level": 0,
+  "content_hash": "d7962a1e70e9e67c45588602c8a1c08bd2a6d8da5cc5e954d90737694deeb863",
+  "created_at": "2026-05-06T15:40:43Z",
+  "created_by": "Mark Atwood",
+  "description": "smime_policy sets max_path_len=1 and code_signing_policy sets max_path_len=1, but there are no tests asserting these values (no field-value assertion and no enforcement test). Compare: web_pki_policy lacks a max_path_len test too. All three profiles set max_path_len but none have a test like 'web_pki_policy_max_path_len_is_2'. P3: correctness of the values is clear from code inspection; enforcement is exercised by validate_path tests (path_too_long_returns_error). Gap is observable by someone adding a profile and forgetting max_path_len.",
+  "ephemeral": 0,
+  "id": "PKIX-k7e.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "smime/code_signing: no test for max_path_len enforcement",
+  "updated_at": "2026-05-06T15:49:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:40:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-k7e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

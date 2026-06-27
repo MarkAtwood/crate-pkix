@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:23:16Z",
+  "compaction_level": 0,
+  "content_hash": "64ef97fc2b4a5c9d5a915bbc73ae76752dd569d70c4f95d6b69532d2d7d23998",
+  "created_at": "2026-05-02T23:20:19Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd `Error::NameConstraintViolation { index: usize }` to `pkix_path::Error` in `pkix-path/src/lib.rs` and implement its `Display` message.\n\n## Algorithm\n- Add variant `NameConstraintViolation { index: usize }` to the `Error` enum\n- Display: \"name constraints violated at certificate index {index}\"\n- The index is the 0-based position in the chain slice where the violation was detected\n\n## Acceptance criteria\n- `pkix_path::Error::NameConstraintViolation { index: 2 }` compiles\n- Display output matches expected string\n- No other error variants changed",
+  "ephemeral": 0,
+  "id": "PKIX-pjz",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add Error::NameConstraintViolation variant",
+  "updated_at": "2026-05-02T23:23:16Z"
+}

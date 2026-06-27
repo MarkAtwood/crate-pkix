@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:13:58Z",
+  "compaction_level": 0,
+  "content_hash": "be0faad9131056a12ccf3417640e45522e69632b333674c40e792517662adbf2",
+  "created_at": "2026-05-07T16:13:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2686-2688 \u2014 in \u00a76.1.5(g)(iii)(3):\n  `// Delete the leaf anyPolicy node.`\n  `tree.retain(|nd| !(nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY));`\n\nThis deletion happens AFTER materialising nodes for initial_policy_set OIDs. This is the correct ordering per RFC 5280 \u00a76.1.5(g)(iii)(3)-(4).\n\nHowever, the materialization (lines 2676-2685) adds new PolicyNodes but does NOT populate their expected_policy_set from the parent anyPolicy node's expected_policy_set. It uses `expected_policy_set: vec![*p_oid]`. For newly materialized nodes at leaf depth, expected_policy_set is only used for the leaf level's own linkage (not needed beyond the leaf). So this is fine.\n\nThe deletion at line 2688 could leave a parent at depth leaf_depth-1 with anyPolicy in its expected_policy_set but no anyPolicy child at leaf_depth. The prune in \u00a76.1.5(g)(iii)(4) at line 2692-2694 would then remove that parent if it has no other children. This is correct behavior.\n\nNot a bug \u2014 the code follows the RFC algorithm correctly.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path chain_walk \u00a76.1.5(g): leaf anyPolicy node deleted before materialising initial_policy_set",
+  "updated_at": "2026-05-07T16:13:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:13:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

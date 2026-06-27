@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T03:17:24Z",
+  "id": "019e1f56-d123-739c-9c58-90f818bc2996",
+  "issue_id": "PKIX-fmtv.11",
+  "text": "Parent epic appeared on `bd ready` autonomous-frontier today (P2, unblocked). Inspecting children:\n\n- PKIX-fmtv.11.1 (RFC 6125 hostname binding body in pkix-identity) \u2014 closed\n- PKIX-fmtv.11.2 (verify_tls_server / verify_tls_client wrappers in pkix-chain) \u2014 in_progress, assigned `bd-spin/bd-spin-20260513T014512Z-2345176`\n- PKIX-fmtv.11.3 (bettertls dnsnames corpus wiring) \u2014 closed\n\nThe parent epic has no autonomous work of its own \u2014 its remaining deliverable is whatever .11.2 ships. Labeling `human` to keep the loop from re-picking this every session while .11.2 is claimed elsewhere. Parent should close on its own once .11.2 lands; this label can be dropped at that time.\n\nWorkflow question for you (no action required): should `bd ready` exclude parent epics whose only open children are claimed-by-others / in_progress, or is the manual human-label pattern intentional?\n"
+}

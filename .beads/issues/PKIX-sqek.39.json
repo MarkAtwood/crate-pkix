@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a57cca71d1ebfef9eb5e1bb269aa3f686d773dbf15297f6096ed65615e3f5256",
+  "created_at": "2026-05-14T18:18:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1453-1457 and 1468-1472 both use the same nested-if-let pattern:\n\n```rust\nif let Some(leaf) = &self.leaf_id {\n    if leaf.matches(cert) {\n        return Ok(());\n    }\n}\n```\n\nThis is the textbook case for `Option::is_some_and` (stable since Rust 1.70 \u2014 well below the workspace MSRV of 1.73):\n\n```rust\nif self.leaf_id.as_ref().is_some_and(|leaf| leaf.matches(cert)) {\n    return Ok(());\n}\n```\n\nOr, given the pattern is repeated in two methods, extract a private helper:\n\n```rust\nimpl<'a, R: RevocationChecker> NoCheckShim<'a, R> {\n    fn bypass(&self, cert: &Certificate) -> bool {\n        self.leaf_id.as_ref().is_some_and(|leaf| leaf.matches(cert))\n    }\n}\n```\n\nThen both call sites collapse to:\n\n```rust\nif self.bypass(cert) { return Ok(()); }\nself.inner.check_revocation(cert, issuer)\n```\n\nWhat goes wrong if it stays: the duplicated 4-line pattern across two trait methods is bug bait \u2014 a future fix to the bypass predicate (e.g. adding a count of remaining bypasses, expanding to a list of leaves) has to be made in two places consistently. The nested-if-let form is also a clippy lint `collapsible_if` candidate; running `cargo clippy --all-features` would flag it.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.39",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Nested if let Some(leaf) = ... { if leaf.matches(cert) { ... } } in NoCheckShim impl",
+  "updated_at": "2026-05-14T18:18:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:18:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added OID_EXT_EXTENDED_KEY_USAGE to CRITICAL_OK_LEAF_EXTENSIONS and HANDLED_CRITICAL_OIDS; updated crate doc to not overclaim TLS support.",
+  "closed_at": "2026-05-02T20:16:49Z",
+  "compaction_level": 0,
+  "content_hash": "25e3f80b438704c4fa5643fe90b781c4a47743aa3c5fd329ee03a2ee0ab727cd",
+  "created_at": "2026-05-02T20:11:38Z",
+  "created_by": "Mark Atwood",
+  "description": "CRITICAL_OK_LEAF_EXTENSIONS omits OID_EXT_EXTENDED_KEY_USAGE. CA/B Forum TLS and code-signing certificates routinely mark EKU as critical. Any such cert passed to verify_simple returns Error::UnhandledCriticalExtension { index: 0 }. The crate-level doc says it is for 'TLS and code-signing chains' \u2014 this is the exact class of chains that will be rejected. Users following the README quick-start will hit this immediately with any real CA-issued cert. Maintenance consequence: flood of confused issue reports from users whose real-world TLS chain is rejected by the 'TLS chain' crate.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple rejects critical EKU \u2014 contradicts 'TLS chains' doc claim",
+  "updated_at": "2026-05-02T20:16:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:11:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

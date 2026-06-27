@@ -1,0 +1,33 @@
+{
+  "acceptance_criteria": "pkix-path/tests/fixtures/anchor-nc/*.der exist and are non-empty; generation script committed; cargo build -p pkix-path succeeds (no compilation change).",
+  "assignee": "Mark Atwood",
+  "close_reason": "Generated 5 DER fixtures in pkix-path/tests/fixtures/anchor-nc/ using pyca/cryptography P-256 ECDSA; anchor_permitted_dns, anchor_excluded_dns, leaf_good_dns, leaf_bad_dns, leaf_excluded_dns",
+  "closed_at": "2026-05-03T13:09:04Z",
+  "compaction_level": 0,
+  "content_hash": "dd8f7fcb7589da8933b80eaa0799d9bd61505e73682ff610a685a5c646a14e7e",
+  "created_at": "2026-05-03T13:04:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Generate and commit DER test fixtures for trust anchor NC enforcement tests.\n\n**What:** Use pyca/cryptography to create a minimal PKI where the trust anchor cert carries a NameConstraints extension, plus leaf certs that pass and fail the constraints.\n\n**Algorithm:**\n1. Write a Python script pkix-path/tests/gen_anchor_nc_fixtures.py using cryptography library (same pattern as pkix-revocation/tests/gen_ocsp_cross_ca_fixture.py).\n2. Script generates:\n   a. anchor-nc-permitted-dns: self-signed CA cert with NC extension permittedSubtrees={dNSName:.example.com}. Key: P-256.\n   b. anchor-nc-excluded-dns: self-signed CA cert with NC extension excludedSubtrees={dNSName:.example.com}. Key: P-256.\n   c. leaf-good-dns: end-entity cert signed by anchor-nc-permitted-dns CA, with SAN dNSName=good.example.com\n   d. leaf-evil-dns: end-entity cert signed by anchor-nc-permitted-dns CA, with SAN dNSName=evil.other.com\n   e. leaf-excluded-dns: end-entity cert signed by anchor-nc-excluded-dns CA, with SAN dNSName=bad.example.com\n3. All certs use validity 2020-01-01 to 2030-01-01 (to be valid during PKITS_NOW = 2020-01-01).\n4. Commit script and DER files to pkix-path/tests/fixtures/anchor-nc/.\n5. Print hex fingerprints of all generated certs for verification.\n\n**Defensive programming rules:**\n- Script must set keyUsage keyCertSign + cRLSign on the CA cert (required for intermediate checks in chain_walk).\n- Script must set basicConstraints cA=TRUE on the CA cert.\n- Leaf certs must NOT have basicConstraints cA=TRUE.\n- Validity period must include 2020-01-01T00:00:00Z (PKITS_NOW).\n- Do NOT derive test vectors from the code under test; use pyca as the oracle.\n\n**Tests:** the fixture DER files are the oracle for W3A tests. No Rust tests in this bead.",
+  "ephemeral": 0,
+  "id": "PKIX-aoe.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Generate test fixtures: trust anchor with NameConstraints (pyca/cryptography)",
+  "updated_at": "2026-05-03T13:09:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:04:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

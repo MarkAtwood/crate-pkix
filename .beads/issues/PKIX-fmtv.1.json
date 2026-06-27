@@ -1,0 +1,31 @@
+{
+  "close_reason": "Superseded by audit 2026-05-11. Composable-policy architecture already shipped: Profile -> ValidationPolicy -> verify_chain consuming SignatureVerifier + RevocationChecker callbacks. See pkix-chain/src/lib.rs:156-184. No ratification needed.",
+  "closed_at": "2026-05-12T04:55:27Z",
+  "compaction_level": 0,
+  "content_hash": "a95f424c57d8d319c08572efd426e1d5c0f3deb52a84406ec416a8290e74ae46",
+  "created_at": "2026-05-12T02:41:30Z",
+  "created_by": "Mark Atwood",
+  "description": "**Keystone decision** for the verify pipeline. All other children (.2 through .20) reshape if this changes.\n\nSurvey of 7 reference implementations (OpenSSL, BouncyCastle, Microsoft CAPI, Apple Security, rustls-webpki, Go crypto/x509, mozilla::pkix) identified three architecture clusters:\n\n1. **Big context + single call** (OpenSSL, Go) \u2014 legacy idiom.\n2. **Build-then-validate, two calls** (BC, MS, webpki, Apple) \u2014 mainstream.\n3. **Verifier state machine with caller callbacks** (mozilla::pkix) \u2014 purist.\n\nApple's composable-policy model is the recommendation: one policy object per concern (TLS-server-on-hostname, S/MIME-on-mailbox, revocation, lint), stacked, evaluated together. Production-validated 15+ years. Scales to new use cases without core API churn.\n\n**Options:**\n\n- **A) Ratify as proposed.** `VerificationPolicy` trait + `policies::*` constructor module + stacked-policies `verify()` signature.\n- **B) Closed enum.** `VerifyPurpose::TlsServer{hostname}` etc. Simpler API; less extensible. Each new use case is an API addition.\n- **C) Big context with flags** (OpenSSL-style). Avoid \u2014 bag-of-flags legacy idiom.\n- **D) Two-call** (build path, then identity-bind in separate call). Avoid \u2014 ergonomics worse than Apple's composable model.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Ratify composable-policy architecture (keystone)",
+  "updated_at": "2026-05-12T04:55:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

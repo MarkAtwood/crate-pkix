@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:30Z",
+  "compaction_level": 0,
+  "content_hash": "363e828ffb1d1212537672f7e79d088846b6fcefb297037354d5337d3ab5aa9c",
+  "created_at": "2026-05-14T17:58:25Z",
+  "created_by": "Mark Atwood",
+  "description": "TRIGGER: A user copies any of three examples from pkix-chain/README.md and tries to compile them.\n\nISSUE 1 (line 22): `TrustAnchor::from_der(root_der)?` \u2014 TrustAnchor has no `from_der` constructor. Available constructors per pkix-path/src/lib.rs are `new(subject, spki, name_constraints)`, `from_cert(Certificate)`, and `From<&Certificate>` / `From<Certificate>`. `from_der` is not a method on TrustAnchor. A user copying this snippet hits 'no associated function from_der' immediately.\n\nISSUE 2 (line 65): `let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation)?;` \u2014 only five arguments. The current verify_chain signature (line 384) takes SIX:\n\n    pub fn verify_chain<V, R, A>(\n        chain: &[Certificate],\n        anchors: &[TrustAnchor],\n        policy: &ValidationPolicy,\n        verifier: &V,\n        revocation: &R,\n        aia: &A,    // <-- 6th argument added in PKIX-zkjb.7\n    ) -> ...\n\nThe 6th `aia` argument was added in PKIX-zkjb.7 (commit 50e43963 wired AIA into Verifier::verify_one) and the README was not updated. A user copying this hits 'this function takes 6 arguments but 5 were supplied'.\n\nISSUE 3 (lines 121-122): 'The workspace does not yet ship a BasicTlsClientProfile; see the follow-up bead for the missing profile.' \u2014 but BasicTlsClientProfile WAS shipped in commit a792545c (PKIX-fmtv.11.2.x). pkix-profiles/src/lib.rs:305 defines it.\n\nThe README is the first thing a new user reads. Broken examples in the README turn into 'pkix-chain doesn't even compile its own docs' GitHub issues. The doc tests inside src/lib.rs do compile (cargo test --doc passes), but README.md is not run through any compiler \u2014 so these regressions slip through.\n\nFIX: (a) regenerate README examples from working source; (b) consider extracting README's Rust blocks into compile-tested doctests (e.g. via doc_comment::doctest! or a build.rs that asserts they match a known-good doctest); (c) at minimum, add a CI step that does `cargo test --doc` AND lints README for code blocks via `mdtest` / `rustdoc --test`.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "README.md examples are broken: TrustAnchor::from_der does not exist; verify_chain signature changed",
+  "updated_at": "2026-06-04T19:32:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:58:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

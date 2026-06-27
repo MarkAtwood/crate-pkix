@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "self-issued NC exemption and pathLenConstraint exemption implemented; all 5 PKITS tests now pass",
+  "closed_at": "2026-05-03T14:12:18Z",
+  "compaction_level": 0,
+  "content_hash": "c1bb43bc21813e05c2b86fa9bfe3711a20225b02f458cb1e4056e17429153c31",
+  "created_at": "2026-05-02T21:39:30Z",
+  "created_by": "Mark Atwood",
+  "description": "RFC 5280 \u00a74.2.1.9: self-issued intermediate certificates do not count against pathLenConstraint. pkix-path chain_walk counts all intermediates regardless of self-issuance. PKITS 4.6.15-17 are explicitly ignored. Current behavior is fail-closed (over-rejects valid cross-cert chains) so it is not a security hole today. The risk is in the fix: implementing the exemption requires accurately identifying self-issued certs (issuer == subject per RFC 5280 \u00a73.3, not just byte equality) and excluding them from the (i-1) count. An incorrect implementation could undercount, allowing chains that exceed the constraint. The fix touches the core path-length check and needs its own PKITS test suite coverage before merging. File a sub-issue with the test vectors and the correct formula before touching chain_walk.",
+  "ephemeral": 0,
+  "id": "PKIX-8wp",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pathLenConstraint self-issued exemption absent \u2014 future fix likely to introduce undercount",
+  "updated_at": "2026-05-03T14:12:18Z"
+}

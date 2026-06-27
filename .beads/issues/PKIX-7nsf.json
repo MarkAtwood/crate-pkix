@@ -1,0 +1,89 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T18:14:03Z",
+  "compaction_level": 0,
+  "content_hash": "d3ec90a39eee25b33c97b33f3496fdd65f87a662f75d7bfaa5e24db7dea7378d",
+  "created_at": "2026-05-08T05:57:08Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKITS exercises RFC 5280 \u00a76.1 *as written*. Real-world certs and the major shipping implementations (OpenSSL, NSS, BoringSSL, BouncyCastle, JDK, Microsoft, Apple) all disagree with each other and with the literal spec on dozens of corner cases. Without a differential test harness, `pkix-path` will inevitably ship a verdict on some real cert that disagrees with what every TLS stack on Earth says \u2014 and we will not know until a downstream user files an issue.\n\nDocumented divergence classes (each is a real interop minefield):\n\n- DN comparison: RFC 4518 string-prep vs case-fold-byte-equal vs Java/BC variant\n- `UTF8String` \u2194 `PrintableString` equivalence at RDN level\n- Critical-extension allowlist (SCT/RFC 6962, CT poison, qualified-cert-statements, etc.)\n- Clock-skew tolerance for `notBefore`/`notAfter`\n- Negative/zero serial numbers (in the wild, spec rejects)\n- Policy-tree intersection at \u00a76.1.5(g) (8-way `initial_*` flag matrix; OpenSSL/BC/JDK genuinely disagree)\n- Self-issued cert detection (DN-only vs DN+SKI vs DN+SPKI)\n- CRL distribution point \u2194 IDP name matching\n- RSA-PSS algorithm parameter encoding (multiple \"valid\" encodings in the wild)\n- EKU `anyExtendedKeyUsage` semantics\n\nThis is the single highest-leverage mitigation against shipping a verdict-divergence bug.\n\n## What\n\nA binary harness (Rust, lives in `tools/difftest/` or as a separate workspace member) that:\n\n1. Loads a corpus of real cert chains from a directory tree (`chain.pem` files, leaf-first or root-first auto-detected).\n2. For each chain, calls in parallel:\n   - `pkix_path::validate_path` (with a configurable `ValidationPolicy`)\n   - `openssl verify` (subprocess, parsed output) \u2014 primary oracle\n   - `cryptography.x509.verification` (Python subprocess, JSON output) \u2014 secondary oracle\n3. Compares verdicts, classifies into:\n   - `Agreement` \u2014 all oracles agree (Pass or Fail)\n   - `StricterThanWild` \u2014 pkix-path Fail, oracle(s) Pass (we reject; OpenSSL accepts) \u2014 investigate, may be intentional\n   - `LooserThanWild` \u2014 pkix-path Pass, oracle(s) Fail \u2014 likely a bug, must investigate\n   - `OracleDivergence` \u2014 oracles disagree with each other (informational; spec is genuinely ambiguous here)\n   - `DiagnosticDivergence` \u2014 agreement on Pass/Fail but different error variants \u2014 low priority\n4. Emits a summary report (text and JSON) with counts per class and a sample of each.\n\n## Corpus sources (in order of effort)\n\n- **Tier 1: PKITS** (already committed). Trivial to add. Mostly `Agreement` expected; surfaces are sites where `Error` variant choice differs from oracle phrasing.\n- **Tier 2: pyca/cryptography test corpus** (`tests/x509/v1/` etc.). Curated weird certs. ~hundreds of chains. Highest signal-to-noise.\n- **Tier 3: CT log scrape** \u2014 pull a few hundred thousand chains from a recent CT log (Cloudflare Nimbus, Let's Encrypt Oak). Real-wild, very high volume, low signal density but catches things curated corpora miss. Separate bead \u2014 fetch+store machinery is its own work.\n- **Tier 4: known-quirks set** \u2014 hand-curated chains for specific divergences (certs with negative serials, mixed `UTF8String`/`PrintableString`, unhandled critical extensions, etc.). Built up as Tier 2/3 surface them.\n\n## Out of scope (v1)\n\n- BouncyCastle as a third oracle. JVM dependency cost > benefit at this stage; revisit if BC-specific divergences are suspected.\n- OCSP differential testing (responder semantics are their own quagmire).\n- Performance benchmarking. The harness only checks verdicts, not speed.\n- CI integration on every PR. Initial run is manual / scheduled. CI integration is a follow-up bead once divergence rate is known.\n\n## Acceptance\n\n- [ ] Harness binary builds and runs on Linux with system OpenSSL + Python 3 + `cryptography` package.\n- [ ] Tier 1 (PKITS) corpus runs to completion. Every PKITS chain produces a verdict from each oracle. Divergence report committed as a baseline (`tools/difftest/baseline-pkits.md`).\n- [ ] Tier 2 (pyca corpus) runs to completion, baseline committed.\n- [ ] At least one real divergence found, classified, and recorded in a project-level `INTEROP.md` with rationale (\"we side with X because Y\").\n- [ ] Documentation: `tools/difftest/README.md` explains how to add a new oracle, add a new corpus, and re-run a baseline.\n- [ ] No new runtime dependencies on `pkix-path` itself (the harness is dev-tooling; pkix-path stays `no_std`).\n\n## Recommended decomposition (file children when work starts)\n\n1. **Skeleton**: workspace member or `tools/difftest/`, CLI scaffolding, single-chain entry point. Foundational.\n2. **OpenSSL oracle**: subprocess to `openssl verify`, parse stderr/stdout, map to `(Pass | Fail { reason })`.\n3. **pyca/cryptography oracle**: small Python script + Rust subprocess wrapper, JSON IPC.\n4. **Corpus loader (Tier 1+2)**: walk `chain.pem` directory tree, parse, normalise leaf-first.\n5. **Verdict classifier + reporter**: the comparison logic and the markdown/JSON output.\n6. **PKITS baseline run + commit**: produce the first real artefact.\n7. **pyca corpus baseline run + commit**.\n8. **CT log scrape (Tier 3)**: fetch+store machinery. Larger; defer.\n9. **`INTEROP.md` initial draft**: capture divergences found in steps 6+7.\n10. **CI integration**: scheduled run, alert on new divergences. Defer until baseline is stable.\n\nEach of (1)\u2013(7) is roughly half a day to a day of work. (8)\u2013(10) are larger or external-dep-bound.\n\n## Notes\n\n- AGENTS.md already names OpenSSL and pyca/cryptography as the project's acceptable oracles. This bead operationalises that.\n- `pkix-revocation/tests/pkits_4_5.rs` discovered the indirect-CRL semantic gap in v0.1 by doing exactly this kind of \"what does OpenSSL do?\" comparison manually. The harness automates that workflow.\n- The `SignatureVerifier` trait means the harness should be parameterised on the verifier \u2014 running the same chain with `DefaultVerifier` (RustCrypto) vs a hypothetical ring-backed verifier may itself reveal divergences (RSA-PSS parameter encoding being the obvious case).",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Filed in response to the spec-vs-implementation interop concern raised during PKIX-als9 decomposition. The largest unmitigated risk in shipping pkix-path v0.1 is verdict divergence from the major implementations on real-world chains \u2014 PKITS does not catch this. This harness is the canonical mitigation. Recommend starting after PKIX-als9 prep+H1-H5 land (refactor will continue, but harness can run continuously and catch regressions in real-time).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Differential testing harness: pkix-path vs OpenSSL+pyca on real-world cert corpus",
+  "updated_at": "2026-05-08T18:14:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:20:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.8",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:57:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:02Z",
+  "compaction_level": 0,
+  "content_hash": "70d90415aca74390e6bc1ff8bea6f38a70c6d67cb28f795e2108b2b31d521eda",
+  "created_at": "2026-05-14T17:42:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:42-46\npkix-ct/src/verify.rs:837-857\n\nDocstring says:\n\n> `None` means the log has never reached the `usable` state.\n\nImplementation in `log_window_contains` treats `None` as \"unbounded\nlower bound \u2014 every SCT timestamp passes\":\n\n```rust\nif let Some(lo) = log.usable_from_ms {\n    if timestamp_ms < lo {\n        return false;\n    }\n}\n// fallthrough: pass\n```\n\nThese two interpretations are contradictory. PKIX-ppbr.1 already filed\nthis as a bug to fix. The api-contract angle is that `Option<u64>`\nis the wrong TYPE for what the field needs to express, regardless of\nwhich interpretation the bugfix picks.\n\nThe contract has three distinct states the caller cares about:\n\n1. Log has reached `usable`, and a precise `usable_from_ms` is known.\n2. Log has been observed in the log-list source but has not yet\n   reached `usable` \u2014 every SCT signed by it is untrusted.\n3. Log-list source did not encode a timestamp, but the log is in\n   `usable`/`readonly`/`retired` \u2014 caller wants permissive behavior\n   (don't reject just because metadata is missing).\n\n`Option<u64>` collapses (2) and (3) into the same value. The Google\nlog_list.json schema actually does distinguish them: a log with state\n`pending` has no `usable.timestamp` because it never became usable; a\nlog with state `usable` always has `usable.timestamp` because the\nschema requires it.\n\nRecommendation: replace with a typed `LogTrustWindow` (PKIX-ppbr.1\nwill need to choose anyway). Sketch:\n\n```rust\npub enum LogTrustWindow {\n    NeverTrusted,\n    UsableFromMs(u64),\n    UsableFromMsUntilMs(u64, u64),\n    UnboundedTimes,  // permissive default, callers can opt in\n}\n```\n\nOr carry the schema state explicitly: `state: LogState` where\n`LogState::{Pending, Qualified, Usable {ts}, ReadOnly, Retired {ts},\nRejected}`. That's also the fix for PKIX-ppbr.2.\n\nThis is also a partial fix for non-negotiable #5's framework-policy\nsplit: the spec defines six states; the workspace currently picks two\nfields and hopes they cover the cases.\n\nPriority P1 because the bug fix in PKIX-ppbr.1 is going to touch this\ntype signature; the contract decision should be made jointly.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CtLog::usable_from_ms: None has two conflicting documented meanings \u2014 Option<u64> wrong type",
+  "updated_at": "2026-06-04T19:51:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:42:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

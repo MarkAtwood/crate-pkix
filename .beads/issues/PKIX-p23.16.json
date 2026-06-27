@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:13Z",
+  "compaction_level": 0,
+  "content_hash": "460fff2c231886420a4b5bf6b8c41710ab64ef78dca0a3e93478195629e80561",
+  "created_at": "2026-05-06T21:33:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs: delta CRL verification (verify sig, check expiry, collect entries) appears near-identically in both check_revocation (lines ~279-350) and check_revocation_against_anchor (lines ~456-499).\n\nExtract a helper fn verify_and_collect_delta_entries(delta_der, verifier, issuer_spki, issuer_name, now_unix) -> Result<Vec<RevokedCert>>.\n\nBoth callers reduce to one call. If delta CRL logic changes later it must currently be updated in two places.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M7: Delta-CRL verification block duplicated ~70 lines in CrlChecker",
+  "updated_at": "2026-05-06T21:42:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:33:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

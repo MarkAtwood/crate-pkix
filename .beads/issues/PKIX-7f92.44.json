@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Switched return type to impl Iterator<Item = &Finding> + '_; callers that need a Vec now collect() at the call site (which documents the allocation cost explicitly). Updated the two in-source test callers (Vec indexing -> .collect() + len(); .len() -> .count()). No downstream callers exist outside pkix-lint itself; cargo build --workspace --all-features clean. Commit b082a620.",
+  "closed_at": "2026-05-14T16:38:48Z",
+  "compaction_level": 0,
+  "content_hash": "7142ff9d760197ebe1dfc3f7d2175026382d2b1315ab95d3c21929ef8c163b03",
+  "created_at": "2026-05-14T16:09:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs:176-181 has `pub fn findings_at_or_above(&self, min_severity: Severity) -> Vec<&Finding>` that internally builds a transient `Vec` via `.iter().filter(...).collect()`. Every caller that wants to render or count findings allocates this Vec, even when they only walk it once and discard it.\\n\\nIdiomatic Rust: return `impl Iterator<Item = &'_ Finding> + '_` so callers compose further (`.take(5)`, `.find`, `.count`, `.next`) without the round-trip allocation. Callers that genuinely need a Vec can `.collect()` themselves \u2014 that is one extra token at the call site that documents the allocation cost.\\n\\nThis is the canonical 'leaky abstraction' pattern from the iterators subsection of the review prompt: forcing callers to call a method and then iterate (instead of returning an iterator directly) hides the natural iteration pattern.\\n\\nAdditional carry: AGENTS.md non-negotiable #6 wants result types to admit caller-side caching. A Vec<&Finding> with lifetime tied to &self forecloses on certain reusable-buffer patterns; an iterator over &Finding does not.\\n\\nFix is non-breaking-source for callers that already do `.iter()` / `for f in result` on the return value (works on both Vec and Iterator), and breaking-source only for callers that call Vec-specific methods (.len, indexing). At 0.x there are no published consumers, so the fix is free now and a major bump later.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.44",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "EvaluationReport::findings_at_or_above returns Vec<&Finding> instead of impl Iterator",
+  "updated_at": "2026-05-14T16:38:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:09:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

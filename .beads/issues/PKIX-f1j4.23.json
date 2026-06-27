@@ -1,0 +1,31 @@
+{
+  "close_reason": "Positive finding: sync+async parallel trait families is correct",
+  "closed_at": "2026-06-15T18:47:55Z",
+  "compaction_level": 0,
+  "content_hash": "f321c88a3a3c4c38eac448dfe9dd8a5aecab6f04e8c9fa06bfcb2eab49966f08",
+  "created_at": "2026-05-14T19:01:17Z",
+  "created_by": "Mark Atwood",
+  "description": "src/async_fetcher.rs:6-30: the module rustdoc enumerates three alternatives (A: put AsyncRevocationChecker in pkix-revocation core, B: one async fetcher trait with sync HttpCrlFetcher block_on'ing, C: parallel families). Adopted (C). This is correct.\n\nWhat a future contributor / commenter will incorrectly suggest:\n\n1. 'Why duplicate the trait surface? Just make one trait async and have a sync block_on shim.' \u2014 This is the Option B trap. block_on inside a running async runtime deadlocks the executor; it's a well-known footgun. The 'sync block_on shim' suggestion comes up routinely on Rust-async tutorials and is wrong.\n\n2. 'Just move AsyncRevocationChecker into pkix-revocation so callers don't need two crate deps.' \u2014 This is the Option A trap. It propagates async-trait machinery into every consumer including no_std-style environments (embedded TLS, kernel-mode crypto). The split exists explicitly to keep pkix-revocation free of async machinery.\n\n3. 'reqwest has both Client and blocking::Client in one crate; why not the same here?' \u2014 reqwest pays for the blocking::Client by mounting tokio under it, which means a tokio runtime in the dep graph of every consumer of the sync API. Same outcome as Option A.\n\nDefending this decision: the pattern matches every well-designed Rust async/sync split (reqwest's split is in two FEATURES of one crate, but it pays the tokio cost the consumer thinks they avoided; we genuinely avoid it). The duplication of trait surface is the correct cost to keep the seam clean.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.23",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Two parallel trait families (sync + async, both in pkix-revocation-http) is the right shape",
+  "updated_at": "2026-06-15T18:47:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:01:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

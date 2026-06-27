@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:13:50Z",
+  "compaction_level": 0,
+  "content_hash": "0359ae493af8a9ee9e6d9311bad3294301a301195ea72441b30af1a1a37e4ff1",
+  "created_at": "2026-05-06T20:48:37Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-revocation/src/crl.rs - CrlChecker::check_revocation() calls CertificateList::from_der(&self.crl_der) at line 189, and also at line 271 for the delta CRL. OcspChecker::check_revocation() similarly re-parses at line 93. This means for an N-cert chain every call to check_revocation re-parses the full CRL (and delta CRL). For a 5-cert chain that is 5 full CRL parses + 5 delta CRL parses per validation run. The doc comment at crl.rs:80-83 acknowledges this as a v0.2 tracking item. This is already documented, but should be filed as a finding for tracking. The OcspChecker doc comment at ocsp.rs:39-43 also acknowledges this. File: pkix-revocation/src/crl.rs:189 and pkix-revocation/src/ocsp.rs:93. Fix: Cache parsed CertificateList/BasicOcspResponse in new()/with_delta(). Tracked by existing v0.2 notes in doc comments.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: CrlChecker re-parses DER on every call (O(N) for N-cert chain)",
+  "updated_at": "2026-05-06T21:13:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

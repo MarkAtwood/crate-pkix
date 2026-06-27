@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c313a3bead553992b92794cd842742ec07be19715d60168be236c0a9f59c122f",
+  "created_at": "2026-05-14T14:27:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/sct.rs:208-250 \u2014 internal Cursor type with hand-rolled read_u8 / read_u16_be / read_u64_be / read_u16_prefixed methods. Refuses to pull in nom or byteorder for what's essentially a 40-line plumbing helper.\n\nA future contributor might suggest 'use nom for cleaner parsing.' Adding nom would:\n- Add ~300KB to the compiled crate per nom version churn.\n- Drag in error-type machinery (nom::error::*) that doesn't compose with this crate's Error type.\n- Make the no_std contract more fragile (nom is no_std but the macro stack changes between versions).\n\nThe current Cursor is 40 lines, bounds-checks, returns Result<&[u8]>, and is trivially auditable. No engineering basis to prefer nom or byteorder for parsers this small.\n\nMarked opinion because the choice is taste; what's NOT taste is the 'no needless deps' principle that picks the right outcome here. Defend the manual cursor against 'simplification' suggestions.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.23",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cursor-based bytes parser is no_std-friendly and avoids dependencies on byteorder or nom",
+  "updated_at": "2026-05-14T14:27:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:27:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

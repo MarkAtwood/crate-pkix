@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f9d8eceaae5b3c731c65df26e7b6cc75048cd00f1cf4289253fa02c6eb1bfd1e",
+  "created_at": "2026-05-14T19:38:47Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:151-184 (CrlChecker fields) tracks construction mode via two pieces of state:\n- crl_issuer_cert: Option<Certificate>  (None = direct CRL, Some = an external signer cert is set)\n- signer_discovered: bool                (true = signer came from path-level discovery, false = legacy explicit cRLIssuer or direct CRL)\n\nA future contributor might suggest collapsing this into a single enum:\n    enum SignerMode { Direct, Indirect(Certificate), Discovered(Certificate) }\n\nThat looks cleaner but changes the runtime cost shape: the match in check_revocation (lines 490-532) currently does `(&self.crl_issuer_cert, crl_declares_indirect)` which is a small enum pair. An enum-based redesign would force a discriminant check + cert dereference on the hot path.\n\nMore importantly, the two-bit state preserves the invariant 'signer_discovered = true implies crl_issuer_cert is Some' as a property check (lines 499) rather than as a type guarantee. That property is verified at construction time and never weakened \u2014 it's a small invariant easily reviewed. The enum redesign would couple the two bits into one type at the cost of making the IDP cross-check arms harder to read.\n\nDefend: the current shape is intentional. The 'discovery bypasses the IDP cross-check' arm at line 499 reads as exactly what it is. The enum redesign would obscure it.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Two-bit construction state (crl_issuer_cert + signer_discovered) is the right shape",
+  "updated_at": "2026-05-14T19:38:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:38:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

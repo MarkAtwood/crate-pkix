@@ -1,0 +1,31 @@
+{
+  "close_reason": "Duplicate of PKIX-mxj.8 (same deviation.rs:313 allocation issue, already filed in first pass)",
+  "closed_at": "2026-05-07T03:56:10Z",
+  "compaction_level": 0,
+  "content_hash": "ac554e117d5b2d998a9ed47c1e76fd40bcd5215f0fb425da062f0591e3119f0d",
+  "created_at": "2026-05-07T03:55:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:313 \u2014 DeviationScope::IssuerDnContains::matches allocates a new String on every call via cert.tbs_certificate.issuer.to_string().to_lowercase(). The issuer DN is stringified and lowercased on the hot path (once per certificate per active deviation) without caching. Consider converting the Name to string once at construction time or storing the lowercased form as a pre-computed String in the variant (it already stores the substring lowercased; storing the whole lowercased issuer string in the scope or doing the comparison lazily with a single allocation per unique cert would help). At minimum, to_lowercase() should be called on the result of to_string() rather than allocating two strings: let lower = issuer_lower already does this correctly but the intermediate String is still heap-allocated on every match.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains::matches allocates per call",
+  "updated_at": "2026-05-07T03:56:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:55:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

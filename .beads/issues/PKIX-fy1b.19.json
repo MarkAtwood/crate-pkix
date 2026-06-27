@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: the clone is required \u2014 commit 0bc07f47 restored it precisely because removing it was a regression; revoked_certificates is Option<Vec<...>> and must be cloned to return an owned Vec",
+  "closed_at": "2026-05-07T04:44:00Z",
+  "compaction_level": 0,
+  "content_hash": "84b1893c763edeeab932cb63b705b159c66b90dbf502d99766849cd6264e0f9e",
+  "created_at": "2026-05-07T04:40:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs verify_delta_crl_and_collect (around line 544) ends with:\n\n    Ok(delta_crl\n        .tbs_cert_list\n        .revoked_certificates\n        .clone()\n        .unwrap_or_default())\n\nThis clones every RevokedCert entry from the delta CRL into a new Vec<RevokedCert> on every check_revocation call. The caller immediately converts the result to a slice (&delta_entries) and passes it to check_revocation_status, which only reads it.\n\nFor large CRLs this is O(N) allocation + copy per check. The clone compounds the already-documented O(N) re-parse on every call (tracked for v0.3).\n\nThe fix is to change the signature to return a reference to the slice:\n\n    fn verify_delta_crl_and_collect<'crl>(delta_crl: &'crl CertificateList, ...) -> Result<&'crl [RevokedCert]>\n\nthen use .as_deref().unwrap_or(&[]) instead of .clone().unwrap_or_default().\n\nThe lifetime would need to thread through the caller in check_revocation/check_revocation_against_anchor (the delta_crl lives long enough since it is parsed just above the call and lives to the end of the function).\n\nCategory: R5 (cloning entire Vec where only a slice is needed)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.19",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: verify_delta_crl_and_collect clones entire revoked-cert Vec",
+  "updated_at": "2026-05-07T04:44:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:40:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

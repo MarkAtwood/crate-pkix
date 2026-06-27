@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:20Z",
+  "compaction_level": 0,
+  "content_hash": "7898436aab539f230a12a35277c4ca464c218a0dbf5888813e308f7efdc48d13",
+  "created_at": "2026-05-06T16:50:45Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path/src/lib.rs:1668\\n\\nThe modulus bit-length is computed as modulus_byte_len * 8. A 2048-bit RSA key requires a 256-byte modulus magnitude, but that magnitude byte could have bit 6 as the highest set bit, making the actual modulus 2041 bits. DER UintRef still returns 256 bytes (the leading byte is non-zero, so no stripping), and 256*8 = 2048 passes the 2048-bit floor.\\n\\nThe doc comment at line 1632-33 says 'conservative rounding is acceptable for a minimum-floor check' \u2014 this is wrong. Over-counting is LENIENT for a floor check, not conservative. A 2041-bit key passes a 2048-bit floor.\\n\\nFix: use the actual bit length: for the leading magnitude byte b, bit_len = (modulus_byte_len - 1) * 8 + (8 - b.leading_zeros() as usize).\\n\\nSecurity impact: For a 2048-bit floor (e.g., CA/B Forum), keys down to ~2041 bits may incorrectly pass. Impact is marginal for real RSA keys (key generation always targets the full bit count), but the documented claim of 'conservative' is incorrect and should be fixed before public release.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rsa_public_key_bits over-counts: up to 7-bit slack on RSA key floor",
+  "updated_at": "2026-05-06T16:58:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:50:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

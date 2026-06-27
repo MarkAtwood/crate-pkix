@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:42Z",
+  "compaction_level": 0,
+  "content_hash": "6f2f4cf6ebb641371214cd9b3f85b10c46b8589ffe54623c984880734429bc6a",
+  "created_at": "2026-05-07T17:22:54Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:42 (BasicConstraints), :147 (validate_path), :298 (SubjectPublicKeyInfo), :321 (SubjectPublicKeyInfo) \u2014 Clippy pedantic doc_markdown lint: these identifiers appear in doc comments without backtick quoting. They should be written as `BasicConstraints`, `validate_path`, `SubjectPublicKeyInfo` so they render as code in rustdoc and are recognized as intra-doc link candidates. Same pattern appears throughout tests/integration.rs (build_path, validate_path, NoPathFound, GoodCACert, BadSignedCACert, NoPathFound \u2014 multiple lines). All should be backtick-quoted.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] doc comments missing backticks on type names",
+  "updated_at": "2026-05-07T18:44:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

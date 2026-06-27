@@ -1,0 +1,23 @@
+{
+  "close_reason": "Superseded by PKIX-zkjb (AiaFetcher implementation epic). All cache-friendliness constraints from this bead are reproduced verbatim in PKIX-zkjb's description and will be enforced by the implementation children.",
+  "closed_at": "2026-05-13T16:16:09Z",
+  "compaction_level": 0,
+  "content_hash": "3fa223a9a1783c6645b0e76b1aad20af481a53c509562998680e1c1f22ba3794",
+  "created_at": "2026-05-12T19:16:34Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nPKIX-fmtv.2 (CLOSED 2026-05-12) ratified adding an `AiaFetcher` trait for online intermediate retrieval per RFC 5280 \u00a74.2.2.1, alongside SignatureVerifier and RevocationChecker. The .2 closure deferred all downstream shape decisions (trait location, sync vs async, error type, failure-mode contract, caching contract, HTTP impl crate location) to implementation children.\n\nAGENTS.md non-negotiable #6 (added 2026-05-12) adds a hard requirement: trait + result types must be cache-friendly. This bead captures that constraint so it lands on whatever implementation epic eventually files the AiaFetcher work.\n\n## Constraints the AiaFetcher trait MUST satisfy\n\n- **Trait shape admits caching wrappers.** Method signature is `fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError>` (or async equivalent), with `&self` (not `&mut self`) so a caller can wrap with Arc-based caches. Don't bake in state that prevents this.\n\n- **Error type is cache-friendly.** `AiaError` derives `Clone + Debug + PartialEq + Eq + non_exhaustive`, is `Send + Sync`, supports serde behind the workspace's serde feature flag. Don't embed std::io::Error directly (not Clone); flatten / wrap.\n\n- **Fetcher impls can be either sync or async.** Mirror the pkix-revocation / pkix-revocation-http split: sync trait in core no_std-friendly crate; async variant in std-only adapter crate.\n\n- **Empty default (`NoAiaFetcher`) returns an error rather than panicking.** Caller treats missing-intermediate as a failure mode, not a fetch attempt. Cache-friendliness implies this naturally \u2014 the no-op fetcher should be a zero-cost wrapper that emits a deterministic error.\n\n- **Batch fetch SHOULD be admitted at the trait level if the implementation can do better than N sequential fetches.** Real consumer: certs with multiple AIA URIs to try in fallback order; HTTP fetcher could pipeline. Not required (callers can loop) but the trait shouldn't preclude it.\n\n## Out of scope\n\nThis bead does not file the AiaFetcher implementation work. It captures the design constraint for whoever does. Close this bead when the AiaFetcher implementation epic/bead is filed AND its description references these constraints. Alternative: include the constraints by reference in the implementation epic's description so this bead can close immediately.\n\n## Why human-labeled\n\nDecision-gate: when the AiaFetcher implementation work is decomposed, sync/async/error-type/caching-contract choices need to satisfy these constraints. Reviewer of the implementation epic confirms compliance before closing this bead.\n\n## Cross-references\n\n- PKIX-fmtv.2 (CLOSED 2026-05-12, decided to add the trait)\n- AGENTS.md non-negotiable #6 (cache/batch/prevalidation rule)\n- Memory pkix-caching-batch-prevalidation-2026-05-12\n- pkix-revocation-http::extract_aia_http_urls (already exists, gives ca_issuers list per cert)",
+  "ephemeral": 0,
+  "id": "PKIX-8uyr",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 closed: superseded by PKIX-zkjb]\n\nPKIX-zkjb filed 2026-05-13 as the AiaFetcher implementation epic. All five cache-friendliness constraints from this bead reproduced verbatim in PKIX-zkjb's description under 'Cache-friendliness constraints (from PKIX-8uyr, MUSTs)'. The constraint-capture mission of this bead is now fulfilled by PKIX-zkjb's existence.\n\nPKIX-zkjb.1 filed as the one open sub-decision (trait location: pkix-aia vs pkix-chain vs pkix-revocation). Mark to decide; recommendation is (i) pkix-aia.\n\nPKIX-zkjb children .2-.7 not yet filed \u2014 autonomous loop can decompose as it works through the epic after .1 lands.\n\nClosing this bead as superseded. Implementation work tracked under PKIX-zkjb.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AiaFetcher trait design must satisfy AGENTS.md non-negotiable #6 (cache-friendly)",
+  "updated_at": "2026-05-13T16:16:09Z"
+}

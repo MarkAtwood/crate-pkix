@@ -1,0 +1,31 @@
+{
+  "close_reason": "Performance optimization deferred to v0.2. Not a correctness issue.",
+  "closed_at": "2026-05-02T17:48:17Z",
+  "compaction_level": 0,
+  "content_hash": "f5ee51f12922c33c10841cb14400c01e21824b4a30e1a1321275c2223884edbb",
+  "created_at": "2026-05-02T17:27:52Z",
+  "created_by": "Mark Atwood",
+  "description": "When multiple anchors share a DN (key rollover scenario), chain_walk is called once per candidate anchor. Each call re-encodes every cert's TBSCertificate from scratch: N encode_to_slice calls per anchor attempt. For A anchors and N-length chain, total TBS encodings = A*N. In a typical browser trust store with ~130 roots, even 1% name-collision rate means a long chain gets 1-2 extra full encodings \u2014 negligible. However, if anchor list is large and name-collision is common (e.g., testing harness with many anchors), this degrades to O(A*N*encode_cost). The fix (cache TBS DER per cert before the anchor loop) would be a non-trivial restructuring since chain_walk owns the buffer. Low actual impact, worth tracking.",
+  "ephemeral": 0,
+  "id": "PKIX-841.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk re-encodes TBS N times per anchor attempt",
+  "updated_at": "2026-05-02T17:48:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:27:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added Copy, Hash to ValidatedPath derive.",
+  "closed_at": "2026-05-02T17:46:38Z",
+  "compaction_level": 0,
+  "content_hash": "977d304a27cb9418f864906ed2d3c0c94ec1291a51182f06c9037e31572c2e5e",
+  "created_at": "2026-05-02T17:33:16Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidatedPath has Clone, Debug, PartialEq, Eq but not Copy or Hash. Its two fields are both usize \u2014 Copy and Hash are trivially correct. Missing Copy forces callers to .clone() when they only need to pass by value (a common pattern when logging or returning alongside something else). Missing Hash prevents using ValidatedPath as a HashMap key. Both are zero-cost for a two-usize struct.",
+  "ephemeral": 0,
+  "id": "PKIX-841.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath missing Copy and Hash derives",
+  "updated_at": "2026-05-02T17:46:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:33:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

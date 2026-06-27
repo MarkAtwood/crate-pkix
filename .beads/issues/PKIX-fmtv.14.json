@@ -1,0 +1,45 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T18:34:24Z",
+  "compaction_level": 0,
+  "content_hash": "e953177d4ed1ebe8c5ac73283d6e8a4666a04e121a5bd19d6a1888fd8eae1fc5",
+  "created_at": "2026-05-12T02:42:29Z",
+  "created_by": "Mark Atwood",
+  "description": "**`policies::lint_catalog(catalog: &LintCatalog) -> impl VerificationPolicy`** \u2014 wraps `pkix-lint::LintRunner` as a `VerificationPolicy`.\n\nEach lint finding from the runner becomes a `Finding` with:\n- `source = FindingSource::Lint(lint_id)`\n- `severity` mapped from lint severity (Error \u2192 Error, Warn \u2192 Warn, Notice \u2192 Notice)\n- `message` from lint finding detail\n- `evidence` includes the cert index + the lint rule's stable ID\n\nPer `.6` decision (lint integration model), this child exists only if option A (adapter) is chosen. If option B (parallel pipeline), this child closes as WONTFIX and `pkix-lint` stays standalone.\n\n**Blocks on:** .1 (trait), .6 (lint integration model).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement policies::lint_catalog adapter",
+  "updated_at": "2026-05-12T18:34:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:43:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T19:44:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:41:47Z",
+  "compaction_level": 0,
+  "content_hash": "cfcffe3a1665f2c37c3e66908f7987337a688e977b8adb97da33fd2b0a21a1ec",
+  "created_at": "2026-05-07T16:18:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:702-710\n\nThe pattern .map(|bc| bc.ca).unwrap_or(false) is the anti-idiomatic form of .is_some_and(|bc| bc.ca). Clippy pedantic catches this as 'called map(<f>).unwrap_or(false) on an Option value'. The same pattern exists in pkix-path/src/lib.rs cert_is_ca_cert equivalent.\n\nis_some_and was stabilised in Rust 1.70; MSRV is 1.73, so it is available.\n\nSuggested fix:\n  cert.tbs_certificate\n      .extensions\n      .as_deref()\n      .unwrap_or(&[])\n      .iter()\n      .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)\n      .and_then(|e| BasicConstraints::from_der(e.extn_value.as_bytes()).ok())\n      .is_some_and(|bc| bc.ca)",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] cert_is_ca_cert: .map(|bc| bc.ca).unwrap_or(false) should be .is_some_and(|bc| bc.ca)",
+  "updated_at": "2026-05-07T16:41:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:18:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

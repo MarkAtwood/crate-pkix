@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:10Z",
+  "compaction_level": 0,
+  "content_hash": "b756bb325e494c7b156b7bc3ae5c2b66f6df17e9892d208c8b291750dabbdd11",
+  "created_at": "2026-05-06T22:20:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs and pkix-lint/src/deviation.rs each define an identical private fn de_static_str that leaks a String to produce &'static str. The two functions have the same body and the same doc comment. Idiomatic Rust would place this in a private serde_helpers submodule (cfg(feature=\"serde\")) and import it from both call sites, eliminating the copy-paste maintenance hazard.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.22",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_static_str duplicated in lib.rs and deviation.rs",
+  "updated_at": "2026-05-06T22:29:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

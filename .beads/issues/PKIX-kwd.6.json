@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:14Z",
+  "compaction_level": 0,
+  "content_hash": "9f24ae34d693b0a84ad1fef3f9a3a4a6a9cf521ceed7259a43c5b8a308b2e793",
+  "created_at": "2026-05-06T15:12:15Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs tests: smime_policy tests (lines 419-495) and code_signing_policy tests (lines 501-552) are primarily field-value assertions against the returned ValidationPolicy struct (e.g., assert_eq!(p.max_validity_secs, Some(1185*86400))). The integration tests that call validate_path only test rejection cases (cert with serverAuth rejected by smime_policy). There is no passing test that validates an S/MIME or code-signing certificate with the appropriate EKU and SAN through the full chain with smime_policy/code_signing_policy. The smime_policy test named smime_policy_email_protection_eku_passes() (line 455) has a misleading name \u2014 it actually tests rejection (serverAuth cert failing emailProtection requirement). Compare to web_pki_policy which has web_pki_conforming_cert_passes() with a genuine end-to-end passing fixture. Adding fixtures with emailProtection and codeSigning EKUs and running full validate_path calls would increase confidence.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "smime_policy test coverage is mostly oracle-only field assertions, no end-to-end validation test",
+  "updated_at": "2026-05-06T15:35:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:12:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

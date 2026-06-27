@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T13:55:42Z",
+  "compaction_level": 0,
+  "content_hash": "dc3ab9c860ac93e1021118175cfeb8045e46f35ce8de1e747946eb0e4ceeca76",
+  "created_at": "2026-05-02T13:45:18Z",
+  "created_by": "Mark Atwood",
+  "description": "names_match \u2192 normalized_eq \u2192 NormalizedIter is broken: when a space byte is seen, the code sets pending_space=true AND immediately returns Some(b' ') (emitting the space). On the next call, the pending_space handler clears the flag, skips further spaces, then returns Some(b' ') AGAIN \u2014 emitting a second space. Tracing 'a b': yields 'a', ' ', ' ', 'b' instead of 'a', ' ', 'b'. This means RFC 4518 whitespace normalization is incorrect for any input containing spaces (which is nearly every certificate DN). The bug is latent in current tests because PKITS chains use binary-equal names, so the double-space is symmetric and comparisons still pass. Fix: in the pending_space branch, after skipping extra spaces, fall through to process the next character rather than returning Some(b' ').",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.44",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter emits double space for single-space input",
+  "updated_at": "2026-05-02T13:55:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:45:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

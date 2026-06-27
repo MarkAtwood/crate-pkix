@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:34:32Z",
+  "compaction_level": 0,
+  "content_hash": "7044cbae7a7f2ab76e75f2a157ac760b2c68cfb5757d6f786bea66e48ab1d142",
+  "created_at": "2026-05-06T22:32:21Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-vhi",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Confidence: 5% chance of missed bug. Full diff reviewed line-by-line, all five targeted questions answered cleanly. Test suite passes (353 tests, 0 failures). The five specific questions from the review prompt: (1) names_match on empty Name returns true correctly, no panic, no Option involved; (2) no callers match on OcspStatusUnknown for the CertID mismatch case \u2014 the test only uses is_err(); (3) CRL anchor self-issued check is correct \u2014 cert.issuer == anchor.subject is exactly what you want for the anchor-issued cert; (4) auto-lowercase in add() is correct \u2014 takes owned mut Deviation, no extra clone, one allocation for lowercase String; (5) verify_responder_id_impl passes identical data as original two functions. One P4 stale comment filed (PKIX-vhi.1). No correctness, risk, efficiency, or elegance issues found.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review pass 2: verify fixes from PKIX-9to",
+  "updated_at": "2026-05-06T22:34:32Z"
+}

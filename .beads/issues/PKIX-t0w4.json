@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T08:07:26Z",
+  "compaction_level": 0,
+  "content_hash": "2bdfbf6837330f08c715c06a5a0c0cd68c3c0df43617cd52a1baee8cacd94c81",
+  "created_at": "2026-05-08T17:56:03Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe PKITS baseline (PKIX-7nsf.6) surfaced 13 `StricterThanWild` chains where pkix-path reports `signature invalid at chain index N` but OpenSSL accepts. All are PKITS \u00a74.4 (Separate Cert/CRL Keys) and \u00a74.14 (Indirect CRL / cRLIssuer) tests, plus \u00a74.5 self-issued-rollover tests. The cause is documented in the bd memory `pkits-certpath-is-bundle-not-signature-chain`:\n\n> PKITS vectors.json `CertPath` is intended as a bundle for path builders, not a pre-ordered signature chain. For most tests CertPath happens to also be the signature chain. For \u00a74.4, \u00a74.14, and some \u00a74.5 tests, CertPath includes a non-signing cert at a position that breaks pkix-path's positional walk.\n\nThis is not a pkix-path bug. The harness's PKITS loader (`src/corpus/pkits.rs`) passes `CertPath` through verbatim; the fix is to use path-building before invoking pkix-path.\n\n## What\n\nIntegrate `pkix-path-builder` into the harness PKITS loader:\n\n1. Where the loader currently passes `CertPath` verbatim, instead call `pkix_path_builder::build_path(bundle, leaf, trust_anchors)` to assemble a properly-ordered signature chain. The bundle includes the CRL-signing cert; the path builder picks the actual signature chain by walking AKI \u2192 SKI, dropping the CRL-signing cert from the path (it would remain in a bundle if/when revocation lands in the harness).\n2. The resulting Chain is then passed to pkix-path's positional walker.\n\n`pkix-path-builder` already exists at `pkix-path-builder/` in the workspace (currently 0.3.0), so this is integration work, not new crate development.\n\n## Acceptance\n\n- [ ] PKITS baseline re-run shows 0 `StricterThanWild` chains with reason `signature invalid at chain index N`.\n- [ ] No regressions: `Agreement` count goes UP, no other class moves except `StricterThanWild` going DOWN.\n- [ ] Documentation update: `pkix-difftest/baseline-pkits.md` and `baseline-pkits-analysis.md` updated to remove the \"harness limitation\" notes for the 13 affected chains.\n\n## Filed as\n\nFollow-up to PKIX-7nsf.6. With AGENTS.md's \"path building out of scope for v0.1\" line removed (PKIX-agp7.1), this becomes integration work using the existing pkix-path-builder crate rather than a tactical AKI/SKI walk in the harness or a from-scratch path-builder bootstrap.",
+  "ephemeral": 0,
+  "id": "PKIX-t0w4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: PKITS CertPath includes non-signing certs (path-building integration)",
+  "updated_at": "2026-05-11T08:07:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:29:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

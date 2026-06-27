@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "AGENTS.md gained non-negotiable constraint #5 encoding the OSCAL-as-source-of-truth stance with reference to PKIX-ztmr (stance bead) and PKIX-9vnx (alignment epic). Existing constraints 1-4 unchanged.",
+  "closed_at": "2026-05-11T05:58:20Z",
+  "compaction_level": 0,
+  "content_hash": "e613e252f58031decd6b3a70b634b047b41263e6e41dca108298dfad3e4baf37",
+  "created_at": "2026-05-11T05:56:17Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer PKIX-ztmr stance, OSCAL is the source of truth for catalogs / profiles / deviations / findings. AGENTS.md needs a new non-negotiable constraint encoding this so future agents and contributors don't drift back into bespoke serialization formats or self-invented policy languages.\n\n## What\n\nAppend a new non-negotiable constraint (number 6) to AGENTS.md, sibling of PKIX-amgn.1's framework-not-policy constraint (#5):\n\n> 6. **OSCAL is the source of truth for lint catalogs, profile composition, deviations, and assessment findings.** `pkix-lint`'s public types ARE OSCAL data models (Catalog, Profile, Assessment Results, Finding, Observation, Risk), just typed in Rust. New bespoke serialization formats for these are NOT acceptable. Scope axes for deviations are OSCAL Subject props on Risk objects, not new Rust enum variants. Profile composition uses OSCAL Profile semantics (select / exclude / modify / import chaining), not Rust composition functions. `pkix-path::ValidationPolicy` is out of scope for this constraint \u2014 it is the validator's runtime config, not a compliance assertion. See PKIX-ztmr for the full rationale.\n\nAlso update the `## Test discipline` section if appropriate to mention OSCAL JSON Schema validation as part of CI when PKIX-9vnx lands.\n\n## Acceptance\n\n- [ ] New non-negotiable constraint #6 in AGENTS.md.\n- [ ] References PKIX-ztmr.\n- [ ] Existing constraints unchanged.\n\n## Out of scope\n\n- Updating the rest of AGENTS.md to reflect the OSCAL data models in the 'What this is' section \u2014 that happens via PKIX-amgn.1 + PKIX-9vnx.3-7 as those lands.\n\n## Depends on\n\nNone \u2014 independent of the rest of the alignment epic chain. Can land first as a stance anchor.",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AGENTS.md: encode OSCAL-as-source-of-truth stance as non-negotiable",
+  "updated_at": "2026-05-11T05:58:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:56:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

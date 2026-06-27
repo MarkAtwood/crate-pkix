@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:26Z",
+  "compaction_level": 0,
+  "content_hash": "5e1156ac17993af4822a3d7aecd54af0eeff6d7a3597b95b7d347e7b8154576b",
+  "created_at": "2026-05-06T23:18:08Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 484: the SHA-512 oracle comment shows the hex string as 'ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff' \u2014 this is only 63 bytes (126 hex chars) but SHA-512 produces 64 bytes (128 hex chars). The comment is missing the leading '0' on the first byte: the correct value is '0ee26b0dd...' not 'ee26b0dd...'. The hardcoded byte array in the test (lines 487-494) is correct (64 bytes, starting 0xee), so the test itself passes correctly. Only the documentation comment is wrong. This will confuse anyone trying to verify the oracle independently. Suggested fix: prepend '0' to the hex string in the comment on line 484.",
+  "ephemeral": 0,
+  "id": "PKIX-d5a",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: SHA-512 test vector comment has typo in hex string",
+  "updated_at": "2026-05-06T23:47:26Z"
+}

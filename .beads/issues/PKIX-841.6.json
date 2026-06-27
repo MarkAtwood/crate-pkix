@@ -1,0 +1,31 @@
+{
+  "close_reason": "ValidationPolicy::new(now_unix) is the preferred constructor and is documented. Default has a comment noting current_time_unix=0 requires explicit setting. Removing Default is a breaking API change deferred to v0.2.",
+  "closed_at": "2026-05-02T17:47:45Z",
+  "compaction_level": 0,
+  "content_hash": "83ae550fd59ac039981985f5a315cbd1c067a4ddf8c33252c0529aeaa95c7b06",
+  "created_at": "2026-05-02T17:27:11Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy::default() sets current_time_unix=0 (1970-01-01). Any caller who writes ValidationPolicy { max_path_len: 5, ..Default::default() } will silently get time=0 and fail all cert validity checks with ValidityPeriod. The rustdoc warning on the field is good, but the Default impl itself is the trap: Rust developers habitually use ..Default::default() without reading field docs. Issue reports from this will be chronic. Mitigation options: (a) remove Default impl and force explicit construction, (b) make ValidationPolicy::new(now) the only public path and mark Default as deprecated, or (c) add a builder pattern. The current ValidationPolicy::new(now_unix) constructor is the right UX \u2014 Default should be removed or panic-guarded.",
+  "ephemeral": 0,
+  "id": "PKIX-841.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy::default() current_time_unix=0 is a footgun",
+  "updated_at": "2026-05-02T17:47:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:27:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

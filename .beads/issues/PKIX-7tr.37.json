@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:16:16Z",
+  "compaction_level": 0,
+  "content_hash": "039a2fe8d1ea0d1a2d60a329920fc0ef20156d7145d22b1c6ae2d802608c7313",
+  "created_at": "2026-05-02T13:42:51Z",
+  "created_by": "Mark Atwood",
+  "description": "The std feature in Cargo.toml (line 17) only enables der/std. spki, x509-cert, and signature all have their own std features that may or may not be enabled transitively. If a caller enables pkix-path/std expecting full std support (e.g. std::error::Error impl on der::Error), the transitively enabled crates may not get std support, leading to missing trait implementations or different behavior depending on workspace configuration. The std feature should propagate to all workspace deps that have it: spki/std, x509-cert/std, signature/std.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.37",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "std feature only gates der/std not spki/std or x509-cert/std",
+  "updated_at": "2026-05-02T14:16:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

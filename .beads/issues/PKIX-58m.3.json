@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:21Z",
+  "compaction_level": 0,
+  "content_hash": "84187c6a38b09a2f4eb61b4f608792d9075dd8a85b968c0137b43908eabf5f35",
+  "created_at": "2026-05-05T14:34:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Parse IDP extension (OID 2.5.29.28, critical) from CRL. Check onlyContainsUserCerts/onlyContainsCACerts against cert BasicConstraints. Check onlyContainsAttributeCerts is false. Note: x509-cert 0.2.5 has wrong AssociatedOid for IDP; must parse by raw OID.",
+  "ephemeral": 0,
+  "id": "PKIX-58m.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement IssuingDistributionPoint checking (RFC 5280 \u00a75.2.5)",
+  "updated_at": "2026-05-05T15:25:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:34:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-58m",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:34:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-58m.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

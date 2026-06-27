@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:08:58Z",
+  "compaction_level": 0,
+  "content_hash": "ccdbfa9c318989958cba97ab4487f47d777a1ecb4b24721febe2d75db1dbad75",
+  "created_at": "2026-05-07T16:08:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:235-236 \u2014 the thisUpdate check is:\n  `if self.now_unix < this_update { return Err(Error::CrlExpired); }`\n\nThis rejects CRLs where now < thisUpdate \u2014 i.e., a CRL that is not yet valid (future-dated or clock skew). This is CORRECT behavior. The comment says 'CRL validity window check failed' which covers both cases. No bug here.\n\nWait \u2014 actually re-reading the code: the check at line 235 is `now_unix < this_update` which triggers when the CRL's thisUpdate is in the future. This IS the right semantic. The issue I was originally looking for (inverting now < next_update vs now > next_update) is not present. No bug.\n\nWithdrawing \u2014 NOT filing this.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CRL validity: thisUpdate check direction is inverted (should reject future-dated CRL)",
+  "updated_at": "2026-05-07T16:08:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:08:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decided 2026-05-11 (Mark): option B. pkix-identity is a new workspace crate dedicated to cert-side identity matching (RFC 6125 hostname, RFC 5280 \u00a74.2.1.6 + RFC 8398 mailbox, IP literal). Rationale: identity binding is a separable concern \u2014 pure function over (cert, identity-string) -> Result with no chain context. Reusable for callers that need leaf-level identity checks without the full pipeline (ACME TLS-ALPN-01 verification, trust-store adapters, raw leaf inspection, fast unit tests). Wrong fit for Profile trait (stateless data transform) or for inlining in pkix-chain (would force duplication). Precedent: rustls-pki-types::ServerName + webpki SubjectNameRef split this way in the wider Rust ecosystem. Maintains workspace per-crate-discipline. Scope discipline: matching only; name constraints stay in pkix-path, DN canonicalization stays in pkix-path, public suffix list not enforced (caller responsibility). Implementation tracked: PKIX-fmtv.21 (scaffold) + PKIX-fmtv.11 (hostname + verify_tls_server) + PKIX-fmtv.12 (mailbox + verify_smime_*).",
+  "closed_at": "2026-05-12T05:05:04Z",
+  "compaction_level": 0,
+  "content_hash": "7cedd3ccee1289fc9741d6afbf150d8376689edf2af7973abc87bbc15f8e46ff",
+  "created_at": "2026-05-12T02:41:39Z",
+  "created_by": "Mark Atwood",
+  "description": "RFC 6125 (TLS hostname matching with wildcards / IP literals / IDN), RFC 5280 \u00a74.2.1.6 + RFC 8398 (mailbox matching with internationalized local-part), DN exact-match for some PIV uses. Where does this code live?\n\n**Options:**\n\n- **A) Inline in each policy object.** `policies::tls_server` carries RFC 6125 binding internally; `policies::smime_signer` carries RFC 8398 binding internally. Localized but duplicates effort if callers want hostname-binding without invoking the whole pipeline.\n- **B) New `pkix-identity` crate.** Both `pkix-profiles` (`BasicTlsProfile`, `BasicSmimeProfile`) and `pkix-chain::policies::*` consume it. Reusable; one more crate in the workspace.\n- **C) Inside `pkix-profiles`.** The `BasicTlsProfile` / `BasicSmimeProfile` types likely already have it. Pragmatic; couples policy stack to profiles, but profiles are the natural home.\n\nWorth verifying before the decision: what `pkix-profiles::BasicTlsProfile` / `BasicSmimeProfile` currently expose. May already provide the binding API; if so, C is free.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide identity-binding subsystem location",
+  "updated_at": "2026-05-12T05:05:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

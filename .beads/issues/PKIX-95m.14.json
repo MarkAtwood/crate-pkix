@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:25:00Z",
+  "compaction_level": 0,
+  "content_hash": "1495190d4e0c2ca4e362d07a1ac3e96ec52bc6aafd9ba64109c75d9edfb8a62f",
+  "created_at": "2026-05-06T20:17:36Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs:123-138 \u2014 Severity derives PartialOrd+Ord (Info < Warn < Error < Fatal), but findings_at_or_above uses a manual matches!() table instead. This is unmaintainable: adding a new Severity variant requires a manual table update or silently produces wrong results. The detail().is_some() guard is also redundant (Warn/Error/Fatal always have detail). Fix: extract a severity(result) -> Option<Severity> helper and filter by severity.map_or(false, |s| s >= min_severity).",
+  "ephemeral": 0,
+  "id": "PKIX-95m.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "findings_at_or_above reimplements severity comparison instead of using derived Ord",
+  "updated_at": "2026-05-06T20:25:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:45Z",
+  "compaction_level": 0,
+  "content_hash": "02708fd50c508e9675a3543f579754b136391f6aeeffad4bd7573c3a253b8051",
+  "created_at": "2026-05-02T20:34:21Z",
+  "created_by": "Mark Atwood",
+  "description": "CrlChecker<V> and OcspChecker<V> store Vec<u8>, u64, and V. All three types are Clone/Debug when V: Clone + Debug. Neither struct derives Clone or Debug today. A user who wants to log a checker, clone it for parallel use, or put it in a struct that needs Debug will hit a dead end. Fix: add #[derive(Clone, Debug)] \u2014 the derives work because Vec<u8> and u64 are Clone+Debug, and V is bounded by the trait impl.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.4",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker and OcspChecker missing Clone/Debug derives",
+  "updated_at": "2026-05-02T20:36:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

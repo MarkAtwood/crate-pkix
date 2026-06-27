@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2b9256e90a068a129f39e1fc72fece1af1eeb4459596e4a7d585527b4ec152b4",
+  "created_at": "2026-05-14T17:41:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:160-162\n\n```rust\npub const fn new(logs: CtLogList, verifier: V) -> Self {\n    Self { logs, verifier }\n}\n```\n\nThe `const fn` qualifier commits the maintainer to a body that is\nconst-evaluable forever. Any future version that wants to:\n\n- Validate `logs` (reject empty list, check for duplicate log_ids\n  across operators)\n- Pre-compute a `log_id -> SPKI` cache to avoid re-parsing on every\n  verify call\n- Lazily wire in algorithm-pref ordering\n\n\u2026is now blocked, because none of those can be `const fn` until\n`Vec::new()` and `BTreeMap::iter()` are stably const in Rust, which\nthey are not.\n\n`const fn` was the right answer for a zero-cost wrapper; it is the\nwrong answer if validation or pre-computation belongs in the\nconstructor. The maintainer paid forward an optimization (callable\nin const contexts) that no real caller will use, and locked future\nflexibility.\n\nRecommendation: drop `const` from `new`. Callers cannot tell the\ndifference; removing const is a non-breaking change so this can be\ndone at any 0.x release, but if it's wrong it's wrong to leave it.\n\nSame critique applies to `CtLogList::new` (line 64) and\n`SctVerifier::logs` (line 166): the latter two are pure accessors and\nconst is fine there; only `SctVerifier::new` carries forward\nconstruction-time validation potential.\n\nMarking P3 because const can be dropped silently as a non-breaking\nchange; this is just preventative.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctVerifier::new is const fn \u2014 locks construction shape across versions",
+  "updated_at": "2026-05-14T17:41:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:41:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "close_reason": "Both children PKIX-fmtv.12.1 and PKIX-fmtv.12.2 closed. Mailbox binding shipped in pkix-identity (.12.1, 2026-05-12) and verify_smime_signer/verify_smime_recipient wrappers shipped in pkix-chain (.12.2, 2026-05-13). epic_closeable=true confirmed.",
+  "closed_at": "2026-05-13T02:19:15Z",
+  "compaction_level": 0,
+  "content_hash": "e6d9cdcc339592eee8ae50dac1ad0eb70e60eb18ff155e3cde1b8cd6cc80a7ef",
+  "created_at": "2026-05-12T02:42:20Z",
+  "created_by": "Mark Atwood",
+  "description": "**Retargeted 2026-05-11 per `.3` decision (option B):** binding code lives in new `pkix-identity` crate; pkix-chain ships the thin wrappers.\n\n## In `pkix-identity` (fills scaffold stub)\n\nImplement `verify_mailbox(cert: &Certificate, mailbox: &MailboxName) -> Result<(), IdentityError>`:\n\n- Parse leaf's SubjectAlternativeName extension; iterate `GeneralName` entries.\n- For each `GeneralName::Rfc822Name(addr)`: apply RFC 5280 \u00a74.2.1.6 + RFC 822 matching against `mailbox`:\n  - **Local-part** is case-sensitive by default (per RFC 5321 \u00a72.4 \u2014 local-part case-sensitivity is left to the receiving domain; we choose case-sensitive for safety).\n  - **Domain part** case-insensitive (per RFC 1035 / RFC 5321).\n- For each `GeneralName::OtherName { type_id: id-on-SmtpUTF8Mailbox, value }`: per RFC 8398 \u00a73:\n  - Decode `value` as UTF-8 mailbox.\n  - Same local-part / domain handling but on UTF-8 (not ASCII).\n  - U-label/A-label domain normalization via `idna`.\n- If any matches: `Ok(())`. If no SAN entries match (or SAN missing): `Err(IdentityError::NoMatchingMailbox)` or `MissingSan`.\n\nAlso implement `MailboxName::parse` constructor with input validation (RFC 5322 syntax, optional internationalized-mailbox handling).\n\n## In `pkix-chain`\n\nShip two new public functions:\n\n```rust\npub fn verify_smime_signer(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    mailbox:    &MailboxName<'_>,    // from pkix-identity\n    policy:     &ValidationPolicy,   // typically BasicSmimeProfile.policy(now)\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n\npub fn verify_smime_recipient(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    mailbox:    &MailboxName<'_>,\n    policy:     &ValidationPolicy,\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n```\n\nBodies:\n1. `verify_chain(...)?` (existing).\n2. `pkix_identity::verify_mailbox(&chain[0], mailbox)?` (new).\n3. `Ok(ValidatedPath)`.\n\nThe signer/recipient distinction lives in the `ValidationPolicy` (keyUsage: digitalSignature for signer vs keyEncipherment for recipient \u2014 set by the caller via `BasicSmimeProfile` or downstream `SmimeProfile`s in `pkix-profiles-cabf`).\n\n`VerifyError` gets new variants for `MailboxMismatch`, `MalformedMailbox`.\n\nWhether both signer and recipient wrappers ship in v0.x is per `.7` decision.\n\n## Tests\n\n- Plain ASCII mailbox: `alice@example.com` matches SAN `rfc822Name=alice@example.com`.\n- Case sensitivity: `Alice@example.com` does NOT match SAN `alice@example.com` (local-part). `alice@Example.com` DOES match SAN `alice@example.com` (domain).\n- Internationalized: SAN otherName SmtpUTF8Mailbox `\u7528\u6237@example.com` matches input `\u7528\u6237@example.com`.\n- Mixed: SAN with both rfc822Name (ASCII) and otherName (UTF-8) variants; verify both code paths.\n- SAN missing \u2192 error.\n\n## Blocks on\n\n- New scaffold child (creates pkix-identity with API stubs).\n- `.7` (decides whether both signer and recipient wrappers ship).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.12",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 5280/8398 mailbox binding in pkix-identity + verify_smime_signer/recipient wrappers in pkix-chain",
+  "updated_at": "2026-05-13T02:19:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:43:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T22:04:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.21",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

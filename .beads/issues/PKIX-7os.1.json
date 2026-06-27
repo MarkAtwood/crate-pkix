@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:35Z",
+  "compaction_level": 0,
+  "content_hash": "ae72ec79c057091a33547e18ef5bc942a278970ad814019a1170b695cbc7d1da",
+  "created_at": "2026-05-02T14:38:39Z",
+  "created_by": "Mark Atwood",
+  "description": "check_extensions returns Error::UnexpectedExtension for any extension not in the whitelist, regardless of criticality. Error::UnhandledCriticalExtension (declared in the enum, listed in verify_simple docs as a return value) is never actually returned. Callers matching on pkix_chain_simple::Error::UnhandledCriticalExtension will never trigger, silently missing critical-extension rejections in their error handling.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: UnhandledCriticalExtension variant unreachable",
+  "updated_at": "2026-05-02T14:48:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:38:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

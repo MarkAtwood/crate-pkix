@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:28:46Z",
+  "compaction_level": 0,
+  "content_hash": "0c78f38138ce2496f50427467a91db8a02f4fe865aabe5e67f9a24792ecc08a8",
+  "created_at": "2026-05-06T20:15:49Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs:123-138 \u2014 Severity derives PartialOrd+Ord (Info < Warn < Error < Fatal), so the filter should simply be: f.result.detail().is_some() && result_severity(f) >= min_severity. Instead the current implementation uses an explicit matches! table that omits the case (Fatal, Error): a Fatal finding is NOT returned when min_severity=Error because the pattern (Fatal(_), _) is the only wildcard for Fatal but the arm order and placement may also be correct \u2014 need to re-check. More critically, the check calls f.result.detail().is_some() redundantly (detail is Some for Warn/Error/Fatal) and the severity-filter logic is not DRY: Severity implements Ord but is not used for the comparison, so future Severity variants will silently require manual update to this table.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "findings_at_or_above ignores Severity ordering and misses Fatal with min_severity=Error",
+  "updated_at": "2026-05-06T20:28:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:15:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

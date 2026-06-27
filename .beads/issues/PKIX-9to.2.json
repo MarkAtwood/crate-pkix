@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:25:14Z",
+  "compaction_level": 0,
+  "content_hash": "d275ba2ef5aefdcc3a115a747a2a2b7dcebd56bea74fcd036c369a36faef3b27",
+  "created_at": "2026-05-06T22:14:36Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:888: 'a.issuer == b.issuer' uses PartialEq on x509_cert::name::Name, which is DER byte-level equality. names_match() applies RFC 4518 normalization (case-fold, whitespace collapse). A pair of certs with semantically identical issuers but different DER encodings (e.g., one uses PrintableString, the other UTF8String for the same attribute) will pass the duplicate check even though they represent the same cert. Attacker can include a cert twice with re-encoded DN to bypass Error::DuplicateCertificate.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Duplicate cert detection uses byte-eq on issuer DN, not names_match",
+  "updated_at": "2026-05-06T22:25:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:14:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

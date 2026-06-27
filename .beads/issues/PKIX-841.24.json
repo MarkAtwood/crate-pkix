@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added PartialEq, Eq to TrustAnchor derive.",
+  "closed_at": "2026-05-02T17:46:11Z",
+  "compaction_level": 0,
+  "content_hash": "5cdf1752ab6f5cde3cdbacaec63183110da681cd04da587f5756218e26a84252",
+  "created_at": "2026-05-02T17:31:53Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor is a public struct. Its fields (x509_cert::name::Name and spki::SubjectPublicKeyInfoOwned) both implement PartialEq/Eq \u2014 confirmed by the direct != comparison in validate_path line 377. Without derives, callers cannot compare TrustAnchor values, deduplicate an anchor list, or write straightforward test assertions. Any consumer building anchor management (rotation, pinning) will need to work around the missing impl. Should add #[derive(PartialEq, Eq)].",
+  "ephemeral": 0,
+  "id": "PKIX-841.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor missing PartialEq/Eq derives",
+  "updated_at": "2026-05-02T17:46:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:31:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

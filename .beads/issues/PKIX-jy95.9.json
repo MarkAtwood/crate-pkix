@@ -1,0 +1,31 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T21:43:58Z",
+  "compaction_level": 0,
+  "content_hash": "084f7d6b4a948a3dfe8badc73d515fafc38758584f2a62ad5409d8e3e58d3b07",
+  "created_at": "2026-05-12T21:40:11Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nNew workspace crate `pkix-policy-oscal`. Std-only. Consumes OSCAL Profile JSON (NIST OSCAL v1.2.2 schema) and produces a configured `LintRunner` containing only the workspace Lints selected by the Profile.\n\nSibling adapter to pkix-policy-zlint and pkix-policy-pkilint, but architecturally different: no subprocess, no external tool dependency. Pure JSON parse + Lint-impl lookup + LintRunner construction.\n\n## Scope\n\n- Parse OSCAL Profile JSON per NIST OSCAL v1.2.2 schema (vendored under specs/oscal-v1.2.2/)\n- Extract Control IDs from Profile's imports / merge / modify sections\n- Map Control IDs to workspace `Lint` impls via the `Lint::id()` field\n- Construct a `LintRunner` carrying only the selected Lints\n- Surface OSCAL Profile parse errors with useful context (path, expected types)\n\n## Reuse from pkix-lint\n\npkix-lint/src/oscal/* already contains OSCAL parsing primitives (parse.rs, catalog.rs, profile.rs). This crate reuses those types. Some pkix-lint internals likely need promotion to public API behind the existing 'oscal' feature flag. Specifically:\n\n- Whatever serde types pkix-lint uses for OSCAL Profile representation\n- Helper functions for Profile import resolution\n\nDecide at implementation time: should pkix-policy-oscal depend on pkix-lint with feature 'oscal' enabled, or should pkix-lint's OSCAL types move to a more neutral home (workspace-internal helper crate)? Probably the former \u2014 pkix-lint already owns OSCAL emit and the types belong with the emit code.\n\n## Open shape decisions (defer to implementation)\n\n- OSCAL Profile features supported: import-only? import + modify (alters/adds control properties)? import + modify + merge?\n- Behavior when Profile references a Control ID that has no corresponding workspace Lint impl: error / warn / silently ignore?\n- LintRunner config richness: just select-lints? Also override severity? Apply per-control parameters from OSCAL?\n- Does this crate's API admit caching the parse \u2192 LintRunner step? Non-negotiable #6 says yes; LintRunner is already Clone+Send+Sync, so caching a configured runner across many cert validations should be straightforward.\n\n## Cross-references\n\n- PKIX-jy95.5 (decision that filed this crate)\n- PKIX-9vnx (shipped OSCAL emit/parse code in pkix-lint/src/oscal/*; this crate reuses parse primitives)\n- AGENTS.md non-negotiable #5 (three-mode policy-class model; OSCAL named as one optional adapter)\n- AGENTS.md non-negotiable #6 (cache-friendly types; LintRunner caching for parsed Profiles)\n- specs/oscal-v1.2.2/ (NIST schema reference)\n\n## Out of scope\n\n- Implementing OSCAL Catalog support (this crate is for Profile JSON; Catalogs are emit-only via pkix-lint).\n- Generic OSCAL Profile composition algebra beyond what's needed to extract selected Control IDs.\n- OSCAL emit (already shipped in pkix-lint/src/oscal/emit.rs).\n\n## Acceptance\n\n- [ ] Crate exists in workspace Cargo.toml as a published library\n- [ ] Depends on pkix-lint with feature 'oscal' enabled\n- [ ] Public API: parse_profile(json) -> Result<Profile, ParseError>; build_runner(profile, lint_registry) -> Result<LintRunner, BuildError>\n- [ ] ParseError + BuildError satisfy non-negotiable #6\n- [ ] Cargo feature 'serde' enables Serialize/Deserialize derives on the public types\n- [ ] Test fixtures: at least one valid OSCAL Profile JSON + several invalid variants exercising error paths\n- [ ] Doctest example: load a Profile, configure a LintRunner, run on a cert\n- [ ] CHANGELOG + AGENTS.md inventory entry",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.9",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-policy-oscal crate (consume OSCAL Profile JSON to configure LintRunner)",
+  "updated_at": "2026-05-12T21:43:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T14:40:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

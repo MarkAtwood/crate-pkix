@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.14",
+  "title": "parse_certificate_issuer_dn: opaque error for 'no directoryName'",
+  "description": "Location: pkix-revocation/src/crl.rs, parse_certificate_issuer_dn() (lines 989-1008)\n\nWhen the certificateIssuer CRL entry extension contains only non-DN GeneralNames (e.g., only rfc822Name or URI), the function fabricates a DER error:\n\n  Err(Error::CrlParseError(crate::DerError::new(der::Error::new(\n      der::ErrorKind::Failed,\n      der::Length::ZERO,\n  ))))\n\nThis returns a CrlParseError whose Display message is something like 'DER error at offset 0' \u2014 not actionable for someone debugging why a specific CRL entry was rejected. The actual situation is 'we parsed the certificateIssuer extension successfully, but found no directoryName among the GeneralNames', which is semantically different from a parse failure.\n\nWhat goes wrong: an operator seeing 'CRL parse error: [...] at offset 0' in logs will investigate a DER formatting issue that does not exist. A comment at line 999-1003 explains the real situation, but that context does not reach the error consumer. A dedicated Error variant (e.g., CertificateIssuerNoDn) or at minimum a more descriptive DerError message would eliminate the red herring.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:41Z",
+  "updated_at": "2026-06-15T17:30:45Z",
+  "closed_at": "2026-06-15T17:30:45Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:40"
+    }
+  ]
+}

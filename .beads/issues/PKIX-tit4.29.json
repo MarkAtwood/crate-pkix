@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c21c720c6da6d22d3ebca5db0b0b1c964e8d805348144381fb06e7ec30139628",
+  "created_at": "2026-05-14T09:44:58Z",
+  "created_by": "Mark Atwood",
+  "description": "The enum-level `#[non_exhaustive]` on `Error` (lib.rs:353) admits new\n*variants* in minor releases, but does NOT protect fields inside\nexisting struct variants. `Error::MalformedAnchor { index, source }`\n(lib.rs:397-402) is the only struct-variant in `Error`, and it lacks\nits own `#[non_exhaustive]` attribute.\n\nConcrete consequence: a future minor release that wants to surface\nadditional diagnostic context \u2014 e.g., the offending certificate's\nserial number, subject DN, or the raw DER bytes \u2014 cannot do so\nnon-breakingly. Every caller pattern-matching the variant with full\nfield destructuring breaks at compile time:\n\n```rust\n// Caller code that currently compiles:\nmatch err {\n    Error::MalformedAnchor { index, source } => log(index, source),\n    _ => /* enum-level non_exhaustive covered by `_` */,\n}\n```\n\nAfter adding a third field, that match must become\n`{ index, source, .. }` \u2014 a breaking change for every consumer.\n\nThis is inconsistent with the rest of the public surface:\n- `IoFailure` (lib.rs:223) is `#[non_exhaustive]` and its doc\n  explicitly promises 'future minor releases may surface additional\n  context'.\n- `TrustAnchor` in pkix-path is `#[non_exhaustive]` (pkix-path/src/lib.rs:650)\n  with the same promise.\n- The `Error` enum itself is `#[non_exhaustive]`.\n\nThe fix is one line: add `#[non_exhaustive]` to the variant declaration.\nPer-variant `#[non_exhaustive]` is stable since Rust 1.40, well within\nthe workspace MSRV of 1.73.\n\n```rust\n#[non_exhaustive]\nMalformedAnchor {\n    index: usize,\n    source: DerError,\n},\n```\n\nInternal call site in lib.rs:579-585 already uses functional update via\nthe struct-literal syntax; that pattern remains legal inside the\ndefining crate. The tests at lib.rs:740-744 use full destructuring and\nwould need `.. }` added, which is a single-character change.\n\nPre-1.0 this is a free fix; post-1.0 it becomes a 'we can't grow the\ndiagnostic surface without a major bump' problem. File now while\nbreaking changes are still free per workspace policy (AGENTS.md\n'Project phase and decision framing': breaking changes are the\nmechanism for getting the design right).\n\nEngineering basis: structural forward-compat consistency. Not opinion.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::MalformedAnchor struct variant lacks #[non_exhaustive], blocking non-breaking field additions",
+  "updated_at": "2026-05-14T09:44:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T02:44:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

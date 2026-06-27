@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:32:22Z",
+  "compaction_level": 0,
+  "content_hash": "d3e0ffd5ceeafcd987fb7249468274067fcd6e20c731ba2dc9669ba9f1cdc11c",
+  "created_at": "2026-05-12T05:19:04Z",
+  "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "description": "Fill the scaffold stubs in pkix-identity created by PKIX-fmtv.21 with the RFC 6125 \u00a76.4 hostname binding implementation. Scope is the pkix-identity half ONLY; pkix-chain verify_tls_server / verify_tls_client wrappers are split out as PKIX-fmtv.11.2 (blocked on PKIX-fmtv.7's wrapper-set decision, which is human-labeled).\n\n## Deliverable\n\n### pkix-identity changes\n\nAdd workspace deps used by this body:\n- `idna` 1.x (workspace, no_std with `alloc` feature; std opt-in via crate feature)\n- `der` (already a workspace dep; may need extra features for extension parsing)\n\nImplement `ServerName::dns_name(name: &'a str) -> Result<Self, IdentityError>`:\n- Validate against LDH + length limits (RFC 952 / RFC 1123 / RFC 5890).\n- Lower-case ASCII labels at parse time (case folding done once at construction).\n- IDN: if input contains non-ASCII, convert U-label \u2192 A-label via `idna` crate before storage.\n- Reject empty, overlong, or non-LDH inputs.\n\nImplement `ServerName::ip_address(ip: &'a str) -> Result<Self, IdentityError>`:\n- Parse as IPv4 dotted-quad or IPv6 (with or without brackets).\n- Store as canonical 4-byte or 16-byte buffer.\n- Reject malformed inputs.\n\nImplement `verify_dns_name(cert: &Certificate, name: &ServerName) -> Result<(), IdentityError>`:\n- Parse leaf's SubjectAlternativeName extension (OID 2.5.29.17); iterate `GeneralName` entries.\n- For each `GeneralName::DnsName(dns)`: apply RFC 6125 \u00a76.4 matching against `name`:\n  - **Exact** case-insensitive ASCII match (case folding already done at `name` parse time; SAN entry folded inline).\n  - **Wildcard** rules: SAN entry `\"*.foo.com\"` matches `\"a.foo.com\"` but NOT `\"a.b.foo.com\"` (single leftmost label only), NOT bare `\"*\"`, NOT `\"*.com\"` (no public-suffix check \u2014 caller responsibility per scope discipline), NOT embedded wildcards (`\"*.foo.*.com\"` rejected).\n  - **IDN** SANs: SAN is already in A-label form (CABF requires); compare against A-label `name`.\n- For each `GeneralName::IpAddress(bytes)`: if `name` is an IP literal (4 or 16 bytes), byte-equal compare.\n- If any SAN entry matches: `Ok(())`.\n- If SAN present but no entry matches: `Err(IdentityError::NoMatchingSan)`.\n- If SAN missing: `Err(IdentityError::MissingSan)`.\n- Do NOT consult Subject DN CN (deprecated by RFC 6125 \u00a76.4.4).\n\n## Test corpus\n\nbettertls.com hostname-matching corpus is already vendored in `pkix-difftest` (per AGENTS.md). Wire it through the new `verify_dns_name` API.\n\nAdditional unit tests:\n- Wildcard edge cases: leftmost-label-only, no-embedded-wildcards, no-bare-asterisk.\n- IDN: U-label input \u2192 A-label SAN match, both directions.\n- IP literal: IPv4 / IPv6 / mismatched length.\n- SAN missing \u2192 `MissingSan`.\n- SAN present, no match \u2192 `NoMatchingSan`.\n- CN-only cert (no SAN): rejected with `MissingSan` (CN fallback intentionally not performed).\n\n## Out of scope (split to PKIX-fmtv.11.2)\n\n- `pkix_chain::verify_tls_server` / `verify_tls_client` wrappers \u2014 depend on PKIX-fmtv.7 (human-labeled, wrapper-set decision).\n- New `VerifyError` variants in pkix-chain.\n\n## Acceptance\n\n- `cargo build -p pkix-identity` clean (default features + `--no-default-features`).\n- `cargo build -p pkix-identity --target wasm32-unknown-unknown --no-default-features` clean (no_std preserved).\n- `cargo clippy -p pkix-identity --all-targets --all-features -- -D warnings` clean.\n- bettertls corpus integration test passing.\n- CHANGELOG entry in `pkix-identity/CHANGELOG.md` and top-level CHANGELOG.\n\n## What this unblocks\n\nPKIX-fmtv.11.2 (pkix-chain TLS wrappers, still blocked on .7) and any future pkix-chain caller that wants hostname binding without the wrapper convenience.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.11.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 6125 hostname binding body in pkix-identity (verify_dns_name + ServerName constructors)",
+  "updated_at": "2026-05-12T05:32:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:19:03Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.11",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

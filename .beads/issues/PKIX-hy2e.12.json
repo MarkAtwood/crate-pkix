@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fc620056703e3a123615712a7a1a0928b73ffa21d30f6d56fc692c2f90b7ee2d",
+  "created_at": "2026-05-14T12:41:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: rfc8398.rs:338-356. The function converts U-label (smtputf8) to A-label via idna::domain_to_ascii(u_domain), then compares case-insensitively against r_domain (the rfc822Name domain). Assumes rfc822 carries A-label form per RFC 8398 \u00a73. Real-world counter-example: some buggy CAs emit rfc822Name with the IDN domain in U-label form (which is RFC-non-conforming \u2014 rfc822Name is IA5String, technically restricted to ASCII \u2014 but the field is sometimes loaded with UTF-8 anyway, especially in test vectors). For those certs, idna::domain_to_ascii(u_domain) produces 'xn--caf-dma.example' and r_domain is still 'caf\u00e9.example' (or 'xn--caf-dma.example' if the CA pre-converted). The eq_ignore_ascii_case comparison fails silently. This is technically the lint's job (rfc822Name SHOULD be A-label-encoded) but the lint's error message ('rfc822Name SAN entry has no matching SmtpUTF8Mailbox; RFC 8398 \u00a73 requires byte-identical local-part and A-label/U-label-equivalent domain') doesn't pinpoint the encoding issue. Better: also try idna::domain_to_ascii(r_domain) and compare both directions; report 'rfc822 domain is not in A-label form' as a sub-diagnostic when the two ASCII conversions match each other. Filed P2 because real-world hit rate is low (most CAs do A-label) but the silent diagnostic is bad UX.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "mailbox_equivalent does not idna-convert the rfc822 domain \u2014 silently rejects RFC-non-conforming-but-real rfc822 U-label SANs",
+  "updated_at": "2026-05-14T12:41:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

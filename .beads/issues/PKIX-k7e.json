@@ -1,0 +1,22 @@
+{
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-06T15:49:14Z",
+  "compaction_level": 0,
+  "content_hash": "f8aeb8ed56644edaaf0178fb95ae086fc9e2c3591c4d46005d7267cc6ce45ebb",
+  "created_at": "2026-05-06T15:40:35Z",
+  "created_by": "Mark Atwood",
+  "description": "Second-pass review of commits d36ef3a..a6fc6fe covering: do-beads fixes for PKIX-kwd, profile implementations (web_pki/smime/code_signing), and ValidationPolicy profile fields.",
+  "ephemeral": 0,
+  "id": "PKIX-k7e",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 2: findings from do-beads fixes",
+  "updated_at": "2026-05-06T15:49:14Z"
+}

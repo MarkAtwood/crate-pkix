@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "FALSE POSITIVE: RFC 5280 \u00a76.1.4(b) says 'there is a node of depth i with valid_policy of anyPolicy' \u2014 depth i is cert_depth. Code checks nd.depth == cert_depth which is correct. The review agent confused depth i with i-1.",
+  "closed_at": "2026-05-07T16:24:19Z",
+  "compaction_level": 0,
+  "content_hash": "273238bee46a51f0b29b8b31f1603332d8fd0905e116dbf17ba9c58aa6989e11",
+  "created_at": "2026-05-07T16:14:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2350-2360 \u2014 when no node at cert_depth has valid_policy == ID-P, the code checks for anyPolicy at cert_depth:\n  `let has_any = tree.iter().any(|nd| nd.depth == cert_depth && nd.valid_policy == OID_ANY_POLICY);`\n\nRFC 5280 \u00a76.1.4(b) says (paraphrasing): 'If ID-P is not in the valid_policy_tree, but a node with valid_policy anyPolicy exists at depth i-1, generate a new node at depth i.'\n\nThe code checks for anyPolicy at depth i (cert_depth), not at depth i-1 (cert_depth - 1). The anyPolicy node at cert_depth was added by \u00a76.1.3(d)(2) for the CURRENT cert. The RFC check should look for anyPolicy at the PARENT depth (cert_depth - 1), which would be the anyPolicy inherited from the path up to this point.\n\nChecking cert_depth instead of cert_depth-1 means:\n- We only generate the mapping node if the CURRENT cert itself already has an anyPolicy node (which means \u00a76.1.3(d)(2) added it)\n- We miss the case where the parent (cert_depth-1) has anyPolicy but the current cert doesn't\n\nThis could cause valid policy mappings to fail (not generate the expected node) in chains where the parent CA asserted anyPolicy but the current cert does not. This produces a wrong-empty policy tree.\n\nHOWEVER: if \u00a76.1.3(d)(2) added anyPolicy at cert_depth because inhibit_any > 0 AND the cert has anyPolicy... but the RFC says anyPolicy should be generated at cert_depth when the cert's CertificatePolicies includes anyPolicy. If the cert includes anyPolicy AND a mapping from ID-P to ID-Q, then both an anyPolicy node and the mapping update exist. If the cert includes a mapping but NOT anyPolicy, the anyPolicy at cert_depth won't exist.\n\nIn that case (mapping exists, cert has no anyPolicy), we check cert_depth for anyPolicy and find none \u2192 the mapping node is NOT generated. But RFC says to check cert_depth-1 (the parent). If the parent had anyPolicy, we should generate the mapping node.\n\nP1 \u2014 policy mapping does not correctly handle the case where parent has anyPolicy but current cert doesn't.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path \u00a76.1.4(b): policy mapping update uses wrong depth for generating new anyPolicy child",
+  "updated_at": "2026-05-07T16:24:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:14:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Security scan completed from earlier run. 13 findings (3 Medium, 10 Low). Report at /tmp/skoll-review-GXNuiP.md and /tmp/skoll-review-Uje7MH.json",
+  "closed_at": "2026-06-04T18:01:41Z",
+  "compaction_level": 0,
+  "content_hash": "985e88f71d06c2678f29c7b2323d02eb85c6d1768b31fca6d7445471c2146702",
+  "created_at": "2026-06-04T17:28:12Z",
+  "created_by": "Mark Atwood",
+  "description": "Run 'skoll security' from ~/PROJECT/PKIX for comprehensive vulnerability review with CWE mapping. This covers: input validation at system boundaries (DER/PEM parsing, certificate fields), memory safety in cert chain handling, error handling gaps that could lead to path validation bypass, trust anchor handling, and revocation checking. Save output: 'skoll security --out ~/PROJECT/PKIX/reports/skoll-security.md'. The adaptive preflight will detect x509/pkix/der/asn1 domain keywords and tailor categories accordingly.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Skoll security scan \u2014 vulnerability review",
+  "updated_at": "2026-06-04T18:01:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added EcdsaP256Verifier behind #[cfg(feature=p256)]; test passes with OpenSSL-generated P-256 cert",
+  "closed_at": "2026-05-02T06:42:05Z",
+  "compaction_level": 0,
+  "content_hash": "f3db27a1e8225bd0c6152635caddf7beceabc7fbb1bf8b711c663ddee9f528a9",
+  "created_at": "2026-05-02T05:52:15Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement ECDSA over P-256 with SHA-256 as a concrete SignatureVerifier backend in pkix-path, behind the p256 feature flag.\n\nOID: ecdsa-with-SHA256 = 1.2.840.10045.4.3.2\n\nImplementation:\n  - Extract EC public key from SubjectPublicKeyInfoRef. The SubjectPublicKeyInfo for P-256 has:\n      algorithm.oid = id-ecPublicKey (1.2.840.10045.2.1)\n      algorithm.parameters = namedCurve P-256 (1.2.840.10045.3.1.7)\n      subjectPublicKey = uncompressed point (04 || x || y, 65 bytes)\n  - Construct p256::ecdsa::VerifyingKey from the uncompressed point bytes\n  - Signature encoding: RFC 5480 DER-encoded ECDSA-Sig-Value (SEQUENCE { INTEGER r, INTEGER s })\n    Parse with p256::ecdsa::Signature::from_der()\n  - Verify with p256::ecdsa::signature::Verifier::verify(message, &sig)\n  - Return Ok(()) / Err(signature::Error::new()) per PKIX-q13 corrected return type\n\nTest vectors: use OpenSSL or pyca/cryptography to generate P-256 signed certs. Extract TBSCertificate bytes and signature bytes. Commit as hex literals.\n  openssl ecparam -name prime256v1 -genkey | openssl req -new -x509 -sha256 -days 3650 -nodes -out cert.pem",
+  "ephemeral": 0,
+  "id": "PKIX-evy",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: ECDSA P-256 SHA-256 SignatureVerifier backend",
+  "updated_at": "2026-05-02T06:42:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:03:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q13",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

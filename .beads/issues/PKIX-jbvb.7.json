@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented per Mark 2026-05-13 decision in PKIX-jbvb.6. All scope items landed: OID constants renamed (.3.3 / .4.3 with _STRICT_POLICY suffix); OID_ORGANIZATION_IDENTIFIER added; OID_SERIAL_NUMBER removed (unused after dropping serialNumber from DN rules); SmimeProfile validity 1185\u2192825d; SmimeSponsorValidated picks up organizationIdentifier SHALL and drops serialNumber, OID .3.3, validity 825d; SmimeIndividualValidated drops serialNumber, OID .4.3, validity 825d; lib.rs top-level table updated; free-function rustdoc tables updated; gen-smime-tier-fixtures.py regenerated fixtures (Sponsor fixtures carry organizationIdentifier, both tier OIDs are .3); CHANGELOG and divergences.md updated. cargo test -p pkix-profiles-cabf passes 50 unit + 9 integration tests. Workspace-wide cargo test --workspace --all-features passes. clippy --all-features --all-targets -D warnings clean on pkix-profiles-cabf. Pre-existing fmt issue in pkix-truststore/tests/serde_round_trip.rs unrelated and out of scope. Pre-existing rustdoc warning on Self::lint_runner intra-doc link unrelated. Commit 79417054.",
+  "closed_at": "2026-05-14T00:53:56Z",
+  "compaction_level": 0,
+  "content_hash": "0d1bfb2ab5dbc284ddd55044847bd60ceb3f9dfa6c285a2948084573340a791c",
+  "created_at": "2026-05-14T00:35:38Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nImplementation work resolving PKIX-jbvb.6. Mark's decision: refined Option A \u2014\nswitch shipped Sponsor/Individual tier types from Legacy OID `.1` to Strict\nOID `.3`, fix adjacent spec-conformance bugs (organizationIdentifier missing\nfor Sponsor, serialNumber over-strict for both, validity period wrong for\nLegacy), and also fix SmimeProfile's latent Legacy/Strict validity mismatch.\n\n## Scope\n\n### `pkix-profiles-cabf/src/lib.rs`\n\n1. **Add `OID_ORGANIZATION_IDENTIFIER`** crate-private constant (2.5.4.97).\n\n2. **Rename + revalue tier policy OID constants:**\n   - `CABF_SMIME_SPONSOR_VALIDATED_POLICY` \u2192 `CABF_SMIME_SPONSOR_VALIDATED_STRICT_POLICY`\n     - Value: `2.23.140.1.5.3.1` \u2192 `2.23.140.1.5.3.3`\n   - `CABF_SMIME_INDIVIDUAL_VALIDATED_POLICY` \u2192 `CABF_SMIME_INDIVIDUAL_VALIDATED_STRICT_POLICY`\n     - Value: `2.23.140.1.5.4.1` \u2192 `2.23.140.1.5.4.3`\n   - Both are crate-private; rename is internal-only.\n\n3. **Update `SmimeProfile`:**\n   - `max_validity_secs`: 1185 \u2192 825 days (BR \u00a76.3.2 Strict cap).\n   - Rustdoc: clarify \"targets Mailbox-validated Strict generation.\"\n   - Limitations: add note that Legacy issuance was banned 2025-07-15 (\u00a77.1.6.1).\n\n4. **Update `SmimeSponsorValidated`:**\n   - `required_leaf_policy_oids`: use new STRICT constant.\n   - `max_validity_secs`: 1185 \u2192 825.\n   - DN rule: `AllOf(organizationName, organizationIdentifier, AnyOf(pseudonym, AllOf(givenName, surname)))`.\n     - **Add** `organizationIdentifier` (SHALL across all generations per \u00a77.1.4.2.5).\n     - **Remove** `serialNumber` (MAY in all generations).\n   - Rustdoc: cite \u00a77.5 Strict tier, OID `.3.3`, updated DN rule.\n\n5. **Update `SmimeIndividualValidated`:**\n   - `required_leaf_policy_oids`: use new STRICT constant.\n   - `max_validity_secs`: 1185 \u2192 825.\n   - DN rule: `AnyOf(pseudonym, AllOf(givenName, surname))`.\n     - **Remove** `serialNumber` (MAY in all generations per \u00a77.1.4.2.6).\n   - Rustdoc: cite \u00a77.6 Strict tier, OID `.4.3`, updated DN rule.\n\n6. **Update lib.rs top-level table (lines 67-72)** with new OIDs and DN rules.\n\n7. **Update free-function rustdoc tables** (`smime_individual_policy`,\n   `smime_sponsor_policy`) \u2014 validity, OIDs, DN rules.\n\n8. **Update inline `#[cfg(test)] mod tests`:**\n   - Rename `*_max_validity_is_1185_days` tests to `*_is_825_days` and update expected value.\n   - Update constant references to new `_STRICT_POLICY` names.\n   - Fixture-loading tests will fail until fixtures are regenerated (see below).\n\n### `pkix-path/tests/fixtures/policy-checks/gen-smime-tier-fixtures.py`\n\n1. Change Sponsor OID `2.23.140.1.5.3.1` \u2192 `2.23.140.1.5.3.3`.\n2. Change Individual OID `2.23.140.1.5.4.1` \u2192 `2.23.140.1.5.4.3`.\n3. Add `organizationIdentifier` attribute to both Sponsor fixtures.\n4. Update docstring to reflect Strict tier targeting.\n5. Re-run script to regenerate fixtures.\n\n### `pkix-profiles-cabf/CHANGELOG.md`\n\nAdd `### Changed` section under `[Unreleased]`:\n- OID constants renamed and revalued (Legacy `.1` \u2192 Strict `.3`).\n- `max_validity_secs` corrected from 1185d (Legacy) to 825d (Strict).\n- Sponsor DN rule: added `organizationIdentifier` SHALL.\n- Sponsor + Individual DN rules: dropped `serialNumber` from SHALL (it is MAY).\n- SmimeProfile validity corrected (same Legacy/Strict mismatch).\n\n### `pkix-profiles-cabf/divergences.md`\n\nUpdate \"Sub-profile families partially split\" section:\n- Reflect Strict targeting for all three Profile types.\n- Reference \u00a77.1.6.1 Legacy ban (2025-07-15).\n- Note `-cabf` does not ship Legacy-tier profile types.\n\nUpdate \"S/MIME and CS max_validity_secs\" section: 1185 \u2192 825 for SmimeProfile.\n\n## Acceptance\n\n- All edits land per the scope above.\n- `cargo test -p pkix-profiles-cabf --all-features` passes.\n- `cargo clippy -p pkix-profiles-cabf --all-features --all-targets -- -D warnings` clean.\n- `cargo fmt --all` clean.\n- `pkix-path/tests/fixtures/policy-checks/gen-smime-tier-fixtures.py` regenerated; new DER files committed.\n- CHANGELOG entry under `[Unreleased]` reflects all changes.\n- `divergences.md` updated.\n- Commit message: `fix(pkix-profiles-cabf): switch S/MIME tier profiles from Legacy .1 to Strict .3`\n\n## Cross-references\n\n- PKIX-jbvb.6 (decision)\n- PKIX-jbvb.2 (Sponsor implementation that needs correction; was closed prematurely)\n- PKIX-jbvb.3 (Individual implementation that needs correction; was closed prematurely)\n- AGENTS.md non-negotiable #5 unprincipled-exception clause\n- AGENTS.md spec-taxonomy principle (PKIX-mzsk)\n- specs/cabforum-smime-BR.md \u00a77.1.6.1 (Legacy ban), \u00a77.1.4.2.5 (Sponsor DN), \u00a77.1.4.2.6 (Individual DN), \u00a76.3.2 (validity)\n\n## Not in scope\n\n- Multi-generation surface (filed as PKIX-jbvb.8).\n- `SmimeOrganizationValidated` tier (still tracked under PKIX-jbvb.1 \u2014 separate bead).\n- Adding `required_leaf_policy_oids` to `SmimeProfile` (would be a behavior change for the most-used existing type; deferred unless explicitly requested).\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: fix S/MIME tier OID/predicate mismatch \u2014 switch to Strict (.3)",
+  "updated_at": "2026-05-14T00:53:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T17:35:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T17:36:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

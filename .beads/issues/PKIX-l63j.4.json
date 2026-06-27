@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a108f676d1f7ca6a3fcc2b21d68900e3d14a4a0cc2f5a45d605bcd13fbcc5e33",
+  "created_at": "2026-05-08T20:49:26Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSubset of PKIX-l63j epic. PKITS contains zero non-ASCII / non-PrintableString DN fixtures; new test coverage for BMPString and Unicode-normalized DN comparison must come from a synthetic corpus.\n\n## What\n\nBuild synthetic fixtures:\n- chains where intermediate Subject DN uses BMPString or UTF8String for non-ASCII CN\n- mixed-encoding chains: PrintableString in one cert, BMPString in another with same logical Unicode\n- canonical-equivalence pairs: precomposed vs decomposed accented Latin\n- T61String corpus (if PKIX-l63j.3 chooses to support it)\n\nGeneration: OpenSSL with custom asn1conf, or pyca/cryptography `x509.NameAttribute(... _ASN1Type.BMPString)`. Document the generation script for reproducibility. Commit DER fixtures.\n\n## Acceptance\n\n- See parent PKIX-l63j acceptance.",
+  "ephemeral": 0,
+  "id": "PKIX-l63j.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path: foreign-language DN test corpus (BMPString/UTF8String mixed encodings)",
+  "updated_at": "2026-05-08T20:49:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T13:49:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8ad663dd7a0ebcceb72a3549dac9db81d850b85b55f36879eff0faec4399cf57",
+  "created_at": "2026-05-14T17:47:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:191-192, 284-285\n\nPKIX-ppbr.5 already filed this from the bug angle. Filing here too\nto keep the docs-section count accurate. The two error doc lines\nsay:\n\n> `Error::SctTimestampOutsideLogWindow` \u2014 `sct.timestamp_ms` is\n> outside `[log.usable_from_ms, log.retired_at_ms]`.\n\nThe implementation in `log_window_contains` (verify.rs:845-857) is\n`[lo, hi)`. The function-level doc on `log_window_contains` itself\n(verify.rs:837-844) gets this right (\"strictly before\nretired_at_ms\"). The two `# Errors` sections do not.\n\nRecommendation: change `]` to `)` in both `# Errors` sections to\nmatch the implementation. Or fix the implementation per PKIX-ppbr.5\nto match the documented `]`.\n\nThe `opinion` label is here because PKIX-ppbr.5 is already the\nauthoritative tracking and a fix there should resolve this. Filed\nto keep section counts honest.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.38",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Doc on verify_sct_for_cert/precert claims [lo, hi] closed window \u2014 code is [lo, hi) half-open",
+  "updated_at": "2026-05-14T17:47:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:47:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

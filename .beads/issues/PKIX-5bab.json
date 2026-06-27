@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T19:29:06Z",
+  "compaction_level": 0,
+  "content_hash": "9f5162523b14442c67a59dd70f18a04e45c9fc4388311e96734f64fcf9c1a077",
+  "created_at": "2026-05-08T15:20:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nTier 3 of the PKIX-7nsf corpus plan: real-wild chains from a CT log (Cloudflare Nimbus, Let's Encrypt Oak). Very high volume, low signal density, but catches divergences curated corpora miss.\n\n## What\n\nSeparate sub-project (NOT a blocker for PKIX-7nsf parent \u2014 that closes on PKITS + pyca baselines):\n\n1. CT log fetcher: `pkix-difftest/python/fetch-ct.py` (or Rust binary) that hits a CT log's get-entries endpoint and writes chains to a corpus directory.\n2. Corpus loader integration: PEM-tree loader (already done in PKIX-7nsf.4) should handle the dumped chains.\n3. Baseline run + commit (large output, may need separate storage strategy \u2014 e.g., not committed in-tree, just summary).\n\n## Out of scope\n\n- Live monitoring of new CT log entries (that's a service, not a one-shot scrape).\n- BC oracle (still deferred per parent bead).\n\n## Acceptance\n\n- [ ] Fetcher script + docs.\n- [ ] One scraped baseline committed (summary only, raw chains stored externally).\n- [ ] Storage-strategy decision documented.\n\n## Filed as\n\nFollow-up to PKIX-7nsf, deferred per the parent bead's 'Recommended decomposition' steps (8).",
+  "ephemeral": 0,
+  "id": "PKIX-5bab",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked blocked 2026-05-10: bead's own description says this is Tier-3 follow-up to PKIX-7nsf, explicitly deferred. Unblock when PKIX-7nsf parent baseline closes and a CT scrape storage strategy is in scope.\nEscalated to human 2026-05-11 by do-beads autonomous loop: bead acceptance criterion 'Storage-strategy decision documented' is an open architecture choice (in-tree vs LFS vs external-only with manifest, summary-only commit policy, retention/refresh schedule), not autonomously decidable. The implementation work (fetcher script, loader integration, baseline run) is bounded and clear once that choice is made. Recommendation: pick the storage strategy first, then re-open to a fresh autonomous loop.\nRatified 2026-05-11 (Mark): external-only with manifest.\n\nStorage decisions:\n- Scraped corpus lives outside the repo (S3 or equivalent external object store).\n- Repo carries a JSON manifest with content hashes (BLAKE3 or SHA-256) + a summary MD of the differential results.\n- Refresh cadence: quarterly or on-demand (not automated CI).\n- Consistent with how ~/GIT/x509-limbo is handled today (external corpus + in-tree summary).\n\nRejected: in-tree (repo size), LFS (adds tooling complexity), summary-only-no-manifest (loses reproducibility).\n\nImplementation work: fetcher script (pkix-difftest/python/fetch-ct.py or Rust equivalent), corpus loader integration (already in place per PKIX-7nsf.4 PEM-tree loader), one scraped baseline run with summary committed.\n\nReady for autonomous claim. Note: this remains parented under PKIX-hbzo (diff-harness completeness) as a Tier-3 follow-up.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: Tier-3 CT log scrape corpus",
+  "updated_at": "2026-05-11T19:29:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:29:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

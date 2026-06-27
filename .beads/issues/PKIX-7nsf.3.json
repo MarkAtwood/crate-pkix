@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T17:46:40Z",
+  "compaction_level": 0,
+  "content_hash": "e23fcffd0a66a8936402fcd74ad2164516062df1d48bd9e9905dc91ad064b878",
+  "created_at": "2026-05-08T15:18:34Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSecondary external oracle. pyca/cryptography is widely used by Python TLS clients and has documented deliberate divergences from OpenSSL on edge cases (e.g., DN comparison, critical-extension allowlist). AGENTS.md names it as an acceptable oracle.\n\n## What\n\n1. **Python sidecar script**: `pkix-difftest/python/pyca_oracle.py`. Reads a PEM-concatenated chain from stdin (or a chain spec from argv), uses `cryptography.x509.verification.PolicyBuilder` + `Store` to verify, prints JSON `{\"verdict\":\"pass|fail\",\"reason\":<str|null>}` to stdout.\n\n2. **Rust wrapper**: `pkix-difftest/src/oracles/pyca.rs`. Function `verify(chain: &Chain) -> io::Result<Verdict>`:\n   - Locates the Python interpreter to use (priority: $PYCA_DIFFTEST_PYTHON env var \u2192 ./venv/bin/python \u2192 system python3).\n   - Pipes chain PEM to stdin, parses JSON stdout.\n   - Handles non-zero exit, malformed JSON, ImportError as distinct `io::Error` cases (NOT `Verdict::Fail` \u2014 those are harness errors, not verification fails).\n\n3. **Venv bootstrap script**: `pkix-difftest/python/setup-venv.sh`. Idempotent: creates `pkix-difftest/python/.venv`, pip-installs pinned `cryptography>=42.0` (system Python 3.12 has 41.0.7 which lacks `cryptography.x509.verification`). Prints a one-liner the user can `eval` to set $PYCA_DIFFTEST_PYTHON.\n\n4. **README note** (in this child): `pkix-difftest/python/README.md` documents how to run `setup-venv.sh` and what version of pyca is expected.\n\n## Edge cases\n\n- Missing python \u2192 `io::Error`, not panic.\n- pyca version too old \u2192 ImportError surfaces as `io::Error` with a clear message ('install cryptography>=42.0 in the venv').\n- Subprocess hang \u2192 60-second timeout per chain.\n- Chain with non-leaf-first ordering: PolicyBuilder needs leaf separated from intermediates and roots \u2014 Rust wrapper handles the split, sends three sections in JSON over stdin (not raw PEM) so the python script does not have to re-detect ordering.\n\n## Acceptance\n\n- [ ] `pkix-difftest/python/setup-venv.sh` succeeds on fresh checkout.\n- [ ] `pyca_oracle.py` runs as standalone script (smoke: pipe PKITS Test1 chain in, get pass; Test2 with bad sig, get fail).\n- [ ] Rust wrapper returns valid `Verdict` for both fixtures from PKIX-7nsf.1.\n- [ ] Rust wrapper returns `io::Error` (NOT `Fail`) when python missing or pyca too old.\n- [ ] No new deps on pkix-path.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: pyca/cryptography oracle (Python sidecar + JSON IPC + venv setup)",
+  "updated_at": "2026-05-08T17:46:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:18:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

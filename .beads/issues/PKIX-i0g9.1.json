@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:18:01Z",
+  "compaction_level": 0,
+  "content_hash": "ed213d9ac9ad60e7455a5f4d450a1b46de616b6acb7b64e9f006935aefc2ffba",
+  "created_at": "2026-05-07T04:13:58Z",
+  "created_by": "Mark Atwood",
+  "description": "root dir \u2014 The file rust_out (3.9 MB ELF executable, not stripped) is present in the workspace root and is not listed in .gitignore. Only /target/ is gitignored. Running 'git status' will show rust_out as an untracked file every session and it risks accidental commit. Add 'rust_out' (or '/rust_out') to .gitignore.",
+  "ephemeral": 0,
+  "id": "PKIX-i0g9.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rust_out binary not in .gitignore",
+  "updated_at": "2026-05-07T04:18:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:13:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-i0g9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

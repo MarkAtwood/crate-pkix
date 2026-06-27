@@ -1,0 +1,68 @@
+{
+  "acceptance_criteria": "All four cargo test commands exit 0. cargo clippy exits 0 with no warnings. cargo fmt --check exits 0. No uncommented unwrap() in production code paths of the five new check blocks.",
+  "assignee": "Mark Atwood",
+  "close_reason": "All cargo test, clippy, and fmt checks pass across pkix-path, pkix-chain, pkix-profiles. No unwrap() in production code of new policy checks. All 5 new fields have rustdoc.",
+  "closed_at": "2026-05-06T05:00:50Z",
+  "compaction_level": 0,
+  "content_hash": "53f80464d7f8d3a5b1be68c5031836b4dbe79f48b19a28817e78dd35af843e51",
+  "created_at": "2026-05-06T03:46:50Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Verify the complete pkix-path (and dependent crate) test suites pass without modification after the five new policy fields are added and enforced.\n\n**Algorithm:**\n1. Run the full test suite for all affected crates:\n   ```bash\n   cargo test -p pkix-path --all-features 2>&1\n   cargo test -p pkix-chain --all-features 2>&1\n   cargo test -p pkix-profiles --all-features 2>&1\n   cargo test -p pkix-chain-simple --all-features 2>&1\n   ```\n2. Also run clippy on all affected crates:\n   ```bash\n   cargo clippy -p pkix-path --all-features -- -D warnings 2>&1\n   cargo clippy -p pkix-chain --all-features -- -D warnings 2>&1\n   ```\n3. Run rustfmt check:\n   ```bash\n   cargo fmt -p pkix-path -- --check 2>&1\n   ```\n4. Verify no new `unwrap()` calls were introduced in non-test code:\n   ```bash\n   grep -n 'unwrap()' pkix-path/src/lib.rs | grep -v '// '\n   ```\n   Every `unwrap()` in production code must have a comment explaining why it is unreachable. If any new uncommented `unwrap()` calls exist, they are a defect \u2014 file a follow-up or fix inline.\n5. Check that the five new policy fields all have rustdoc comments.\n\n**Defensive programming rules:**\n- This bead does NOT modify any code. It only runs verification commands and reports failures.\n- If any test suite fails: stop, report the failure with the exact test name and error message, and do NOT mark this bead closed.\n- If clippy reports warnings: report the exact warning text. Do not suppress with `#[allow]` \u2014 fix the source.\n\n**Subagent instructions:**\n- This bead is single-threaded: run the commands sequentially, report all results.\n- Do NOT modify test files to make failing tests pass. If a previously-passing test now fails due to the new code, that is a defect in the implementation beads \u2014 surface it to the human.\n\n**Tests:** N/A \u2014 this bead is itself the validation step.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Regression: full test suite passes with all new policy fields",
+  "updated_at": "2026-05-06T05:00:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:46:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.10",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.11",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.12",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.13",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.9",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

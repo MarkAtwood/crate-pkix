@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b535db639cd7d2c0ae3efdf254e8c27d0b98f85d976358fcc790c87f62e6fb33",
+  "created_at": "2026-05-14T18:29:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:1014-1018 in build_first_valid_path_with_config: when the PathCandidates iterator yields Some(Err(BudgetExceeded)) AFTER some candidates have been tried and rejected, the function returns Err(BudgetExceeded) verbatim, dropping the accumulated `tried` counter and the `last_error` String. The rustdoc explicitly endorses this (\"We do NOT wrap these in NoValidPath because they describe failures of the topological search\") and the reasoning is internally consistent. Operational consequence: a user debugging a builder that tried 47 candidates and ran out of budget gets exactly the same error report as a user whose first frame ran out of budget. Diagnostics for adversarial pools, performance investigations, and post-mortems all degrade. Possible fix: add a new variant Error::BudgetExceededAfterCandidates { tried: usize, last_error: String } or extend BudgetExceeded with these fields (breaking, but Error is #[non_exhaustive]). At minimum, this tradeoff deserves to be called out in build_first_valid_path's rustdoc as a known-debug-limitation so future debugging sessions don't waste time looking for the missing diagnostic state.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "BudgetExceeded mid-iteration loses partial diagnostic state (tried count + last_error)",
+  "updated_at": "2026-05-14T18:29:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

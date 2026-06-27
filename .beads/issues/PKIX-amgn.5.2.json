@@ -1,0 +1,38 @@
+{
+  "close_reason": "Superseded by PKIX-amgn.5 commit c70821b4: cabf_tls_br.rs moved from pkix-lint to pkix-lint-cabf (git mv); pkix-lint-cabf/src/lib.rs declares pub mod cabf_tls_br; pkix-lint/src/lib.rs dropped the module decl (was L219); use crate::{...} rewritten to use pkix_lint::{...} (added Profile + ValidationPolicy to the re-export to avoid pulling pkix-path as a direct dep); pkix-profiles-cabf dropped from pkix-lint/Cargo.toml [dependencies] and [dev-dependencies]; pkix-lint/src/rfc5280.rs rustdoc updated. Workspace cargo check --all-features clean.",
+  "closed_at": "2026-05-12T01:39:27Z",
+  "compaction_level": 0,
+  "content_hash": "3b75ba7107b596038446de8fc57d5eea2ae145021c9beaaae495641e95dfb795",
+  "created_at": "2026-05-11T22:50:48Z",
+  "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "description": "## Why\n\nPKIX-amgn.5 stripping step. After PKIX-amgn.5.1 prepares the destination crate, this bead does the mechanical file relocation.\n\n## What\n\n1. `git mv pkix-lint/src/cabf_tls_br.rs pkix-lint-cabf/src/cabf_tls_br.rs`.\n2. In `pkix-lint-cabf/src/lib.rs`, add `pub mod cabf_tls_br;`.\n3. In `pkix-lint/src/lib.rs`, drop `pub mod cabf_tls_br;` (currently L219).\n4. Inside the moved `cabf_tls_br.rs`, rewrite `use crate::{Lint, LintProfile, LintResult, LintRunner, Scope, Severity, SubjectKind}` \u2192 `use pkix_lint::{Lint, LintProfile, LintResult, LintRunner, Scope, Severity, SubjectKind}`.\n5. Remove `pkix-profiles-cabf` from `pkix-lint/Cargo.toml`'s `[dependencies]` (currently L29) and `[dev-dependencies]` (currently L45).\n6. Update `pkix-lint/src/rfc5280.rs` rustdoc (L19, L21\u201322) to point at `pkix_lint_cabf::cabf_tls_br` rather than `crate::cabf_tls_br`.\n\n## Acceptance\n\n- [ ] `pkix-lint` compiles cleanly without `cabf_tls_br` (`cargo check -p pkix-lint --all-features`).\n- [ ] `pkix-lint-cabf` exposes `pub mod cabf_tls_br` with all six lints + `CabfTlsBrProfile` + `all_lints()` (`cargo check -p pkix-lint-cabf`).\n- [ ] `pkix-lint-cabf/Cargo.toml` carries the deps from PKIX-amgn.5.1.\n\n## Out of scope\n\n- Integration tests file move \u2014 PKIX-amgn.5.3 (it's coupled with a design decision about test policy).\n- README / rustdoc reframe \u2014 PKIX-amgn.5.4.\n- Version bumps + CHANGELOG \u2014 PKIX-amgn.5.5.\n- Six framework unit tests in `pkix-lint/src/oscal/catalog.rs` and `pkix-lint/src/oscal/profile.rs` that import `crate::cabf_tls_br::all_lints` \u2014 these break in this bead and are resolved in .5.3 (per the design call there).\n\n## Depends on\n\nPKIX-amgn.5.1.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.5.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Move cabf_tls_br.rs from pkix-lint to pkix-lint-cabf",
+  "updated_at": "2026-05-12T01:39:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T15:50:48Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T15:51:48Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

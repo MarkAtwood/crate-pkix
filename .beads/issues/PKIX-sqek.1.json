@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:29Z",
+  "compaction_level": 0,
+  "content_hash": "b42cbb940b750efd531da3c6b1b4336114c43bb21ddeba468f38666af4fb0342",
+  "created_at": "2026-05-14T17:57:27Z",
+  "created_by": "Mark Atwood",
+  "description": "TRIGGER: caller-supplied chain has an AIA-recoverable defect (e.g. missing intermediate \u2192 ChainBroken/NoTrustedPath/SignatureInvalid) AND the leaf or another cert is expired (or has any non-recoverable cert-level defect like NameConstraintViolation, KeyUsageMissing, PolicyViolation).\n\nFLOW: Verifier::verify_one fast path runs pkix_path::validate_path. The 'cheap' defect (e.g. ChainBroken because intermediate is missing) surfaces FIRST because validate_path checks chain linkage before it does per-cert validity/EKU/etc. checks on every cert. is_aia_recoverable() says 'true' \u2192 slow path build_with_aia runs. AIA succeeds in fetching the missing intermediate, augments the pool, then pkix_path_builder::build_first_valid_path runs validate_path on the built chain. validate_path now sees the leaf is expired and returns Err. build_first_valid_path translates this to Error::NoValidPath{tried, last_error: String}, which build_with_aia propagates as Error::PathBuild(NoValidPath { ... }).\n\nBAD BEHAVIOR: The error surfaced is Error::PathBuild(NoValidPath {tried: 1, last_error: 'validity period check failed at chain index 0'}) instead of Error::Path(pkix_path::Error::ValidityPeriod {index: 0}) that the fast path would have produced if the chain had been complete to begin with. Callers pattern-matching on Error::Path(_) \u2014 including the test e2e_verify_chain_default_expired_returns_validity_error and any downstream consumer doing the same \u2014 get a different variant for the SAME underlying cert defect depending on whether the caller happened to supply a complete chain or an incomplete one.\n\nWorse, the inner pkix_path::Error is downgraded to a String inside NoValidPath, so callers cannot programmatically distinguish ValidityPeriod from NameConstraintViolation from PolicyViolation after a slow-path build. This is a real information regression introduced by PKIX-zkjb.7, not just a cosmetic variant difference.\n\nFIX OPTIONS: (a) in build_with_aia, on NoValidPath, parse the inner string and translate back into a pkix_path::Error variant (brittle); (b) call pkix_path::validate_path before invoking the AIA loop on each candidate so we can capture the structured error (already done \u2014 but the structured error is lost when we route through build_first_valid_path); (c) bypass build_first_valid_path entirely when the only AIA-recoverable error was SignatureInvalid or NoTrustedPath and walk candidates manually; (d) document the behavior change and update is_aia_recoverable to NOT include any error variant whose retry might mask a cert-level defect.\n\nThe current AGENTS.md non-negotiable #6 also names `Error` as a public result type that must be Clone+Debug+PartialEq+Eq+serializable. NoValidPath's String 'last_error' field is already a downgrade from a structured inner error to a Display string \u2014 it has the same root cause.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_one slow-path validity errors surface as PathBuild instead of Path(ValidityPeriod)",
+  "updated_at": "2026-06-04T19:32:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:57:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

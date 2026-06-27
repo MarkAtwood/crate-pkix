@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision recorded in rustdoc; PartialEq warning reinforces the same design",
+  "closed_at": "2026-05-02T22:03:43Z",
+  "compaction_level": 0,
+  "content_hash": "cc94af40fb7792104d71e0f287c56061b147aacb5ea814070e6be23919c7a9fd",
+  "created_at": "2026-05-02T21:58:22Z",
+  "created_by": "Mark Atwood",
+  "description": "spki_key_matches compares algorithm.oid + subject_public_key (ignoring parameters). This is correct and worth defending: (1) RFC 3279 \u00a72.3.1 explicitly allows both NULL and absent for rsaEncryption, making parameter comparison overly strict for RSA. (2) For ECDSA, two keys on different curves have different key byte lengths, so OID+bytes is still sufficient to distinguish them even without comparing the curve-OID in parameters. (3) The docstring captures both of these justifications. A future contributor might suggest using full AlgorithmIdentifier comparison or adding a parameter normalization step \u2014 both would be regressions.",
+  "ephemeral": 0,
+  "id": "PKIX-c2p.3",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID+key comparison for anchor guard is the correct relaxation",
+  "updated_at": "2026-05-02T22:03:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T14:58:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-c2p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

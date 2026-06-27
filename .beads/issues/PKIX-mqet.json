@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Made CtLogList::new and DeviationStore::new const fn, matching the precedent set by CertPool::new in pass-2. Both are trivial constructors over fields that are const-initializable (unit struct / Vec::new()). No API or behavior change.",
+  "closed_at": "2026-05-07T23:26:15Z",
+  "compaction_level": 0,
+  "content_hash": "e07a706209b01be17f7556ed4a9f5fd38e074266b286015e89ecf4bd17495ae2",
+  "created_at": "2026-05-07T23:04:03Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPKIX-qwzx (pass 2) commit message claims: 'CertPool::new is const fn with FromIterator + Extend'. The const-fn change at pkix-path-builder/src/lib.rs:69 was an idiom cleanup \u2014 Vec::new() is const since 1.39, so a constructor that only initializes a Vec field can be const fn.\n\n## Finding\nThe same idiom applies to two other constructors that pass-2 did not touch:\n\n1. **pkix-ct/src/lib.rs:51** \u2014 CtLogList::new\n   ```\n   pub fn new() -> Self { Self::default() }\n   ```\n   CtLogList has no fields (line 44 \u2014 comment-only struct). The body uses Self::default() because Default::default() is not const-callable in this context. Could be:\n   ```\n   pub const fn new() -> Self { Self {} }\n   ```\n   Trivial change; same shape as CertPool::new.\n\n2. **pkix-lint/src/deviation.rs:525** \u2014 DeviationStore::new\n   ```\n   pub fn new() -> Self { Self::default() }\n   ```\n   DeviationStore has one field: deviations: Vec<Deviation>. Vec::new() is const, so:\n   ```\n   pub const fn new() -> Self { Self { deviations: Vec::new() } }\n   ```\n   Mirrors CertPool::new exactly.\n\n## Verification\n`grep 'pub (const )?fn new(' pkix-*/src/*.rs` shows the inconsistency clearly:\n- pkix-path-builder/src/lib.rs:69: pub const fn new() \u2014 done in pass-2\n- pkix-path-builder/src/lib.rs:343: pub const fn new() \u2014 PathBuilderConfig, also done\n- pkix-composite/src/lib.rs:72: pub const fn new() \u2014 done\n- pkix-revocation-http/src/lib.rs:114, 145: pub const fn new() \u2014 done\n- pkix-path/src/lib.rs:440: pub const fn new() \u2014 TrustAnchor, done\n- pkix-lint/src/deviation.rs:693: pub const fn new() \u2014 DeviationRunner, done\n- pkix-ct/src/lib.rs:51: pub fn new() \u2014 MISSED\n- pkix-lint/src/deviation.rs:525: pub fn new() \u2014 MISSED\n- pkix-path/src/lib.rs:681: pub fn new() \u2014 ValidationPolicy. Body uses ..Default::default() over a 13-field struct; making it const requires writing out all 13 field initializers. Less compelling, separate finding if anything.\n- pkix-revocation/src/{crl,ocsp}.rs:127, 102: pub fn new() \u2014 body returns Result<Self>, depends on parsing, cannot be const. Correctly non-const.\n- pkix-lint/src/lib.rs:610, src/report.rs:139: pub fn new() \u2014 bodies do non-const work (debug_assert, Vec::new with checks, Cow). Acceptable as non-const.\n\n## Severity\nP3 (idiom / consistency). const-fn constructors are useful for static initialization and for callers that want to embed the type in const contexts. The benefit is small but the change is mechanical and matches a precedent set by pass-2 for the same shape of constructor.\n\n## Fix\nFor each of the two missed constructors:\n1. Add 'const' before 'fn new'.\n2. Replace Self::default() with the explicit Self { ... } literal whose fields are all const-initializable (Vec::new(), unit fields).\n\nNo API or behavior change \u2014 purely additive (const fn is a strict superset of fn for callers).",
+  "ephemeral": 0,
+  "id": "PKIX-mqet",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: pass-2 const-fn cleanup incomplete: CtLogList::new and DeviationStore::new still non-const while CertPool::new is const",
+  "updated_at": "2026-05-07T23:26:15Z"
+}

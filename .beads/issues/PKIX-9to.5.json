@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:25:15Z",
+  "compaction_level": 0,
+  "content_hash": "17ac4aec810a40159ada4464039ba955fda965191fe19ea82098bd704c804954",
+  "created_at": "2026-05-06T22:15:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/.. deviation.rs: DeviationScope::IssuerDnContains requires the stored substring to be pre-lowercased (documented), but DeviationStore::add does NOT validate this invariant. An operator who writes DeviationScope::IssuerDnContains('Agency X'.to_string()) (mixed case) will have a deviation that silently matches nothing \u2014 the scope check always returns false. The test at deviation.rs:943 explicitly tests and documents the silent failure. This creates a silent security gap: the operator believes a deviation is in effect but it never fires. DeviationStore::add should either auto-lowercase the substring or return DeviationAddError for a non-lowercased IssuerDnContains scope.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains accepts uppercase substring silently matches nothing",
+  "updated_at": "2026-05-06T22:25:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:15:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

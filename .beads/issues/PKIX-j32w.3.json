@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "39d7d971c498f2f78de5fb885ea82cbda6b554dc43d057c35117ce1248cc0eaf",
+  "created_at": "2026-05-12T19:24:11Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nWire DANE into pkix-chain's verify_tls_server (PKIX-fmtv.11) via the layered control model from Mark 2026-05-12.\n\n## Cargo feature\n\n`pkix-chain/Cargo.toml`:\n\n```toml\n[features]\ndefault = [\"dane\"]\ndane = [\"dep:pkix-dane\", \"dep:pkix-dane-resolver\"]\n```\n\nWhen `dane` is enabled (default), verify_tls_server attempts DANE. When disabled, verify_tls_server is pure-PKIX behavior.\n\n## Runtime config\n\nverify_tls_server gains a config struct (or builder) carrying DANE state:\n\n- Resolver override (default: built-in pkix-dane-resolver with sensible config)\n- Enable/disable toggle (runtime override of the compile-time default)\n- Failure-mode policy (depends on .4)\n\nConceptual API:\n\n```rust\nverify_tls_server(chain, anchors, hostname, port, now, &verifier, &rev_checker)\n    // -> DANE-default if compile-time enabled, runtime can override\n\nverify_tls_server_with_config(chain, anchors, hostname, port, now, &verifier, &rev_checker, &dane_config)\n    // -> explicit config for callers who care\n```\n\nOR builder pattern:\n\n```rust\nTlsServerVerifier::new(anchors)\n    .with_resolver(custom_resolver)\n    .with_dane_off()\n    .verify(chain, hostname, port, now, ...)\n```\n\nBuilder shape vs args shape is a sub-decision; file separately if needed.\n\n## DANE flow inside verify_tls_server\n\n1. If `dane` feature off OR runtime config dane=false: pure PKIX path (current behavior).\n2. Else:\n   a. Resolve TLSA records via configured resolver.\n   b. If DNS/DNSSEC fails: apply failure-mode policy (.4 decision).\n   c. If TLSA records absent: pure PKIX path (treat as no constraint).\n   d. If TLSA records present: dispatch by usage:\n      - DANE-EE (usage 3): match leaf hash; if match, return Ok bypassing chain validation.\n      - DANE-TA (usage 2): synthesize TrustAnchor; add to anchor set; run verify_chain.\n      - PKIX-TA (usage 0): run verify_chain; assert chain transits through TLSA-named CA.\n      - PKIX-EE (usage 1): run verify_chain; assert leaf matches TLSA.\n      - Multiple records: try in policy-defined order.\n\n## Depends on\n\n- PKIX-j32w.1 (pkix-dane)\n- PKIX-j32w.2 (pkix-dane-resolver)\n- PKIX-fmtv.11 (verify_tls_server foundation)\n- PKIX-j32w.4 (failure-mode decision)\n- PKIX-j32w.5 (DNS config source decision)\n\n## Acceptance\n\n- [ ] Cargo feature `dane` exists, default-on\n- [ ] verify_tls_server attempts DANE when feature on and runtime config allows\n- [ ] verify_tls_server is pure-PKIX when feature off\n- [ ] All four DANE usages exercised in tests\n- [ ] CHANGELOG entry flagging the dep tree growth\n- [ ] AGENTS.md crate inventory updated to reflect pkix-chain's new shape\n\n## Stub status\n\nFuture work. Blocks on .1 + .2 + PKIX-fmtv.11. Decision-children .4 + .5 needed before this lands.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "pkix-chain: add dane Cargo feature default-on + runtime config in verify_tls_server",
+  "updated_at": "2026-05-13T00:20:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:24:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

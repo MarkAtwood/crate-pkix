@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:00:10Z",
+  "compaction_level": 0,
+  "content_hash": "b19121811a758aab9b1c35f376879fec86551c19194b914ae9f7783dcb8f8814",
+  "created_at": "2026-05-06T20:48:31Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: When the 'serde' feature is enabled, DeviationAction, DeviatedFinding, and EvaluationReport all derive Serialize/Deserialize. However Deviation (pkix-lint/src/deviation.rs:65), DeviationScope (line 193), and DeviationStore (line 411) do NOT have #[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]. This asymmetry means a caller who enables 'serde' to serialize EvaluationReport (which contains DeviatedFinding) cannot serialize the underlying Deviation store itself \u2014 there is no way to export or restore the deviation configuration. The module doc comment at line 38-57 describes a use case of attaching deviations to audit packs, which implies serialization of the full deviation store is desirable. Fix: add serde derives to Deviation, DeviationScope, and DeviationStore under the 'serde' feature flag.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: DeviationStore not serde-serializable despite fields that are",
+  "updated_at": "2026-05-06T21:00:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

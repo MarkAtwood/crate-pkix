@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:27:02Z",
+  "compaction_level": 0,
+  "content_hash": "4a1af5f715190fa06df0e574c6828b46d4b73ea965d33e52b127205b349ac166",
+  "created_at": "2026-05-06T22:17:03Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:256: IssuerDnContains variant doc says 'The stored substring must be pre-lowercased' but this is a hidden invariant with no enforcement. The test at line 943 explicitly tests the silent-failure behavior with an uppercase substring. A contributor reading only the struct definition and not the full doc would not know this constraint. The fix: either auto-lowercase in DeviationStore::add (most operator-friendly), or return DeviationAddError::InvalidScope for uppercase IssuerDnContains substrings, or at minimum add an assert_debug in the matches() path.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains 'pre-lowercased' invariant not checked at construction time",
+  "updated_at": "2026-05-06T22:27:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:17:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T01:57:51Z",
+  "compaction_level": 0,
+  "content_hash": "44dfe498f483e0d8a20636c0bc19ac6e860eb1a3693f4be05d3ee753aebe8919",
+  "created_at": "2026-05-12T02:42:38Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (implement `VerifyReport` emit + optional OSCAL Assessment Results compat) is moot for the report-shape question (see `.5`). The existing `ValidatedPath` and `Error` types have basic `Display`/`Debug`, but the new error variants added by `.11`/`.12` (hostname binding failures, mailbox binding failures, etc.) need `Display` impls too.\n\nWhat remains:\n\n- **`Display` impls** on any new error variants added by `.11`/`.12`/`.13`. Human-readable single-line summaries: \"hostname `evil.com` does not match SAN entries\", \"mailbox `alice@example.com` not in SAN rfc822Name set\", etc.\n\n- **`Debug` impls** with full structured output for new error variants.\n\n- **If `.5` chose option B or C (structured findings):** ship `VerifyReport` emit. Display impl for human-readable summary. Optional JSON serializer behind a `serde-json` feature. Possible OSCAL Assessment Results JSON emit behind feature-gated `oscal-emit` cargo feature (connects to PKIX-ncab \u2014 OSCAL is one supported emit format, not canonical).\n\n- **If `.5` chose option A (pass-through Result):** no structured-report work; just the Display/Debug impls above.\n\n**Blocks on:** `.5` (decides whether structured-findings emit happens).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Display/Debug impls for new error variants + optional findings emit",
+  "updated_at": "2026-05-13T01:57:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:44:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1b79f22e0c7e26379b11c6d5f77defb503147130c650870ad348b61e3ee1915b",
+  "created_at": "2026-05-14T18:09:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:693-708 (Verifier::verify_batch):\n\n    /// This is a sequential loop over [`Verifier::verify_one`]; the\n    /// chains do not share any per-validation state. Callers requiring\n    /// cross-chain caching (memoised path-builder candidates,\n    /// revocation lookups, etc.) should layer that on top of\n    /// `verify_one` or inside their [`SignatureVerifier`] /\n    /// [`RevocationChecker`] implementations.\n    pub fn verify_batch(&self, chains: &[&[Certificate]]) -> Vec<crate::Result<ValidatedPath>> {\n        chains.iter().map(|chain| self.verify_one(chain)).collect()\n    }\n\nThe rustdoc explicitly commits to \"sequential loop\" semantics. That word locks in two contract clauses:\n\n1. **Ordering visibility.** Side-effecting callback implementations (a SignatureVerifier that logs each invocation; an AiaFetcher that batches HTTP requests in a connection pool; a RevocationChecker that emits metrics) observe their callbacks in chain[0]-first, chain[N-1]-last order. A caller relying on observed ordering for diagnostics or batching is depending on the API.\n\n2. **Error-isolation contract.** \"failures in one chain do not abort the others\" is documented (line 696). The Vec<Result> shape ALREADY communicates this. The \"sequential\" addition pins ordering BEYOND error-isolation.\n\nWHY IT MATTERS:\n\nAGENTS.md non-negotiable #6 names \"Batch APIs where setup cost is non-trivial\" as a supported pattern. The future-proof shape for batch is rayon-able: `chains.par_iter().map(...).collect()` with the same `Vec<Result>` output. The current rustdoc says that is **not** what verify_batch does. A future contributor who tries to flip to par_iter for performance has to either:\n\n- Break the documented \"sequential\" promise (and any caller depending on observed ordering); or\n- Add a NEW method (verify_batch_parallel?) and live with both forever.\n\nThe actual implementation is \"map over a slice and collect\" \u2014 there's no semantic reason it has to be sequential. The doc commitment is the only thing preventing a non-breaking switch.\n\nThe docstring also says \"the chains do not share any per-validation state\" which IS a real constraint (callbacks must be Send+Sync \u2014 which PKIX-sqek.8 separately addresses). That part is sound.\n\nOPTIONS:\n\n(a) Drop the word \"sequential\" \u2014 say \"the chains are verified independently; the result Vec has the same length and order as the input.\" That preserves the order-of-results contract (which is necessary; callers consume by index) while leaving evaluation order unspecified. Future parallel evaluation is non-breaking.\n\n(b) Keep \"sequential\" and live with the lock-in. Acceptable if you genuinely intend verify_batch to remain a thin wrapper for simple cases, and a future `verify_batch_parallel` (or `Verifier::with_parallelism(n).verify_batch(...)`) is the parallel path.\n\n(c) Explicitly document \"evaluation order is unspecified and may run in parallel\" \u2014 most flexible, but requires callers to NOT lean on observation order even today.\n\nThis is a SOFT immutability issue \u2014 the function signature isn't locked, just one descriptive word in the rustdoc. But once shipped at 1.0, callers will write code that depends on the word, and removing it becomes a soft-breaking change (\"we used to promise this and now we don't\"). Cheap to fix pre-1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier::verify_batch contract pins 'sequential' ordering \u2014 locks out future parallel impl as non-breaking",
+  "updated_at": "2026-05-14T18:09:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:09:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

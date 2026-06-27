@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-bue.1",
+  "title": "ServerName/MailboxName: no into_owned() or 'static escape hatch",
+  "description": "Lifetime 'a forces caller to hold the borrow forever. No way to get an owned 'static version. Old: PKIX-68mt.21",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:21Z",
+  "updated_at": "2026-06-15T17:54:21Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-bue",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:54:21"
+    }
+  ]
+}

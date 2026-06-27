@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "opinion: 6 bools are intentional RFC 5280 policy switches; no safety gain from refactor",
+  "closed_at": "2026-05-07T16:42:17Z",
+  "compaction_level": 0,
+  "content_hash": "ff04a03539ddafd4b17b5e2499939a871aca71618760f0e584f848a6db0e544f",
+  "created_at": "2026-05-07T16:19:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:510 (ValidationPolicy struct)\n\nClippy pedantic flags this as 'more than 3 bools in a struct'. ValidationPolicy has 6 boolean fields:\n\n  enforce_key_usage: bool,\n  initial_explicit_policy: bool,\n  initial_any_policy_inhibit: bool,\n  initial_policy_mapping_inhibit: bool,\n  require_subject_alt_name: bool,\n  require_rfc822_san: bool,\n\nThis is a design-level flag: many booleans in a struct are a sign that some of them may be better grouped or represented as a bitflags-style type, or that the struct is accumulating policy concerns it should delegate.\n\nWhether to act on this is a judgment call. The current layout is intentional and well-documented. However, the flag should be acknowledged: if any new bool policies are added, the cluster of booleans grows and callers face combinatorial confusion about which flags interact.\n\nA bitflags wrapper for the three RFC 5280 \u00a76.1.1 inhibit/initial flags (initial_explicit_policy, initial_any_policy_inhibit, initial_policy_mapping_inhibit) would reduce the bool count without breaking callers.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.43",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-path: ValidationPolicy has more than 3 bools (clippy::struct_excessive_bools)",
+  "updated_at": "2026-05-07T16:42:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

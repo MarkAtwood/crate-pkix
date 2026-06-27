@@ -1,0 +1,31 @@
+{
+  "close_reason": "Acknowledged decision: pyca/cryptography as independent oracle",
+  "closed_at": "2026-06-15T18:47:55Z",
+  "compaction_level": 0,
+  "content_hash": "394a81480322075ec2520de248e138553dbdf008344e8aed7bfe81138bc42579",
+  "created_at": "2026-05-14T19:15:19Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/fixtures/gen.py uses pyca/cryptography to produce DER fixtures. The Rust verifier under test never participates in fixture creation. README.md and gen.py both call out 'oracle independence' explicitly.\n\nA future contributor will suggest 'we have der + x509-cert in the workspace, why not generate fixtures in Rust to avoid the Python dep?' That suggestion would silently break AGENTS.md's test-integrity rule: tests must have an independent oracle.\n\nDefend: the whole point of the fixture pipeline is that the byte representation of the cert is produced by code that shares zero implementation with pkix-identity. If gen.py were rewritten in Rust using x509-cert, a bug in x509-cert's SAN encoder would correlate with a bug in pkix-identity's SAN decoder, and the test would be self-confirming.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.17",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: independent oracle via pyca/cryptography for fixture generation",
+  "updated_at": "2026-06-15T18:47:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:15:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Integration test added: self_issued_rsa_anchor_absent_params_not_no_trusted_path; verifies guard doesn't return NoTrustedPath for same-key anchor with different param encoding",
+  "closed_at": "2026-05-02T22:02:30Z",
+  "compaction_level": 0,
+  "content_hash": "e9b138ce091c5b89784543e85a969ce97c9b2f67373a813e59a0816b7c37fd25",
+  "created_at": "2026-05-02T21:58:08Z",
+  "created_by": "Mark Atwood",
+  "description": "The unit test (tests_rsa::spki_key_matches_ignores_null_vs_absent_params) validates spki_key_matches in isolation. The guard call site in validate_path (lines 410-417) is not exercised end-to-end for the acceptance case. A regression that reverts the guard from !spki_key_matches(...) back to != would not be caught by any test \u2014 all existing tests would still pass. To cover: add a test in tests_validate_path that builds a TrustAnchor with parameters:None from the RSA cert (same OID + key bytes, absent params), calls validate_path with the cert as chain[0], and asserts Ok(...). The forged_anchor_name_match_spki_mismatch_rejected test covers the rejection direction; the acceptance direction (different encoding, same key) is uncovered.",
+  "ephemeral": 0,
+  "id": "PKIX-c2p.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No validate_path integration test for NULL-vs-absent acceptance path",
+  "updated_at": "2026-05-02T22:02:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T14:58:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-c2p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

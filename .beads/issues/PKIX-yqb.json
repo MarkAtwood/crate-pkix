@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "Spoofing test (same name, wrong SPKI) returns NoTrustedPath. All 4 tests pass.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T06:52:33Z",
+  "compaction_level": 0,
+  "content_hash": "e4141238b792c75a6dc015ac2a2c0f650febe195f76347187322c087e9077a4e",
+  "created_at": "2026-05-02T06:13:53Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement private fn find_trust_anchor(chain, anchors, verifier_context) -> Result<usize>\nthat locates the trust anchor terminating the chain.\n\n## What\n\nWalk anchors[]. For each anchor, check:\n1. anchor.subject DN == chain.last().tbs_certificate.issuer, using names_match() from PKIX-drv.\n2. anchor.subject_public_key_info bytes == chain.last().tbs_certificate.authority_key_identifier's\n   key identifier hash (or direct SPKI comparison after PKIX-o76 lands).\n\nReturn Ok(anchor_index) for the FIRST matching anchor, Err(Error::NoTrustedPath) if none match.\n\n## Security requirement\nName-only matching MUST NOT be used. A self-signed leaf whose subject == anchor.subject\nbut with a different key must be rejected. SPKI comparison is the defense.\nAfter PKIX-o76 TrustAnchor holds (subject_name, spki) directly \u2014 compare both.\n\n## Tests (externally-generated DER hex literals)\n- Single anchor, matching name + SPKI -> Ok(0)\n- Two anchors, second one matches -> Ok(1)\n- Anchor with matching name but different SPKI -> Err(NoTrustedPath)   [security test]\n- Anchor with mismatched name -> Err(NoTrustedPath)\n- Zero anchors -> delegates to check_inputs; guard here is belt-and-suspenders\n\n## Depends on\nPKIX-drv (names_match), PKIX-1tb (trust anchor matching primitives), PKIX-o76 (TrustAnchor shape)",
+  "ephemeral": 0,
+  "id": "PKIX-yqb",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: find_trust_anchor \u2014 subject DN + SPKI matching",
+  "updated_at": "2026-05-02T06:52:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:14:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-1tb",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-drv",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o76",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

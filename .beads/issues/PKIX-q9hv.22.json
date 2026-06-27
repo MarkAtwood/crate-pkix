@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9476a69dd3a26146b16fa20dd005c11b42ee887278fe163caf397976cea94dd4",
+  "created_at": "2026-05-14T14:50:42Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:1535-1541 has a compile-time assertion that `Error: Send + Sync`:\n\n    const _: fn() = || {\n        fn _assert_send_sync<T: Send + Sync>() {}\n        _assert_send_sync::<Error>();\n    };\n\nBut the `Verifier<'a, V, R, A>` struct's Send / Sync properties are\nneither asserted nor documented. The struct holds:\n\n    &'a [TrustAnchor]\n    &'a V                  // V: SignatureVerifier\n    &'a R                  // R: RevocationChecker\n    &'a ValidationPolicy\n    &'a A                  // A: AiaFetcher\n\nIf `V: Send + Sync`, `R: Send + Sync`, `A: Send + Sync`, and the\nreference targets are valid for `'a`, then `Verifier` is `Send + Sync`\ntoo \u2014 but the rustdoc never says so. A caller that wants to use\n`&Verifier` across threads (a natural thing given `verify_batch` is\nsequential and the obvious parallel-batch case is to `rayon::par_iter`\nover chains) has to derive this fact themselves.\n\nTwo issues this raises:\n\n1. The trait bounds on the three plugin traits (`SignatureVerifier`,\n   `RevocationChecker`, `AiaFetcher`) don't require `Send + Sync`.\n   That's correct for `no_std` flexibility (pkix-path is no_std and\n   doesn't want to force `Send + Sync` on its own callers), but it\n   means `Verifier` is only conditionally `Send + Sync`. A caller\n   plugging in a non-Send fetcher (interior `Rc<RefCell<HttpClient>>`)\n   silently produces a non-Send Verifier.\n\n2. The rustdoc on `verify_batch` says it's sequential, with the\n   suggestion to layer threading on top. But it doesn't say *how* to\n   layer threading on top: \\\"is &Verifier shareable?\\\" remains\n   unanswered. A caller has to read the source.\n\nSuggested fix: add a Send + Sync assertion on `Verifier` parameterized\nwith `Send + Sync` plugins, and document the propagation. Something\nlike:\n\n    /// `Verifier` is `Send + Sync` when its plugin types are\n    /// `Send + Sync`. The provided `NoRevocation`, `NoAiaFetcher`,\n    /// and `DefaultVerifier` all satisfy this, so the default\n    /// configuration is shareable across threads.\n\nOptionally an explicit assertion with the default plugin tuple:\n\n    const _: fn() = || {\n        fn _assert<T: Send + Sync>() {}\n        _assert::<Verifier<'static, DefaultVerifier, NoRevocation, NoAiaFetcher>>();\n    };\n\nCaller impact: anyone building a parallel-batch validator (CT log\nbackfill, batch admission control, high-throughput TLS gateway).",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier Send + Sync contract is undocumented",
+  "updated_at": "2026-05-14T14:50:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:50:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

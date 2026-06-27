@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:15Z",
+  "compaction_level": 0,
+  "content_hash": "515ccd601b71509a0e6a72398b807a2373f19fcd358818f61134b2cc51979514",
+  "created_at": "2026-05-06T21:33:45Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1053-1057\n\nlet child_policies: Vec<_> = tree.iter().filter(...).collect();\n// immediately used in tree.retain()\n\nThe collect exists to release the shared borrow before tree.retain() takes a mutable borrow. Without a comment explaining this, future readers will try to eliminate the allocation. Add: // collect to release shared borrow before tree.retain takes &mut",
+  "ephemeral": 0,
+  "id": "PKIX-p23.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M2: prune_policy_tree collect needs borrow-checker comment",
+  "updated_at": "2026-05-06T21:42:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:33:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

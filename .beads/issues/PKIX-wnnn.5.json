@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2b2cebb42e930ccd25322196f32530a0e8580f428b1ab4ef62ccc6113b59d4fd",
+  "created_at": "2026-05-14T18:29:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:195-200 \u2014 NoValidPath carries the inner pkix_path::Error as String (via {e} formatting), justified in the rustdoc by \"so Error retains its Hash derive (the upstream error enum does not implement Hash)\". This is a deliberate tradeoff but locks consumers out of: programmatic match on inner error variants (e.g. detecting SignatureInvalid vs NameConstraintViolation vs TimeNotValid distinctly), serde round-trip preserving the inner variant structure (the String is opaque), and any future caller that wants to retry on specific failure modes. The escape hatch \"drop down to build_path_candidates and call validate_path per candidate themselves\" forces every such consumer to reimplement the iterate-and-validate loop. Two paths forward: (a) make Hash derive on Error optional or drop it (Hash is unused elsewhere in the workspace \u2014 verify), or (b) add a typed last_error field gated by a feature or a separate variant. The Hash derive on Error has no test or doc justification \u2014 search the workspace and confirm whether dropping Hash is acceptable. If it is, NoValidPath { tried, last_error: Box<pkix_path::Error> } is the principled shape. `pkix-chain` already box-wraps a pkix_path_builder::Error so the change does not cascade. Bears on AGENTS.md non-negotiable #6 (cache-friendly serde-round-trippable result types): right now the inner error is unreviewable after serde round-trip.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::NoValidPath { last_error: String } locks consumers out of programmatic match on inner pkix_path::Error",
+  "updated_at": "2026-05-14T18:29:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

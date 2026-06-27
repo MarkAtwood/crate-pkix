@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:55:06Z",
+  "compaction_level": 0,
+  "content_hash": "ee850c3224318543297babbe092790fe5a4f22cb9ce730a9b1650cc0592dc27c",
+  "created_at": "2026-05-07T04:38:10Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-profiles/src/lib.rs line 221, SmimeProfile sets max_validity_secs = Some(1185 * 86_400) with the comment 'approximately 39 calendar months. Approximated as 1185 days; exact calendar-month enforcement requires notBefore date arithmetic not available in ValidationPolicy.' 1185 days = 39.5 months (not 39), and the S/MIME BR actually specifies ~825 days for some certificate types. The approximation should cite the exact S/MIME BR section and ballot version, and the rounding direction (1185 > ~39 months) should be explained as lenient-in-favor-of-cert rather than conservative. This is a documentation/accuracy issue, P3.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.17",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles SmimeProfile approximates calendar months as 1185 days without spec reference for the approximation",
+  "updated_at": "2026-05-07T04:55:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:38:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

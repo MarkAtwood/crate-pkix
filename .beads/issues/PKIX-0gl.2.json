@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:25:01Z",
+  "compaction_level": 0,
+  "content_hash": "2fc569c66edaf0afefa533d3aee90a6dc2c7e0a3c9a60441c38cfa71e5a30b68",
+  "created_at": "2026-05-02T22:20:22Z",
+  "created_by": "Mark Atwood",
+  "description": "Doc specifies BMPString/UniversalString will get full RFC 4518 six-step normalization in v0.2, but currently-supported string types (UTF8String, PrintableString, Ia5String, VisibleString) only get partial normalization (case-fold + space rules, not NFKC + Prohibit + CheckBidi). The doc doesn't clarify whether v0.2 will backfill these to full normalization. This creates design ambiguity that a PR reviewer will challenge. Recommend: clarify in doc whether v0.2 brings all string types to parity or keeps them stratified.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "v0.2 RFC 4518 normalization plan is incomplete across string types",
+  "updated_at": "2026-05-02T22:25:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:42Z",
+  "compaction_level": 0,
+  "content_hash": "46f5f501fa4b9168266724744c72b69683f0277ee1bc755051fdaf2435d76b3e",
+  "created_at": "2026-05-02T14:38:54Z",
+  "created_by": "Mark Atwood",
+  "description": "CrlChecker documents re-parsing the CRL DER on every check_revocation call as a v0.1 limitation. OcspChecker has the same behavior (re-parses response_der on every call) but the limitation is absent from OcspChecker's doc comment. Inconsistent documentation will confuse users reasoning about performance in chains with many certs.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker: re-parse on every call not documented in Limitations",
+  "updated_at": "2026-05-02T14:48:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:38:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

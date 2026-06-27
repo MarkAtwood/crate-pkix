@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:03:29Z",
+  "compaction_level": 0,
+  "content_hash": "51adf1a67644c279930960bfccd7b0332c898620042e55b119b2a6b4869da828",
+  "created_at": "2026-05-06T16:51:20Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/src/crl.rs:229-240\\n\\nWhen the IDP scope flags exclude the certificate being checked (onlyContainsAttributeCerts, onlyContainsUserCerts for CA certs, onlyContainsCACerts for EE certs), the code returns Ok(()). This is semantically 'not covered by this CRL' but Ok(()) is also the return for 'explicitly checked and not revoked.'\\n\\nCallers (pkix-chain) cannot distinguish between 'we checked and it is clean' vs 'this CRL is irrelevant for this cert.' In a hard-fail revocation policy (required by CA/B Forum), 'not covered' should be treated as a revocation status error ('undetermined'), not as 'not revoked.'\\n\\nThis is documented as a limitation ('path validator must hard-fail') in the test comments (e.g., line 596-598). However, the RevocationChecker trait interface (lib.rs:179) returns Result<()> which cannot convey 'not covered' vs 'not revoked.'\\n\\nImpact: In the current design, a caller that uses CrlChecker with an IDP-scoped CRL may silently skip revocation checking for certificates the CRL doesn't cover, treating 'no coverage' as 'not revoked.'\\n\\nFix: Add a third outcome to RevocationChecker: NotCovered (or return a specific error variant), or document the hard-fail requirement more prominently in the RevocationChecker::check_revocation contract. At minimum, the trait doc should state that Ok(()) means 'checked and not revoked' \u2014 callers relying on soft-fail semantics would then know they are responsible for coverage verification.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CRL onlyContainsAttributeCerts/UserCerts returns Ok() without distinguishing not-covered from not-revoked",
+  "updated_at": "2026-05-06T17:03:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

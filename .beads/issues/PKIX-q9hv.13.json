@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c74a050a2591931d1a7c9d561a196be0d99389943eef93a40f23318a8f2965da",
+  "created_at": "2026-05-14T14:39:25Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1235-1279: verify_ocsp_responder takes `issuer: &Certificate` AND `chain: &[Certificate]`. The two arguments must be consistent (chain[0].issuer matches issuer.subject by DN, AND ideally issuer is in the chain so verify_chain's signature check covers it) but the function does NOT enforce that issuer is in chain. The rustdoc at lines 1286-1290 hand-waves: 'The cryptographic signature check ... is already covered by verify_chain when issuer appears in the chain.' But the function doesn't VERIFY that issuer appears in chain \u2014 a caller can pass a completely orphan `issuer` cert that DN-matches chain[0].issuer without ever being in the chain or anchors. Then the wrapper returns Ok even though the supposed-issuer never signed anything. This is closely related to PKIX-q9hv.3 (DN-match insufficient). Two layers of fix: (a) the spec-correct delegation pinning per PKIX-q9hv.3, AND (b) enforce that `issuer` either appears in chain (by content equality) or is the trust anchor that terminated the path. Otherwise the issuer argument is API-level theater.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_ocsp_responder takes &Certificate for issuer but doesn't enforce that it's in the chain",
+  "updated_at": "2026-05-14T14:39:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:39:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

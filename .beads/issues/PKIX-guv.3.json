@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added Error::NotYetImplemented variant to pkix-path-builder; build_path now returns it instead of NoPathFound.",
+  "closed_at": "2026-05-02T20:16:51Z",
+  "compaction_level": 0,
+  "content_hash": "75c390146f4f277a6b0ceefe9a45e24109889908d248e14d532dd7f7eba198e4",
+  "created_at": "2026-05-02T20:11:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix_path_builder::build_path always returns Err(Error::NoPathFound). Error::NoPathFound means 'no valid path exists in pool'. Callers who integrate this cannot distinguish 'pool genuinely has no path' from 'function is not yet implemented'. When a real implementation is added later, the behavior changes silently from 'always Err(NoPathFound)' to 'sometimes Ok(chain)'. Any code written today that handles NoPathFound as if the function works correctly is silently relying on stub behavior. An Error::NotImplemented variant (or panic\\!() / todo\\!()) would make the stub state obvious at runtime. Callers could then add an explicit version gate.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path stub returns NoPathFound \u2014 indistinguishable from real failure",
+  "updated_at": "2026-05-02T20:16:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:11:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

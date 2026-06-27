@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:57:34Z",
+  "compaction_level": 0,
+  "content_hash": "db9455fca0f8f65027fef4282e5f1f08bbc5c393a97574fdb1b9980a1aa8529f",
+  "created_at": "2026-05-06T16:51:06Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path/src/lib.rs:2034\\n\\nThe check:\\n    if policy.enforce_key_usage && !matches!(has_key_cert_sign(cert), Some(true))\\nreturns KeyUsageMissing for intermediates whose KeyUsage extension is ABSENT (has_key_cert_sign returns None).\\n\\nRFC 5280 \u00a74.2.1.3 says: 'If the keyCertSign bit is asserted, then the cA bit in the basic constraints extension (Section 4.2.1.9) MUST also be asserted.' The RFC only mandates keyCertSign if KeyUsage is present AND keyCertSign is relevant. RFC 5280 \u00a76.1.4(n) says: 'If a KeyUsage extension is present, verify that the keyCertSign bit is set.' The 'if present' qualifier means absent KeyUsage should not trigger this check.\\n\\nThe error variant name is KeyUsageMissing but the condition fires for both 'KeyUsage present but keyCertSign=0' and 'KeyUsage absent entirely' \u2014 these are semantically different cases.\\n\\nImpact: Intermediate CA certificates without a KeyUsage extension (legal under RFC 5280) will be rejected when enforce_key_usage=true (the default). Old CA certs from before wide KeyUsage adoption may break.\\n\\nFix: Change the condition to only reject when KeyUsage IS present but keyCertSign is not set:\\n    if policy.enforce_key_usage && has_key_cert_sign(cert) == Some(false)\\nAdd separate behavior documentation for absent KeyUsage (treat as no constraint, or add a strict_require_key_usage option).",
+  "ephemeral": 0,
+  "id": "PKIX-taa.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "enforce_key_usage rejects intermediates with absent KeyUsage, contradicting RFC 5280",
+  "updated_at": "2026-05-06T16:57:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

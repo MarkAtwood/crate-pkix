@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-h7i",
+  "title": "Policy/config data format: decide wire format(s) or commit to Rust-only",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:58:22Z",
+  "updated_at": "2026-06-15T17:58:22Z",
+  "closed_at": "2026-06-15T17:58:22Z"
+}

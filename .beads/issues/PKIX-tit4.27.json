@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed as a side-effect of PKIX-tit4.4. The field-level rustdoc on IoFailure::kind now correctly says 'Debug output' rather than 'Display representation', and discloses both the brittleness of Debug-on-ErrorKind and the unknown-variant degradation. Single commit covers tit4.4 and tit4.27.",
+  "closed_at": "2026-05-14T08:02:39Z",
+  "compaction_level": 0,
+  "content_hash": "f8dcd52799501af96f8f8d4c68c0bc277289fe580d4c23daef81eab16a653ebc",
+  "created_at": "2026-05-14T07:30:41Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:108-113 documents the `kind` field of\n`IoFailure`:\n\n```\n    /// Kind of I/O error.\n    ///\n    /// `io::ErrorKind` is `Copy + Eq + Hash`; we serialize it via\n    /// its `Display` representation for forward compatibility (new\n    /// `ErrorKind` variants land in the standard library without\n    /// breaking the wire form).\n```\n\nThe implementation (lib.rs:160-168) uses **Debug**, not Display:\n\n```\n    pub fn serialize<S: Serializer>(\n        kind: &io::ErrorKind,\n        s: S,\n    ) -> Result<S::Ok, S::Error> {\n        // `Debug` on `ErrorKind` produces the variant name verbatim\n        // (\"NotFound\", \"PermissionDenied\", \u2026); ...\n        s.serialize_str(&format!(\"{:?}\", kind))\n    }\n```\n\nThe module-level rustdoc on `io_error_kind_serde` (lib.rs:147-156)\ncorrectly says \"Debug.\" The deserializer matchlist (lib.rs:170-197)\nparses Debug-form strings (\"NotFound\", \"PermissionDenied\", ...).\n`Debug` and `Display` produce different strings:\n- `Debug for ErrorKind`: variant name (\"NotFound\")\n- `Display for ErrorKind`: human-readable description (\"entity not\n  found\")\n\nWhat goes wrong for a caller / future maintainer:\n\n1. A maintainer doing future refactoring reads the field-level rustdoc\n   (\"Display representation\"), decides to make the field's Display\n   impl drive the wire form, switches the impl to use `{}` instead of\n   `{:?}`. Wire form silently changes. Old caches no longer\n   round-trip. Tests on the producer side still pass; consumers using\n   pre-change payloads decode every variant to `ErrorKind::Other`.\n\n2. A consumer writing a custom deserializer (e.g. for a non-serde\n   format, or porting to another language) reads the docstring,\n   implements parsing of `\"entity not found\"`, finds it never matches.\n\n3. A reviewer comparing the docs vs the code reasonably concludes one\n   of them is wrong; without the matched fix to both, the next\n   contributor inherits the same ambiguity.\n\nOverlap with PKIX-tit4.4: that finding calls out the broader\nbrittleness of depending on Debug for the wire form, citing the\nmodule-level rustdoc claim at lib.rs:165 (\"upstream documents this as\nthe canonical textual identifier\"). PKIX-tit4.4's option (c) is to\nrewrite the module docs to disclose the lossy-degradation behavior;\nthat fix does not touch the field-level rustdoc at lib.rs:111. If\nPKIX-tit4.4 is fixed by option (a) or (b) (drop ErrorKind from the\nwire form, or hand-mapped u8 table) the field-level rustdoc would\nneed separate rewrite anyway since the new wire form is neither\nDisplay nor Debug.\n\nFix: change `Display` to `Debug` in the field-level rustdoc at\nlib.rs:111, or fold this rustdoc into whatever PKIX-tit4.4's chosen\nfix produces. Single-word change if the underlying serde mechanism\nstays as-is.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IoFailure.kind rustdoc claims serde wire form uses Display but impl uses Debug",
+  "updated_at": "2026-05-14T08:02:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T00:30:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:49:27Z",
+  "compaction_level": 0,
+  "content_hash": "db74c69dd9c8c6177b7afce0c060344a640e1175d919e6fbaceb8fbeba6fa899",
+  "created_at": "2026-05-02T17:29:09Z",
+  "created_by": "Mark Atwood",
+  "description": "The SignatureVerifier trait takes the full AlgorithmIdentifierRef (not just an OID string), the full SPKI, the raw TBS bytes, and the raw signature bytes. This gives implementors everything they need for any algorithm including those with parameters (RSA-PSS has parameters in AlgorithmIdentifier; EC has curve parameters in SPKI). The design avoids over-abstracting into per-algorithm traits (which would require a registry) or under-abstracting with just a raw byte callback. A contributor might suggest splitting into separate traits per algorithm family \u2014 that would break runtime dispatch and make the FIPS backend story much harder. The current design is correct and should be defended.",
+  "ephemeral": 0,
+  "id": "PKIX-841.18",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pluggable SignatureVerifier trait with OID dispatch is correct seam",
+  "updated_at": "2026-05-02T17:49:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:29:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

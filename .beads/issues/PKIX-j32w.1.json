@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "067aa27fc5240cfaaaef6748b2cb55e853e0859f4dd420b4d0fab6da219d732b",
+  "created_at": "2026-05-12T19:23:42Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nNew workspace crate `pkix-dane`. no_std-friendly. Provides:\n\n- TLSA record types: usage (CertUsage), selector (Selector), matching type (MatchingType), association data\n- DER / wire-format parsing for TLSA records\n- Per-usage match logic per RFC 6698 \u00a72.1 + RFC 7218 disambiguation:\n  - usage 0 (PKIX-TA): constrain which CA must sign\n  - usage 1 (PKIX-EE): constrain leaf cert\n  - usage 2 (DANE-TA): synthesize trust anchor from TLSA-asserted cert/SPKI\n  - usage 3 (DANE-EE): direct match on leaf cert, bypassing chain\n- Per-usage verify functions:\n  - `verify_pkix_ta(path: &ValidatedPath, tlsa: &[TlsaRecord]) -> Result<(), DaneError>`\n  - `verify_pkix_ee(leaf: &Certificate, tlsa: &[TlsaRecord]) -> Result<(), DaneError>`\n  - `verify_dane_ta(leaf: &Certificate, tlsa: &[TlsaRecord]) -> Result<TrustAnchor, DaneError>`\n  - `verify_dane_ee(leaf: &Certificate, tlsa: &[TlsaRecord]) -> Result<(), DaneError>`\n- DaneError enum \u2014 Clone + Debug + PartialEq + Eq + non_exhaustive, Send + Sync (per AGENTS.md non-negotiable #6)\n- No DNS. Caller supplies validated TLSA records (DNSSEC verified externally).\n\n## RFCs in scope\n\n- RFC 6698 \u2014 The DNS-Based Authentication of Named Entities (DANE) Transport Layer Security (TLS) Protocol: TLSA\n- RFC 7218 \u2014 Adding Acronyms to Simplify Conversations About DANE  \n- RFC 7671 \u2014 The DNS-Based Authentication of Named Entities (DANE) Protocol: Updates and Operational Guidance\n- RFC 7929 \u2014 DNS-Based Authentication of Named Entities (DANE) Bindings for OpenPGP (probably out of scope but cross-reference)\n- RFC 8460 \u2014 SMTP TLS Reporting (related; out of scope here)\n\n## Out of scope\n\n- DNS resolution (in pkix-dane-resolver)\n- SMTP-specific DANE policy (RFC 7672 \u2014 possibly a separate verify_smtp_dane helper later)\n- Integration into pkix-chain (separate child)\n\n## Acceptance\n\n- [ ] no_std builds clean\n- [ ] DaneError satisfies non-negotiable #6\n- [ ] Four per-usage verify functions implemented\n- [ ] Test fixtures: TLSA records + corresponding cert chains covering all four usages\n- [ ] Differential oracle: at minimum, OpenSSL's danessl or sufficient public test vectors\n\n## Stub status\n\nFuture work. Filed as architectural commitment under PKIX-j32w.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.1",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Create pkix-dane crate (no_std DANE primitives)",
+  "updated_at": "2026-05-13T00:20:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:23:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

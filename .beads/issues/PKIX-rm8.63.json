@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.63",
+  "title": "CertPool missing PartialEq/Eq with documented rationale",
+  "description": "pkix_path_builder::CertPool derives Clone and Debug but intentionally does not derive PartialEq/Eq. The doc comment at line 76 explains: 'CertPool is documented as an unordered bag, so a derived implementation (which compares the internal Vec in insertion order) would be semantically wrong.'\n\nThis is correctly reasoned and documented. However, the omission means CertPool cannot be used in assertions in tests (assert_eq!) and cannot be compared for structural equality at all. No semantic-equality method is provided either (e.g. a set-equality comparison).\n\nWhat goes wrong if this stays as-is: Callers who want to compare two CertPools for equality (e.g. in test assertions, or to detect whether a pool was modified) have no way to do so. This is a minor usability gap. A semantic eq() method that compares as sets (ignoring order) would serve the documented semantics correctly, but this is a convenience feature not a contract defect.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-path-builder/src/lib.rs lines 75-80 (CertPool struct and doc comment)",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:59Z",
+  "updated_at": "2026-06-15T17:30:56Z",
+  "closed_at": "2026-06-15T17:30:56Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:58"
+    }
+  ]
+}

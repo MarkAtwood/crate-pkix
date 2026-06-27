@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:49Z",
+  "compaction_level": 0,
+  "content_hash": "9840d459a77726d15409cb050fbb1700284046735d78dc92165cce794ab4e115",
+  "created_at": "2026-05-07T16:10:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:256-266 \u2014 RsaMinKeySizeLint uses rsa_modulus_byte_len which calls der_tlv_value_len. The DER INTEGER for an unsigned value includes a leading 0x00 byte when the high bit would otherwise be set. For a true 2048-bit key, the DER INTEGER value is 257 bytes (256 magnitude + 1 leading zero). The check `n_bytes >= 256` accepts 256+ bytes, so a 2047-bit key (256 bytes, no leading zero needed) passes.\n\nThe doc comment acknowledges: 'n_bytes >= 256 accepts both 2048-bit keys (257 bytes) and 2047-bit keys (256 bytes). This is the same floor-byte comparison used by most CA/B Forum linting tools and matches zlint's behavior.'\n\nHowever, the doc comment also claims 'DER INTEGER encoding of unsigned values: a leading 0x00 byte is prepended when the high bit of the first content byte would be 1.' This description is for UintRef (sign-stripped) but der_tlv_value_len gets the raw INTEGER VALUE length, which DOES include the leading zero. For a 2048-bit key: high bit set \u2192 DER prepends 0x00 \u2192 total value length = 257 bytes \u2192 257 >= 256 \u2192 Pass.\n\nBUT the description on lines 211-213 says 'der_tlv_value_len returns ... the byte length of the modulus INTEGER value (including any leading 0x00 byte).' This is correct, the check >= 256 is therefore accepting 2047-bit keys as passing (256 bytes without leading zero = bit length ~2047).\n\nThe comment at line 213-214 says: 'Therefore n_bytes >= 256 accepts both 2048-bit keys (257 bytes) and 2047-bit keys (256 bytes). This is the same floor-byte comparison used by most CA/B Forum linting tools and matches zlint's behavior.'\n\nThe CA/B Forum TLS BR \u00a76.1.5 actually requires >= 2048 bits. Accepting 2047-bit keys is a protocol relaxation. This may be intentional to match industry practice, but it contradicts the strict spec reading.\n\nP3 \u2014 minor spec deviation from TLS BR \u00a76.1.5, intentionally matches zlint.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RsaMinKeySizeLint uses raw INTEGER byte length including leading 0x00 padding byte",
+  "updated_at": "2026-05-07T16:36:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:10:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

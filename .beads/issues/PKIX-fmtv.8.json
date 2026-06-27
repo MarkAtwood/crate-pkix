@@ -1,0 +1,38 @@
+{
+  "close_reason": "Superseded by audit 2026-05-11. Profile/ValidationPolicy/ValidatedPath/Error already serve the foundational-types role. Identity-binding work (.11/.12) extends ValidationPolicy and Error variants instead of introducing new trait.",
+  "closed_at": "2026-05-12T04:55:36Z",
+  "compaction_level": 0,
+  "content_hash": "f93b2b1238f2bb87369827a203269706d64c4bf50c9296227e265c2c142bff26",
+  "created_at": "2026-05-12T02:42:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Foundational types for the verify pipeline. Sits at the base of all `policies::*` impls.\n\n**Deliverable:** `pkix-chain/src/policy.rs` (or similar) exposing:\n\n- `pub trait VerificationPolicy { fn id(&self) -> &str; fn evaluate(&self, ctx: &PathContext) -> Vec<Finding>; }`\n- `pub struct PathContext<'a> { /* built_path: &'a [Certificate], time, trust_anchors, ... */ }`\n- `pub struct Finding { source, severity, message, evidence, cert_index }`\n- `pub enum Severity { Error, Warn, Notice, Info }`\n- `pub enum FindingSource { PathValidation, Revocation, PurposeBinding(&'static str), Profile(ProfileId), Lint(LintId) }`\n- `pub struct Evidence` per `.5` decision\n\nTest surface:\n- Trait-object stacking compiles and runs.\n- Basic `Finding` construction and equality.\n- `PathContext` exposes the path index and trust anchor lookup.\n\n**Blocks on:** .1 (must ratify the trait shape first).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement VerificationPolicy trait + PathContext + Finding types",
+  "updated_at": "2026-05-12T04:55:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:43:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

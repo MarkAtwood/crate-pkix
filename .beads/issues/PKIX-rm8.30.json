@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.30",
+  "title": "pkix-revocation-http errors do not derive Clone/Eq",
+  "description": "pkix-revocation-http defines two public error types:\n- `ExtractError` \u2014 derives only `Debug`, missing `Clone, PartialEq, Eq, #[non_exhaustive]` is present but no serde.\n- `FetchError` \u2014 derives only `Debug`, missing `Clone, PartialEq, Eq`. Documented as intentional because `FetchError::Transport(Box<dyn Error + Send + Sync>)` is not Clone/Eq.\n\nAGENTS.md non-negotiable #6: 'Public result/error types ... MUST derive Clone + Debug + PartialEq + Eq and MUST be Send + Sync.'\n\n`ExtractError` wraps `der::Error`, which does implement Clone + PartialEq. There is no structural reason ExtractError cannot derive Clone + PartialEq + Eq. The missing derives are an oversight, not a necessary exception.\n\n`FetchError` has a legitimate exception for the Transport variant's `Box<dyn Error>`, which is documented. But FetchError also lacks a Send+Sync compile-time assertion. Since `Box<dyn Error + Send + Sync>` IS Send+Sync, the whole enum is auto-Send+Sync but no compile-time assertion pins it.\n\nImpact: callers cannot cache `ExtractError` values or compare them in tests without converting to String first. This makes ExtractError a second-class citizen compared to every other workspace error.\n\nLocations: /home/mark/PROJECT/PKIX/pkix-revocation-http/src/lib.rs lines 158-164 (ExtractError), lines 290-299 (FetchError)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:19Z",
+  "updated_at": "2026-06-15T17:03:39Z",
+  "closed_at": "2026-06-15T17:03:39Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:19"
+    }
+  ]
+}

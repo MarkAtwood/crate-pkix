@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:12Z",
+  "compaction_level": 0,
+  "content_hash": "5e98232801bb1c25c4fbb6942bdfb109026fc2eb94a2b13b16176edd48fdff21",
+  "created_at": "2026-05-06T22:20:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs:399-420 (verify_responder_id) and 427-447 (verify_responder_id_anchor) share identical match logic. The only difference is how the issuer's name and SPKI key are accessed: Certificate vs TrustAnchor. Idiomatic Rust: extract the common logic into a fn verify_responder_id_inner(id: &ResponderId, issuer_name: &Name, issuer_key_raw: &[u8]) -> crate::Result<()> and call it from both wrappers, eliminating the duplicate match arms.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.26",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ocsp.rs: verify_responder_id and verify_responder_id_anchor duplicated",
+  "updated_at": "2026-05-06T22:29:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

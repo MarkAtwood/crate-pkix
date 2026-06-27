@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:15:22Z",
+  "compaction_level": 0,
+  "content_hash": "01932c6111c8612dca22c963ac946acce0f467f85eaaf541b9399ce5e85bff2f",
+  "created_at": "2026-05-07T16:15:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2826-2898 \u2014 the code at \u00a73 checks emailAddress attributes in the subject DN against rfc822Name constraints. This is correct per RFC 5280 \u00a74.2.1.10.\n\nHowever, the check at line 2839:\n  `if has_rfc822_constraint && !subject_is_empty {`\n  `    // walk RDN emailAddress attributes`\n  `}`\n\nThe check is skipped when subject_is_empty. This means a cert with an empty Subject DN and a critical SAN containing rfc822Name entries is NOT checked against rfc822Name constraints via this code path. However, the cert_has_san_identity check (line 2344) and the general SAN check (line 2796-2813) DO check SAN entries including rfc822Name against NC subtrees.\n\nSo rfc822Name entries in SAN ARE checked (via the general SAN loop). The specific check at \u00a73 covers the additional case of emailAddress in Subject DN. For empty-subject certs, there are no DN emailAddress attributes to check. This is correct.\n\nActually wait \u2014 the check `!subject_is_empty` also controls whether to even enter the `for rdn in subject.0.iter()` loop. An empty subject has no RDNs to iterate. So the guard is redundant but not wrong.\n\nNot a bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: NameConstraints NC check does not check emailAddress in leaf subject DN against SAN-only cert",
+  "updated_at": "2026-05-07T16:15:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:15:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

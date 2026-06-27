@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T13:55:50Z",
+  "compaction_level": 0,
+  "content_hash": "25dea71ab6ab666a9de50f75d9448bc69de0cff9031e7c301dab08c001888a33",
+  "created_at": "2026-05-02T13:40:57Z",
+  "created_by": "Mark Atwood",
+  "description": "EcdsaP256Verifier::verify_signature (line 622) and RsaPkcs1v15Sha256Verifier::verify_signature (line 651) both accept _algorithm without checking the OID. A caller can pass any AlgorithmIdentifier (e.g. ecdsa-with-SHA384 OID) and EcdsaP256Verifier will verify using SHA-256 anyway. In a composable dispatch table this is a latent security issue: if DefaultVerifier's OID dispatch ever has a bug (duplicate OID match, off-by-one), the individual verifiers won't catch the mismatch. Each verifier should assert that algorithm.oid matches its expected OID and return Err(SignatureError::new()) otherwise.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.9",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "EcdsaP256Verifier and RsaPkcs1v15Sha256Verifier ignore algorithm OID",
+  "updated_at": "2026-05-02T13:55:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

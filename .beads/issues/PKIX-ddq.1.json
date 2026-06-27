@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "False alarm: the depth>=1 vpns collection IS the correct RFC 5280 \u00a76.1.5(g)(iii) implementation. The depth-0 root is always anyPolicy, making all depth-1 nodes vpns. For deeper trees, the cascade deletion in lines 2112-2129 handles descendant cleanup. Restricting to leaf_depth broke 7 PKITS policy tests. Added documentation clarifying the correct behavior.",
+  "closed_at": "2026-05-05T16:18:30Z",
+  "compaction_level": 0,
+  "content_hash": "33e95aa1781e7b2ba569c8296f763a8ea6d6754060ce3bb9674a44868780beca",
+  "created_at": "2026-05-05T16:15:09Z",
+  "created_by": "Mark Atwood",
+  "description": "In validate_path \u00a76.1.5(g)(iii), the vpns_indices collection at ~line 2068 collects ALL nodes in the tree whose parent is anyPolicy, regardless of depth. RFC 5280 \u00a76.1.2(d) defines valid_policy_node_set as nodes at depth n (leaf depth). For a 3+ cert chain, intermediate nodes at depth < leaf_depth could be incorrectly deleted by step (iii)(2) if their valid_policy is not in initial_policy_set. The fix is to add a depth filter: && nd.depth == leaf_depth to the vpns_indices filter predicate. The bug is latent in current tests because all PKITS policy tests use 2-cert chains (CA+EE) where depth-1 IS leaf_depth.",
+  "ephemeral": 0,
+  "id": "PKIX-ddq.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "\u00a76.1.5(g) vpns not restricted to leaf depth",
+  "updated_at": "2026-05-05T16:18:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T09:15:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ddq",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

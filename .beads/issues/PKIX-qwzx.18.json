@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added Copy, Default, PartialEq, Eq, Hash to WebPkiProfile, SmimeProfile, CodeSigningProfile, Rfc5280Profile (alongside existing Clone, Debug). Builds clean.",
+  "closed_at": "2026-05-07T22:30:55Z",
+  "compaction_level": 0,
+  "content_hash": "c5d41a49ef18bb77e5da8702a15ddfd33dc9e78e902a85db84bd0fc83741c4e6",
+  "created_at": "2026-05-07T22:14:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nFour unit-struct profiles in `pkix-profiles/src/lib.rs` derive only `Clone, Debug`:\n\n```rust\n#[derive(Clone, Debug)]\npub struct WebPkiProfile;\n#[derive(Clone, Debug)]\npub struct SmimeProfile;\n#[derive(Clone, Debug)]\npub struct CodeSigningProfile;\n#[derive(Clone, Debug)]\npub struct Rfc5280Profile;\n```\n\nThese are ZSTs implementing `pkix_path::Profile`. The idiomatic derive set for a\npublic ZST is `Clone, Copy, Debug, Default, PartialEq, Eq, Hash`. All seven are\nzero-cost.\n\nParticularly important here:\n- `Default` \u2014 convenient for generic profile-registry tests:\n  `fn run_with_profile<P: Profile + Default>() { P::default()... }`\n- `Copy` \u2014 profile values get passed around by value (`profile.policy(now)`);\n  `Copy` removes the need to think about ownership for trivially-copyable ZSTs.\n- `PartialEq + Eq + Hash` \u2014 let profiles be keys in a registry-style\n  `HashMap<ProfileId, ProfileFn>` adjacent structure.\n\nPass 1 (epic PKIX-hxu1) addressed the same issue for `DefaultVerifier` (added\n`Copy + Default`) but missed these four profile ZSTs.\n\nFix: change all four to:\n`#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]`\n\nLocations:\n- `pkix-profiles/src/lib.rs:157-158` (`WebPkiProfile`)\n- `pkix-profiles/src/lib.rs:221-222` (`SmimeProfile`)\n- `pkix-profiles/src/lib.rs:280-281` (`CodeSigningProfile`)\n- `pkix-profiles/src/lib.rs:321-322` (`Rfc5280Profile`)",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.18",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: four profile ZSTs in pkix-profiles lack Copy/Default/PartialEq/Eq/Hash",
+  "updated_at": "2026-05-07T22:30:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:14:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

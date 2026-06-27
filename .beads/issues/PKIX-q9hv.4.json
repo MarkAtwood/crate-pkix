@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "20f543ccb712554081d51855cbfc9adb2a3553fb44ba1829318189fbfa2254c0",
+  "created_at": "2026-05-14T14:36:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1235-1279: verify_ocsp_responder constructs NoCheckShim wrapping the caller's revocation checker, then passes `&shim` to verify_chain. If the chain[0] (responder cert) carries id-pkix-ocsp-nocheck AND the chain is incomplete and the wrapper hardcodes `&NoAiaFetcher` (line 1273), AIA won't fire \u2014 but the OCSP wrapper also doesn't expose an AiaFetcher parameter, so a chain like [responder-with-nocheck-but-missing-intermediate] always returns Aia(FetchingDisabled). That's a documented limitation. The real issue is more subtle: LeafIdent::matches uses BYTE-equality on Name (derived PartialEq on x509_cert::name::Name) per the comment at line 1352-1359. The comment claims this is safe because 'both sides come from the same DER encoder.' That holds in the fast path (chain[0] is identity-equal to itself when fed into run_revocation_checks). BUT in any future code path where validate_path is followed by revocation on a different cert object (e.g. a built chain where chain[0] could in principle be re-encoded), byte equality could miss. Today this is fine; it is a latent invariant. Trigger: future refactor that re-clones chain[0] through a path that re-encodes; nocheck bypass silently stops working. Recommend: compare via pkix_path::names_match for the Name field and bytewise on the serial (same as it does now), to make the match robust against any future re-encoding. The serial check is already opaque-bytewise; the issuer should use names_match for the same reason verify_responder_is_delegated_by does.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Crypto-security framing (from /review-crypto-security pass, 2026-05-14): the OCSP-nocheck bypass is a security-critical override \u2014 if `LeafIdent::matches` returns true incorrectly, revocation is silently skipped on the wrong cert. Today the byte-equality is correct because (1) `verify_chain` propagates the exact same `&chain[0]` reference through to the shim's callback, and (2) `pkix-path` does not re-canonicalize `Certificate` values. The safety therefore depends on an invariant in another crate. Switch to `pkix_path::names_match` for the issuer DN field and keep byte-equality on the SerialNumber (which RFC 5280 \u00a74.1.2.2 specifies as a byte-opaque INTEGER); document the rationale in the rustdoc so the security argument is visible. P1 from API-idiom lens; from a security lens this is a P2 defense-in-depth (current behavior is correct, but the safety isn't local).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LeafIdent uses byte-equality on Name; use names_match for robustness",
+  "updated_at": "2026-05-14T15:04:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:36:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

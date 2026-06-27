@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.55: added PartialEq/Eq derives. Hash not added (separate concern)",
+  "closed_at": "2026-06-15T18:30:20Z",
+  "compaction_level": 0,
+  "content_hash": "10339baec27cfdc47fa62330db873ef909a73a95697a3e3fb3707b64e6583149",
+  "created_at": "2026-05-14T19:18:28Z",
+  "created_by": "Mark Atwood",
+  "description": "ServerName<'a> and MailboxName<'a> derive only Debug + Clone. They do NOT derive PartialEq, Eq, or Hash.\n\nCaller impact:\n\n* HashMap<ServerName, T> impossible. Callers wanting to memoize 'has this name already been validated against this cert?' must derive their own keying \u2014 typically by retaining the *string* representation alongside, which defeats the point of the typed handle.\n* Set-of-known-identities patterns (deduplicating a list of names a CA serves) need a Vec<ServerName> and O(n\u00b2) comparison via re-parsing, or duplicate string buffers.\n* The pkix-chain Verifier::verify_batch use case (AGENTS.md non-negotiable #6: 'Batch APIs where setup cost is non-trivial') cannot cache identity-match verdicts keyed by (cert_fingerprint, identity) without making the identity hashable.\n\nAdding PartialEq / Eq / Hash later is technically non-breaking, but the derive defines the equality semantics. Once the type is in callers' hands without these, callers will roll their own. If we later add Hash and the semantics they assumed (e.g., 'EXAMPLE.com' equals 'example.com' via case fold) disagrees with what we ship (byte equality on the post-normalized form), workarounds break.\n\nSpecific semantics that must be locked in before shipping:\n\n1. ServerName equality: is 'example.com' == 'EXAMPLE.com'? The normalizer lower-cases ASCII, so post-parse they're byte-equal in the Cow. But what about 'b\u00fccher.example' (Owned A-label) vs 'XN--BCHER-KVA.example' parsed as ASCII (Borrowed, lower-cased)? Currently both end up as the same lower-case A-label string \u2014 equality should match. We should commit to this in the derive + docstring.\n2. IP equality: IPv4 4-byte vs IPv4-mapped IPv6 16-byte \u2014 same address, different repr. Should equality treat them as equal? (Probably no, since SAN matching is byte-exact and these are distinct SAN encodings.)\n3. MailboxName equality: case-sensitive local-part, case-insensitive domain \u2014 the current shape stores local case-preserved and domain case-folded, so byte-equal on the fields matches the documented matching semantics. Lock this in.\n\nRecommend: derive PartialEq + Eq + Hash NOW with byte-equal semantics on the normalized internals, and document the equality contract in rustdoc.\n\nSeverity P1 because shipping without it forecloses on cache-keyed callers per non-negotiable #6.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ServerName / MailboxName do not derive PartialEq / Eq / Hash",
+  "updated_at": "2026-06-15T18:30:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:18:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

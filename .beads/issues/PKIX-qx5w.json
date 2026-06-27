@@ -1,0 +1,22 @@
+{
+  "close_reason": "matches! with | patterns is idiomatic Rust; no real finding here \u2014 opinion level",
+  "closed_at": "2026-05-07T15:21:10Z",
+  "compaction_level": 0,
+  "content_hash": "8fbe44566fb34ea86a9cba4ee090ecc94340e0bd2b0d94d22b924c8e963fc36f",
+  "created_at": "2026-05-07T15:21:05Z",
+  "created_by": "Mark Atwood",
+  "description": "cabf_tls_br.rs:183: 'if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1)' \u2014 this is idiomatic and correct for multi-pattern matching. However, pkix-chain/src/lib.rs:181 (tests): 'matches!(result, Err(pkix_path::Error::SignatureInvalid { .. }))' vs direct assert!(result.is_err()) would be clearer for the two-way Ok/Err pattern. This is minor/opinion-level. No action needed.",
+  "ephemeral": 0,
+  "id": "PKIX-qx5w",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path (rusty): matches! macro used on single non-pattern match \u2014 use == instead",
+  "updated_at": "2026-05-07T15:21:10Z"
+}

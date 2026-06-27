@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:59:23Z",
+  "id": "019e1d8e-def0-74cb-8f5c-00d098d2f043",
+  "issue_id": "PKIX-amgn",
+  "text": "Re-auto-closed 2026-05-12 -- PKIX-amgn.8 closed WONTFIX (final) under the no-transcription stance + unprincipled-exception ratification for the -cabf crates. The framework-not-policy realignment work is fully resolved: pkix-profiles and pkix-lint ship RFC-baseline framework; pkix-profiles-cabf and pkix-lint-cabf survive as small curated reference sets explicitly labeled 'unprincipled exception'; comprehensive CA/B Forum coverage moves to a future pkix-policy-zlint adapter crate (filed as a separate epic). AGENTS.md non-negotiable #5 rewritten to the three-mode policy-class model."
+}

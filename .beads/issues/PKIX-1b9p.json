@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:33:59Z",
+  "compaction_level": 0,
+  "content_hash": "91b91ba7fd438b78f1bbbdae0b0234440f153c47a2e622b3c96bc6ee5843b44d",
+  "created_at": "2026-05-07T20:11:21Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`RUSTDOCFLAGS=\\\"--cfg docsrs -D warnings\\\" cargo +nightly doc --no-deps --workspace --all-features\\` produces 4 errors:\n\n1. \\`pkix-lint/src/lib.rs:271\\` \u2014 \\`LintResult\\` doc links to private item \\`de_static_str\\` (rustdoc::private_intra_doc_links)\n2. \\`pkix-lint/src/lib.rs:508\\` \u2014 \\`Finding\\` doc links to private item \\`de_static_str\\` (same lint)\n3. \\`pkix-lint/src/deviation.rs:99\\` \u2014 unclosed HTML tag \\`<id>\\` in \\`\\\"DEVIATION APPLIED by <id>\\\"\\` (rustdoc::invalid_html_tags)\n4. \\`pkix-lint/src/report.rs:98\\` \u2014 same \\`<id>\\` tag\n\n## Why P1\nWorkspace-wide \\`[package.metadata.docs.rs]\\` sets \\`rustdoc-args = [\\\"--cfg\\\", \\\"docsrs\\\"]\\` and \\`all-features = true\\`. The docs.rs build for pkix-lint will fail when these errors fire under nightly toolchain conventions.\n\nThe cargo-doc invocation is the exact one prescribed by AGENTS.md RustCrypto contribution checklist: \\`RUSTDOCFLAGS=\\\"--cfg docsrs -D warnings\\\" cargo +nightly doc --no-deps --all-features -p <crate>\\`.\n\n## Fix\n- For 1 and 2: change \\`[\\`de_static_str\\`]\\` references to plain backticks, OR mark them with \\`#[allow(rustdoc::private_intra_doc_links)]\\` on the items, OR document de_static_str publicly. Plain backticks is simplest.\n- For 3 and 4: replace literal \\`<id>\\` with backticked \\`\\\\\\`<id>\\\\\\`\\` or escape as \\`&lt;id&gt;\\`.\n\n## Scope reference\n\\`pkix-lint/src/lib.rs:271\\`, \\`pkix-lint/src/lib.rs:508\\`, \\`pkix-lint/src/deviation.rs:99\\`, \\`pkix-lint/src/report.rs:98\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-1b9p",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: docs.rs build fails \u2014 4 rustdoc errors in pkix-lint with --cfg docsrs -D warnings",
+  "updated_at": "2026-05-07T20:33:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:12:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "decision captured in code doc comment",
+  "closed_at": "2026-05-02T22:35:59Z",
+  "compaction_level": 0,
+  "content_hash": "efbc7b5381f8593be4786a5be312a3bec8d350a5ad17d67123ccf60e63279271",
+  "created_at": "2026-05-02T22:20:59Z",
+  "created_by": "Mark Atwood",
+  "description": "The comment cites RFC 4518 \u00a72.1 and RFC 5280 \u00a77.1. These citations let reviewers and v0.2 implementers verify claims independently. Example: 'RFC 5280 \u00a77.1 classifies TeletexString support as OPTIONAL' is verifiable; 'TeletexString is rarely used' is not. RFC citations are a sign of rigor, not over-documentation. Worth keeping and using as a model for other comments.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DECISION: RFC citations in doc comment enable independent verification",
+  "updated_at": "2026-05-02T22:35:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

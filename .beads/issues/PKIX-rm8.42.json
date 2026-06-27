@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.42",
+  "title": "pkix-chain LeafIdent and NoCheckShim missing Debug/Clone",
+  "description": "In pkix-chain/src/lib.rs:1439-1503, the internal types LeafIdent and NoCheckShim do not derive Debug or Clone. While they are private types, the coding standard says 'put a doc comment on everything that rustdoc knows how to document' and 'derive liberally: Debug on almost everything.'\n\nWhat goes wrong: If a future maintainer needs to debug the OCSP-nocheck bypass logic, they cannot inspect these types in a debugger or log. The missing derives make refactoring harder.\n\nLocations:\n- pkix-chain/src/lib.rs:1439 (LeafIdent)\n- pkix-chain/src/lib.rs:1470 (NoCheckShim)\n\nRecommendation: Add #[derive(Debug)] to both. Clone is also natural for LeafIdent since it holds only borrowed references.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:55Z",
+  "updated_at": "2026-06-15T17:03:16Z",
+  "closed_at": "2026-06-15T17:03:16Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:55"
+    }
+  ]
+}

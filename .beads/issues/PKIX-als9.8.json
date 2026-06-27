@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Extracted check_subject_dn_against_subtrees helper from check_name_constraints. Subject-DN-against-subtrees block (22 lines) became a single helper call inside check_names closure. All 262 tests pass including PKITS \u00a74.13 NC suite.",
+  "closed_at": "2026-05-11T04:13:59Z",
+  "compaction_level": 0,
+  "content_hash": "5152108f9de16fd11c3dfbcc8ce15be9883d5fc0a1cfe34311a1016989384f2a",
+  "created_at": "2026-05-08T05:43:59Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract subject-DN-against-permitted/excluded-subtrees check (~22 lines) from `check_name_constraints` (lib.rs:2868\u20133026) into `pub(crate) fn check_subject_dn_against_subtrees(...)`.\n\n## Risk\n\nLow.\n\n## Acceptance\n\n- New helper in pkix-path/src/lib.rs.\n- check_name_constraints calls helper.\n- PKITS NC tests (\u00a74.13) pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: N1 \u2014 extract check_subject_dn_against_subtrees from check_name_constraints (~22 lines)",
+  "updated_at": "2026-05-11T04:13:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

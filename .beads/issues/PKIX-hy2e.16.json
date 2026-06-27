@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "277ef7fa96b2fac94824d9296d59c2da71ccc53b360ac8f724dc30b86c8cdc61",
+  "created_at": "2026-05-14T12:41:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: deviation.rs:920-938. DeviationRunner::run_path matches on chain.first(): Some(leaf) \u2192 apply_deviations(raw, leaf, now_unix); None \u2192 return raw findings unmodified. Doc says 'If the chain is empty (shouldn\\'t happen after validate_path), fall back to no scope matching (treat as Any).' But: chain.is_empty() means validate_path has not been called (validate_path produces ValidatedPath on success and the chain is non-empty), or the caller is misusing the API. Treating it as 'no scope match' silently produces a partial result. Suggested rewrite: change run_path to return Result<DeviationRunResult, EmptyChainError> or, alternatively, debug_assert!(!chain.is_empty(), 'run_path requires at least one cert'). The current behavior is the worst of both worlds \u2014 accepts invalid input silently while documenting it as a known edge case. Filed P3 because the trigger is API misuse, not a normal flow.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "run_path on empty chain silently uses 'no scope match' fallback instead of erroring or NotApplicable",
+  "updated_at": "2026-05-14T12:41:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

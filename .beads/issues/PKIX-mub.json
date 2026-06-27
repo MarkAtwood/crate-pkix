@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:22Z",
+  "compaction_level": 0,
+  "content_hash": "02f2dce3a4b824cbdc8856d3dca204a2f43975af819e79f40738259c0ba9d518",
+  "created_at": "2026-05-06T23:17:05Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 102: when the caller-supplied issuer cert's subject DN does not match cert.tbs_certificate.issuer, the code returns Err(OcspSignatureInvalid). This is a misleading error: the signature was never attempted \u2014 the mismatch is a caller contract violation (wrong issuer cert supplied), not a signature problem. The same pattern appears in check_revocation_against_anchor at line 228. Callers looking at OcspSignatureInvalid will diagnose this as a key/signature problem rather than a cert-issuer mismatch, making debugging harder. Suggested fix: return Err(Error::OcspCertIdMismatch) or introduce a dedicated Err(Error::OcspIssuerMismatch) variant. At minimum update the doc comment to explain that this error is also returned for caller-side issuer identity mismatches.",
+  "ephemeral": 0,
+  "id": "PKIX-mub",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: check_revocation issuer mismatch returns OcspSignatureInvalid",
+  "updated_at": "2026-05-06T23:47:22Z"
+}

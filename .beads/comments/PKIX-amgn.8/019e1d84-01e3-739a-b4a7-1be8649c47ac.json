@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:47:31Z",
+  "id": "019e1d84-01e3-739a-b4a7-1be8649c47ac",
+  "issue_id": "PKIX-amgn.8",
+  "text": "REVERSED 2026-05-12 (Mark, interactive after framing recalibration). The 2026-05-12 18:12 WONTFIX is reversed. SUBSTANTIVE ARCHITECTURAL DECISION (now explicit): pkix-lint-cabf when complete = comprehensive CA/B Forum BR coverage that matches or approaches zlint's scope. Hand-authoring at that scope is intractable; mirroring zlint's living catalog is the only tractable path. This is the right design for the crate per the prelaunch 'done right from the start' framing -- a 'reference, not authoritative' interpretation crate that ships ~30 hand-authored marquee lints does not deliver on the crate's stated purpose at scale. WHAT THIS REVERSES: the 'small curated reference set' implicit architectural choice from the prior WONTFIX. WHAT STAYS FROM THE PRIOR CLOSURE: zlint+pkilint remain valuable as differential oracles (PKIX-hbzo.1), independent of mirroring scope. WHAT IS NOW UPSTREAM-BLOCKED: the format-of-mirror-output is determined by PKIX-apmt. Dependency edge restored. The 2026-05-12 decomposition (.8.1 shipped, .8.2 shipped, .8.3-.8.6 reopened) is conceptually right; the children's exact form (OSCAL Catalog JSON target vs Rust constants codegen vs other) reshapes once apmt resolves. pkix-lint-cabf-refresh/ scaffold purpose is restored. Memory pkix-amgn-8-wontfix-2026-05-12 SUPERSEDED by pkix-amgn-8-reversed-2026-05-12."
+}

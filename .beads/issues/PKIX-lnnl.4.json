@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "96a710931cfb9900e0d714519132cb33f84a943a37f43a30adba5f63b436b8db",
+  "created_at": "2026-05-14T19:37:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: every call to CrlChecker::new_with_signer_discovery (pkix-revocation/src/crl.rs:325-358).\n\nThe `cert_to_check: &Certificate` parameter is declared in the public signature (currently spelled `_cert_to_check` to silence the unused-variable lint) and the rustdoc (lines 281-288) explicitly says: 'It is taken at construction time only for ergonomic symmetry with the discovery flow; the actual revocation lookup happens at check_revocation call time. Passing a different cert argument to check_revocation later is well-defined.'\n\nThis is API surface that has zero behavioral effect today. Two consequences for the maintainer:\n\n1. Future-self forgetting: in 12 months, a caller will rely on the parameter (perhaps believing it pre-validates the CRL covers cert_to_check) and the code will silently ignore it. They will file an issue about 'why doesn't new_with_signer_discovery reject when I pass the wrong cert.'\n\n2. Post-1.0 lock-in: the parameter is part of the function signature. Removing it post-1.0 is a breaking change. Adding behavior to it post-1.0 is a behavior change that prior callers (who pass any cert) may have relied on as a no-op.\n\nPer AGENTS.md 'design for the eventual complete shape' and 'breaking changes are free pre-1.0': decide now.\n\nOptions:\n1. Remove the parameter entirely. Update the rustdoc to drop the 'ergonomic symmetry' rationale.\n2. Make it meaningful: at construction time, check that the CRL is at least syntactically applicable to cert_to_check (e.g., issuer-DN match between cert.issuer and the discovered signer's subject, or run check_idp_dp_scope to fail-fast on out-of-scope CRLs before the caller even calls check_revocation).\n\nEither is fine; the status quo (parameter present, behavior absent, doc explains it's pointless) is the worst of both worlds.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "new_with_signer_discovery: _cert_to_check parameter is unused, locks API to a no-op arg",
+  "updated_at": "2026-05-14T19:37:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:37:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

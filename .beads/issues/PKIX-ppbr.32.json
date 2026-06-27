@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bc7c32104e9aba3df1c8c911055afaf08d564fb2607702c7cbd04a202e7a5fc9",
+  "created_at": "2026-05-14T17:46:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:153-168\n\n```rust\npub struct SctVerifier<V: SignatureVerifier> {\n    logs: CtLogList,\n    verifier: V,\n}\n\nimpl<V: SignatureVerifier> SctVerifier<V> {\n    pub const fn new(logs: CtLogList, verifier: V) -> Self { ... }\n    pub const fn logs(&self) -> &CtLogList { &self.logs }\n}\n```\n\nThe struct is constructed once and never mutated. Callers cannot:\n\n- Update the log list as new logs are added to Chrome's log_list.json\n  feed (real production servers refresh this weekly).\n- Recover the inner `V` to reuse it with a different log list (some\n  verifier impls hold expensive state like pre-loaded keys).\n- Swap the log list while holding the same `&SctVerifier` reference\n  (typical pattern for ArcSwap-backed live config).\n\nThe contract is: build once at startup, never refresh. That's a real\nproduction limitation. A long-running TLS server that wants to honor\nlog retirement events has to:\n\n1. Construct a new `SctVerifier`\n2. Atomically swap the `Arc<SctVerifier>` in their config slot\n3. Old connections finish on the old verifier; new connections use\n   the new one\n\n\u2026which is fine, but it requires the caller to wrap `SctVerifier` in\nArcSwap or RwLock themselves. The crate provides no accessor that\nwould let the caller mutate-in-place even if they hold the only\nreference.\n\nRecommendation: add accessors:\n\n```rust\nimpl<V: SignatureVerifier> SctVerifier<V> {\n    pub fn logs_mut(&mut self) -> &mut CtLogList { &mut self.logs }\n    pub fn replace_logs(&mut self, new: CtLogList) -> CtLogList { ... }\n    pub fn into_parts(self) -> (CtLogList, V) { (self.logs, self.verifier) }\n}\n```\n\nCost: 3 short methods. Benefit: callers can refresh in-place or\nrecover the inner verifier.\n\nPriority P3: workaround (build new + swap Arc) exists; this is\nergonomic improvement.\n\nNon-negotiable #6 is also relevant here: callbacks-not-closed-structs\nimplies the caller can wrap. If the caller wants to wrap with a\nfresh-log-list closure they can already implement `SignatureVerifier`\nthemselves and inject log_list lookup at the verifier layer. So\nthis is API ergonomics, not framework violation.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctVerifier::logs() returns &CtLogList \u2014 no way to swap log list, drop verifier, or recover V",
+  "updated_at": "2026-05-14T17:46:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:46:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

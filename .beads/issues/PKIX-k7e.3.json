@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:49:12Z",
+  "compaction_level": 0,
+  "content_hash": "8deee8c90d113862583e1c56447fb0432956215d7450e7d0e6cece79787b63d4",
+  "created_at": "2026-05-06T15:45:18Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-profiles/src/lib.rs:355-356, the test web_pki_policy_san_field_is_true builds:\n  let mut policy = pkix_path::ValidationPolicy::new(NOW);\n  policy.require_subject_alt_name = true;\nbut then calls validate_path with `&web_pki_policy(NOW)` (line 370), not with `&policy`. The two lines that construct and mutate `policy` are dead \u2014 they have no effect on what the test exercises.\n\nFix: remove lines 355-356 and their associated misleading comment block (lines 351-364), which was written as if the test was going to use the custom policy but doesn't.\n\nThe test still has value after the removal \u2014 it checks that web_pki_policy sets require_subject_alt_name=true (line 347-350) and that a conforming cert passes (lines 365-371).",
+  "ephemeral": 0,
+  "id": "PKIX-k7e.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "web_pki_policy_san_field_is_true: dead policy variable",
+  "updated_at": "2026-05-06T15:49:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:45:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-k7e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

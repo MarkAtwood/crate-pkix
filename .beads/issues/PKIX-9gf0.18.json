@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:12:05Z",
+  "compaction_level": 0,
+  "content_hash": "88d0a0ac17e396b499f2b27654b6f9ba66fd227edc9f1ff0c393e14b2546ca26",
+  "created_at": "2026-05-07T16:12:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2298-2306 \u2014 pathLenConstraint enforcement:\n  `if let Some(path_len) = bc.and_then(|b| b.path_len_constraint) {`\n  `    let effective_depth = chain[1..i].iter().filter(|c| !is_self_issued_cert(c)).count();`\n  `    if effective_depth > path_len as usize { return Err(Error::PathTooLong); }`\n  `}`\n\nRFC 5280 \u00a74.2.1.9 says: 'where pathLenConstraint is the maximum number of non-self-issued intermediate certificates that may follow this certificate in a valid certification path.'\n\nThe cert at position i in chain has chain[1..i] as the intermediates BELOW it (between the cert and the leaf at 0). The count of non-self-issued intermediates in chain[1..i] is the number of intermediates that follow cert i toward the leaf.\n\nFor a chain [leaf(0), intA(1), intB(2), root_in_chain(3)] with the trust anchor separately:\n- cert at i=2 (intB): chain[1..2] = [intA] \u2192 effective_depth = 1\n  - If pathLen=0 on intB, this means intB may have 0 more intermediates below it. chain[1..2] = [intA] counts 1 \u2192 1 > 0 \u2192 PathTooLong. This is CORRECT.\n- cert at i=3 (root_in_chain): chain[1..3] = [intA, intB] \u2192 effective_depth = 2\n  - If pathLen=1, then 2 > 1 \u2192 PathTooLong. This is CORRECT (1 intermediate allowed, 2 present).\n\nThe RFC counts non-self-issued intermediates that 'follow' the CA cert (i.e., between it and the end entity). chain[1..i] represents exactly that set. The check appears correct.\n\nNot a bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path chain_walk: pathLenConstraint check uses chain[1..i] but RFC 5280 requires counting non-self-issued intermediates BELOW cert i",
+  "updated_at": "2026-05-07T16:12:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:12:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

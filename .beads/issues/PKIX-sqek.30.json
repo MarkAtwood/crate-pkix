@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a3b8fc723231cda7c5526d8c16ac99dfba021eb0d70bf52fc0eb4895e8951e67",
+  "created_at": "2026-05-14T18:12:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:445-479 (Verifier::new_no_aia and Verifier::new):\n\n    pub fn new(\n        anchors: &'a [TrustAnchor],\n        sig_verifier: &'a V,\n        rev_checker: &'a R,\n        policy: &'a ValidationPolicy,\n        aia: &'a A,\n    ) -> Self { Self { anchors, sig_verifier, rev_checker, policy, aia } }\n\nThe constructor accepts an `anchors: &[TrustAnchor]` of any length, including zero. A Verifier with zero anchors will reject every single chain submitted to verify_one with Error::Path(NoTrustedPath) \u2014 the same error a chain that didn't match any anchor would produce. The caller has no diagnostic distinguishing \"I forgot to load the trust store\" from \"this chain's issuer isn't in the trust store.\"\n\nWHY IT MATTERS:\n\nThis is the slash-command checklist's:\n\n> Methods that take `&[T]` and panic on empty input rather than returning `Result` or `Option`. Callers will write `if !v.is_empty() { ... }` forever.\n\n\u2026rotated 90 degrees: the constructor doesn't panic, but it admits a useless state that produces a misleading error on every subsequent call.\n\nConcrete cost: a caller's \"load trust store\" code path has a config bug \u2014 the file glob matches nothing, or the PEM parser silently rejects all entries. The caller builds a Verifier from the empty result, then on every cert validation gets Error::Path(NoTrustedPath). They debug the chain (which is fine), they audit the cert (which is fine), and only after lengthy investigation realize their anchors slice was empty. There is no signal at construction time.\n\nOPTIONS:\n\n(a) **Make new() fallible: `pub fn new(...) -> Result<Self, Error>`** with an explicit Error::NoAnchors variant (or InvalidInput). The cost is one `?` at every Verifier construction site, including the doctest at lines 47-63 and the workspace's tests. Clean diagnostic at the actual fault location.\n\n(b) **Replace anchor slice with `NonEmptyTrustAnchors<'_>` newtype.** Same shape as the empty-chain option (b) in the previous finding. Type-system-enforced; no runtime check needed. Cost: every callsite goes through a `NonEmpty::from_slice(anchors).expect(\"anchors must not be empty\")?` step.\n\n(c) **Document the failure mode**: rustdoc on Verifier::new explicitly says \"An empty anchors slice produces a Verifier that rejects every chain with Error::Path(NoTrustedPath). Callers should validate non-emptiness at trust-store load time.\" Minimum-effort; preserves the current shape.\n\n(c) is what the workspace currently has implicitly (via pkix-path's input gate); making it explicit closes a small documentation gap without changing behaviour. (a) or (b) gives an early signal but at a real ergonomic cost.\n\nFiled as priority 3 because the failure is recoverable (the caller sees an error every call, just an unhelpful one) and the workaround (verify trust store non-emptiness at load time) is reasonable to expect from a careful caller. Lower priority than the chain[0] panic dependency (PKIX-sqek.21) because the cost is \"confusing error\" not \"latent panic.\"\n\nThe same finding applies to the `verify_chain` free function and every wrapper that takes anchors. If (a) is chosen, the Result wrapping propagates through; if (c), one rustdoc paragraph at lib.rs's top-level rustdoc covers the family.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier::new accepts empty anchor slice without diagnostic; every verify_one call then fails with same opaque error",
+  "updated_at": "2026-05-14T18:12:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:12:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

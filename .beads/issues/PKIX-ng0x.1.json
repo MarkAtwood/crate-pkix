@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "989e6bacba5ffca341ac44eb54600847c89ec6a8bea515ae96773ce988ee003e",
+  "created_at": "2026-05-11T04:47:09Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-ng0x decomposition, child 1 of 5. Foundation: the\n`AttributeCertificate` type currently wraps `Vec<u8>` with no parsing.\nWithout a real ASN.1 type, none of the later children can be built.\n\n## What\n\n1. Define the RFC 5755 \u00a74.1 ASN.1 types using `der` derives:\n   - `AttributeCertificate ::= SEQUENCE { acinfo, signatureAlgorithm,\n      signature }`\n   - `AttributeCertificateInfo ::= SEQUENCE { version, holder, issuer,\n      signature, serialNumber, attrCertValidityPeriod, attributes,\n      issuerUniqueID OPTIONAL, extensions OPTIONAL }`\n   - `Holder`, `V2Form`, `IssuerSerial`, `ObjectDigestInfo`,\n      `AttCertValidityPeriod`, `Attribute`, etc. (most are\n      reusable from `x509-cert` where possible).\n2. Implement `Decode` + `Encode` for the top-level type via derives.\n3. Replace the current `Vec<u8>` wrapper inside `AttributeCertificate`\n   in `pkix-ac/src/lib.rs` with the new typed inner.\n4. Public API: `AttributeCertificate::parse_der(bytes)` and `.to_der()`.\n\n## Tests\n\n- [ ] Round-trip oracle: a known-good AC DER (sourced externally \u2014 see\n      below) is parsed, then re-encoded, then byte-equal to the input.\n      External oracle is the original encoder (openssl `cms` /\n      `attr-cert` tooling or pyca/cryptography), NOT pkix-ac itself.\n- [ ] Negative oracle: malformed DER returns `Err`, never panics.\n- [ ] Property: each Holder shape (baseCertificateID, entityName,\n      objectDigestInfo) parses if present in the input.\n\n## External AC test vector sourcing\n\nReal-world ACs are scarce. Options:\n1. **pyca/cryptography**: `tests/x509/scripts/` may have an\n   attribute-cert generator. Verify before relying on it.\n2. **OpenSSL**: `openssl cms -aa` or the `cmsutil` family in newer\n   OpenSSL builds may produce ACs.\n3. **Bouncy Castle**: Java test suite ships AC vectors at known paths.\n\nThe bead implementer must pick one source and commit the resulting DER\nplus a regenerate script.\n\n## Acceptance\n\n- [ ] AttributeCertificate parses RFC 5755 \u00a74.1 SEQUENCE.\n- [ ] Round-trip succeeds against at least one real-world DER.\n- [ ] Tests document the external oracle.\n- [ ] No new runtime deps.",
+  "ephemeral": 0,
+  "id": "PKIX-ng0x.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-ac: RFC 5755 \u00a74.1 AttributeCertificate ASN.1 parser + round-trip",
+  "updated_at": "2026-05-11T04:47:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:47:09Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

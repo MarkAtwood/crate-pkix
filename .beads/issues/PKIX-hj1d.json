@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:30:52Z",
+  "compaction_level": 0,
+  "content_hash": "b690d5d642ad59af57971185b8805d261612b4dec34177a2fbf7c5ea636c222c",
+  "created_at": "2026-05-07T20:10:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`git ls-files target/ | wc -l\\` reports 26,943 tracked files under \\`target/\\` even though \\`.gitignore\\` includes \\`/target/\\` and \\`*.rlib\\`. The branch is 96 commits ahead of origin/main and \\`git status\\` always shows modified rlib files because every workspace build rewrites them.\n\n## Why P0\n- Persistent working-tree dirtiness obscures real changes during review (this entire review had to ignore \\`target/.rustc_info.json\\` and 11 modified rlibs).\n- Repo bloat: tens of thousands of compiled artifacts in history.\n- Merge conflicts in compiled artifacts on every cross-branch operation.\n- Future operators cannot reproduce builds because compiled artifacts are out of sync with source after any rustc/dep version change.\n\n## Reproduction\n\\`\\`\\`\n\\$ git ls-files target/ | wc -l\n26943\n\\$ git status | head\nmodified:   target/.rustc_info.json\nmodified:   target/debug/libpkix_ac.rlib\n... (all 11 crate rlibs)\n\\`\\`\\`\n\n## Fix\n1. \\`git rm -r --cached target/\\` and commit\n2. Verify \\`/target/\\` line in \\`.gitignore\\` is honored\n3. Same treatment may be needed for the gitignored-but-stray \\`rust_out\\` binary in repo root\n\n## Scope reference\nWorkspace root, \\`.gitignore\\`, all of \\`target/\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-hj1d",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: 26,943 build artifacts under target/ tracked in git despite .gitignore",
+  "updated_at": "2026-05-07T20:30:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:11:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

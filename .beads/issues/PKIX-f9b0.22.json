@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:58Z",
+  "compaction_level": 0,
+  "content_hash": "78abfbfdaedcace61988534b651a1179ad80d37163126981ae09f925be88dc0b",
+  "created_at": "2026-05-07T17:22:52Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:355-357,431,691,1075,1085,1099,1103,1106 \u2014 Clippy (doc_markdown) flags identifiers and numeric literals in doc comments that are not backtick-wrapped. Examples: '1_773_532_800' at line 355, 'web_pki_policy' at line 691, 'max_validity_secs' at line 691, 'SubjectAltName' at line 431, 'smime_policy' at line 1075, 'require_rfc822_san' at line 1075, 'MissingRfc822San' at line 1099, 'required_leaf_eku' at line 1106. Fix: wrap each flagged token in backticks. Mostly mechanical. Most occurrences are in test-module doc comments.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-profiles] doc_markdown: identifiers/numeric literals in doc comments need backticks",
+  "updated_at": "2026-05-07T17:32:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

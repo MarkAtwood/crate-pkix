@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f9cc42d211ed650f368a61d05f55b6b7532449635797c55aa6e9d19df00c000d",
+  "created_at": "2026-05-11T04:44:35Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 1 of 6. Verifies that AKI-aware candidate\nselection (PKIX-yn3e, already closed) finds the verifying path on the first\nDFS pass when two intermediates share the same issuer DN but have different\nSubjectPublicKeyInfos.\n\n## What\n\nPool topology:\n\n```\nStressRoot \u2500\u2500 signs \u2500\u2500 BridgeIntermediateOld   (SKI=key0, same DN)\nStressRoot \u2500\u2500 signs \u2500\u2500 BridgeIntermediateNew   (SKI=key1, same DN)\nBridgeIntermediateNew \u2500\u2500 signs \u2500\u2500 BridgedEE\n```\n\nEE.AKI = key1 (must match BridgeIntermediateNew.SKI).\n\nBuild steps:\n\n1. Use the PKIX-xj81.1 generator to issue:\n   - `BridgeIntermediateOld.crt` and `BridgeIntermediateNew.crt` with the\n     same subject DN, different keys, both with `SubjectKeyIdentifier` set\n     to their SHA-1-of-SPKI as per RFC 5280 \u00a74.2.1.2 method (1).\n   - `BridgedEE.crt` signed by BridgeIntermediateNew, with\n     `AuthorityKeyIdentifier::keyIdentifier = BridgeIntermediateNew.SKI`.\n2. Commit the three DER fixtures.\n3. Test (`tests/bridge_aki.rs`):\n   - Pool = both intermediates inserted in the \"wrong\" order (Old first).\n   - `build_path(&ee, &pool, &[anchor])` must succeed.\n   - The returned chain must contain `BridgeIntermediateNew`, NOT\n     `BridgeIntermediateOld`, verified by comparing the SubjectKeyIdentifier\n     in the chain[1] cert against `BridgeIntermediateNew`s expected SKI.\n   - `validate_path(...)` must succeed end-to-end.\n4. Independent oracle: parse the DER fixtures with x509-cert and inspect the\n   AKI/SKI extensions in the test itself; compare the extracted bytes to\n   hard-coded hex literals lifted from `openssl x509 -text` output captured\n   at fixture-creation time. The hard-coded constants are the external\n   oracle; the test must not use the path-builder to derive them.\n\n## Acceptance\n\n- [ ] Three DER fixtures committed.\n- [ ] Generation steps documented in `tests/fixtures/generate.sh` so\n      regeneration is reproducible.\n- [ ] One integration test verifying AKI-correct selection.\n- [ ] Test fails (with a clear message) if AKI handling is regressed.\n\n## Depends on\n\nPKIX-xj81.1 (shared generator + helpers).",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: bridge CA cross-cert AKI disambiguation fixture+test",
+  "updated_at": "2026-05-11T04:44:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:44:34Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:27Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

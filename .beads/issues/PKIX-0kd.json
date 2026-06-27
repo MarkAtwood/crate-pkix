@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Expanded Error enum with CRL/OCSP-specific variants, Display, and std::error::Error with source()",
+  "closed_at": "2026-05-02T07:34:08Z",
+  "compaction_level": 0,
+  "content_hash": "dd34475f23b77aef84b79da61acef3c5e65b9d4dc0b25581df4c4bebe878785e",
+  "created_at": "2026-05-02T05:53:21Z",
+  "created_by": "Mark Atwood",
+  "description": "Define the pkix_revocation::Error enum with Display and std::error::Error impls.\n\nBLOCKED BY: PKIX-e9v (Display/Error impl pattern should be consistent with pkix-path).\n\nThis is the first issue in the revocation epic. It establishes the error type that CrlChecker and OcspChecker will return, and the type that RevocationChecker::check_revocation returns after PKIX-b9z is fixed.\n\nVariants:\n  Revoked {\n    // The serial number of the revoked certificate (for logging/diagnostics)\n    serial: x509_cert::serial_number::SerialNumber,\n    // RFC 5280 \u00a75.3.1 reason code if present in the CRL entry (0=unspecified)\n    reason_code: Option<u8>,\n  }\n  CrlExpired   \u2014 CRL thisUpdate/nextUpdate window has expired\n  CrlSignatureInvalid   \u2014 CRL signature did not verify against issuer SPKI\n  CrlParseError(der::Error)  \u2014 DER parse failure\n  OcspSignatureInvalid\n  OcspStatusUnknown   \u2014 OCSP responder returned 'unknown' status (hard-fail)\n  OcspParseError(der::Error)\n\nimpl fmt::Display for Error: human-readable messages for each variant.\n#[cfg(feature = std)] impl std::error::Error for Error with source() returning inner der::Error where applicable.\n\nResult type alias: pub type Result<T> = core::result::Result<T, Error>;",
+  "ephemeral": 0,
+  "id": "PKIX-0kd",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: define Error enum",
+  "updated_at": "2026-05-02T07:34:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:53:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-e9v",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

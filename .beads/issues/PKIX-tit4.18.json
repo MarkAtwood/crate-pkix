@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:32Z",
+  "compaction_level": 0,
+  "content_hash": "372c9ab94c4df294ad186a2e830084a4b9f57862d5523a6b47346724d7968e56",
+  "created_at": "2026-05-14T05:07:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:437-440 carries a compile-time assertion:\n\n  const _: fn() = || {\n      fn _assert_send_sync<T: Send + Sync>() {}\n      _assert_send_sync::<Error>();\n  };\n\nwith a comment noting that TrustAnchor is covered by an equivalent\nassertion in pkix-path. This is the right pattern \u2014 it ensures the\nproperties survive future refactors. But it is not exposed in the\nrustdoc, so a caller reading docs.rs cannot see the guarantee.\n\nWhat goes wrong for a caller in production:\n\n  - The natural use pattern is 'load anchors at startup on the main\n    thread, share them across worker threads.' Without a documented\n    Send+Sync contract, callers either:\n      (i)  read the source to verify, which is a cost the maintainer\n           could amortize once by writing the docstring, or\n      (ii) defensively wrap anchors in Arc<Mutex<...>>, sacrificing\n           lock-free read concurrency, or\n      (iii) assume Send+Sync without checking, exposing themselves to\n           a future maintainer change that drops the property without\n           noticing the source-level assertion.\n  - Error: Send + Sync matters when the error crosses thread boundaries\n    in a worker pool that handles trust-store loads asynchronously. Same\n    'read source vs document' tradeoff.\n\nThis is a one-line rustdoc fix. Examples in other workspace crates already\ndo this (e.g., pkix-path has Send+Sync mentioned in TrustAnchor's rustdoc\nor workspace stability section \u2014 verify and match the existing pattern).\n\nSuggested top-level rustdoc addition to lib.rs after the # Stability\nsection:\n\n  //! # Thread safety\n  //!\n  //! `TrustAnchor`, `Error`, and `IoFailure` are all `Send + Sync`.\n  //! Trust anchors are typically loaded once at startup and shared by\n  //! reference across worker threads or behind `Arc<Vec<TrustAnchor>>`.\n  //! Compile-time assertions (see source) enforce this; the property\n  //! is part of the public contract.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Send + Sync contract on Error / TrustAnchor is compile-asserted but not in rustdoc; callers must read source to confirm",
+  "updated_at": "2026-05-14T08:14:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:07:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

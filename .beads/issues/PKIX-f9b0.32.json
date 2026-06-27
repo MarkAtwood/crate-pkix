@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:29:30Z",
+  "compaction_level": 0,
+  "content_hash": "af762b8531066f7956140dca486601cc4e4dcef2adcfee8d5be3b016352e99a8",
+  "created_at": "2026-05-07T17:23:23Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs:544-548 \u2014 verify_delta_crl_and_collect() ends with:\n\n    Ok(delta_crl.tbs_cert_list.revoked_certificates\n        .clone()\n        .unwrap_or_default())\n\nThis clones the entire Vec<RevokedCert> to return an owned Vec. The CertificateList is borrowed for the duration of the function; returning a reference instead of cloning would eliminate the allocation. Signature change: return &[RevokedCert] borrowed from the parsed CertificateList, which must be kept alive by the caller. Callers (check_revocation, check_revocation_against_anchor) already hold the parsed delta_crl in scope, so lifetime extension is straightforward.\n\nAlso, the else-branch Vec::new() at crl.rs:322 and crl.rs:428 is idiomatic given Vec::new() does not heap-allocate, but with a &[RevokedCert] return type both branches become zero-cost.\n\nPriority P3 \u2014 correctness unaffected; idiomatic Rust prefers borrowing over cloning when the owner is in scope.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation] borrow delta entries instead of cloning into Vec",
+  "updated_at": "2026-05-07T17:29:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

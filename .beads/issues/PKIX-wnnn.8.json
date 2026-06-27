@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fb88fb5db1a9a2f4bf7fa38054b2cc07b741ce92ea02dbb20a49b2504d018a2e",
+  "created_at": "2026-05-14T18:29:22Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/build_first_valid_path.rs covers: positive (tc60), NoValidPath (AlwaysRejectVerifier), NoPathFound (empty pool). It does NOT cover BudgetExceeded propagation, despite the rustdoc explicitly documenting that variant (lib.rs:934-935: \"DepthExceeded / BudgetExceeded \u2014 propagated from build_path_candidates when the iterator surfaces them\"). Risk: a future refactor of the propagation path (e.g., a well-intentioned contributor folding BudgetExceeded into NoValidPath because \"they're both no-path results\") will silently change semantics with no test failure. The fixture pattern from tests/integration.rs:test_iterator_budget_bounded_across_calls is reusable \u2014 a budget-tight config on a pool that yields one rejected candidate before exhaustion would exercise the propagation. Also missing: DepthExceeded propagation, but that's less critical because the depth-probe logic in build_first_valid_path_with_config (lib.rs:1031-1042) has its own subtle case-split between \"zero candidates yielded \u2192 probe\" and \"some candidates yielded but all rejected \u2192 NoValidPath wins\".",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "no test exercises BudgetExceeded propagation through build_first_valid_path",
+  "updated_at": "2026-05-14T18:29:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

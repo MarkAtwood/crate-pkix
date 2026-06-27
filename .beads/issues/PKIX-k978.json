@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:18Z",
+  "compaction_level": 0,
+  "content_hash": "6a0e540b93727f2a16c624ba2c62312f06341d6904ee3c4e21e555ec4cc89f96",
+  "created_at": "2026-05-07T20:27:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`EvaluationReport` at `pkix-lint/src/report.rs:55` derives `PartialEq` but not `Eq`. Clippy flags this with `clippy::derive_partial_eq_without_eq`. All fields are themselves `Eq`, so deriving `Eq` is sound and gives consumers access to `Hash` derivation, `BTreeSet`/`HashSet` storage, etc.\n\n## Location\n\n```\npkix-lint/src/report.rs:55-56\n\n#[derive(Clone, Debug, Default, PartialEq)]\npub struct EvaluationReport {\n```\n\n## Fix\n\n```rust\n#[derive(Clone, Debug, Default, PartialEq, Eq)]\npub struct EvaluationReport {\n```\n\n## Priority\n\nP3 \u2014 small, idiomatic, observable to consumers in a way that matters (Hash, set keys).\n",
+  "ephemeral": 0,
+  "id": "PKIX-k978",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: EvaluationReport derives PartialEq but not Eq",
+  "updated_at": "2026-05-07T21:25:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1958875d44f305eebbcf612fdff8070e884ef3430218ce2b6bdb8459d8007210",
+  "created_at": "2026-05-14T18:19:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1493-1505 splits one logical lookup (\"find the EKU extension\") into two `.ok_or` calls that both produce the same fixed-string error:\n\n```rust\nlet exts = leaf\n    .tbs_certificate\n    .extensions\n    .as_ref()\n    .ok_or(Error::ProfileViolation {\n        reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n    })?;\nlet ext = exts\n    .iter()\n    .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)\n    .ok_or(Error::ProfileViolation {\n        reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n    })?;\n```\n\nThe two failure cases (`extensions == None` and `extensions == Some(empty)`-or-`Some(no-EKU)`) produce byte-identical error messages, which is the correct behaviour \u2014 the caller cannot distinguish them. But the source has the same error literal in two places.\n\nThe same module already has the idiomatic one-liner at `aia_extract.rs:67-75`:\n\n```rust\nfn find_extension_value<'a>(cert: &'a Certificate, oid: &ObjectIdentifier) -> Option<&'a [u8]> {\n    cert.tbs_certificate\n        .extensions\n        .as_deref()\n        .unwrap_or(&[])\n        .iter()\n        .find(|e| &e.extn_id == oid)\n        .map(|e| e.extn_value.as_bytes())\n}\n```\n\nAdopted here:\n\n```rust\nlet ext = leaf\n    .tbs_certificate\n    .extensions\n    .as_deref()\n    .unwrap_or(&[])\n    .iter()\n    .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)\n    .ok_or(Error::ProfileViolation {\n        reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n    })?;\n```\n\nOne `.ok_or`, one error literal, no possibility of the two literals drifting apart in a future refactor (e.g. someone tweaks one wording but not the other, producing inconsistent error output depending on which path was taken).\n\nWhat goes wrong if it stays: two identical string literals are bug bait. A typo-fix or wording change applied to one but not the other becomes a silent inconsistency \u2014 the same logical failure produces different error strings depending on which branch happened to execute. The `.as_deref().unwrap_or(&[])` pattern is already established in this file at `aia_extract.rs` \u2014 consistency favours using it here too.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.41",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "enforce_timestamping_eku_critical_and_sole: two .ok_or with identical error strings; use .as_deref().unwrap_or(&[])",
+  "updated_at": "2026-05-14T18:19:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:19:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

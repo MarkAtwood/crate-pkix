@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T23:43:09Z",
+  "id": "019e1e92-a8f1-7652-a83b-9d0070a2f883",
+  "issue_id": "PKIX-fmtv.11",
+  "text": "API SHAPE UPDATE 2026-05-12 (cascade from PKIX-2l0v.3 = C, filed as PKIX-gsd9): verify_tls_server's implementation composes a Verifier struct internally rather than calling free-function verify_chain. The Verifier struct holds the trust-domain seam (SignatureVerifier + RevocationChecker + AiaFetcher) + anchors + time; verify_tls_server creates a Verifier, calls verify_one(chain), then runs hostname binding via pkix-identity (+ optional DANE composition per PKIX-j32w.3 when dane feature is on). Free-function verify_chain stays as a thin wrapper for callers that don't need verify_tls_server's hostname-binding step. DESIGN SEAM IMPACT: this bead's earlier note that verify_tls_server 'must accept hostname AND port' still holds. The Verifier struct construction now happens INSIDE verify_tls_server's body (or via a builder), not exposed at the call site. PKIX-gsd9 lands first (Verifier struct exists), then PKIX-fmtv.11 implementation composes it."
+}

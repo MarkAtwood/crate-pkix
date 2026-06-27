@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:36:11Z",
+  "compaction_level": 0,
+  "content_hash": "a7be8aeaad67e8e3ced03e8ad2a6f07302af1ce4c2735c20b45f2617f58e1dcd",
+  "created_at": "2026-05-06T23:34:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Edition 2021 match ergonomics make ref/ref mut in if-let patterns non-idiomatic. Affected: pkix-revocation/src/crl.rs (2 sites), pkix-lint/src/deviation.rs (1 site), pkix-path/src/lib.rs (8+ sites). Replace 'if let Some(ref x) = foo' with 'if let Some(x) = &foo'.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "refactor: replace ref/ref mut in if-let patterns with & on scrutinee",
+  "updated_at": "2026-05-06T23:36:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:34:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

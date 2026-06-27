@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "395a4b2ab8a990df7d6e9606782b8087d4cb356d642195cafd88fa8a9da44c94",
+  "created_at": "2026-05-14T19:37:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/signer_discovery.rs:186-205 (find_parent) decodes both AKI on `cert` and SKI on every `candidate` in `bundle` on every call. reaches_self_signed (lines 139-175) calls find_parent up to bundle.len()+1 times. Net: O(N\u00b2) DER decode calls for a bundle of size N during a single signer-discovery construction.\n\nToday's bundles in PKITS \u00a74.5 are 2-3 certs, so this is microseconds. The concern is pkix-chain composing this with pkix-path-builder, which can hand pkix-revocation a bundle assembled from a much larger trust store + intermediate cache (50-500 certs in real deployments).\n\nx509-cert's Extension::from_der is not free \u2014 it allocates and runs ASN.1 state. For a 500-cert bundle, that's 250000 decode calls in the worst case, with allocations.\n\nFix: build a SKI lookup table at the top of reaches_self_signed: HashMap<&[u8], &Certificate> keyed by SKI bytes (or a slice-of-pairs if no_std-friendly). Bundle traversal becomes O(N) decode + O(1) lookup per step, total O(N) for the walk. Pkix-revocation already has std (the crl feature requires std per Cargo.toml line 22), so std HashMap is available.\n\nNot a hot path today; flagged for when bundles grow.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Per-cert SKI/AKI re-decoded on every iteration of reaches_self_signed",
+  "updated_at": "2026-05-14T19:37:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:37:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

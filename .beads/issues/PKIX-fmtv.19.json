@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:29:03Z",
+  "compaction_level": 0,
+  "content_hash": "8c7a501438499a10e8b2e094d82e07dc89af9dbbdb42bdff039ffbbb32573900",
+  "created_at": "2026-05-12T02:42:56Z",
+  "created_by": "Mark Atwood",
+  "description": "Differential testing of `pkix-chain::verify_*` against pyca/cryptography for the canonical purposes.\n\npyca has `x509.verification.PolicyBuilder` (RFC 6125-binding TLS verifier) and is the second oracle per AGENTS.md test discipline. `pkix-difftest` already has a pyca oracle for path validation.\n\nPer purpose:\n- **TLS server** \u2014 `PolicyBuilder().store(...).time(...).build_server_verifier(DNSName(...))` vs `pkix_chain::verify_tls_server`.\n- **TLS client** \u2014 `build_client_verifier(...)`.\n- **S/MIME** \u2014 pyca's S/MIME path may not exist; fall back to OpenSSL only.\n- **Code signing** \u2014 pyca doesn't ship a code-signing verifier; OpenSSL only.\n\nAcceptance: per-purpose pass-rate documented in `pkix-difftest/baseline-verify-pyca.md`. Coverage gaps (where pyca doesn't support a use case) documented.\n\n**Blocks on:** .15.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Differential testing against pyca/cryptography for canonical purposes",
+  "updated_at": "2026-05-13T05:29:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:44:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.15",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-12T21:39:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.22",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

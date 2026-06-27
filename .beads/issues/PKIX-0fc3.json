@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:33:58Z",
+  "compaction_level": 0,
+  "content_hash": "e31b984ca21c219c8d0523f45f77b0c53c907a109751ce7b3ce4d5107d179283",
+  "created_at": "2026-05-07T20:11:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-path/src/lib.rs\\` (v0.2.0 package) contains many doc comments that still describe the code as v0.1:\n\n- L509 (\\`ValidationPolicy\\` doc): \\\"Path-building (...) is **out of scope for v0.1**.\\\"\n- L752 (\\`ValidatedPath\\`): \\\"\\`ValidatedPath\\` derives \\`Copy\\` and is committed to remain \\`Copy\\` in all v0.1.x releases.\\\" \\\"Any future field additions ... will be added in a new minor version (v0.2+)\\\"\n- L800 (\\`validate_path\\`): \\\"See crate-level documentation for v0.1 scope limits.\\\"\n- L1057 (\\`PolicyNode\\`): \\\"# Limitations (v0.1) Policy qualifiers (\\`qualifier_set\\` ...) are not stored ... Application-specific qualifier processing is deferred to v0.2.\\\"\n- L1289\u20131290 (\\`names_match\\`): \\\"For v0.1: implements case-fold ... Full Unicode NFKD normalization is deferred to v0.2.\\\"\n- L1408\u20131424 (\\`any_to_str_bytes\\`): \\\"v0.1 partial normalization\\\" / \\\"v0.2 planned \u2014 decode then normalize:\\\" \u2014 but this is v0.2 already and the work is not done.\n- L1453: \\\"full Unicode case-folding (NFKC + case-fold) is deferred to v0.2.\\\"\n\n## Why P1\nSection 0 anchor \u2014 the package is v0.2.0; doc comments assert future v0.2 work that is overdue and treat the current version as v0.1. A reader cannot trust the documented scope when timeline references contradict the version they're reading.\n\n## Fix\nThree coherent options (pick one and apply consistently):\n1. Bump every \\\"v0.2 planned\\\" reference to \\\"v0.3 planned\\\" with bd-tracked issues.\n2. Implement the deferred items (NFKC, BMPString, qualifier_set) in v0.2.\n3. Drop the version qualifiers entirely and use \\\"current limitation\\\" / \\\"future work\\\" without a version commitment.\n\nOption 1 is the lowest-cost path consistent with the existing release.\n\n## Scope reference\n\\`pkix-path/src/lib.rs:509,752,800,1057,1289-1290,1408-1424,1453\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-0fc3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: pkix-path/src/lib.rs has 7+ stale \"v0.1\" doc references in v0.2.0 code",
+  "updated_at": "2026-05-07T20:33:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:12:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

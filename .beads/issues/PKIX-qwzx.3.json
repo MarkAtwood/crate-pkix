@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated pkix-path/README.md usage example to use TrustAnchor::from_cert(Certificate) and ValidationPolicy::new(now_unix), and validated.anchor_index.",
+  "closed_at": "2026-05-07T22:22:44Z",
+  "compaction_level": 0,
+  "content_hash": "d9d465a1b0b86fca02571d88ff617584b8c013bc125b908edb4fcb2ecc07143a",
+  "created_at": "2026-05-07T22:01:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/README.md \"Usage\" code block (lines 21-44) has three independent compilation errors:\n\n1. Lines 31-35: TrustAnchor is constructed with struct literal syntax:\n   ```\n   TrustAnchor {\n       subject: root_cert.tbs_certificate.subject.clone(),\n       subject_public_key_info: root_cert.tbs_certificate.subject_public_key_info.clone(),\n       name_constraints: None,\n   }\n   ```\n   TrustAnchor is `#[non_exhaustive]` (pkix-path/src/lib.rs:418); external crates cannot use struct-literal syntax. The struct's own doc at line 415 explicitly says: 'Construct via TrustAnchor::new ... Do not use struct literal syntax.'\n   Fix: `TrustAnchor::from_cert(root_cert)` or `TrustAnchor::new(subject, spki, name_constraints)`.\n\n2. Lines 37-40: Same issue with ValidationPolicy struct literal \u2014 `#[non_exhaustive]`.\n   Fix: `ValidationPolicy::new(1_780_272_000)`.\n\n3. Line 43: `println!(\"trust anchor subject: {:?}\", validated.trust_anchor.subject);` \u2014 ValidatedPath has no `trust_anchor` field. Its fields are `anchor_index: usize` and `depth: usize`.\n   Fix: `println!(\"anchor index: {}\", validated.anchor_index);` (and use `anchors[validated.anchor_index].subject` if the subject is needed).\n\nSeverity: P2 because this is the on-boarding example for the most security-critical crate in the workspace.\n\nPass-1 attribution: not addressed in commits 0d3e5db6..01908663. Add the README to a doctest target (or use `#[doc = include_str!(\"../README.md\")]` with appropriate `# fn main(){}` framing) so the compiler enforces correctness.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: pkix-path/README.md usage example does not compile (3 errors)",
+  "updated_at": "2026-05-07T22:22:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

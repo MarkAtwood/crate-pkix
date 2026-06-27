@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0c175ed84f6d239c2e3758bc6267d0c6d69f51a9b07e816e270d670ac9d1b21f",
+  "created_at": "2026-05-14T17:48:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:6-40\n\nThe crate-level rustdoc lists what is implemented but does not show\nthe caller workflow:\n\n> SCT binary-format parsing ... is implemented; see\n> `SignedCertificateTimestamp` and `SctList`. Delivery-channel\n> adapters ... see `sct_list_from_tls_extension` and ...\n> `sct_list_from_ocsp_response`. CT log list management is\n> implemented behind ... see `CtLog`, `CtLogList`, and\n> `CtLogList::from_google_log_list_json`. SCT signature\n> verification ... see `verify_sct_for_cert` and\n> `verify_sct_for_precert`. Merkle inclusion proof verification\n> ... see `verify_inclusion` and `verify_sth`.\n\nThis reads as a feature checklist, not a usage guide. The caller\nwho wants to verify CT for a TLS server has to discover, in order:\n\n1. Parse SCTs from `Certificate.tbs_certificate.extensions[sct_oid]`\n   via `SctList::from_extension_value`.\n2. Or for OCSP: `sct_list_from_ocsp_response`.\n3. Or for TLS handshake: `sct_list_from_tls_extension`.\n4. Get a log list:\n   `CtLogList::from_google_log_list_json(fetch(GOOGLE_URL))`.\n5. Build verifier: `SctVerifier::new(log_list, DefaultVerifier)`.\n6. For embedded SCTs (precert_entry):\n   `verify_embedded_scts(leaf, issuer)` or per-SCT\n   `verify_sct_for_precert(sct, leaf, issuer)`.\n7. For OCSP / TLS handshake SCTs (x509_entry): per-SCT\n   `verify_sct_for_cert(sct, cert)`.\n8. Check the count against your policy threshold (BR \u00a73.2.2.9).\n\nThat 8-step pipeline is in the maintainer's head but not on the\npage.\n\nRecommendation: add a `# Usage` section to lib.rs (after the\nexisting `# Limitations` section, perhaps renamed `# Status`).\n\n```rust\n//! # Usage\n//!\n//! To verify CT compliance for a TLS server cert:\n//!\n//! ```no_run\n//! use pkix_ct::{SctList, SctVerifier, CtLogList};\n//! use pkix_path::DefaultVerifier;\n//!\n//! // Step 1 \u2014 log list (caller-supplied trust state).\n//! let logs = CtLogList::from_google_log_list_json(json)?;\n//! let verifier = SctVerifier::new(logs, DefaultVerifier);\n//!\n//! // Step 2 \u2014 verify embedded SCTs.\n//! let n = verifier.verify_embedded_scts(leaf_cert, issuer_cert)?;\n//! assert!(n >= 2, \"CA/B Forum TLS BR \u00a73.2.2.9 minimum\");\n//!\n//! // Step 3 \u2014 optionally verify Merkle inclusion proofs.\n//! // ...\n//! # Ok::<(), pkix_ct::Error>(())\n//! ```\n```\n\nPriority P3 because the information is technically available; this\nmakes the contract accessible. Similar treatment in `pkix-chain`'s\nREADME (which I checked earlier) makes a big difference for caller\nonboarding.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.39",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Crate docs (lib.rs) lack 'Caller workflow' section \u2014 caller must read 5 modules to find the pipeline",
+  "updated_at": "2026-05-14T17:48:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:48:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

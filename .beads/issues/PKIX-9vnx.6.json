@@ -1,0 +1,39 @@
+{
+  "close_reason": "All acceptance criteria met by children .6.1/.6.2/.6.3/.6.4: Lint trait OSCAL-Control metadata (.6.1), Catalog JSON serializer (.6.2), round-trip parser + LintRunner::filter_to_ids (.6.3), parameter mechanism + first RFC-conformance Lint Rfc5280MaxSerialLengthLint (.6.4). Citation URLs use rfc-editor.org form (.6.1 + .6.4). Catalog is constructible from built-in lints (the lint set is currently just Rfc5280MaxSerialLengthLint in pkix-lint proper + the CABF set in cabf_tls_br pending PKIX-amgn.5 migration). Reparented .6.5 (Profile modify-directive overrides) under PKIX-9vnx.7 (Profile composition) \u2014 that work is Profile-side, not Lint-as-Control.",
+  "closed_at": "2026-05-11T22:20:40Z",
+  "compaction_level": 0,
+  "content_hash": "5df098d225d3b161b7877bde637b5d3d91a72e9506cea9194dae0ced244eb849",
+  "created_at": "2026-05-11T05:54:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nUnder Level 3 OSCAL alignment, each lint IS an OSCAL Control. The Rust `Lint` trait stays for the executable side (checking a cert) but each impl declares its canonical OSCAL Control metadata: id, title, description, parameters, parts, etc. Loading a lint Catalog from an OSCAL JSON file constructs the same set of Controls that hardcoded Lint impls produce.\n\n## What\n\nExtend the `Lint` trait so each implementor declares OSCAL Control metadata:\n\n```rust\npub trait Lint {\n    // Existing executable side\n    fn check_cert(&self, cert: &Certificate, ctx: &LintContext) -> LintResult;\n    \n    // New canonical-metadata side\n    fn control(&self) -> oscal::Control;\n}\n\n// Or alternatively: Lint impls register declaratively into a Catalog,\n// and the executable side is keyed by Control id at runtime.\n```\n\nEach `oscal::Control` carries:\n\n- `id` \u2014 stable identifier (e.g., `rfc5280.crit-ext-must-be-recognized`).\n- `title` \u2014 short human-readable name.\n- `parts` \u2014 structured prose: `statement` (the rule), `guidance` (interpretation notes), `assessment-objective` (what passing/failing means).\n- `params` \u2014 parameters the rule can be tuned by (e.g., max serial length).\n- `links` \u2014 citations to RFC sections (e.g., `href=\"rfc5280#section-4.2.1.9\"`).\n\nA 'Catalog' is then `Vec<oscal::Control>` corresponding to a set of `Lint` impls. Loading from JSON deserializes a Catalog; pairing with executable Rust code happens by id.\n\n## Acceptance\n\n- [ ] `Lint` trait carries a way to obtain the OSCAL Control metadata for each impl.\n- [ ] A canonical 'RFC-conformance Catalog' is constructible from `pkix-lint`'s built-in lints.\n- [ ] Catalog round-trips: deserialize OSCAL JSON, run lints, get same set of Controls as the hardcoded Catalog.\n- [ ] Citation links use `https://www.rfc-editor.org/rfc/...` URLs or DOI form.\n- [ ] At least one lint demonstrates parameter use (e.g., a `max-serial-length` parameter overrideable via OSCAL Profile).\n\n## Depends on\n\nPKIX-9vnx.2 (binding for `oscal::Control`), PKIX-9vnx.3, PKIX-9vnx.4, PKIX-9vnx.5 (the rest of the data model).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Reframed 2026-05-11 (Arch 2 \u2014 see PKIX-ztmr / PKIX-9vnx notes):\n\n- Lint trait grows metadata methods (id, title, description, severity, citation, parameters) \u2014 unchanged from original plan.\n- The new method shape is NOT `fn control(&self) -> oscal::Control` (that implies an `oscal::Control` Rust type). Instead either:\n  (a) discrete trait methods (`fn title(&self) -> &str`, `fn rfc_citation(&self) -> Option<&str>`, etc.) that a serializer composes into OSCAL Control JSON, or\n  (b) `fn oscal_control_metadata(&self) -> serde_json::Value` if a lint wants to emit a full custom Control fragment.\n- A canonical 'RFC-conformance Catalog' is built by iterating the registered Lints and projecting each one to OSCAL Control JSON via the serializer. The Catalog is materialized as JSON, not as a Rust `oscal::Catalog` struct.\n- Round-trip: load Catalog JSON, pair each Control by id with a registered Lint impl, run lints. Acceptance unchanged.\n- No longer blocked by PKIX-9vnx.2 (closed).\nDecomposed 2026-05-11 by do-beads loop session bd-spin-20260511T170116Z-854030 into 5 children with linear+parallel deps:\n\n- PKIX-9vnx.6.1 (P2) \u2014 Lint trait OSCAL-Control metadata methods (foundational). No deps.\n- PKIX-9vnx.6.2 (P2) \u2014 OSCAL Catalog JSON serializer. Depends on .6.1.\n- PKIX-9vnx.6.3 (P2) \u2014 OSCAL Catalog round-trip + id-pair runner. Depends on .6.2.\n- PKIX-9vnx.6.4 (P2) \u2014 Lint parameter mechanism + first parametric Lint (Rfc5280MaxSerialLengthLint). Depends on .6.1. Parallelizable with .6.2 / .6.3.\n- PKIX-9vnx.6.5 (P3) \u2014 OSCAL Profile modify-directive overrides parameters. Depends on .6.4 and .6.2.\n\nKey context for whichever agent picks up .6.1 first:\n- pkix-lint has ZERO RFC-conformance Lint impls today; only the 6 CABF lints (scheduled to move to pkix-lint-cabf via PKIX-amgn.3).\n- The Lint trait already has id/citation/severity/scope/applies_to. .6.1 adds title/description/rfc_section_id/rfc_url as defaults.\n- No Parameter type exists; .6.4 designs it.\n- LintRunner registers via Vec<Box<dyn Lint>>; no id-keyed map exists (.6.3 introduces one).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Lint-as-Control mapping: each Lint declares OSCAL Control metadata",
+  "updated_at": "2026-05-11T22:20:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:54:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

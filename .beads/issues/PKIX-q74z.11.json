@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a7a0221615266a01459880a3261f9654238efb075cda7b60709369e394a02397",
+  "created_at": "2026-05-14T14:24:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:671 \u2014 the comparison `if r != *expected_root` uses [u8;32] PartialEq, which short-circuits on first byte mismatch (variable-time). For SCT verification, this is not a problem: the SCT-verification flow is offline / does not run against attacker-controlled timing channels.\n\nHowever the workspace ships SctVerifier for use inside chain validation pipelines that DO sometimes run against attacker-controlled timing (e.g., TLS handshake verification, web-side OCSP+SCT validation). A Merkle root mismatch leaks a few bytes of timing info about which byte of the reconstructed root first differs from the expected root \u2014 this is reconstructed from caller-controlled audit_path data, so an attacker who can choose audit_path can probe the expected root one byte at a time.\n\nIn practice this is a weak side channel (root_hash is public anyway, distributed via signed STH) and would require many billions of audit_path probes to recover. So P4 \u2014 flag, do not block.\n\nPre-1.0 it is free to use subtle::ConstantTimeEq::ct_eq() \u2014 matches what other crypto crates in the workspace do.\n\nSuggested fix: import subtle::ConstantTimeEq, replace the != with ct_eq. Zero engineering cost; defense in depth.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verify_sth uses constant-time eq via != on signature path but root_hash comparison in verify_inclusion_inner is non-CT",
+  "updated_at": "2026-05-14T14:24:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:24:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

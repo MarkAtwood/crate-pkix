@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: added BitOr impl alongside existing BitOrAssign.",
+  "closed_at": "2026-05-05T16:08:12Z",
+  "compaction_level": 0,
+  "content_hash": "652aeef6801c1f6c3ff5adf8c02cdfe36c693df4e056188c1ea6fe0831e6b514",
+  "created_at": "2026-05-05T15:46:02Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1156\u20131160\n\nOnly BitOrAssign is implemented for NcTypeMask:\n\n    impl core::ops::BitOrAssign for NcTypeMask { ... }\n\nBitOr (the non-assignment form, returning a new value) is not.  The code uses |= exclusively, but a bitmask type used in expressions would naturally want |, & and ^ as well.  Without BitOr, expressions like 'let combined = a | b;' do not compile, forcing callers to write 'let mut tmp = a; tmp |= b; tmp'.\n\nThe idiomatic pattern for a bitmask newtype in Rust is to implement both BitOr and BitOrAssign (the latter can delegate to the former).  Since BitAnd is used implicitly in contains() (on the inner u32), BitAnd on the newtype should also be considered.\n\nThis is not a current bug \u2014 all callers happen to use |= \u2014 but it is an incomplete API for a type that represents a bit-set.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NcTypeMask missing BitOr (only BitOrAssign implemented)",
+  "updated_at": "2026-05-05T16:08:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

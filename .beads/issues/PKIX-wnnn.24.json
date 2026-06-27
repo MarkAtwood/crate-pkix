@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8a419e01d44f5a920596271151031ae836325f2f25954150fbf84bcece3a0c17",
+  "created_at": "2026-05-14T18:37:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:185-194 (rustdoc on `Error::NoValidPath`):\n\n```rust\n/// `last_error` is the [`pkix_path::Error::Display`] rendering of the\n/// last candidate's validation failure. \u2026\n///\n/// [`SignatureVerifier`]: pkix_path::SignatureVerifier\n/// [`pkix_path::Error::Display`]: pkix_path::Error\n```\n\nThe intra-doc link `[`pkix_path::Error::Display`]` is a reference-style link with definition `pkix_path::Error::Display: pkix_path::Error`. Rustdoc resolves `pkix_path::Error` to the type page and emits an HTML anchor with visible text \"pkix_path::Error::Display\" pointing at `\u2026/pkix_path/enum.Error.html`. A reader clicks the link expecting to see the `Display` impl and lands on the enum's main page.\n\nThis is technically a working link, so `cargo doc --all-features` won't warn (unlike PKIX-wnnn.2 where the target was a private item \u2014 that one's a hard fail). But the visible text mismatch is misleading: the reader has to scroll the Error type page to find the Display impl block, with no indication that's what was intended.\n\nThree principled fixes (pick one):\n\n1. **Drop the `::Display` from the link, mention Display in surrounding prose**:\n   ```\n   /// `last_error` is the [`Display`] rendering of the last candidate's\n   /// [`pkix_path::Error`].\n   ```\n   Rustdoc links to `pkix_path::Error`, and `Display` is the standard trait \u2014 the reader recognizes the pattern.\n\n2. **Use a fragment link to the actual Display impl block**: this is harder to make stable across rustdoc versions because the anchor ID is generated.\n\n3. **Plain text, no link**:\n   ```\n   /// `last_error` is the `Display` rendering of the last\n   /// [`pkix_path::Error`].\n   ```\n\nOption (3) is the cheapest. Option (1) is the most informative.\n\nDistinct from PKIX-wnnn.2 (which is the `cargo doc` failure on a private link). This one is a UX/accuracy issue, not a build failure.\n\nNote: this is \"opinion-adjacent.\" If the maintainer prefers the current link as a stylistic choice (where the visible text describes intent, not target), close as opinion. But the current text-vs-target mismatch is real.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::NoValidPath rustdoc intra-doc link [pkix_path::Error::Display] points at the type, not the Display impl",
+  "updated_at": "2026-05-14T18:37:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:37:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

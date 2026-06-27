@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.69",
+  "title": "pkix-chain-simple missing re-export of pkix_path",
+  "description": "pkix-chain-simple/src/lib.rs uses pkix_path::Error, TrustAnchor, ValidatedPath in its public API surface (Error::Path variant at line 330, verify_simple signature) but does not re-export pkix_path.\n\nLocation: pkix-chain-simple/src/lib.rs:72-77, 330\nRecommendation: Add pub use pkix_path; to pkix-chain-simple's public API.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:49Z",
+  "updated_at": "2026-06-15T17:19:17Z",
+  "closed_at": "2026-06-15T17:19:17Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:48"
+    }
+  ]
+}

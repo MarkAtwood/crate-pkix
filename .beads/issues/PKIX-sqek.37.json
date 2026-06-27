@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "57351b8f5c12fa61695366706a435ac25b6d399e9be36636468618924e7fa625",
+  "created_at": "2026-05-14T18:18:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1609-1612 uses a hand-rolled const block to assert `Error: Send + Sync`:\n\n```rust\nconst _: fn() = || {\n    fn _assert_send_sync<T: Send + Sync>() {}\n    _assert_send_sync::<Error>();\n};\n```\n\nThe workspace's review-rusty prompt explicitly notes that `static_assertions::assert_impl_all!` used internally is **encouraged**:\n\n> `static_assertions` (`assert_eq_size!`, `assert_impl_all!`) used internally: encouraged. Compile-time invariants that would otherwise live only in comments.\n\nThe idiomatic equivalent is one line:\n\n```rust\nstatic_assertions::assert_impl_all!(Error: Send, Sync);\n```\n\nThis:\n- Renders the intent in the line itself (no `_assert_send_sync` helper to read past)\n- Produces clearer compile errors when the assertion fails (the macro names the type and the bound, the hand-rolled version produces a generic \"the trait bound is not satisfied\" message far from the call site)\n- Is the documented pattern other workspace crates already use (PKIX-2l0v.2 stance)\n\nWhat goes wrong if it stays: every reader has to parse the closure/inner-fn dance to confirm it does what `assert_impl_all!` does in one well-known idiom. The pattern is also harder to grep for \u2014 a new contributor looking for \"how do I assert Send+Sync in this workspace?\" will not find this incantation by searching for the obvious keyword. Workspace dep cost: `static_assertions = \"1\"` is ~5kB of compile-time-only macros.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.37",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Hand-rolled const _: fn() Send+Sync assertion instead of static_assertions::assert_impl_all",
+  "updated_at": "2026-05-14T18:18:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:18:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

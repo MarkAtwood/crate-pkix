@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.12",
+  "title": "IdentityError::NotYetImplemented retained as dead variant",
+  "description": "pkix_identity::IdentityError::NotYetImplemented is documented as 'Retained for API compatibility but no longer returned by any function in this crate.' The enum is already #[non_exhaustive], so removing a variant in a minor release is a semver break (callers matching on it would stop compiling). However, keeping a dead variant that was only ever used during scaffold development is a permanent API wart. No function returns it; no caller should match on it.\n\nWhat goes wrong if this stays as-is: Every downstream pattern match on IdentityError must handle (or wildcard-match) a variant that can never occur in practice. The variant name communicates the wrong thing to new callers ('this crate has missing functionality') when in fact every entry point is fully implemented. This is a minor API clarity issue, not a safety concern.\n\nThe #[non_exhaustive] annotation already allows adding new variants in the future. The only principled options are: (a) keep it forever as a historical artifact, (b) remove it in the next semver-breaking release with a deprecation warning in between. Option (b) is free pre-1.0.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-identity/src/lib.rs line 347 (NotYetImplemented variant)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:35Z",
+  "updated_at": "2026-06-15T16:58:10Z",
+  "closed_at": "2026-06-15T16:58:10Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:34"
+    }
+  ]
+}

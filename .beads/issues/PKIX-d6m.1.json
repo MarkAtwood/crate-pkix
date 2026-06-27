@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: removed redundant to_lowercase() call in IssuerDnContains::matches; substring is pre-lowercased by DeviationStore::add.",
+  "closed_at": "2026-05-07T01:57:28Z",
+  "compaction_level": 0,
+  "content_hash": "11293a92124f6730da9f2f3fd08194fd530c853f11346e372a68a1468e062a8c",
+  "created_at": "2026-05-07T01:48:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:311 \u2014 DeviationScope::IssuerDnContains(matches) calls substring.to_lowercase().as_str() on every call to matches(), allocating a String each time. The invariant from DeviationStore::add() guarantees the stored substring is already lowercase. Fix: compare directly against substring.as_str() (no to_lowercase needed). The to_lowercase call is dead work proportional to the number of cert evaluations times the number of IssuerDnContains deviations.",
+  "ephemeral": 0,
+  "id": "PKIX-d6m.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "R1: deviation.rs: redundant to_lowercase() in IssuerDnContains::matches",
+  "updated_at": "2026-05-07T01:57:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:48:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-d6m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

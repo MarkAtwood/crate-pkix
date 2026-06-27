@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.27",
+  "title": "RevocationChecker default skip is a pit of failure for custom impls",
+  "description": "RevocationChecker::check_revocation_against_anchor has a default impl that returns Ok(()) (skip). The trait rustdoc (pkix-revocation/src/lib.rs lines 615-703) warns about this extensively, and pkix-chain's verify_chain rustdoc (pkix-chain/src/lib.rs lines 367-383) documents it again. But the API shape itself is a pit of failure: any custom RevocationChecker that only implements check_revocation() will silently skip the anchor-issued cert with no compile-time or runtime signal. The warning text is thorough, but the damage when someone misses it is a silent security gap (the cert closest to the root is unchecked). What goes wrong: a consumer implements RevocationChecker with only check_revocation(), deploys it, and the cert issued directly by the trust anchor is never revocation-checked. There is no test assertion, no log, no metric \u2014 just a silent Ok(()). Consider: (a) a lint or clippy-style check in CI that detects impl RevocationChecker without check_revocation_against_anchor, (b) a sealed helper trait that requires both methods, or (c) a runtime diagnostic on the Verifier that logs when the default is hit. This is an API-contract risk, not a correctness bug in the existing code \u2014 CrlChecker and OcspChecker both override correctly.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:11Z",
+  "updated_at": "2026-06-15T17:07:38Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:11"
+    }
+  ]
+}

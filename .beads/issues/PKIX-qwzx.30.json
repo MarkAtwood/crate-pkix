@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Applied recommended action: added a Variant naming convention section to pkix-revocation::Error rustdoc explaining the Crl*/Ocsp* prefix and the three intentional exceptions (Revoked, MalformedCertificate, DeltaCrlBaseMismatch). No renames per the issue's recommendation. Doc rebuilds with -D warnings.",
+  "closed_at": "2026-05-07T22:38:09Z",
+  "compaction_level": 0,
+  "content_hash": "b61e4fe526ad87750ec9ba0e48e5a20e3c4fcbc646f63d69ae4c7de2d3e96793",
+  "created_at": "2026-05-07T22:17:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\n`pkix-revocation::Error` has 17 variants. 14 of them follow a clear\nprefix convention:\n- `Crl*` for CRL-specific failures (8 variants: `CrlExpired`,\n  `CrlIssuerMismatch`, `CrlSignatureInvalid`, `CrlParseError`, `CrlSignMissing`,\n  `CrlNumberMismatch`, \u2026)\n- `Ocsp*` for OCSP-specific failures (7 variants: `OcspSignatureInvalid`,\n  `OcspResponderIdMismatch`, `OcspCertIdMismatch`, \u2026)\n\nThree variants break the pattern:\n- `Revoked { serial, reason_code }` \u2014 applies to both CRL and OCSP results,\n  so no prefix is correct.\n- `MalformedCertificate` \u2014 refers to a malformed *subject* certificate\n  (not a CRL or OCSP response), so no prefix is correct, but the variant doc\n  comment makes this distinction unclear.\n- `DeltaCrlBaseMismatch` \u2014 has the prefix but in a non-standard position\n  (`DeltaCrl*`, not `CrlDelta*`).\n\nThis is opinion-level. The current naming is internally defensible:\n- `Revoked` \u2014 the only outcome that can come from either source, so no prefix is\n  correct (matches what `RevocationChecker::check_revocation` returns\n  generically).\n- `MalformedCertificate` \u2014 fires on the subject cert, not on the revocation\n  source, so no `Crl*`/`Ocsp*` prefix is correct.\n- `DeltaCrlBaseMismatch` \u2014 semantically scoped to delta-CRL workflow, so\n  `Delta*Crl*` reads naturally.\n\nRecommendation: leave naming as-is, but add a doc-level note at the top of the\n`Error` enum explaining the prefix convention and the three intentional\nexceptions. This prevents future contributors from \\\"normalizing\\\" the names in\na future refactor that would be a semver break.\n\nIf a rename were to happen, the only one I'd consider is renaming\n`MalformedCertificate` to `MalformedSubjectCertificate` to disambiguate from\n`CrlParseError`/`OcspParseError` (which are about the revocation source DER).\nThat's a distinct readability win for callers reading match arms.\n\nThis is a P4 opinion finding \u2014 file it for visibility, do not fix unless the\nmaintainer agrees.\n\nLocation: `pkix-revocation/src/lib.rs:60-176`.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.30",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: pkix-revocation::Error variant naming inconsistency: MalformedCertificate/Revoked break the Crl*/Ocsp* prefix convention",
+  "updated_at": "2026-05-07T22:38:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:17:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

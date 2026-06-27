@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Design decision: returning Ok() for out-of-scope certs (IDP mismatch) is correct per RFC 5280 \u00a76.3.3 \u2014 the CRL simply does not cover this cert. The caller must supply the correct CRL. Documented in CrlChecker doc.",
+  "closed_at": "2026-05-05T16:09:27Z",
+  "compaction_level": 0,
+  "content_hash": "30af4ccd1386db4c7683ab46de0085b0e7bb0d8b074da1205ef2e430ee733e8c",
+  "created_at": "2026-05-05T15:46:48Z",
+  "created_by": "Mark Atwood",
+  "description": "**Issue**: In check_revocation at crl.rs:213-215, when the CRL's IDP has `onlyContainsUserCerts=TRUE` and the certificate IS a CA cert, the code returns `Ok(())` with the comment 'CRL does not cover CA certs'. This means a CA cert presented against a user-cert-only CRL gets a 'not covered' response, which the caller interprets as 'not revoked'.\n\nRFC 5280 \u00a76.3.3(b) requires that when a CRL is presented for revocation checking, if it doesn't cover the certificate type, the path validator must either find another CRL that does cover it, or fail (hard-fail). The `CrlChecker` itself returning `Ok(())` here is consistent with its documented 'not covered \u2192 Ok' behavior (documented in the limitations section and the test at pkits_4_14_11).\n\n**The real problem**: the PKITS \u00a74.14.11 test documents this behavior but then asserts `Ok(())` as the expected result for checking an EE cert (not a CA cert). For the CA cert revocation case, the test at pkits_4_14_11 checks the EE against the user-certs-only CRL (where EE IS a user cert, so it IS covered). The CA cert's revocation status is left undetermined.\n\n**RFC conformance concern**: RFC 5280 \u00a76.3.3(b) says explicitly: 'If the certificate is a v3 certificate, the onlyContainsUserCerts flag in the issuingDistributionPoint extension ... MUST be checked.' The 'MUST be checked' refers to path validation policy, not the CRL lookup itself. Our checker correctly returns 'not covered' but the path validator (chain.rs?) does not enforce hard-fail on 'not covered' responses.\n\n**Where**: The responsibility gap between CrlChecker (returns Ok for not-covered) and the path validator (which doesn't enforce coverage) creates a silent security gap: a revoked CA cert could evade detection if the only available CRL uses onlyContainsCACerts=FALSE and is presented as the CRL for that CA.\n\n**Location**: pkix-revocation/src/crl.rs:213-221; pkix-chain/src/lib.rs (the caller that uses CrlChecker)\\n\\n**Severity**: P2 \u2014 this is a gap between two components, and the PKITS \u00a74.14.11 and \u00a74.14.12 tests are marked as 'path validator must hard-fail' without that hard-fail being enforced. Until the path validator enforces coverage checks, presenting a scoped CRL is an effective revocation bypass for the uncovered cert type.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.14",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IDP onlyContainsUserCerts returns Ok for CA certs \u2014 ambiguous semantics",
+  "updated_at": "2026-05-05T16:09:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

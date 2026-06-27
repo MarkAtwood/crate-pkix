@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:09Z",
+  "compaction_level": 0,
+  "content_hash": "80dde7c5d1fba70b8b9f7ff17f05186851ebbbcd04356a816b822dd4c0a905c8",
+  "created_at": "2026-05-07T20:28:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-lint/src/lib.rs:634`:\n\n```rust\ndebug_assert!({\n    let mut ids: Vec<_> = ...;\n    ids.sort_unstable();   // <-- mutates inside debug_assert!\n    ...\n});\n```\n\nClippy: `clippy::debug_assert_with_mut_call`.\n\n## Why it matters\n\n`debug_assert!` is **compiled out** in release builds. Any side-effect inside it (including a `Vec::sort_unstable` call) disappears in release. While the surrounding expression is just for the assertion's truth value, the pattern is fragile \u2014 a future edit could hoist the `let mut ids` outside and create a debug/release behavior split that's hard to spot.\n\n## Context\n\nNeed to read the actual block to know whether the mutation is inside the assertion's value-producing expression or as a setup statement. Either way, splitting setup from assertion is the safer pattern.\n\n## Fix\n\nHoist the setup outside:\n\n```rust\nlet mut ids: Vec<_> = ...;\nids.sort_unstable();\ndebug_assert!(ids.windows(2).all(|w| w[0] != w[1])); // or whatever the actual check is\n```\n\nThis way the sort runs in both debug and release.\n\nIf the sort is *only* needed for the assertion (i.e., the post-sort check), use `cfg(debug_assertions)`:\n\n```rust\n#[cfg(debug_assertions)]\n{\n    let mut ids: Vec<_> = ...;\n    ids.sort_unstable();\n    assert!(...);\n}\n```\n\n## Priority\n\nP4 \u2014 defensive coding nit. Look at the actual block; if the mutation is purely for the assertion, the current code is benign but lint-flagged.\n",
+  "ephemeral": 0,
+  "id": "PKIX-5t03",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: debug_assert! contains mutating call (sort_unstable) at pkix-lint/src/lib.rs:634",
+  "updated_at": "2026-05-07T21:49:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

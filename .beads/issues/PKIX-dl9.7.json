@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Historical commit message mismatch; commit 39f1964d contains only target/.rustc_info.json. No code change possible.",
+  "closed_at": "2026-05-07T01:57:18Z",
+  "compaction_level": 0,
+  "content_hash": "d29cd59805ebae00b36577266213b92cec79dce76a218d1d52465a227fecb73a",
+  "created_at": "2026-05-07T01:51:39Z",
+  "created_by": "Mark Atwood",
+  "description": "Commit 39f1964d ('refactor: replace ref patterns and empty string literals (idiom pass)') has a diff that only touches target/.rustc_info.json \u2014 a build artifact. The actual Rust source changes described by the commit message appear to be in the earlier commit c350d2b0 (which has the same message prefix). HEAD~3 is an empty/artifact-only commit with a misleading message. This should be investigated: either the wrong commit was pushed (the Rust file changes got folded into c350d2b0 without being listed in HEAD~3), or the commit was created empty by accident. Low severity but creates confusion during bisect and archaeology.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.7",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "commit HEAD~3 message doesn't match diff content",
+  "updated_at": "2026-05-07T01:57:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:51:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Minor: commit 6276e4e covers path builder via test infrastructure fixes. Section 0 alignment is acceptable.",
+  "closed_at": "2026-05-05T16:10:47Z",
+  "compaction_level": 0,
+  "content_hash": "bad30a13bc46ac9dbb5bf226e3528c3ef2a9f4249cef15586456f35680c7ff91",
+  "created_at": "2026-05-05T15:50:22Z",
+  "created_by": "Mark Atwood",
+  "description": "Commit 3f922ad is titled 'feat: path builder, policy scaffolding, CRL OIDs, PKITS CRL fixtures'. The path builder (pkix-path-builder/src/lib.rs) was apparently introduced in this commit.\\n\\nCommit 6276e4e is titled 'feat: policy validation, delta CRLs, IDP checking'. The delta CRL and IDP logic is in pkix-revocation/src/crl.rs, and the policy state machine is in pkix-path/src/lib.rs. The commit message aligns with the file changes.\\n\\nCommit dcdc963 is titled 'fix(pkix-path): harden NameConstraints implementation'. The changes are in pkix-path/src/lib.rs \u2014 the NameConstraints code (lib.rs ~1460-2035). The commit message aligns.\\n\\nOne mismatch: the ValidationPolicy doc at lib.rs:378-381 says 'Policy enforcement (CertificatePolicies, PolicyMappings, PolicyConstraints, InhibitAnyPolicy) is implemented per RFC 5280 \u00a76.1' which is accurate after commit 6276e4e. But the crate-level doc (lines 24-29) still lists policy validation as unimplemented. This was noted in PKIX-b5r.18. No additional commit-level mismatches found.\\n\\nConclusion: all three commits are broadly consistent with their messages. The only alignment issue is the stale crate-level Limitations doc (tracked in PKIX-b5r.18). Filing this as confirmation that Section 0 found only one issue (already tracked).",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.37",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Section 0: commit message alignment \u2014 6276e4e omits path builder",
+  "updated_at": "2026-05-05T16:10:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:50:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

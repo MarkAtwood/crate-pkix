@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:35Z",
+  "compaction_level": 0,
+  "content_hash": "8e86380fdfb58120bdc52c9f6297261d66cbbc9ddbdaa2e47d22403c095a2087",
+  "created_at": "2026-05-07T17:23:13Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/integration.rs:257 \u2014 vec![i as u8; 32] where i: usize. While N=30 is safe, the cast is flagged by Clippy pedantic cast_possible_truncation. Use u8::try_from(i).expect(\"i < 256\") or simply assert the invariant. This makes the safety constraint explicit and prevents a silent bug if N is ever increased beyond 255.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] cast_possible_truncation on i as u8 in adversarial test",
+  "updated_at": "2026-05-07T18:44:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

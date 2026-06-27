@@ -1,0 +1,32 @@
+{
+  "close_reason": "Policy decision (c) committed: raw DER byte comparison for TeletexString; no T.61\u2192Unicode transcoding. Docs updated in pkix-path/src/lib.rs.",
+  "closed_at": "2026-05-11T03:18:12Z",
+  "compaction_level": 0,
+  "content_hash": "6ba054315320dc4035fd788fdc7072c709319f8a744a94bd5078f162b3e5e261",
+  "created_at": "2026-05-08T20:49:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSubset of PKIX-l63j epic. RFC 4518 \u00a71.6 punts on T.61 transcoding ('implementation-defined'). `der::asn1::TeletexString` exists in der 0.7.10 but treats T.61 as ASCII/Latin-1 \u2014 not real T.61 multi-byte decoding.\n\n## What\n\nDecide policy:\n- (a) implement ISO 6937 subset like OpenSSL does (~50 lines of mapping table)\n- (b) strict-reject T61String DNs in strict modes; document as ASCII-fallback only otherwise\n\nRecommend (b) initially per parent bead. Implement and update limitation docs.\n\n## Acceptance\n\n- See parent PKIX-l63j acceptance.",
+  "ephemeral": 0,
+  "id": "PKIX-l63j.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Resolved by policy decision: option (c) \u2014 commit to status quo. pkix-path uses raw DER byte comparison for TeletexString AVAs and does not transcode T.61 to Unicode. Rationale: OpenSSL/NSS/GnuTLS use mutually incompatible vendor T.61 tables; adopting any of them would silently diverge from the others. Byte-equality is fail-closed and satisfies RFC 5280 \u00a74.1.2.4 well-formed issuer/subject DN reuse. Docs updated at pkix-path/src/lib.rs (any_to_str_bytes rustdoc, names_match rustdoc, crate-level Limitations section).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: TeletexString policy decision (strict-reject or ISO 6937 mapping)",
+  "updated_at": "2026-05-11T03:18:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T13:49:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:36:49Z",
+  "compaction_level": 0,
+  "content_hash": "498583567ac744d103ae75d60c8a75040c1b739fe02396e0d2144cde37e3806d",
+  "created_at": "2026-05-02T18:32:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs: CertPool wraps Vec<Certificate> and exposes .add(), .len(), .is_empty(). Missing: impl IntoIterator (or impl Iterator) so callers can write 'for cert in &pool' instead of 'for cert in pool.certs.iter()' (which they can't do at all \u2014 certs is private). Also missing: impl Index<usize>, impl FromIterator<Certificate>. A type that is naturally a collection should implement the standard Rust collection traits. At minimum, IntoIterator for &CertPool is needed for callers to inspect or debug the pool contents.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CertPool lacks Iterator impl \u2014 callers must call .iter() to iterate",
+  "updated_at": "2026-05-02T18:36:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:32:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

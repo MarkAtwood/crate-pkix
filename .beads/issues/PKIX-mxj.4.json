@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:04:13Z",
+  "compaction_level": 0,
+  "content_hash": "56c6db740caf4f6716e095d834f83d63cd6673bfa99d8c9bc8af6aa586935011",
+  "created_at": "2026-05-07T03:49:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:122-129 \u2014 de_static_str deserializes JSON strings by allocating a String and then Box::leak()ing it to produce a &'static str. The doc correctly warns 'In long-running services deserializing untrusted JSON, each unique string value grows process memory permanently.' However, the struct-level serde bound on EvaluationReport and LintResult does not mention this constraint anywhere visible to callers consuming these types via serde. The crate-level docs don't call out the memory growth risk either. A caller who rounds-trips thousands of EvaluationReport values from a database will silently leak memory. Fix: add a crate-level warning in the serde section and on EvaluationReport::deserialize pointing to the Box::leak behavior, and consider interning or switching LintResult/Finding to Cow fields instead of &'static str for the detail fields.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_static_str leak unbounded in long-lived server use",
+  "updated_at": "2026-05-07T04:04:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

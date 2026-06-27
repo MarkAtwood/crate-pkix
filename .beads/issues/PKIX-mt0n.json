@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:23Z",
+  "compaction_level": 0,
+  "content_hash": "e200ed5fb29b4e94743fb7f30f3a1dbe43f936947110e3a8251a41e01006d9b0",
+  "created_at": "2026-05-07T20:13:54Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-path-builder/src/lib.rs\\` \\`dfs\\` (L185\u2013268) terminates a path when an anchor's subject DN matches the current cert's issuer DN \u2014 only DN match, no SPKI match. The doc comment on \\`build_path\\` states \\\"Signatures are **not** verified here; that is the responsibility of the caller via [\\`pkix_path::validate_path\\`].\\\" \u2014 fair, but:\n\n- A trust-anchor pool with two anchors having the same subject DN but different keys (key rollover scenario) terminates path building at whichever anchor matches first. \\`validate_path\\` is then called and may return SignatureInvalid if the wrong key was matched.\n- pkix-path's \\`validate_path\\` correctly handles this case by trying every name-matching anchor (line 838\u2013862). The path builder does not surface that ambiguity; it returns a single chain.\n\n## Why P3\n- Documented behavior, not a defect per the contract.\n- The downstream caller (\\`pkix_path::validate_path\\`) does the correct thing, so no security failure.\n- BUT: in a key-rollover scenario, \\`build_path\\` returns success and the caller sees \\`SignatureInvalid\\` on validate_path even though a valid path through the *other* anchor exists. Less debuggable than necessary.\n\n## Fix\nTwo reasonable improvements (either; not both):\n1. When matching anchors by DN, iterate all matches and try each; return the first that produces a chain whose terminating cert can be SPKI-verified by the anchor (use \\`spki_key_matches\\`-equivalent comparison).\n2. Document this behavior more prominently in the API doc and in a dedicated section on key-rollover.\n\n## Scope reference\n\\`pkix-path-builder/src/lib.rs:185-268\\`, \\`pkix-path/src/lib.rs:838-862\\` (the corresponding correct loop in validate_path).",
+  "ephemeral": 0,
+  "id": "PKIX-mt0n",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder build_path doc says shortest path returned; DFS does not verify anchor SPKI",
+  "updated_at": "2026-05-07T21:25:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

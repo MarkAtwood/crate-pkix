@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:41:50Z",
+  "compaction_level": 0,
+  "content_hash": "a68810fff75bb47f1ff1a0a58b201c654e2c026966e1443f91af64cd04fca538",
+  "created_at": "2026-05-11T17:27:59Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.5 shipped the emit half: `pkix_lint::oscal::emit::risks_from_store(&DeviationStore) -> Vec<Value>` projects a deviation policy as a JSON array of OSCAL Risk objects. The persistence story is only complete when a parser can read those Risks back into a `DeviationStore` losslessly.\n\n## What\n\nImplement `pkix_lint::oscal::parse::deviation_store_from_risks(value: &Value) -> Result<DeviationStore, Error>` that walks a JSON array of OSCAL Risk objects (in the shape emitted by `risks_from_store`) and reconstructs the original `DeviationStore`.\n\nField decoding mirrors the emit:\n- `uuid` ignored on parse (regenerated deterministically by future emits).\n- `description` / `statement` \u2192 `justification`.\n- `status` validated against `\"deviation-approved\"`; reject otherwise (other OSCAL Risk statuses are out of scope for pkix-lint deviation policy).\n- Props decoded by name:\n  - `pkix-lint.deviation-id` \u2192 `Deviation::id` (required).\n  - `pkix-lint.target-lint` \u2192 `target_lint` (required).\n  - `pkix-lint.action` \u2192 `DeviationAction`: literal `\"suppress\"` or `\"downgrade:<severity-label>\"` (required).\n  - `pkix-lint.authorized-by` \u2192 `authorized_by` (required, non-empty).\n  - `pkix-lint.effective-start` / `pkix-lint.effective-end` \u2192 `Option<u64>` (parsed as decimal u64; absent = None).\n- Subjects decoded by type discriminator:\n  - `pkix-lint.scope.any` \u2192 `DeviationScope::Any`.\n  - `pkix-lint.scope.issuer-dn-contains` \u2192 `DeviationScope::IssuerDnContains(<substring prop>)`.\n  - `pkix-lint.scope.issuer-dn-exact` \u2192 `DeviationScope::IssuerDnExact(Name::from_der(hex_decode(<dn-der prop>)))`. The DER prop is the lossless oracle; the human-readable `pkix-lint.issuer-dn` prop is informational only.\n  - `pkix-lint.scope.serial-range` \u2192 `DeviationScope::SerialRange { issuer: Name::from_der(...), start: hex_decode(...), end: hex_decode(...) }`.\n- `links` with `rel=reference` \u2192 `evidence_uri` (first matching link).\n\n## Acceptance\n\n- [ ] `emit::risks_from_store` \u2192 `parse::deviation_store_from_risks` is a closed loop: `(emit . parse)` over a non-empty store yields an `Eq`-equal store.\n- [ ] Malformed inputs return descriptive errors (missing required prop, unknown subject type, malformed DER, malformed hex, unknown action string, etc.) \u2014 not panics.\n- [ ] At least one test covers each of the four DeviationScope variants in a round-trip.\n- [ ] At least one test covers the optional-field handling (effective_start=None, effective_end=None, evidence_uri=None).\n\n## Out of scope\n\n- Reading OSCAL Risk objects produced by other tools (e.g., a POA&M from a different OSCAL emitter). pkix-lint's parser specifically targets pkix-lint's own emit shape \u2014 a stricter contract for round-trip integrity.\n\n## Filed by\n\nPKIX-9vnx.5 closure 2026-05-11 (the emit half landed; this is the parse half).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: OSCAL Risk parser for DeviationStore round-trip",
+  "updated_at": "2026-05-11T17:41:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T10:27:59Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

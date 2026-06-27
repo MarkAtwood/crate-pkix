@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4a48cadf1f6d303f93bdd15a663af4eda29194902f3522d56f90d31231f9c10c",
+  "created_at": "2026-05-14T12:48:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:135:\n\n    // Re-export so callers only need to depend on pkix-lint, not pkix-path.\n    pub use pkix_path::{Profile, ValidatedPath, ValidationPolicy};\n\nThis is convenience for callers but locks pkix-lint's public API to\npkix-path's major version. If pkix-path cuts 1.0 \u2192 2.0 (e.g., changes\nValidatedPath to gain a new public field, or renames Profile method\nsignatures), every pkix-lint consumer's source breaks even if they\nnever touched the re-exported types directly.\n\nWorkspace-internal that is the intended shape: both crates live in\nthe same workspace, version together. But pkix-lint is published to\ncrates.io as a separate crate; downstream consumers who pin\n`pkix-lint = \\\"0.9\\\"` will receive the *current* pkix-path version\ntransitively. When pkix-path bumps major, pkix-lint must bump major\ntoo even when nothing in pkix-lint itself changed.\n\n# What the caller cannot do\n\nThe caller has no way to insulate themselves from pkix-path major\nbumps via pkix-lint. They cannot pin pkix-lint and float pkix-path\nindependently \u2014 pkix-lint locks the version.\n\n# Options\n\n1. Document the version-coupling: state explicitly in pkix-lint's\n   public docs that pkix-path major bumps will force a pkix-lint\n   major bump too. Callers can then make their dependency decision\n   informed.\n\n2. Re-export through your own newtype: define pkix_lint::Profile,\n   pkix_lint::ValidatedPath, pkix_lint::ValidationPolicy as wrappers\n   that delegate. This decouples versions but doubles the maintenance\n   surface and forces callers to convert between types when bridging\n   to pkix-chain.\n\n3. Keep the re-export but version-pin pkix-path tightly (=0.5 or\n   similar) in pkix-lint's Cargo.toml and bump both together as a\n   workspace policy.\n\nThe current Cargo.toml uses `pkix-path = { workspace = true }`, which\ndefers the pin to the workspace root. That's the right structural\nchoice for now, but it should be made explicit that the workspace's\nversion-bump cadence applies to pkix-lint as a consequence.\n\nPer AGENTS.md: 'Re-exports from upstream crates that lock the major\nversion. If you `pub use foo::Bar` and `foo` cuts a major version,\nyour crate's API is broken too. Either re-export through your own\nnewtype or document the upstream version pin.'\n\nCheapest fix: document the coupling. Verdict P2 because the\nworkspace ships both crates as a unit and the coupling is intentional\nunder the workspace stance, but the contract should state it.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: re-exporting pkix_path::{Profile, ValidatedPath, ValidationPolicy} couples major versions",
+  "updated_at": "2026-05-14T12:48:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:48:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

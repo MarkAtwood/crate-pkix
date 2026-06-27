@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f8330c5de11986004534297677dd15e33f935a968540e72997ed4ee3203f4f9b",
+  "created_at": "2026-05-14T09:45:16Z",
+  "created_by": "Mark Atwood",
+  "description": "The crate-level Features doc at lib.rs:100-111 enumerates what the\n`serde` feature adds:\n\n> Adds `serde::Serialize` and `serde::Deserialize` derives to\n> [`Error`] and [`IoFailure`], and propagates `pkix-path/serde` so\n> the re-exported [`DerError`] gains the matching wire form.\n\nThat description is incomplete. Enabling `pkix-truststore/serde`\npropagates `pkix-path/serde`, which also adds `Serialize/Deserialize`\nto the re-exported [`TrustAnchor`] (pkix-path/src/lib.rs:649):\n\n```rust\n#[derive(Clone, Debug, PartialEq, Eq)]\n#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n#[non_exhaustive]\npub struct TrustAnchor { ... }\n```\n\nA caller reading pkix-truststore's docs would conclude only the error\ntypes and `DerError` gain serde behavior, and miss that `Vec<TrustAnchor>`\nis also serializable. The canonical caller use case for the `serde`\nfeature is exactly the inverse of what the doc emphasizes: callers turn\nit on to **cache parsed trust stores** (e.g., load 200 anchors once at\nstartup, serialize the Vec to a cache file, reload on warm-start without\nre-parsing PEM). That use case is invisible from the current doc.\n\nThis is a docs-as-contract gap: an undocumented capability that callers\nbenefit from depends on a feature flag whose docs do not mention the\ncapability.\n\nFix: extend the bullet to enumerate all types that gain serde behavior\nvia the propagation. Suggested text:\n\n```\n//! - **`serde`** (off by default) \u2014 adds `serde::Serialize` and\n//!   `serde::Deserialize` derives to [`Error`] and [`IoFailure`], and\n//!   propagates `pkix-path/serde` so the re-exported [`TrustAnchor`]\n//!   and [`DerError`] gain matching wire forms. The canonical use is\n//!   caching: load anchors once with `from_pem_file`, serialize the\n//!   resulting `Vec<TrustAnchor>` to a process-local cache, and on\n//!   warm-start deserialize back instead of re-parsing PEM.\n```\n\nThe `TrustAnchor` wire form uses pkix-path's `serde_der` module (base64\nin human-readable serializers, raw bytes in binary), per\npkix-path/Cargo.toml:23. That detail belongs in pkix-path's own docs;\npkix-truststore only needs to acknowledge the surface exists.\n\nEngineering basis: real caller use case (cache hydration) silently\nsupported. Not opinion \u2014 closing the gap between code behavior and\ndocumented contract is a routine docs-fix.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "serde feature docs omit TrustAnchor; rustdoc only mentions DerError gains serde via pkix-path/serde propagation",
+  "updated_at": "2026-05-14T09:45:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T02:45:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

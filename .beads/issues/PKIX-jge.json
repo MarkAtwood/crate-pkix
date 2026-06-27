@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Core deviation mechanism complete: Deviation, DeviationStore, DeviationRunner; OSCAL investigation (jge.4) and expiry corpus (jge.3) remain open",
+  "closed_at": "2026-05-06T19:29:32Z",
+  "compaction_level": 0,
+  "content_hash": "3a84a937baa3c239917486d0f08c4abda50972374ac95ec541b885aad1350bcb",
+  "created_at": "2026-05-06T19:20:38Z",
+  "created_by": "Mark Atwood",
+  "description": "Operators need a first-class, auditable way to suppress or downgrade lint findings for legitimate local exceptions (CP waivers, interpretation memos, internal-CA deviations). Design requirements:\n\n- Deviations are structured objects, not CLI flags or env vars\n- Each deviation has: deviation_id, target_lint (specific lint ID), scope (issuer DN match, serial range, etc.), effective date range (expiry required), action (downgrade_severity_to, suppress), justification (text + optional evidence URI), authorized_by (signature or attribution)\n- Deviations are signed by an operator-controlled key (not pkix-lint keys)\n- Deviations are visible in output, not invisible: flagged as 'DEVIATION APPLIED by <id>' rather than suppressed silently\n- Deviations are scoped \u2014 no wildcards on issuer, no 'suppress all for this lint ever'\n- Deviations expire: after effective_end, the finding re-appears without renewal\n- 'bd deviations list' equivalent: corpus of all active deviations is itself reportable/exportable\n- No deviation packs ship inside the crate; vendor/CA packs must be loaded by the operator from operator-controlled storage\n- Investigate OSCAL compatibility: NIST OSCAL Assessment Results profile has nearly identical semantics; federal customers already have OSCAL tooling\n\nThis is the mechanism behind 'you want it suppressed, write a local modification to the lint db.' Must be first-class and low-friction enough that operators with real waivers will use it, hostile enough to laundering that operators without real waivers cannot.\n\nReference: OSCAL, OPA/Rego policy bundles, CycloneDX VEX (Vulnerability Exploitability eXchange) \u2014 steal schema ideas from VEX especially.",
+  "ephemeral": 0,
+  "id": "PKIX-jge",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: design and implement deviation (waiver) mechanism",
+  "updated_at": "2026-05-06T19:29:32Z"
+}

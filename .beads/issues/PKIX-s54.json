@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "round 2 complete: P0=P1=P2=0 after fix wave; SEC7 running out of real complaints; follow-up PKIX-vsx filed for ValidationPolicy #[non_exhaustive]",
+  "closed_at": "2026-05-03T13:41:02Z",
+  "compaction_level": 0,
+  "content_hash": "0acebcd3362f9f0391d6739d8f7c760a2dd336dc8516dcaad9c2fe60770557f5",
+  "created_at": "2026-05-03T13:28:12Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-s54",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "R2-SEC0 correctness: clean \u2014 round 1 fixes verified correct, no new issues\nR2-SEC4 readability: both P4 items from round 1 (PKIX-onc.8, PKIX-onc.16) were NOT addressed by round 1 fixes. Filed as PKIX-s54.2 (try_find_cert_ext missing doc) and PKIX-s54.3 (find_cert_ext ambiguous referent). No new doc clarity issues found in round 1 additions.\nR2-SEC6 decisions: one new decision recorded (PKIX-s54.5) \u2014 TrustAnchor dual-constructor fail-open/fail-closed split for NC parsing. All other design choices in round 2 code are already covered by round 1 decisions or are sufficiently explained inline.\nR2-SEC2 efficiency: TryFrom<Certificate> move fix verified (lines 334-342, no clone). Two new P2 issues filed: PKIX-s54.6 (unconditional subject clone before empty check), PKIX-s54.7 (anchor NC subtrees cloned per chain_walk attempt).\nR2-SEC3 elegance: PKIX-onc.17 not filed (style not engineering). nc_constrained_types init is clean. One new P3: PKIX-s54.4 chain_walk step labels off by one.\nR2-SEC1 Maintainer risk: LOW \u2014 Round 1 fixes all verified adequate; two new P1 doc issues filed (ValidationPolicy missing #[non_exhaustive] will force a semver-major bump on first v0.2 policy field addition; chain_walk step labels mislabelled relative to RFC walk list), both fixable with small edits before release.\nR2-SEC7 duplicate: PKIX-s54.4 and PKIX-s54.8 same issue; correct priority is P2 because the mislabels are real (4 inline comments off-by-one: (e)BasicConstraints should be (f), (f)KeyUsage should be (g), (g)pathLen should be (h), (h)NC-update should be (i)), and a contributor placing a new \u00a76.1.4 check would mis-sequence it relative to the RFC steps. P3 (pure elegance) understates the maintenance consequence; P1 overstates it \u2014 this cannot cause a semver break or security failure. Recommend: keep PKIX-s54.8 as the canonical issue at P1, close PKIX-s54.4 as duplicate, but note actual risk is P2.\nR2-SEC7 scope: PKIX-s54.6 subject clone is new in PKIX-aoe; in-scope. The clone (line 1444) was introduced in 0c58781 (feat: implement NameConstraints) and the subject_is_empty guard was added in 22610b1 (refactor: review pass) but the clone was not moved after the guard. Both commits are PKIX-aoe work.\nR2 Confidence: 85% chance of missed bug. Running out of real complaints: YES. P0=0 P1=2 P2=2 after dedup/labeling. (P1: PKIX-s54.1 ValidationPolicy missing non_exhaustive, PKIX-s54.8 step labels off-by-one [canonical]; P2: PKIX-s54.6 subject clone before empty check [in-scope, new in PKIX-aoe], PKIX-s54.7 anchor NC subtrees cloned per chain_walk call; PKIX-s54.4 duplicate of s54.8 labeled opinion; PKIX-s54.5 design decision labeled opinion; P4: PKIX-s54.2 and PKIX-s54.3 doc polish only.)",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review round 2: TrustAnchor NC seeding (PKIX-aoe)",
+  "updated_at": "2026-05-03T13:41:02Z"
+}

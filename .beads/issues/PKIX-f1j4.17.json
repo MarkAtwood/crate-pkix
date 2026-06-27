@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8ec84bd8e64119d606c84ba2f2d13a112d955a48b66a252ec8e3f9f6b0f22b64",
+  "created_at": "2026-05-14T18:59:05Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:194-222: the trait surface is six methods:\n\n    fn get_crl, put_crl, invalidate_crl\n    fn get_ocsp, put_ocsp, invalidate_ocsp\n\nThe crl/ocsp suffix is encoded by both (a) the key type (CrlCacheKey vs OcspCacheKey) and (b) the value type (CachedCrl vs CachedOcspResponse). The method names are pure redundancy on top of the type signature.\n\nAlternative shape: factor into a generic associated function and let dispatch fall out of the key type:\n\n    trait RevocationCache: Send + Sync {\n        fn get<K: CacheKey>(&self, key: &K) -> Option<Arc<K::Value>>;\n        fn put<K: CacheKey>(&self, key: K, value: K::Value);\n        fn invalidate<K: CacheKey>(&self, key: &K);\n    }\n\nwith CrlCacheKey: CacheKey<Value = CachedCrl> and OcspCacheKey: CacheKey<Value = CachedOcspResponse>. Three methods instead of six; type-driven dispatch.\n\nThis is a real elegance win but it forces consumers writing custom cache impls to write the GAT trait dance, which is heavier than the current six-method shape. Pre-1.0 either is defensible \u2014 the current shape is more verbose but more approachable.\n\nMarked opinion because it's net-neutral; flagging so a future contributor doesn't reopen this as 'why aren't these generic?' without seeing the trade-off.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "RevocationCache trait: get_crl / put_crl / invalidate_crl named with redundant suffixes",
+  "updated_at": "2026-05-14T18:59:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

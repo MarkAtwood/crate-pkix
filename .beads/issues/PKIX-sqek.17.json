@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "10e4bd8ad4917d1d38d14ee754aaa7e71eba395d419a30a752a2a8394974d989",
+  "created_at": "2026-05-14T18:03:27Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs lines 1630-1637: is_aia_recoverable matches against a SHORT explicit list of pkix_path::Error variants (ChainBroken, NoTrustedPath, SignatureInvalid), not against a 'is it a fatal cert-level error' negative list.\n\nWHY THIS IS CORRECT: the allowlist approach means new pkix_path::Error variants are by default NOT considered AIA-recoverable. A future variant like RevocationStatusUnknown or HsmSignatureRequired added to pkix_path will not silently trigger pointless AIA round-trips. The reviewer adding the new variant has to explicitly decide whether AIA fetching can fix that condition; the answer is no for almost every cert-level defect.\n\nThe docstring (lines 1614-1629) explicitly lists 'all other variants (ValidityPeriod, KeyUsageMissing, NameConstraintViolation, PolicyViolation, Der, \u2026) describe cert-level defects that the chain-build seam cannot fix by adding more certs, so they are propagated directly without ever invoking the AiaFetcher.' The rationale is captured next to the code.\n\nWHAT A FUTURE CONTRIBUTOR MIGHT WRONGLY SUGGEST: 'invert the match \u2014 list the non-recoverable errors and recover by default.' That suggestion produces the silent-pointless-fetch hazard: a new error variant becomes recoverable without explicit review.\n\nTwo test cases ground the allowlist's behaviour:\n- non_recoverable_path_error_does_not_invoke_aia (tests/aia_chain_build.rs:206) \u2014 expired leaf surfaces directly without AIA.\n- aia_fetches_missing_intermediate_and_chain_validates (tests/aia_chain_build.rs:85) \u2014 ChainBroken triggers AIA and succeeds.\n\nDEFEND IF: someone suggests inverting the match, adding more variants to the recoverable list without test coverage, or removing the comment that documents WHY the list is short.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.17",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "is_aia_recoverable allowlist (not denylist) of pkix_path errors that may benefit from AIA augmentation",
+  "updated_at": "2026-05-14T18:03:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:03:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

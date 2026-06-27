@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:28:14Z",
+  "compaction_level": 0,
+  "content_hash": "ba4e74c81b4caa36b91634565eb72c151a1cb7e1cf8e0db9ad4dba61e7dab4f0",
+  "created_at": "2026-05-06T23:20:37Z",
+  "created_by": "Mark Atwood",
+  "description": "Scope-mismatched lints are skipped (no finding recorded). Kind-mismatched lints produce NotApplicable findings. The doc comment says 'Lints that do not apply return NotApplicable findings' which is false for scope mismatches. Fix: clarify doc: 'Lints whose scope() does not match are skipped entirely. Lints in scope but whose applies_to() does not match produce NotApplicable.' File: pkix-lint/src/lib.rs lines 633-636.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: LintRunner::run_cert scope-skip vs kind-skip behavior inconsistency in docs",
+  "updated_at": "2026-05-06T23:28:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:03:36Z",
+  "id": "019e15d9-31ed-7dbb-9c38-3a0965ee8488",
+  "issue_id": "PKIX-9vnx.2",
+  "text": "Requires choice among three non-equivalent options (existing oscal-rs crate vs hand-rolled subset vs JSON-Schema-generated). All three are architecturally defensible; the choice is a maintainer judgement on dependency posture (no_std support, MSRV, schema-drift maintenance burden, generated-code verbosity). do-beads loop cannot pick one without overstepping. Surveys the options thoroughly in the description; recommend maintainer pick + answer the inline question 'separate pkix-oscal crate vs inline in pkix-lint?'."
+}

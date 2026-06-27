@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dc1362c24c017942cef4ad01ca9cf9f482fa6327d761e4e9a87c233772ad6224",
+  "created_at": "2026-05-14T18:12:35Z",
+  "created_by": "Mark Atwood",
+  "description": "verify_ocsp_responder (pkix-chain/src/lib.rs:1262-1266) has an explicit input guard:\n\n    if chain.is_empty() {\n        return Err(Error::OcspDelegation {\n            reason: Cow::Borrowed(\"OCSP responder chain must contain at least the responder cert\"),\n        });\n    }\n\nThe other seven wrappers (verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper) do NOT have such a guard. They rely on pkix-path::validate_path returning Err(NoTrustedPath) for empty chains (pkix-path/src/lib.rs:1561). The eight wrappers therefore have THREE distinct contracts for the same input:\n\n- verify_code_signer: empty chain \u2192 Error::Path(NoTrustedPath) (validate_path catches it; no post-validation chain[0] access).\n- 6 other wrappers (verify_tls_server, etc.): empty chain \u2192 Error::Path(NoTrustedPath) TODAY, but post-validation `&chain[0]` access (lines 772, 858, 935, 1003, 1036, 1157-1158) would PANIC if upstream behaviour changes. See PKIX-sqek.21 for the cross-crate invariant gap.\n- verify_ocsp_responder: empty chain \u2192 Error::OcspDelegation { reason: \"...\" }.\n\nWHY IT MATTERS:\n\nThe slash-command checklist for defensive-code-forcing calls out:\n\n> API shapes that force every caller to write the same boilerplate defensive check. If 100% of callers will `if x.is_some() {` before doing anything useful, the API should have done that itself.\n\nThe inverse is also true: API shapes that produce a DIFFERENT error variant for the same input failure across a family of related functions force every caller to write per-function defensive code. A caller using all eight wrappers via a generic dispatch layer (e.g. \"validate this cert under whatever profile is configured\") has to match on three different error patterns for \"empty chain\":\n\n    match wrapper_fn(chain, ...) {\n        Err(Error::Path(pkix_path::Error::NoTrustedPath)) => \"empty chain or no anchor matched\",  // 7 wrappers\n        Err(Error::OcspDelegation { reason }) if reason.contains(\"must contain\") => \"empty chain\",  // 1 wrapper\n        ...\n    }\n\nWorse, the verify_ocsp_responder variant is *misleading*: Error::OcspDelegation semantically means \"the responder cert was not delegated by the named issuer.\" An empty chain is not a delegation failure; it is an input-validation failure. The wrapper has overloaded a variant to carry a separate failure class.\n\nOPTIONS:\n\n(a) **Add a dedicated Error::EmptyChain variant** (or `Error::InvalidInput { reason: Cow<'static, str> }` to admit other input-validation failures: empty anchors, malformed identity, etc.). Have all eight wrappers check at entry and return this. Document it in each wrapper's Errors section. Uniform contract; clean variant; defensive code is single-arm.\n\n(b) **Use an input type that cannot be empty.** Replace `chain: &[Certificate]` with `chain: &NonEmptySlice<Certificate>` (workspace newtype) or with a tuple `(leaf: &Certificate, intermediates: &[Certificate])`. The compiler enforces non-emptiness; the error doesn't exist. Heavy-weight: every callsite has to construct the input.\n\n(c) **Document the panic / upstream-dependency contract.** Every wrapper says \"panics if chain is empty\" (a lie \u2014 it doesn't panic today) or \"returns Error::Path(NoTrustedPath) on empty chain\" (true today, depends on upstream). Closes the documentation gap PKIX-sqek.21 raises but doesn't remove the OcspDelegation inconsistency.\n\nThe verify_ocsp_responder special-case suggests the maintainer ALREADY saw that \"empty chain produces an obscure upstream error\" is a defensive footgun, and patched it for the one wrapper. Generalizing the patch to all eight is the natural completion.\n\nClosely related: PKIX-sqek.21 (chain[0] indexing depends on undocumented upstream gate). The two findings resolve together: option (a) here makes (a) for PKIX-sqek.21 trivially correct (empty chain returns Error::EmptyChain before chain[0] is ever touched).\n\nFiled as priority 2 because empty-chain is the *cleanest* example of input-validation inconsistency, but the broader pattern (every wrapper has different defensive surface for malformed inputs) is the real cost. A single Error::InvalidInput variant fixes the family.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Wrapper empty-chain handling is inconsistent: 7 wrappers rely on upstream gate, 1 uses misleading Error::OcspDelegation variant",
+  "updated_at": "2026-05-14T18:12:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:12:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "close_reason": "opinion+out-of-scope: pre-existing bool flag in private closure; not part of PKIX-aoe",
+  "closed_at": "2026-05-03T13:29:03Z",
+  "compaction_level": 0,
+  "content_hash": "07cbf8e9868c95116293f013446fbb56b4bcd33b3e6a5c47dd55e98460891b2a",
+  "created_at": "2026-05-03T13:15:46Z",
+  "created_by": "Mark Atwood",
+  "description": "check_names closure (line 1420) takes require_match: bool where false=excluded-check and true=permitted-check. Call sites check_names(nc_excluded.as_slice(), false) and check_names(permitted.as_slice(), true) are not self-documenting \u2014 a reader must visit the closure definition to understand the polarity. Fix: split into two closures, check_excluded and check_permitted, or name the parameter mode: Mode with enum Mode { Excluded, Permitted }. Two closures are simplest since the bodies barely overlap.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "SEC7: This code is pre-existing, not introduced by PKIX-aoe. The bool flag anti-pattern is real but the function is a private internal closure called exactly twice in one function \u2014 the cost of misreading is low and bounded. Labeled opinion; out of scope for this review pass.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_names boolean flag: replace with two named closures",
+  "updated_at": "2026-05-03T13:29:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

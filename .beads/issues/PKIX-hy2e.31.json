@@ -1,0 +1,31 @@
+{
+  "close_reason": "Resolved as part of PKIX-hy2e.22. LintParameter now has both #[non_exhaustive] and a LintParameter::new(id, label, default_value) constructor.",
+  "closed_at": "2026-05-14T13:50:33Z",
+  "compaction_level": 0,
+  "content_hash": "b520c665730bdfa84bee959317ddade4c4940ca0c35696d5e115591842252ca5",
+  "created_at": "2026-05-14T12:51:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:381:\n\n    pub struct LintParameter {\n        pub id: Cow<'static, str>,\n        pub label: Cow<'static, str>,\n        pub default_value: Cow<'static, str>,\n    }\n\nThis struct is the in-memory form of an OSCAL Catalog `parameter`. The\ndoc itself (lines 366-376) lists OSCAL parameter fields that are\n'not modelled here': constraint, guideline, select, link.\n\nThree of those (constraint, guideline, select) cover constraint\nvalidation rules that the workspace's parameter mechanism doesn't\nsupport today. The OSCAL Profile composition (resolve_profile in\noscal/profile.rs) doesn't enforce them either \u2014 it just emits the\nparameters and trusts Lint::set_parameter to validate.\n\nWhen the workspace eventually decides to expose constraint/select\nslots (e.g., to let an OSCAL Catalog say 'max-octets MUST be between\n1 and 32' without each Lint impl duplicating that range check), every\nnew field is a breaking change because LintParameter is not\n#[non_exhaustive].\n\nCombined with the lack of a constructor:\n\n    let p = LintParameter {\n        id: Cow::Borrowed(\\\"max-octets\\\"),\n        label: Cow::Borrowed(\\\"Max octets\\\"),\n        default_value: Cow::Borrowed(\\\"20\\\"),\n    };\n\nevery lint that ships a parameter uses struct-literal construction.\nThe day `constraint: Option<...>` is added, every lint's parameter\nconstructor needs an update.\n\n# Cheapest fix\n\nAdd #[non_exhaustive] and provide:\n\n    impl LintParameter {\n        pub fn new(\n            id: impl Into<Cow<'static, str>>,\n            label: impl Into<Cow<'static, str>>,\n            default_value: impl Into<Cow<'static, str>>,\n        ) -> Self { ... }\n    }\n\nThen `LintParameter::new(\\\"max-octets\\\", \\\"Max octets\\\", \\\"20\\\")` becomes\nthe construction path, and the struct itself is evolvable. The\nshipped Rfc5280MaxSerialLengthLint and any future parametric lints\nget the constructor for free.\n\n# Combined with PKIX-hy2e.22\n\nThis is one of the structs called out in PKIX-hy2e.22 (the sweeping\n#[non_exhaustive] finding). Filing separately because LintParameter\nis a particularly clear case \u2014 the OSCAL spec literally has the\nextension slots already, and the rustdoc admits the limitation. Same\nfix shape but its own visibility.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "API contract: LintParameter has no constructor and no #[non_exhaustive], OSCAL parameter shape locked",
+  "updated_at": "2026-05-14T13:50:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:51:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

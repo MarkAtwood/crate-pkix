@@ -1,0 +1,22 @@
+{
+  "close_reason": "Extended TeletexString/BMPString scope note with encoding requirements",
+  "closed_at": "2026-05-02T17:20:09Z",
+  "compaction_level": 0,
+  "content_hash": "bb4ff95622d11988126e186542bcee78e2b82da3ce252c36ede1d83536ffa58b",
+  "created_at": "2026-05-02T17:15:35Z",
+  "created_by": "Mark Atwood",
+  "description": "Comments note that TeletexString and BMPString are deferred to v0.2 (RFC 5280 \u00a77.1 / RFC 4518 \u00a72.6), but don't document the required changes: (1) which encoding tables (cp850? ISO-8859-1?) are needed, (2) whether NFKC decomposition applies to these types, (3) whether any_to_str_bytes signature must change, (4) what test vectors to use (PKITS, external oracles?). Clarify scope and acceptance criteria for v0.2 legacy string type support so future implementers don't guess.",
+  "ephemeral": 0,
+  "id": "PKIX-2xm",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RFC 4518 v0.2 scope: document TeletexString/BMPString normalization requirements",
+  "updated_at": "2026-05-02T17:20:09Z"
+}

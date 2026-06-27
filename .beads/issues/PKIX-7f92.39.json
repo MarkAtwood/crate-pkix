@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed by the same commit as PKIX-7f92.5 \u2014 both bounds of the max-octets parameter and both API paths (with_max_octets, set_parameter) now route through a shared validate_max_octets helper enforcing 1..=21. with_max_octets panics on out-of-range; set_parameter returns ParameterError::InvalidValue. with_max_octets_zero_panics + with_max_octets_above_21_panics regression tests lock the panic shape.",
+  "closed_at": "2026-05-14T17:18:35Z",
+  "compaction_level": 0,
+  "content_hash": "a177c74ed37b7f81b8e3990450e94b293036bb29dfbb57f483d139fd616c0297",
+  "created_at": "2026-05-14T16:03:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/rfc5280.rs:95 (with_max_octets) and :151 (set_parameter) \u2014 Two API paths to the same parameter have opposite validation:\n\n  pub fn with_max_octets(max_octets: usize) -> Self {\n      ...\n      Self { max_octets, parameters }  // accepts 0\n  }\n\n  fn set_parameter(&mut self, id: &str, value: &str) -> Result<(), ParameterError> {\n      ...\n      if parsed == 0 {\n          return Err(ParameterError::InvalidValue { id, reason: \"...\" });\n      }\n      self.max_octets = parsed;\n      Ok(())\n  }\n\nCALLER IMPACT: A caller writes either:\n  // Path A \u2014 typed constructor\n  let lint = Rfc5280MaxSerialLengthLint::with_max_octets(0);\n\n  // Path B \u2014 string parameter\n  let mut lint = Rfc5280MaxSerialLengthLint::default();\n  lint.set_parameter(\"max-octets\", \"0\")?;\n\nPath A silently constructs a lint with max_octets=0. Every certificate has a serial number of at least 1 octet (RFC 5280 \u00a74.1.2.2 requires positive non-zero), so this lint rejects EVERY cert with LintResult::Error. The caller sees finding output but cannot debug the configuration error from the symptom.\n\nPath B returns ParameterError::InvalidValue with a clear \"max-octets must be at least 1\" message. The caller fixes their input.\n\nThe asymmetry produces a debugging trap: callers using the typed constructor get a silent misconfiguration; callers using set_parameter get diagnostic feedback.\n\nThis is a parameter-validation gap, not a documentation gap. PKIX-7f92.5 separately flags the OTHER direction (>20 silently weakens the RFC baseline). Both flaws apply to with_max_octets.\n\nREMEDIATION OPTIONS:\n\n1. Change with_max_octets parameter to NonZeroUsize:\n   pub fn with_max_octets(max_octets: NonZeroUsize) -> Self\n   Type-system enforcement; cleanest. Callers write NonZeroUsize::new(20).unwrap() or NonZeroUsize::new(20).expect(\"non-zero serial cap\").\n\n2. Make with_max_octets fallible:\n   pub fn with_max_octets(max_octets: usize) -> Result<Self, ParameterError>\n   Symmetrical with set_parameter; same error type. Less ergonomic for callers building config tables.\n\n3. Panic in with_max_octets on 0:\n   pub fn with_max_octets(max_octets: usize) -> Self {\n       assert!(max_octets >= 1, \"with_max_octets: max-octets must be at least 1\");\n       ...\n   }\n   Document # Panics. Matches LintRunner::new's panic-on-duplicate-id pattern (precedent in the crate).\n\nOption 1 is most defensive and type-system-enforced; Option 3 is the minimum-invasive precedent-following choice.\n\nPre-1.0 free for any choice. PKIX-7f92.5 will need a similar treatment for the upper bound (20). Consider whether to combine both validations into a single typed range (e.g., wrap the parameter in a SerialOctetLimit newtype).",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.39",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc5280MaxSerialLengthLint::with_max_octets(0) silently constructs a lint that rejects every cert; set_parameter rejects 0 with InvalidValue \u2014 the two parameter paths have opposite validation semantics",
+  "updated_at": "2026-05-14T17:18:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:03:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

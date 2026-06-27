@@ -1,0 +1,22 @@
+{
+  "close_reason": "Filer recommended Reject. clippy::option_if_let_else is nursery-only (not in workspace lint config); the existing match form is preferred for readability when the two arms differ in structural complexity. Decision documented in original bead.",
+  "closed_at": "2026-05-07T23:16:29Z",
+  "compaction_level": 0,
+  "content_hash": "34b0c4c6d78b713305c16e06d42af327befd966fe113f09262f9087e8ea86ac7",
+  "created_at": "2026-05-07T23:05:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-path/src/lib.rs:2017-2024 \u2014 initial nc_permitted/nc_excluded extraction from anchor.name_constraints.\n\n## Finding\n```\nlet (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {\n    None => (None, GeneralSubtrees::default()),\n    Some(nc) => (\n        nc.permitted_subtrees.clone(),\n        nc.excluded_subtrees.clone().unwrap_or_default(),\n    ),\n};\n```\n\nclippy with -W clippy::nursery flags this with clippy::option_if_let_else, suggesting:\n\n```\nlet (mut nc_permitted, mut nc_excluded) = anchor.name_constraints\n    .as_ref()\n    .map_or_else(|| (None, GeneralSubtrees::default()), |nc| (\n        nc.permitted_subtrees.clone(),\n        nc.excluded_subtrees.clone().unwrap_or_default(),\n    ));\n```\n\n## Why this was not fixed\nclippy::option_if_let_else is in the nursery group, not the default lint set. Default workspace clippy is clean. The suggestion is purely stylistic and many reviewers find the original match form more readable for tuple destructuring with two non-trivial branches.\n\n## Severity\nP4 (opinion). The nursery lint is opinion-class; both forms are correct, equally efficient, and the match form is arguably easier to scan because each arm is a clearly delineated tuple expression.\n\n## Recommendation\n**Reject**. The match form is preferable here because:\n1. The branches differ in complexity: None is a simple unit-default, Some clones two fields with different unwrap_or_default chains. The match form puts these side-by-side.\n2. map_or_else nests three closures-or-thunks deep (move closure, init closure, mapping closure with another inner closure for unwrap_or_default), which is denser than the match.\n\nThis finding is filed for transparency: clippy::option_if_let_else fires here, the team has read the suggestion, and the decision is to keep the match. Do not 'fix' this without explicit reviewer agreement.\n\n## Out of scope\nAlready implicitly documented by the absence of -W clippy::nursery in the default workspace lint config.",
+  "ephemeral": 0,
+  "id": "PKIX-5zf2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: chain_walk anchor.name_constraints initialisation matches clippy::option_if_let_else nursery suggestion",
+  "updated_at": "2026-05-07T23:16:29Z"
+}

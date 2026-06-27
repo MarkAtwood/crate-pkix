@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:18Z",
+  "compaction_level": 0,
+  "content_hash": "ed5a24fc35223c04de29cfc3874de91308348b212fcf5be1b289fd896db1db1f",
+  "created_at": "2026-05-02T13:41:41Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidatedPath is marked #[non_exhaustive] (line 250) but has all-public fields. non_exhaustive prevents external callers from struct-initializing it or pattern-matching exhaustively, which is the right choice for a library type. However with public fields, callers can still read anchor_index and depth directly. This is actually fine and intentional, but the crate has no doc comment explaining why fields are pub despite non_exhaustive. Without explanation, maintainers may wonder if the public fields were a mistake. Add a doc comment clarifying that non_exhaustive guards against future field additions without breaking match syntax, while pub fields allow read access.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath pub fields and non_exhaustive together inconsistent",
+  "updated_at": "2026-05-02T14:19:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

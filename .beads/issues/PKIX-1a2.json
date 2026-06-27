@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Skeleton created: Cargo.toml, src/lib.rs. Builds and passes clippy -D warnings. Implementation stubs (check_algorithm, check_extensions, RustCryptoVerifier) tracked for v0.1 impl work.",
+  "closed_at": "2026-05-02T05:29:10Z",
+  "compaction_level": 0,
+  "content_hash": "7e6f23d6f5ec3789bff56ed8c5129cb061b0200d5a1b002e899803cda7415ac2",
+  "created_at": "2026-05-02T05:27:35Z",
+  "created_by": "Mark Atwood",
+  "description": "Create a 4th crate pkix-chain-simple that provides a strict, opinionated chain verifier. Accepts only the small subset of cert configurations seen in common TLS/code-signing chains. If ANYTHING is unusual (long chain, non-standard algorithm, unexpected extension), it returns an error rather than trying to handle it. API: verify_simple(chain, anchors, now_unix) with no verifier or revocation params.",
+  "ephemeral": 0,
+  "id": "PKIX-1a2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add pkix-chain-simple crate skeleton",
+  "updated_at": "2026-05-02T05:29:10Z"
+}

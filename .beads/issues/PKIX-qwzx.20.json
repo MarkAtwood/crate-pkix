@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced #[deprecated] with #[doc(hidden)] on three stub APIs (pkix-ac::validate_attribute_cert, pkix-ct::verify_scts, pkix-composite::CompositeVerifier::new). Added a # Limitations section to CompositeVerifier::new (the other two already had one). Removes spurious deprecation warnings while still hiding the symbol from rustdoc.",
+  "closed_at": "2026-05-07T22:32:08Z",
+  "compaction_level": 0,
+  "content_hash": "c6789c55a36edb0a128c76eaaabf1f721f3b240d634e1e3933937c6be710f1ad",
+  "created_at": "2026-05-07T22:14:45Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nThree stub crates use `#[deprecated = \\\"... is not yet implemented\\\"]` to flag\nunimplemented APIs:\n\n- `pkix-ac/src/lib.rs:129` \u2014\n  \\`#[deprecated = \\\"pkix-ac is not yet implemented; this function always returns AaPathInvalid\\\"]\\`\n- `pkix-ct/src/lib.rs:104` \u2014\n  \\`#[deprecated = \\\"pkix-ct is not yet implemented; this function always returns NoTrustedSct\\\"]\\`\n- `pkix-composite/src/lib.rs:65` \u2014\n  \\`#[deprecated = \\\"pkix-composite is not yet implemented\\\"]\\`\n\n`#[deprecated]` is a semver-stable contract that means **\\\"this item exists, works,\nand is being phased out\\\"** \u2014 it generates a warning to migrate to a successor.\nThat is the wrong signal for a stub that has never worked.\n\nIdiomatic alternatives:\n\n1. **Best**: do not export the API yet. Mark the function as `pub(crate)` or do\n   not include it in `lib.rs`. Stubs that don't compile-block downstream callers\n   are not a real release contract.\n\n2. **Acceptable**: keep the symbol but use `#[doc(hidden)]` plus a\n   `# Limitations` doc section that says it's a placeholder. Combine with\n   `#[allow(unused)]` on parameters.\n\n3. **Wrong but currently used**: `#[deprecated]` \u2014 this tells `clippy` and\n   `rustc` to fire migration warnings on every call site, which both confuses\n   users (\\\"migrate to what?\\\") and trains them to ignore deprecation warnings.\n\nFix: replace `#[deprecated = \\\"... not yet implemented\\\"]` with `#[doc(hidden)]`\nplus an in-doc `# Limitations` section. Keep the placeholder body.\n\nSide effect: removes spurious deprecation warnings in downstream code that\ncurrently calls these stubs (e.g., the workspace doc-tests in\n`pkix-composite/src/lib.rs:18`).",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.20",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: misuse of #[deprecated] on stub APIs in pkix-ac/pkix-ct/pkix-composite",
+  "updated_at": "2026-05-07T22:32:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:14:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:39:05Z",
+  "compaction_level": 0,
+  "content_hash": "fe656de600811e7e4405911819ff35d5519ebb45c67ddb45f85a84603aeeed08",
+  "created_at": "2026-05-02T18:31:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs validate_path(): when the last chain cert is self-issued (issuer==subject), the code additionally checks that the anchor SPKI matches the cert SPKI. Without this check, an attacker who creates a CA with the same DN as a trusted root but a different key could have the name match succeed (since chain_walk is skipped until after anchor selection), then fail in chain_walk \u2014 but it leaks timing. The guard short-circuits early and prevents even attempting chain_walk with the wrong SPKI. This is a meaningful defense-in-depth check that a contributor might remove as 'redundant with the signature check in chain_walk' \u2014 it is not redundant.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.13",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Self-issued SPKI guard in validate_path prevents key-collision attack",
+  "updated_at": "2026-05-02T22:39:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Landed in 499b9461. Pure state-grouping refactor \u2014 introduced WorkingState<'a> with ten RFC 5280 \u00a76.1.2-anchored fields (working_spki, working_issuer_name, working_issuer_is_san_identity, nc_permitted, nc_excluded, nc_constrained_types, explicit_policy, inhibit_any, policy_mapping, policy_tree). All 262 pkix-path tests pass; clippy clean with -D warnings. Bead description mentioned 12 fields including i_non_self_issued and max_path_len; in reality i_non_self_issued is computed inline via is_self_issued_cert(cert) and max_path_len lives on ValidationPolicy (already accessible), so the struct has 10 fields. Monolith doc-comment retained per design plan (retirement deferred to als9.17 cleanup). Unblocks als9.12 (H8 apply_policy_mappings).",
+  "closed_at": "2026-05-11T04:01:16Z",
+  "compaction_level": 0,
+  "content_hash": "3f38c545c7e32fb8243318829ace85e986991ecedfcb5b3b6b85784da576c36d",
+  "created_at": "2026-05-08T05:43:52Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`chain_walk` carries 7+ mutable state vars (working_spki, working_issuer_name, working_issuer_is_san_identity, valid_policy_tree, permitted_subtrees, excluded_subtrees, max_path_len, i_non_self_issued, explicit_policy, policy_mapping, inhibit_any_policy, nc_constrained_types) through the loop body. The high-risk helpers (H8/H9/H10/H11) need these vars; threading them as individual params would make the function signatures fragile. The PKIX-als9 description explicitly recommends a struct.\n\n## What\n\nIntroduce `pub(crate) struct WorkingState { ... }` in pkix-path/src/lib.rs collecting the policy/NC/path-len state. Doc-comment each field with its RFC 5280 \u00a76.1 origin. `chain_walk` constructs it once at \u00a76.1.2 init (lines 2042\u20132111), mutates fields in the loop, and consumes it at \u00a76.1.5 final wrap-up. No helper extraction yet \u2014 purely a state-grouping refactor.\n\n## Sequencing\n\nLands BEFORE H8 (first helper that needs the struct). H1\u2013H7 do not need WorkingState; they take individual params.\n\n## Acceptance\n\n- New struct `WorkingState` defined and used in chain_walk.\n- All existing PKITS tests pass: `cargo test -p pkix-path`.\n- `cargo clippy --all-features -p pkix-path -- -D warnings` clean.\n- Doc-comment on the struct names each field s RFC 5280 \u00a76.1 source.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: prep \u2014 introduce WorkingState struct (groups policy/NC/path-len state)",
+  "updated_at": "2026-05-11T04:01:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

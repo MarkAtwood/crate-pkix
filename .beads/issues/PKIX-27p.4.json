@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-03T02:46:42Z",
+  "compaction_level": 0,
+  "content_hash": "5ccbb48c11e464c5b9ff2a5773d1394508fddb610ef7d1a394c717eca2327599",
+  "created_at": "2026-05-03T02:41:15Z",
+  "created_by": "Mark Atwood",
+  "description": "The default impl returns Ok(()) (skip). Any custom RevocationChecker implementation that doesn't override check_revocation_against_anchor silently skips the anchor-issued cert revocation check with no compile error. The docs explain the default but a busy developer adding a CRL-or-OCSP checker will test check_revocation and miss check_revocation_against_anchor entirely. The concrete consequence: a revoked intermediate CA issued directly by the trust anchor passes revocation checking in verify_chain. Consider whether this should be a required method (breaking) or add a #[must_override] doc note and integration test that verifies an overriding implementation.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RevocationChecker::check_revocation_against_anchor default Ok(()) is a silent security gap for custom impls",
+  "updated_at": "2026-05-03T02:46:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

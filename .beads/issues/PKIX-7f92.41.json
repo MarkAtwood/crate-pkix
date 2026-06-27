@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "427513cbfae9754da528a5a1f5000f5603ecfea7c93312c0753351bb082d0a5c",
+  "created_at": "2026-05-14T16:04:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1648 (LintProfile trait) + ~1661 (lint_runner method) + 1716 (check_shape) \u2014 The LintProfile trait has:\n\n  pub trait LintProfile: Profile {\n      fn lint_runner(&self) -> LintRunner;\n  }\n\nAnd the rustdoc says (paraphrased): \"Implementors should document whether this method caches the runner or allocates fresh on each call.\"\n\nThis pushes the contract onto every implementor. A caller writing generic code over `dyn LintProfile` cannot rely on any default behavior \u2014 they don't know whether `profile.lint_runner()` is cheap (cached) or expensive (fresh allocation).\n\nCALLER IMPACT:\n\ncheck_shape (lib.rs:1716) calls profile.lint_runner() on EVERY invocation:\n\n  pub fn check_shape(profile: &dyn LintProfile, cert: &Certificate, ...) -> Vec<Finding> {\n      let runner = profile.lint_runner();   // fresh per call \u2014 implementor's choice\n      runner.run_cert(cert, ...)\n  }\n\nA caller running check_shape in a tight loop over many certs incurs:\n- Per-cert LintRunner::new() call (which has an O(n log n) duplicate-id check, see lib.rs:1181's # Panics doc).\n- Per-cert clone of every Box<dyn Lint> (via LintClone::clone_box if the implementor builds the runner from owned lints).\n- Per-cert Vec allocation for the lint set.\n\nFor a profile with 30 lints, this is ~30 Box::clone() per cert call. At 1000 certs/sec batch validation (per AGENTS.md non-negotiable #6's batch-evaluation requirement), that's 30000 Box::clone() / sec for the lint set, before any actual lint work runs.\n\nThe implementor cannot fix this within the current trait shape because lint_runner returns owned LintRunner. There is no way to return a cached &LintRunner from an impl.\n\nREMEDIATION OPTIONS:\n\n1. PIN THE CONTRACT IN THE TRAIT RUSTDOC:\n   /// # Contract\n   /// Implementors SHOULD allocate fresh on each call. Callers MUST cache\n   /// the returned LintRunner if they invoke it repeatedly; the caller side\n   /// is the appropriate place for the cache.\n\n   Documentation-only. Doesn't address the underlying inefficiency but documents the contract.\n\n2. CHANGE THE RETURN TYPE TO Cow<'_, LintRunner>:\n   fn lint_runner(&self) -> Cow<'_, LintRunner>;\n\n   - Implementors with cached state can return Cow::Borrowed.\n   - Implementors building fresh can return Cow::Owned.\n   - check_shape uses the runner via &*runner; works either way.\n   - Caller batch code can store the Cow and pay the cost once.\n\n3. SEPARATE THE CONCERNS:\n   fn lint_set(&self) -> &[Box<dyn Lint>];\n   fn bundle_version(&self) -> &str { \"\" }\n\n   And let callers build LintRunner themselves once. Pushes the runner-construction responsibility caller-side, which is where batching wants it anyway.\n\nOption 2 is the highest-flexibility / lowest-friction choice. Option 3 is the most architecturally clean.\n\nPRE-1.0: Either is a breaking signature change and is free now. Post-1.0, only Option 1 remains.\n\nRELATED: AGENTS.md non-negotiable #6 \u2014 \"Batch APIs where setup cost is non-trivial. Policy-adapter crates with subprocess overhead MUST expose batch APIs...\" \u2014 applies to LintProfile by analogy. The per-cert lint_runner() call is non-trivial setup repeated unnecessarily.\n\nThe current state \u2014 delegating the contract to implementors \u2014 means pkix-lint cannot guarantee batch-friendliness for any LintProfile-using code. That violates non-negotiable #6 unless the caller knows to cache.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.41",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintProfile::lint_runner caching/allocation contract delegated to implementors; trait-level contract unspecified, check_shape silently pays a fresh-runner cost per call",
+  "updated_at": "2026-05-14T16:04:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:04:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

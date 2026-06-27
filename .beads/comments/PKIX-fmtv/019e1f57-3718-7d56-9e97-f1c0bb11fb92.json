@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T03:17:50Z",
+  "id": "019e1f57-3718-7d56-9e97-f1c0bb11fb92",
+  "issue_id": "PKIX-fmtv",
+  "text": "Parent epic surfaced on `bd ready` autonomous-frontier. Open children breakdown:\n\n- PKIX-fmtv.11 \u2014 human-labeled this session (.11.2 in_progress under bd-spin agent)\n- PKIX-fmtv.17 (PKITS regression through new verify_* wrappers) \u2014 human-labeled\n- PKIX-fmtv.18 (differential testing vs OpenSSL for canonical purposes) \u2014 human-labeled\n- PKIX-fmtv.19 (differential testing vs pyca for canonical purposes) \u2014 human-labeled\n\nAll 4 open children are human-gated. Closed children: 17/21. The parent epic has no autonomous work of its own \u2014 its remaining deliverable depends entirely on human-gated children. Labeling `human` to keep the loop from re-picking each session. Parent should close once .11 / .17 / .18 / .19 all close; this label can be dropped at that time.\n\nSame workflow question as PKIX-fmtv.11: `bd ready` surfaces parent epics whose only open children are human-gated; either bd should filter those out automatically, or the manual `human` propagation pattern is intentional.\n"
+}

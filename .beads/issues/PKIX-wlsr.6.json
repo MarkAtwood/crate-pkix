@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "close_reason": "Per-crate # Limitations rustdoc audit complete. Added top-level # Limitations sections to 10 of the 11 existing 1.0-scope crates (pkix-path already had one \u2014 its stale 'P-384 planned' line corrected). pkix-aia (12th crate per amended narrow scope) doesn't exist yet; its Limitations will ship with the crate via PKIX-zkjb. Cross-references verified: PKIX-zkjb, PKIX-l63j, PKIX-gphz, PKIX-lwr9.4, PKIX-8h87, PKIX-p8vz, PKIX-mzsk, PKIX-jy95.10, PKIX-jbvb. cargo doc --no-deps --workspace --all-features builds at the pre-existing warning baseline (zero new warnings from this audit). Committed as a818cedb.",
+  "closed_at": "2026-05-13T17:24:16Z",
+  "compaction_level": 0,
+  "content_hash": "c00fb419cb10181e860d7026794278fad12ba9e5379cfcc54895e69908ec6bc7",
+  "created_at": "2026-05-13T16:58:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## Per-crate `# Limitations` rustdoc audit for 1.0\n\nAutonomous-execution bead. Blocks on .1 (scope decided) and .2 (skeleton disposition decided).\n\nFor each 1.0-included crate, audit its `# Limitations` rustdoc section against shipped reality and update accurately. The Limitations section is part of the 1.0 promise: it tells callers what the workspace does and does NOT do, so they can decide whether the crate fits their needs.\n\n## Per-crate checklist\n\nFor each of the 11 crates under .1 narrow scope (or expanded set if .1 picks (B)/(C)):\n\n- [ ] `# Limitations` section exists in the crate's top-level rustdoc (lib.rs)\n- [ ] Section accurately enumerates: missing algorithms, missing extensions, missing RFC sections, missing differential coverage, etc.\n- [ ] Section cross-references the relevant beads (PKIX-zkjb for AiaFetcher, PKIX-jbvb for S/MIME tier expansion, PKIX-ng0x for AC, PKIX-baac for CT, etc.)\n- [ ] No stale \"planned\" or \"TODO\" references to features already shipped\n- [ ] Section is concise (1-2 paragraphs + bullet list); not exhaustive RFC-detail-level\n\n## Crate-specific Limitations to verify\n\n### pkix-path\n\n- Algorithm coverage gaps (PKIX-gphz children: P-521, Ed25519, RSA-PSS variants, etc.)\n- Unicode DN handling status (PKIX-l63j children: NFKC + non-ASCII case fold)\n- Any RFC 5280 \u00a76 corner cases known-not-handled\n\n### pkix-revocation\n\n- CRL delta + indirect CRL support status\n- OCSP nonce/extension support level\n- CRL distribution point fetching (offline-only; pkix-revocation-http for online)\n\n### pkix-chain\n\n- AiaFetcher missing (caller must provide full chain) \u2014 explicit at 1.0\n- Verifier struct generic-ity (2-generic vs 3-generic per .3 decision)\n\n### pkix-path-builder\n\n- RFC 4158 implementation status; documented residual divergences (PKIX-lwr9.4 if not closed by 1.0)\n\n### pkix-truststore\n\n- No platform/system trust store integration (pkix-truststore-system stays at 0.x)\n- No PKCS#11 (pkix-truststore-pkcs11 stays at 0.x)\n\n### pkix-identity\n\n- RFC 6125 wildcard rule compliance level\n- RFC 8398 SmtpUTF8Mailbox support level\n- IP literal handling (IPv4/IPv6)\n\n### pkix-profiles + pkix-profiles-cabf\n\n- pkix-profiles: RFC-baseline only (BasicTlsProfile, BasicSmimeProfile, etc.)\n- pkix-profiles-cabf: reference, not authoritative; spec-taxonomy principle per PKIX-mzsk; TLS BR / S/MIME BR (Mailbox-validated only at 1.0; tier expansion via PKIX-jbvb post-1.0) / CS BR\n\n### pkix-lint + pkix-lint-cabf\n\n- Lint framework + RFC-conformance Lints\n- pkix-lint-cabf: small reference set; comprehensive predicate coverage via pkix-policy-zlint (post-1.0)\n\n### pkix-revocation-http\n\n- HTTP transport for CRL + OCSP\n- Sync only at 1.0 (async via separate adapter if needed)\n\n## Execution\n\nAutonomous loop reads each crate's current Limitations section, audits against this bead's checklist + cross-referenced beads, edits the rustdoc accordingly, runs `cargo doc --no-deps -p <crate>` to verify build.\n\n## Acceptance\n\n- [ ] Each 1.0-included crate's Limitations section reviewed and accurate\n- [ ] Cross-references to post-1.0 beads are correct (no stale IDs)\n- [ ] `cargo doc --no-deps --workspace` builds clean\n- [ ] Mark reviews the diff before merge\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- PKIX-wlsr.1 (scope decision; gates which crates are in audit)\n- PKIX-wlsr.2 (skeleton disposition; determines which Limitations point at \"stays 0.x\")\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Per-crate # Limitations rustdoc audit for 1.0 (autonomous)",
+  "updated_at": "2026-05-13T17:24:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:58:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T09:58:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:58:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

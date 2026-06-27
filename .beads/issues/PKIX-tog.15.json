@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:28:02Z",
+  "compaction_level": 0,
+  "content_hash": "8d035035066476bc1fb003a8490b31e90e1a65f09d471bec3ab7c9d95e9ecd13",
+  "created_at": "2026-05-06T23:20:30Z",
+  "created_by": "Mark Atwood",
+  "description": "CertPool is documented as 'an unordered collection' but derives PartialEq which compares internal Vec element-by-element. Two pools with the same certs in different insertion order are not equal. Fix: drop PartialEq/Eq derives, or implement manually with order-insensitive comparison. File: pkix-path-builder/src/lib.rs line 55.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "path-builder: CertPool derives order-sensitive PartialEq but semantics are bag",
+  "updated_at": "2026-05-06T23:28:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

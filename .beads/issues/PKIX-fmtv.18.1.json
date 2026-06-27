@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:33:28Z",
+  "compaction_level": 0,
+  "content_hash": "c770ee694f1b95927820fa15c31bf3c00ece18b1fee353713e76d04488094499",
+  "created_at": "2026-05-13T05:30:26Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Factor the existing pkix-difftest OpenSSL oracle to accept per-purpose arguments (-purpose, -verify_hostname, -verify_email, -verify_ip) for the wrapper-level differential tests under PKIX-fmtv.18.\n\nThe existing oracle in pkix-difftest/src/oracles/openssl.rs is chain-shape only. The wrapper-level diff needs to pass additional flags. Add a small helper API alongside the existing verify (do NOT break the chain-shape callers).\n\nShape sketch:\n  pub struct VerifyArgs<'a> {\n      pub purpose: Option<&'a str>,            // sslserver, sslclient, smimesign, smimeencrypt, codesign, timestampsign, ocsphelper\n      pub verify_hostname: Option<&'a str>,\n      pub verify_email: Option<&'a str>,\n      pub verify_ip: Option<&'a str>,\n  }\n  pub fn verify_with_args(chain: &Chain, args: &VerifyArgs) -> io::Result<Verdict>;\n\nThis subbead is the precondition for every purpose-specific diff bead below it.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: shared wrapper-level OpenSSL oracle helper",
+  "updated_at": "2026-05-13T05:33:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:25Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

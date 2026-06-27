@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "52f36aa772fcf89f22d0984808ee49d37573433fa6cfdeb7d93b20beb7c39f55",
+  "created_at": "2026-05-14T17:47:45Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:130-151\n\n```rust\n/// ```no_run\n/// # #[cfg(all(feature = \"log-list\", feature = \"log-list-json\"))]\n/// # fn example() -> Result<(), pkix_ct::Error> {\n/// use pkix_ct::{CtLogList, SctVerifier, SctList};\n/// use pkix_path::DefaultVerifier;\n/// ...\n/// let v = SctVerifier::new(logs, DefaultVerifier);\n/// ```\n```\n\n`pkix_path::DefaultVerifier` is feature-gated:\n\n```rust\n// pkix-path/src/lib.rs:4254\n#[cfg(any(feature = \"p256\", feature = \"p384\", feature = \"rsa\"))]\npub struct DefaultVerifier;\n```\n\n`pkix-path`'s default features include `[\"rsa\", \"p256\"]`, so under\ndefault-feature builds `DefaultVerifier` IS available. But if a\ndownstream user builds `pkix-ct` with `default-features = false` on\n`pkix-path` (or via workspace inheritance where the workspace\ndisables defaults), the doctest will fail to compile.\n\nThe `# #[cfg(all(feature = \"log-list\", feature = \"log-list-json\"))]`\ngate only checks pkix-ct's features, not pkix-path's. The doctest\nis hidden from invocation by the gate (so `no_run` doesn't matter)\nbut is the COMPILE step (rustdoc still compiles the doc-test code\nunder `cargo test --doc`).\n\nRecommendation: tighten the gate, or switch to a verifier example\nthat doesn't depend on a pkix-path optional feature.\n\nOption A (cheaper):\n\n```rust\n/// ```no_run\n/// # #[cfg(all(feature = \"log-list\", feature = \"log-list-json\"))]\n/// # fn example() -> Result<(), pkix_ct::Error> {\n/// # struct StubVerifier;\n/// # impl pkix_path::SignatureVerifier for StubVerifier { ... }\n/// use pkix_ct::{CtLogList, SctVerifier};\n/// let v = SctVerifier::new(logs, StubVerifier);\n/// ```\n```\n\nA stub verifier is portable across pkix-path features.\n\nOption B: add a doctest-features clause to Cargo.toml:\n\n```toml\n[[example]]\nname = \"verify_sct\"\nrequired-features = [\"log-list-json\", \"pkix-path/p256\"]\n```\n\n(Not exactly a doctest equivalent, but the same idea.)\n\nOption C: keep current example, document the implicit feature\ndependency:\n\n```rust\n/// # Feature requirements\n///\n/// This example requires `pkix-path`'s `p256` or `rsa` feature to\n/// be enabled (both are in pkix-path's default feature set).\n```\n\nPriority P3 because in the typical setup the doctest compiles, but\na hardened CI matrix that turns off pkix-path defaults will fail.\n\nThis connects to PKIX-ppbr.28 (feature interactions) \u2014 the contract\nbetween pkix-ct features and pkix-path features is under-documented.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.37",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctVerifier doctest uses pkix_path::DefaultVerifier which is feature-gated \u2014 compiles only with default features",
+  "updated_at": "2026-05-14T17:47:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:47:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

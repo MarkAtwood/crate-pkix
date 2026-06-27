@@ -1,0 +1,41 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T05:38:01Z",
+  "compaction_level": 0,
+  "content_hash": "98613da665b896ea904cb0e4e0c9c20f7b469ca5a9052efcddab2dbda7ae8d94",
+  "created_at": "2026-05-07T23:46:54Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer the chain_walk decomposition design doc attached to PKIX-als9 (Section 5, Section 7), PKITS \u00a74.5 \u2014 Verifying Paths with Self-Issued Certificates \u2014 is the single largest unmonitored regression class for the planned refactor. The current pkix-path/tests/ directory imports PKITS \u00a74.1, \u00a74.2, \u00a74.3, \u00a74.6, \u00a74.7, \u00a74.8, \u00a74.9, \u00a74.10, \u00a74.11, \u00a74.12, \u00a74.13 but not \u00a74.5.\n\n## What \u00a74.5 covers\n\nPKITS \u00a74.5 exercises is_self_issued_cert exemptions in three RFC 5280 sites:\n- \u00a76.1.3(b) \u2014 NameConstraints subject-name check skip for self-issued certs\n- \u00a76.1.4(h) \u2014 explicit_policy / policy_mapping / inhibit_any_policy counter-decrement skip\n- \u00a76.1.4(m) \u2014 pathLenConstraint counts only NON-self-issued certs\n\nWithout \u00a74.5 coverage, refactor regressions in:\n- H7 (check_intermediate_basic_constraints \u2014 pathLen counting)\n- H10 (update_name_constraints_state \u2014 NC check skip on self-issued)\n- H11 (finalise_policy_tree_with_user_set \u2014 counter behavior)\nwill not be caught.\n\n## Action\n\n1. Locate PKITS 04 archive (NIST PKITS 2.16.840.1.101.3.2.1.48.51) \u00a74.5 test cases and CRLs.\n2. Convert fixtures using the existing pkits_*.rs harness pattern (see pkits_4_6_4_7.rs).\n3. Add tests to pkix-path/tests/pkits_4_5.rs.\n4. External oracle: NIST PKITS expected results table (each test case has an expected pass/fail outcome documented in the PKITS specification).\n\n## Constraints\n\n- Tests must be fully offline (PKITS fixtures committed to repo).\n- pkix-path is no_std; test harness can use std (pkix-path tests already use std for fixture loading).\n- Independent oracle: NIST PKITS expected results \u2014 not the code under test.\n\n## Acceptance\n\n- pkix-path/tests/pkits_4_5.rs exists with all \u00a74.5 test cases.\n- All pass with current chain_walk implementation (regression-protective baseline).\n- Block dependency added: PKIX-als9 PR-2 (H7+H9) and PR-3 (H8+H10+H11) should not land before this.",
+  "design": "## PKITS \u00a74.5 self-issued path tests \u2014 scoping result\n\n## \u00a71 PKITS source\n- Zip: https://csrc.nist.gov/CSRC/media/Projects/PKI-Testing/documents/PKITS_data.zip (HTTP 200, ~3.05 MB, last-modified 2024-09-29).\n- PDF: https://csrc.nist.gov/CSRC/media/Projects/PKI-Testing/documents/PKITS.pdf (HTTP 200, ~5.03 MB).\n- pkix-path/tests/pkits/README.md documents the layout.\n\n## \u00a72 \u00a74.5 test cases (verbatim from PKITS, verdicts confirmed via vectors.json)\n- 4.5.1 Valid Basic Self-Issued Old With New Test1 \u2014 PASS\n- 4.5.2 Invalid Basic Self-Issued Old With New Test2 \u2014 FAIL\n- 4.5.3 Valid Basic Self-Issued New With Old Test3 \u2014 PASS\n- 4.5.4 Valid Basic Self-Issued New With Old Test4 \u2014 PASS\n- 4.5.5 Invalid Basic Self-Issued New With Old Test5 \u2014 FAIL\n- 4.5.6 Valid Basic Self-Issued CRL Signing Key Test6 \u2014 PASS\n- 4.5.7 Invalid Basic Self-Issued CRL Signing Key Test7 \u2014 FAIL\n- 4.5.8 Invalid Basic Self-Issued CRL Signing Key Test8 \u2014 FAIL\n\n## \u00a73 Existing harness\n- pkix-path/tests/pkits_helper.rs (84 lines): pkits_cert(name), pkits_trust_anchor(), pkits_validate(&[leaf_first_names], now_unix) -> Result<ValidatedPath>. PKITS_NOW=1_577_836_800 (2020-01-01).\n- Existing test files: pkits_4_1_4_2.rs (189), pkits_4_3.rs (147), pkits_4_6_4_7.rs (431), pkits_4_13.rs (726), pkits_policy.rs (1663), pkits_smoke.rs.\n- Naming: `pkits_4_6_1_missing_basic_constraints` style.\n- Verdict assertion: PASS uses `result.expect(\"\u00a7X must validate\")`; FAIL uses `assert!(matches!(result, Err(Error::SpecificVariant{..})))` \u2014 variant-precise where possible.\n- API: all call pkix_path::validate_path via pkits_validate. No pkix-chain.\n- is_self_issued_cert exists at pkix-path/src/lib.rs:1438; already exercised by 4.6.15/16/17 and policy 4.8/4.9/4.11.\n\n## \u00a74 Fixture inventory \u2014 ALREADY COMMITTED\nAll 13 \u00a74.5 certs and all 5 \u00a74.5 CRLs are present in pkix-path/tests/pkits/{certs,crls}/. Zero new imports required.\n\n## \u00a75 Effort\n- ~250-320 LOC for pkits_4_5.rs (extrapolating from \u00a74.6/\u00a74.7 boilerplate).\n- No new helpers needed for pkix-path-only PASS subset.\n- A pkits_validate_with_crls helper would be needed to run through pkix-revocation.\n- Oracle: PKITS PDF Table 4 (Test Results), \u00a74.5 entries.\n- Total: ~3-5 hours pkix-path PASS-only; ~6-8 hours full pkix-revocation suite.\n\n## \u00a76 Critical: \u00a74.5 splits across two crates\n\nAll 8 \u00a74.5 vectors carry a CRLPath. The 4 FAIL cases (4.5.2, 4.5.5, 4.5.7, 4.5.8) FAIL **because** the EE is revoked on a self-issued-signed CRL. Per AGENTS.md (pkix-path is no_std, no revocation), the FAIL cases CANNOT live in pkix-path/tests/. Without revocation, those 4 tests would WRONGLY pass.\n\nRequired split:\n- PR-1: pkix-path/tests/pkits_4_5.rs \u2014 4 PASS cases (4.5.1, 4.5.3, 4.5.4, 4.5.6). Exercises the RFC 5280 \u00a76.1.3(b) NC-skip and \u00a76.1.4(h)/(m) counter/path-len exemptions for self-issued certs. ~150 LOC, ~2 hrs.\n- PR-2: pkix-revocation/tests/pkits_4_5.rs \u2014 all 8 cases via a new pkits_validate_with_crls helper. ~250 LOC + ~50 LOC harness, ~5 hrs.\n\n## \u00a77 Risks\n- Validity window: all BasicSelfIssued certs valid 2010-2030; PKITS_NOW=2020 is in-window.\n- is_self_issued_cert correctness: textbook \u00a73.3 implementation, already exercised by other PKITS sections; high confidence.\n- chain_walk H7/H10/H11 linkage: \u00a74.5 PASS cases will exercise these \u2014 tests must land BEFORE chain_walk refactor begins so refactor regressions are caught.\n\n## \u00a78 Recommendation\nProceed with the split:\n1. PR-1 (pkix-path): 4 PASS cases. Lands first, blocks PKIX-als9 refactor PR.\n2. PR-2 (pkix-revocation): 8 cases including FAIL via new harness. Independent of PR-1, can land in parallel with chain_walk refactor.",
+  "ephemeral": 0,
+  "id": "PKIX-77cl",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Both children completed:\n- PKIX-77cl.1 (pkix-path PR): 5 tests in pkix-path/tests/pkits_4_5.rs covering structural cases 4.5.1, .3, .4, .6 (PASS) and .8 (FAIL \u2014 Test8EE signed by cRLSign-only self-issued cert lacking BasicConstraints).\n- PKIX-77cl.2 (pkix-revocation PR): 7 tests in pkix-revocation/tests/pkits_4_5.rs covering revocation lens for 4.5.1-7.\n\nOriginal bead description scoped 4 PASS to pkix-path and 4 FAIL to pkix-revocation. After reading the PKITS PDF \u00a74.5 narrative, \u00a74.5.8 turned out to be a path-validation failure (not revocation), so the corrected split is 5 structural in pkix-path / 7 revocation in pkix-revocation. All 12 tests pass; full workspace suite green.\n\nRegression-protective baseline for the planned chain_walk decomposition is in place: \u00a74.5.1, .3, .4, .6 PASS exercise \u00a76.1.4(m) self-issued-cert path-length exemption.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add PKITS \u00a74.5 self-issued cert tests (fixtures already present; split across pkix-path PASS + pkix-revocation FAIL)",
+  "updated_at": "2026-05-08T05:38:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:11:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77cl.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:11:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77cl.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

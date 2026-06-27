@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated README quick-start: TrustAnchor::try_from(Certificate), ValidationPolicy::new, validated.depth, '?' on CrlChecker::new.",
+  "closed_at": "2026-05-07T22:23:02Z",
+  "compaction_level": 0,
+  "content_hash": "7d2312dcb7b13dd6fea923e59920be861b2f967ddd754ada6ba4b4dc69f6440d",
+  "created_at": "2026-05-07T22:00:58Z",
+  "created_by": "Mark Atwood",
+  "description": "README.md lines 52-74 (the first runnable code block, the on-boarding example shown to every new user on crates.io and GitHub) has three independent compilation errors:\n\n1. Line 64: `TrustAnchor::from_der(root_der)?` \u2014 no such function exists.\n   Available constructors: TrustAnchor::new, TrustAnchor::from_cert(Certificate),\n   TrustAnchor::from(&Certificate), TrustAnchor::try_from(Certificate).\n\n2. Lines 66-69: `let policy = ValidationPolicy { current_time_unix: ..., ..Default::default() };` \u2014 `ValidationPolicy` is `#[non_exhaustive]` (pkix-path/src/lib.rs:554), so external crates cannot construct it with struct-literal syntax (even with `..Default::default()`). The struct's own doc at line 415 even says 'Construct via TrustAnchor::new ... Do not use struct literal syntax.' but the README does the forbidden thing for ValidationPolicy.\n   Fix: use `ValidationPolicy::new(1_780_272_000)`.\n\n3. Line 73: `println!(\"chain depth: {}\", validated.chain.len());` \u2014 ValidatedPath has no `chain` field. Its public fields are `anchor_index: usize` and `depth: usize` (pkix-path/src/lib.rs:805-820).\n   Fix: `println!(\"chain depth: {}\", validated.depth);`\n\nBonus issue at line 81 in the next block: `CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier)` now returns `Result<Self>` (changed in P3 commit ff707564, PKIX-xjbw). The example doesn't `?` or unwrap it, so `crl_checker` would have type `Result<CrlChecker<DefaultVerifier>, Error>` and be passed by reference where `&impl RevocationChecker` is required \u2014 also won't compile. (Listed here rather than as a separate bead because it's the same README block; mark as resolved when the README is rewritten.)\n\nSeverity: P2 because this is the literal first example users see; broken examples damage onboarding more than missing docs would.\n\nPass-1 attribution: not addressed in commits 0d3e5db6..01908663 (P1 fixed pkix-chain doctest only). The README never tested as a doc build target; consider adding it with `cargo readme` or a custom test driver to prevent recurrence.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: top-level README quick-start example does not compile (3 errors)",
+  "updated_at": "2026-05-07T22:23:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:00:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

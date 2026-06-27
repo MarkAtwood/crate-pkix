@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features -- tests_policy_fields exits 0 with all 4 require_san tests passing. Test 4 specifically verifies the i==0 guard by using a SAN-less intermediate.",
+  "assignee": "Mark Atwood",
+  "close_reason": "4 require_subject_alt_name tests including i==0 guard regression test. All pass.",
+  "closed_at": "2026-05-06T04:59:36Z",
+  "compaction_level": 0,
+  "content_hash": "93b9fb4c52215aa3534fca753f66aed3163764f68d58dfe0cf1f66e129f8ed76",
+  "created_at": "2026-05-06T03:46:08Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add unit tests for the `require_subject_alt_name` policy field in `pkix-path`.\n\n**Algorithm:**\nTests go in `mod tests_policy_fields` in `pkix-path/src/lib.rs`.\n\n**Test 1: `require_san_passes_when_san_present`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku (has SAN: DNS:test.example.com)\n- Policy: `require_subject_alt_name = true`\n- Assert: `result.is_ok()`\n\n**Test 2: `require_san_fails_when_san_absent`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-no-san (no SAN extension)\n- Policy: `require_subject_alt_name = true`\n- Oracle: Leaf has no SAN \u2192 `MissingSan`.\n- Assert: `matches!(result, Err(Error::MissingSan))`\n\n**Test 3: `require_san_false_does_not_fail_on_missing_san`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-no-san (no SAN)\n- Policy: `require_subject_alt_name = false` (default)\n- Assert: `result.is_ok()` \u2014 when false, missing SAN is not an error.\n\n**Test 4: `require_san_only_checks_leaf_not_intermediates`**\n- This is an important semantic test. Intermediates (CA certs) typically have no SAN.\n- The existing `int-p256.der` fixture was generated WITHOUT a SAN extension.\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku\n- Policy: `require_subject_alt_name = true`\n- Assert: `result.is_ok()` \u2014 the policy only checks the leaf (i == 0), so the SAN-less intermediate must not cause failure.\n\n**Defensive programming rules:**\n- Test 4 is the regression-protection test for the `i == 0` guard.\n- `matches!(result, Err(Error::MissingSan))` \u2014 no fields on this variant.\n- No `unwrap()` on the success cases.\n\n**Subagent instructions:**\n- Spawn one research subagent: confirm that `int-p256.der` does NOT have a SAN extension (run `openssl x509 -inform DER -in int-p256.der -text -noout | grep -i 'subject alt'` and confirm absence).\n- Spawn one implementation subagent: write all 4 tests.\n- Spawn one validation subagent: `cargo test -p pkix-path --all-features -- tests_policy_fields::require_san 2>&1`. All 4 must pass.\n\n**Tests:**\n| Name | Condition | Oracle | Assertion |\n|---|---|---|---|\n| passes with SAN | leaf has SAN, policy=true | Extension present | `is_ok()` |\n| fails without SAN | leaf no SAN, policy=true | Extension absent | `Err(MissingSan)` |\n| false skips check | leaf no SAN, policy=false | default behavior | `is_ok()` |\n| only checks leaf | int has no SAN, policy=true | i==0 guard | `is_ok()` |",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Tests: require_subject_alt_name enforcement",
+  "updated_at": "2026-05-06T04:59:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:46:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

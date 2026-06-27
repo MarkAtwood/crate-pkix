@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.45",
+  "title": "build_with_aia returns topology-only chain when NoValidPath, losing structured error",
+  "description": "In pkix-chain/src/lib.rs lines 619-629, when build_first_valid_path returns NoValidPath (topology OK but every candidate failed validate_path), the code falls back to build_path (topology-only, no validation) and returns that chain. The caller (verify_one, line 558-559) then re-runs validate_path on this chain, which will fail again \u2014 but this time the error is the structured pkix_path::Error from validate_path, not the path-builder's NoValidPath{tried, last_error: String}. The comment says this is intentional (PKIX-sqek.1: preserves programmatic matchability). The concern: if the topology-only build_path returns a DIFFERENT chain than the one that NoValidPath was produced from (because build_path is single-shot DFS while build_first_valid_path iterates), the validate_path error in verify_one may describe a different chain's failure than the last_error in NoValidPath. This is confusing for diagnostics but not a correctness issue \u2014 the chain still fails validation and the error is still accurate for the chain that was tried. Flagging as an API-contract concern: the error message a caller sees may not correspond to the 'best' candidate chain that was tried.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:00Z",
+  "updated_at": "2026-06-15T17:07:36Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:00"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:48Z",
+  "compaction_level": 0,
+  "content_hash": "44c1a572939aaace88b9a689fc315aaa892a96129109ff78f371772ae0ce0d2a",
+  "created_at": "2026-05-07T20:06:12Z",
+  "created_by": "Mark Atwood",
+  "description": "Pre-merge review pass over the entire crate-pkix workspace at HEAD (96 commits ahead of origin/main, v0.2.0 across all 11 crates).\n\n## Scope\nAll 11 crates: pkix-path, pkix-revocation, pkix-chain, pkix-chain-simple, pkix-path-builder, pkix-revocation-http, pkix-profiles, pkix-lint, pkix-ct, pkix-composite, pkix-ac.\n\n## Section 0 anchor\nREADME claims (workspace-level + per-crate) vs. actual public API/code state. Identify drift, lies, broken doctests, unimplemented features advertised as present.\n\n## Baseline state at review time\n- cargo check --workspace --all-features: clean\n- cargo clippy --workspace --all-features --all-targets -- -D warnings: clean\n- cargo test --workspace: all pass (no failures, some ignored doctests, several no_run examples)\n- 0 open beads issues, 865 closed\n- workspace v0.2.0; pkix-revocation-http/pkix-ct/pkix-composite/pkix-ac at v0.1.1 (\"planned\"/stub)\n- 18,947 lines of Rust across src+tests\n\n## Workflow\nPass 1 of review-loop: file every finding (P0\u2013P4) under this epic. Then /review-rusty, then /do-beads.",
+  "ephemeral": 0,
+  "id": "PKIX-hxu1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss epic \u2014 full workspace pre-merge review v0.2.0 HEAD",
+  "updated_at": "2026-05-07T21:49:48Z"
+}

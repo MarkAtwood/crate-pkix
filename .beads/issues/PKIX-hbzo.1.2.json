@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a1c1664fba9a6a6b3a96a7b3172cf35757e3e90402525c6ded83a062256e12cf",
+  "created_at": "2026-05-13T04:00:22Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "## Why\n\nPkilint half of PKIX-hbzo.1. Mirrors `.1.1` shape: thin pkix-difftest adapter over `pkix-pkilint-bridge`. Pkilint is DigiCert (Python, Apache-2.0); strong on S/MIME BR + ETSI.\n\n## What\n\nNew file `pkix-difftest/src/lint_oracles/pkilint.rs` \u2014 `PkilintOracle` struct holding a `pkix_pkilint_bridge::PkilintBridge`. `impl LintOracle for PkilintOracle` (trait from `.1.1`) maps pkilint per-cert verdicts \u2192 `Vec<NormalizedFinding>` using `OracleSource::Pkilint`.\n\n## Acceptance\n\n- [ ] `pkix_pkilint_bridge` wired as workspace dep of pkix-difftest, gated behind the same `lint-oracles` feature added in `.1.1`.\n- [ ] `PkilintOracle` impl in `lint_oracles/pkilint.rs`.\n- [ ] Unit tests against tiny in-tree fixture certs.\n- [ ] One integration test gated on real `pkilint` binary present.\n- [ ] `cargo build --features lint-oracles` and `cargo clippy --features lint-oracles -- -D warnings` clean.\n\n## Out of scope\n\n- 3-way reconciliation (.1.3).\n- Anything zlint-related (.1.1).\n\n## Depends on\n\n- **`pkix-pkilint-bridge`** (PKIX-jy95.8 \u2014 status=blocked as of 2026-05-12, must ship first).\n- `.1.1` for the `LintOracle` trait + `NormalizedFinding` shape.\n\n## Filed by\n\nDecomposition of PKIX-hbzo.1 (2026-05-12). Cannot proceed until pkix-pkilint-bridge crate exists.",
+  "ephemeral": 0,
+  "id": "PKIX-hbzo.1.2",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: pkilint oracle adapter (lint-domain differential)",
+  "updated_at": "2026-05-13T04:00:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T21:00:22Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-hbzo.1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

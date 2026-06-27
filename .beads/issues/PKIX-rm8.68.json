@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.68",
+  "title": "pkix-chain missing re-export of pkix_path_builder",
+  "description": "pkix-chain/src/lib.rs exposes Error::PathBuild(pkix_path_builder::Error) in its public API (line 233) but does not re-export pkix_path_builder. Callers matching on this variant must add pkix-path-builder as a direct dependency.\n\nLocation: pkix-chain/src/lib.rs:233\nRecommendation: Add pub use pkix_path_builder; to pkix-chain's public API.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:42Z",
+  "updated_at": "2026-06-15T17:19:12Z",
+  "closed_at": "2026-06-15T17:19:12Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:42"
+    }
+  ]
+}

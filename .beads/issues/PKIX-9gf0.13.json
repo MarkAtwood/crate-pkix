@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:56Z",
+  "compaction_level": 0,
+  "content_hash": "96c1738ad2f64539018261417a30a4b674203e950c85b0b2ea4880352ccf7c71",
+  "created_at": "2026-05-07T16:11:03Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:334-336 \u2014 IssuerDnContains matches by converting the cert's issuer DN to its display string and checking for a substring:\n  `let mut issuer_str = cert.tbs_certificate.issuer.to_string();`\n  `issuer_str.make_ascii_lowercase();`\n  `issuer_str.contains(substring.as_str())`\n\nThe Name::to_string() output depends on the x509_cert Display impl, which is an RFC 4514 LDAP string representation. This string is:\n1. Not guaranteed to be stable across library versions\n2. Not the same as the RFC 4518 string preparation used by names_match\n3. Case folding via make_ascii_lowercase() handles only ASCII\n\nThe doc comment acknowledges: 'This is a substring match, not an RFC 4518-normalized DN match. Prefer IssuerDnExact when precise DN identity is required.'\n\nHowever, there's an additional issue: if the DN contains non-ASCII characters (BMPString, UTF8String with non-ASCII), make_ascii_lowercase() silently ignores them. The substring match could silently fail to match what looks identical to humans.\n\nMore importantly, the to_string() output may differ from what an operator expects when viewing certificate contents in tools like OpenSSL (which uses RFC 4514 but with different attribute type abbreviations).\n\nP2 \u2014 API footgun that may cause deviations to silently not apply, with no error. The API design choice is documented but the substring matching has subtle failure modes.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationScope::IssuerDnContains uses to_string() on Name \u2014 not RFC 4518 normalized",
+  "updated_at": "2026-05-07T16:36:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:11:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

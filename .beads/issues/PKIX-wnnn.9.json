@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1efbfdcbb0ccd7449482bd013b2b44d4dc1f0f5985313d099beee435dcc34a04",
+  "created_at": "2026-05-14T18:29:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:1005 calls pkix_path::validate_path(&chain, anchors, policy, verifier) once per yielded candidate. validate_path re-runs all of: check_inputs, check_oid_consistency, anchor matching (anchor DN compared against last cert's issuer), path-length check, AND then the full signature chain walk. For a pool that yields N candidate chains with M anchors, anchor matching alone is O(N*M) name_match calls; the input guards repeat for every candidate. For typical pools (3-5 candidates, 1-100 anchors) this is fine. For adversarial pools that yield many candidates against a large anchor store (Mozilla bundle ~150 anchors), this is significant. Optimization opportunity: identify the anchor index once at the start of build_first_valid_path (anchors[i] whose subject_dn matches the deepest cert's issuer), then either pass it to validate_path via a variant or factor anchor matching out. Not blocking for 1.0 \u2014 flag for awareness. The shape of build_first_valid_path's current API doesn't admit anchor-pinning without a new entry point, so this is a forward-looking efficiency note.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path re-runs validate_path's input guards per-candidate; large anchor sets pay O(candidates * anchors)",
+  "updated_at": "2026-05-14T18:29:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

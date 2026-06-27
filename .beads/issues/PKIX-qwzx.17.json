@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)] to all six CABF TLS BR lint ZSTs (ValidityMaxLint, Sha1ProhibitedLint, RsaMinKeySizeLint, SanRequiredLint, EkuServerAuthLint, BcCaFlagLint). Builds clean.",
+  "closed_at": "2026-05-07T22:30:21Z",
+  "compaction_level": 0,
+  "content_hash": "d9ba7074d3d12213f81218338ff0764ef161c5c88bb4e363cbe4f896ec15cbaf",
+  "created_at": "2026-05-07T22:14:02Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nSix unit-struct lints in `pkix-lint/src/cabf_tls_br.rs` have zero `#[derive(...)]`\nattributes:\n\n```\npub struct ValidityMaxLint;\npub struct Sha1ProhibitedLint;\npub struct RsaMinKeySizeLint;\npub struct SanRequiredLint;\npub struct EkuServerAuthLint;\npub struct BcCaFlagLint;\n```\n\nThese are zero-sized types. The idiomatic derive set for a public ZST that\nimplements a trait is `Clone, Copy, Debug, Default, PartialEq, Eq, Hash`. All\nseven derives are zero-cost, semver-stable, and unblock common usage:\n\n- `Default` \u2014 `let lint = ValidityMaxLint::default()` for generic helpers.\n- `Debug` \u2014 `{lint:?}` is the bare minimum for diagnostic logging; without it,\n  callers can't even print which lint is in their `Vec<Box<dyn Lint>>` for\n  troubleshooting (Lint::id() returns the ID string, but Debug is independent).\n- `Copy + Clone` \u2014 let callers construct a `&dyn Lint` from `&MyLint` without\n  worrying about move semantics.\n- `PartialEq + Eq + Hash` \u2014 usable as `HashSet`/`HashMap` keys and in test\n  fixtures.\n\nCompare with the four profile structs in `pkix-profiles` (also missing some of\nthese \u2014 see separate finding) and the verifier ZSTs in `pkix-path` (missing\n`PartialEq, Eq, Hash` \u2014 see separate finding). The pattern is consistent across\nthe workspace: ZST trait-implementer types are under-derived.\n\nFix: add `#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]` to all six\nCABF lint structs.\n\nLocations: `pkix-lint/src/cabf_tls_br.rs` \u2014 the six `pub struct ...Lint;` lines\n(grep `pub struct .*Lint;`).",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.17",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: all six CABF lint structs in pkix-lint/cabf_tls_br.rs have NO derives whatsoever",
+  "updated_at": "2026-05-07T22:30:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:14:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

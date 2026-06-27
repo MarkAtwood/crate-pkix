@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-06T20:50:57Z",
+  "compaction_level": 0,
+  "content_hash": "22bb2d759d9bfd36329a14ca9cb7e4c9ba67a7bae8d2ea17065152dbec05b96b",
+  "created_at": "2026-05-06T20:50:41Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/cabf_tls_br.rs parse_der_length() at lines 291-308. The function handles 'long-form' DER lengths up to 4 bytes: 'if n_bytes == 0 || n_bytes > 4 || rest.len() < n_bytes { return None; }'. However, a legitimate RSA key's DER encoding uses standard short-form or long-form lengths. The 4-byte limit means max parseable content is ~4 GiB, but the key byte limit is that RSA keys are rarely > 16384 bits = 2048 bytes. The integer overflow protection uses checked_shl(8) and checked_add(b as usize), which is correct. HOWEVER: the comment says 'n_bytes > 4' rejects > 4-byte lengths, but the RSAPublicKey for very large (hypothetical) keys could theoretically have a modulus length needing > 2 bytes of DER length encoding. For a 2048-byte modulus, DER length is 0x82 0x08 0x00 (3 bytes for 2048). 4 bytes of DER length encoding allows up to 4 GiB content, which is sufficient for any realistic RSA key. The checked arithmetic protects against overflow. Actually this is fine \u2014 no bug here. Closing this finding as not a real issue. Mark as P4 (opinion \u2014 the code is correct).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING (P4/opinion): parse_der_length 4-byte limit - not a bug",
+  "updated_at": "2026-05-06T20:50:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:50:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

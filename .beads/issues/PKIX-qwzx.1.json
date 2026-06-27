@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Renamed enum variants ParseError->AcParseError, SignatureInvalid->AcSignatureInvalid, ValidityPeriod->AcExpired to match the rustdoc comments. RUSTDOCFLAGS='-D warnings' cargo doc -p pkix-ac --no-deps --all-features now passes.",
+  "closed_at": "2026-05-07T22:22:37Z",
+  "compaction_level": 0,
+  "content_hash": "72eb91efb876f336241b870ff75c7a4d334188c8406d8f804d7d65c1e421b054",
+  "created_at": "2026-05-07T22:00:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ac/src/lib.rs:119-121 references Error::AcParseError, Error::AcExpired, Error::AcSignatureInvalid in the # Errors rustdoc section of validate_attribute_cert. None of these variants exist \u2014 the actual variants are ParseError, ValidityPeriod, SignatureInvalid (lines 71-79).\n\nReproduction:\n  RUSTDOCFLAGS=\"-D warnings\" cargo doc -p pkix-ac --no-deps --all-features\n  -> error: unresolved link to `Error::AcParseError` (and 2 more)\n\nImpact:\n- docs.rs builds use -D warnings on broken-intra-doc-links and will fail (every published version of pkix-ac will have a red docs.rs page).\n- Pass 1 P1 commit (e67f0c7b) explicitly claimed to fix rustdoc errors blocking docs.rs builds (PKIX-1b9p). It fixed pkix-lint but missed pkix-ac.\n\nFix: rename the references in the doc comment to match the actual variant names, OR rename the variants to match the docs (preferred since the names are less ambiguous):\n  ParseError       -> AcParseError      (collision-resistant)\n  ValidityPeriod   -> AcExpired         (matches doc text 'outside validity window')\n  SignatureInvalid -> AcSignatureInvalid\n\nWhichever direction, also add a CI step (RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --all-features) so this regression cannot recur.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: pkix-ac rustdoc fails docs.rs build with -D warnings (3 broken intra-doc links to non-existent Error variants)",
+  "updated_at": "2026-05-07T22:22:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:00:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

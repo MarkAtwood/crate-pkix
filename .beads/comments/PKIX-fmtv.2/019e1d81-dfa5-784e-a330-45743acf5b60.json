@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:45:11Z",
+  "id": "019e1d81-dfa5-784e-a330-45743acf5b60",
+  "issue_id": "PKIX-fmtv.2",
+  "text": "RATIONALE CORRECTION 2026-05-12 (framing recalibration). The closure rationale used 'Path of regret reframed' language that was the right call dressed in slightly wrong-frame clothing. Per the new AGENTS.md 'Project phase and decision framing' section, the substantive rationale stands clearly on its own and does not need cost-of-being-wrong reframing: (1) The trust-domain seam has three legs (SignatureVerifier for crypto, RevocationChecker for \u00a76.3 revocation, AiaFetcher for \u00a74.2.2.1 AIA-issuer retrieval). Three callbacks completes the structural pattern that mozilla::pkix established; two callbacks is structurally incomplete. (2) AIA parsing already shipped in pkix-revocation-http::extract_aia_http_urls; the ca_issuers half of AiaUrls is dead surface that this trait activates. (3) The trait is no_std-friendly by design (no I/O at the trait layer); HTTP impl lives in std-only sibling, matching the pkix-revocation / pkix-revocation-http relationship. This is design-completeness, not speculative engineering. The 'speculative engineering' counter-argument from this session's analysis was wrong-framed: speculation cost applies to features, not to completing an architectural pattern that the workspace has already committed to (two-callback version already shipped)."
+}

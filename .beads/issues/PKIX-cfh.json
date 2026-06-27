@@ -1,0 +1,22 @@
+{
+  "close_reason": "All four API shape fixes complete: q13 (SignatureVerifier return type), o76 (TrustAnchor shape), b9z (RevocationChecker error type), e9v (Display+Error traits). cargo clippy -D warnings passes.",
+  "closed_at": "2026-05-02T06:52:59Z",
+  "compaction_level": 0,
+  "content_hash": "e1bb253d04c838185d39977e3398c53c06c8bc58fd01a6c9122b55ba5ac31080",
+  "created_at": "2026-05-02T05:49:12Z",
+  "created_by": "Mark Atwood",
+  "description": "The four published crates have design defects in their public API that must be corrected before any implementation is written. All are breaking changes. Since 0.1.0 was a namespace-grab with no real users, the plan is to yank 0.1.0 across all four crates and publish corrected shapes as 0.2.0-alpha.1 once this epic is complete.\n\nIssues in this epic:\n- PKIX-e9v: Add Display + std::error::Error to all Error types\n- PKIX-b9z: RevocationChecker returns pkix_path::Result but no Revoked variant exists\n- PKIX-q13: SignatureVerifier::verify_signature return type forces wrong error index\n- PKIX-o76: TrustAnchor requires full Certificate; should accept (subject, SPKI) directly\n\nAcceptance: cargo clippy -D warnings passes, cargo test passes, all four API changes are in place, 0.1.0 yanked, 0.2.0-alpha.1 published.",
+  "ephemeral": 0,
+  "id": "PKIX-cfh",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: Fix API shape before any implementation",
+  "updated_at": "2026-05-02T06:52:59Z"
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1104428f7ad33566b1443e1222cfd4d64abf55ccb0caefe892b81375e26e0c2d",
+  "created_at": "2026-05-14T12:58:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:131 declares `use std::borrow::Cow;` at the top of the file. Then in the body \u2014 lib.rs:991, 1028, 1060, 1264, 1265, 1366, 1367, and ~15 test-only locations \u2014 the fully qualified `std::borrow::Cow::Borrowed(...)` and `std::borrow::Cow<'static, str>` paths are used instead of the imported alias `Cow::Borrowed(...)` / `Cow<'static, str>`. \\n\\nNo engineering reason for the inconsistency \u2014 the alias is in scope. Reading is harder because the eye has to discount the noise prefix on every line. `Cow::Borrowed(lint.id())` vs `std::borrow::Cow::Borrowed(lint.id())` is the difference between 3 and 5 visual tokens to express the same construction.\\n\\nFix: replace all `std::borrow::Cow` references in lib.rs with `Cow`. Mechanical change; no test-coverage gap risk.\\n\\nNote: deviation.rs is consistent the other direction (no `use` and FQ paths throughout). That is also defensible \u2014 it's the inconsistency within a single file that's flagged here.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.38",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "std::borrow::Cow::Borrowed fully qualified despite top-level use std::borrow::Cow",
+  "updated_at": "2026-05-14T12:58:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:58:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

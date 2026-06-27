@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:37Z",
+  "compaction_level": 0,
+  "content_hash": "5b350f060c8dda19fb4d6ab475f125248ac5ab7a92df0f4820169bb2df2c2f14",
+  "created_at": "2026-05-06T20:49:33Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/cabf_tls_br.rs lines 553-563. CabfTlsBrProfile implements LintProfile with: (1) lints() returns a reference to a OnceLock-cached static Vec<Box<dyn Lint>>; (2) lint_runner() always calls all_lints() which allocates a fresh Vec each time. This inconsistency means: callers using profile.lints() get the static cached slice (efficient, consistent), but callers using profile.lint_runner() get a fresh Vec each time (less efficient, but also different object identity). The LintProfile trait doc says 'Implementors should document whether this method caches the runner or allocates fresh on each call.' That documentation is not present on CabfTlsBrProfile::lint_runner(). Also, the bundle_version is '' on the fresh runner from lint_runner(), while the lints from lints() have no version context at all. More importantly: if a caller calls both lints() and lint_runner(), the LintRunner created by lint_runner() has DIFFERENT Box<dyn Lint> objects than those returned by lints(). Fix: Either (a) have lint_runner() also use the OnceLock-cached lints and wrap them in a LintRunner, or (b) document the allocation behavior and the inconsistency explicitly. The current state is an API usability bug.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: CabfTlsBrProfile::lints() returns static ref but lint_runner() allocates fresh",
+  "updated_at": "2026-05-06T20:58:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:49:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

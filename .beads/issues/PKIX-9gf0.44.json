@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:27:25Z",
+  "compaction_level": 0,
+  "content_hash": "8c00cc4c4307fe562ca5799b7058d3b11c93afdeb955dd38a070ca44a222a42b",
+  "created_at": "2026-05-07T16:20:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:305\n\nThe trait method check_revocation_against_anchor lacks #[must_use]. Clippy pedantic flags this as 'docs for function returning Result missing # Errors section' (companion issue), but the more pressing concern is that unlike check_revocation (which already has #[must_use] at line 273), check_revocation_against_anchor does not.\n\nA caller who calls this method and discards the Result will silently skip anchor-level revocation checking with no warning. The security doc already calls this out as a silent security gap; enforcing #[must_use] at the trait level makes the omission a compile-time error rather than a runtime surprise.\n\n  #[must_use = \"revocation check result must not be silently discarded\"]\n  fn check_revocation_against_anchor(\n      &self,\n      _cert: &Certificate,\n      _anchor: &TrustAnchor,\n  ) -> crate::Result<()>",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.44",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-revocation: RevocationChecker::check_revocation_against_anchor missing #[must_use]",
+  "updated_at": "2026-05-07T16:27:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:20:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

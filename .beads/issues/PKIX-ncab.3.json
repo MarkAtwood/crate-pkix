@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision B (rework framing). check_shape API stays; surrounding docs/PR text scrubbed of OSCAL framing. Folds into .12-style audit for .9.x doc comments. Applied under PKIX-ncab.7.",
+  "closed_at": "2026-05-12T16:33:45Z",
+  "compaction_level": 0,
+  "content_hash": "4c398f53312630946048a061851ee7c147634a9679b54e368b701a133e4392c2",
+  "created_at": "2026-05-12T02:20:28Z",
+  "created_by": "Mark Atwood",
+  "description": "PKIX-9vnx.9 was framed under the OSCAL Lint-as-Control mapping. `check_shape()` is a user-facing convenience API; per-profile aliases let users import `TlsBrLint` etc. without OSCAL vocabulary in their face.\n\nDecide whether the convenience API stands on its own merits or was tied to OSCAL framing:\n\n- **A) Keep as-is**; the convenience layer is independent of whether OSCAL is canonical.\n- **B) Rework framing** in docs and PR descriptions; ship with no OSCAL references in user-facing text.\n- **C) Close**; convenience API was overkill once OSCAL centrality is gone.\n\nNote: PKIX-9vnx.9.2 (workspace-dep design call) is currently human-labeled and was the last blocker before demotion.\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of PKIX-9vnx.9 (check_shape API + per-profile aliases)",
+  "updated_at": "2026-05-12T16:33:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

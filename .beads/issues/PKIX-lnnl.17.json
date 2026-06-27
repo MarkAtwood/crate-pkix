@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dba3deb3e53428e90d146c52fd454ac9859a6bfa125f9ab3a9641ccc549ffd09",
+  "created_at": "2026-05-14T19:43:29Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/lib.rs:375-403:\n\n  /// ...could not locate a certificate in the caller-supplied bundle...\n  CrlSignerNotFound,\n\n  /// ...found a candidate cert in the bundle, but the candidate does not chain back to a self-signed (anchor-like) cert...\n  CrlSignerNotTrusted,\n\nBoth variants are unit (no fields). The contract gives callers no way to tell, programmatically:\n\n1. For CrlSignerNotFound: which AKI/DN was searched for. A caller diagnosing 'why didn't my bundle work?' has to log the CRL DER themselves and re-parse the AKI/issuer DN, or rebuild the search themselves. No information about whether the AKI was present-but-no-match vs. absent vs. present-but-malformed.\n\n2. For CrlSignerNotTrusted: which candidate was found (so the caller could log 'I tried this cert but it didn't reach an anchor'). The caller cannot distinguish 'discovery found cert X but X's issuer is missing from the bundle' from 'discovery found cert X but X is in a cycle' from 'discovery found cert X but the walk hit max_steps without finding a self-signed terminator.'\n\nDefensive-code-forcing aspect: a caller who wants production-quality diagnostic output (the kind that gets file an issue against pkix-revocation if the message is opaque) must:\n\n  - re-parse the CRL to extract the AKI/issuer DN\n  - re-implement discover_crl_signer to find the candidate\n  - re-implement reaches_self_signed (and they CAN'T, it's pub(crate) \u2014 see PKIX-lnnl.16)\n  - log all of the above as ad-hoc strings\n\nA richer error shape would be something like:\n\n  CrlSignerNotFound { searched_aki: Option<Vec<u8>>, searched_issuer_dn: Vec<u8> },\n  CrlSignerNotTrusted { candidate_subject_dn: Vec<u8>, candidate_serial: SerialNumber, walked_steps: u32 },\n\nBut that runs into:\n- no_std vs alloc considerations (Vec<u8>)\n- whether pkix-revocation Error should ever carry per-error context payloads\n- consistency with the rest of Error variants (most are unit; only Revoked carries data)\n- size of Error (currently quite small)\n\nCounter-argument: existing Error variants in pkix-revocation are mostly unit-shaped. CrlParseError(DerError) and OcspParseError(DerError) and Revoked are the only ones with payloads. Adding payload to the discovery errors would be a precedent that other variants in this module would feel pressure to match.\n\nRecommendation: file (this issue) for visibility, then pick one of:\n\n(A) Status quo: unit variants, document explicitly in the rustdoc 'this error carries no payload; callers needing detailed diagnostics must invoke discover_crl_signer directly (currently pub) and inspect.' This requires resolving PKIX-lnnl.16 in the FULL-LOW-LEVEL direction.\n\n(B) Add payload fields, accept the precedent, plan a follow-up to enrich other Error variants similarly.\n\n(C) Pull-the-trigger compromise: introduce a single new variant `CrlSignerDiscoveryFailed { stage: DiscoveryStage }` with a small enum DiscoveryStage { Aki, Dn, AnchorWalk } describing how far it got. Keeps payload bounded.\n\nThis is api-contract,underspecified because the as-shipped contract leaves callers without the diagnostic surface they need at runtime.\n\nAcceptance: a decision recorded. If (A), one-line rustdoc addition is the fix.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CrlSignerNotFound vs CrlSignerNotTrusted carry no payload identifying which signer failed",
+  "updated_at": "2026-05-14T19:43:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:43:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:15:53Z",
+  "compaction_level": 0,
+  "content_hash": "8973f23ac5e0dafc78226d7bb327b574ce989d442080fe887ebef74bc02779c3",
+  "created_at": "2026-05-07T16:15:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2636-2658 \u2014 the cascade deletion after vpns cleanup uses:\n  `let reachable: Vec<...> = tree.iter().filter(|nd| nd.depth == parent_depth).flat_map(|nd| nd.expected_policy_set.iter().copied()).collect();`\n  `let any_parent = tree.iter().any(|nd| nd.depth == parent_depth && nd.valid_policy == OID_ANY_POLICY);`\n  `tree.retain(|nd| { if nd.depth != d { return true; } reachable.contains(&nd.valid_policy) || any_parent });`\n\nThe reachability check says: a node at depth d is reachable if some parent at depth d-1 has its valid_policy in the parent's expected_policy_set.\n\nBUT RFC 5280 \u00a76.1.5(g)(iii)(2) says to delete descendants of the deleted vpns nodes \u2014 a cascade through the TREE STRUCTURE (parent-child relationships), not through expected_policy_set reachability.\n\nThe tree is stored flat. The actual parent-child relationship is defined by: node at depth d is a child of node at depth d-1 whose expected_policy_set contains node's valid_policy (OR whose valid_policy == anyPolicy).\n\nSo the reachability check IS the correct way to determine tree descendants in this flat structure. The cascade is correct.\n\nHowever: if a node at depth d has valid_policy P, and no parent at depth d-1 has P in its expected_policy_set, but there IS an anyPolicy parent, the node is retained (any_parent is true). This is correct per the RFC: anyPolicy parents imply all children are reachable.\n\nAfter the vpns deletion removes some nodes at certain depths, the anyPolicy parent condition may incorrectly keep orphaned nodes alive. Let me trace this carefully:\n- If a vpns node V at some depth was deleted (its valid_policy not in initial_policy_set)\n- V's children at the next depth should also be deleted\n- If anyPolicy exists at V's parent depth, any_parent = true for V's child depth \u2192 children kept\n\nBut if V was the ONLY path to those children (no anyPolicy at V's parent depth), and V was deleted, those children SHOULD be deleted. The any_parent check for children's depth (d) looks at depth d-1, not V's depth. If V is at depth d-1 and there's no anyPolicy at d-1, any_parent is false for children at depth d. The reachable set at d is determined by surviving parents at d-1. If V was at d-1 and was deleted, V's policy doesn't appear in the reachable set from d-1. So children are deleted correctly.\n\nThis is actually correct. Not a bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path \u00a76.1.5(g)(iii)(2) cascade deletion uses expected_policy_set as reachability \u2014 may under-prune",
+  "updated_at": "2026-05-07T16:15:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:15:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

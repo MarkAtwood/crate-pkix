@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "af489629673f7620a57f3e8fb22e51153775901825dec26d00adb780163fe081",
+  "created_at": "2026-05-14T14:38:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:416-422: `pub struct Verifier<'a, V, R, A = NoAiaFetcher>` carries only `&'a` references. It is logically a small copyable handle, but no derives are present. Consequences: (1) callers cannot clone the verifier into multiple threads from a single construction, (2) cannot Debug-print it during diagnostics. AGENTS.md non-negotiable #6 requires cache-friendly types and the docstring at line 408-415 actively promotes the cache-friendly design \u2014 callers will want to clone the Verifier handle into multiple worker tasks. Per AGENTS.md framing this is a prelaunch design completeness issue: add #[derive(Clone, Copy, Debug)] now. (Note: the Send + Sync compile-time assertion at lines 1538-1541 only asserts Error; add an analogous assertion for Verifier<'_, DefaultVerifier, NoRevocation, NoAiaFetcher> so 'Verifier is Send+Sync when its generic parameters are' is a tested invariant.)",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier struct missing Clone/Copy/Debug derives",
+  "updated_at": "2026-05-14T14:38:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:38:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

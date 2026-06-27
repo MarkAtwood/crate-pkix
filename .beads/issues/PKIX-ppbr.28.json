@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dd9de3fc7e2a3eac0246bef61a3add2b657d51ffbc24ffaa4e2b0bbd83636454",
+  "created_at": "2026-05-14T17:45:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/Cargo.toml:13-36, pkix-ct/src/lib.rs:42-64\n\nFour features add or remove public items:\n\n- `std`: enables `std::error::Error` impl on `Error`\n- `ocsp`: enables `sct_list_from_ocsp_response`\n- `log-list`: enables `CtLog`, `CtLogList`, `SctVerifier`,\n  `merkle_*`, `MerkleAuditPath`, `SignedTreeHead`\n- `log-list-json`: enables `CtLogList::from_google_log_list_json`,\n  implies `log-list`\n\nThe doc comment in `lib.rs:42-64` shows `mod log_list` /\n`mod verify` gated on `log-list`; `verify` is the largest module\n(1359 lines, includes the verifier, Merkle helpers, and STH).\n\nA caller wanting just SCT parsing (zero CT verification, just\nextract the SCTs from a TLS extension or OCSP response) needs only\nthe default+`ocsp` features. A caller wanting SCT verification\nwithout log_list.json ingestion needs `log-list` without\n`log-list-json`. A caller wanting the full surface needs\n`log-list-json` (which transitively pulls `log-list`).\n\nThree contract problems:\n\n1. The `log-list` feature gates a LOT of unrelated functionality\n   \u2014 Merkle inclusion proofs (`verify_inclusion`, `MerkleAuditPath`),\n   STH signature verification (`verify_sth`, `SignedTreeHead`), and\n   SCT signature verification (`SctVerifier::verify_*`) all live\n   behind `log-list`. None of them strictly need the log list to\n   work as data structures; they only need it to look up keys at\n   verify time. The feature name is misleading \u2014 `log-list` reads\n   as \"log list parsing\" but it actually gates \"anything that\n   touches CT log keys\".\n\n2. Inverse: a caller wanting Merkle inclusion proof verification\n   only (against a root_hash they trust through some other\n   channel \u2014 e.g. a witness signature) gets dragged into the\n   full `log-list` feature including the `BTreeMap` and `sha2`\n   dep, even though Merkle inclusion is pure hash math with no\n   log-list dependency.\n\n3. The `log-list-json` implies `log-list` is documented in Cargo.toml\n   but the inverse (what `log-list` gives you BEFORE adding\n   `log-list-json`) is not stated in the public API docs. A caller\n   reading the rustdoc has no way to know that `SctVerifier` is\n   available with `log-list` alone, vs. `log-list-json`.\n\nRecommendation:\n\n- Split `log-list` into three features: `log-list` (just CtLog +\n  CtLogList), `verify` (SctVerifier + STH verification, depends\n  on log-list), `merkle` (verify_inclusion + MerkleAuditPath,\n  no deps).\n\n- Document the public-surface-by-feature in the crate-level rustdoc\n  with a table:\n\n  | Feature       | Public items added              |\n  |---------------|---------------------------------|\n  | (none)        | Error, SCT parser types, TLS ext|\n  | ocsp          | OCSP-response extractor         |\n  | log-list      | CtLog, CtLogList                |\n  | verify        | SctVerifier + STH               |\n  | merkle        | verify_inclusion, audit path    |\n  | log-list-json | from_google_log_list_json       |\n\nPriority P3 because the feature shape is internal-ish and can be\nre-split non-breakingly (renaming features IS breaking; adding new\nfeatures is not, so add new feature aliases first, deprecate the\nbroad `log-list`).",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Features change public surface but feature interaction undocumented \u2014 log-list-json implies log-list, but other combinations not stated",
+  "updated_at": "2026-05-14T17:45:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:45:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

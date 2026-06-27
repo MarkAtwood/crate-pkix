@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e213f1a9a2ae3e13d6e3abfcdf9c6abd3834afb0eadddf854a0e871e5b695592",
+  "created_at": "2026-05-14T17:33:28Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: a log_list.json file containing a malformed timestamp such as `\"2024-03-04T99:99:99Z\"`. `parse_rfc3339_to_unix_ms` (log_list.rs:237-275) parses hour/min/sec via `parse_digits` (line 248-250) which only checks ascii-digit, not range.\n\nActual bad behavior: `days_from_civil(2024, 3, 4)` returns a valid day count; the bogus 99:99:99 adds `99*3600 + 99*60 + 99 = 362,439` seconds (~4 days). The result is a Unix-ms timestamp that's about 4 days into the future from the encoded date. No error returned.\n\nImpact severity: low in practice (the log list publisher is Google/Chrome, not an attacker), but the function is parsing a security-sensitive trust-anchor JSON file. Robustness in input validation is part of the contract \u2014 and 'this format comes from a trusted source' is not how RFC 3339 validation should be specified in a library that may later be reused for other JSON sources.\n\nFix: after parsing hour/min/sec, enforce `hour < 24`, `min < 60`, `sec <= 60` (leap-second permitted). One block, three checks. Trivial.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "parse_rfc3339_to_unix_ms accepts out-of-range hour/minute/second values",
+  "updated_at": "2026-05-14T17:33:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:33:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

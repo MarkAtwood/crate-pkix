@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:11Z",
+  "compaction_level": 0,
+  "content_hash": "c295dbc0295f9a8c2f6a00262a2d274c09a0ff94abc63e70926ecdcd59c9e4db",
+  "created_at": "2026-05-06T21:31:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs lines 326-331: After the main loop fails, build_path runs a probe at MAX_DEPTH+1 to distinguish NoPathFound from DepthExceeded. This probe also charges the shared budget (budget is passed by &mut). If the budget is nearly exhausted from the main loop, the probe itself may exhaust it and return BudgetExceeded from within the probe. At that point the function returns BudgetExceeded even though the correct answer would be NoPathFound or DepthExceeded. The caller receives BudgetExceeded instead of a more informative error. The probe should use a separate budget, or budget exhaustion during the probe should still be mapped to NoPathFound/DepthExceeded based on how far the probe got before being cut off.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder build_path DepthExceeded probe also charges shared budget \u2014 probe at MAX_DEPTH+1 can exhaust budget",
+  "updated_at": "2026-05-06T21:42:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

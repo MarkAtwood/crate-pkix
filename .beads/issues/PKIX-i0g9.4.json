@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:20:46Z",
+  "compaction_level": 0,
+  "content_hash": "7b9fad9619cbe6baf0509f9127531db8e81f2d6b03d237139b23e1ffea159307",
+  "created_at": "2026-05-07T04:14:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/tests/crl_checker_tests.rs:255-410 \u2014 The delta CRL tests correctly use a separate CA (CN=Test Delta CRL CA, serial=200) distinct from the base CRL tests (CN=Test CRL CA, serial=100). However no test verifies that a delta CRL from one CA is rejected when used with a base CRL from a different CA (cross-CA attack). The with_delta constructor does check issuer DN matching, but there is no test that constructs a CrlChecker::with_delta(base-from-ca-A, delta-from-ca-B, ...) and asserts DeltaCrlBaseMismatch. Without this test the issuer-mismatch check is not exercised for the cross-CA path.",
+  "ephemeral": 0,
+  "id": "PKIX-i0g9.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "delta CRL tests use same CA as existing CRL tests \u2014 cross-CA isolation not verified",
+  "updated_at": "2026-05-07T04:20:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:14:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-i0g9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

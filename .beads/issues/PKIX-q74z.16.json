@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "04a85a86b04acda9c3cdf0ac84c3ae51dda4f2c8477d3c0a847962f4861afb94",
+  "created_at": "2026-05-14T14:25:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:837-857 \u2014 docstring (lines 839-844) says: \"RFC 6962 \u00a73.5 / \u00a76.2 (and CT log lifecycle documentation) describe usable_from/retired_at as inclusive lower and upper bounds: SCTs timestamped at or after usable_from and strictly before retired_at are trustworthy.\"\n\nThe phrase \"inclusive lower and upper bounds\" is wrong/contradictory. The code (and the very next clause \"at or after usable_from and strictly before retired_at\") describes a half-open interval [usable_from_ms, retired_at_ms): inclusive lower, EXCLUSIVE upper.\n\nThe test verify.rs:1087-1099 (\"log_window_upper_bound_exclusive\") confirms exclusive upper. The text is mis-edited: someone wrote \"inclusive lower and upper\" when they meant \"inclusive lower, exclusive upper\".\n\nSuggested fix: \"usable_from_ms as an inclusive lower bound and retired_at_ms as an exclusive upper bound\" matches the code and the tests. Two-word change.\n\nWhy this matters: a contributor reading the doc to add a new boundary test could easily pick the wrong semantics for retired_at. A user filing an issue about a borderline SCT would expect to be told \"exclusive\" \u2014 current text says \"inclusive\" and the issue reporter would believe their case was a bug.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "log_window_contains semantic ambiguity: docstring says \"inclusive lower and upper bounds\" but code is [lo, hi)",
+  "updated_at": "2026-05-14T14:25:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:25:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

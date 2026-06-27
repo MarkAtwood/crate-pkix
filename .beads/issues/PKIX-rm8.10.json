@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.10",
+  "title": "CRL: signer_discovered flag's two-case semantics not obvious",
+  "description": "Location: pkix-revocation/src/crl.rs, CrlChecker struct field signer_discovered (lines 166-181)\n\nThe signer_discovered bool flag controls a critical behavioral branch in check_revocation: when true, the IndirectCrlIssuerMissing/Unexpected cross-check is bypassed (line 499-513). The field doc explains this at length (15 lines of comment), but the semantics are subtle:\n\n  (Some(discovered), false) if self.signer_discovered => { ... }\n\nA reader encountering this match arm must understand that 'false' means 'the CRL does NOT declare itself indirect' AND 'signer_discovered' means 'we found the signer via the discovery constructor, so we intentionally bypass the indirect/direct cross-check'. This is non-obvious correct behavior.\n\nWhat goes wrong: a future contributor adding a new CrlChecker constructor could set crl_issuer_cert to Some(...) without understanding that signer_discovered controls whether the indirect-CRL cross-check fires. The comment is thorough but the flag name does not communicate 'bypass indirect-CRL validation'; something like bypass_indirect_check or signer_from_bundle would make the control flow self-documenting at the match site.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:28Z",
+  "updated_at": "2026-06-15T17:30:39Z",
+  "closed_at": "2026-06-15T17:30:39Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:28"
+    }
+  ]
+}

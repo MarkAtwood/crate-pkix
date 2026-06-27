@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:41:17Z",
+  "compaction_level": 0,
+  "content_hash": "ca62641ec6f475f22d1b406d800807043301d4d869653ee4501f6ff83d143454",
+  "created_at": "2026-05-02T18:30:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs chain_walk(): cert.tbs_certificate.encode_to_slice(&mut tbs_buf) where tbs_buf=[0u8; 8192]. A valid cert with TBS > 8 KiB (large government/enterprise CA certs with extensive NameConstraints, policy OIDs, or HSM attestation certs) returns Error::Der(e) where e is a DER encoding-overflow error. The caller sees 'DER error: ...' for a cert that is structurally valid \u2014 the error blames DER when the real problem is an internal buffer too small. The cert is valid, the user's input is correct, but they receive a DER parse error with no actionable guidance. Add a variant Error::CertificateTooLarge or at minimum add a comment in the Der variant docs that this can indicate oversized (valid) input.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TBS 8 KiB stack buffer returns misleading Der error for large valid certs",
+  "updated_at": "2026-05-02T18:41:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:30:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T23:19:15Z",
+  "id": "019e1e7c-c7a5-71f4-8c26-308aae7688f2",
+  "issue_id": "PKIX-jy95.8",
+  "text": "BATCH SHAPE NOTE 2026-05-12 (related to PKIX-jy95.3): zlint bridge adopted multi-file CLI invocation with both run_on_cert (cached single) and run_on_certs (batch) entry points. pkilint bridge should follow the same architectural shape, but pkilint's CLI capabilities need verification at implementation time:\n\n- Does pkilint support multi-file invocation? Or one-cert-per-invocation?\n- Does pkilint accept stdin? Does it support multi-cert stdin streaming?\n- Does pkilint have a long-running 'server' / 'daemon' mode that would be preferable to per-batch subprocess?\n\nUNTIL VERIFIED: assume same multi-file shape as zlint. If pkilint's CLI is more restrictive (one-cert-per-invocation only), fall back to one subprocess per cert with caching -- still ~700x amortized if the bridge's cache is effective across many certs. If pkilint's CLI is RICHER (e.g., daemon mode), upgrade the implementation accordingly.\n\nAPI SHAPE STAYS THE SAME regardless: pkix-pkilint-bridge exposes run_on_cert(cert) cached + run_on_certs(certs) batch, matching pkix-zlint-bridge's contract. Consumer code is symmetric between the two bridges."
+}

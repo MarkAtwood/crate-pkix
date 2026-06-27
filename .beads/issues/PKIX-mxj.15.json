@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:06:18Z",
+  "compaction_level": 0,
+  "content_hash": "159717f806bbf9b46272d0010c0c4a46ad83830734d678f6b9a480e2b8ba462c",
+  "created_at": "2026-05-07T03:52:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:332-341 \u2014 build_path loops over max_depth 1..=MAX_DEPTH. If dfs() returns Err(BudgetExceeded) in any round (via the ? operator), the entire build_path returns BudgetExceeded immediately. This means a pool with >10,000 non-matching candidates at depth 1 will trigger BudgetExceeded before any depth-2 or deeper paths are tried, even if a valid 2-hop path exists. A legitimate pool with a large number of irrelevant CAs (e.g. a browser root store mixed with intermediates) could exceed the budget at shallow depths. Fix options: (1) continue to the next round on BudgetExceeded (treating budget-exceeded at depth k as 'no path at depth k'), or (2) document that BudgetExceeded means 'pool too large for any depth' rather than 'pool too large for this depth'.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path BudgetExceeded in early round prevents later valid-depth discovery",
+  "updated_at": "2026-05-07T04:06:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:52:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T09:59:22Z",
+  "compaction_level": 0,
+  "content_hash": "61959b368e4c59fd4c08e4f815b0d71283ba7e24b50b33388c2d17fe5b1c2adb",
+  "created_at": "2026-05-11T09:39:31Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nThird leg of PKIX-g9vc. Adds the user-facing CLI entry point for the LimboCorpus.\n\n## What\n\n1. **Subcommand**: `pkix-difftest run limbo <manifest> [RunOpts]` where `<manifest>` defaults to `~/GIT/x509-limbo/limbo.json` if unset (or stays required, decide during impl \u2014 recommendation: required, no implicit lookup).\n2. **CLI plumbing** (`src/main.rs`):\n   - Add `Limbo { manifest: PathBuf, opts: RunOpts }` variant to `CorpusCmd` enum (`main.rs:73-95`).\n   - Add one match arm to `run_corpus` (`main.rs:168-175`) constructing a `LimboCorpus` and dispatching through the shared driver.\n3. **Help text** mentions the default filter (~9,700 cases retained) and points at the loader's docstring for filter details.\n4. **Output options** unchanged: `--output-md`, `--output-json`, `--title`, `--sample-size`, `--oracles` all flow through.\n\n## Acceptance\n\n- [ ] `pkix-difftest run limbo --help` works.\n- [ ] `pkix-difftest run limbo ~/GIT/x509-limbo/limbo.json --sample-size 5 --oracles pkix-path` runs to completion against 5 cases.\n- [ ] Output JSON matches the existing schema in `baseline-pkits.json` (same emitter; no new code path needed in `report.rs`).\n\n## Depends on\n\n- PKIX-g9vc.1 (validation_time threading) \u2014 oracles need to consume the per-testcase time set by LimboCorpus.\n- PKIX-g9vc.2 (LimboCorpus loader) \u2014 provides the corpus type.\n\n## Out of scope\n\n- Full baseline run (PKIX-g9vc.4).\n- New output formats.\n\n## Filed as\n\nDecomposition of PKIX-g9vc. Blocks .4.",
+  "ephemeral": 0,
+  "id": "PKIX-g9vc.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: wire 'run limbo' CLI subcommand",
+  "updated_at": "2026-05-11T09:59:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T02:39:31Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T02:39:50Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T02:39:51Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

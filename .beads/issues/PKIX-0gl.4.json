@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:51Z",
+  "compaction_level": 0,
+  "content_hash": "fa1c720b03c72192cec01c297c03a9079cf3b38211e16d1957ae74305c4e1a31",
+  "created_at": "2026-05-02T22:20:28Z",
+  "created_by": "Mark Atwood",
+  "description": "The opening line 'Extract the string content bytes from a DirectoryString Any value' jumps straight to implementation detail without explaining that this function decides which string types are eligible for RFC 4518 normalization in ava_values_match. Add a sentence: 'This function gates RFC 4518 normalization in ava_values_match: only handled string types get normalized; unhandled types fall back to raw DER byte comparison.'",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.4",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: opening should motivate why function exists",
+  "updated_at": "2026-05-02T22:35:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

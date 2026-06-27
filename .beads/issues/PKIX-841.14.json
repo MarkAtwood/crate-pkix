@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:48:45Z",
+  "compaction_level": 0,
+  "content_hash": "58727b2cf65ef1e557ad5c80716c0447dd02d29ca764043ded12fbd57e9c92fa",
+  "created_at": "2026-05-02T17:28:24Z",
+  "created_by": "Mark Atwood",
+  "description": "The ignore attribute on pkits_4_7_4 and pkits_4_7_5 says 'cRLSign enforcement not implemented in path validation (RFC 5280 \u00a76.1 only requires keyCertSign)'. This is accurate but does not explain WHY PKITS requires failure here while RFC 5280 \u00a76.1 does not. A future maintainer will not know whether (a) we intentionally deviate from PKITS, (b) we have a bug, or (c) the PKITS test itself is over-specified. The ignore comment should state: 'PKITS \u00a74.7.4 tests a policy stricter than RFC 5280 \u00a76.1 (which does not require cRLSign for CA certs used in path validation). Our implementation is RFC-conforming; the PKITS requirement is advisory for policy layers, not \u00a76.1 path validation. See [RFC 5280 \u00a76.1] vs PKITS \u00a74.7.4 commentary.'",
+  "ephemeral": 0,
+  "id": "PKIX-841.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS \u00a74.7.4/\u00a74.7.5 ignore comment does not explain PKITS vs RFC 5280 divergence",
+  "updated_at": "2026-05-02T17:48:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:28:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

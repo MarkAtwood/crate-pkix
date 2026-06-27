@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "64324a378b94e6b4a60b70b8aeba9486707d2417767de68fc20b4966ccaccbfb",
+  "created_at": "2026-05-12T19:24:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nWhere does the default pkix-dane-resolver get its upstream DNS server config from?\n\n## Options\n\n- **A) System resolv.conf.** Read /etc/resolv.conf on Unix; equivalent on Windows / macOS. Matches OS DNS behavior. Hickory has built-in support.\n- **B) Hardcoded fallback.** Use 1.1.1.1 / 8.8.8.8 / 9.9.9.9. Predictable; corporate-network-unfriendly. Bypasses OS DNS configuration.\n- **C) Env variable override + (A) fallback.** `PKIX_DANE_RESOLVER=...` env var; falls back to system config. Maximum operator flexibility.\n- **D) Pluggable, no built-in default.** Consumer always provides config. Defeats the 'no consumer code change' goal \u2014 but consistent with adapter-trait pattern.\n\n## Considerations\n\n- 'No consumer code change' goal pushes toward (A) or (C).\n- Corporate networks often use internal DNS resolvers that handle DNSSEC. (A) respects this.\n- DNSSEC-capable system resolvers are common on Linux (systemd-resolved with DNSSEC=allow-downgrade), uncommon on Windows / macOS.\n- Some operators specifically want DNSSEC queries to bypass their org's DNS (to avoid filtering). (C) admits this.\n\n## Tentative position\n\nC \u2014 env variable override on top of system config. Zero-config behavior matches OS DNS (A); operators get an override knob without code changes; pluggable Resolver trait per non-negotiable #6 lets consumers fully replace if they want.\n\n## Decision-gate\n\nHuman-labeled. Surface when PKIX-j32w.2 (pkix-dane-resolver) implementation starts.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.5",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Decide DNS config source for pkix-dane-resolver",
+  "updated_at": "2026-05-13T00:20:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:24:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

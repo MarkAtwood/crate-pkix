@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "7bba34c8afceb784c5a7157a6ff2b35b16253df06e6a9948834e3be6c3c64913",
+  "created_at": "2026-05-14T14:24:24Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:162-168 \u2014 the LogStateJson struct only deserializes 'usable' and 'retired' state entries. Logs in other states (pending, qualified, readonly, rejected) end up with usable_from_ms = None and retired_at_ms = None \u2014 i.e., they parse as 'open window' (unbounded usable).\n\nlog_window_contains() returns true for None-on-both-sides (verify.rs:846-857). So a log in 'pending' state (never been usable!) will be accepted by SctVerifier as if it had an open window. A log in 'rejected' state (the operator has been kicked off) likewise.\n\nChrome's log_list.json includes pending/qualified logs alongside usable ones; consumers using Chrome's list as their trust source would be silently accepting SCTs from logs Chrome hasn't validated yet.\n\nSuggested fix: track all five states. Map them to a CtLogState enum on CtLog. Refuse to set 'usable' window on a log whose state is not 'usable' or 'retired'. Have log_window_contains() additionally check the state \u2014 only 'usable' and 'retired' (with the window check) should be trusted.\n\nAlternative: document this clearly in the parser docstring and let callers pre-filter the JSON. Currently neither is done \u2014 Chrome-list-derived CtLogList trusts more logs than Chrome itself trusts.\n\nCross-reference: this is what mozilla::pkix and certificate-transparency-go both handle explicitly. Worth getting right pre-1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Google log_list.json parser silently ignores logs in 'pending', 'qualified', 'readonly', 'rejected' states",
+  "updated_at": "2026-05-14T14:24:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:24:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

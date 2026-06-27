@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:41Z",
+  "compaction_level": 0,
+  "content_hash": "d6d4da3f85254563df0e8c8505d866e189a766b5d264f36e33c5d327ba93d533",
+  "created_at": "2026-05-07T16:09:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs:172-179 \u2014 the producedAt freshness check:\n  `if self.now_unix < produced_at { return Err(Error::OcspMalformed); }`\n\nThe code returns OcspMalformed when producedAt is in the future. The comment explains: 'a future-dated producedAt is structurally suspicious \u2014 a legitimate responder cannot claim to have produced a response after now.'\n\nRFC 6960 \u00a74.2.2.1 does not define the case of future producedAt explicitly. It's arguable this should be OcspExpired (freshness issue) vs OcspMalformed (structural defect). The current choice of OcspMalformed is defensible and documented.\n\nHowever, the thisUpdate check at line 184-187 returns OcspExpired for the case where thisUpdate > now, which is a similar freshness issue. Returning different errors (OcspMalformed vs OcspExpired) for the two freshness failures may confuse callers.\n\nThis is a P3 documentation/API consistency issue, not a correctness bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP check: producedAt field compared with wrong semantics (OcspMalformed not OcspExpired)",
+  "updated_at": "2026-05-07T16:36:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:09:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

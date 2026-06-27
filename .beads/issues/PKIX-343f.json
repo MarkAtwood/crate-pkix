@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Took option (b): removed the false no_std claim from pkix-ct (dropped categories=['no-std'], the cfg_attr no_std line, the std feature, and the cfg(feature='std') gate on impl std::error::Error). pkix-ct is now plain std, matching the workspace policy that only pkix-path is required to be no_std.",
+  "closed_at": "2026-05-07T23:26:46Z",
+  "compaction_level": 0,
+  "content_hash": "04db79f8b2b2ec058878af8f6fc430be320270d963361e726fe16809b87a6be5",
+  "created_at": "2026-05-07T22:49:30Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPass-2 commit e586bc49 closed PKIX-qwzx.10 (\"pkix-ct uses std::error::Error unconditionally without an std feature gate\"). The fix:\n- Added `#![cfg_attr(not(feature = \"std\"), no_std)]` at pkix-ct/src/lib.rs:1\n- Added `[features] default = []; std = [\"der/std\", \"x509-cert/std\", \"pkix-path/std\"]` to pkix-ct/Cargo.toml\n- Gated `impl std::error::Error for Error` behind `#[cfg(feature = \"std\")]`\n- Added `categories = [\"cryptography\", \"no-std\"]` to Cargo.toml\n\n## Finding\nThe fix is incomplete. `pkix-ct` depends on `x509-cert` (workspace dep, version \"0.2\") via `x509-cert = { workspace = true }` *without* `default-features = false`. `x509-cert 0.2` default features are `[\"pem\", \"std\"]` (verified from cargo-metadata). So `x509-cert/std` is always pulled in, regardless of pkix-ct's std feature.\n\nReproduction:\n```\ncargo build -p pkix-ct --no-default-features --target riscv32imc-unknown-none-elf\n```\nResult: const-oid fails to compile with \"can't find crate for std\" \u2014 confirms x509-cert is always pulled with std=enabled, defeating pkix-ct's no_std cfg.\n\n## Severity\nP3. The crate is a stub (always returns Err(NoTrustedSct)) so this is not behaviorally observable. But:\n- `categories = [\"no-std\"]` is a public crates.io claim \u2014 false advertising.\n- The `#![cfg_attr(not(feature=\"std\"), no_std)]` is a developer signal that breaks on real no_std targets.\n\n## Fix\nEither (a) add `default-features = false` to the x509-cert workspace dep AND propagate via std feature, OR (b) remove the `categories = [\"no-std\"]` claim and the no_std cfg until the underlying deps actually support it.\n\nPer project AGENTS.md, only pkix-path is required to be no_std. pkix-ct could safely revert to std-only and remove the claim.\n\n## Pass-2 attribution\nPKIX-qwzx.10 closure was about std::error::Error feature gating; that part is correct. The simultaneous addition of `categories = [\"no-std\"]` and the `#![cfg_attr(not(feature = \"std\"), no_std)]` line introduced a new doc/manifest overclaim that wasn't asked for in PKIX-qwzx.10.",
+  "ephemeral": 0,
+  "id": "PKIX-343f",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-ct claims category=no-std but does not compile on a no_std target",
+  "updated_at": "2026-05-07T23:26:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:50:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yydv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

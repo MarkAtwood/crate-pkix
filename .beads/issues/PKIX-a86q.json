@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:39:51Z",
+  "compaction_level": 0,
+  "content_hash": "2162bb9c29dacff97e9408dddc9a318d45d526995a3ff6efcc5598d8b5c3870b",
+  "created_at": "2026-05-11T05:28:50Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`Finding` currently records lint_id, citation, evaluated_at_unix, rule_bundle_version \u2014 but not which cert triggered the finding. For evidence packs intended to be auditable (OSCAL Assessment Results, federal compliance exports), each finding should pin to a specific cert by content hash so the evidence is replayable.\n\n## What\n\nAdd `cert_sha256: [u8; 32]` to `Finding`. SHA-256 of the DER-encoded cert that triggered the lint. The lint engine computes this once per cert per evaluation run and stamps it on each emitted finding.\n\n## Acceptance\n\n- [ ] `Finding.cert_sha256` field present, populated by `LintRunner::run_cert`.\n- [ ] Serde round-trips correctly (hex or base64 in JSON, raw bytes in postcard etc.).\n- [ ] Evidence-pack documentation updated to call out cert_sha256 as the provenance field.\n- [ ] Crate version bumped (additive to a non_exhaustive struct).\n\n## Why not done already\n\nEarlier design deferred this to avoid adding a SHA-256 dep to the engine core. Revisit: pkix-lint already depends transitively on `sha2` via x509-cert, so the dep cost is zero.\n\n## Filed as\n\nTracker for pkix-lint/src/lib.rs:481 'Planned fields' rustdoc block. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-a86q",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: add Finding.cert_sha256 field for evidence-pack provenance",
+  "updated_at": "2026-05-11T07:39:51Z"
+}

@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added pkix-path-builder/tests/integration.rs with 4 integration tests, all pass.",
+  "closed_at": "2026-05-05T14:41:09Z",
+  "compaction_level": 0,
+  "content_hash": "72258fd68f802dfa741126202c19df210d1a66d089b0f379ee410e994108fa9d",
+  "created_at": "2026-05-05T14:33:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Add tests/integration.rs to pkix-path-builder. Load PKITS \u00a74.1 cert chains in shuffled order and verify build_path + validate_path succeeds. Also test NoPathFound and DepthExceeded cases.",
+  "ephemeral": 0,
+  "id": "PKIX-y2j.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Write path-builder integration tests",
+  "updated_at": "2026-05-05T14:41:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-y2j",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-y2j.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

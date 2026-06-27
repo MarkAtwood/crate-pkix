@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced near-duplicate keywords (sct, ct) with pki and rfc6962 for better crates.io discoverability.",
+  "closed_at": "2026-05-07T22:26:58Z",
+  "compaction_level": 0,
+  "content_hash": "d8d895d140698e8118fcf8d6360039aa3789447dda5786a2ed707190a6a903e3",
+  "created_at": "2026-05-07T22:03:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/Cargo.toml:10:\n  keywords = [\"x509\", \"certificate\", \"transparency\", \"sct\", \"ct\"]\n\n5 keywords (the crates.io maximum), and three of them refer to the same thing: 'transparency', 'sct', 'ct'. crates.io search rewards distinctness \u2014 picking 'transparency' OR 'ct' (not both) frees a slot for, e.g., 'rfc6962' or 'pki', which are the keywords used by pkix-path and pkix-chain for cross-crate discoverability.\n\nSuggested replacement:\n  keywords = [\"x509\", \"certificate\", \"pki\", \"transparency\", \"rfc6962\"]\n\nSeverity: P4 / opinion. Trivial fix; no functional impact.\n\nPass-1 attribution: pass 1 added Cargo metadata (PKIX-6xdl) for pkix-lint but did not audit the existing stub-crate metadata.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.13",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: pkix-ct keywords contain a near-duplicate ('ct' and 'transparency' and 'sct')",
+  "updated_at": "2026-05-07T22:26:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:03:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:48:29Z",
+  "compaction_level": 0,
+  "content_hash": "6bae0fef7431e6fc9131a8f8dbac1754cfd0c54cff14008cb47dba6fb46cb18e",
+  "created_at": "2026-05-07T16:46:09Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 1 expanded ALLOWED_INTERMEDIATE_EXTENSIONS to include NameConstraints, CertificatePolicies, PolicyMappings, PolicyConstraints, InhibitAnyPolicy, EKU, SAN, and IssuerAltName. However, CRITICAL_OK_INTERMEDIATE_EXTENSIONS still only contains BasicConstraints and KeyUsage.\n\nIn check_extensions, any extension OID that is in ALLOWED_INTERMEDIATE_EXTENSIONS but NOT in CRITICAL_OK_INTERMEDIATE_EXTENSIONS will cause UnhandledCriticalExtension when marked critical (line 523). For several of the newly-added OIDs this is always the case in practice:\n\n- NameConstraints: RFC 5280 \u00a74.2.1.10 says it MUST be critical.\n- InhibitAnyPolicy: RFC 5280 \u00a74.2.1.14 says it MUST be critical.\n- PolicyConstraints: RFC 5280 \u00a74.2.1.11 SHOULD be critical.\n\nSo adding NameConstraints (and the others) to ALLOWED_INTERMEDIATE_EXTENSIONS while not adding them to CRITICAL_OK_INTERMEDIATE_EXTENSIONS means verify_simple will always reject real-world intermediates carrying these extensions. pkix-path handles all these OIDs as critical (HANDLED_CRITICAL_OIDS), so CRITICAL_OK_INTERMEDIATE_EXTENSIONS should be expanded to match.\n\nFix: Add OID_EXT_NAME_CONSTRAINTS, OID_EXT_CERTIFICATE_POLICIES, OID_EXT_POLICY_MAPPINGS, OID_EXT_POLICY_CONSTRAINTS, OID_EXT_INHIBIT_ANY_POLICY, OID_EXT_EXTENDED_KEY_USAGE, OID_EXT_SUBJECT_ALT_NAME to CRITICAL_OK_INTERMEDIATE_EXTENSIONS (matching the set that pkix-path already handles in HANDLED_CRITICAL_OIDS).",
+  "ephemeral": 0,
+  "id": "PKIX-n626.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: CRITICAL_OK_INTERMEDIATE_EXTENSIONS too narrow after ALLOWED_INTERMEDIATE_EXTENSIONS expansion",
+  "updated_at": "2026-05-07T16:48:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:46:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-n626",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision recorded in issue; no code change needed \u2014 these are preservation notes.",
+  "closed_at": "2026-05-03T02:46:57Z",
+  "compaction_level": 0,
+  "content_hash": "f08ae2c067aee13c75358c0ace4c22cbce93cc42f46092abd2193715031b317f",
+  "created_at": "2026-05-03T02:41:41Z",
+  "created_by": "Mark Atwood",
+  "description": "In chain_walk, check_name_constraints(cert, ...) is called BEFORE the NC state is updated from that cert's own NC extension. This is correct per RFC 5280 \u00a76.1.4: a CA's NC constraints apply to its issued certificates, not to itself. If a contributor moves the NC update before the check (to 'apply constraints eagerly'), the CA's own names would be validated against its own constraints \u2014 which is wrong and would cause valid CA-signed paths to be rejected. The ordering is RFC-mandated.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.9",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC state update AFTER check: applied to children, not self \u2014 do not reorder",
+  "updated_at": "2026-05-03T02:46:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

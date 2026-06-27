@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T233709Z-3219518",
+  "created_at": "2026-05-14T00:16:52Z",
+  "id": "019e23d7-e5bc-7886-aad3-5b73ddf6dc9e",
+  "issue_id": "PKIX-jbvb.1",
+  "text": "[2026-05-13 do-beads loop] Claim released. Substantive correctness issue discovered after shipping PKIX-jbvb.2 and .3: my shipped DN rules don't match BR Legacy generation (the policy OID suffix I used). Filed PKIX-jbvb.6 (human-labeled) to decide between Option A (switch to Multipurpose OID .2, smaller change), Option B (loosen DN rules to Legacy semantics), or Option C (ship per-generation variants). PKIX-jbvb.1 cannot proceed until that decision lands because the choice affects what DnAttrRule SmimeOrganizationValidated should produce (Org-validated needs organizationIdentifier as SHALL across all generations \u2014 the bead description acknowledges this \u2014 but the strictness of the OTHER attrs depends on generation choice). Bead remains open."
+}

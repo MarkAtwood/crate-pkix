@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T23:09:33Z",
+  "id": "019e194d-8ac2-7e10-9fd8-a96d596f3b44",
+  "issue_id": "PKIX-9vnx.9",
+  "text": "do-beads loop hygiene 2026-05-11: core check_shape() shipped via .9.1 (commit 5c0d67de). Sole remaining open child .9.2 is human-labeled pending workspace-dep design call. Umbrella has no autonomous frontier; relabeling human to stop bd ready from surfacing it. Re-evaluate when .9.2 resolves."
+}

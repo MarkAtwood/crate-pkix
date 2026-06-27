@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T21:59:47Z",
+  "id": "019e190d-ad66-7cf2-a175-9150e48fa90e",
+  "issue_id": "PKIX-lwr9.4",
+  "text": "Re-scoped 2026-05-11 by PKIX-lwr9.6: original framing of '~10 deep-chain depth-5/6 sig-invalid + 2 non-CA-at-depth-6' cases survives as exactly 1 case (tc60). The other ~11 cases were harness artifacts (the harness bypassed pkix-path-builder entirely), not builder bugs."
+}

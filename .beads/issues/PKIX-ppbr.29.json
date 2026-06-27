@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "531e7e8dfd7a0ce4d3496d0b81384d83e46a838cdff3fd0f21e3f2dbc6760f43",
+  "created_at": "2026-05-14T17:45:23Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:384-425\n\n```rust\npub fn verify_embedded_scts(\n    &self,\n    leaf_cert: &Certificate,    // x509_cert::Certificate\n    issuer_cert: &Certificate,\n) -> Result<usize>\n```\n\nMethod takes `&Certificate` from `x509-cert`. Internally, it calls\n`encode_to_vec` (lines 406-413) to produce the DER bytes that the\nverifier consumes. Two leakage problems:\n\n1. `x509_cert::Certificate` is in the public method signature. If\n   `pkix-ct` ever wants to swap to a different X.509 parser\n   (`pkix-cert`-something, a hand-rolled parser, etc.), every\n   downstream caller that passes a `Certificate` value has to\n   migrate. The `x509-cert` crate is currently 0.3-pre.X; its API\n   has been evolving.\n\n2. The other verify methods (`verify_sct_for_cert`,\n   `verify_sct_for_precert`) take `cert_der: &[u8]` \u2014 the\n   sibling API uses bytes. The contract is split: half the verify\n   methods are byte-oriented, half are parsed-cert-oriented. A\n   caller cannot tell from a quick look which form to use.\n\nSub-problem of (1): `Certificate` is `&'a` borrowed from the\ncaller's owned DER. The caller already has the DER. If the verifier\nneeds DER too, the caller is paying:\n\n- caller-side DER alloc (the bytes), and\n- caller-side Certificate parse (~ 30-50 micros), and\n- pkix-ct-side `encode_to_vec` re-encoding (~50 micros, allocation),\n  and\n- per-SCT cert-DER copy in the signed-input builder.\n\nA pure byte-oriented API skips steps (b) and (c) entirely. PKIX-ppbr.7\nalready flags the per-SCT re-encoding cost; this is the API-contract\nangle on the same issue.\n\nRecommendation: make the bytes the only contract. Replace:\n\n```rust\npub fn verify_embedded_scts(\n    &self,\n    leaf_cert_der: &[u8],\n    issuer_cert_der: &[u8],\n) -> Result<usize>\n```\n\nIf callers want to pass a parsed `Certificate`, give them a\n`&Certificate` -> `&[u8]` accessor (which `x509-cert::Certificate`\nalready has via TBS preservation \u2014 they keep the original DER as\n`tbs_certificate.original_der_octets` or similar).\n\nThis also dissolves PKIX-ppbr.4 (the x509-cert re-encoder\nbit-exactness problem): if the caller provides bytes, pkix-ct never\nre-encodes the leaf bytes; the only re-encoded thing is the\nextension-stripped TBS, which is what the spec defines as the\nsigned-over structure anyway.\n\nPriority P2.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts requires parsed Certificate, re-encodes to DER internally \u2014 exposes x509-cert dep",
+  "updated_at": "2026-05-14T17:45:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:45:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

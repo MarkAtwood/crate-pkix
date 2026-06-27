@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.67",
+  "title": "Error::MalformedIntermediate is a dead variant in pkix-path-builder",
+  "description": "pkix_path_builder::Error::MalformedIntermediate is documented as reserved for future diagnostic use but no code path returns it. Pre-1.0 it can be removed freely. Post-1.0 it is locked in forever. Callers must handle a variant that can never occur. Location: /home/mark/PROJECT/PKIX/pkix-path-builder/src/lib.rs lines 159-173.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:39Z",
+  "updated_at": "2026-06-15T16:54:54Z",
+  "closed_at": "2026-06-15T16:54:54Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:38"
+    }
+  ]
+}

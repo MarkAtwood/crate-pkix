@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "877208fa76eb8542aedbc6aa3095c7b9434e399f3f3be366140ed391b5e07724",
+  "created_at": "2026-05-14T17:43:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:697-705\n\n```rust\n#[must_use]\npub fn merkle_leaf_hash(leaf_bytes: &[u8]) -> [u8; 32] {\n    let mut h = Sha256::new();\n    h.update([0x00u8]);\n    h.update(leaf_bytes);\n    ...\n}\n```\n\nThe signature does not constrain what `leaf_bytes` is. The doc says\nit's `MerkleTreeLeaf` bytes (built by `merkle_tree_leaf_for_cert` or\n`merkle_tree_leaf_for_precert`), but at the type level any byte\nsequence is acceptable.\n\nA caller using the type system to track wire-format identity will be\ndisappointed. A typo passing the SCT signature bytes instead of the\nMerkleTreeLeaf bytes will silently produce a wrong hash with no\ndiagnostic.\n\nRecommendation: wrap the byte sequence in a newtype.\n\n```rust\npub struct MerkleTreeLeafBytes(Vec<u8>);\n\nimpl MerkleTreeLeafBytes {\n    pub fn for_cert(sct: &SCT, cert_der: &[u8]) -> Result<Self> {\n        ... // current merkle_tree_leaf_for_cert\n    }\n    pub fn for_precert(sct: &SCT, leaf: &[u8], issuer: &[u8]) -> Result<Self> { ... }\n    pub fn hash(&self) -> [u8; 32] { merkle_leaf_hash(&self.0) }\n    pub fn as_bytes(&self) -> &[u8] { &self.0 }\n}\n```\n\nThen `merkle_leaf_hash(&[u8])` becomes private; the public path is\n`MerkleTreeLeafBytes::for_cert(...).hash()`. Cleaner contract and\ncaller cannot pass wrong bytes.\n\nCost: an extra newtype in the public surface, and a small allocation\nthe caller has to manage. Benefit: the type system enforces that\nwhat you hash is what you built.\n\nPriority P3 because the existing API works for correct callers; the\nrisk is to careless callers, and the test fixture audit at the\noracle level catches it for the workspace's own tests.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "merkle_leaf_hash takes &[u8] without naming the contract \u2014 callers can hash arbitrary bytes",
+  "updated_at": "2026-05-14T17:43:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:43:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

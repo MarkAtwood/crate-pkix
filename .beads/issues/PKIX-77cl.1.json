@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T05:24:02Z",
+  "compaction_level": 0,
+  "content_hash": "1546a9fa64f7ac2030918b5adc8f2426cc55a9f72f30f2fb32784df01465e86c",
+  "created_at": "2026-05-08T05:11:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer parent PKIX-77cl design \u00a76 and \u00a78: PKITS \u00a74.5 must split across two crates because the 4 FAIL cases fail on revocation, and pkix-path is no_std without revocation.\n\n## Scope (this PR only)\n\nAdd `pkix-path/tests/pkits_4_5.rs` containing the 4 \u00a74.5 PASS cases:\n- 4.5.1 Valid Basic Self-Issued Old With New Test1\n- 4.5.3 Valid Basic Self-Issued New With Old Test3\n- 4.5.4 Valid Basic Self-Issued New With Old Test4\n- 4.5.6 Valid Basic Self-Issued CRL Signing Key Test6\n\nThese exercise RFC 5280 \u00a76.1.4(h) (policy/inhibit counter skip on self-issued) and \u00a76.1.4(m) (pathLen counts only NON-self-issued certs). They are the regression-protective baseline for chain_walk refactor (PKIX-als9 H7, H10, H11).\n\n## Out of scope\n\nThe 4 FAIL cases (4.5.2, 4.5.5, 4.5.7, 4.5.8) \u2014 they fail on revocation, belong in PR-2 (pkix-revocation). Including them in pkix-path tests would have them wrongly pass.\n\n## Implementation\n\n- Reuse existing `pkix-path/tests/pkits_helper.rs` \u2014 no new helpers.\n- Pattern: copy boilerplate from `pkits_4_6_4_7.rs`.\n- Per-test rustdoc: PKITS source line + RFC 5280 site + 'MUST validate'.\n- Chain ordering (leaf-first, anchor excluded) per parent bead design \u00a76.\n- Oracle: PKITS vectors.json (ShouldValidate=true).\n\n## Acceptance\n\n- [ ] `pkix-path/tests/pkits_4_5.rs` exists with 4 PASS tests.\n- [ ] All 4 tests pass: `cargo test -p pkix-path --test pkits_4_5`.\n- [ ] `cargo fmt --all` clean.\n- [ ] `cargo clippy --all-features -p pkix-path -- -D warnings` clean.\n- [ ] No new dependencies added.",
+  "ephemeral": 0,
+  "id": "PKIX-77cl.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Committed as 5baa23c0. 4 PASS tests added in pkix-path/tests/pkits_4_5.rs. Key finding documented inline: \u00a74.5.4 Test4EE and \u00a74.5.6 Test6EE chain directly to the main CA (verified via AKI), not through the self-issued bridge \u2014 the PKITS canonical CertPath assumes a path builder, while pkix-path is positional. cargo fmt + clippy + test all clean. Full pkix-path suite (87 tests) passes.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PR-1: pkix-path PKITS \u00a74.5 PASS subset (4.5.1, 4.5.3, 4.5.4, 4.5.6)",
+  "updated_at": "2026-05-08T05:24:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:11:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77cl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

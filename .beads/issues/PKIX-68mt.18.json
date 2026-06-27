@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.65: added as_dns_name, as_ip_bytes, local_part, domain, is_internationalized",
+  "closed_at": "2026-06-15T18:30:19Z",
+  "compaction_level": 0,
+  "content_hash": "7187a64642f9b38507a79b6e77bdaee41bd1878ca9b6025d02f7ad794f3e00a9",
+  "created_at": "2026-05-14T19:18:09Z",
+  "created_by": "Mark Atwood",
+  "description": "Public API surface gap: ServerName<'a> and MailboxName<'a> have private fields and zero accessor methods.\n\nOnce parsed:\n\n* No way to read back the normalized DNS A-label form (caller has b\u00fccher.example, parses, cannot get xn--bcher-kva.example back out).\n* No way to read back the canonical IPv6 bytes or render to dotted/colon form.\n* No way to read the mailbox local-part, domain A-label, or is_internationalized flag.\n\nCallers who want to log/audit/serialize the parsed form must:\n\n1. retain the original input string alongside the typed handle, or\n2. re-parse and re-stringify themselves, defeating the validate-once point of the type.\n\nImpact (caller-side):\n\n* Logging: only {:?} works, and that exposes the internal Cow variant choice (Borrowed vs Owned), which is implementation-specific and may change.\n* Caching/serde: even with the optional serde feature, ServerName / MailboxName don't get Serialize/Deserialize derives \u2014 see separate finding. But even with that, the type currently has nothing to serialize *to* shape-wise without exposing private fields.\n* Pkix-chain wrapper code in this workspace can't display *which* identity failed validation without keeping a parallel string.\n\nMinimum viable accessor surface (proposed for resolution, not for this filing):\n\n* ServerName::as_dns_str(&self) -> Option<&str>\n* ServerName::as_ip_bytes(&self) -> Option<&[u8]>  // already used internally\n* ServerName::is_dns(&self) -> bool / is_ip(&self) -> bool\n* MailboxName::local_part(&self) -> &str\n* MailboxName::domain(&self) -> &str  (A-label form)\n* MailboxName::is_internationalized(&self) -> bool\n\nThis is a forever commitment if shipped without accessors: adding them later is non-breaking, but the maintainer loses the option of a) reading the normalized form, b) round-tripping for caller-side caches. The non-negotiable #6 (cache-friendly result types) implies these accessors must exist for ValidationPolicy/Verifier caches to work without retaining parallel string copies.\n\nVerdict: callers will write defensive 'keep the original string around' wrappers forever if this ships as-is.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ServerName / MailboxName have no public accessors \u2014 types are write-only post-parse",
+  "updated_at": "2026-06-15T18:30:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:18:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

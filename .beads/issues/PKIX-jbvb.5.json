@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T23:36:22Z",
+  "compaction_level": 0,
+  "content_hash": "eca969dcc702853b661ef67dfc24ac8bd3168d33ac20d3f892c3ebf803aefcbf",
+  "created_at": "2026-05-13T21:35:40Z",
+  "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "description": "## What\n\nPKIX-jbvb.{1,2,3} require dual-sourced fixtures (zlint testdata/ AND pkilint fixtures, per Mark's 2026-05-11 decision option d). Auditing the available sources surfaces a fundamental shape mismatch:\n\nzlint's smime_leg1_{mv,ov,sv,iv}_eff1.pem fixtures are **single leaf certs issued by a Fake CA** for which zlint does not ship the CA. zlint runs single-cert lints, so it doesn't need the CA. We can't run them through validate_path because we don't have the issuing cert.\n\npkilint repo is not yet cloned; expected to have a similar shape (lint-tool fixtures, not chain fixtures).\n\n## Three options for tests\n\n(A) **Generate new self-signed Org-/Sponsor-/Individual-validated certs** in pkix-path/tests/fixtures/policy-checks/ (extending gen.py), modeled after zlint's smime_leg1_*_eff1.pem fixture shapes. Use them through validate_path with the cert as both anchor and leaf (matches existing pkix-profiles-cabf::smime_conforming_cert_passes test pattern using smime-self-signed-365d.der).\n\n   - Pro: tests exercise full chain_walk (e3a/e3b) enforcement; the new required_leaf_policy_oids + required_leaf_subject_dn_attrs predicates actually fire.\n   - Pro: provenance per-cert can cite \"modeled after zlint's smime_leg1_ov_eff1.pem (policy OID + DN shape)\"; cross-validation with pkilint becomes \"pkilint would also classify this cert as Org-validated based on its policy OID + DN attributes\".\n   - Con: not literally the zlint cert bytes; reviewer trust depends on the modeling rationale.\n\n(B) **Use zlint's certs as-is via shape-checks (LintRunner / check_shape), not validate_path**. SmimeOrganizationValidated would impl LintProfile returning a set of Lints that check the policy OID + DN attrs. The Profile's policy() would still set the new ValidationPolicy fields, but tests would exercise the *lint* path instead of the *chain-walk* path.\n\n   - Pro: literally uses zlint's fixtures with their attestable provenance.\n   - Pro: gives -cabf profiles real lint sets, advancing toward operational use.\n   - Con: requires authoring Lint impls (cabf_smime_br_organization_policy_oid_lint, etc.) which is a substantial side scope; PKIX-mzsk says comprehensive predicate coverage is pkix-policy-zlint's job.\n   - Con: doesn't actually exercise the new PKIX-jbvb.4 ValidationPolicy fields in the test (the lints duplicate the predicate, not test it).\n\n(C) **Field-value assertion tests only** (no fixture validation). Tests check Profile.policy(now).required_leaf_policy_oids == Some([P_org]) etc. directly.\n\n   - Pro: minimal new infrastructure.\n   - Con: drops the dual-sourcing-from-real-ecosystem-fixtures spirit of Mark's option-d decision entirely.\n\n## Recommendation\n\n(A) Generate new self-signed certs in pkix-path/tests/fixtures/policy-checks/. Each new cert documents the zlint testdata fixture it was modeled after; pkilint cross-validation is documented as \"based on policy OID + DN attrs that pkilint classifies the same way\" (verifiable manually by running pkilint on a clone, no test infra needed).\n\nThis gives us:\n- Working chain validation tests that fire the new PKIX-jbvb.4 predicates\n- Provenance trail back to real ecosystem fixtures\n- No new Lint infrastructure side-quest\n- One small extension to gen.py per tier\n\n## Open questions for human\n\n1. Is (A) the intended model? The bead's literal wording (\"pull from BOTH zlint testdata/ AND pkilint fixtures\") reads as (B), but (B) requires Lint authoring that PKIX-mzsk explicitly punts to pkix-policy-zlint.\n\n2. If (A): is gen.py the right place, or should -cabf grow its own fixture-gen script?\n\n3. Per-cert dual-source provenance documentation: SOURCES.md per tier? Inline rustdoc on the test? Comments in the gen.py extension?\n\n4. Does this bead's resolution apply uniformly to PKIX-jbvb.1, .2, and .3, or could one tier be done one way and another differently?\n\n## Blocks\n\nThis question blocks PKIX-jbvb.1, .2, .3. When answered, the autonomous loop can implement all three tiers in turn using the chosen model.",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fixture-sourcing model for PKIX-jbvb.{1,2,3} S/MIME tier profile tests",
+  "updated_at": "2026-05-13T23:36:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T14:35:39Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

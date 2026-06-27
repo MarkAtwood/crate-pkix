@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.40",
+  "title": "pkix-chain Verifier missing Debug derive",
+  "description": "In pkix-chain/src/lib.rs:426, struct Verifier<'a, V, R, A> holds references to the four validation components but does not derive Debug (or any trait beyond the implicit auto-traits). Per the coding standards, Debug should be derived on almost everything.\n\nWhat goes wrong: Callers cannot println!(\"{:?}\", verifier) for diagnostic logging. This is a small ergonomic gap but worth fixing since the four inner references all point to types that typically impl Debug.\n\nLocation: pkix-chain/src/lib.rs:426\n\nRecommendation: Add #[derive(Debug)] with appropriate V: Debug, R: Debug, A: Debug bounds (or use a manual Debug impl that prints the type without requiring Debug on the generics). Also consider Copy/Clone if all fields are shared references.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:45Z",
+  "updated_at": "2026-06-15T17:03:11Z",
+  "closed_at": "2026-06-15T17:03:11Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:45"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:53:12Z",
+  "compaction_level": 0,
+  "content_hash": "5b6ab833b728965cb4380ec173d7b3425340a5de426e9a4fb33d915bf877fd1c",
+  "created_at": "2026-05-02T21:39:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs verify_chain loops over chain[i] and calls check_revocation only when chain[i+1] exists. The last cert in chain \u2014 the one whose issuer is the trust anchor \u2014 is never checked. For a typical [leaf, intermediate_CA] chain, only leaf is checked; intermediate_CA's revocation status is never queried. A revoked intermediate CA can continue to sign new leaf certs that pass full chain validation. The limitation is documented in the function docstring but has no compile-time or runtime signal \u2014 callers who skim the API will miss it. Fix options: (a) extend the RevocationChecker trait to accept TrustAnchor as issuer for the last cert, (b) require the trust anchor cert to appear in chain so it appears as chain[n-1]'s issuer, (c) add a dedicated check_revocation_against_anchor method. The right fix changes the API; file separately before touching code.",
+  "ephemeral": 0,
+  "id": "PKIX-pr6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_chain never revocation-checks the cert issued by the trust anchor",
+  "updated_at": "2026-05-02T22:53:12Z"
+}

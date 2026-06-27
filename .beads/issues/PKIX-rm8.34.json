@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.34",
+  "title": "PathCandidates clones candidates onto path stack",
+  "description": "In pkix-path-builder/src/lib.rs:714, PathCandidates::next() clones each candidate certificate onto the path stack (self.path.push(candidate.clone())). Similarly, line 645 clones the entire path on each yield (return Some(Ok(self.path.clone()))).\n\nWhat goes wrong: Each DFS step allocates a full Certificate clone. For deep pools with many candidates, this produces O(depth * candidates_tried) Certificate clones. The yield path additionally clones the entire chain. x509_cert::Certificate is a complex type with multiple inner Vecs; cloning it is not trivial.\n\nThe path-on-yield clone (line 645) is unavoidable given the iterator's resume contract (the iterator must hold onto the DFS state while the caller inspects the yielded chain). The per-step candidate clone (line 714) could be avoided by storing pool indices in self.path rather than owned Certificates, and only materializing the Vec<Certificate> at yield time.\n\nLocations:\n- pkix-path-builder/src/lib.rs:714 (per-candidate clone)\n- pkix-path-builder/src/lib.rs:645 (per-yield clone)\n\nRecommendation: Store &Certificate borrows or pool indices in the path stack instead of owned clones. Reconstruct the owned Vec<Certificate> only at yield time. This reduces the per-step cost from O(cert_size) to O(1) and the per-yield cost stays the same.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:26Z",
+  "updated_at": "2026-06-15T17:25:46Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:25"
+    }
+  ]
+}

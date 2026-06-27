@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:34:32Z",
+  "id": "019e15f5-8291-70af-b078-7f220f6fa992",
+  "issue_id": "PKIX-emf1",
+  "text": "6 of 7 children closed (.1, .2, .3, .5, .6, .7). Only PKIX-emf1.4 remains: maintainer call on pyca CRL strategy. Until that lands, this epic is blocked on human input. The baseline-pkits regeneration (in PKIX-emf1.7) captures the current pyca-no-revocation state explicitly so the divergence is visible and traceable."
+}

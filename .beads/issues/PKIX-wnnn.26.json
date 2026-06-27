@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "95aa51e92d11ece905a9847660764b2a1bd62cc20824f1759a7fedab9ef29470",
+  "created_at": "2026-05-14T18:38:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:904-955 \u2014 `build_first_valid_path` rustdoc covers:\n\n- What it does\n- When to use this over `build_path`\n- Errors\n- Out of scope\n- Relationship to other entry points (table)\n\nIt does NOT include an Examples section. `PathCandidates` (lib.rs:497-524) has a worked example of the build-then-validate retry pattern (ignore-marked, since it requires a real `SignatureVerifier` impl), and its prose says \"The pattern above is exactly what `build_first_valid_path` wraps.\" So callers reading the iterator's example see the helper's pattern by proxy.\n\nThis is structurally similar to how `build_path` (lib.rs:781-805) lacks an Examples section but cross-references `PathCandidates`. The inconsistency isn't between `build_path` and `build_first_valid_path`; it's that the new entry point \u2014 which is the recommended path for the most common use case \u2014 has zero direct example coverage.\n\nAn `ignore`-marked example on `build_first_valid_path` itself would:\n\n- Surface the function's signature shape (V: SignatureVerifier generic; passing `&policy` and `&verifier`)\n- Give cargo doc users a code block they can copy without clicking through to `PathCandidates`\n- Match the doctest pattern set by `pkix-path`'s entry points\n\nSuggested addition (sketch only; maintainer to refine):\n\n```rust\n/// # Example\n///\n/// ```ignore\n/// use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};\n/// use pkix_path_builder::{build_first_valid_path, CertPool};\n///\n/// let pool: CertPool = \u2026 ;\n/// let anchors: Vec<TrustAnchor> = \u2026 ;\n/// let policy = ValidationPolicy::new(now_unix);\n/// let verifier = DefaultVerifier::default();\n///\n/// match build_first_valid_path(&target, &pool, &anchors, &policy, &verifier) {\n///     Ok(chain) => { /* chain validated */ }\n///     Err(pkix_path_builder::Error::NoValidPath { tried, last_error }) => {\n///         eprintln!(\"tried {tried} candidates; last error: {last_error}\");\n///     }\n///     Err(e) => return Err(e.into()),\n/// }\n/// ```\n\nThis is opinion-flagged: the cross-reference from `PathCandidates` is a defensible substitute, and adding a direct example is taste. Closing as opinion is reasonable. Filing for completeness because the API surface this diff adds is the new \"recommended path\" and recommended paths typically warrant their own example.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path lacks an Examples section (PathCandidates has one; cross-link is by proxy only)",
+  "updated_at": "2026-05-14T18:38:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:38:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

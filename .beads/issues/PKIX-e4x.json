@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: changed Display message from 'SPKI' to 'issuer+serial'",
+  "closed_at": "2026-05-06T21:47:58Z",
+  "compaction_level": 0,
+  "content_hash": "48199545deb6a6c1185a8f517a503c21bb7be267acf34c6e0d42ed598a6a60ab",
+  "created_at": "2026-05-06T21:46:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:256 - The Display impl for Error::DuplicateCertificate still says 'duplicate certificate SPKI at chain indices' but the detection logic was changed in commit b8af672 to use issuer+serial (not SPKI). The message is factually wrong and will mislead operators diagnosing this error. Fix: change the message to 'duplicate certificate (issuer+serial) at chain indices'.",
+  "ephemeral": 0,
+  "id": "PKIX-e4x",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DuplicateCertificate Display says SPKI, should say issuer+serial",
+  "updated_at": "2026-05-06T21:47:58Z"
+}

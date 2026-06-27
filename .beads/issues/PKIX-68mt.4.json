@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b746680b09343f3d9b3c885a232eaa9ad75256ce75bdd595ab935f40c93cda86",
+  "created_at": "2026-05-14T19:13:38Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: a malformed certificate carries two SubjectAltName extensions (RFC 5280 \u00a74.2 says MUST NOT, but parsers see it in the wild \u2014 typically from broken CA software). find_san at pkix-identity/src/lib.rs:788-799 uses Iterator::find which returns the FIRST match by OID.\n\nBehavior: if the first SAN extension does not contain the target identity but a duplicate second one does, verify_dns_name / verify_mailbox returns NoMatchingSan \u2014 even though an SAN entry matching the target IS present in the certificate.\n\nThis is the 'first wins' interpretation. The alternative ('any wins' across duplicates, scanning all SAN extensions) is more permissive but also defensible \u2014 and pkix-path may take a different stance on duplicate extensions.\n\nChoice required:\n- 'First wins' (current): document it explicitly in the find_san doc and the verify_* doc-comments. Users who think 'the cert has the identity' will be wrong if it's in the second extension; document why.\n- 'Any wins': scan all SAN extensions, attempt match in each, return on first hit. Slightly more work, slightly more forgiving.\n- 'Reject duplicates': return MalformedSan if multiple SAN extensions present. Strictest interpretation.\n\nPre-1.0 is the time to pick. Currently neither code nor docs are explicit.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "find_san returns first SAN extension only; duplicate-extension carry-over silently ignored",
+  "updated_at": "2026-05-14T19:13:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "9130d5c74286823755c9781ae3fb9cd2a9e85f65bf21727d16c7bc257eba557e",
+  "created_at": "2026-05-14T14:21:59Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-q74z",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T141618Z-3840208",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T141618Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-ct since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Confidence: ~10% chance of missed bug. Least confident flags: PKIX-q74z.5 (TBS round-trip canonicalization is hard to falsify without running against PKITS / limbo / live-internet corpora); PKIX-q74z.11 (the timing side-channel scenario is plausibly worse than I sketched; would need a peer review by someone who has worked on Merkle proof timing attacks). Uncertainty driven by: lack of differential testing against real CT logs at scale (only one captured triple in live_log.rs), and no fuzz harness on the SCT parser. Would raise confidence if: (1) PKITS/limbo run on tbs_without_sct_list confirming round-trip is universal, (2) cargo-fuzz harness on SctList::from_extension_value + SignedCertificateTimestamp::from_bytes ran for 24h with no crashes, (3) the SctVerifier code was reviewed by another set of eyes against RFC 6962 / RFC 9162 line by line.\nMaintainer risk: MEDIUM \u2014 clean parser, sound algorithms, generous independent-oracle test discipline, but several public-API and trust-boundary issues (Precert Signing Certificate handling, OCSP-status conflation, silent log-state acceptance) need fixing before 1.0 to avoid CVE class issues post-launch.\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-ct since 24701180",
+  "updated_at": "2026-05-14T14:33:15Z"
+}

@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:37:48Z",
+  "compaction_level": 0,
+  "content_hash": "7d6987ef4edca8a9c4bef89f7b98518fb92d84419344f47f8a477df0c744f21a",
+  "created_at": "2026-05-13T05:30:36Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Wrapper-level differential test for pkix_chain::verify_tls_client_dns against 'openssl verify -purpose sslclient -verify_hostname X'.\n\nOpenSSL's sslclient purpose enforces clientAuth EKU. -verify_hostname applies SAN binding. This makes OpenSSL a stronger oracle for verify_tls_client_dns than pyca's ClientVerifier (which doesn't bind subject and doesn't enforce EKU under permit_all).\n\nAcceptance:\n- pkix-difftest/tests/verify_wrapper_openssl_client.rs covers the clientauth-DNS fixtures.\n- baseline-verify-openssl.md gets a TLS-client section.\n\nBlocks on PKIX-fmtv.18.1.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: verify_tls_client_dns vs -purpose sslclient -verify_hostname",
+  "updated_at": "2026-05-13T05:37:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:36Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T22:30:57Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

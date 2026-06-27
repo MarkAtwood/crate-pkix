@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Removed redundant #[must_use] from 6 Result-returning fns/trait methods (validate_path, validate_path_with_profile, build_path, build_path_with_config, check_revocation, check_revocation_against_anchor). Result's own type-level #[must_use] handles this.",
+  "closed_at": "2026-05-07T22:32:38Z",
+  "compaction_level": 0,
+  "content_hash": "ffa24fa1b7ed94186c8f75513e2ddb4dbec194896dc36e7df253b196c7703125",
+  "created_at": "2026-05-07T22:15:02Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\n`Result<T, E>` is already annotated `#[must_use]` in libcore. Adding\n`#[must_use]` to a function that returns `Result` is redundant \u2014 `rustc` already\nfires the `unused_must_use` lint on dropped `Result` values regardless of\nfunction-level annotation.\n\nSites:\n\n`pkix-path/src/lib.rs`:\n- line 849: `#[must_use = \\\"path validation result must be checked\\\"]` on\n  `pub fn validate_path(...) -> Result<ValidatedPath>`\n- line 931: `#[must_use = \\\"path validation result must be checked\\\"]` on\n  `pub fn validate_path_with_profile(...) -> Result<ValidatedPath>`\n\n`pkix-path-builder/src/lib.rs`:\n- line 398: `#[must_use = \\\"path building result must be checked\\\"]` on\n  `pub fn build_path(...) -> Result<Vec<Certificate>>`\n- line 416: `#[must_use = \\\"path building result must be checked\\\"]` on\n  `pub fn build_path_with_config(...) -> Result<Vec<Certificate>>`\n\n`pkix-revocation/src/lib.rs`:\n- line 309: `#[must_use = \\\"revocation check result must not be silently discarded\\\"]`\n  on trait method `check_revocation` returning `crate::Result<()>`\n- line 352: same on default-impl trait method `check_revocation_against_anchor`\n  returning `crate::Result<()>`\n\nThe custom message strings are individually nice \u2014 but the underlying lint fires\neither way, so the message is unreachable in practice (the default\n`#[must_use]` from `Result` triggers first with its own \\\"unused Result that must\nbe used\\\" message).\n\nFix: drop `#[must_use]` on these six sites. Keep documentation in the function's\nrustdoc if the warning message carried useful prose. Modern clippy does not\nflag this as redundant by default, but `clippy::redundant_must_use` is in\nnursery.\n\n(Trait-method `#[must_use]` in particular is a footgun: it can be silently\nignored when the trait is consumed via dyn dispatch, while the underlying\n`Result` type-level `#[must_use]` always works.)",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.21",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: redundant #[must_use] on Result-returning fns and trait methods",
+  "updated_at": "2026-05-07T22:32:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:15:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

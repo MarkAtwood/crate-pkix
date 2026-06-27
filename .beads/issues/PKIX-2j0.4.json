@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:43Z",
+  "compaction_level": 0,
+  "content_hash": "ec2b991d614a7da42ec14a2ad093169ac20aec80daa42498668bbac6afd4d9f3",
+  "created_at": "2026-05-06T16:49:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2572-2583\n\nThe code has a duplicated comment block in the `check_name_constraints` function's RFC 822 handling path. Lines 2572-2577 and 2577-2583 contain nearly identical comments:\n\n```\n// Pre-filter the permitted rfc822 entries once, outside the RDN loop,\n// to avoid re-checking the Option and iterating nc_permitted on every\n// emailAddress AVA found (vjc.26).\n//\n// Collect into a local GeneralSubtrees so the slice borrow lives as long\n// as this block. `None` means RFC822 permitted check is inactive (only\n// excluded may apply).\n// Collect the RFC822 permitted subtrees once so the slice borrow lives\n// for the whole RDN loop.  `None` means the permitted check is inactive\n// (only an excluded check may apply).  The NcTypeMask::RFC822 condition is\n// checked once here; `permitted_rfc822` carries the result forward.\n```\n\nThe two comment blocks saying essentially the same thing (collect once, avoid recomputation) should be collapsed into one clear comment. The first partial comment should be removed and the second complete one retained, or vice versa.\n\nThis is cosmetic/docs cleanup only \u2014 no behavioral change.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Remove duplicate OID comment block in check_name_constraints rfc822 path",
+  "updated_at": "2026-05-06T16:58:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:49:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "closed_at": "2026-05-11T16:51:53Z",
+  "compaction_level": 0,
+  "content_hash": "5fe94a044124ebd4c94a8dd96b84b044491be172c0e763f91c7b5b72e41f6e92",
+  "created_at": "2026-05-11T05:44:48Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nCA/B Forum-specific profile content (`WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`, the `CABF_*_ALLOWED_ALGS` tables, SC-081 validity caps, etc.) needs a home outside `pkix-profiles` per the framework-not-policy stance (PKIX-amgn). This bead creates the empty receiving crate. The actual move of code happens in PKIX-amgn.4.\n\n## What (scope X \u2014 empty skeleton only)\n\nPer Mark 2026-05-11: this bead creates the empty crate. No code moves. The move is PKIX-amgn.4's job.\n\n1. Create new workspace member `pkix-profiles-cabf/` (`Cargo.toml`, `src/lib.rs`, `README.md`).\n2. `Cargo.toml`:\n   - `name = \"pkix-profiles-cabf\"`\n   - `version = \"0.1.0\"` (pinned in `workspace.dependencies`, following the workspace pattern).\n   - `description = \"Reference implementation of CA/B Forum certificate profile requirements (not authoritative)\"`.\n   - Publish: enabled (workspace default; no `publish = false`).\n   - Deps: `der`, `pkix-path` (workspace), `pkix-profiles` (workspace, for the `Profile` trait).\n3. `src/lib.rs`: empty module body, just the crate-level rustdoc header below. No re-exports yet (the move into the crate is .4).\n4. Crate-level rustdoc header (prominent, top of `src/lib.rs`):\n\n   > # pkix-profiles-cabf\n   >\n   > **Reference implementation of CA/B Forum cert profile requirements. Not authoritative.**\n   >\n   > CA/B Forum Baseline Requirements (TLS BR, S/MIME BR, Code Signing BR) change on a ballot cycle. The implementations in this crate are a snapshot of those requirements at the time of the most recent revision. They are intended as a starting point: fork and adapt to your deployment's current interpretation of the BR text, which is the only canonical source.\n   >\n   > For the current Baseline Requirements: see https://cabforum.org/baseline-requirements/ (TLS), https://cabforum.org/smime-br/ (S/MIME), and https://cabforum.org/code-signing-baseline-requirements/ (CS).\n   >\n   > Maintained on a best-effort basis. If your deployment depends on bit-exact CA/B Forum conformance, you SHOULD vendor and review the relevant rule definitions yourself.\n\n5. `README.md` mirrors the rustdoc header.\n6. Add `\"pkix-profiles-cabf\"` to root `Cargo.toml` `workspace.members`.\n7. Add `pkix-profiles-cabf = { path = \"pkix-profiles-cabf\", version = \"0.1.0\" }` to root `Cargo.toml` `[workspace.dependencies]`.\n\n## Acceptance\n\n- [ ] `pkix-profiles-cabf` crate skeleton exists in the workspace.\n- [ ] `cargo check --workspace --all-features` clean.\n- [ ] `cargo doc --workspace` clean.\n- [ ] Rustdoc header carries the not-authoritative caveat verbatim, including all three CA/B Forum BR URLs (TLS, S/MIME, Code Signing).\n- [ ] `README.md` mirrors the rustdoc header.\n- [ ] Workspace `Cargo.toml` `members` + `workspace.dependencies` updated.\n\n## Out of scope (handled by PKIX-amgn.4)\n\n- Moving `WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`, `CABF_*_ALLOWED_ALGS` tables, or any other CA/B Forum content out of `pkix-profiles`.\n- Adding `BasicSmimeProfile` / `BasicTlsProfile` to `pkix-profiles`.\n- Deprecation shims in `pkix-profiles` for moved types.\n- Maintaining the crate long-term \u2014 maintainer decision separate from creation.\n- Implementing PKIX-jbvb's S/MIME BR sub-profile families (Org/Sponsor/Individual) here \u2014 that's PKIX-amgn.6 reparenting work.\n\n## Depends on\n\nPKIX-amgn.1 (stance anchor \u2014 CLOSED).\n",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.2",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Closed 2026-05-11: stub crate created under scope X.\n\n- Crate exists at pkix-profiles-cabf/ with Cargo.toml + src/lib.rs + README.md.\n- Crate-level rustdoc carries the not-authoritative caveat verbatim, including all three CA/B Forum BR URLs (TLS, S/MIME, Code Signing).\n- README.md mirrors the rustdoc header.\n- Workspace Cargo.toml updated (members + workspace.dependencies entry at 0.1.0).\n- cargo check --workspace --all-features clean.\n- cargo publish --dry-run -p pkix-profiles-cabf clean.\n\nAnticipatory pkix-path / pkix-profiles deps were dropped from the stub Cargo.toml \u2014 they will be added when the substantive content (PKIX-amgn.4) lands. This is consistent with stub-only scope.\n\nPublication to crates.io is a maintainer action; see top-level summary for cargo publish command.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-profiles-cabf workspace crate (reference, not authoritative)",
+  "updated_at": "2026-05-11T16:51:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:44:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

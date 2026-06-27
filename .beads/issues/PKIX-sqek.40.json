@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f876635417067772c60d80c678143ae9d7fe423643c575b013efd5f2d801655c",
+  "created_at": "2026-05-14T18:18:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:572-583 hand-rolls index arithmetic to walk pairs of adjacent certs plus the trailing cert against an anchor:\n\n```rust\nfor (i, cert) in chain.iter().enumerate() {\n    if i + 1 < chain.len() {\n        self.rev_checker.check_revocation(cert, &chain[i + 1])?;\n    } else {\n        self.rev_checker\n            .check_revocation_against_anchor(cert, &self.anchors[validated.anchor_index])?;\n    }\n}\n```\n\nThe pattern is two distinct operations:\n1. For every (cert, next) adjacent pair: `check_revocation(cert, next)`\n2. For the final cert (no next in chain): `check_revocation_against_anchor(cert, anchor)`\n\nThe idiomatic Rust expression is:\n\n```rust\nfor pair in chain.windows(2) {\n    self.rev_checker.check_revocation(&pair[0], &pair[1])?;\n}\nif let Some(last) = chain.last() {\n    self.rev_checker.check_revocation_against_anchor(\n        last,\n        &self.anchors[validated.anchor_index],\n    )?;\n}\n```\n\nOr, using `split_last` to avoid the second `if let`:\n\n```rust\nif let Some((last, rest)) = chain.split_last() {\n    for window in rest.windows(2).chain(std::iter::once(&[last.clone(), last.clone()][..])) { ... }\n}\n```\n\n(The `windows`/`split_last` form is cleaner.)\n\nWhat goes wrong with the current form:\n\n1. **Index arithmetic is panic-prone by default.** `chain[i + 1]` can panic; `pair[0]`/`pair[1]` on a `windows(2)` slice cannot. The compiler does not check that the `i + 1 < chain.len()` gate is consistent with the `chain[i + 1]` access \u2014 a refactor that drops the gate compiles but panics.\n\n2. **\"Find the last element\" is expressed as a runtime branch on every iteration** instead of \"do this once at the end.\" The current form pays one extra `if` per cert; the rewrite pays zero.\n\n3. **The split between `check_revocation` and `check_revocation_against_anchor` is buried in the loop body.** The two operations have different signatures and should look different at the call site, not be unified inside a single `for` loop with an `if` switch. The rewrite makes the two operations textually distinct, matching their conceptual distinction.\n\nA serious Rust reviewer reading this would not write `if i + 1 < chain.len()` inside a `.enumerate()` loop \u2014 they would reach for `windows`, `split_last`, or `chunks`.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.40",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "run_revocation_checks uses index arithmetic; chain.windows(2) + chain.last() is idiomatic",
+  "updated_at": "2026-05-14T18:18:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:18:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

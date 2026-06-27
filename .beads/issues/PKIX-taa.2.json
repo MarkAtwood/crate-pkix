@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:50Z",
+  "compaction_level": 0,
+  "content_hash": "c7b879ee9c08696617335d7576b10bf66ab27834a6e6f59276a2e7a51f870590",
+  "created_at": "2026-05-06T16:50:55Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-profiles/src/lib.rs:162\\n\\nsmime_policy sets require_subject_alt_name = true with the intent of enforcing 'rfc822Name SAN required for Mailbox-validated' (doc comment). However, the enforcement in pkix-path/src/lib.rs:1987 only checks that the SAN extension is present and non-empty \u2014 it does not check that any entry is an Rfc822Name.\\n\\nA TLS certificate with SAN=DNS:example.com and EKU=emailProtection would pass smime_policy's SAN check, violating the S/MIME BR \u00a77.3 requirement that the certificate must contain an rfc822Name in the SubjectAltName.\\n\\nContract violation: the doc comment says 'rfc822Name SAN required for Mailbox-validated' but the implementation only enforces 'non-empty SAN'.\\n\\nFix options:\\n1. Add an rfc822Name check to ValidationPolicy (new field: require_rfc822_san) and set it in smime_policy.\\n2. Document the limitation explicitly: 'this policy requires a non-empty SAN extension but does not verify that the SAN contains an rfc822Name \u2014 full Mailbox-validated enforcement requires a separate rfc822Name check.'\\n\\nOption 2 is a scope-limited workaround; option 1 is the correct fix for v0.1 if S/MIME is a declared use case.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "smime_policy SAN check doesn't verify rfc822Name \u2014 DNS SAN would pass",
+  "updated_at": "2026-05-06T16:58:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:50:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

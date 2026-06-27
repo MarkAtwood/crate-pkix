@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: removed .clone() before .unwrap_or_default() \u2014 field is owned, move directly",
+  "closed_at": "2026-05-07T01:59:37Z",
+  "compaction_level": 0,
+  "content_hash": "342a8a1bf3ea19dae033ba5a169685062775a2bcbccca50c598ae80f9e8eb202",
+  "created_at": "2026-05-07T01:59:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:531-535 \u2014 delta_crl.tbs_cert_list.revoked_certificates.clone().unwrap_or_default() clones a potentially large Vec<RevokedCert> unnecessarily. The CertificateList is owned here; move the field directly.",
+  "ephemeral": 0,
+  "id": "PKIX-d6m.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "R1: crl.rs: clone before unwrap_or_default in verify_delta_crl_and_collect",
+  "updated_at": "2026-05-07T01:59:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:59:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-d6m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

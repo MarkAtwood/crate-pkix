@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T09:40:14Z",
+  "id": "019e1668-990f-7ba3-aea6-e820a1ea9af8",
+  "issue_id": "PKIX-g9vc",
+  "text": "Decomposed 2026-05-11 into 4 sub-beads .1/.2/.3/.4. Dependencies: .3 blocked-by .1 and .2; .4 blocked-by .3. Release umbrella claim \u2014 umbrella stays open until children close (PKIX-baac pattern). Working .1 first in this session."
+}

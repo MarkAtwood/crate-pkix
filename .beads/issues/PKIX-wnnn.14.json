@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a875779328d7a93b1ef441eb69b25a90e0f7ff4e2308f0f1d663c5c251a82dc0",
+  "created_at": "2026-05-14T18:30:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:948-955 \u2014 the comparison table in build_first_valid_path's rustdoc lists 3 entry points: build_path / build_path_candidates / build_first_valid_path. It does NOT list the corresponding _with_config variants. Every API in the crate has paired default + config entry points; the table presents only half. Reader hitting that table from rustdoc has to scroll back to discover the with_config siblings exist. Either add three more rows or add a footnote like \"each entry point has a _with_config sibling accepting a PathBuilderConfig\". One-line fix.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path doc table at lib.rs:948-955 omits PathBuilderConfig variant; inconsistent with other rustdocs",
+  "updated_at": "2026-05-14T18:30:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

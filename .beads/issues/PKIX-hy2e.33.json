@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "70dcd10bf20bee0e53209d0feddeb01118d2267a4c44b0fa89e7c240b7ea4cba",
+  "created_at": "2026-05-14T12:51:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:642:\n\n    pub trait Lint: Send + Sync {\n        ...\n    }\n\nThe trait declaration carries Send + Sync as a supertrait. This means\nevery implementor MUST be Send + Sync, even if they have no use for\nthreading. The LintRunner doc (lib.rs:982-985) documents this:\n\n    /// # Thread safety\n    ///\n    /// `LintRunner` is `Send + Sync` as long as all supplied lints are `Send + Sync`\n    /// (enforced by the `Lint: Send + Sync` bound).\n\nBut the Lint trait's own doc (lib.rs:629-642) says only:\n\n    /// # Object safety\n    ///\n    /// The trait is object-safe: `Box<dyn Lint>` and `&dyn Lint` both work.\n\nThe Send + Sync requirement is in the syntax but not in the prose. A\ncaller implementing a Lint that wraps `Rc<RefCell<State>>` or\n`MaybeUninit<...>` gets a confusing 'Send is not implemented for X'\ncompile error from `LintRunner::new(vec![Box::new(MyLint)])` rather\nthan a clear contract statement at trait definition.\n\n# Suggested fix\n\nAdd to the Lint trait rustdoc:\n\n    /// # Thread safety\n    ///\n    /// `Lint: Send + Sync` is a hard requirement so that `LintRunner`\n    /// (which stores `Vec<Box<dyn Lint>>`) is itself `Send + Sync`. This\n    /// is enforced by the supertrait bound. Implementors using\n    /// non-thread-safe interior state (`Rc`, `RefCell`, `Cell`) must\n    /// switch to `Arc`/`Mutex` or a synchronization primitive that\n    /// implements `Send + Sync`.\n\nThis makes the contract discoverable at the right level (where the\ncaller reads the trait) rather than deferred to LintRunner.\n\n# Why P3\n\nThe compiler enforces the rule even without the prose. The harm is\ncaller experience (one round of compilation diagnostics) rather than\nsilent corruption. But it's a one-line rustdoc fix.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: Lint trait does not document Send + Sync requirement on object-safe usage",
+  "updated_at": "2026-05-14T12:51:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:51:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

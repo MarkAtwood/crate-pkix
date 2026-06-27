@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "46983cad509b75d2b5f14872cba73ff646fc2e6fd3b1b0a9b74bc73d1fdb8158",
+  "created_at": "2026-05-14T14:49:42Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:149-150 marks the outer `Error` enum as `#[non_exhaustive]`, which\nallows adding new variants without a breaking change. But two of the\nvariants are struct variants with named fields:\n\n    ProfileViolation { reason: Cow<'static, str> },\n    OcspDelegation   { reason: Cow<'static, str> },\n\nNeither variant is itself marked `#[non_exhaustive]`. Without that\nattribute on the variant, the destructuring pattern\n`Error::ProfileViolation { reason }` exhaustively binds the variant's\nfields \u2014 meaning a caller's pattern match like:\n\n    match err {\n        Error::ProfileViolation { reason } => log(reason),\n        // ...\n    }\n\nwill fail to compile if pkix-chain adds a second field (e.g. an\n`rfc_section: &'static str` so callers can recognise *which* RFC\ninvariant was violated, or a `severity` enum to distinguish hard fail\nfrom advisory).\n\nSince the rustdoc on both variants explicitly says \\\"pattern-match on\nthe variant rather than the inner string,\\\" the maintainer is\nencouraging the use pattern that is most fragile under field\nadditions. The two safe options are:\n\na) Add `#[non_exhaustive]` to each struct variant:\n\n       #[non_exhaustive]\n       ProfileViolation { reason: Cow<'static, str> },\n\n   This works since Rust 1.40 and forces callers to write\n   `Error::ProfileViolation { reason, .. }`.\n\nb) Wrap the payload in a `#[non_exhaustive]` struct:\n\n       ProfileViolation(ProfileViolationDetail),\n\n       #[non_exhaustive]\n       pub struct ProfileViolationDetail {\n           pub reason: Cow<'static, str>,\n       }\n\n(a) is cheaper and matches the existing `#[non_exhaustive]` on the\nouter enum. (b) is conceptually cleaner but adds a public type that\nmust itself be maintained.\n\nNote: `Error::Path(_)` / `Error::Revocation(_)` / `Error::Identity(_)`\n/ `Error::Aia(_)` / `Error::PathBuild(_)` are tuple variants whose\ninner type is itself `#[non_exhaustive]`, so they're fine \u2014 adding a\nnew field to those upstream errors doesn't break this enum.\n\nCaller impact: anyone matching specifically on ProfileViolation /\nOcspDelegation (the latter is the only programmatic way to recognise\n\\\"RFC 6960 \u00a74.2.2.2 delegation failed\\\").",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::ProfileViolation and ::OcspDelegation struct variants not non_exhaustive",
+  "updated_at": "2026-05-14T14:49:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:49:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

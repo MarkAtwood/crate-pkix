@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:13:39Z",
+  "compaction_level": 0,
+  "content_hash": "90dc34f2c2cfffa547b74a4f22d6c1ea1f12c485e62d31060352ac27f1b8c47b",
+  "created_at": "2026-05-02T13:40:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Default::default() for ValidationPolicy sets current_time_unix=0 (1970-01-01T00:00:00Z). Any cert with notBefore > 0 (i.e. every cert issued after 1970) will fail check_validity with ValidityPeriod. The inline comment says 'caller must set to avoid silent clock skew' but this is in the implementation, not the rustdoc on the field. A caller who uses ValidationPolicy { max_path_len: 5, ..Default::default() } and forgets to set current_time_unix will get spurious ValidityPeriod errors with no indication the time was never set. The rustdoc on current_time_unix should prominently warn that 0 causes all validity checks to fail, and the Default impl should document this explicitly in a # Panics or # Warning rustdoc section. Consider using Option<u64> with None meaning 'skip validity check' or requiring callers to construct the policy without Default.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.7",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy::default() sets current_time_unix=0 causing silent failure",
+  "updated_at": "2026-05-02T14:13:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

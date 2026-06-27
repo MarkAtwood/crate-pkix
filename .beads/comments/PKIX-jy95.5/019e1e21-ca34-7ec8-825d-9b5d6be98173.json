@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:39:51Z",
+  "id": "019e1e21-ca34-7ec8-825d-9b5d6be98173",
+  "issue_id": "PKIX-jy95.5",
+  "text": "DECISION 2026-05-12 (Mark, interactive): A) File pkix-policy-oscal as a new sibling adapter crate. Discoverability via crate name (parallel to pkix-policy-zlint and pkix-policy-pkilint) wins over the architectural symmetry of extending pkix-lint/src/oscal/. Consumers searching for OSCAL support find a directly-named crate. RATIONALE NOTES: (1) under prelaunch 'done right from the start,' discoverability is a real user-experience design point and worth a small new-crate overhead. (2) The three-mode model in AGENTS.md non-negotiable #5 names OSCAL as one of three industry-forum policy-adapter formats; having all three live in similarly-named sibling crates clarifies the pattern. (3) Architectural-symmetry argument for B (extend pkix-lint) is overridden by Mark's design judgment that adapter pattern visibility outweighs file-locality. CASCADE: file new child PKIX-jy95.9 (pkix-policy-oscal crate, implementation epic). The crate will depend on pkix-lint for the Lint trait + OSCAL parsing primitives that already exist in pkix-lint/src/oscal/. Existing pkix-lint/src/oscal/parse.rs likely needs some types promoted to public for cross-crate reuse \u2014 implementation detail to settle when work starts."
+}

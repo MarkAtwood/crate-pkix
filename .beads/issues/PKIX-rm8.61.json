@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.61",
+  "title": "Side-channel: crypto delegation to RustCrypto is correct",
+  "description": "This is a positive finding (no issue). All cryptographic operations are correctly delegated to RustCrypto crates:\n\n1. Signature verification: pkix-path's SignatureVerifier trait delegates to p256::ecdsa, p384::ecdsa, and rsa crates. The library never performs signature comparison itself -- it calls the RustCrypto verify() methods which handle constant-time comparison internally.\n\n2. OCSP ResponderId byKey matching (pkix-revocation/src/ocsp.rs:486-489): SHA-1 digest comparison uses standard == on hash output bytes. This is NOT a secret comparison -- both the expected hash and the response's KeyHash are derived from public keys, so timing leakage of public certificate content is not a concern.\n\n3. CertID hash comparison (pkix-revocation/src/ocsp.rs:221-222): Same analysis -- issuerNameHash and issuerKeyHash are derived from public certificate fields; byte-equal comparison is correct.\n\n4. DN comparison (pkix-path: names_match): Compares public certificate subject/issuer names. Not secret data.\n\n5. Serial number comparison: Public certificate field.\n\nNo instance of secret-dependent comparison, branching on secret bytes, or secret-indexed table lookup was found. The library holds no private key material. All comparisons are over public certificate data.\n\nLocation: workspace-wide",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "bug",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:52Z",
+  "updated_at": "2026-06-15T16:31:08Z",
+  "closed_at": "2026-06-15T16:31:08Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:52"
+    }
+  ]
+}

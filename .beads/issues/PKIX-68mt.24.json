@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:20Z",
+  "compaction_level": 0,
+  "content_hash": "a9ecd85b77cea7ae936980806a290382126675ff0ae64354c1543c99201dfb05",
+  "created_at": "2026-05-14T19:20:09Z",
+  "created_by": "Mark Atwood",
+  "description": "Cargo.toml line 20-21:\n\n  serde = [\"dep:serde\"]\n\nIn src/lib.rs the serde derives are applied only to IdentityError:\n\n  #[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n  pub enum IdentityError { ... }\n\nThe Cargo.toml comment says this is for caching/transport in pkix-chain::Error 'AGENTS.md non-negotiable #6'. But that same non-negotiable says:\n\n> Public result/error types ... MUST derive Clone + Debug + PartialEq + Eq and MUST be Send + Sync. They SHOULD support serde::Serialize + Deserialize behind a `serde` feature flag for cross-process / persistent caches.\n\nServerName and MailboxName are 'public result types' the moment they appear in caller-side caches. Per the cross-process-cache use case explicitly called out in non-negotiable #6: a sidecar process that pre-validates identity-bindings and serializes the verdict needs to serialize BOTH the identity (ServerName/MailboxName, as the cache key) AND the verdict (Ok or IdentityError).\n\nToday: the verdict can be serialized but the key cannot. Workaround: caller serializes the *input string* and replays parse on every cache hit. That's correct but defeats parse-once semantics.\n\nRecommend: add Serialize/Deserialize derives to ServerName and MailboxName under the serde feature. This forces a Serialize-shape decision (internal representation: tagged union? Or wire as the canonical normalized string?) \u2014 file that as the design question.\n\nThis also forces resolution of PKIX-68mt.21 (lifetime parameter): Deserialize<'de> on a Cow<'a, str> needs care; an into_owned() variant or 'static type is the path of least friction.\n\nSeverity P2: serde derives are additive (non-breaking to add later), but the absence right now signals the design hasn't fully committed to non-negotiable #6's cacheable-by-default stance.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "serde feature derives only on IdentityError; ServerName / MailboxName not serializable",
+  "updated_at": "2026-06-15T18:51:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:20:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

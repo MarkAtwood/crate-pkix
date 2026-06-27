@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bc48dcb133dd6184d07e759c4e7cbd39b35b706aee4f293c63c6bdff09d8eada",
+  "created_at": "2026-05-08T19:15:47Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nS/MIME-in-production bar requires the smime crate not error on valid messages in the wild. Real-world S/MIME corpus has a long tail of certs from older issuance:\n\n* **RSA-PKCS1v15 + SHA-1** (`1.2.840.113549.1.1.5`) \u2014 used by older government PKI (DoD pre-~2018, federal bridge cross-certs), legacy commercial CAs, many self-managed enterprise CAs.\n* **ECDSA + SHA-1** (`1.2.840.10045.4.1`) \u2014 rarer but exists in older deployments.\n\nWithout these verifiers, `pkix-path` rejects these chains as `AlgorithmNotAllowed` (or `signature::Error` from `DefaultVerifier` with no detail). The smime crate has no way to validate the chain and decide policy ('verify but warn user' is the standard browser/mail-client behaviour). CA/B Forum S/MIME BR forbids new SHA-1 issuance, but messages signed years ago sit in mailboxes for decades and the smime crate must still verify them.\n\n## What\n\nIn `pkix-path/src/lib.rs`, two new unit-struct verifiers under separate feature flags so security-conscious downstream consumers can compile them out:\n\n1. `RsaPkcs1v15Sha1Verifier` behind `feature = \"rsa-sha1\"`. Mirror `RsaPkcs1v15Sha256Verifier` at `lib.rs:1909`. Reuse `sha1` workspace dep (already present per `Cargo.toml:52`).\n2. `EcdsaP256Sha1Verifier` behind `feature = \"ecdsa-sha1\"`. Mirror `EcdsaP256Verifier` at `lib.rs:1867`. Note: ECDSA-SHA1 covers all curves; for the verifier impl this is P-256 + SHA-1. P-384/P-521 + SHA-1 combinations exist in the wild but are extraordinarily rare; document as out-of-scope.\n\nOID dispatch in `DefaultVerifier` (`lib.rs:3047`) for both, gated by `#[cfg(feature = ...)]`.\n\n## Security framing (rustdoc must call this out)\n\n`# Security` section on each verifier explaining:\n\n* SHA-1 collision attacks are practical (SHAttered, 2017). A SHA-1-signed cert can be substituted by an attacker with sufficient resources.\n* These verifiers are provided **for legacy interop only**. New deployments MUST NOT use them.\n* The default feature set (`rustcrypto`) MUST NOT include `rsa-sha1` or `ecdsa-sha1`. Consumers opt in explicitly.\n* Recommend smime/cms callers gate SHA-1 acceptance behind a separate runtime policy flag (e.g. \"accept legacy SHA-1 with prominent warning\") rather than always-accept.\n\n## Acceptance\n\n- [ ] `RsaPkcs1v15Sha1Verifier` and `EcdsaP256Sha1Verifier` compile cleanly with their feature flags enabled.\n- [ ] Default workspace build (no `rsa-sha1` / `ecdsa-sha1`) does NOT include them \u2014 confirm via `cargo hack check --feature-powerset --depth 2`.\n- [ ] Unit tests verify a known-good SHA-1 signature using independent test vectors (RustCrypto `rsa` or `ecdsa` crate test vectors).\n- [ ] Tampered-signature test rejects.\n- [ ] `DefaultVerifier` dispatches when feature enabled; returns `signature::Error` when disabled.\n- [ ] Real-world legacy S/MIME chain added to `pkix-difftest/tests/fixtures/` (e.g. extract a SHA-1 cert from any older corpus). Smoke-test that with the feature on, validation succeeds.\n- [ ] `# Security` rustdoc block on each verifier with collision-attack note.\n- [ ] Top-level `pkix-path` README and `# Limitations` section updated to note these are available but not in the default crypto set.\n\n## Out of scope\n\n- ECDSA-SHA1 for curves other than P-256.\n- SHA-1 in TLS (this is for cert validation; TLS handshake hash is a TLS concern).\n- MD5-based signatures (id-md5WithRSAEncryption, etc.) \u2014 refuse to implement; collision attacks have been practical since 2008. If a downstream consumer needs MD5 they can implement `SignatureVerifier` themselves and accept the security cost.\n\n## Filed as\n\nPKIX-gphz child #6, P2 under the S/MIME-in-production bar. Not on my original v1.0 bar list \u2014 surfaced when user articulated the smime-bar-must-not-error standard.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz.6",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "crypto: legacy SHA-1 SignatureVerifiers (RSA + ECDSA, feature-gated, off by default)",
+  "updated_at": "2026-05-08T19:15:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T12:15:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Top-level README CRL example now explicitly notes that 'crl' Cargo feature is required ('pkix-chain = { version = \"0.2\", features = [\"crl\"] }'). Mirrors the documentation pattern already used in the per-crate READMEs.",
+  "closed_at": "2026-05-07T23:26:53Z",
+  "compaction_level": 0,
+  "content_hash": "fd438406124340b750f2cc7ce1eada4b29d9a616cc1d1ccd9525ee6f5af0ff5a",
+  "created_at": "2026-05-07T22:48:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPass-2 commit e586bc49 rewrote the top-level README quick-start examples to fix the broken pre-pass-1 examples (PKIX-qwzx.2, PKIX-qwzx.6).\n\n## Finding\nREADME.md:46-48 says:\n```toml\n[dependencies]\npkix-chain = \"0.2\"\n```\n\nREADME.md:74-81 then shows a CRL example using `pkix_chain::CrlChecker`. But pkix-chain/Cargo.toml gates `CrlChecker` re-export behind `features = [\"crl\"]` (lines 16, 41-42). With the dependency line as written, `use pkix_chain::CrlChecker` does not resolve.\n\nReproduced: `cargo build` against pkix-chain (default features) with the literal README CRL example body fails with E0432 (unresolved import). Adding `features = [\"crl\"]` to the dependency line resolves it.\n\n## Severity\nP3 / opinion. The first example (NoRevocation) compiles. The CRL example was the entire purpose of PKIX-qwzx.6 \u2014 that issue closed correctly on the API surface (Result-returning new()) but the broader compilability issue is that the README still does not tell the reader they need features = [\"crl\"].\n\n## Fix\nOne-line update to README.md:46-48 \u2014 change `pkix-chain = \"0.2\"` to `pkix-chain = { version = \"0.2\", features = [\"crl\"] }` for the CRL example, OR add a sentence above the CRL example saying \"Enable the `crl` feature.\"\n\n## Why this is P3 not higher\n- The first example (the more-prominent quick-start) compiles fine with default features.\n- This is documentation, not behavior.\n- A sophisticated reader will notice the cfg-gated re-export from rustdoc and figure it out.\n\n## Pass-2 attribution\nPass-2 closure of PKIX-qwzx.6 (\"CRL example uses pre-P3 CrlChecker::new signature\") fixed the new() signature change but did not surface the feature-flag requirement.",
+  "ephemeral": 0,
+  "id": "PKIX-glva",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: top-level README CRL example silently requires features=[\"crl\"]",
+  "updated_at": "2026-05-07T23:26:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:50:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yydv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

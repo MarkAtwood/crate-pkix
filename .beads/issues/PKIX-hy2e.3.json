@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed apply_parameter_overrides to use longest-prefix matching against the set of registered lints instead of splitting at the rightmost dot. This correctly handles both dotted lint ids (existing convention) and dotted parameter ids (previously broken). Also split the function into Phase 1 (resolve-or-fail-fast on UnknownParameterOverride) and Phase 2 (apply set_parameter), which addresses the partial-application surface for UnknownParameterOverride errors (the InvalidParameterOverride atomicity surface remains as PKIX-hy2e.6, which needs LintClone). Added three regression tests: apply_parameter_overrides_resolves_dotted_param_id (closes the actual bug), apply_parameter_overrides_longest_prefix_wins_on_lint_id_collision (covers prefix-overlap), and apply_parameter_overrides_fails_fast_before_mutation (proves Phase 1 surfaces UnknownParameterOverride without mutating). 246 lib tests + 7 doc tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:28:33Z",
+  "compaction_level": 0,
+  "content_hash": "ff13470c529f3714627f2f543823df1a49f75abe007d9f25df81e7ead5e1b78a",
+  "created_at": "2026-05-14T12:39:43Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: register a Lint that exposes a parameter whose id contains a dot, e.g. LintParameter { id: 'thresholds.warn' }. catalog::param_value builds the composite OSCAL Parameter id as format!('{lint_id}.{param_id}') = 'rfc5280.foo.thresholds.warn'. resolve_profile produces ParameterOverride { param_id: 'rfc5280.foo.thresholds.warn', value: ... }. LintRunner::apply_parameter_overrides (lib.rs:1190-1212) then splits at the rightmost '.': lint_id = 'rfc5280.foo.thresholds', param_id = 'warn'. No registered lint has id 'rfc5280.foo.thresholds' \u2192 returns UnknownParameterOverride. Actual bad behavior: parameter override silently fails for any param-id containing a dot, with an error message that says the lint is unknown even though the lint IS registered. Doc on apply_parameter_overrides notes 'parameter ids by convention do not [contain dots]' but does not enforce it at the LintParameter constructor or at catalog emission time. No tests cover this case. Fix: either (a) validate at LintParameter construction that the id contains no dot, returning a typed error; (b) use a different separator (':' is common in OSCAL composite ids); or (c) split at the FIRST dot rather than the rightmost. Option (a) is least disruptive to existing emitted catalogs.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "apply_parameter_overrides splits composite id on rightmost '.' assuming param ids contain no dots",
+  "updated_at": "2026-05-14T13:28:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:39:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

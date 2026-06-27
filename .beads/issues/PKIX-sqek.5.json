@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "76c2abe5a52c3bea3c831c4c9335aaac3a8ec011ebb9372ce55ff82f72323c91",
+  "created_at": "2026-05-14T17:59:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/aia_extract.rs::ca_issuers_http_uris filters URIs to http:// and https:// schemes before handing them to the AiaFetcher (lines 57-61):\n\n    if let GeneralName::UniformResourceIdentifier(uri) = &ad.access_location {\n        let uri_str = uri.as_str();\n        if is_http_scheme(uri_str) {\n            out.push(uri_str.to_owned());\n        }\n    }\n\nOther URI schemes (ldap://, ftp://, file://) are silently dropped at the pkix-chain layer.\n\nSCENARIO that triggers the cost: a contributor writes a new AiaFetcher implementation that handles LDAP-bound CA repositories (RFC 4523, common in enterprise PKIs). The fetcher implements pkix_aia::AiaFetcher::fetch() with full LDAP support and is wired through Verifier::new. The fetcher's fetch() method is never called with an LDAP URI because pkix-chain's URI extractor silently dropped every ldap:// AccessDescription before the fetcher saw them.\n\nThe contributor's only debugging signal is 'fetcher was constructed, never called, chain validation fails with PathBuild(NoPathFound)'. There is no error variant pointing at 'we filtered out URIs we deemed unfetchable.' AiaError::UriUnsupported, which is the right signal, never fires because pkix-chain made the decision for the fetcher.\n\nMAINTENANCE CONSEQUENCE: This is exactly the kind of design lock-in PKIX-zkjb.4 created the AiaFetcher trait to avoid. The trait surface says 'caller decides what is fetchable' but pkix-chain has unilaterally encoded an http-only assumption. Every future fetcher that supports a non-HTTP scheme has to coordinate with pkix-chain to widen the filter. That defeats the trait abstraction.\n\nThe aia_extract.rs docstring (lines 13-18) acknowledges the parallel implementation in pkix-revocation-http but does NOT explain why the http-only filter belongs in pkix-chain rather than in each fetcher.\n\nFIX: emit ALL URIs from caIssuers AccessDescriptions to the AiaFetcher. Let the fetcher itself surface AiaError::UriUnsupported for schemes it doesn't handle (HttpFetcher already does this \u2014 see pkix-aia-http/src/lib.rs and the test aia_e2e_negative_unsupported_scheme_surfaces_uri_unsupported). pkix-chain then collects per-URI errors; the existing last_aia_error machinery already surfaces these correctly.\n\nThe is_http_scheme helper and the test for it would be redundant once this filtering moves to the fetcher boundary; both delete cleanly.\n\nRECOMMENDATION: do this before 1.0. After 1.0, every new fetcher author has to either (a) re-litigate this filter or (b) accept that non-HTTP fetchers cannot be used with pkix-chain \u2014 which makes the AiaFetcher trait an http-only trait in practice.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "aia_extract drops non-HTTP URI schemes inside pkix-chain instead of deferring to AiaFetcher",
+  "updated_at": "2026-05-14T17:59:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:59:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

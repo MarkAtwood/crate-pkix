@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.3",
+  "title": "LintProfile: lints() and lint_runner() duplicate lint lists",
+  "description": "In pkix-profiles/src/lib.rs, both BasicTlsProfile and BasicSmimeProfile have LintProfile impls where lints() (backed by a static OnceLock) and lint_runner() construct identical lint lists independently (lines 260-284 and 386-409). If a developer adds a lint to one but not the other, the two views silently diverge.\n\nWhat goes wrong: lints() returns the static-cached list for read-only inspection; lint_runner() builds a fresh LintRunner with its own list. If these drift, check_shape (which uses lint_runner) runs a different set of checks than code inspecting lints().\n\nLocations:\n- pkix-profiles/src/lib.rs, BasicTlsProfile LintProfile impl (lines ~260-284)\n- pkix-profiles/src/lib.rs, BasicSmimeProfile LintProfile impl (lines ~386-409)\n\nRecommendation: Factor the lint-list construction into a single function and have both lints() and lint_runner() call it.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:23:58Z",
+  "updated_at": "2026-06-15T17:18:37Z",
+  "closed_at": "2026-06-15T17:18:37Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:23:57"
+    }
+  ]
+}

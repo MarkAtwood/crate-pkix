@@ -1,0 +1,22 @@
+{
+  "close_reason": "Filer recommended Defer + bundle with PKIX-als9. Stylistic loop change (range vs enumerate+rev) inside chain_walk; better addressed during the chain_walk decomposition refactor than as a drive-by edit. Tracked under PKIX-als9.",
+  "closed_at": "2026-05-07T23:16:30Z",
+  "compaction_level": 0,
+  "content_hash": "1ed509b3b7bde80d133c2f4223eb56d086da1310f7f75327e3af419954bf183f",
+  "created_at": "2026-05-07T23:04:19Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-path/src/lib.rs:2076 \u2014 top of chain_walk's main loop.\n\n## Finding\n```\nfor i in (0..chain.len()).rev() {\n    let cert = &chain[i];\n    // ... uses both i and cert\n}\n```\n\nThe classical Rust idiom for 'iterate with index in reverse over a slice' is:\n```\nfor (i, cert) in chain.iter().enumerate().rev() {\n    // ... uses both i and cert\n}\n```\n\nBoth produce the same result. The enumerate+rev form:\n- Avoids the bounds-checked indexing on line 2077 (chain[i] panics on out-of-bounds; enumerate borrows directly).\n- Makes the dependency on chain explicit at the head of the loop.\n- Is the form clippy::needless_range_loop usually suggests; here clippy does not fire because the body uses the index in error variants (Error::SignatureInvalid { index: i } at line 2115 etc.), so the range loop is preserved.\n\n## Severity\nP4 (opinion / cosmetic). The current form is correct, builds clean, passes all tests, and the index is referenced multiple times in the body so removing it is not free. clippy does not flag this. Whether enumerate+rev or the index-only loop is more readable in this specific function is judgment.\n\n## Fix (optional)\n```\nfor (i, cert) in chain.iter().enumerate().rev() {\n    // ... drop 'let cert = &chain[i];'\n}\n```\n\n## Recommendation\nDefer. chain_walk is already covered by PKIX-qwzx.22 (too_many_lines, deferred). Bundling a stylistic loop change with a future decomposition refactor is preferable to a single-line drive-by.",
+  "ephemeral": 0,
+  "id": "PKIX-40gc",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: chain_walk uses 'for i in (0..chain.len()).rev()' where 'chain.iter().enumerate().rev()' would be more idiomatic",
+  "updated_at": "2026-05-07T23:16:30Z"
+}

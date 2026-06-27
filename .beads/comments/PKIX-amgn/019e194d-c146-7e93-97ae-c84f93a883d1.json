@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T23:09:47Z",
+  "id": "019e194d-c146-7e93-97ae-c84f93a883d1",
+  "issue_id": "PKIX-amgn",
+  "text": "do-beads loop hygiene 2026-05-11: open autonomous frontier exhausted. Open children .5 (P2, human-labeled, refactor pkix-lint to strip CABF bundles) and .8 (P2, human-labeled, vendor zlint catalog) both require human design calls. Remaining .7 (P3, README+CHANGELOG migration docs) is blocked on .5. No autonomous descendant can claim. Relabeling human to stop bd ready from surfacing it. Re-evaluate when .5/.8 resolve."
+}

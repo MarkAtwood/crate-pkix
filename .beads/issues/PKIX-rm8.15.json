@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.15",
+  "title": "pkix-path-builder Error::NoValidPath wraps String",
+  "description": "In pkix-path-builder/src/lib.rs:198-203, Error::NoValidPath carries a last_error: String field. The rustdoc explains this is because pkix_path::Error does not implement Hash (which is needed for the derive on Error). But per the coding standards, error variants should carry structured fields, not String messages.\n\nWhat goes wrong: Callers that need to programmatically distinguish 'last candidate failed with SignatureInvalid' from 'last candidate failed with ExpiredCert' cannot do so - they would have to parse the Display string, which is fragile.\n\nLocation: pkix-path-builder/src/lib.rs:198-203\n\nRecommendation: Either add Hash to pkix_path::Error (since it already has Clone + Debug + PartialEq + Eq), or carry the last pkix_path::Error directly and derive Hash manually on pkix_path_builder::Error, skipping the last_error field.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:44Z",
+  "updated_at": "2026-06-15T16:31:03Z",
+  "closed_at": "2026-06-15T16:31:03Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:44"
+    }
+  ]
+}

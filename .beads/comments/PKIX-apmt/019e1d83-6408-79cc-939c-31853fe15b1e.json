@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:46:51Z",
+  "id": "019e1d83-6408-79cc-939c-31853fe15b1e",
+  "issue_id": "PKIX-apmt",
+  "text": "Re-deferred 2026-05-12 (Mark, interactive after framing recalibration). HONEST REASONING: Mark wants to think about the substantive architectural question more. No date set; not waiting on a consumer or trigger event. The decision-gate stays open until Mark works it through. Substantive question that needs answering: what does the policy-data-storage architecture look like when complete? Two candidate shapes laid out in the framing-correction comment above (A: Rust-only / policy IS code; B: workspace prescribes a canonical wire format -- OSCAL or SARIF or workspace-defined JSON Schema or other). RELATED: PKIX-amgn.8 reversed in the same session -- the architectural call there is 'mirror upstream living catalog (zlint scope)'; the format-of-mirror-output blocks on this epic. So this is no longer 'no current work needs this' -- mirroring needs a target format. Apmt is now upstream of real work again."
+}

@@ -1,0 +1,38 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "4 Profile impls in pkix-profiles; per-profile alg constants; sc081_validity_cap; 35 tests pass",
+  "closed_at": "2026-05-06T18:54:49Z",
+  "compaction_level": 0,
+  "content_hash": "bf69b0b8c32b12d916dca1a80e7d2f9ae2b9d2919861b6121f975af6abe18c2a",
+  "created_at": "2026-05-06T18:48:51Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-8c6.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement Profile trait in pkix-profiles (4 structs + free fn aliases)",
+  "updated_at": "2026-05-06T18:54:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T11:48:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8c6",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-06T11:48:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8c6.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

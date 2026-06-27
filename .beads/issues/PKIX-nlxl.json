@@ -1,0 +1,22 @@
+{
+  "close_reason": "Absorbed into PKIX-9vnx alignment epic. Under PKIX-ztmr Level 3 OSCAL alignment, pkix-lint's public types ARE OSCAL types \u2014 native serialization (probably via a feature flag) replaces what this bead proposed as a thin translator crate. A separate pkix-lint-oscal crate is no longer needed for the core 'emit Assessment Results JSON' use case. If a separate crate later becomes useful for downstream concerns (NIST schema validation tooling, OSCAL extension models, etc.), file a fresh bead at that time.",
+  "closed_at": "2026-05-11T05:55:42Z",
+  "compaction_level": 0,
+  "content_hash": "1e2e59810516769a65564677bddee2f13a7f8d04ff1be670b63a5ac22961808d",
+  "created_at": "2026-05-11T05:29:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint::EvaluationReport` carries enough metadata to map cleanly onto NIST OSCAL Assessment Results (catalog \u2192 profile \u2192 assessment-plan \u2192 assessment-results). Federal customers already have OSCAL tooling and prefer that schema; commercial GRC tooling increasingly does too.\n\nThe mapping is sketched in pkix-lint/src/report.rs:13-26:\n\n```\nprofile_id \u2192 assessment-results.import-ap.href\nevaluated_at_unix \u2192 assessment-results.metadata.last-modified\nrule_bundle_version \u2192 assessment-results.metadata.prop[name=rule-bundle-version]\nfindings \u2192 assessment-results.results.findings (non-deviated)\ndeviated_findings \u2192 assessment-results.results.risks[status=deviation-approved]\n```\n\nBut the adapter itself doesn't exist.\n\n## What\n\nNew workspace member crate `pkix-lint-oscal`:\n\n```rust\npub fn report_to_oscal(report: &pkix_lint::EvaluationReport) -> oscal::AssessmentResults;\npub fn report_to_oscal_json(report: &pkix_lint::EvaluationReport) -> Result<String, _>;\n```\n\nUses an OSCAL Rust binding (TBD which crate; or hand-rolled minimal subset).\n\n## Acceptance\n\n- [ ] New crate `pkix-lint-oscal` with `pkix-lint` as a dep.\n- [ ] One canonical EvaluationReport \u2192 AssessmentResults conversion, with stable field mapping.\n- [ ] JSON output validates against OSCAL Assessment Results JSON Schema.\n- [ ] Round-trip test: synthetic EvaluationReport \u2192 OSCAL JSON \u2192 re-parse \u2192 check key fields preserved.\n- [ ] Independent oracle: NIST oscal-cli validate (if practical) OR pyca/oscal-pydantic round-trip.\n\n## Out of scope\n\n- OSCAL catalog (rule definitions) \u2014 that's its own bead if needed.\n- OSCAL Assessment Plan generation \u2014 output-only adapter.\n\n## Filed as\n\nTracker for pkix-lint/src/report.rs:26 'A full OSCAL export adapter is planned for the pkix-lint-oscal crate.' Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-nlxl",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint-oscal: OSCAL Assessment Results export adapter crate",
+  "updated_at": "2026-05-11T05:55:42Z"
+}

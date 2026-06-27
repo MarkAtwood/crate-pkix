@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:40Z",
+  "compaction_level": 0,
+  "content_hash": "91272121df9e787aa754037969204d33dda698004daf8b08ac66704a21ce8cd4",
+  "created_at": "2026-05-02T20:34:02Z",
+  "created_by": "Mark Atwood",
+  "description": "verify_simple sets max_path_len = 1 + MAX_INTERMEDIATES = 3 in the ValidationPolicy passed to validate_path. MAX_INTERMEDIATES is 2, so verify_simple advertises allowing only 2 intermediates \u2014 but the policy allows 3. The shape check catches chains with >3 certs before validate_path is called, so the policy's PathTooLong guard never fires for the 3-intermediate case. If the shape check were ever removed or had an off-by-one, the policy would silently permit one extra intermediate that verify_simple claims to reject. Defense-in-depth is absent: the policy should say max_path_len = MAX_INTERMEDIATES = 2, not 3.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_simple passes max_path_len=3 but enforces max 2 intermediates",
+  "updated_at": "2026-05-02T20:36:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

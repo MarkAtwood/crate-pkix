@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2334e77d04378e9dde03b1a61570dcc249a0288d2216838f9a0e4d3aa958d490",
+  "created_at": "2026-05-14T14:24:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:384-425 \u2014 verify_embedded_scts() encodes leaf_cert and issuer_cert once before the loop (lines 406-413). Good. But then each iteration calls verify_sct_for_precert(sct, &leaf_der, &issuer_der), which in turn calls tbs_without_sct_list(&leaf_der) (parses+strips+re-encodes) and issuer_key_hash_from_cert(&issuer_der) (parses+re-encodes+hashes).\n\nFor N SCTs in one cert (typical: 2-5; CT BR allows up to ~5), the inner per-SCT work is:\n- Parse leaf DER \u2192 Certificate (~tens of microseconds for a small cert)\n- Re-encode TBS minus SCT-list ext (similar)\n- Parse issuer DER \u2192 Certificate\n- Encode issuer SPKI\n- SHA-256 the SPKI\n\nAll five of these are deterministic across iterations \u2014 they depend only on the (leaf, issuer) pair, not on the per-SCT data. They should be computed once outside the loop.\n\nConcrete improvement: hoist tbs_no_sct and issuer_key_hash out of verify_sct_for_precert (or add a verify_sct_for_precert_with_precomputed() variant). For N=5 SCTs, current implementation does the work 5x \u2014 measurable on first-page-load TLS handshakes.\n\nSuggested fix (non-breaking even post-1.0): keep the simple verify_sct_for_precert as-is, and add a faster batch entry point that pre-computes the (tbs_no_sct, issuer_key_hash) pair once. verify_embedded_scts then uses the batch entry point internally.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts re-encodes leaf+issuer DER once but verify_sct_for_precert re-parses cert N times in the inner loop",
+  "updated_at": "2026-05-14T14:24:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:24:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

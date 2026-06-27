@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3df6333ffc233261f51072edd98cce44a76a2023133a19a8ba3c239bae308ec0",
+  "created_at": "2026-05-14T19:38:33Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/signer_discovery.rs:14-26 and the new_with_signer_discovery rustdoc commit to: discovery walks the bundle structurally (AKI/SKI/DN), checks cRLSign in KeyUsage, and checks structural reachability to a self-signed cert \u2014 but verifies NO signatures along the way.\n\nThis is correct and worth defending. Pulling pkix-path::validate_path into the discovery constructor would invert the workspace's one-way dependency direction (AGENTS.md non-negotiable #2: 'pkix-path is no_std; pkix-revocation depends on pkix-path; no reverse'). A future contributor who sees the 'lenient' comment and thinks 'we should make this strict by validating the signer's chain in-process' would force pkix-revocation to depend on the full path validator \u2014 a structural regression.\n\nThe correct strict-validation path is composing this with pkix-chain (or any caller that has already validated the bundle). The lenient/strict tradeoff is tracked separately as PKIX-yi7k.1. Do not change this without revisiting the dependency direction.\n\nWhat a future contributor might incorrectly suggest:\n- 'reaches_self_signed should verify signatures' \u2192 would invert deps\n- 'discover_crl_signer should call full path validation' \u2192 same\n- 'new_with_signer_discovery should accept a SignatureVerifier and use it on the chain' \u2192 same (the SignatureVerifier we have is for the CRL itself; reusing it to validate the bundle chain bypasses the rest of \u00a76.1)",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Discovery is structural-only; signature verification deferred to pkix-chain",
+  "updated_at": "2026-05-14T19:38:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:38:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

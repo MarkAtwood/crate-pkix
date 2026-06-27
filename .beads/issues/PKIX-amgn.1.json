@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T060707Z-154326",
+  "close_reason": "Added non-negotiable constraint #6 (framework, not policy) to AGENTS.md. Numbering: original issue said #5 but #5 was already taken by the OSCAL stance (PKIX-ztmr) which landed first; used #6 instead, same content. The '## What this is' update to mention -cabf reference crates is deferred to the coordinated commit that lands PKIX-amgn.2 and .3, per the issue's acceptance criterion 2 ('coordination with .2 and .3').",
+  "closed_at": "2026-05-11T06:08:31Z",
+  "compaction_level": 0,
+  "content_hash": "05eaa7ba122dbebf62cc5df121d95684261f57e43577bd65185523055a6ff62d",
+  "created_at": "2026-05-11T05:44:30Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAdd the framework-not-policy stance to AGENTS.md `## Non-negotiable constraints` so future agents and contributors don't drift back into encoding CA/B Forum / DoD / vendor-root-program policies in the main crates.\n\n## What\n\nAppend a new non-negotiable constraint (number 5):\n\n> 5. **Framework, not policy.** The workspace ships standards-based mechanisms (Profile trait, Lint trait, ValidationPolicy, DeviationStore, etc.) and RFC / ITU-T / NIST baseline implementations. It does NOT ship canonical encodings of any single organization's policy \u2014 CA/B Forum, DoD, Mozilla / Apple / Microsoft root programs, or individual CA CPSs. CA/B Forum reference implementations live in sibling `-cabf` crates (`pkix-profiles-cabf`, `pkix-lint-cabf`) marked 'reference / not authoritative.' Adding new vendor or industry-forum policy encodings to the main crates requires explicit human approval.\n\nAlso update the `## What this is` section to list the new `-cabf` reference crates once they exist (this child should land **after** PKIX-amgn.2 and PKIX-amgn.3 add the crates, OR as a single coordinated commit).\n\n## Acceptance\n\n- [ ] New non-negotiable constraint #5 in AGENTS.md.\n- [ ] `## What this is` mentions the `-cabf` reference crates once they exist (coordination with .2 and .3).\n- [ ] Existing constraints 1-4 unchanged.\n\n## Out of scope\n\n- Encoding the line precisely for every edge case (e.g. is RFC 6125 'TLS identity verification' a policy decision? we've decided yes for the universal serverAuth EKU bit, no for hostname matching \u2014 but this is in the epic body, not the AGENTS.md text).\n\n## Filed as\n\nAnchor child of PKIX-amgn.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AGENTS.md: encode framework-not-policy stance as non-negotiable",
+  "updated_at": "2026-05-11T06:08:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:44:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

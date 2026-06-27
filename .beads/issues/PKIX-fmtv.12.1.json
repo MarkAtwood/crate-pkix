@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:38:25Z",
+  "compaction_level": 0,
+  "content_hash": "607a1904f3b7770f9a8dbfaca878e83e5b9b6e6af34c4adaec3ceb8634f11c7c",
+  "created_at": "2026-05-12T05:17:38Z",
+  "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "description": "Fill the scaffold stubs in pkix-identity created by PKIX-fmtv.21 with the RFC 5280 \u00a74.2.1.6 + RFC 8398 mailbox binding implementation. Scope is the pkix-identity half ONLY; pkix-chain verify_smime_signer/verify_smime_recipient wrappers are split out as PKIX-fmtv.12.2 (blocked on PKIX-fmtv.7's wrapper-set decision, which is human-labeled).\n\n## Deliverable\n\n### pkix-identity changes\n\nAdd workspace deps used by this body:\n- `idna` 1.x (workspace, no_std with `alloc` feature; std opt-in via crate feature)\n- `der` (already a workspace dep; may need extra features for extension parsing)\n\nImplement `MailboxName::parse(mailbox: &'a str) -> Result<Self, IdentityError>`:\n- Validate against RFC 5322 mailbox syntax (local-part \"@\" domain, basic checks).\n- Support RFC 8398 internationalized mailbox (UTF-8 local-part allowed).\n- Store local-part and domain split (private fields).\n\nImplement `verify_mailbox(cert: &Certificate, mailbox: &MailboxName) -> Result<(), IdentityError>`:\n- Parse leaf's SubjectAlternativeName extension (OID 2.5.29.17); iterate `GeneralName` entries.\n- For each `GeneralName::Rfc822Name(addr)`:\n  - Local-part: case-sensitive byte compare (per RFC 5321 \u00a72.4 \u2014 local-part case sensitivity is left to receiving domain; we choose case-sensitive for safety, matches webpki + pyca behaviour).\n  - Domain part: case-insensitive ASCII compare (per RFC 1035 / RFC 5321).\n- For each `GeneralName::OtherName { type_id: id-on-SmtpUTF8Mailbox (1.3.6.1.5.5.7.8.9), value }`:\n  - Decode `value` as UTF-8 mailbox per RFC 8398 \u00a73.\n  - Same case rules but on UTF-8 (NOT folding non-ASCII local-part).\n  - Domain: U-label \u2192 A-label via `idna` crate before compare.\n- If any matches: `Ok(())`.\n- If SAN present but no entry matches: `Err(IdentityError::NoMatchingSan)`.\n- If SAN missing: `Err(IdentityError::MissingSan)`.\n\nAdd new `IdentityError` variant if needed (the bead body uses `NoMatchingMailbox` \u2014 see if `NoMatchingSan` from the scaffold is reusable or if a more specific variant is wanted).\n\n## Test fixtures\n\nNeed leaf certs with:\n1. `rfc822Name=alice@example.com` SAN (single ASCII rfc822Name).\n2. `rfc822Name=alice@example.com` SAN (test domain-case mismatch: `alice@Example.com`).\n3. `otherName` with `id-on-SmtpUTF8Mailbox` containing `\u7528\u6237@example.com` (internationalized local-part).\n4. SAN with BOTH rfc822Name (ASCII) and otherName (UTF-8) variants.\n5. Cert without SAN (negative test for `MissingSan`).\n\nGeneration oracle: OpenSSL (`openssl req -x509 -addext 'subjectAltName=email:...'` for rfc822Name) + pyca/cryptography for the SmtpUTF8Mailbox otherName variant (openssl does not support otherName naturally; pyca's UnstructuredName / OtherName types do).\n\n## Tests\n\nMirror the bead body's 5 test scenarios:\n- Plain ASCII match.\n- Local-part case sensitivity: `Alice@example.com` vs SAN `alice@example.com` \u2192 reject.\n- Domain case insensitivity: `alice@Example.com` vs SAN `alice@example.com` \u2192 accept.\n- RFC 8398 otherName match: input `\u7528\u6237@example.com` vs SAN otherName UTF-8 \u2192 accept.\n- Mixed SAN: cert with both rfc822Name and otherName; verify both code paths.\n- SAN missing \u2192 `MissingSan`.\n- SAN present but no entry matches \u2192 `NoMatchingSan`.\n\nIndependent oracles: pyca/cryptography's `certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)` + `san.get_values_for_type(x509.RFC822Name)` + `san.get_values_for_type(x509.OtherName)` for cross-validation.\n\n## Out of scope (split to PKIX-fmtv.12.2)\n\n- `pkix_chain::verify_smime_signer`/`verify_smime_recipient` wrappers \u2014 depend on PKIX-fmtv.7 (human-labeled, wrapper-set decision).\n- New `VerifyError` variants in pkix-chain.\n\n## Acceptance\n\n- `cargo build -p pkix-identity` clean (default features + `--no-default-features`).\n- `cargo build -p pkix-identity --target wasm32-unknown-unknown --no-default-features` clean (no_std preserved).\n- `cargo clippy -p pkix-identity --all-targets --all-features -- -D warnings` clean.\n- All 7 test scenarios pass.\n- CHANGELOG entry in `pkix-identity/CHANGELOG.md` and top-level CHANGELOG for the body landing.\n\n## What this unblocks\n\nPKIX-fmtv.12.2 (pkix-chain S/MIME wrappers, still blocked on .7) and any future pkix-chain caller that wants mailbox binding without the wrapper convenience.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.12.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 5280/8398 mailbox binding body in pkix-identity (verify_mailbox + MailboxName::parse)",
+  "updated_at": "2026-05-12T05:38:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:17:38Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.12",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "close_reason": "sc081_validity_cap() implements full SC-081 phased schedule with boundary tests",
+  "closed_at": "2026-05-06T18:54:52Z",
+  "compaction_level": 0,
+  "content_hash": "cfa6d9b9781abc2060cb9dff844690b658d1e49fd7c7366fd908e8b0ec000390",
+  "created_at": "2026-05-06T18:11:50Z",
+  "created_by": "Mark Atwood",
+  "description": "CA/B Forum Ballot SC-081 introduced phased validity caps:\\n- 200 days from 2026-03-15 (already in effect as of 2026-05-06)\\n- 100 days from 2027-03-15\\n- 47 days from 2029-03-15\\n\\nThe current hard-coded 398-day cap is already incorrect for newly-issued certificates. The policy function needs date-aware logic to select the applicable cap.",
+  "ephemeral": 0,
+  "id": "PKIX-0k9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: SC-081 phased validity caps not enforced; 398-day cap already stale",
+  "updated_at": "2026-05-06T18:54:52Z"
+}

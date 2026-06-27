@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "close_reason": "Cycle-break landed in commit e9c52dd8. CabfTlsBrProfile deleted from pkix-lint-cabf; LintProfile bundling moved to pkix_profiles_cabf::WebPkiProfile per the architectural invariant (Profile types in -profiles* crates, Lint types in -lint* crates, runtime dep flow profiles->lint only). SC-081 cap math inlined as pub(crate) helper in pkix-lint-cabf to remove the back-edge at the runtime layer; pkix-profiles-cabf::sc081_validity_cap remains the public-facing copy and is cross-validated by tests in both crates. Three CabfTlsBrProfile integration tests moved to pkix-profiles-cabf/tests/web_pki_profile_lints.rs (4 tests total \u2014 added cross-validation of WebPkiProfile::lints() against pkix_lint_cabf::cabf_tls_br::all_lints as independent oracle). pkix-difftest's PkixLintCabfOracle updated to consume WebPkiProfile.lint_runner(). All 1376 workspace tests pass (0 failures); clippy clean on all 3 affected crates. cargo tree confirms no runtime cycle: pkix-profiles-cabf -> pkix-lint-cabf only. CHANGELOGs updated in all 3 affected crates. PKIX-9vnx.9.2 (the original alias-shipping bead) is now unblocked.",
+  "closed_at": "2026-05-13T18:53:47Z",
+  "compaction_level": 0,
+  "content_hash": "46b6ebbb553edc43b7ca5ba250c8334c193e68f2235aac259c85ff6df8d4657a",
+  "created_at": "2026-05-13T05:16:29Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Precondition step 1-5 from PKIX-9vnx.9.2's recorded plan (Mark, 2026-05-12). Today pkix-lint-cabf::cabf_tls_br::CabfTlsBrProfile carries both impl Profile and impl LintProfile, and delegates path-policy fields to pkix_profiles_cabf::WebPkiProfile. This puts a Profile-shaped type in a -lint- crate and creates the edge pkix-lint-cabf -> pkix-profiles-cabf that blocks the inverse edge needed by PKIX-9vnx.9.2 (pkix-profiles-cabf -> pkix-lint-cabf for WebPkiProfile::lints()).\n\nArchitectural invariant Mark recorded: Profile types live in -profiles / -profiles-cabf crates; Lint types live in -lint / -lint-cabf crates. Dep flow: -profiles* -> -lint*.\n\n## Scope\n\n1. Delete pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile. Its impl Profile content is already covered by pkix_profiles_cabf::WebPkiProfile.\n2. Move the existing impl LintProfile (which returned 6 Lints) to live on WebPkiProfile in pkix-profiles-cabf \u2014 this is the core of the refactor.\n3. Make each individual Lint constructor pub in pkix-lint-cabf so pkix-profiles-cabf can pull them. Today they may be private struct types; surface them as zero-arg pub constructors (e.g. pub fn sha1_signature_lint() -> Box<dyn Lint>) or as pub structs with a pub fn new(). Either is acceptable; pick the smaller surface.\n4. Drop pkix-profiles-cabf from pkix-lint-cabf's [dependencies] (no longer needed once WebPkiProfile reference goes away).\n5. Add pkix-lint + pkix-lint-cabf to pkix-profiles-cabf's [dependencies].\n6. Update call sites:\n   - pkix-difftest/src/lint_oracles/pkix_lint_cabf.rs (currently uses CabfTlsBrProfile.lint_runner()) -> replace with WebPkiProfile.lint_runner().\n   - pkix-lint-cabf/tests/cabf_tls_br_tests.rs (the 'CabfTlsBrProfile integration \u2014 LintProfile impl' section, ~3 test fns) -> either delete (if covered by new pkix-profiles-cabf tests) or move to pkix-profiles-cabf/tests/.\n\n## Acceptance\n\n- cargo check --workspace --all-features clean (no dep cycle)\n- cargo test --workspace --all-features clean\n- cargo clippy --workspace --all-targets -D warnings clean\n- CabfTlsBrProfile no longer exists in pkix-lint-cabf source\n- WebPkiProfile.lint_runner() returns the same 6 lints CabfTlsBrProfile.lint_runner() returned (pin by lint id list in a new test)\n- CHANGELOG entries in both pkix-lint-cabf (breaking: removed type) and pkix-profiles-cabf (additive: LintProfile impl)\n\n## Out of scope (separate beads)\n\n- CabfSmimeBrProfile / CabfCsBrProfile \u2014 do not exist yet. When they do, the same pattern applies.\n- The five check_*_shape aliases in pkix-profiles / pkix-profiles-cabf \u2014 that is PKIX-9vnx.9.2's own work, blocked on this bead.\n- New RFC-conformance lints in pkix-lint \u2014 that is PKIX-9vnx.9.2.1 (also blocked on this).\n\n## Why a sub-bead\n\nPKIX-9vnx.9.2's recorded plan separates the cycle-break (steps 1-5) from the alias work (steps 6-8). Mark wrote 'Steps 1-5 are the cycle-break refactor (precondition). Steps 6-8 are this bead's original scope. Steps can ship as one PR or as two sequential PRs; the cycle break stands alone if separated.' Separating gives the refactor its own review surface.",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.9.2.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Cycle-break: move CabfTlsBrProfile from pkix-lint-cabf into pkix-profiles-cabf (consolidate with WebPkiProfile)",
+  "updated_at": "2026-05-13T18:53:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:16:29Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-9vnx.9.2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

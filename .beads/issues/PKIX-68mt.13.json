@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fd5af90524c262d0b9a81201fd618516669fa84c3d6f881aece0d7204cb2dcf8",
+  "created_at": "2026-05-14T19:14:51Z",
+  "created_by": "Mark Atwood",
+  "description": "gen.py at pkix-identity/tests/fixtures/gen.py:52 calls ec.generate_private_key(ec.SECP256R1()) per cert. Each run produces fixture .der bytes that differ from the committed copy at the key + signature level.\n\nConsequence: any contributor who regenerates fixtures (e.g., to add a new SAN combination) will see the unrelated fixtures churn in git. Reviewer cannot tell from the diff whether a fixture's SAN content changed or only its key.\n\nSuggested rewrite: seed deterministically. Two clean options:\n- Hardcode a fixed PEM key for self-signed leaf signing.\n- Use ec.derive_private_key(int, ec.SECP256R1()) with a per-fixture stable scalar.\n\nNot blocking \u2014 the fixture .der files are committed and tests are offline regardless. But the next contributor who runs gen.py will produce a noisy diff.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "tests/fixtures/gen.py uses fresh ec keys each run (non-deterministic byte-level fixtures)",
+  "updated_at": "2026-05-14T19:14:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

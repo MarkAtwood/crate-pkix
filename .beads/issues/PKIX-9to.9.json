@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:27:02Z",
+  "compaction_level": 0,
+  "content_hash": "b7421a54a7d969492b5389914684742feefe763aa846f50cd75b0e11b43e2cbf",
+  "created_at": "2026-05-06T22:15:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:747: ValidatedPath doc says 'Copy stability is committed for all v0.1.x releases. Any future field additions that are non-Copy will be added in a new minor version (v0.2+) with an explicit removal of the Copy derive, constituting a breaking change.' This promise is well-intentioned but unnecessary. #[non_exhaustive] already prevents exhaustive matching and struct literal construction. If a useful non-Copy field (e.g., a policy OID set from the validated policy tree) needs to be added in a minor release, this promise blocks it. The promise should be weakened to 'Copy may be removed in minor versions with a deprecation notice in the changelog.'",
+  "ephemeral": 0,
+  "id": "PKIX-9to.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "ValidatedPath.copy_promise is documented at lib.rs:743 as a committed API guarantee. This is a design record, not a bug.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath Copy stability promise may block adding non-Copy fields in v0.1.x",
+  "updated_at": "2026-05-06T22:27:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:15:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

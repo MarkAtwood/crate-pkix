@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:29:56Z",
+  "compaction_level": 0,
+  "content_hash": "ce1445c77a5376a389bacadb530b1825aadb23a84dfa939a706c724e50539596",
+  "created_at": "2026-05-07T17:23:41Z",
+  "created_by": "Mark Atwood",
+  "description": "report.rs:163 \u2014 self.findings.iter().any(|f| f.is_finding()) uses a closure that is an exact method-call wrapper. clippy::redundant_closure_for_method_calls fires. Fix: replace with self.findings.iter().any(Finding::is_finding). One-character ergonomic change, no semantic difference.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.35",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-lint] redundant closure in EvaluationReport::has_findings",
+  "updated_at": "2026-05-07T17:29:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

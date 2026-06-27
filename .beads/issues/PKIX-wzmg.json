@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "close_reason": "Upstream issue/PR already filed and merged by Luke Valenta as RustCrypto/formats#1965 (commit 6e6ed032, 2025-07-26). Fix ships in x509-cert 0.3.0-rc.2+, not in any 0.2.x stable. No new upstream filing needed. Workaround removal is gated on the workspace bumping to x509-cert 0.3.x stable and is tracked as follow-up bead PKIX-rb6n. In-source comment updated to point at the upstream PR so future maintainers know the removal trigger.",
+  "closed_at": "2026-05-11T04:42:02Z",
+  "compaction_level": 0,
+  "content_hash": "98b7b134aa5e2e3f5e19c0746419329aac7ac73a698443bb8518471fb38f9e5c",
+  "created_at": "2026-05-11T03:46:25Z",
+  "created_by": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "description": "## Why\n\n`x509_cert::Certificate::load_pem_chain` panics with subtract-with-overflow\nat `certificate.rs:256` when given empty or whitespace-only input:\n\n```rust\nwhile position < input.len() - 1 {  // panics if input.len() == 0\n```\n\nHit during PKIX-lhm4 (pkix-truststore). Worked around in `pkix-truststore`\nby pre-checking for the `-----BEGIN CERTIFICATE-----` boundary before\ndelegating to `load_pem_chain`.\n\n## What\n\nUpstream fix: replace the subtract with `position + 1 < input.len()` or\n`input.is_empty()` early return.\n\n## Acceptance\n\n- [ ] File an issue at RustCrypto/formats once we've confirmed it still\n      reproduces on the latest x509-cert release.\n- [ ] When fixed upstream and a new release lands, the workaround in\n      `pkix-truststore/src/lib.rs::from_pem` (the empty-input guard with\n      its rationale comment) can be removed and the `BEGIN_BOUNDARY`\n      const deleted, but only after the workspace bumps `x509-cert` to\n      the fixed version.\n\n## Notes\n\nRepro:\n```rust\nlet _ = x509_cert::Certificate::load_pem_chain(b\"\");\n// thread panics at 'attempt to subtract with overflow'\n```\n\nAffected: x509-cert 0.2.5 (and likely 0.3.0-rc.4; not confirmed yet).",
+  "ephemeral": 0,
+  "id": "PKIX-wzmg",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "x509-cert 0.2.5 load_pem_chain panics on empty input (upstream)",
+  "updated_at": "2026-05-11T04:42:02Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Ack. Positive finding \u2014 no code change. The three-distro fixture set (Debian + Alpine + Fedora) with documented provenance is the correct Tier-1 integration-test bar and must stay through 1.0. Recording closure as a decision-history entry.",
+  "closed_at": "2026-05-14T08:12:58Z",
+  "compaction_level": 0,
+  "content_hash": "c34f7b145e0bcc2f0f8444786ec6938c5038a88606dac21114d525291901e45e",
+  "created_at": "2026-05-14T05:00:21Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/fixtures.rs and tests/fixtures/{debian,alpine,fedora}-* commit three real distro CA bundles with documented provenance (image digest, package version, fetch date) and per-bundle anchor counts derived from external grep.\n\nThis is the right test bar for a Tier-1 PEM loader: the three bundles cover the three real-world dialects (Debian header-comment format, Alpine no-comment-just-certs, Fedora extracted/processed). Synthetic tests cover quirks (BOM, CRLF, trailing whitespace, back-to-back blocks); distro fixtures cover the \"actually shipped\" inputs.\n\nWhat a contributor might incorrectly suggest:\n  - \"These bundles are 3 MB of binary noise in the repo, please move them to a fetch-on-demand model.\" \u2014 rejected. Fixtures must be committed for offline test execution (workspace test-discipline rule). 11 MB total is fine.\n  - \"Just one bundle is enough.\" \u2014 no, the three differ in real ways (Fedora's extracted/* path lacks the symlink target normalisation; Alpine ships a smaller raw bundle; Debian has the metadata comments). A change in load_pem_chain or the BOM/CRLF guards would only fail on the one bundle that exercises the affected quirk.\n  - \"Refresh on each minor version bump.\" \u2014 no, the provenance comment makes refreshes a deliberate act (document the new image digest and package version). Drift from upstream packaging is informative, not a bug.\n\nDefense: keep all three. The provenance-comment discipline (image digest, package version, fetch date) is the part that must survive into 1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Real distro CA bundles (Debian + Alpine + Fedora) are the right integration-test bar",
+  "updated_at": "2026-05-14T08:12:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:00:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

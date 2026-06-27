@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated all six Err(_) arms in malformed-DER lint reporting to bind the der::Error value and include it in the LintResult detail string via Display interpolation: rfc5280.rs (BasicConstraints, ExtendedKeyUsage), rfc6125.rs (SubjectAltName), rfc8398.rs (two SubjectAltName sites), rfc8551.rs (ExtendedKeyUsage). The detail strings now carry the failing tag, offset, expected vs. found, and sub-component path that der::Error provides via Display, which is valuable in the audit trail when a customer ticket reports 'malformed DER' on a real cert. No new tests: the malformed-DER path has no existing coverage (no synthesized malformed-extension fixtures in the workspace), and constructing one principled-enough to oracle would require either der::Any manipulation or a hand-crafted DER blob \u2014 out of scope for an idiom fix. All 129 lib tests + 7 doc tests pass; clippy --all-features clean.",
+  "closed_at": "2026-05-14T13:34:47Z",
+  "compaction_level": 0,
+  "content_hash": "d9c600934afdd045f8e9c68de0f4a463fc86724ece7a402afc998c62f96e59d4",
+  "created_at": "2026-05-14T12:57:06Z",
+  "created_by": "Mark Atwood",
+  "description": "Across rfc5280.rs:280,375, rfc6125.rs:123, rfc8398.rs:120,259,277, and rfc8551.rs:121, the pattern `Err(_) => LintResult::error(\"...malformed DER\")` discards the `der::Error` value returned by x509-cert's `from_der` parsers. der::Error carries structured info (failing tag, offset, expected vs. found, sub-component path) that would be valuable in the audit trail when a lint reports 'malformed DER' on a real cert in a customer ticket. Idiomatic Rust folds the error into the message via Display: `Err(e) => LintResult::error(format!(\"BasicConstraints extension value is malformed DER: {e}\"))` or a structured variant. The current pattern is the error-handling antipattern flagged by the review-rusty error-handling section: 'error variants that wrap String for the message instead of structured fields' \u2014 except worse, because the structured info exists at the call site and is actively thrown away. Fix: every `Err(_)` arm in malformed-DER lint reporting should bind the error and include it in the LintResult detail string (or, if the cost of carrying it is too high, document the discard in a comment explaining why).",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DER parse errors discarded via Err(_) lose structured error info from der::Error",
+  "updated_at": "2026-05-14T13:34:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:57:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

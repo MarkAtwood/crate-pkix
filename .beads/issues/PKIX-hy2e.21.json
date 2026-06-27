@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "368ebddbfb0871ce4e98d3407fa4de21666ad42f50025eb1ff9cb2e140301dcc",
+  "created_at": "2026-05-14T12:42:38Z",
+  "created_by": "Mark Atwood",
+  "description": "Sites: lib.rs LintResult / Finding / Cow throughout, deviation.rs DeviatedFinding. The migration (PKIX-ua6q) from &'static str to Cow<'static, str> on detail / lint_id / citation fields is exactly right: static literals are zero-copy via Cow::Borrowed, runtime-formatted detail strings (format!('{actual} days exceeds {cap}')) use Cow::Owned and free on drop. A contributor will eventually say 'just use String' to simplify. Don't. The Cow form keeps the static-literal path zero-allocation, which matters for the high-volume Finding case (one Finding per lint per cert = thousands per chain in zlint-scale runs). String would allocate per Finding even for the common case of static detail. The de_cow_static helper at lib.rs:234-241 cleanly handles serde deserialization without leaking. The unit tests at lib.rs:2009-2022 pin the no-leak behavior. The serde feature gate keeps the de_cow_static helper out of the default build. This is the right shape for an advisory layer that produces lots of Findings.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.21",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cow<'static, str> migration in LintResult / Finding / DeviatedFinding \u2014 defend against 'just use String'",
+  "updated_at": "2026-05-14T12:42:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:42:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

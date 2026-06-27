@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision C constrained (rename only the two misnomers + deprecated aliases). pkix-lint 0.6.0: rfc_section_id -> spec_section_id, rfc_url -> spec_url, with #[deprecated] default-impl aliases for one minor. Soften all six methods' doc comments to drop OSCAL-centric framing. Names title/description/parameters/set_parameter stay (already neutral). Applied under PKIX-ncab.11.",
+  "closed_at": "2026-05-12T16:34:11Z",
+  "compaction_level": 0,
+  "content_hash": "23bb61680289e280c7e14b3b941b62d1527d074e73f3514ac5ce346167b282a8",
+  "created_at": "2026-05-12T02:20:47Z",
+  "created_by": "Mark Atwood",
+  "description": "PKIX-9vnx.6.1 added 4 default-provided methods to the `Lint` trait declaring per-lint metadata (id, title, description, parameters) that map to OSCAL Control fields. The metadata is useful regardless of OSCAL status, but the names/framing assume OSCAL.\n\nDecide:\n\n- **A) Rename** methods to drop \"Control\" naming (e.g., `lint_id`, `lint_title`, `lint_description`, `lint_parameters`). Breaking API change; pkix-lint 0.6.0.\n- **B) Keep names**; update doc comments to soften OSCAL framing (non-breaking).\n- **C) Both**: rename in 0.6.0 AND ship deprecated aliases for one minor version.\n\nDownstream: .11 applies decision.\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of Lint trait OSCAL-Control metadata methods",
+  "updated_at": "2026-05-12T16:34:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

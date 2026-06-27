@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T18:10:49Z",
+  "compaction_level": 0,
+  "content_hash": "60de984c41e446c5ae50423a1fe79ee84ada9d985badc5b7ffc9627908a40f4b",
+  "created_at": "2026-05-08T15:19:38Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nTier-2 corpus \u2014 pyca/cryptography's curated test corpus. Hundreds of weird, hand-picked certs targeting documented edge cases. Highest signal-to-noise of any external corpus.\n\n## What\n\n1. Shallow-clone pyca/cryptography to `~/GIT/cryptography` (per AGENTS.md source-of-truth rule). Identify the test corpus directory (likely `tests/x509/v1/` or similar; verify before coding the loader).\n2. The PEM-tree corpus loader (PKIX-7nsf.4) should already handle most chain.pem files. Audit failures and extend loader if needed.\n3. Run `pkix-difftest run pem-tree ~/GIT/cryptography/tests/x509/<...> --oracles pkix-path,openssl,pyca --output-md pkix-difftest/baseline-pyca.md --output-json pkix-difftest/baseline-pyca.json`.\n4. Same hand-classification of divergences as PKIX-7nsf.6.\n\n## Acceptance\n\n- [ ] All discoverable chains in the pyca corpus produce a verdict from each oracle (or are explicitly filtered with a documented reason \u2014 e.g., 'this chain has only one cert and the harness requires \u22652').\n- [ ] `baseline-pyca.md` and `baseline-pyca.json` committed.\n- [ ] Every `LooserThanWild` entry has a follow-up bead or a written-out justification.\n- [ ] At least one real divergence is found and recorded \u2014 this is the bead's project-level acceptance criterion ('at least one real divergence found, classified, and recorded').\n\n## Notes\n\n- pyca's corpus has lots of pem files that aren't full chains (single certs, key files, etc.). The loader needs a clear filter rule (e.g., 'only files matching glob ./certs/chain*.pem' or 'only directories containing chain.pem').\n- This is where INTEROP.md (PKIX-7nsf.8) gets its first concrete examples.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: pyca/cryptography corpus baseline run + commit",
+  "updated_at": "2026-05-08T18:10:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:19:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

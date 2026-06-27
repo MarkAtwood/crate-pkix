@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "83656d1d016fa7d55bf14235b1587aeb408e68e7e5395de243a310a31f62dc21",
+  "created_at": "2026-05-12T21:35:41Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nNew workspace crate `pkix-pkilint-bridge`. Std-only. Sibling of pkix-zlint-bridge (PKIX-jy95.7); provides the same shape for pkilint (Python, DigiCert; strong on S/MIME BR and ETSI).\n\n## Scope\n\nSame shape as PKIX-jy95.7 but for pkilint:\n\n- Subprocess spawn (pkilint CLI on PATH or configured Python invocation)\n- Stdout parsing (pkilint's output format)\n- Verdict vocabulary normalization\n- BridgeError type\n- Single-cert and batch entry points\n- Test fixtures sourced from pkilint's own test corpus\n\n## Consumed by\n\n- `pkix-policy-pkilint` (PKIX-jy95.2 area conceptually, parallel to zlint adapter) \u2014 runtime adapter\n- `pkix-difftest`'s pkilint oracle (PKIX-hbzo.1) \u2014 differential testing\n\n## Cross-references\n\n- PKIX-jy95.6 (decision that filed this crate)\n- PKIX-jy95.7 (parallel pkix-zlint-bridge \u2014 implement similar shape)\n- PKIX-hbzo.1 (consumer; differential oracle)\n- AGENTS.md non-negotiable #6\n\n## Open shape decisions\n\n- Python subprocess invocation: `pkilint` CLI directly, or `python -m pkilint ...`, or PyO3? Subprocess preferred per PKIX-jy95.6 / Mark 2026-05-12 \u2014 no in-process Python.\n- pkilint's output format: JSON when --format json is supplied? Verify.\n- pkilint version pinning + lint-module organization (cabf_serverauth / cabf_smime / etsi).\n- Whether to share any abstractions with pkix-zlint-bridge or keep them independent (probably keep independent \u2014 verdict vocabularies and parsing details differ enough).\n\n## Local install status\n\nUnlike zlint (installed locally via PKIX-amgn.8.1), pkilint is NOT yet installed locally. PKIX-hbzo.1 description says install would be via 'pip install pkilint' or vendored Python script under pkix-difftest/python/. Implementation work here will likely require a parallel 'install pkilint locally' setup bead.\n\n## Out of scope\n\n- Implementing pkix-policy-pkilint (separate bead).\n- pkilint contribution / patches upstream.\n\n## Acceptance\n\n- [ ] Crate exists in workspace Cargo.toml as a published library\n- [ ] Subprocess plumbing with configurable pkilint invocation\n- [ ] Output parsing for pkilint's findings format\n- [ ] Verdict normalization to bridge-shaped Verdict enum\n- [ ] BridgeError satisfies non-negotiable #6\n- [ ] Single-cert + batch entry points\n- [ ] Cargo feature 'serde' enables Serialize/Deserialize derives\n- [ ] Test fixtures cite their pkilint test source\n- [ ] CHANGELOG + AGENTS.md inventory entry",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.8",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "Create pkix-pkilint-bridge crate (shared subprocess + parsing infrastructure for pkilint)",
+  "updated_at": "2026-05-13T03:24:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T14:35:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

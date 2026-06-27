@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:26:59Z",
+  "compaction_level": 0,
+  "content_hash": "bcd31348f723c8fd8ede0c2b5717b5da31013d1366ace916cc663308cf895d28",
+  "created_at": "2026-05-06T22:15:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:125 and deviation.rs:74: de_static_str leaks one heap allocation per unique deserialized string permanently. The doc says 'In long-running services deserializing untrusted JSON, each unique string value grows process memory permanently'. There is no interning cache or eviction path. Any service that accepts Finding JSON from external sources (e.g., a CA portal that processes thousands of evidence packs) will have unbounded memory growth. The issue is acknowledged in comments but there is no TODO, tracking issue, or deprecation path. This needs either an explicit API contract ('serde deserialize only in short-lived processes') enforced via #[cfg] or a v0.3 migration plan filed as a beads issue.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "de_static_str doc at lib.rs:120 explicitly documents the leak behavior and the fix path. Documented tradeoff.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_static_str leaks permanently in long-running services: no eviction path",
+  "updated_at": "2026-05-06T22:26:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:15:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

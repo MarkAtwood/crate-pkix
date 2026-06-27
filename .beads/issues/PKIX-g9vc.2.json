@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T09:57:11Z",
+  "compaction_level": 0,
+  "content_hash": "5713a0129bf79ef309a972c2edf9228b2a891086632028930f7f23b35598f2ef",
+  "created_at": "2026-05-11T09:39:20Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nSecond leg of PKIX-g9vc. Implements the actual x509-limbo corpus reader. Independent of validation_time threading (.1) \u2014 they can be developed in parallel.\n\n## What\n\nNew module `pkix-difftest/src/corpus/limbo.rs` implementing the existing `Corpus` trait (`src/corpus/mod.rs:47-55`). Modelled on `PkitsCorpus` (`src/corpus/pkits.rs`) which is the closest precedent.\n\n1. **Serde structs** mirroring `limbo-schema.json` 1:1. `#[serde(default)]` on the 9 optional/defaulted fields. `#[serde(deny_unknown_fields)]` at the testcase level so schema drift fails loudly. Closed enums:\n   - `ValidationKind` (`CLIENT`/`SERVER`)\n   - `ExpectedResult` (`SUCCESS`/`FAILURE`)\n   - `Feature` (13 values, kebab-case)\n   - `Importance`, `PeerKind`, `KeyUsage`, `KnownEKUs`, `SignatureAlgorithm` (inert; for forward-compat)\n2. **`LimboCorpus::load(manifest_path: &Path)`** \u2014 reads the full `limbo.json` (40MB; eager parse is fine \u2014 `PkitsCorpus` does the same with vectors.json).\n3. **Default filter** (RFC 5280-shaped, not pedantic-webpki):\n   - `validation_kind == SERVER` (drop 10 CLIENT cases)\n   - `features.is_empty()` (drop 36 featured cases \u2014 has-crl, name-constraint-dn, max-chain-depth, pedantic-*, denial-of-service, has-policy-constraints, rfc5280-incompatible-with-webpki)\n   - `max_chain_depth.is_none()` (catches the one outlier without the feature tag)\n   - `crls.is_empty()` (defensive; redundant with feature filter)\n   Filter logic and rationale documented inline in code comments so future loosening is principled.\n4. **Per-testcase mapping**:\n   - `peer_certificate` + `untrusted_intermediates` + `trusted_certs` \u2192 `Chain.certs_der` (DER bytes, leaf-first ordering \u2014 same order as PKITS).\n   - `crls` \u2192 `Chain.crls` (currently always empty after filter, but model it now).\n   - `validation_time` \u2192 `Chain.validation_time_unix` via RFC 3339 parser. When `null`, use a deterministic default (e.g. `1700000000` = 2023-11-14 \u2014 \"middle of the limbo era\") rather than `SystemTime::now()` so runs are reproducible. Decision documented in the bead's design notes.\n   - `expected_result` SUCCESS \u2192 `Some(Verdict::Pass)`, FAILURE \u2192 `Some(Verdict::Fail { reason: String::new() })`.\n   - `name`: testcase `id` (already namespaced with `::`).\n5. **Iterator semantics**: per the `Corpus` trait contract (`mod.rs:53`), must NOT silently skip \u2014 filtered-out cases are dropped at `load()` time, not `iter()` time. `iter()` yields the filtered set; bad PEM in a kept case yields `Err` not silent-drop.\n6. **Unit tests**:\n   - Schema deserialises every testcase in `limbo.json` (sanity check; pin to current commit hash).\n   - Filter counts match expected (9763 SERVER \u2192 ~9727 after feature+depth+crl filter).\n   - One round-trip test per id-namespace (e.g. one `cve::*`, one `pathlen::*`, one `rfc5280::*`) verifying `Chain` construction.\n   - RFC 3339 parser handles all year prefixes present in corpus (1970, 2016-2027).\n\n## Acceptance\n\n- [ ] `LimboCorpus` struct + impl in `src/corpus/limbo.rs`.\n- [ ] Public via `src/corpus/mod.rs`.\n- [ ] Default filter retains ~9,700+ testcases.\n- [ ] All structural fields modelled, even inert ones (forward-compat).\n- [ ] Unit tests cover schema parse + filter counts + at least one chain construction per namespace.\n\n## Out of scope\n\n- CLI wiring (PKIX-g9vc.3).\n- Running the full corpus to produce a baseline (PKIX-g9vc.4).\n- Adding new dependencies. `serde_json` is already in pkix-difftest's Cargo.toml. RFC 3339 parsing: implement inline (50 LOC) using the same approach as pkix-ct's `log_list.rs` schema module (per memory `pkix-baac-2-ct-log-list-google-json`), avoiding a new `chrono`/`time` workspace dep.\n\n## Filed as\n\nDecomposition of PKIX-g9vc. Independent of .1; both can run in parallel. CLI in .3 depends on this one.",
+  "ephemeral": 0,
+  "id": "PKIX-g9vc.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: LimboCorpus loader (parse limbo.json + filter)",
+  "updated_at": "2026-05-11T09:57:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T02:39:19Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

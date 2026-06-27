@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:32Z",
+  "compaction_level": 0,
+  "content_hash": "d9ee05495a04b5b43e2fde5bf0bac446d86d6b78b7b428699ebd9151a7ef22bc",
+  "created_at": "2026-05-06T20:50:27Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/deviation.rs DeviationStore::add() at lines 431-446. The method panics (via assert!) if a deviation with the same ID already exists. The doc comment at line 427 says 'Panics if... a deviation with the same id already exists in the store. These are programming errors; the store does not accept incomplete or duplicate deviations.' Using panic for a duplicate ID check is reasonable in a compile-time configuration context, but deviations are expected to be loaded from external stores (YAML, database, etc. per the module doc). In those contexts, a duplicate ID in the external configuration is a data error, not a programming error, and should return Result::Err to allow callers to handle gracefully. Currently any server that loads deviations from a configuration file and encounters a duplicate will crash. Fix: Change add() to return Result<(), DeviationError> or similar, where DeviationError includes a DuplicateId variant. Alternatively, rename the method to add_unchecked() and provide an add() that returns Result. The existing panic-on-duplicate tests use #[should_panic] which would need updating. Priority: P2 (API correctness \u2014 panic in recovery code is inappropriate for data-layer errors).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: DeviationStore::add() panics on duplicate ID instead of returning Result",
+  "updated_at": "2026-05-06T20:58:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:50:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

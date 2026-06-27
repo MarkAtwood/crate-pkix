@@ -1,0 +1,60 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T18:59:00Z",
+  "compaction_level": 0,
+  "content_hash": "64bac5100b1f12e8b6ec61222488809b0b302a317e78e5a9a54308fd9556188a",
+  "created_at": "2026-05-11T16:59:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint-cabf` ships CA/B Forum lint bundles as reference / not authoritative interpretations. CA/B Forum publishes only PDFs. zlint (Go, Apache-2.0, Let's Encrypt + community) is the de facto machine-readable interpretation everyone in the CA world cross-checks against. Re-authoring zlint's catalog from scratch is wasted effort and divergence risk.\n\n**Decision (2026-05-11, Mark):** vendor zlint's lint catalog as OSCAL Catalog JSON; the `pkix-lint-cabf` crate interprets the vendored JSON at runtime. No codegen of Rust constants from zlint; consistent with the OSCAL Arch 2 stance (\"interpret, don't bind\") established in PKIX-ztmr.\n\n## What\n\n### Maintainer-only refresh tool\n\nAdd a tool under `pkix-difftest/python/` (or as a Rust binary in a dev-only sub-crate; final shape TBD) that:\n\n1. Runs `zlint -listLintsJSON` against a pinned zlint release tag.\n2. Transforms zlint's JSON shape to OSCAL Catalog JSON shape:\n   - `zlint.Name` \u2192 `control.id`\n   - `zlint.Description` \u2192 `control.parts[name=statement].prose`\n   - `zlint.Citation` (e.g., \"BRs: 7.1.4.2.2\") \u2192 `control.links[rel=cites]` + `control.props[name=br-section]`\n   - `zlint.Source` (e.g., \"CABFBaselineRequirements\") \u2192 `control.props[name=source-classification]`\n   - `zlint.EffectiveDate` \u2192 `control.props[name=effective-date]`\n3. Filters by `Source` to emit per-profile catalogs:\n   - `cabf-br-tls-derived-from-zlint-v3.X.Y.oscal.json`\n   - `cabf-br-smime-derived-from-zlint-v3.X.Y.oscal.json`\n   - `cabf-br-cs-derived-from-zlint-v3.X.Y.oscal.json`\n4. Writes vendored output to `pkix-lint-cabf/catalogs/`.\n5. Refreshed manually when bumping the pinned zlint version. NOT a build-time dep \u2014 the refresh produces committable artifacts.\n\n### `pkix-lint-cabf` runtime\n\n1. Bakes the vendored OSCAL Catalog JSON via `include_str!()` (one per profile family).\n2. On first use, parses into an in-memory catalog representation. Per OSCAL Arch 2 (PKIX-9vnx.3 onward), parsing yields lean Rust types or `serde_json::Value` walked at lookup time; not 1:1 OSCAL-mirror structs.\n3. Rust `Lint` impls reference Control IDs as `&'static str` constants matching the catalog IDs.\n4. Startup invariant: each registered Rust `Lint` must have a matching Control in the catalog. Mismatch is a hard error at boot, not silent at runtime.\n\n### What we author by hand\n\n- `check_cert()` body of each Rust `Lint` impl \u2014 the actual cert-shape predicate using `x509-cert` / `der`.\n- `divergences.md` documenting where pkix-lint-cabf's interpretation intentionally differs from zlint's, with rationale.\n\n### What we DO NOT author\n\n- Lint metadata (title, description, citation, effective date, source classification).\n- Lint catalog organization (what lints exist, how they're grouped by Source).\n- Test fixture corpus organization (option to vendor zlint's `testdata/` per-lint cert fixtures separately \u2014 filed under PKIX-hbzo.1 cross-validation oracle work).\n\n## Acceptance\n\n- [ ] Refresh tool exists under `pkix-difftest/python/` (or sub-crate; chosen at implementation time).\n- [ ] zlint version pinned in tool source + in refreshed catalog filenames.\n- [ ] At least one vendored OSCAL Catalog (start with `cabf-br-tls`) checked into `pkix-lint-cabf/catalogs/`.\n- [ ] Catalog validates against NIST OSCAL Catalog v1.2.2 schema (per PKIX-9vnx.1 pinning).\n- [ ] `pkix-lint-cabf` runtime parses + indexes the catalog; startup-invariant check on registered Lint IDs.\n- [ ] At least one Rust `Lint` impl referencing a catalog Control ID, demonstrating the pairing pattern.\n- [ ] Attribution: header comment in each vendored catalog crediting zlint + version + URL + Apache-2.0 notice.\n- [ ] `divergences.md` placeholder file exists in `pkix-lint-cabf/`, ready to grow as divergences accumulate.\n\n## Out of scope\n\n- Implementing all 100+ CA/B Forum lints in this bead. This bead establishes the pattern with 1+ example; the rest grow incrementally.\n- pkilint-derived catalog (pkilint has different lint organization; cross-validation only per PKIX-hbzo.1).\n- Generating an OSCAL Catalog for the RFC-conformance lints in `pkix-lint`. Those are workspace-authored, not zlint-derived.\n\n## Depends on\n\n- `PKIX-amgn.3` (pkix-lint-cabf crate exists \u2014 CLOSED 2026-05-11, stub shipped).\n- `PKIX-9vnx.6` (Lint trait has metadata methods that can be matched against Control IDs).\n\n## Relationship to other beads\n\n- **Reshapes PKIX-amgn.5.** The substantive `pkix-lint-cabf` content (originally framed as \"author lint bundles by hand from PDF reading\") becomes \"implement Rust `check_cert()` bodies referencing zlint-derived Catalog IDs.\"\n- **Pairs with PKIX-hbzo.1** (cross-validation oracle). zlint as the catalog-of-record + zlint as a runtime oracle is mutually reinforcing.\n- **Anchored by PKIX-8qz1** (per-rule split). zlint catalogs are policy interpretations of CA/B Forum BR; they live in `-cabf` reference crates. Rust does the executable side.\n\n## Filed by\n\nSurfaced in conversation 2026-05-11 after reasoning through \"CA/B Forum publishes only PDFs; zlint is the de facto machine-readable form; could we treat it as the data source?\" Mark chose interpret-at-runtime over codegen, consistent with Arch 2 OSCAL stance.\n",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Re-scoped 2026-05-12 (PKIX-ncab.2, decision B): OSCAL demoted as canonical format. The zlint catalog vendoring goal is still valid \u2014 pkix-lint-cabf wants to track zlint's living rule set rather than re-encode by hand \u2014 but the OSCAL Catalog JSON target is no longer prescribed. Output format is TBD pending the (not-yet-filed) replacement policy/config format decision. Closed children .8.1 + .8.2 remain as decision-history. Open children .8.3-.8.6 are snapshots of the OSCAL-target version of this work and have been labeled human; they will be reworked, closed, or replaced when the format decision lands. See memory pkix-oscal-demoted-2026-05-11.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "vendor zlint catalog metadata for pkix-lint-cabf (output format TBD)",
+  "updated_at": "2026-05-12T18:59:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:59:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8qz1",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:59:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:59:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:59:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:59:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo.1",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

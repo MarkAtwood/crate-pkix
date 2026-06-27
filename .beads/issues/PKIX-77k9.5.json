@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "090cf3d29179a90556ba4aecc261026ddc31a0d23943464afa87f071bcdff15b",
+  "created_at": "2026-06-15T19:45:48Z",
+  "created_by": "Mark Atwood",
+  "description": "Fix the correctness bugs and harden the API in pkix-ct. CT is becoming mandatory in browser policies and increasingly expected in non-browser contexts.\n\nMust-fix (from PKIX-d4h / PKIX-ppbr):\n- verify_sct_for_cert treats every SCT as x509_entry (wrong for precerts, surfaces as InvalidSignature)\n- tbs_without_sct_list relies on re-encoder bit-exactness (may fail on real-world non-canonical DER)\n- verify_embedded_scts coalesces failures into count=0 with no diagnostic\n- CtLog::usable_from_ms: None has conflicting documented meanings\n- SctList inner Vec is pub (bypasses parser invariants)\n\nAlready fixed this session:\n- #[non_exhaustive] on 4 public types + constructors\n- serde feature + Send+Sync assertion\n\nAcceptance: pkix-ct correctly verifies embedded SCTs and OCSP-stapled SCTs from real CT logs (Google Argon, Cloudflare Nimbus, Let's Encrypt Oak) for both x509 and precert entry types.",
+  "ephemeral": 0,
+  "id": "PKIX-77k9.5",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-ct correctness and API hardening",
+  "updated_at": "2026-06-15T19:45:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:45:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77k9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

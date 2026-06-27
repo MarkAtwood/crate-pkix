@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Pass 2 finds nothing: all changes in pass 1 commit are mechanical refactors/formatting with no logic changes. PKITS test suite confirms behavior parity.",
+  "closed_at": "2026-05-03T02:48:35Z",
+  "compaction_level": 0,
+  "content_hash": "a95269c8097229b84019526134415db58372f88ac8b2fe50959bbcb29329b1bd",
+  "created_at": "2026-05-03T02:47:47Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-eji",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Confidence: 2% chance of missed bug. Changes are mechanical: same_nc_variant simplified, find_cert_ext extracted, docs/comments updated, cargo fmt. All PKITS tests pass. No logic branches added or removed.\nIdiom rating: CLEAN \u2014 no new Rust idiom issues in refactored code.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: refactor pass \u2014 NC invariant + find_ext + docs",
+  "updated_at": "2026-05-03T02:48:35Z"
+}

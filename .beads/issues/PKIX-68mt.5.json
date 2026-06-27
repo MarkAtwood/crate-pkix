@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b73319e6ea199c5bafeed058357a43cbcdd732669cf620c1958c37e132a502f9",
+  "created_at": "2026-05-14T19:13:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Code path: find_san at pkix-identity/src/lib.rs:788-799 calls SubjectAltName::from_der on every verify_* invocation. The decode allocates a Vec<GeneralName> per call.\n\nExpected impact at scale: AGENTS.md non-negotiable #6 explicitly calls out batch validation and prevalidation as supported use cases. A truststore adapter that asks 'what identities does this anchored cert claim?' (per the lib.rs:26-28 example) currently has no efficient way to enumerate identities without re-parsing per-question. Likewise, a verifier checking one cert against N candidate identities pays N * SAN-parse cost.\n\nRecommendation (post-1.0 is fine if surface needs to fossilize first):\n- Expose a public ParsedIdentities (or similar) cache struct that holds the decoded SubjectAltName and exposes verify_dns_name_against / verify_mailbox_against methods. Callers that need batch checks against many identities pay one SAN-parse.\n- Keep the free functions verify_dns_name / verify_mailbox as thin convenience wrappers that build the cache then drop it.\n\nNot blocking 1.0 \u2014 the current free-function shape is the right default. But this seam should land before users start hitting the cost.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_dns_name and verify_mailbox re-parse SAN on every call (no batch-friendly seam)",
+  "updated_at": "2026-05-14T19:13:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

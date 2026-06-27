@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Shipped: LintParameter + ParameterError types, parameters/set_parameter default trait methods, Rfc5280MaxSerialLengthLint (first RFC-conformance lint in pkix-lint). 9 new tests; default 130 / oscal 193 / all-features 199. Commit 50bd8bf7. Design note for downstream beads: LintParameter is descriptor-only (no current_value field) \u2014 lints store typed state directly and convert to/from string at OSCAL boundary.",
+  "closed_at": "2026-05-11T22:11:32Z",
+  "compaction_level": 0,
+  "content_hash": "4d274a8cae0eb5e824a0e7629757c2e47886e668bb068ace43df2e60df5beb77",
+  "created_at": "2026-05-11T18:01:11Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.6 decomposition step 4. The parent's acceptance criterion 'At least one lint demonstrates parameter use (e.g., a max-serial-length parameter overrideable via OSCAL Profile)' requires both a parameter abstraction in the Lint trait AND a concrete parametric lint to demonstrate it.\n\nThere is no Parameter type or parametric mechanism in pkix-lint today. pkix-lint also has zero RFC-conformance Lint impls; the CABF lints are scheduled to move to pkix-lint-cabf. Introducing the parameter demo via a CABF lint would put the demo in the wrong crate. Solution: introduce the first RFC-conformance Lint in pkix-lint as part of this bead.\n\n## What\n\n1. New `LintParameter` type in `pkix-lint/src/lib.rs`:\n\n```rust\npub struct LintParameter {\n    pub id: Cow<'static, str>,        // e.g. \"max-octets\"\n    pub label: Cow<'static, str>,     // human-readable\n    pub default_value: Cow<'static, str>,  // serialized to a Cow<str>\n    pub current_value: Cow<'static, str>,  // mutable; equals default on construction\n}\n```\n\n(Exact shape TBD during implementation \u2014 alternative shapes considered should be filed as new beads if non-trivial.)\n\n2. New trait method on Lint:\n\n```rust\nfn parameters(&self) -> &[LintParameter] { &[] }\nfn set_parameter(&mut self, id: &str, value: &str) -> Result<(), ParameterError>\n```\n\nDefault `parameters()` returns empty slice; default `set_parameter` returns UnknownParameter.\n\n3. First RFC-conformance Lint in pkix-lint: `Rfc5280MaxSerialLengthLint`. Implements RFC 5280 \u00a74.1.2.2 ('Conforming CAs MUST NOT use serialNumber values longer than 20 octets'). Parametric on `max-octets` (default 20). Demonstrates the parameter mechanism end-to-end.\n\n4. Tests:\n   - Default Lint accepts a 20-octet serial, rejects a 21-octet serial.\n   - After set_parameter(\"max-octets\", \"16\"), Lint rejects an 18-octet serial that previously passed.\n   - set_parameter with unknown id returns error.\n\n## Acceptance\n\n- [ ] LintParameter type defined; rustdoc explains the OSCAL Parameter mapping (id \u2192 OSCAL `param.id`, label \u2192 OSCAL `param.label`).\n- [ ] Lint trait gains parameters() + set_parameter().\n- [ ] Rfc5280MaxSerialLengthLint implemented + 4+ tests.\n- [ ] LintRunner::with_bundle_version + LintRunner::new accept Box<dyn Lint> with parametric lints.\n- [ ] Citation includes RFC 5280 \u00a74.1.2.2 URL.\n- [ ] Full pkix-lint suite passes default + --features oscal + --all-features.\n\n## Out of scope\n\n- OSCAL Profile-side modify directive that overrides parameters \u2014 that's .6.5.\n- Catalog Control emit of parameters \u2014 could land here or in .6.5 (interpreter's choice).\n\n## Depends on\n\nPKIX-9vnx.6.1 (trait metadata).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Lint parameter mechanism + first parametric lint",
+  "updated_at": "2026-05-11T22:11:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T11:01:11Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T11:01:34Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-ihq",
+  "title": "Review: SPKI anchor guard OID+key comparison",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:23Z",
+  "updated_at": "2026-06-15T17:57:24Z",
+  "closed_at": "2026-06-15T17:57:24Z"
+}

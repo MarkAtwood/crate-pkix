@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:13:02Z",
+  "compaction_level": 0,
+  "content_hash": "89bdf97980bcec28bb7ecbd133157eb0eb483c94915e7aa30209488f0cc9237f",
+  "created_at": "2026-05-06T17:06:45Z",
+  "created_by": "Mark Atwood",
+  "description": "The pass-1 fix added Clone to pkix-path::Error and pkix-revocation::Error, but pkix-path-builder::Error (lib.rs:101) was not updated. It derives Debug, PartialEq, Eq, Hash \u2014 but not Clone. This is an inconsistency: all three crate Error types should be Clone so callers can store, log, or propagate errors without consuming them. Fix: add Clone to the derive list at lib.rs:101.",
+  "ephemeral": 0,
+  "id": "PKIX-gr9.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: Error missing Clone derive (inconsistent with pass-1 Error Clone fix)",
+  "updated_at": "2026-05-06T17:13:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T10:06:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gr9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:02:40Z",
+  "compaction_level": 0,
+  "content_hash": "6837d02cc27294595985f1bf2d57dd7e56c78cf55462180281f6371ac5684f4e",
+  "created_at": "2026-05-02T13:40:40Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs line 75: if self.now_unix < this_update { return Err(Error::CrlExpired); }. RFC 5280 \u00a76.3.3(a) says thisUpdate must not be in the future; rejecting it is correct per spec. However, clock skew between the CRL issuer and the validator is a real operational concern. The current behavior rejects any CRL whose thisUpdate is even 1 second ahead of now_unix with the misleading CrlExpired error, even though the CRL has not expired. The error variant name is wrong for this case: the CRL is not expired, it is not-yet-valid. This is a correctness issue (wrong error) even if the rejection policy is arguably reasonable.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker rejects CRLs issued in the future (clock skew)",
+  "updated_at": "2026-05-02T14:02:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

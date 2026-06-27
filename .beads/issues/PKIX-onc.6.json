@@ -1,0 +1,31 @@
+{
+  "close_reason": "TryFrom<Certificate> impl now documents absence of TryFrom<&Certificate>",
+  "closed_at": "2026-05-03T13:26:27Z",
+  "compaction_level": 0,
+  "content_hash": "6681e3aa3a61baf4a050128cccbaf57cc13eccc3dedd392e334d5aa0fc231d1b",
+  "created_at": "2026-05-03T13:15:30Z",
+  "created_by": "Mark Atwood",
+  "description": "Only TryFrom<Certificate> (owned) was added; TryFrom<&Certificate> was not added to avoid conflict with the blanket impl From<&Certificate> (From implies Into, and TryFrom<&Certificate> would conflict). This asymmetry is not documented: the TryFrom impl has no doc comment explaining why the borrowed variant is absent. A future contributor will attempt to add TryFrom<&Certificate>, hit the blanket impl conflict, and have no explanation in the source to guide them.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TryFrom<Certificate> gap vs TryFrom<&Certificate> undocumented",
+  "updated_at": "2026-05-03T13:26:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

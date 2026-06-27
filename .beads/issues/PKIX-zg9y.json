@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T21:12:29Z",
+  "compaction_level": 0,
+  "content_hash": "9329d061a185405024233b5e5b2130f4e1f93a7b547d090944bda280d74e4412",
+  "created_at": "2026-05-08T18:59:18Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nDocumented limitation in `pkix-revocation/src/crl.rs:68-86`: the CrlChecker enforces IDP `onlyContains*` scope flags, but does NOT match the cert's `cRLDistributionPoints` (CDP) extension distribution-point name against the CRL's IssuingDistributionPoint (IDP) distribution-point name.\n\nReal-world consequence: a cert that has a CDP pointing at `http://crl.example.com/intermediate/A.crl` could in theory be applied against a CRL fetched from `http://crl.example.com/intermediate/B.crl`. Both might be signed by the same CA, but the CDP/IDP namespaces are different \u2014 the latter doesn't cover the former. RFC 5280 \u00a76.3.3(b)(1) requires this match.\n\nThe omission is harmless when the harness fetches CRLs by URL (the URL path encodes the namespace), but it's a correctness gap when the CRL is supplied out-of-band by the caller (which is what `pkix-revocation` v0.1 does).\n\n## What\n\nExtend the CRL/cert matching logic in `pkix-revocation/src/crl.rs`:\n\n1. **CDP DistributionPointName parsing** \u2014 extract from the cert's `cRLDistributionPoints` extension. The CHOICE has `fullName` (a GeneralNames) and `nameRelativeToCRLIssuer` (RDN appended to the cRLIssuer's name).\n2. **IDP DistributionPointName parsing** \u2014 extract from the CRL's `IssuingDistributionPoint` extension. Same CHOICE shape.\n3. **Match algorithm** per RFC 5280 \u00a76.3.3(b)(1):\n   * If CDP has fullName, IDP MUST have a matching fullName entry.\n   * If CDP has nameRelativeToCRLIssuer, IDP MUST have the same.\n   * If CDP is absent (no CDP extension on cert), the CRL applies if its IDP is also absent or has no DistributionPointName field.\n4. **Reasons-flags matching** (RFC 5280 \u00a75.2.5) \u2014 IDP's `onlySomeReasons` must be a superset of any CDP's `reasons` flags being checked.\n\n## Acceptance\n\n- [ ] CRL with IDP fullName `http://crl.example.com/A.crl` does NOT cover a cert with CDP fullName `http://crl.example.com/B.crl` \u2014 CrlChecker returns `Error::OutOfScope` (or appropriate variant).\n- [ ] Same-fullName match works.\n- [ ] `nameRelativeToCRLIssuer` match works.\n- [ ] Cert without CDP and CRL without IDP (or IDP without DPName) \u2192 match.\n- [ ] No regression: chains that worked under the existing flag-only IDP check continue to work.\n- [ ] Documentation: rustdoc updated, limitation note in `crl.rs:68-86` reflects what's now supported.\n\n## Effort\n\nEstimated ~120 lines + tests. ~1 day of focused work.\n\n## Filed as\n\nMedium-impact gap per audit. Required for correctness when caller-supplied CRLs are used (the v0.1 model). When pkix-revocation-http (PKIX-a1yc) lands and CRLs are URL-fetched, the URL itself partially provides the namespace match \u2014 but this check is still required because two different paths on the same hostname are still different CDPs.",
+  "ephemeral": 0,
+  "id": "PKIX-zg9y",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: CDP/IDP name matching (RFC 5280 \u00a75.2.5)",
+  "updated_at": "2026-05-08T21:12:29Z"
+}

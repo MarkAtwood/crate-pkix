@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "76d4987106193f9b5a88bdeb55dbb35375af3929da1e2e78bf62561bd2cf5f8c",
+  "created_at": "2026-05-14T17:59:27Z",
+  "created_by": "Mark Atwood",
+  "description": "build_with_aia in pkix-chain/src/lib.rs lines 655-679:\n\n    let uri_refs: Vec<&str> = new_uris.iter().map(String::as_str).collect();\n    let results = self.aia.batch_fetch(&uri_refs);\n\n    let mut added_any = false;\n    for (uri, result) in new_uris.iter().zip(results) {\n        ...\n    }\n\nThe AiaFetcher trait's batch_fetch contract says (pkix-aia/src/lib.rs:570-572): 'Returns a Vec aligned with uris by index: the i-th entry is the result for uris[i].' But the trait is implementer-overridable and the default impl just maps fetch() over the slice. A buggy or adversarial implementation could return a Vec of the wrong length.\n\nIf batch_fetch returns FEWER results than uris (e.g. the impl 'returns early' on first failure), .zip silently truncates: trailing URIs are dropped without any error. Their potential responses are never tried, last_aia_error reflects whatever the SHORTER prefix produced, and added_any may be false despite the truncation. The caller sees Error::Aia(...) when in fact the chain could have validated if the dropped URIs had been tried.\n\nIf batch_fetch returns MORE results than uris (less plausible but still a contract violation), the extras are silently ignored \u2014 less critical.\n\nSCENARIO that triggers the cost: a contributor writes a custom AiaFetcher impl that does HTTP/2 multiplexing and accidentally returns early when one of N parallel fetches fails (closing the connection drops the others). build_with_aia silently treats the dropped URIs as 'we already tried them' (because tried_uris.insert() happened upfront, before batch_fetch was called) \u2014 so they are NEVER retried in subsequent iterations either. Permanent silent loss.\n\nMAINTENANCE CONSEQUENCE: A future bug report 'verify_one randomly fails on multi-AIA-URI chains under load' is impossible to root-cause from the current code. There is no assertion that results.len() == uri_refs.len(); there is no panic; there is no error variant.\n\nFIX: replace .zip with an explicit length check. Either:\n\n    if results.len() != uri_refs.len() {\n        return Err(Error::Aia(/* new variant: BatchFetcherContractViolation */));\n    }\n\n\u2026or document the contract violation as an undefined behaviour and add a debug_assert!.\n\nRECOMMENDATION: a debug_assert!(results.len() == uri_refs.len(), ...) is the cheapest defensive guard. Tests run with debug_assertions on; a buggy fetcher impl trips on its first batch call rather than silently dropping URIs.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AiaFetcher::batch_fetch length mismatch silently truncates via zip",
+  "updated_at": "2026-05-14T17:59:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:59:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

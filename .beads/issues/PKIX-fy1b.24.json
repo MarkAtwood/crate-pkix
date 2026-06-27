@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:46:16Z",
+  "compaction_level": 0,
+  "content_hash": "19fc5809730e89decc4e06d51051bc9be2dd3e91ed322b29c884409dd71cfc35",
+  "created_at": "2026-05-07T04:41:47Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs line 174, inside CrlChecker::with_delta:\n\n    let delta_base_num = base_crl_number(&delta_crl)\n        .expect(\"deltaCRLIndicator OID confirmed present by has_delta_crl_indicator\")\n        .map_err(Error::CrlParseError)?;\n\nThis .expect() is in production (non-test) code. The invariant is logically sound \u2014 has_delta_crl_indicator is checked two lines above, and base_crl_number returns None only when the extension is absent. However:\n\n1. Any future refactor that breaks the invariant will panic in production rather than return Err.\n2. The convention for production Rust paths is to use .ok_or_else(|| ...) or .unwrap_or_else to convert Option to a proper Error \u2014 not expect().\n\nThe fix is:\n\n    let delta_base_num = base_crl_number(&delta_crl)\n        .ok_or(Error::DeltaCrlBaseMismatch)?  // should not happen but safe fallback\n        .map_err(Error::CrlParseError)?;\n\nThis converts the unreachable None case to a recoverable error instead of a panic.\n\nCategory: R2 (.expect() in non-test production code)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.24",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: .expect() in production path of CrlChecker::with_delta",
+  "updated_at": "2026-05-07T04:46:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:41:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

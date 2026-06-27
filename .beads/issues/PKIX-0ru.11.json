@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added PartialEq, Eq derives to CertPool and Error in pkix-path-builder/src/lib.rs",
+  "closed_at": "2026-05-06T16:21:50Z",
+  "compaction_level": 0,
+  "content_hash": "5593bd54bc6057f8f2a480b86b2c76c91bb8aa608da4018526ea2d1b8fc24f7a",
+  "created_at": "2026-05-06T16:13:10Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path-builder/src/lib.rs. CertPool derives Debug and Default but not PartialEq/Eq. Error only derives Debug. Both types have derivable equality (unit-variant error, Vec<Certificate> where Certificate impls PartialEq). Add derives to improve testability.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: CertPool and pkix-path-builder::Error missing PartialEq/Eq derives",
+  "updated_at": "2026-05-06T16:21:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:13:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

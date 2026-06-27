@@ -1,0 +1,31 @@
+{
+  "close_reason": "WONTFIX. Verified empirically: serde requires serialize_with functions to have signature fn<S>(&T, S) -> Result<S::Ok, S::Error>. Changing 'kind: &io::ErrorKind' to 'kind: io::ErrorKind' produces 'error[E0308]: mismatched types ... expected ErrorKind, found &ErrorKind' from the derive macro expansion. The bead's premise 'the serialize_with shim passes by value automatically' is incorrect; verified against serde.rs/field-attrs.html (current docs) and via a compile-test on the actual code. clippy::trivially_copy_pass_by_ref does not fire here because the &T is mandated by the calling convention of serialize_with \u2014 not a free choice the author made. No code change possible without dropping the serde_with shim entirely, which is out of scope (and would lose the format-adaptive serialization). Engineering basis for keeping the &io::ErrorKind: it is the only signature serde accepts.",
+  "closed_at": "2026-05-14T07:59:44Z",
+  "compaction_level": 0,
+  "content_hash": "356e053a07a3e3b2d628ed814b47dc2e2c40f6f9c8830731fffd715faf7022a1",
+  "created_at": "2026-05-14T05:15:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:161 \u2014 `pub fn serialize<S: Serializer>(kind: &io::ErrorKind, s: S)` takes the kind argument by reference. `io::ErrorKind` is `Copy` and 1 byte on stable Rust; the reference (8 bytes) is strictly larger than the value. Idiomatic Rust passes small Copy types by value, both for ergonomics (no implicit deref at the use site) and to match what `clippy::trivially_copy_pass_by_ref` enforces by default in pedantic. Fix: change signature to `kind: io::ErrorKind` and update the single call site at lib.rs:117 (the `serialize_with` shim passes by value automatically \u2014 the reference was only used because `format!(\"{:?}\", kind)` accepts either form). What goes wrong if it stays: nothing major, but this is a clippy::pedantic warning visible to anyone running pedantic and signals 'this type might be expensive to clone' when it isn't.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "io_error_kind_serde::serialize takes kind: &io::ErrorKind for a 1-byte Copy type",
+  "updated_at": "2026-05-14T07:59:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:15:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

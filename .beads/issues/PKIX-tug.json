@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:42:08Z",
+  "compaction_level": 0,
+  "content_hash": "f76ae0dcdf4dc740ed3ad7efd254bf855347850d83b406b4559a37c0bdaea1eb",
+  "created_at": "2026-05-06T20:38:13Z",
+  "created_by": "Mark Atwood",
+  "description": "Minor and opinion findings from pass 2 of the review loop (general + Rust idiom). No P0-P2 issues; loop converged.",
+  "ephemeral": 0,
+  "id": "PKIX-tug",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "epic",
+  "updated_at": "2026-05-06T20:42:08Z"
+}

@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a11cdb4a5f795dade331e39538d2059934d4b653bbd0f3e02666aacb400379d9",
+  "created_at": "2026-05-13T15:47:52Z",
+  "created_by": "Mark Atwood",
+  "defer_until": "2026-11-13T08:47:52Z",
+  "description": "## What\n\nTracking bead: re-evaluate the codesign differential approach if a purpose-aware oracle becomes available. Currently PKIX-fmtv.24 implements composed-oracle differential because no single-tool oracle exists.\n\n## Re-evaluation triggers\n\nReopen / re-scope if any of these emerge:\n\n- **pyca-cryptography adds `PolicyBuilder.build_codesign_verifier`** or equivalent. Would replace the composed oracle with a single purpose-aware call, matching the TLS server/client pattern.\n- **OpenSSL adds `verify -purpose codesign`**. Would enable a direct OpenSSL diff (the original PKIX-fmtv.18.5 framing). Unlikely; OpenSSL's purpose list has been stable for years.\n- **A new external oracle emerges** (osslsigncode adding chain-verify mode, signtool exposing a chain-only check, a new pkilint code-signing module). Would either replace or augment the composed oracle.\n- **Composed oracle proves brittle in practice**: pyca chain-walk primitives change shape, or maintaining the EKU check becomes expensive. Triggers a switch to all-OpenSSL composition (the rejected alternative in PKIX-fmtv.24).\n\n## Action when triggered\n\nOpen this bead, file follow-up under PKIX-fmtv.24 (or as sibling), simplify the codesign differential to use the purpose-aware oracle directly. Composed oracle in pkix-difftest stays available as a fallback / cross-check.\n\n## Defer\n\nDeferred 6 months. The triggers are external; no progress this bead can make autonomously. Surfacing on every `bd ready` is noise.\n\n## Filed by\n\nFiled 2026-05-13 alongside PKIX-fmtv.24 to record the known gap explicitly. AGENTS.md prelaunch framing: design for the eventual complete shape \u2014 that includes tracking known coverage gaps without committing work prematurely.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Track: revisit codesign differential if purpose-aware oracle emerges",
+  "updated_at": "2026-05-13T15:47:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T08:47:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

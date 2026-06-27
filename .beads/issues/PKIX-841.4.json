@@ -1,0 +1,31 @@
+{
+  "close_reason": "Documented in TrustAnchor rustdoc: RFC 5280 \u00a76.1.1(c) intentionally excludes anchor validity from path validation. Expired root CAs in trust stores are by design.",
+  "closed_at": "2026-05-02T17:47:18Z",
+  "compaction_level": 0,
+  "content_hash": "f32a28f289794331acd024c41480e3d2f4c1ad765b954fd15713624dce982a46",
+  "created_at": "2026-05-02T17:26:15Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor does not carry a validity period, and validate_path never checks notBefore/notAfter for the anchor. RFC 5280 \u00a76.1.1(c) says the trust anchor's self-signed certificate (if present) is not validated. However, callers using TrustAnchor::from_cert() may expect that an expired root cert extracted from a trust store is still usable as a trust anchor (which is fine per RFC), but callers who assume the validator rejects expired anchors will be surprised. This is not a correctness bug per RFC but creates a security surprise: a TrustAnchor built from an expired root cert will still anchor a path. Needs explicit documentation.",
+  "ephemeral": 0,
+  "id": "PKIX-841.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "trust anchor validity period not checked",
+  "updated_at": "2026-05-02T17:47:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:26:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

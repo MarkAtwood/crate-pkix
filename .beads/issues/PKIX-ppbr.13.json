@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:36:12Z",
+  "compaction_level": 0,
+  "content_hash": "dc4031a5df1dec847117c3ff9a04273ca7ea95041c49051c207f01d0cddbc93b",
+  "created_at": "2026-05-14T17:40:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/sct.rs:56-83\n\n`SignedCertificateTimestamp` is `pub struct` with seven public fields and\nno `#[non_exhaustive]`. Once 0.0.0 ships, the maintainer cannot:\n\n- Add a new field (no `#[non_exhaustive]`, so callers can use struct\n  literal `SignedCertificateTimestamp { ... }` exhaustively).\n- Change `signature: Vec<u8>` to a typed signature enum once\n  RustCrypto's `signature` crate stabilizes a parsed form.\n- Change `extensions: Vec<u8>` to a typed `Vec<CtExtension>` after\n  RFC 6962bis defines extension types.\n- Make `version` private (callers already match on it directly).\n\nThe wire-form fields belong in a sealed type with accessor methods, or\nthe struct should be `#[non_exhaustive]` so callers cannot use struct\nliterals against it.\n\nRecommendation: add `#[non_exhaustive]` to all wire-form structs in\nthis crate's public surface (`SignedCertificateTimestamp`, `CtLog`,\n`SignedTreeHead`, `MerkleAuditPath`). Per non-negotiable #6 these\ntypes must remain `Clone+Debug+PartialEq+Eq+Hash` and serde-able, but\nthat does not require exhaustive struct-literal construction. Provide\na `new()` or `builder()` constructor and document direct field access\nas the only way to construct.\n\nCaller impact when un-fixed: every 0.x release that adds a single\nfield is a major bump. Adoption-blocker for downstream crates that\npin to `^0.1` and expect 0.x minor compatibility.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SignedCertificateTimestamp lacks #[non_exhaustive] \u2014 all fields public, breaking changes locked",
+  "updated_at": "2026-06-15T18:36:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:40:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:19Z",
+  "compaction_level": 0,
+  "content_hash": "c4f820c109f5fb7840148365d40b5a55ca24a75d6709c85f4b4a1c5c0c0885cb",
+  "created_at": "2026-05-07T20:27:08Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`DeviationAddError` at `pkix-lint/src/deviation.rs:69` is `pub` but missing `#[non_exhaustive]`. Every other error enum in the workspace (Error in pkix-path, pkix-revocation, pkix-chain, pkix-chain-simple, pkix-ac, pkix-ct, pkix-path-builder, pkix-revocation-http) carries `#[non_exhaustive]`. This one is inconsistent.\n\n## Location\n\n```\npkix-lint/src/deviation.rs:67-74\n\n/// Error returned by [`DeviationStore::add`].\n#[derive(Clone, Debug, PartialEq, Eq)]\npub enum DeviationAddError {\n    /// A deviation with the same `id` already exists in the store.\n    DuplicateId(String),\n    /// A required string field (`justification` or `authorized_by`) was empty.\n    EmptyField(String),\n}\n```\n\nCompare to e.g. `pkix-path::Error` (line 62) which has `#[non_exhaustive]`.\n\n## Impact\n\nAdding a new variant in a future release becomes a breaking change. All other workspace errors are forward-compatible; this one is not.\n\n## Fix\n\n```rust\n/// Error returned by [`DeviationStore::add`].\n#[non_exhaustive]\n#[derive(Clone, Debug, PartialEq, Eq)]\npub enum DeviationAddError {\n    DuplicateId(String),\n    EmptyField(String),\n}\n```\n\n## Priority\n\nP3 \u2014 API consistency, semver hygiene. Cheap to fix now; harder after release.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ta3g",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: DeviationAddError missing #[non_exhaustive] inconsistent with all other workspace error enums",
+  "updated_at": "2026-05-07T21:25:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

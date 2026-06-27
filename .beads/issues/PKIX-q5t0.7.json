@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: doc updated to not overpromise",
+  "closed_at": "2026-06-15T19:15:42Z",
+  "compaction_level": 0,
+  "content_hash": "88bf7460a8cc68a56056fdbaf3c4ac98f87fb2508803b947de2af2f3e6f0e1f0",
+  "created_at": "2026-06-15T19:06:12Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-identity/src/lib.rs line 246: The doc for `ServerName::to_owned` says 'avoids the intermediate clone when the inner data is borrowed', but the DNS arm does `cow.clone().into_owned()` \u2014 which when the cow is `Cow::Owned(String)` performs a String clone followed by a no-op move. The doc-claimed advantage over `.clone().into_owned()` on the struct doesn't exist: both paths do exactly one allocation regardless.\n\nSame issue for `MailboxName::to_owned` (line 408).\n\nThe methods are correct and their total allocation count is fine (one per call). The doc comment just overpromises. Suggest simplifying the doc to 'Equivalent to `.clone().into_owned()`' (which the MailboxName doc already says), or using `Cow::Owned(cow.as_ref().to_owned())` which is genuinely cheaper in the already-owned case (avoids cloning the String).",
+  "ephemeral": 0,
+  "id": "PKIX-q5t0.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ServerName::to_owned doc claim contradicts implementation",
+  "updated_at": "2026-06-15T19:15:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:06:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q5t0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

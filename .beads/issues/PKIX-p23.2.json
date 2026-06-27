@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:32Z",
+  "compaction_level": 0,
+  "content_hash": "3ea1816bf0a8dc2eed165f358363c457aafa6468375a7aaad65dfb51111bd9b4",
+  "created_at": "2026-05-06T21:29:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs line 46: The module-level doc example constructs DeviationScope::IssuerDnContains(\"Agency X Issuing CA\".to_string()) \u2014 a mixed-case string. The doc for IssuerDnContains at line 222-224 explicitly states \"The stored substring must be pre-lowercased. Passing an uppercase substring will not match anything.\" The example therefore demonstrates a deviation that silently never matches any certificate. This violates the API contract stated in the doc: the deviation would appear set up but would never fire. An operator following the example would deploy a permanently ineffective deviation with no error or warning. Fix: change the example to \"agency x issuing ca\".to_string() to match the lowercasing requirement.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: IssuerDnContains module doc example passes non-lowercased string (silent no-match)",
+  "updated_at": "2026-05-06T21:36:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:29:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

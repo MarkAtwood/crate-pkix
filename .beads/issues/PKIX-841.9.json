@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added 'This trait is object-safe and can be used as dyn SignatureVerifier' to SignatureVerifier rustdoc.",
+  "closed_at": "2026-05-02T17:47:23Z",
+  "compaction_level": 0,
+  "content_hash": "df6d4087703c5bf2642c5dbf633fa4de0f13b0d9b7074c976fbd7ce7e99a4513",
+  "created_at": "2026-05-02T17:27:39Z",
+  "created_by": "Mark Atwood",
+  "description": "SignatureVerifier has no generic type parameters and all methods take &self, so it is object-safe (dyn SignatureVerifier is valid). validate_path and chain_walk are generic over V: SignatureVerifier, which monomorphizes. Applications that need runtime dispatch (e.g. selecting between RSA and ECDSA backends based on config) will need dyn SignatureVerifier. There is no test or documentation confirming this works. If a future change breaks object safety (e.g. adding an associated type), it will be a silent breaking change for dynamic dispatch users. Should add a compile-time assertion (static_assertions::assert_obj_safe!) or at minimum a rustdoc note confirming dyn compatibility.",
+  "ephemeral": 0,
+  "id": "PKIX-841.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SignatureVerifier not documented as object-safe / dyn-compatible",
+  "updated_at": "2026-05-02T17:47:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:27:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

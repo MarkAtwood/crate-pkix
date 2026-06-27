@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.7",
+  "title": "option_vec serialize: dual buffers allocated unconditionally",
+  "description": "Location: pkix-path/src/serde_der.rs, option_vec::serialize() (lines 262-295)\n\nThe function allocates BOTH a Vec<Vec<u8>> (bytes_buf) and a Vec<String> (str_buf) with capacity equal to the input length, then populates only one of them based on is_human_readable(). The other buffer is allocated but never used.\n\nRewrite:\n\n  if is_hr {\n      let mut str_buf: Vec<String> = Vec::with_capacity(values.len());\n      for v in values {\n          let der_bytes = v.to_der().map_err(serde::ser::Error::custom)?;\n          str_buf.push(Base64::encode_string(&der_bytes));\n      }\n      serializer.serialize_some(&str_buf)\n  } else {\n      // ... bytes_buf path ...\n  }\n\nWhat goes wrong: wasted allocation proportional to input length. For small Vec<T> fields this is noise; for a ValidatedPath with many policy qualifiers it is one unnecessary Vec allocation per serialize call.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:16Z",
+  "updated_at": "2026-06-15T17:19:23Z",
+  "closed_at": "2026-06-15T17:19:23Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:16"
+    }
+  ]
+}

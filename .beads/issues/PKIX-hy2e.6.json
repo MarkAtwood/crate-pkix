@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added LintClone supertrait to Lint (blanket-impl'd for every T: Lint + Clone + 'static; concrete Lint impls just need to derive Clone, which all already did) plus a Clone impl for Box<dyn Lint> that delegates to LintClone::clone_box. apply_parameter_overrides now uses clone-and-swap: it clones every affected lint into a BTreeMap, applies set_parameter on the clones, and swaps the clones into the registered slots ONLY after every override has succeeded. A mid-batch InvalidParameterOverride leaves the runner unchanged (preserving either the construction-time default or the most-recently-committed value, depending on prior apply history). The previously-documented 'short-circuit on first failure leaves runner partially mutated' caveat is removed; the rustdoc now documents the atomic-on-either-error-variant contract. Added #[derive(Clone)] on every concrete Lint test fixture (14 sites across pkix-lint, pkix-lint-cabf, pkix-policy-zlint) and to the crate-level doctest example. Three regression tests: apply_parameter_overrides_atomic_on_invalid_value_keeps_default (failed batch from defaults), apply_parameter_overrides_commits_on_full_success (positive control), apply_parameter_overrides_atomic_on_invalid_value_keeps_previous_commit (failed batch after a successful one preserves the previously-committed value). 271 lib tests + 7 doc tests + workspace tests pass; pkix-lint, pkix-lint-cabf, pkix-policy-zlint clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T14:14:58Z",
+  "compaction_level": 0,
+  "content_hash": "4ba9de2bc94d2a7b912d79ef4ecfbbb3152361e3fdb59c3d833668a9384ff698",
+  "created_at": "2026-05-14T12:40:11Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: lib.rs:1184-1214. Documented limitation: 'Errors short-circuit on the first failure \u2014 overrides applied before the failing one remain mutated on the lints. Callers that need atomic application should resolve and validate overrides against the catalog before installing the lints in a runner.' Scenario that triggers cost: an OSCAL Profile sets parameters for lints A, B, C. Lint A accepts its override. Lint B accepts its override. Lint C rejects its override. The runner is now in a state where A and B have the new values but C has the old value, AND the error propagated to the caller. Maintenance consequence: every caller has to either build a 'try first, install later' wrapper, or accept that a failed apply leaves the runner in a half-overridden state. The doc's suggested workaround ('resolve and validate against the catalog before installing') is wrong: catalog-level validation can't predict which set_parameter calls will succeed because the lint's set_parameter accepts/rejects based on the lint's own internal domain constraints, not on the catalog's declared parameter shape. Fix: clone lints, apply to clones, swap on success. Cost: one Box<dyn Lint> clone per registered lint; we don't have a Lint::clone() yet so this needs design work (typed-state lints could derive Clone, the Box<dyn Lint> trait object would need Box<dyn LintClone>). Tracking this as P1 because the workaround is non-obvious.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "apply_parameter_overrides is non-atomic \u2014 partial application on failure",
+  "updated_at": "2026-05-14T14:14:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

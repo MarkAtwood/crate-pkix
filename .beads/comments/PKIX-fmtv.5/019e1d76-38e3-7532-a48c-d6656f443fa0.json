@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:32:28Z",
+  "id": "019e1d76-38e3-7532-a48c-d6656f443fa0",
+  "issue_id": "PKIX-fmtv.5",
+  "text": "DECISION 2026-05-12 (Mark, interactive): A) Pass-through Result. Every verify_* wrapper returns Result<ValidatedPath, Error>. Identity-binding failure modes land as new Error variants (HostnameMismatch, MalformedSan, MailboxMismatch, etc.). No structured VerifyReport / Finding taxonomy / severity-rollup machinery. Rationale: (1) Framework-not-policy (AGENTS.md non-negotiable #5) -- structured findings are policy-shaped output, locking the workspace to a finding taxonomy + severity model + rollup algorithm; same logic that demoted OSCAL and abandoned zlint mirroring applies. (2) Rust-idiomatic: Result + ? operator + pattern matching on flat error variants. (3) ValidatedPath already carries \u00a76.1.5 wrap-up outputs for success-side detail. (4) Door stays open: a future verify_*_verbose(...) -> VerifyReport can be added on concrete consumer demand. CASCADES: PKIX-fmtv.6 must now resolve as B) parallel pipeline -- there is no VerifyReport.findings vec for a lint_catalog VerificationPolicy adapter to write into. OPEN QUESTIONS for downstream implementers: whether to flatten or nest new Error variants (Error::Identity(IdentityError) wrapper vs flat enum); whether existing Error enum is non_exhaustive (additions are non-breaking only if so). Those are .11/.12 implementation calls, not part of this decision."
+}

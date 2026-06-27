@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1a3ad707ca08ef3b5f10eab80db7c2154d74d1efde152737cf85fee0733083ac",
+  "created_at": "2026-05-12T19:23:54Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nNew workspace crate `pkix-dane-resolver`. std-only. Provides:\n\n- DNSSEC-validating resolver (likely built on hickory-dns / hickory-resolver with DNSSEC feature)\n- API: `fn resolve_tlsa(host: &str, port: u16, proto: &str) -> Result<Vec<TlsaRecord>, ResolverError>`\n- Async variant: `async fn resolve_tlsa_async(...)`\n- Built-in TLSA cache respecting record TTLs\n- Configurable upstream: system resolv.conf, hardcoded fallback, env override\n- `Resolver` trait so consumers can plug their own implementation\n\n## Depends on\n\n- PKIX-j32w.1 (pkix-dane TLSA types)\n- Decision PKIX-j32w.5 (DNS config source)\n\n## Open shape decisions\n\n- Sync wrapper over async hickory: spawn_blocking + ad-hoc runtime, or expose async only and require consumers to provide a runtime?\n- Cache strategy: in-memory only, or admit on-disk cache via trait?\n- Hickory feature set: minimum needed for DNSSEC. Hickory's full feature set is large.\n\n## Acceptance\n\n- [ ] Resolver trait + default hickory-backed impl\n- [ ] DNSSEC validation (signed responses required; unsigned = treated as DNSSEC-fail per failure-mode policy in .4)\n- [ ] In-memory TLSA cache with TTL respect\n- [ ] System resolv.conf as default upstream\n- [ ] Test against a public DANE-deployed name (e.g., dnssec-tools.org) as a smoke test; offline tests use captured responses\n- [ ] ResolverError satisfies non-negotiable #6 (Clone+Debug+PartialEq+Eq+Send+Sync; serde behind feature flag)\n\n## Stub status\n\nFuture work. Filed as architectural commitment under PKIX-j32w.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.2",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Create pkix-dane-resolver crate (std DNSSEC resolver)",
+  "updated_at": "2026-05-13T00:20:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:23:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

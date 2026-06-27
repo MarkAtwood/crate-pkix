@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:25Z",
+  "compaction_level": 0,
+  "content_hash": "bacb4fac81ab7fbe6327ccf1e56ed180d35ec36f20f2ec351768e5174a0b8ec2",
+  "created_at": "2026-05-06T21:31:34Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs lines 161-179: WebPkiProfile::policy(now_unix) sets p.max_validity_secs = Some(sc081_validity_cap(now_unix)), where now_unix is the current wall-clock time. But pkix-path chain_walk checks max_validity_secs against (notAfter - notBefore) for every cert in the chain (not as a lookup against notBefore). The SC-081 text says \"the cap in effect at issuance time governs the cert for its lifetime.\" A cert issued before 2026-03-15 under the 398-day cap is permanently subject to the 398-day cap regardless of when the relying party validates it.\n\nWith WebPkiProfile.policy(now_unix) at a 2026-06-01 relying party time: sc081_validity_cap(now_unix) = 200 days. A cert validly issued with 365-day validity on 2026-01-01 (under the 398-day cap then in force) would fail max_validity_secs = 200 days, even though it was compliant at issuance. This is a false rejection.\n\nThe ValidityMaxLint in pkix-lint correctly evaluates the cap at notBefore (cabf_tls_br.rs line 121). The profile-level enforcement in pkix-profiles does not match this correct interpretation.\n\nCorrect fix: do not set max_validity_secs in WebPkiProfile \u2014 rely on ValidityMaxLint for this check. Or, if max_validity_secs must be set in the profile, it should be set to the issuance-time cap (which requires knowing notBefore, not just now_unix). The profile policy() approach is structurally incapable of expressing \"apply the cap as of notBefore\" because max_validity_secs is a single u64 applied uniformly.\n\nNote: the test at pkix-profiles/src/lib.rs line 675 explicitly narrows the cap to 300 days and expects rejection of a 365-day cert \u2014 this test documents the behavior but the behavior is incorrect per SC-081 semantics.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: WebPkiProfile applies SC-081 cap at validation time (now_unix), not at cert issuance time",
+  "updated_at": "2026-05-06T21:36:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

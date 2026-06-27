@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "aee5111a45eb0cd9a19c79a6dd8ba5faac2e71fc8fd77926d7b790ffbf9daae4",
+  "created_at": "2026-05-14T18:37:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:196-200, 1004-1012:\n\n```rust\nNoValidPath {\n    /// Number of candidate chains that were tried and rejected.\n    tried: usize,\n    last_error: alloc::string::String,\n},\n```\n\n```rust\nSome(Ok(chain)) => {\n    match pkix_path::validate_path(&chain, anchors, policy, verifier) {\n        Ok(_) => return Ok(chain),\n        Err(e) => {\n            tried += 1;\n            \u2026\n```\n\nThe doc says \"candidate chains that were tried and rejected.\" It does **not** define what counts as a \"candidate chain.\" Reading the implementation, `tried` is the count of `validate_path` rejections, NOT:\n\n- DFS frame entries (those are charged against `dfs_budget`, which is a different counter)\n- Iterator yields (those are `Some(Ok(_))`; a yield that VALIDATES is not counted in `tried`)\n- Iterator errors (`Some(Err(BudgetExceeded))` etc. bypass `tried` increment entirely and propagate)\n\nA caller seeing `tried: 3` can correctly infer \"the helper tried 3 candidate chains through validate_path; all 3 failed.\" They cannot infer:\n\n- How many DFS frames the iterator visited (could be 3 \u2014 one frame per yield \u2014 or hundreds \u2014 many frames backtracked without yielding).\n- How many iterator yields the helper consumed (exactly `tried + 1` if it eventually succeeded; exactly `tried` if it terminated with NoValidPath).\n- Wall-clock cost \u2014 see PKIX-wnnn.22 for the complexity-doc issue.\n\nThis becomes a real problem for diagnostic reporting. If `pkix-chain`'s `Verifier::verify_one` propagates `Error::NoValidPath { tried: 3, \u2026 }` to a caller's audit log, that caller cannot reconstruct what \"3\" means without reading pkix-path-builder's source.\n\nRequired doc clarification on the variant field:\n\n```\n/// Number of candidate chains that were yielded by the underlying\n/// iterator AND rejected by `pkix_path::validate_path`. This does NOT\n/// count:\n///   - DFS frame entries (see `PathBuilderConfig::dfs_budget`)\n///   - Candidates whose iteration surfaced a fatal error (those\n///     propagate unconditionally and bypass `tried`)\n///\n/// `tried >= 1` when this variant is returned (zero-yield exhaustion\n/// is reported as `Error::NoPathFound`).\n```\n\nMinor concern, doc-only fix.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "NoValidPath.tried counter granularity unspecified \u2014 counts validate_path rejections, not iterator yields or DFS frames",
+  "updated_at": "2026-05-14T18:37:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:37:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.66",
+  "title": "LintProfile missing on 5 of 7 RFC-baseline profiles",
+  "description": "pkix-profiles defines 7 RFC-baseline Profile types. Only 2 (BasicTlsProfile, BasicSmimeProfile) have LintProfile impls. The other 5 (Rfc5280Profile, BasicTlsClientProfile, BasicCodeSigningProfile, BasicTimeStampingProfile, BasicOcspResponderProfile) do not, so they cannot participate in pkix_lint::check_shape() or shape-check convenience aliases. In contrast, pkix-profiles-cabf achieves 7-for-7 LintProfile coverage across its Profile types. This asymmetry means callers using BasicCodeSigningProfile or BasicTimeStampingProfile cannot call check_shape(), while callers using BasicTlsProfile can. If applicable RFC-conformance lints exist (e.g. signatureAlgorithm match, serial-number length cap), they should be bundled. Location: /home/mark/PROJECT/PKIX/pkix-profiles/src/lib.rs.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:17Z",
+  "updated_at": "2026-06-15T16:55:20Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:16"
+    }
+  ]
+}

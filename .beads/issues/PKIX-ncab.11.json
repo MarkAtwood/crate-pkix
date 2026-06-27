@@ -1,0 +1,38 @@
+{
+  "close_reason": "pkix-lint 0.6.0: Lint trait gained spec_section_id and spec_url as canonical names; rfc_section_id and rfc_url retained as #[deprecated(since = '0.6.0')] default-method aliases (independent defaults; calling the deprecated alias on a lint that overrides only the new name returns None \u2014 documented in trait rustdoc). Doc comments on all six metadata methods (title, description, spec_section_id, spec_url, parameters, set_parameter) softened to remove OSCAL-only framing. In-tree call sites and impls migrated: pkix-lint/src/rfc5280.rs, pkix-lint/src/oscal/catalog.rs (module docs, emitter, test fixture), pkix-lint/src/oscal/profile.rs (test fixture), pkix-lint-cabf/src/cabf_tls_br.rs (6 impls via replaceAll), pkix-lint-cabf/tests/cabf_tls_br_tests.rs (metadata assertions + section header). Workspace + pkix-lint Cargo.toml version comments updated. CHANGELOG entry added. cargo check --workspace --all-features clean; pkix-lint tests 201/201 pass; pkix-lint-cabf tests 43/43 pass; doc-tests pass.",
+  "closed_at": "2026-05-12T16:44:42Z",
+  "compaction_level": 0,
+  "content_hash": "67860dbfe91d9b000ff16256720da6bda4286b06066b6ad12f974d9ca3ccc3c2",
+  "created_at": "2026-05-12T02:21:21Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement rename or doc-softening for the `Lint` trait OSCAL-Control metadata methods per the .6 decision:\n\n- If A (rename): breaking API change in pkix-lint 0.6.0. Update all impl sites in pkix-lint, pkix-lint-cabf. Update CHANGELOG.\n- If B (doc-softening only): no API change; edit doc comments on the 4 methods to soften OSCAL framing.\n- If C (both): rename + deprecated aliases. pkix-lint 0.6.0 with deprecation warnings.\n\nCoordinate with .12 (OSCAL module docs audit) \u2014 the trait-method docs are typically in pkix-lint/src/lib.rs, not in pkix-lint/src/oscal/, but the framing should be consistent.\n\nBlocks on: .6.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Apply .6 decision to Lint trait OSCAL-Control metadata methods",
+  "updated_at": "2026-05-12T16:44:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:21:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:21:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

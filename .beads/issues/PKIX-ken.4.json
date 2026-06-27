@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "code_signing_policy returns without panic. Listed tests pass.",
+  "assignee": "Mark Atwood",
+  "close_reason": "code_signing_policy implemented: 1185-day cap, SHA-1 excluded, min 3072-bit RSA, no SAN required, require codeSigning EKU. Tests pass.",
+  "closed_at": "2026-05-06T05:07:29Z",
+  "compaction_level": 0,
+  "content_hash": "b92dda825f512cf617c9b3eb33ea70283ef898ebd06e5b6e99c1b0ea8384610c",
+  "created_at": "2026-05-06T03:26:56Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement code_signing_policy(now_unix) in pkix-profiles/src/lib.rs to return a ValidationPolicy enforcing CA/B Forum Code Signing Baseline Requirements (current version: v3.4+).\n\nConstraints to set:\n- max_validity_secs: 1185 * 86400  (1185 days / ~39 months, per CS BR \u00a76.3.2)\n- allowed_signature_algs: SHA-1 excluded. SHA-256/384/512 RSA and ECDSA allowed. Note: CS BR \u00a76.1.5 also prohibits SHA-1 for signing certificates themselves.\n- min_rsa_key_bits: 3072  (CS BR \u00a76.1.5 \u2014 raised to 3072 bits effective 2023-06-01, higher than TLS BR)\n- require_subject_alt_name: false  (CS certs identify subjects by DN, not SAN)\n- required_leaf_eku: [id-kp-codeSigning]  (1.3.6.1.5.5.7.3.3)\n\nRemove the unimplemented!() panic. Update rustdoc.\n\nNote for implementor: the 3072-bit RSA minimum is the key differentiator from web_pki_policy (2048 bits). Verify the min_rsa_key_bits field from PKIX-ken.1 is enforced against the leaf's SPKI, not the intermediate's.\n\nTests:\n- Cert with id-kp-codeSigning EKU passes\n- Cert missing id-kp-codeSigning rejected\n- RSA 2048-bit leaf rejected (below 3072 floor)\n- RSA 3072-bit leaf accepted\n- SHA-1 cert rejected\n- Cert exceeding 1185 days rejected",
+  "ephemeral": 0,
+  "id": "PKIX-ken.4",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement code_signing_policy (CA/B Forum CS BR)",
+  "updated_at": "2026-05-06T05:07:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:26:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:26:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

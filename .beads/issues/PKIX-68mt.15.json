@@ -1,0 +1,31 @@
+{
+  "close_reason": "Acknowledged decision: wildcard *.<single-label> rejected",
+  "closed_at": "2026-06-15T18:47:54Z",
+  "compaction_level": 0,
+  "content_hash": "4752af5ebd8b11122238e729960a01d730efddadfe87bfb376a4869abd3b1866",
+  "created_at": "2026-05-14T19:15:09Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_dns_san at pkix-identity/src/lib.rs:644 rejects wildcard SANs of the form '*.<single-label>' (no further dot after the wildcard label) \u2014 e.g. '*.com'. The module rustdoc and the san_wildcard_rejects_single_label_tld test both lock this in.\n\nA future contributor or commenter will suggest 'this is a public-suffix-list concern, not the validator's job \u2014 remove this'. They will cite the README which says PSL is out of scope.\n\nDefend: this is a STRUCTURAL check, not a PSL lookup. It blocks the most catastrophic wildcard misuse (*.com matching any .com) without bringing in PSL data. It is universally safe \u2014 there is no legitimate use case for '*.com' style wildcards. webpki and the major browsers all apply equivalent structural restrictions independent of PSL. The check is cheap, ASCII-only, and does not regress on legitimate '*.foo.example.com' patterns. Removing it would be a security regression masquerading as scope discipline.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.15",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: wildcard *.<single-label> structurally rejected as defense-in-depth against PSL",
+  "updated_at": "2026-06-15T18:47:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:15:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

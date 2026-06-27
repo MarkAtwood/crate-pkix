@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "d487484167105827f3840a38559cc8ca2e80ad2d24aa278ede96c0190989e4b6",
+  "created_at": "2026-05-14T19:12:41Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-68mt",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T190857Z-148338",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T190857Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-identity since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Confidence: ~25% chance of missed bug. Least confident flags: PKIX-68mt.11 (IDNA processing-mode behavior across idna crate versions \u2014 I traced the default but did not exercise transitional vs non-transitional inputs end-to-end), PKIX-68mt.4 (duplicate SAN-extension behavior \u2014 could not confirm whether x509-cert's parser already rejects duplicates upstream of find_san). Uncertainty driven by: did not run cargo test to confirm the IPv6 trailing-:: bug empirically (review is read-only per instructions), and did not exercise the matches_dns_san wildcard cases against the upper bound of label-length-after-strip. Would raise confidence if: (a) a probe added 'fe80::', '2001:db8::', and 'a:b:c:d:e:f:0::' cases to the ip_address tests and saw them fail under current code, (b) a probe constructed a synthetic cert with two SAN extensions and exercised find_san's first-wins behavior, (c) idna crate's domain_to_ascii was exercised against the 'fa\\u00DF.de' (German sharp-s) corner case to lock the processing-mode claim.\nMaintainer risk: MEDIUM \u2014 one P0 correctness bug (trailing IPv6 ::) and three P1 surfaces (stale rustdoc claiming mailbox unimplemented; doc/code disagreement on ASCII-target \u00d7 SmtpUTF8-SAN matching; undocumented first-wins on duplicate SAN extensions) need resolution before 1.0 because they fossilize publicly observable behavior or shipped doc claims.\nAPI contract risk: HIGH \u2014 4 new P1 contract findings (no accessors PKIX-68mt.18; no PartialEq/Eq/Hash PKIX-68mt.19; permanent 'a lifetime parameter without into_owned PKIX-68mt.21; plus the existing mailbox/dns/find_san P1s flagged in the prior pass). Without fixes, callers ship workarounds (keep input strings around, write their own hash wrappers, leak input through 'static) and the API permanently calcifies. Six P2 (coarse error variant PKIX-68mt.20, x509-cert version leak PKIX-68mt.22, lost diagnostic info PKIX-68mt.23, serde scope PKIX-68mt.24, missing IP byte ctor PKIX-68mt.26, NotYetImplemented variant debt PKIX-68mt.29). Six P3 docs/ergonomics (PKIX-68mt.25,.27,.28,.30,.31).\nAPI contract confidence: ~20% chance of missed issue. Least confident flags: PKIX-68mt.21 (lifetime decision \u2014 rustls-pki-types went 'static, webpki kept borrows; either is defensible and I'm calling for *a* decision, not specifically which way), PKIX-68mt.20 (error subdivision boundary \u2014 pyca's exceptions are subdivided but the right axis for this crate hasn't been thought through; I file the problem not the specific fix), PKIX-68mt.22 (whether re-exporting x509-cert is the right interop story vs. a trait abstraction \u2014 I haven't surveyed how other RustCrypto crates handle this exact case). Uncertainty driven by: did not read pkix-chain to see how Verifier actually consumes ServerName / MailboxName (would confirm or refute the 'a lifetime drag claim), did not check whether x509-cert 0.x is already re-exported elsewhere in the workspace, did not run cargo doc --all-features to see how the missing accessors / Display interact in practice. Would raise confidence: (a) read pkix-chain's identity-binding call sites to see what *actual* lifetime threading the 'a parameter forces on callers, (b) check rustls-pki-types' API surface side-by-side with this one for explicit pattern alignment, (c) confirm via cargo public-api whether PartialEq/Eq/Hash on the inner Cow<'_, str> would derive cleanly.\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-identity since 24701180",
+  "updated_at": "2026-05-14T19:24:16Z"
+}

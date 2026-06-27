@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added PartialEq, Eq, Hash to DefaultVerifier, EcdsaP256Verifier, RsaPkcs1v15Sha256Verifier (alongside existing Clone, Copy, Debug, Default). Builds clean.",
+  "closed_at": "2026-05-07T22:31:28Z",
+  "compaction_level": 0,
+  "content_hash": "420c08317261084ce25c93537bbca1010444766d25d97f9cde9852f3de42a83e",
+  "created_at": "2026-05-07T22:14:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nThree verifier ZSTs in `pkix-path/src/lib.rs` derive `Clone, Copy, Debug, Default`\nbut lack `PartialEq, Eq, Hash`:\n\n```rust\n#[derive(Clone, Copy, Debug, Default)]\npub struct EcdsaP256Verifier;          // line 1830-1831\n#[derive(Clone, Copy, Debug, Default)]\npub struct RsaPkcs1v15Sha256Verifier;  // line 1872-1873\n#[derive(Clone, Copy, Debug, Default)]\npub struct DefaultVerifier;            // line 3022-3023\n```\n\nPass 1 (epic PKIX-hxu1) added `Copy + Default` to `DefaultVerifier` but did not\nadd `PartialEq, Eq, Hash`. The same gap exists for the two backend-specific\nverifiers.\n\nThe Rust idiom for ZSTs is to derive every zero-cost trait from the\n`Clone, Copy, Debug, Default, PartialEq, Eq, Hash` set. Concrete benefit: lets\ncallers use these as keys/markers in maps, sets, and assertion macros without\nneeding manual wrappers.\n\nFix: change to\n`#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]` on all three.\n\nLocations:\n- `pkix-path/src/lib.rs:1830` (`EcdsaP256Verifier`)\n- `pkix-path/src/lib.rs:1872` (`RsaPkcs1v15Sha256Verifier`)\n- `pkix-path/src/lib.rs:3022` (`DefaultVerifier`)\n\nSister issue: same pattern for the four profiles in pkix-profiles (PKIX-qwzx.18)\nand the six lint ZSTs in pkix-lint/cabf_tls_br (PKIX-qwzx.17).",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.19",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: DefaultVerifier/EcdsaP256Verifier/RsaPkcs1v15Sha256Verifier ZSTs missing PartialEq/Eq/Hash",
+  "updated_at": "2026-05-07T22:31:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:14:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

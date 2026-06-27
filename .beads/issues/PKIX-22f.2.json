@@ -1,0 +1,31 @@
+{
+  "close_reason": "Not a real bug: chain.last().ok_or() is harmless defensive programming. check_inputs prevents the empty-chain case but the guard is not wrong, just redundant. Below threshold for change.",
+  "closed_at": "2026-05-02T17:54:19Z",
+  "compaction_level": 0,
+  "content_hash": "5919efdd1fbc5e2b201d79bcb66600066e083c2a360dc0bd47ccfd65026a6653",
+  "created_at": "2026-05-02T17:52:22Z",
+  "created_by": "Mark Atwood",
+  "description": "In validate_path (line 386), 'chain.last().ok_or(Error::NoTrustedPath)?' is unreachable because check_inputs at line 370 already returns Err(NoTrustedPath) when chain is empty. The .ok_or guard is dead code that creates a false sense of safety and will confuse maintainers who later add branches between check_inputs and this line. Fix: replace with chain.last().expect(\"check_inputs guarantees non-empty\") or, better, assert_debug or extract the non-empty slice as a typed invariant.",
+  "ephemeral": 0,
+  "id": "PKIX-22f.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "dead chain.last().ok_or() after check_inputs guard",
+  "updated_at": "2026-05-02T17:54:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:52:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-22f",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

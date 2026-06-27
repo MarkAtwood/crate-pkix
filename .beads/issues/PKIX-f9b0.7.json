@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:57:51Z",
+  "compaction_level": 0,
+  "content_hash": "b1f94b845cf08c6f6eafebbff1d4b62e6c4a01e9bc4cc57a56d62b165c79d86b",
+  "created_at": "2026-05-07T17:22:24Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1538,1539 \u2014 The word 'IpAddress' appears in a doc comment without backtick quoting. Clippy pedantic doc_markdown fires. Fix: change to ``IpAddress``. Also many occurrences in tests/pkits_policy.rs (explicit_policy, policy_mapping_inhibit etc). All are pure cosmetic.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] doc_markdown: IpAddress in NcTypeMask comment not backtick-quoted",
+  "updated_at": "2026-05-07T18:57:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

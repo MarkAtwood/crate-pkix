@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:57:06Z",
+  "compaction_level": 0,
+  "content_hash": "243c57a0161d526e9fcfe8dcdc5ade4ca2e0a3bed943d2bad72cf1cb2b9f6fce",
+  "created_at": "2026-05-07T17:22:08Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1483 \u2014 `impl<'a> Iterator for NormalizedIter<'a>` has an elidable lifetime. Clippy pedantic elidable_lifetime_names fires. Fix: `impl Iterator for NormalizedIter<'_>`. Pure cosmetic.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] elidable lifetime 'a on NormalizedIter impl",
+  "updated_at": "2026-05-07T18:57:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

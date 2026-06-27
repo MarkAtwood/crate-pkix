@@ -1,0 +1,22 @@
+{
+  "close_reason": "Absorbed into PKIX-9vnx.5 (Deviation/DeviationStore \u2192 OSCAL Risk). Under the PKIX-ztmr stance (OSCAL as source of truth), subject-scoping for deviations becomes OSCAL Subject props on Risk objects, not Rust enum variants on DeviationScope. The SubjectDnContains and PolicyOid scope axes ARE expressible \u2014 but as structured props on OSCAL Subjects, which is the standard, schema-validated way to do it. Growing the bespoke DeviationScope enum is no longer the right call.",
+  "closed_at": "2026-05-11T05:55:27Z",
+  "compaction_level": 0,
+  "content_hash": "0724a625a29384693b5069f44f9afbf641631c4d6693fe9d62dedad75d976133",
+  "created_at": "2026-05-11T05:29:00Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`DeviationScope` covers Any / IssuerDnExact / IssuerDnContains / SerialRange today. Two real use cases aren't covered:\n\n1. **Subscriber-identity scoping** \u2014 'this deviation applies to all certs issued to Subject DN containing \"Foo Corp\".' Needed when a single CA deviates only for a specific subscriber group.\n2. **Policy-OID scoping** \u2014 'this deviation applies to all certs that assert CP OID 1.3.6.1.4.1.example.policy.42.' Needed for policy-based deviation (e.g. a specific identity-proofing tier where the rule legitimately differs).\n\n## What\n\nTwo new variants on `DeviationScope`:\n\n```rust\nSubjectDnContains(String),\nPolicyOid(ObjectIdentifier),\n```\n\nBoth follow the existing variant pattern. Predicate evaluation walks the cert's Subject / certificatePolicies extension and matches against the scope value.\n\n## Acceptance\n\n- [ ] Two new variants on `DeviationScope` (the enum is `#[non_exhaustive]` so addition is non-breaking).\n- [ ] Scope-matching predicate updated for both.\n- [ ] Unit tests with fixture certs covering positive + negative match for each variant.\n- [ ] Crate version bumped (additive on `#[non_exhaustive]` enum).\n\n## Filed as\n\nTracker for pkix-lint/src/deviation.rs:216 '# Planned additions' rustdoc block. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-8mzp",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: add DeviationScope::SubjectDnContains and ::PolicyOid variants",
+  "updated_at": "2026-05-11T05:55:27Z"
+}

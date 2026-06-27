@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8632809813e9245b7caae138dd8808a58e03e97bdf4ebe3225bdffa72ef6a8fe",
+  "created_at": "2026-05-14T19:29:44Z",
+  "created_by": "Mark Atwood",
+  "description": "Why this choice is correct: AiaError at pkix-aia/src/lib.rs:111-205 is marked #[non_exhaustive] and uses struct variant shape (e.g. ResponseTooLarge { limit, actual }) rather than tuple variant shape (ResponseTooLarge(usize, usize)) for any variant carrying more than one field.\n\n#[non_exhaustive] is the right call for a public error enum on a pre-1.0 crate that will expand over time. Future variants for DNS resolution, TLS validation of the AIA endpoint, etc. (already foreseen in the rustdoc at lines 81-83) can land without breaking downstream pattern matches.\n\nStruct variants for ResponseTooLarge and IoFailure are right because:\n- Pattern matchers read better: 'AiaError::ResponseTooLarge { limit, actual }' is self-documenting; 'AiaError::ResponseTooLarge(a, b)' requires checking which is which.\n- Field reordering is non-breaking (struct variants are matched by name).\n- Future field additions (e.g. timing data, request ID) can land without breaking existing matches that use '..' rest pattern.\n\nA future contributor might suggest 'tuple variants are more concise \u2014 use ResponseTooLarge(usize, usize)'. Reject: the readability and future-proofing of struct shape are worth the extra punctuation.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.15",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Decision: #[non_exhaustive] AiaError with struct variants for multi-field cases",
+  "updated_at": "2026-05-14T19:29:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

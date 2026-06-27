@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.28",
+  "title": "pkix-chain Error::ProfileViolation and OcspDelegation use Cow<'static, str>",
+  "description": "In pkix-chain/src/lib.rs:173-209, Error::ProfileViolation and Error::OcspDelegation carry a reason: Cow<'static, str> field. The rustdoc says 'Cow<'static, str> rather than &'static str so the serde deserialize path can yield an owned String'. All producers use Cow::Borrowed from &'static str literals, and consumers are told to 'pattern-match on the variant rather than the inner string'.\n\nWhat goes wrong: The reason field looks like structured data but is actually a fixed set of static strings used as an ad-hoc enum. Callers who want to programmatically distinguish profile violations (e.g., 'EKU not critical' vs. 'EKU not sole') must string-match. Adding a new kind of profile violation requires a new &'static str literal but no type-system help.\n\nLocation: pkix-chain/src/lib.rs:173-209\n\nRecommendation: Consider replacing the Cow<'static, str> reason with a dedicated ProfileViolationKind enum whose Display impl produces the current string text. This preserves programmatic matching and serde round-trip while removing the string-matching antipattern.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:14Z",
+  "updated_at": "2026-06-15T17:25:45Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:13"
+    }
+  ]
+}

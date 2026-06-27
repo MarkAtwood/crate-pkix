@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T05:37:50Z",
+  "compaction_level": 0,
+  "content_hash": "ddad75618ca3b0b669b389ec3c23401484cb6a584fde84c46496028d7339da48",
+  "created_at": "2026-05-08T05:11:34Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer parent PKIX-77cl design \u00a76: the 4 \u00a74.5 FAIL cases fail because the EE is revoked on a self-issued-signed CRL. They must live in pkix-revocation tests, not pkix-path.\n\n## Scope (this PR only)\n\n1. Add `pkix-revocation/tests/pkits_helper.rs` (or extend if it exists) with a new `pkits_validate_with_crls(cert_names, crl_names, now_unix)` helper (~50 LOC) that runs path validation with CRL revocation checking.\n2. Add `pkix-revocation/tests/pkits_4_5.rs` with all 8 \u00a74.5 cases:\n   - 4 PASS: 4.5.1, 4.5.3, 4.5.4, 4.5.6 (revocation check passes \u2014 EE not on CRL)\n   - 4 FAIL: 4.5.2, 4.5.5, 4.5.7, 4.5.8 (EE revoked on self-issued-signed CRL \u2014 assert revoked variant)\n\n## Independence from chain_walk refactor\n\nPer parent bead \u00a78: this PR can land in parallel with PKIX-als9 chain_walk refactor. PR-1 already provides the regression-protective baseline; this PR adds full coverage including revocation paths.\n\n## Implementation notes\n\n- Need to read pkix-revocation public API to determine the right helper signature.\n- CRL fixtures already at `pkix-path/tests/pkits/crls/` \u2014 pkix-revocation test harness needs to load them from there (cross-crate path) or have its own copy.\n- FAIL assertion: pin the exact `pkix_revocation::Error` (or whatever the path-with-revocation result type returns) for revoked status.\n\n## Acceptance\n\n- [ ] `pkix-revocation/tests/pkits_4_5.rs` exists with 8 tests.\n- [ ] Helper function loads + parses CRLs and runs through pkix-revocation's RevocationChecker.\n- [ ] All 8 tests pass: `cargo test -p pkix-revocation --test pkits_4_5`.\n- [ ] FAIL cases assert variant-precise revocation errors.\n- [ ] Tests are fully offline.\n- [ ] `cargo fmt --all`, `cargo clippy --all-features -p pkix-revocation -- -D warnings` clean.\n\n## Oracle\n\nNIST PKITS vectors.json (`ShouldValidate` field) plus PKITS \u00a74.5 narrative for failure mode classification.",
+  "ephemeral": 0,
+  "id": "PKIX-77cl.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Committed as 67d7bf99. 7 PASS+FAIL tests added in pkix-revocation/tests/pkits_4_5.rs. Cargo.toml [[test]] block gated on 'crl' feature.\n\nKey implementation decisions:\n1. Tests use direct CrlChecker::check_revocation calls (matching pkits_crl.rs style), not path+revocation integration via pkix_chain::verify_chain. The bead originally proposed a 'pkits_validate_with_crls' multi-CRL helper but the indirect-CRL semantics in \u00a74.5 (CRL signer differs from cert issuer) are not supported in pkix-revocation v0.1 path-level integration \u2014 deferred to v0.2.\n\n2. Each test explicitly identifies the CRL signer cert (via AKI match against bundle) and supplies it as 'issuer' to check_revocation. Documented inline in the file header.\n\n3. Scope correction: \u00a74.5.8 is NOT a revocation failure (PKITS narrative: 'The end entity's certificate was signed using the CRL signing key' \u2014 i.e., signed by cRLSign-only cert without BasicConstraints). It belongs to PR-1 (pkix-path) and was added in commit 39d56b27.\n\nFinal corrected split:\n- pkix-path/tests/pkits_4_5.rs: 5 tests (4.5.1, .3, .4, .6 PASS, 4.5.8 FAIL).\n- pkix-revocation/tests/pkits_4_5.rs: 7 tests (4.5.1, .2, .3, .4, .5, .6, .7).\n\ncargo fmt + clippy --all-features -p pkix-revocation --tests + full workspace test all clean.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PR-2: pkix-revocation PKITS \u00a74.5 full suite (all 8 cases including 4 revocation FAIL)",
+  "updated_at": "2026-05-08T05:37:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:11:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77cl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

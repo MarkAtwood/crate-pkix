@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T21:43:52Z",
+  "compaction_level": 0,
+  "content_hash": "87c75926a5dc477ca6619454c59e81481a481e3b5fed07d9c31c473bd9377ce6",
+  "created_at": "2026-05-12T19:40:57Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nPKIX-jy95's description lists `pkix-policy-oscal` as a candidate adapter: 'consumes OSCAL Profile JSON and configures the workspace's LintRunner accordingly. NOT a rule DSL interpreter \u2014 just a Profile-selection mechanism that maps OSCAL Control IDs to existing workspace Lint impls.'\n\nShould this crate be filed as a real child of PKIX-jy95, or skipped entirely?\n\n## Context\n\n- PKIX-9vnx already ships OSCAL emit/parse code in pkix-lint/src/oscal/* (now re-roled under three-mode model as 'OSCAL adapter for OSCAL output').\n- That existing code covers the EMIT half (workspace -> OSCAL Assessment Results JSON).\n- A pkix-policy-oscal would cover the CONSUME half (OSCAL Profile JSON -> workspace LintRunner config).\n- The three-mode model in AGENTS.md non-negotiable #5 explicitly treats OSCAL as one optional adapter alongside zlint / pkilint; nothing mandates that the OSCAL adapter exist.\n\n## Options\n\n- **A) File pkix-policy-oscal as a real child of PKIX-jy95.** Build the consume half. Justified by: NIST OSCAL compliance toolchains are a real ecosystem; consumers in regulated industries may want to author their policy as OSCAL Profile JSON and have the workspace honor it. Cost: design + impl of the OSCAL Profile parser (NIST OSCAL Profile v1.2.2 schema).\n\n- **B) Skip pkix-policy-oscal entirely.** The shipped emit-only code in pkix-lint/src/oscal/* is enough. Consumers who want OSCAL-driven config can use a third-party OSCAL parser to extract Control IDs and configure LintRunner manually. Justified by: 'framework not policy' \u2014 workspace doesn't have to ship every conceivable adapter.\n\n- **C) Defer with a trigger.** Park the decision until a concrete consumer asks. (NOTE: under the prelaunch framing, 'no concrete consumer is asking' is the default condition and not a real reason to defer. So this 'defer' would be 'I want to think about it more,' not 'wait for consumer demand.')\n\n## Considerations\n\n- (A) ratifies the OSCAL adapter as a first-class part of the workspace's industry-forum-policy story.\n- (B) keeps the workspace simpler. OSCAL stays an emit-only nice-to-have.\n- The decision interacts with the 'unprincipled exception' clause for pkix-lint-cabf: comprehensive CA/B Forum coverage is pkix-policy-zlint. OSCAL-driven config is a different axis (consumer chose OSCAL as their policy vocabulary).\n\n## Decision-gate\n\nThis is a strategic call about workspace scope. Not blocked by anything; can be answered any time.\n\n## Cross-references\n\n- PKIX-jy95 parent\n- PKIX-9vnx (existing OSCAL emit/parse work; provides re-usable parsing primitives)\n- AGENTS.md non-negotiable #5 (three-mode policy-class model)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.5",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide whether pkix-policy-oscal exists as a real adapter crate",
+  "updated_at": "2026-05-12T21:43:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:40:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

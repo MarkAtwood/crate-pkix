@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T02:54:48Z",
+  "compaction_level": 0,
+  "content_hash": "80334d31e5f77f84fa530e3bc9e2274fc8ba6eb2f66de03ae3b8c9b39aed00c7",
+  "created_at": "2026-05-14T02:40:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nMultipurpose-generation sibling to `SmimeIndividualValidated`\n(Individual Strict, shipped via PKIX-jbvb.7). Per CA/B Forum S/MIME BR\n\u00a77.1.6.1: Multipurpose certs assert policy OID `2.23.140.1.5.4.2` and\npermit additional EKU values beyond `emailProtection`.\n\nNot blocked \u2014 Individual Strict is shipped. Structural template is in\n`pkix-profiles-cabf/src/lib.rs` `SmimeIndividualValidated`.\n\n## API shape\n\n```rust\npub struct SmimeIndividualValidatedMultipurpose;\n\nimpl Profile for SmimeIndividualValidatedMultipurpose {\n    fn id(&self) -> &'static str { \"cabf.smime.individual.multipurpose\" }\n    fn version(&self) -> &'static str { \"1.0.14\" }\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // Baseline same as SmimeIndividualValidated (Strict), with:\n        // - required_leaf_policy_oids: [2.23.140.1.5.4.2]\n        // - EKU permissiveness per \u00a77.1.2.3(f) Multipurpose row\n        // - same DN rule: (givenName \u2227 surname) \u2228 pseudonym\n        //   per \u00a77.1.4.2.6 Note 2\n    }\n}\n\npub const fn smime_individual_multipurpose_policy(now_unix: u64) -> ValidationPolicy { ... }\n```\n\n## Subject DN rule\n\nPer \u00a77.1.4.2.6 Multipurpose column: identical to Strict. Reuse the\nsame `DnAttrRule` construction as `SmimeIndividualValidated`.\n\n## OID constant\n\nAdd `CABF_SMIME_INDIVIDUAL_VALIDATED_MULTIPURPOSE_POLICY` =\n`ObjectIdentifier::new_unwrap(\"2.23.140.1.5.4.2\")`.\n\n## Test fixture\n\nGenerate `smime-individual-multipurpose-self-signed-365d.der` and\n`smime-individual-multipurpose-pseudonym-self-signed-365d.der` via\nextension to `gen-smime-tier-fixtures.py`. Two-form pattern matching\nIndividual Strict.\n\n## Acceptance\n\n- Type, alias, OID constant ship.\n- 2 positive fixtures.\n- Negative: cross-tier OID mismatches fail correctly.\n- CHANGELOG + divergences.md updated.\n- Same clippy/fmt/test bars as PKIX-jbvb.9.2.\n\n## Not blocked\n\nIndividual Strict (PKIX-jbvb.7) is shipped. Autonomous-loop-claimable\nwhen epic priority surfaces it.\n\n## Cross-references\n\n- PKIX-jbvb.9 (epic)\n- PKIX-jbvb.7 (Individual Strict \u2014 structural template)\n- specs/cabforum-smime-BR.md \u00a77.1.6.1, \u00a77.1.2.3(f), \u00a77.1.4.2.6\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeIndividualValidatedMultipurpose profile + fixtures",
+  "updated_at": "2026-05-14T02:54:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:40:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

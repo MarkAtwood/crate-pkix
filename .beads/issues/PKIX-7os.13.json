@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision records, no code change needed",
+  "closed_at": "2026-05-02T14:49:21Z",
+  "compaction_level": 0,
+  "content_hash": "3e22ac08adb08cdc88cabfaceab3a2f9f40d56fd6cbdbba53a2d00abefd49555",
+  "created_at": "2026-05-02T14:39:32Z",
+  "created_by": "Mark Atwood",
+  "description": "#[non_exhaustive] on pkix_path::Error, pkix_revocation::Error, pkix_chain::Error, and pkix_chain_simple::Error is correct. Without it, adding a new error variant in a patch release is a breaking change. Contributors may propose removing it for 'simplicity' \u2014 the breaking-change protection is worth the match boilerplate.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.13",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Non-exhaustive error enums on all public Error types is correct",
+  "updated_at": "2026-05-02T14:49:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:39:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

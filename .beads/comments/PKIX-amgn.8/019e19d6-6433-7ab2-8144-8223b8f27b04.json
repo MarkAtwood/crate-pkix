@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "created_at": "2026-05-12T01:39:01Z",
+  "id": "019e19d6-6433-7ab2-8144-8223b8f27b04",
+  "issue_id": "PKIX-amgn.8",
+  "text": "do-beads loop hygiene 2026-05-11: applying the human label. The epic's autonomous frontier is exhausted \u2014 child .8.3 (zlint JSON \u2192 OSCAL Catalog transform) is human-labeled pending a maintainer-call on which Source-classification values land in which OSCAL Catalog file (cabf_br vs cabf_smime_br vs cabf_cs_br + cross-source filter rules). Without .8.3 closed, descendants .8.4 (vendor first catalog), .8.5 (runtime parser), and .8.6 (first Lint pairing) cannot proceed. Re-evaluate when .8.3 unblocks."
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:33:57Z",
+  "compaction_level": 0,
+  "content_hash": "45261f0f47ccd98bdafefa10da8d595a05456719b2c74dab462b2b3fa901daed",
+  "created_at": "2026-05-07T20:11:31Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-path/Cargo.toml\\` (v0.2.0) line 21 and 33 contain comments that say:\n- L21\u201322: \\\"v0.1: only RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256 are implemented. p384 and ed25519 are reserved for v0.2 and are not declared as features here.\\\"\n- L33: \\\"# Algorithm backends (optional; p384 and ed25519-dalek reserved for v0.2)\\\"\n\nThe package is v0.2.0; these comments are stale.\n\n## Why P1\nSection 0 anchor \u2014 the manifest claims about feature scope must match reality. A reader (or auditor, or Cargo doc generator) sees \\\"reserved for v0.2\\\" in v0.2.0 and reasonably expects p384/ed25519 support. Neither is implemented anywhere in the workspace; the comments are misleading and they entrench a forward-looking promise that is now overdue.\n\n## Fix\nEither:\n- Remove the \\\"reserved for v0.2\\\" comments since they no longer describe the future, OR\n- Update them to a concrete plan (\\\"reserved for v0.3\\\" with a tracking issue), OR\n- Implement P-384 and Ed25519 support if v0.2 was the implementation target.\n\n## Scope reference\n\\`pkix-path/Cargo.toml:21-22,33\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-memj",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: pkix-path/Cargo.toml comments reference v0.1 features in v0.2.0 package",
+  "updated_at": "2026-05-07T20:33:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:12:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

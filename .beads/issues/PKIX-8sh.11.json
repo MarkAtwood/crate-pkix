@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:38:59Z",
+  "compaction_level": 0,
+  "content_hash": "e6bf850e606c4e79ecf6ce6828cd2e29038e80d90a253cd89b2b6f5161d30281",
+  "created_at": "2026-05-02T18:31:46Z",
+  "created_by": "Mark Atwood",
+  "description": "#[non_exhaustive] on ValidatedPath (pkix-path/src/lib.rs) prevents external code from constructing the struct or matching it exhaustively. This is the correct choice: anchor_index and depth are obviously the first fields, but future fields (selected policy, chain signature algorithms, etc.) should be addable in minor versions. A contributor who sees the struct might suggest removing #[non_exhaustive] because the fields are pub \u2014 the answer is that the two serve different purposes.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath is #[non_exhaustive] \u2014 future fields can be added without a breaking change",
+  "updated_at": "2026-05-02T22:38:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

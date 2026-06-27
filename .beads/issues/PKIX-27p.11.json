@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-03T02:46:32Z",
+  "compaction_level": 0,
+  "content_hash": "21f6a8f988c68eec6d57cd02b9424654f3ed6ffdca6115313e9df326cca5070c",
+  "created_at": "2026-05-03T02:42:48Z",
+  "created_by": "Mark Atwood",
+  "description": "cargo fmt --check reports two formatting diffs: (1) pkix-chain/src/lib.rs: method-call chain for check_revocation_against_anchor split across two lines \u2014 rustfmt wants it on one line. (2) pkix-chain/tests/e2e.rs: use pkix_chain::{...} import should be wrapped. Fix: run 'cargo fmt --all' and commit the result.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.11",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cargo fmt fails on pkix-chain/src/lib.rs and pkix-chain/tests/e2e.rs",
+  "updated_at": "2026-05-03T02:46:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:42:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

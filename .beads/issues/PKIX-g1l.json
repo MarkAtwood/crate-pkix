@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:51:39Z",
+  "compaction_level": 0,
+  "content_hash": "e27acabcd61abc545f6fccf94b214c335e354b15c61820629a46812b7c0d1394",
+  "created_at": "2026-05-06T23:17:52Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs: the OcspChecker struct-level doc (line 59) mentions that if no SingleResponse matches the serial number, OcspStatusUnknown is returned. However the RevocationChecker::check_revocation doc on the trait (lib.rs lines 194-216) does not list OcspStatusUnknown as a possible error and its description of Ok(()) does not mention the 'not covered by this OCSP response' case. Unlike CRL, the OCSP checker does NOT return Ok(()) for unmatched serials \u2014 it hard-fails with OcspStatusUnknown. This asymmetry is not called out in the trait doc, leaving callers to discover it from the struct-level doc or source. Suggested fix: add to the OcspChecker impl's check_revocation doc (or the struct doc) an explicit note that this checker always hard-fails on unmatched serials, contrasting it with CrlChecker's Ok(())-for-unknown behavior.",
+  "ephemeral": 0,
+  "id": "PKIX-g1l",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: OcspChecker doc: 'SingleResponse not found \u2192 OcspStatusUnknown' not documented on check_revocation",
+  "updated_at": "2026-05-06T23:51:39Z"
+}

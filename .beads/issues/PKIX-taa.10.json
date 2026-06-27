@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2728fac96a9ebf98fc8e057b84e398dcc6738981edde95ef447f92a95fff8dc6",
+  "created_at": "2026-05-06T16:52:51Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path-builder/src/lib.rs:150-213\\n\\nThe iterative-deepening DFS in build_path has worst-case O(pool_size^max_depth) node visits. With MAX_DEPTH=10 and a pool of N certificates, worst case is N^10 visits.\\n\\nCycle detection (lines 193-200) prunes certs whose subject DN is already in the path, which bounds the DFS by unique DNs in the pool. However:\\n1. An adversary can craft a pool of N certs with N distinct DNs that each topologically connect to each other, forming a complete graph. The DFS would explore all N! orderings before declaring NoPathFound.\\n2. Even with legitimate-looking certs (e.g., from a compromised intermediate that cross-certified many other CAs), the pool could be poisoned.\\n\\nFor N=20 distinct DNs and depth 10: C(20,10)*10! \u2248 670 million node visits. This is a denial-of-service risk when the cert pool is populated from untrusted input (e.g., certificates presented in a TLS handshake).\\n\\nFix: Add a visited-path-hash set (tracking the set of certs in the current path) AND a global node-visit counter with a configurable limit. When the limit is exceeded, return Error::DepthExceeded or a new Error::BudgetExceeded. Alternatively, add a max_pool_size parameter to CertPool.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Exponential DFS is a real concern for adversarial inputs but pkix-path-builder is not intended for use with untrusted certificate pools in v0.1. # Security doc note added to build_path. Pool-size limits deferred to v0.2.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "build_path: exponential DFS complexity with large certificate pool is a DoS vector",
+  "updated_at": "2026-05-06T17:02:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:52:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

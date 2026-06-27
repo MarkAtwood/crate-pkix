@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.60",
+  "title": "TrustAnchor::from_cert silently drops malformed NameConstraints",
+  "description": "TrustAnchor::from_cert (line 706 in pkix-path/src/lib.rs) silently sets name_constraints = None when the anchor cert's NameConstraints extension has malformed DER. The doc comment explains this behavior and directs callers to TrustAnchor::try_from for strict handling. However, the fail-open semantics are a silent security gap: a deployment that intended 'this root may only sign for *.example.com' via NameConstraints would silently lose that constraint if the extension's DER is malformed.\n\nThe alternative constructor TrustAnchor::try_from exists and propagates the error, and pkix-truststore uses it (from_pem at line 524: 'TrustAnchor::try_from(c).map_err(Error::Der)'). So the strict path is available and used in the canonical trust-store loader.\n\nWhat goes wrong if this stays as-is: Callers who construct TrustAnchor via from_cert (the consuming-ownership path, typical for manual anchor construction) get fail-open behavior on malformed NameConstraints. The constraint is silently dropped. The non-consuming From<&Certificate> impl at line 717 has the same fail-open behavior. Both are documented, but the default-and-easy path is fail-open while the strict path requires the caller to know to use try_from.\n\nThis is a defensive-code-forcing concern: the natural/easy constructor is the unsafe one. The safe constructor requires the caller to make a deliberate choice. The pkix-truststore crate already made the right choice, but nothing in the API surface steers callers toward try_from.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-path/src/lib.rs line 706 (from_cert)\n- /home/mark/PROJECT/PKIX/pkix-path/src/lib.rs line 717 (From<&Certificate>)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:47Z",
+  "updated_at": "2026-06-15T17:18:54Z",
+  "closed_at": "2026-06-15T17:18:54Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:47"
+    }
+  ]
+}

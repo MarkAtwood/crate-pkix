@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "20367df4315fc63c18b6b44c1eb6b59ea486609056b80bd4ff661ba9b505822d",
+  "created_at": "2026-05-11T04:45:22Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 6 of 6. Audit notes that the builder cycle\nguard is correct but is only stress-tested via the 30-self-loop budget test\n\u2014 not a true 3-cycle A->B->C->A. This bead adds direct coverage.\n\n## What\n\nPool topology:\n\n```\nLoopCertA: subject=CN=A, issuer=CN=C, signed-by=C-key, AKI=C-key-SKI\nLoopCertB: subject=CN=B, issuer=CN=A, signed-by=A-key, AKI=A-key-SKI\nLoopCertC: subject=CN=C, issuer=CN=B, signed-by=B-key, AKI=B-key-SKI\n```\n\nThe signatures form a closed loop: A is issued by C, B by A, C by B. No\ntrust anchor reachable from this pool.\n\nBuild steps:\n\n1. Generator issues three DER fixtures. Note: openssl normally rejects\n   non-self-signed root issuance because there is no anchor; the generator\n   has to bypass standard CA setup and just produce three certificates that\n   reference each other. May need direct ASN.1 construction or carefully\n   ordered signing of partial certs. Document the technique in the\n   generator script.\n2. Test (`tests/cycle_loop.rs`):\n   - Pool: all three LoopCert*.\n   - Trust anchors: empty (or unrelated).\n   - `build_path(&LoopCertA, &pool, &anchors)` must return `Err(...)` with\n     either `MaxDepthExceeded`, `CycleDetected`, or `NoPathFound` \u2014\n     whichever variant the builder uses. Document the chosen verdict.\n   - The call must return promptly (assert with a timeout < 5s, sanity\n     check) and must NOT exhaust the candidate budget \u2014 the cycle guard\n     should terminate before reaching `PathBuilderConfig::max_candidates`.\n3. Negative: do the same with a 2-cycle (A->B->A, two-cert) to confirm\n   the simpler case also terminates.\n\n## Acceptance\n\n- [ ] At least three DER fixtures committed.\n- [ ] Generation reproducible (may require a small Rust program emitted\n      by `generate.sh`, since openssl CLI cannot easily produce loop chains).\n- [ ] One integration test verifying loop termination.\n\n## Depends on\n\nPKIX-xj81.1.",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: 3-cycle A->B->C->A loop guard fixture+test",
+  "updated_at": "2026-05-11T04:45:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:45:21Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:32Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

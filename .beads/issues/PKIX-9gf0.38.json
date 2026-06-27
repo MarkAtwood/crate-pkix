@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:31:36Z",
+  "compaction_level": 0,
+  "content_hash": "de18d5d01ace525b33b86e53960b5e82bcc50de7fcd2b3434a737163ea22876a",
+  "created_at": "2026-05-07T16:19:10Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple/src/lib.rs:456\n\n  for ext in extensions.iter() {\n\nClippy (explicit_iter_loop) flags this as 'it is more concise to loop over references to containers instead of using explicit iteration methods'. The idiomatic form is:\n\n  for ext in extensions {\n\nThe type of extensions is &Extensions (a slice reference), so iterating directly produces &Extension items, identical to .iter(). This is pure style with no functional difference, but it avoids the unnecessary method call.\n\nSame pattern appears in multiple .iter() loops across pkix-path/src/lib.rs (lines 1310, 1318, 2105, 2155, etc.) \u2014 the fix is mechanical for all of them.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.38",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-chain-simple: extensions.iter() should be &extensions",
+  "updated_at": "2026-05-07T16:31:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "created_at": "2026-05-13T21:12:08Z",
+  "id": "019e232e-c2be-793b-82eb-e3acb921b2c7",
+  "issue_id": "PKIX-wlsr.7",
+  "text": "Decomposed mid-claim in do-beads session 2026-05-13. The bead description assumed all 12 1.0-scope crates have a CHANGELOG.md with an [Unreleased] section to roll up. Empirical finding (subagent survey): only 5 of 12 do. The 7 missing CHANGELOGs (pkix-path, pkix-revocation, pkix-path-builder, pkix-truststore, pkix-profiles, pkix-lint, pkix-revocation-http) must be authored from scratch first.\n\nSplit into three sub-beads:\n- PKIX-wlsr.7.1 (P2): Author the 7 missing CHANGELOG.md files from the workspace-level CHANGELOG.md (1726 lines, has unified per-crate history) + git log + bead memories\n- PKIX-wlsr.7.2 (P2): Roll up [Unreleased] -> ## 1.0.0 in all 12 CHANGELOGs (literal PKIX-wlsr.7 scope)\n- PKIX-wlsr.7.3 (P3): Workspace-level RELEASE_NOTES.md for the 1.0 announcement\n\nDependencies wired: .7.2 blocks on .7.1; .7.3 blocks on .7.1 + .7.2.\n\nHeading-style decision deferred to .7.2: existing 5 CHANGELOGs use inconsistent breaking-change headings (### Changed (breaking) in pkix-chain; ### Removed (breaking) in pkix-lint-cabf; pkix-profiles-cabf has a behavior-change with no breaking heading at all). Recommendation in .7.2 description: standardize on ### Breaking.\n\nThis bead remains open as the umbrella tracker; closes when all three children close."
+}

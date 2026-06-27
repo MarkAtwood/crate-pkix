@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:34Z",
+  "compaction_level": 0,
+  "content_hash": "00fc40f169a13a4e192c228456afa2d4dacc8bcb3edce4fe03826f977a0e718c",
+  "created_at": "2026-05-06T22:16:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/../deviation.rs:599: DeviationStore::find_deviation iterates all deviations on every call. DeviationRunner::run_cert calls this once per finding per cert. For a chain of 3 certs \u00d7 6 lints \u00d7 100 deviations in the store = 1800 linear scans per chain validation. With a lint runner producing many findings, this is O(findings \u00d7 deviations) per chain. A HashMap<lint_id, Vec<Deviation>> indexed by target_lint would reduce the hot path to O(matching_deviations_for_lint) with O(1) lookup.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Typical deviation store has < 20 entries. O(N) linear scan is fine. HashMap optimization adds complexity with no measurable benefit at this scale.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationStore::find_deviation is O(N) linear scan; hot path for per-cert evaluation",
+  "updated_at": "2026-05-06T22:29:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

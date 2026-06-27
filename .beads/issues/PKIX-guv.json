@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-02T20:16:53Z",
+  "compaction_level": 0,
+  "content_hash": "9db199ce99e4c1823735823191bfa6b519316409ec09b5ad9fb6659b775684e7",
+  "created_at": "2026-05-02T20:10:20Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-guv",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 no correctness bugs found in RFC 5280 \u00a76.1 path validation logic. P1 risks are documentation/API surface issues: revocation coverage gap, misleading crate description, stub ambiguity, implementation limits.\nIdiom rating: ACCEPTABLE \u2014 no unsafe code (forbid attribute enforced), no unwrap in production paths, non_exhaustive on all error enums, Display + source() on all errors, From impls for operator? chaining. Two minor clippy-level items filed (for\u2192find/and_then, is_some_and). No ownership, lifetime, or type-design issues found.\nConfidence: 15% chance of missed bug. Least confident flags: (1) RSA NULL-vs-absent params behavior depends on x509-cert PartialEq impl which I haven't verified against real-world certs; (2) pkix-chain-simple critical EKU behavior \u2014 the crate IS documented as strict/opinionated, this may be intentional and the doc description is the only thing that needs fixing. Uncertainty driven by: no test run performed, no real-world cert corpus tested. Would raise confidence if: cargo test --all-features passes, and at least one real CA-issued TLS cert is run through verify_simple to confirm the critical EKU behavior.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: PKIX project \u2014 fresh eyes full review",
+  "updated_at": "2026-05-02T20:16:53Z"
+}

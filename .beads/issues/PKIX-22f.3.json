@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: two remaining exts.iter() calls in has_key_cert_sign and cert_basic_constraints (4-space indented; missed by round 1 replace_all which matched 8-space version).",
+  "closed_at": "2026-05-02T17:54:13Z",
+  "compaction_level": 0,
+  "content_hash": "7baee9bebbb4c578b1a584b8e9e2d2be1afcaba3d209ea7e37162b689986b38e",
+  "created_at": "2026-05-02T17:52:28Z",
+  "created_by": "Mark Atwood",
+  "description": "Round 1 (PKIX-841) fixed the iter() redundancy in check_critical_extensions (line 464) but missed the same pattern in two helper functions: has_key_cert_sign (line 487: 'for ext in exts.iter()') and cert_basic_constraints (line 509: 'for ext in exts.iter()'). Both should be 'for ext in exts' \u2014 the collection already yields references when iterated directly. Clippy would flag these as clippy::into_iter_on_ref.",
+  "ephemeral": 0,
+  "id": "PKIX-22f.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "redundant .iter() in has_key_cert_sign and cert_basic_constraints",
+  "updated_at": "2026-05-02T17:54:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:52:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-22f",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

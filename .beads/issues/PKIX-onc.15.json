@@ -1,0 +1,31 @@
+{
+  "close_reason": "decision record: #[non_exhaustive] timing captured",
+  "closed_at": "2026-05-03T13:28:50Z",
+  "compaction_level": 0,
+  "content_hash": "929fa303cf8c01b01c27c7052cef929c9a955d7ceef99d1caa52bee3df9c8121",
+  "created_at": "2026-05-03T13:15:52Z",
+  "created_by": "Mark Atwood",
+  "description": "non_exhaustive was added to TrustAnchor at the same commit that added name_constraints. This is the correct timing. If added in a later release, any downstream exhaustive struct literal (TrustAnchor { subject: .., subject_public_key_info: .. }) valid before the attribute would break retroactively. Adding simultaneously means the struct has never been exhaustively constructable from outside the crate in any released version. A future contributor might suggest removing it to simplify test construction. That would give downstream code false confidence the field set is frozen and create a breaking change whenever a fourth field is added.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.15",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "#[non_exhaustive] on TrustAnchor added with first new public field \u2014 correct timing, not belated",
+  "updated_at": "2026-05-03T13:28:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

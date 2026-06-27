@@ -1,0 +1,31 @@
+{
+  "close_reason": "find_cert_ext doc now names try_find_cert_ext explicitly instead of 'this'",
+  "closed_at": "2026-05-03T13:38:01Z",
+  "compaction_level": 0,
+  "content_hash": "d1a2b85bd809625440d5cf2d501868f1c4d6ad63fe4ea8b7d5d1304ced4aec73",
+  "created_at": "2026-05-03T13:31:07Z",
+  "created_by": "Mark Atwood",
+  "description": "find_cert_ext doc (lib.rs line 641) says 'callers that need to distinguish parse errors from absence should call this directly' \u2014 'this' is ambiguous: does it mean find_cert_ext or try_find_cert_ext? Rewrite as 'callers that need to distinguish parse errors from absence should use try_find_cert_ext instead'",
+  "ephemeral": 0,
+  "id": "PKIX-s54.3",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_cert_ext doc: ambiguous 'call this directly'",
+  "updated_at": "2026-05-03T13:38:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:31:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

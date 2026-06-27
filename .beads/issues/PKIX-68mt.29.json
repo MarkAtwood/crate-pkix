@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.12: variant removed entirely",
+  "closed_at": "2026-06-15T18:30:20Z",
+  "compaction_level": 0,
+  "content_hash": "624b31bcfc7a5dc6962fb9bf31ffe90a2d45688149fc121a0b2667ba9d2d12b8",
+  "created_at": "2026-05-14T19:21:38Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs line 343-347 + module rustdoc lines 65-72: IdentityError::NotYetImplemented is retained 'as a non-removed variant so future scaffold-then-fill workflows can reuse it without a breaking API change.'\n\nThis is a self-inflicted forever-cost. Once shipped (in 0.1.0, already shipped):\n\n* Every caller's exhaustive-but-future-compatible match must include a NotYetImplemented arm.\n* The variant's *Display* string is locked: 'pkix-identity functionality not yet implemented'.\n* New developers reading the source will ask 'what's still not implemented?' \u2014 the answer is 'nothing, but we keep the variant'. This is confusing onboarding cost.\n* Audit / compliance reviewers seeing 'NotYetImplemented' in an enum from a 1.0 crypto-adjacent crate raise eyebrows.\n\nThe justification \u2014 'so future scaffold-then-fill workflows can reuse it without a breaking API change' \u2014 assumes:\n\na) The crate will scaffold-then-fill again post-1.0. This is the wrong assumption for a published API. Post-1.0 features are either ready to ship or aren't shipped.\n\nb) Adding a new variant later is a breaking change. Per #[non_exhaustive] on the enum, it is NOT \u2014 that's the whole point of #[non_exhaustive] for forward compatibility. So the stated rationale is just wrong.\n\nc) Retaining a dead variant is cheaper than adding one. Backwards: the dead variant pollutes the API in the meantime; the future variant when actually needed would have a meaningful name and meaningful Display message.\n\nPKIX-68mt.2 already flagged that the rustdoc on this variant misstates the current state. That's a doc fix. The deeper fix is: the variant should be removed before 1.0 (which IS a breaking change at 0.2 \u2014 acceptable per AGENTS.md prelaunch framing).\n\nRecommend:\n\n1. Document a clear deprecation: mark the variant #[deprecated(since = '0.2.0', note = '...')] in the 0.2 release.\n2. Remove it in 0.3 / 1.0.\n\nThe rationale in the module docstring ('retained as a non-removed variant so future scaffold-then-fill workflows can reuse it') should be deleted; the #[non_exhaustive] attribute on IdentityError makes the stated benefit moot.\n\nSeverity P2: pre-launch is exactly when this should be cleaned up. Punting to post-1.0 is the wrong call per the prelaunch framing in AGENTS.md ('Breaking changes are free. Pre-1.0, semver explicitly permits breaking changes across 0.x releases. They are the *mechanism* for getting the design right.').",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IdentityError::NotYetImplemented variant is permanent technical debt if 1.0 ships with it",
+  "updated_at": "2026-06-15T18:30:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:21:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

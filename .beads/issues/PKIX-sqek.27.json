@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4268a6e20956ac1708464e1061b1204a8ed2f87c1d6b7e02ec7112f1f9b994c8",
+  "created_at": "2026-05-14T18:11:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:147-243 \u2014 five of the eight Error variants wrap upstream error types as opaque payloads:\n\n    pub enum Error {\n        Path(pkix_path::Error),\n        Revocation(pkix_revocation::Error),\n        Identity(pkix_identity::IdentityError),\n        Aia(pkix_aia::AiaError),\n        PathBuild(pkix_path_builder::Error),\n        // ... ProfileViolation, OcspDelegation, AiaDepthExceeded are local\n    }\n\nThe slash-command checklist for leakage names this exact shape:\n\n> Error types that wrap third-party error types in their public surface rather than mapping to a stable local enum.\n\nWHY IT MATTERS \u2014 three concrete leakage consequences:\n\n1. **Variant proliferation on upstream changes.** Every time pkix-path adds an error variant (e.g. `pkix_path::Error::Pq sig` for a future PQ algorithm), pkix-chain's surface area silently grows: a caller's `match error { Error::Path(pkix_path::Error::X) => ... }` matches expand. If the upstream is `#[non_exhaustive]` the new variant is non-breaking for SOFT match arms; if the caller patterns-matches inside `Error::Path(_)` exhaustively, it's breaking. The caller has no clean facade-layer abstraction to lean on.\n\n2. **Display chain leakage.** pkix_chain::Error::Display produces \"path validation: {pkix_path::Error::Display}\". The caller's user-facing log line directly reflects pkix-path's wording choices. A future pkix-path refactor that improves error messages cascades through pkix-chain without pkix-chain having any input on the wording. A consumer who pinned pkix-chain's log format (\"our service emits log lines like `path validation: chain broken at index 0`\") is depending on a deep transitive contract.\n\n3. **Source-chain depth.** `Error::source()` (lines 263-276) routes the source chain to the inner upstream error. A consumer using `std::error::Error::sources()` (the iterator added in 1.65) sees a fixed-depth chain whose shape depends on the upstream error's own source chain. If pkix-path wraps DER errors today and the source chain is `pkix_chain::Error -> pkix_path::Error -> der::Error`, but a future pkix-path refactor adds an intermediate -> `pkix_chain::Error -> pkix_path::Error -> pkix_path::InnerError -> der::Error`, the depth changes. Code doing `err.sources().nth(2)` to find the root cause silently changes meaning.\n\nOPTIONS:\n\n(a) **Map upstream errors to a local taxonomy.** Replace `Error::Path(pkix_path::Error)` with rich local variants: `Error::ChainBroken { index: usize }`, `Error::ExpiredCertificate { index: usize }`, `Error::SignatureInvalid { index: usize }`, `Error::TrustAnchorMismatch`, ... The mapping function lives in pkix-chain and can be evolved independently of the upstreams. Loses the source-chain link to the upstream's structured error but gains pkix-chain control of the surface. This is the slash-command checklist's recommended shape.\n\n(b) **Carry upstream Error as Box<dyn Error + Send + Sync> behind an opaque local Diagnostic type.** Keep the source() chain (callers can downcast if they want to) but don't expose `pkix_path::Error` as part of pkix-chain's match-able surface. Local variants describe pkix-chain semantics; the inner Box is debug-only.\n\n(c) **Status quo: document the leakage.** Add a Stability note (\"Error::Path's inner variant set follows pkix-path's enum; changes to pkix-path errors are transitively breaking for pkix-chain match arms\"). Acknowledges what consumers are signing up for. Same shape as PKIX-sqek.25's option (c) for the module re-export lock-in.\n\nThe PKIX-sqek.1 finding (slow-path validity errors surface as PathBuild instead of Path(ValidityPeriod)) is the FIRST concrete cost of this leakage: callers writing `match err { Error::Path(pkix_path::Error::ValidityPeriod{..}) => \"leaf expired\" }` get DIFFERENT variant routing depending on whether the chain hit the fast or slow path. A local taxonomy (option a) would have a single `Error::ExpiredCertificate { index }` variant either way. The leakage is what's enabling the inconsistency PKIX-sqek.1 captures.\n\nPRE-1.0 FRAMING: a major redesign of the Error type is free pre-1.0. Picking (a) requires authoring the mapping; (b) is the minimum-effort path that still removes the lock-in. Both are non-breaking after 1.0 only if Error stays `#[non_exhaustive]` (it is, line 149). The lock-in is on the inner-variant taxonomy, which `#[non_exhaustive]` does not cover at the upstream layer.\n\nFiled as priority 1 because Error is the single most-touched type in any consumer's pkix-chain code, and this shape decision sets the maintenance cost for every error-handling change in any of five upstream crates.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error enum wraps five upstream error types directly in public variants \u2014 transparent leakage of every upstream design decision",
+  "updated_at": "2026-05-14T18:11:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:11:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "82ddf046de025c068f651fd103134bc4927e9e2c441e418b925a762a9b8a6593",
+  "created_at": "2026-05-14T14:26:22Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/Cargo.toml:31: 'log-list = [\"dep:sha2\"]' \u2014 the log-list feature gates sha2 because CtLogList::insert verifies SHA-256(key_der) == log_id.\n\nBut verify.rs uses sha2::{Digest, Sha256} unconditionally (verify.rs:60 'use sha2::{Digest, Sha256};' is at module level) for merkle_leaf_hash (line 697), inner_hash (line 678), and issuer_key_hash_from_cert (line 1013). verify.rs itself is gated by the 'log-list' feature (lib.rs:48-49 has 'mod verify' under cfg(feature = log-list)), so sha2 happens to be available \u2014 but only because of the log-list feature gate, not as an explicit dependency.\n\nThis creates an implicit dependency on log-list: 'I want SCT verification but not log-list management' is impossible. The feature combos compiling correctly is accidental \u2014 anyone refactoring this could easily break it.\n\nSuggested fix: pull sha2 out of log-list's optional dep set; make it a required dependency (always pulled in), since the crate's core verification path needs it. Then log-list gates only the CtLog/CtLogList types, not the hash crate. Document that sha2 is always required.\n\nAlternatively: split into 'sct-verify' and 'log-list' features where sct-verify gates sha2 and verify.rs, and log-list builds on top. But pre-1.0 the simpler 'sha2 is always present' route is more honest.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.18",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cargo.toml 'log-list' feature pulls in sha2 unconditionally \u2014 sha2 is also used by verify.rs but not gated",
+  "updated_at": "2026-05-14T14:26:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:26:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

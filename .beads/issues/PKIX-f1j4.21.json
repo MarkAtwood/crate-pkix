@@ -1,0 +1,31 @@
+{
+  "close_reason": "Workspace-wide convention \u2014 PKIX-* tracker IDs are present in public rustdoc throughout the workspace (e.g. pkix-path/src/lib.rs, pkix-revocation/src/lib.rs). The maintainer has accepted this trade-off; retracting as bikeshedding a decided pattern.",
+  "closed_at": "2026-05-14T19:00:30Z",
+  "compaction_level": 0,
+  "content_hash": "f9d11f339e4f83c099628c115a29dd8dc2c9023fe0c9359123e64c10f742a54d",
+  "created_at": "2026-05-14T18:59:46Z",
+  "created_by": "Mark Atwood",
+  "description": "src/async_fetcher.rs:13 (and multiple other files): the module-level rustdoc carries internal beads issue identifiers like 'PKIX-a1yc.10' / 'PKIX-a1yc.7' / 'PKIX-a1yc.5' in publicly-rendered docstrings. These render on docs.rs once the crate publishes and look like opaque internal codes to external readers.\n\nPublic rustdoc should communicate to a consumer who has never heard of beads. Internal references belong in commit messages and tracker links, not in the consumer-facing API documentation. The internal tracker IDs have meaning to the maintainer but are a source of confusion for consumers.\n\nRecommendation: strip the PKIX-* references from public rustdoc in src/*.rs files. Keep them in CHANGELOG.md (already done \u2014 and that's where they belong for change-tracking) and in commit messages. If a docstring needs to reference a design rationale, link to the bead's URL in the workspace's GitHub repo rather than the bead's ID.\n\nAffected: at minimum src/async_fetcher.rs lines 13, src/cache.rs line 3, 59, src/lib.rs line 63, src/clients/ureq.rs line 161 (PKIX-a1yc.9 - the 'tracked under' comment), and probably more. Grep PKIX-a1yc in src/ to find them all.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.21",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Module-level rustdoc in async_fetcher.rs mentions PKIX-a1yc.10 \u2014 internal tracker ID will leak to docs.rs",
+  "updated_at": "2026-05-14T19:00:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

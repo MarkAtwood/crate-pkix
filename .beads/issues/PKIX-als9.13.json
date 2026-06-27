@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "47cd74c9ae22d6931cd75a6508c1e9733cf5170e86b6aa59468aea58cefe919c",
+  "created_at": "2026-05-08T05:45:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.3(d)+(e) policy-tree update (lines 2210\u20132308, the dominant 99-line block) into `pub(crate) fn update_policy_tree_from_cert(cert: &Certificate, state: &mut WorkingState, ...) -> Result<()>`.\n\n## Risk\n\nHIGH. The dominant policy-tree mutation step.\n\n## Tree-NULL invariant (PKIX-als9 design \u00a77)\n\n> \"the tree becomes NULL when no nodes at depth \u2265 1 check (currently 3 identical sites: 2300\u20132303, 2509\u20132514, 2823\u20132826) must be preserved.\"\n\nIf prep3 (`policy_tree_post_op_prune`) has landed, H9 uses that helper at the post-op point. If not, H9 inlines the equivalent check.\n\n## Dependencies\n\n- H8 (sequenced).\n\n## Acceptance\n\n- New helper.\n- \"tree becomes NULL\" invariant preserved at the H9 boundary.\n- All PKITS policy tests pass (\u00a74.8\u2013\u00a74.12).\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: H9 \u2014 extract update_policy_tree_from_cert (~99 lines, \u00a76.1.3(d)+(e))",
+  "updated_at": "2026-05-08T05:45:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-07T22:46:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.12",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

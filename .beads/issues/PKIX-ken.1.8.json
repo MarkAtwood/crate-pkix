@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "pkix-path/tests/fixtures/policy-checks/ directory exists and is committed. gen.py present. 11 DER fixture files present and parseable by openssl x509. OpenSSL chain verification passes for both P-256 and RSA chains. gen.py exits 0 when re-run (deterministic output).",
+  "assignee": "Mark Atwood",
+  "close_reason": "gen.py written; 11 DER fixtures generated. NOT_BEFORE=2026-01-01 (valid at GRY_NOW=2026-06-01). OpenSSL chain verify passes for both P-256 and RSA chains.",
+  "closed_at": "2026-05-06T04:50:17Z",
+  "compaction_level": 0,
+  "content_hash": "6806305331b9d9f4dcff1a8ef1dcbaee819bea486683e750baa501614bed8dfc",
+  "created_at": "2026-05-06T03:44:36Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Create `pkix-path/tests/fixtures/policy-checks/gen.py` and commit the generated DER fixtures needed by the five policy-field test beads.\n\n**Algorithm:**\n1. Study the existing `pkix-path/tests/fixtures/anchor-nc/gen.py` to understand the pyca/cryptography pattern used in this project.\n2. Create `pkix-path/tests/fixtures/policy-checks/gen.py` using pyca/cryptography (Python 3, `pip install cryptography`). The script must be self-contained (no network access during CI).\n3. Generate the following DER fixtures. Use a deterministic reference time `NOT_BEFORE = datetime(2025, 1, 1, tzinfo=timezone.utc)` so generated certs are not time-sensitive:\n\n   | Filename | Description | Key | Algorithm | Validity | Extensions |\n   |---|---|---|---|---|---|\n   | `root-p256.der` | Self-signed P-256 root CA | P-256 | ecdsa-sha256 | 3650 days | BC cA=True |\n   | `int-p256.der` | P-256 intermediate signed by root | P-256 | ecdsa-sha256 | 3650 days | BC cA=True |\n   | `leaf-p256-365d-san-eku.der` | Leaf: P-256, 365 days, SAN, serverAuth EKU | P-256 | ecdsa-sha256 | 365 days | SAN=DNS:test.example.com, EKU=serverAuth |\n   | `leaf-p256-400d-san-eku.der` | Leaf: P-256, 400 days, SAN, serverAuth EKU | P-256 | ecdsa-sha256 | 400 days | SAN=DNS:test.example.com, EKU=serverAuth |\n   | `leaf-p256-365d-no-san.der` | Leaf: P-256, 365 days, NO SAN extension | P-256 | ecdsa-sha256 | 365 days | EKU=serverAuth only |\n   | `leaf-p256-365d-no-eku.der` | Leaf: P-256, 365 days, SAN, NO EKU extension | P-256 | ecdsa-sha256 | 365 days | SAN=DNS:test.example.com only |\n   | `leaf-p256-365d-wrong-eku.der` | Leaf: P-256, 365 days, SAN, wrong EKU (emailProtection only) | P-256 | ecdsa-sha256 | 365 days | SAN, EKU=emailProtection |\n   | `leaf-rsa2048-365d-san-eku.der` | Leaf: RSA-2048, 365 days, SAN, serverAuth EKU | RSA-2048 | sha256WithRSAEncryption | 365 days | SAN, EKU=serverAuth |\n   | `leaf-rsa1024-365d-san-eku.der` | Leaf: RSA-1024, 365 days, SAN, serverAuth EKU | RSA-1024 | sha256WithRSAEncryption | 365 days | SAN, EKU=serverAuth |\n   | `root-rsa2048.der` | Self-signed RSA-2048 root CA (for RSA chain tests) | RSA-2048 | sha256WithRSAEncryption | 3650 days | BC cA=True |\n   | `int-rsa2048.der` | RSA-2048 intermediate signed by RSA root | RSA-2048 | sha256WithRSAEncryption | 3650 days | BC cA=True |\n\n   Chains:\n   - P-256 chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-*\n   - RSA chain: root-rsa2048 \u2192 int-rsa2048 \u2192 leaf-rsa*\n\n4. Run the script: `python3 gen.py` from inside the `policy-checks/` directory. Confirm it produces all 11 DER files.\n5. Verify each DER file is parseable:\n   ```bash\n   for f in *.der; do openssl x509 -inform DER -in $f -text -noout | grep -E '(Subject:|Not Before|Not After|Key Size|X509v3)' ; done\n   ```\n6. Verify the chains validate with OpenSSL (external oracle):\n   ```bash\n   openssl verify -CAfile <(openssl x509 -inform DER -in root-p256.der) \\\n       -untrusted <(openssl x509 -inform DER -in int-p256.der) \\\n       <(openssl x509 -inform DER -in leaf-p256-365d-san-eku.der)\n   ```\n7. Commit both `gen.py` and all `.der` files. The DER files are binary fixtures \u2014 do not gitignore them.\n\n**Defensive programming rules:**\n- The script must not require network access \u2014 all keys generated locally.\n- Use far-future NOT_BEFORE (2025-01-01) so tests never fail due to time drift.\n- All BEFORE + validity must be set such that the current time (from the PKITS_NOW constant) falls within the validity window \u2014 check `pkix-path/tests/pkits_helper.rs` for the PKITS_NOW value.\n- No secrets committed \u2014 private keys are test-only and not reused outside tests.\n\n**Subagent instructions:**\n- Spawn one research subagent: read `pkix-path/tests/fixtures/anchor-nc/gen.py` and `pkix-path/tests/pkits_helper.rs` (for the PKITS_NOW constant) to understand the existing patterns and the reference time value.\n- Spawn one implementation subagent: write gen.py, run it, commit.\n- Spawn one validation subagent: run OpenSSL verification on all three chain fixtures and confirm exit 0 for each.\n\n**Tests:** This bead produces the oracles. No tests in this bead itself.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Generate DER test fixtures for policy-checks tests (gen.py)",
+  "updated_at": "2026-05-06T04:50:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:44:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

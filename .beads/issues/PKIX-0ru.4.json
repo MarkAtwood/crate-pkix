@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: changed \u00a77.2.2 citation to \u00a77.2 to avoid citing a specific subsection that may cover Key Generation rather than CA hierarchy structure.",
+  "closed_at": "2026-05-06T16:16:33Z",
+  "compaction_level": 0,
+  "content_hash": "0a08350df33c3ffe3978c2fea85544411f985dc917f5a9d137595646952258f7",
+  "created_at": "2026-05-06T16:12:44Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-profiles/src/lib.rs ~line 157. Comment cites 'S/MIME BR \u00a77.2.2' (which covers Key Generation) for the max_path_len=1 constraint. Find and cite the correct S/MIME BR section for path length limits.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: smime_policy doc comment cites wrong S/MIME BR section for max_path_len",
+  "updated_at": "2026-05-06T16:16:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:12:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

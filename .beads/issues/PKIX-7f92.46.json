@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b1c7d94f25a882094516f099d708d1e427e8447926697c03fa54451e717208ff",
+  "created_at": "2026-05-14T16:09:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1193-1218 detects duplicate ids by:\\n\\n1. Collecting all ids into a `Vec<&str>`.\\n2. Sort + dedup the Vec.\\n3. If length changed, re-walk the original lints with a `HashSet<&str>` to find the first duplicate so the panic message can name it.\\n4. `unreachable!()` if step 3 fails to find the duplicate that step 2 proved exists.\\n\\nThis is two passes (sort+dedup, then HashSet walk) plus an unreachable arm. The HashSet pass alone produces the same answer in one go:\\n\\n```rust\\nlet mut seen = HashSet::with_capacity(lints.len());\\nfor lint in lints {\\n    let id = lint.id();\\n    if !seen.insert(id) {\\n        panic!(\"LintRunner constructed with duplicate lint id {id:?}; \u2026\");\\n    }\\n}\\n```\\n\\nDrop the sort+dedup, drop the `unreachable!()` (which signals to a reader 'these two algorithms might disagree, here is the safety net'). The sort+dedup is leftover scaffolding from when only the panic-decision was needed.\\n\\nThe `unreachable!()` arm is the smell from the error-handling subsection: 'unreachable! where the surrounding code already guarantees the case is impossible' \u2014 except here the impossibility is established by a second algorithm that should not exist in the first place.\\n\\nThis is a chore-level cleanup; behavior is identical. Filed as P3.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.46",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner::check_unique_ids does sort+dedup then re-walks with HashSet to find offender \u2014 single pass suffices",
+  "updated_at": "2026-05-14T16:09:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:09:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

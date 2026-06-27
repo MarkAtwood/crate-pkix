@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:53:21Z",
+  "id": "019e1e2e-2314-701f-b803-e89492a6ecd3",
+  "issue_id": "PKIX-jy95.2",
+  "text": "DECISION 2026-05-12 (Mark, interactive): B with ordering = Info < Notice < Warn < Error < Fatal. Extend pkix-lint::Severity enum with a new Notice variant slotted between Info and Warn. Aligns with zlint's per-check severity vocabulary (verified in ~/GIT/zlint/v3/lint/result.go: Pass(3) < Notice(4) < Warn(5) < Error(6) < Fatal(7)) AND syslog severity ordering (RFC 5424: Informational > Notice > Warning by severity ranking). Both standards agree on relative ordering, so the workspace enum uses the same convention. NON-BREAKING: Severity is non_exhaustive, so adding a variant doesn't break existing pattern matches as long as callers don't exhaustively match without a wildcard arm. Bumps pkix-lint to a new minor version when implementation lands. SEVERITY MAPPING TABLE (final): zlint catalog severity -> pkix-lint Severity: notice -> Severity::Notice (new), warning -> Severity::Warn, error -> Severity::Error, fatal -> Severity::Fatal. Per-cert verdict -> LintResult: NA -> NotApplicable, NE -> NotApplicable, pass -> Pass, notice/warn/error/fatal -> error(detail). The Finding's emitted severity is the Lint's declared severity (from zlint catalog at enumeration time). IMPLEMENTATION: filed as new task bead PKIX-jy95.2.1 (extend pkix-lint Severity). Per-Lint dynamic creation in bridge happens after that lands."
+}

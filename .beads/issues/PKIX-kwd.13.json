@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:26:16Z",
+  "compaction_level": 0,
+  "content_hash": "132ec254fcca2db131abd9397a4b3681e76f268742215e755c0016529be3ee0b",
+  "created_at": "2026-05-06T15:17:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs: Three locations cast usize as u32 without overflow check.\n\n1. Line 1643: modulus_byte_len.saturating_mul(8) as u32 \u2014 byte length of RSA modulus is bounded in practice (~8 KiB max enforced elsewhere), but the cast is visibly unchecked. A comment bounding the range or u32::try_from would be clearer and avoids surprising any future reader.\n\n2. Lines 1728, 1733, 1738: (n as u32).saturating_add(1) where n = chain.len(). n is a usize counting certs in the chain. On a 64-bit target a chain with >4 billion certs would truncate n before the saturating_add, producing a wrong counter value. Fix: u32::try_from(n).unwrap_or(u32::MAX) or keep counters as usize throughout (they only need to count to n+1).\n\nClippy pedantic fires: 'casting usize to u32 may truncate the value on targets with 64-bit wide pointers'",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "usize-to-u32 cast in rsa_public_key_bits and policy counters can truncate",
+  "updated_at": "2026-05-06T15:26:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:17:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

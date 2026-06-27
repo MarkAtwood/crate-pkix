@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "CrlChecker and OcspChecker both override check_revocation_against_anchor; 4+6 new tests",
+  "closed_at": "2026-05-06T19:01:44Z",
+  "compaction_level": 0,
+  "content_hash": "0e87aa8a6b04a2dd1622d003bdc58c380ab0f18023cfdf8f647572296723621c",
+  "created_at": "2026-05-06T18:11:37Z",
+  "created_by": "Mark Atwood",
+  "description": "RevocationChecker::check_revocation_against_anchor has a default Ok(()) impl. Neither CrlChecker nor OcspChecker override it, so the certificate directly issued by the trust anchor is silently skipped in all shipped implementations. This is a silent correctness hole \u2014 no compile error, no runtime warning.",
+  "ephemeral": 0,
+  "id": "PKIX-x1i",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: check_revocation_against_anchor not overridden in CrlChecker or OcspChecker",
+  "updated_at": "2026-05-06T19:01:44Z"
+}

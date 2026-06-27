@@ -1,0 +1,22 @@
+{
+  "close_reason": "decision captured in code",
+  "closed_at": "2026-05-02T22:39:19Z",
+  "compaction_level": 0,
+  "content_hash": "bc5d9afb3f0c75ae22d2d15cb1efd2a73f4cc6ef015ec5ed52bf3cea2e376f1f",
+  "created_at": "2026-05-02T17:15:40Z",
+  "created_by": "Mark Atwood",
+  "description": "any_to_str_bytes (lines 573-588) returns None for unhandled string types (TeletexString, BMPString), causing ava_values_match (lines 560-570) to fall back to raw DER byte comparison. This is the correct fail-closed default: if the implementation doesn't understand an encoding, don't guess at normalization\u2014require exact binary match instead. This prevents subtle bugs where unsafe normalization of T61/BMP could incorrectly match or reject semantically equivalent names. Explicitly tracked as v0.1 limitation with forward reference to RFC 5280 \u00a77.1 for v0.2 legacy encoding support.",
+  "ephemeral": 0,
+  "id": "PKIX-2ld",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: Fail-closed on unrecognized DirectoryString types",
+  "updated_at": "2026-05-02T22:39:19Z"
+}

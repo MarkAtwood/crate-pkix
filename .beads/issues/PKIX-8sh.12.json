@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:39:02Z",
+  "compaction_level": 0,
+  "content_hash": "ca9148c27a62bbd9ed647e1084d60229e2b8af7ef68b923cfae854d0b0651392",
+  "created_at": "2026-05-02T18:31:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs: TrustAnchor's own signature is explicitly not verified in chain_walk. RFC 5280 \u00a76.1.1(c) states the trust anchor is trusted by definition. The comment in TrustAnchor's doc explains this clearly. A contributor might suggest adding signature verification to 'make things more secure' \u2014 this would be both incorrect (the anchor has no issuer to verify against) and potentially harmful (self-signed cert verification provides a false sense of security, as anyone can create a self-signed cert). The design is correct.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.12",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Trust anchor not signature-verified by design (RFC 5280 \u00a76.1.1(c))",
+  "updated_at": "2026-05-02T22:39:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

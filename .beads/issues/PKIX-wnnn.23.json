@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fb93c317f40c5ce7afd3df90fb0c10685cbb23506749c2e01995e7fe130aa717",
+  "created_at": "2026-05-14T18:37:25Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:933-935 (`build_first_valid_path` rustdoc, Errors section):\n\n```\n/// - [`Error::DepthExceeded`] / [`Error::BudgetExceeded`] \u2014 propagated from\n///   [`build_path_candidates`] when the iterator surfaces them.\n```\n\nThis is inaccurate. Tracing the implementation:\n\n- The `PathCandidates::next` body (lib.rs:581-714) **never** yields `Error::DepthExceeded`. When `frames.len() > max_depth`, it silently backtracks (lib.rs:653-657) and the iterator returns `None` on exhaustion. The only fatal error the iterator surfaces is `BudgetExceeded` (lib.rs:619-622).\n- `Error::DepthExceeded` is computed by the wrapper after the main iterator exhausts (lib.rs:1028-1043). The wrapper runs a fresh `PathCandidates` at `max_depth + 1`; if that probe yields any chain, the wrapper returns `Err(Error::DepthExceeded)`. This is \"computed by the helper,\" not \"propagated from the iterator.\"\n- `BudgetExceeded` may come from either the main iterator OR the depth probe. The doc lumps both into \"propagated from build_path_candidates\" but the depth probe is a separate invocation.\n\nA caller reading the doc and writing a recovery path assuming \"DepthExceeded comes from the iterator and I can detect it before the wrapper retries with a larger budget\" will be surprised: by the time `build_first_valid_path` returns `Err(Error::DepthExceeded)`, the depth probe already ran (one extra DFS budget worth of work that the caller didn't anticipate).\n\nSuggested correction:\n\n```\n/// # Errors\n///\n/// - [`Error::NoPathFound`] \u2014 the underlying iterator yielded no candidates\n///   and no candidates exist at any depth.\n/// - [`Error::DepthExceeded`] \u2014 the underlying iterator yielded no candidates\n///   within `max_depth`, but a depth-probe at `max_depth + 1` did. This\n///   error is computed by this function, NOT yielded by the iterator\n///   itself. The depth probe costs up to one additional `dfs_budget` of\n///   DFS work.\n/// - [`Error::BudgetExceeded`] \u2014 DFS frame-entry budget was exhausted,\n///   either in the main candidate enumeration or in the post-exhaustion\n///   depth probe.\n/// - [`Error::NoValidPath`] \u2014 at least one candidate was yielded but none\n///   passed `validate_path`. Carries `tried` (>= 1) and the last\n///   `validate_path` error rendering.\n```\n\nSame correction applies to `build_path`'s rustdoc at lib.rs:771-779 \u2014 the existing wording there (\"a path exists topologically but requires more than `max_depth` intermediates\") is accurate behaviorally, but doesn't mention that detection costs an extra probe pass. Forward-link to the depth probe's hidden cost.\n\nMinor \u2014 this is a doc-fidelity issue, not a behavior bug.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path Errors section says DepthExceeded is propagated from build_path_candidates \u2014 actually computed by the wrapper",
+  "updated_at": "2026-05-14T18:37:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:37:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

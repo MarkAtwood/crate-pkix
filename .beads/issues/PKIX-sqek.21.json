@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:03Z",
+  "compaction_level": 0,
+  "content_hash": "a64b0675eaf6479d42c21fdcea45eea4ba61e73a54317b39e9a5e94b04e9dd9a",
+  "created_at": "2026-05-14T18:09:18Z",
+  "created_by": "Mark Atwood",
+  "description": "Seven of the eight use-case wrappers index `chain[0]` after `verify_chain` returns:\n\n- verify_tls_server (line 772): `pkix_identity::verify_dns_name(&chain[0], name)?;`\n- verify_tls_client_dns (line 858): `pkix_identity::verify_dns_name(&chain[0], name)?;`\n- verify_tls_client_mailbox (line 935): `pkix_identity::verify_mailbox(&chain[0], mailbox)?;`\n- verify_smime_signer (line 1003): `pkix_identity::verify_mailbox(&chain[0], mailbox)?;`\n- verify_smime_recipient (line 1036): `pkix_identity::verify_mailbox(&chain[0], mailbox)?;`\n- verify_time_stamper (lines 1157-1158): `enforce_timestamping_eku_critical_and_sole(&chain[0])?; enforce_timestamping_ku_shape(&chain[0])?;`\n- verify_ocsp_responder (line 1271): `has_ocsp_no_check(&chain[0])` and (line 1291) `verify_responder_is_delegated_by(&chain[0], issuer)?;`\n\n(verify_code_signer is the only one that does not index `chain[0]` post-validation; verify_ocsp_responder has an explicit `if chain.is_empty()` guard at line 1262 but the other six do not.)\n\nNone of the wrapper rustdocs document the *precondition* \"chain must not be empty.\" The wrappers rely on pkix-path's `validate_path` returning `Err(Error::NoTrustedPath)` for an empty chain (pkix-path/src/lib.rs:1561 \u2014 `if chain.is_empty() || anchors.is_empty() { return Err(Error::NoTrustedPath); }`).\n\nWHY IT MATTERS FOR THE CALLER:\n\nThis is an undocumented cross-crate invariant. Three failure modes for the caller:\n\n1. **Future pkix-path refactor.** If a future pkix-path version stops rejecting empty chains at the input gate (e.g., a profile that allows trust-anchor-as-leaf, or a refactor that moves the emptiness check elsewhere), the wrappers' post-validation `&chain[0]` indexes become live panic sites. The wrapper docs claim Result-shaped errors; the caller sees a panic. A non-public test breakage in pkix-path becomes a runtime panic in every consumer of pkix-chain.\n\n2. **Misleading error variant when triggered legitimately.** Today, calling `verify_tls_server(&[], ...)` returns `Error::Path(pkix_path::Error::NoTrustedPath)`. That variant is documented as \"no trust anchor matched the chain\" \u2014 a chain-of-trust failure, not an input-validation failure. A caller reading the error has no way to distinguish \"I sent an empty chain by mistake\" from \"the cert was issued by an untrusted CA.\" The wrapper has the context to give a clean answer (\"input chain was empty\") but currently launders it through pkix-path's enum.\n\n3. **Inconsistency across the wrapper family.** verify_ocsp_responder DOES check `chain.is_empty()` and returns `Error::OcspDelegation { reason: \"OCSP responder chain must contain at least the responder cert\" }` (line 1262-1265). That variant is also misleading for an empty input (OcspDelegation suggests \"you got the wrong responder,\" not \"you gave me no responder\"), but it's at least a Result. The other seven don't even bother. The contract should be uniform.\n\nCONTRACT GAP: every wrapper's rustdoc should document either (a) \"Panics if chain is empty\" (current de-facto behavior depends on upstream, so this would be a lie \u2014 it doesn't panic *today* but would if upstream changes), or (b) \"Returns Err(...) on empty chain\" with an explicit input-validation error variant, defended at the wrapper boundary not the upstream gate. Option (b) is the only stable contract.\n\nPROPOSED FIX:\n\nAdd a dedicated `Error::EmptyChain` variant (or `Error::InvalidInput { reason: Cow<'static, str> }` to admit other input-validation failures) and have every wrapper check `chain.is_empty()` (and identity arguments where applicable) at function entry. Document it in each rustdoc's \"Errors\" section.\n\nFiled as priority 1 because it's a contract integrity issue at the API boundary that hides a latent panic dependency on upstream behaviour.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Wrappers index chain[0] after verify_chain; safety relies on undocumented pkix-path 'rejects empty chain' invariant",
+  "updated_at": "2026-06-04T19:51:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:09:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

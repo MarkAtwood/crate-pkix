@@ -1,0 +1,45 @@
+{
+  "close_reason": "Superseded by PKIX-9vnx.7 (commit c0e63477). PKIX-9vnx.7 implemented the broader OSCAL Profile resolver which includes modify.set-parameters handling. The parameter-overrides extractor and LintRunner::apply_parameter_overrides method ship as part of that work in pkix-lint/src/oscal/profile.rs and pkix-lint/src/lib.rs. Round-trip behavior pinned by oscal::profile::tests::end_to_end_profile_override_changes_runner_behavior. Negative tests for unknown control id, unknown param id, malformed Profile shape, and invalid value all present (apply_parameter_overrides_unknown_lint_errors, apply_parameter_overrides_unknown_param_id_errors, apply_parameter_overrides_invalid_value_wraps_parameter_error). All .6.5 acceptance criteria met in .7's implementation; no separate bead needed.",
+  "closed_at": "2026-05-11T22:46:07Z",
+  "compaction_level": 0,
+  "content_hash": "8ad021dc9caebf7881392abc477a67240b1e541695ba3f063db89cd0c8eceefd",
+  "created_at": "2026-05-11T18:01:24Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.6 decomposition step 5. Closes the OSCAL Profile composition story for parameters. OSCAL Profiles can `modify` Controls by overriding their parameter values; this bead wires that to the Lint parameter mechanism from .6.4.\n\n## What\n\n1. New parser in `pkix-lint/src/oscal/parse.rs`:\n\n```rust\npub struct ProfileOverride {\n    pub control_id: String,\n    pub param_id: String,\n    pub new_value: String,\n}\n\npub fn overrides_from_profile(value: &Value) -> Result<Vec<ProfileOverride>, ParseError>\n```\n\nWalks an OSCAL Profile JSON Value and extracts `modify.set-parameters[*]` entries; each `set-parameter` references a control + a parameter id + a new value (or label).\n\n2. New function on `LintRunner` (or free):\n\n```rust\npub fn apply_overrides(&mut self, overrides: &[ProfileOverride]) -> Result<(), ApplyError>\n```\n\nFor each override, find the Lint by control_id and call `set_parameter` on it. Missing control_id or unknown param_id surfaces as ApplyError.\n\n3. Round-trip test:\n   - Build LintRunner with Rfc5280MaxSerialLengthLint.\n   - Construct a Profile JSON that overrides `max-octets` to 16.\n   - Parse + apply.\n   - Verify the lint now rejects an 18-octet serial that the default accepted.\n\n4. Profile JSON shape reference: NIST OSCAL Profile model, modify.set-parameters[*].\n\n## Acceptance\n\n- [ ] overrides_from_profile parses set-parameter entries.\n- [ ] LintRunner::apply_overrides mutates parametric lints.\n- [ ] Round-trip test passes.\n- [ ] Negative tests: unknown control_id, unknown param_id, malformed Profile.\n- [ ] Full pkix-lint suite passes; `oscal` feature gated.\n\n## Out of scope\n\n- Profile `select / exclude` directives (Catalog subset) \u2014 that's separate work (PKIX-9vnx.7 / .8).\n- Profile `import` chaining \u2014 also out of this bead.\n\n## Depends on\n\nPKIX-9vnx.6.4 (parameter mechanism)\nPKIX-9vnx.6.2 (catalog serializer \u2014 for sample Profile fixtures that reference real Control ids).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL Profile modify-directive overrides Lint parameters",
+  "updated_at": "2026-05-11T22:46:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T11:01:35Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T11:01:35Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T15:20:21Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-9vnx.7",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

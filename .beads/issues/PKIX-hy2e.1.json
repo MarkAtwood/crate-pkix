@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Adopted option (a) from the bug report: documentation. Each of the four use-case-specific lints (Rfc5280EkuServerAuthLint, Rfc6125TlsServerSanLint, Rfc8398SmimeSanLint, Rfc8551EkuEmailProtectionLint) gained a '# Use-case applicability \u2014 operator contract' section in its struct-level rustdoc, naming its canonical LintProfile bundler and stating the operators-must-not-cross-bundle rule. Added a matching trait-level rustdoc section on Lint explaining the framework's stance: use-case selection is the LintProfile bundle's responsibility, the trait does not encode use case in its type signature. Considered option (c) self-narrowing via EKU but rejected after it broke check_basic_smime_shape's ability to gate (a TLS cert silently passing the S/MIME shape check is a worse failure mode than the original bug). Added two regression tests (use_case_mutual_exclusion_tls_cert_fails_smime_lints, use_case_mutual_exclusion_smime_cert_fails_tls_lints) that empirically verify the documented mutual-exclusion claim against real fixtures so the rustdoc cannot drift. All 126 lib tests pass; pkix-profiles tests pass; clippy --all-features clean. Sibling: PKIX-hy2e.4 (same fix).",
+  "closed_at": "2026-05-14T13:23:29Z",
+  "compaction_level": 0,
+  "content_hash": "4562cbc76d88ec4913505ea4801d27f2da0f13dfcdc34e282161680e9749f542",
+  "created_at": "2026-05-14T12:39:21Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: load any non-TLS-server end-entity certificate (S/MIME, code-signing, OCSP responder, time-stamping) and run rfc5280::Rfc5280EkuServerAuthLint against it. The lint declares applies_to() = SubjectKind::Leaf with no further qualification. RFC 5280 \u00a74.2.1.12 only requires id-kp-serverAuth on TLS server certificates, not all leaves. Actual bad behavior: every non-TLS-server leaf produces LintResult::Error 'ExtendedKeyUsage does not include id-kp-serverAuth', poisoning EvaluationReport for any operator who registers the lint via a generic 'rfc5280-conformance' bundle. This trips the test corpus too: leaf-p256-365d-wrong-eku.der (used as a positive fixture in rfc8551 tests) is correctly rejected here only because the file happens to be intended for TLS-server-auth contexts. Same systemic shape as Rfc6125TlsServerSanLint, Rfc8398SmimeSanLint, Rfc8551EkuEmailProtectionLint \u2014 each lint silently assumes a use-case context but applies to any leaf. Fix options (any one): (a) document that these lints must only be registered by use-case-specific LintProfile implementations (currently no such warning); (b) gate via Lint::applies_to taking a use-case parameter; (c) have the lint inspect the cert's stated use-case from BasicConstraints + EKU + KeyUsage before firing. See lib.rs Lint trait documentation: there is no protection in the runner against registering mutually-exclusive use-case lints.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc5280EkuServerAuthLint fires false positives on non-TLS-server leaves",
+  "updated_at": "2026-05-14T13:23:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:39:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

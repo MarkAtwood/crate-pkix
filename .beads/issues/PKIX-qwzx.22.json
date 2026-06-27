@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Duplicate of PKIX-als9 (filed earlier; same issue: chain_walk + check_name_constraints exceed clippy too_many_lines threshold and need structural decomposition). PKIX-als9 remains as canonical.",
+  "closed_at": "2026-05-07T23:16:23Z",
+  "compaction_level": 0,
+  "content_hash": "4f14d1cd65dcd0228544cc88b953a66d0f1736eeed137e6e760fb54c44ccee9a",
+  "created_at": "2026-05-07T22:15:22Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nTwo functions in `pkix-path/src/lib.rs` exceed `clippy::pedantic`'s\n`too_many_lines` threshold (100 lines):\n\n- `fn chain_walk(...)` at line 1996: **489 lines**\n- `fn check_name_constraints(...)` at line 2843: **109 lines**\n\nBoth implement RFC 5280 \u00a76.1 phases. `chain_walk` is the \u00a76.1 state-machine\ndriver and is the most security-critical function in the workspace. Function\nlength alone is not a correctness issue, but at 489 lines it has 14+ distinct\ninline phases (signature alg allowlist, signature verify, validity, validity\nwindow, key size, key usage, BasicConstraints, name constraints, policy tree,\nexplicit-policy counter, etc.). Each phase is independently testable, but\nbecause they share the loop's mutable `working_*` state, they are currently\ninseparable.\n\nThis is a maintainability finding, not a correctness one. The phases that are\ntrivially extractable (each is a self-contained block with `?`-propagated\nerrors and small captured state) should be lifted into helper functions on the\nchain-walk loop body. Specifically:\n\n- (a0) `check_signature_alg(cert, policy, index)`\n- (a) `verify_signature(cert, working_spki, verifier, index)`\n- (b)/(c) `check_subject_name(cert, working_issuer_name, ...)`\n- (d) policy-tree update\n- (e) `check_validity_window(cert, policy, index)`\n- (f) `check_key_size(cert, policy, index)`\n- (h) `check_basic_constraints(cert, ...)`\n\nEach helper would be 15-40 lines. The driver loop becomes ~80 lines and is\nreadable end-to-end without scrolling.\n\n`check_name_constraints` (109 lines) has one nested closure. Splitting that\nclosure into a free function would drop it under threshold.\n\nFix: refactor under PR-only review; keep the per-phase semantics identical\n(no behavior change), allow the existing PKITS test corpus to validate.\n\nNote: the `too_many_lines` lint is in `clippy::pedantic` (default-allow), so\nthis is not blocking; it is filed as a P3 idiom finding because the structure\nis the single biggest barrier to onboarding new maintainers in this workspace.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.22",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "DEFERRED by /do-beads pass: this overlaps with the explicitly-deferred PKIX-als9 (chain_walk refactor) and is a structural refactor needing dedicated PR review. The clippy too_many_lines lint is in pedantic (default-allow) so this is not gating CI. Leaving open for the same reason als9 is open.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: chain_walk (489 lines) and check_name_constraints (109 lines) exceed clippy too_many_lines threshold",
+  "updated_at": "2026-05-07T23:16:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:15:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

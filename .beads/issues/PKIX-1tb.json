@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added find_trust_anchor using names_match; anchor matched by subject DN equality",
+  "closed_at": "2026-05-02T06:42:05Z",
+  "compaction_level": 0,
+  "content_hash": "abc37bb892f8f600347f2588c22f896be9aa51077b5d5a8c62bce16293382690",
+  "created_at": "2026-05-02T05:51:35Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement find_trust_anchor(last_cert: &Certificate, anchors: &[TrustAnchor]) -> Option<usize> that finds which trust anchor (if any) issued the last certificate in the chain.\n\nAfter PKIX-o76 (TrustAnchor redesign), TrustAnchor will hold (subject: Name, subject_public_key_info: SubjectPublicKeyInfo). Matching: the last cert's issuer field must match an anchor's subject field using the RFC 4518 names_match() helper from PKIX-drv.\n\nReturns:\n  Some(i) \u2014 anchors[i] issued last_cert; its SPKI is used to verify last_cert's signature\n  None    \u2014 no anchor matched; return Error::NoTrustedPath\n\nDesign note: this function is called BEFORE signature verification of the last cert. The signature verification of the last cert is performed by the \u00a76.1 state machine after the anchor is found. The trust anchor itself is never signature-verified (it is trusted by definition).",
+  "ephemeral": 0,
+  "id": "PKIX-1tb",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: trust anchor matching",
+  "updated_at": "2026-05-02T06:42:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:03:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-drv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

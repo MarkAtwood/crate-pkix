@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:35:49Z",
+  "id": "019e1e1e-18a8-7327-beef-3c2f2c8bfec2",
+  "issue_id": "PKIX-hbzo.1",
+  "text": "DEPENDENCY UPDATE 2026-05-12 (cascade from PKIX-jy95.6 = A): this bead now depends on the pkix-zlint-bridge and pkix-pkilint-bridge crates (PKIX-jy95.7 and .8) rather than implementing its own subprocess plumbing. The differential oracles for pkix-difftest call into the bridge crates for 'run zlint on this cert, give me parsed findings' / same for pkilint, then handle the verdict-reconciliation logic locally. Architectural rationale: PKIX-jy95.6 ratified shared public bridge crates as the right shape for this functionality. The bridge plumbing is identical between runtime adapter and differential oracle use cases; sharing prevents drift. Out of scope changes here: oracle implementation timing now wants to lag bridge crate readiness (PKIX-jy95.7 ships first, then this oracle work consumes it). Re-evaluate sequencing when PKIX-jy95.7 implementation starts."
+}

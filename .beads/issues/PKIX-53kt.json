@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented delegated OCSP responder support (RFC 6960 \u00a74.2.2.2) in pkix-revocation. New flow in OcspChecker: resolve_signing_key_for_response unifies ResponderId match + signature key resolution; checks issuer first (direct path), then scans basic.certs for a cert whose ResponderId matches and validates it as a CA Designated Responder (validate_delegate_responder_cert: same-CA issuance, id-kp-OCSPSigning EKU presence, validity at producedAt, CA signature on TBS). Five new Error variants added (#[non_exhaustive]): OcspResponderEkuMissing, OcspResponderEkuMalformed, OcspResponderCertNotIssuedByCa, OcspResponderCertExpired, OcspResponderCertSigInvalid. id-pkix-ocsp-nocheck documented but not enforced (single-shot checker never recurses). Trusted Responder (third RFC 6960 case) explicitly out of scope. Responder ID matching now happens during signing-key resolution (before signature verify) \u2014 two pre-existing tests that checked corrupted-byKey produces OcspSignatureInvalid updated to expect the more specific OcspResponderIdMismatch (semantic invariant 'corrupted byKey rejected' preserved; new variant is strictly more diagnostic). 7 new pyca-generated fixtures (gen_ocsp_delegated_fixtures.py): ca/leaf + good/no-eku/wrong-ca/expired-cert/bad-sig delegated responses. 6 new integration tests covering the happy path + each of the 5 rejection modes + delegated check_revocation_against_anchor. All 21 OCSP tests pass; no_std preserved; clippy clean -D warnings; dependent crates pass.",
+  "closed_at": "2026-05-08T20:07:25Z",
+  "compaction_level": 0,
+  "content_hash": "364537558e7397c2fa7ef8afd78b1b4cea7c6abc9cd945b42e23354032ff79ec",
+  "created_at": "2026-05-08T18:58:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nDocumented limitation in `pkix-revocation/src/ocsp.rs:37-51`: the OcspChecker only accepts responses signed directly by the issuer of the cert being checked. Real-world OCSP responses are routinely signed by a *delegated* OCSP responder cert \u2014 a separate cert issued by the same CA, carrying the `id-kp-OCSPSigning` EKU, used to keep CA root keys offline.\n\nWithout this, every commercial OCSP deployment fails (Let's Encrypt, DigiCert, etc.).\n\n## What\n\nExtend `OcspChecker` (`pkix-revocation/src/ocsp.rs`) to:\n\n1. **Accept a separate OCSP signer cert** in the response. RFC 6960 \u00a74.2.2.2: the response's `certs` field carries the signer cert when delegated.\n2. **Validate the delegate's chain** back to the cert's issuer. The delegate cert MUST be issued by the same CA whose certs the responder is asserting status for; this prevents a rogue cert with the EKU from being accepted.\n3. **Verify the delegate carries `id-kp-OCSPSigning`** EKU (`1.3.6.1.5.5.7.3.9`).\n4. **Verify the delegate's own validity period** at the time the response was signed.\n5. **Optional: `id-pkix-ocsp-nocheck`** extension handling. When present on the delegate, callers MUST NOT check the delegate's revocation status (otherwise infinite recursion). When absent, callers MAY check (typically via a CRL).\n\n## Acceptance\n\n- [ ] OCSP responses with a delegated signer cert in the `certs` field validate correctly when the signer is a properly-issued OCSP delegate.\n- [ ] Responses with a 'rogue' signer (signer cert lacks `id-kp-OCSPSigning` EKU) are rejected.\n- [ ] Responses where the signer's CA chain doesn't match the cert-being-checked's CA chain are rejected.\n- [ ] Signer's own validity window checked.\n- [ ] No regressions on direct (issuer-signed) responses.\n- [ ] `id-pkix-ocsp-nocheck` documented; recommend treating it as 'caller decides whether to check delegate revocation' \u2014 pkix-revocation does not auto-recurse.\n- [ ] Documentation: rustdoc updated, limitation note in `ocsp.rs:37-51` reflects what's now supported.\n\n## Effort\n\nEstimated ~120 lines + tests. ~1 day of focused work.\n\n## Filed as\n\nv1.0 'bar' item per gap audit. Pairs with indirect CRL for full revocation coverage. Required for any real-world commercial OCSP deployment.",
+  "ephemeral": 0,
+  "id": "PKIX-53kt",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: delegated OCSP responder support (RFC 6960 \u00a74.2.2.2)",
+  "updated_at": "2026-05-08T20:07:25Z"
+}

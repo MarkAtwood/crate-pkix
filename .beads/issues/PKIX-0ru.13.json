@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Improved: expanded ignored test comment with explicit RFC 5280 \u00a76.1.6(b) citation, documented OpenSSL 3.x cross-check result (validates), and noted errata trigger condition for re-enabling.",
+  "closed_at": "2026-05-06T16:22:42Z",
+  "compaction_level": 0,
+  "content_hash": "e9d3346c914cd2260080ae967c61516adc84726533184ddb7f7157058560b092",
+  "created_at": "2026-05-06T16:13:19Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path/tests/pkits_policy.rs ~line 524. Test is #[ignore] claiming PKITS vector is wrong per RFC 5280 \u00a76.1.5. PKITS is authoritative; ignoring without a published RFC errata citation or independent implementation result (e.g., openssl verify output) is risky. Add a reference or document the cross-check result in the comment.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkits_4_8_14 ignored test needs RFC errata citation or OpenSSL cross-check",
+  "updated_at": "2026-05-06T16:22:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:13:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

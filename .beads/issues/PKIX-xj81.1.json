@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ac5b5e93b21fc2ee5450d2617f1840f5c8746d962753d55a6dd36190fcdd69ca",
+  "created_at": "2026-05-11T04:44:21Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition (shared infra). The 6 stress-pattern fixture beads\n(PKIX-xj81.B through .G) all need a common openssl-driven generator and a\ncommon Rust-side loader. Building that once here keeps each topology bead\nsmall and independent.\n\n## What\n\n1. Create `pkix-path-builder/tests/fixtures/` directory.\n2. Write `pkix-path-builder/tests/fixtures/generate.sh`:\n   - Requires nothing but openssl 3.x + bash.\n   - Creates a synthetic root CA (`StressRoot`) with a stable serial and a\n     known SKI.\n   - Defines reusable shell functions to issue intermediates and end-entity\n     certs with explicit AKI/SKI/SPKI parameters (so per-topology beads can\n     call `issue_intermediate $issuer_key $subject_name $aki_value` etc.).\n   - Generates a small set of \"always-present\" fixtures shared across all\n     topology beads (the root cert; possibly a per-test EE template).\n   - Emits DER files only. PEM intermediate files used during generation\n     are removed at the end so the only committed artifacts are DER.\n   - Idempotent: re-running with the same RNG seed (`-rand seed-file`) is\n     deterministic so fixtures do not churn between regenerations.\n3. Write a small Rust helper module `pkix-path-builder/tests/common/mod.rs`\n   exposing:\n   - `fn stress_cert(name: &str) -> Certificate` mirroring `pkits_cert` but\n     pointing at the new fixtures directory.\n   - `fn stress_trust_anchor() -> TrustAnchor` returning the synthetic root.\n   - `const STRESS_NOW: u64` \u2014 a unix timestamp safely inside the synthetic\n     cert validity window. The generator must set validity windows that\n     contain this constant.\n4. Commit the generated `StressRoot.crt` DER file under\n   `pkix-path-builder/tests/fixtures/` plus the generator script.\n5. Document provenance in the module-level doc of `common/mod.rs`:\n   openssl version used, command line invoked, date generated.\n\n## Acceptance\n\n- [ ] `bash pkix-path-builder/tests/fixtures/generate.sh` produces the same\n      DER bytes as committed when re-run on the same machine with the same\n      seed file.\n- [ ] The Rust helper module compiles and exposes the three items above.\n- [ ] `cargo test -p pkix-path-builder` passes (no existing tests should\n      change behaviour; the new helper is only consumed by future beads).\n- [ ] No new runtime deps; `std` is fine (this is test code).\n\n## Out of scope\n\n- The per-topology fixture trees themselves. Those are PKIX-xj81.B\n  through .G.",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: shared cert-generation infra for stress-pattern fixtures",
+  "updated_at": "2026-05-11T04:44:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:44:20Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

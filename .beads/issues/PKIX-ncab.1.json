@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision B (rename + retain). PKIX-9vnx will be renamed to reflect that it is now historical alignment work whose shipped emit/parse code remains in tree as one supported output format. Applied under PKIX-ncab.7.",
+  "closed_at": "2026-05-12T16:33:30Z",
+  "compaction_level": 0,
+  "content_hash": "62c0772f6b46a222bb1f2ab503a9475678032f1438a1505d54e04e4797a082f2",
+  "created_at": "2026-05-12T02:20:18Z",
+  "created_by": "Mark Atwood",
+  "description": "PKIX-9vnx is the now-historical OSCAL alignment epic. Its closed children (PKIX-9vnx.1-.8, .10, .11) document shipped work. The premise (OSCAL as source of truth) has been demoted via the OSCAL demotion stance (memory `pkix-oscal-demoted-2026-05-11`).\n\nDecide:\n\n- **A) Close-as-superseded** with a final comment pointing at this cleanup epic. Open child PKIX-9vnx.9 reparents to this epic or closes.\n- **B) Rename** to reflect demoted status (e.g., \"OSCAL emit/parse implementation (historical alignment epic)\") and retain.\n- **C) Keep current title**; add prominent supersession note in description.\n\nDownstream: PKIX-9vnx.9 (check_shape API, open) handling depends on this; see .3.\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of PKIX-9vnx (epic 'OSCAL alignment', 91% complete)",
+  "updated_at": "2026-05-12T16:33:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:44:46Z",
+  "compaction_level": 0,
+  "content_hash": "d765f3eac8833c67b3216a802936c82aa85e9a8bcdd5935ae378a51cfd89128e",
+  "created_at": "2026-05-12T02:21:00Z",
+  "created_by": "Mark Atwood",
+  "description": "Soften OSCAL framing from canonical to \"one supported output format\" in four files:\n\n- Root `README.md` (line 145 references OSCAL Catalog/Profile/Assessment Results as part of the framework offer)\n- `pkix-lint/README.md` (line 5 leads with OSCAL framing)\n- `pkix-lint-cabf/README.md` (line 21 references \"zlint-derived OSCAL Catalogs\" as future work; may need cross-coordination with .8 decision)\n- `specs/README.md` (lines 51-61 frame OSCAL as the source of truth)\n\nNo functional code changes. No new docs created. Existing factual references to the optional OSCAL emit/parse code in pkix-lint stay.\n\nIndependent of Phase 1 decisions; can ship in parallel.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Reframe workspace docs: root README, pkix-lint README, pkix-lint-cabf README, specs/README",
+  "updated_at": "2026-05-12T05:44:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "opinion: 6 bools are intentional RFC 5280 policy switches; API break with no safety gain",
+  "closed_at": "2026-05-07T19:57:51Z",
+  "compaction_level": 0,
+  "content_hash": "85fb2d519cd7e4779140d2f714eccf60c4f53ce4ee0339889eaf8eb420b8c52e",
+  "created_at": "2026-05-07T17:22:31Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:512 \u2014 ValidationPolicy has 6 bool fields (enforce_key_usage, initial_explicit_policy, initial_any_policy_inhibit, initial_policy_mapping_inhibit, require_subject_alt_name, require_rfc822_san). Clippy pedantic struct_excessive_bools fires (>3). The bools are intentional policy flags matching RFC 5280 \u00a76.1.1 and the struct is #[non_exhaustive] public API, so refactoring to enums is a breaking change. [opinion] Unless the API is being revised, suppress with #[allow(clippy::struct_excessive_bools)] and a comment.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] struct_excessive_bools on ValidationPolicy",
+  "updated_at": "2026-05-07T19:57:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

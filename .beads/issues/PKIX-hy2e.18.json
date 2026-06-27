@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "99578dee267f450650f3214831bfc6e36d43be669c0cf514098fd839a172df3d",
+  "created_at": "2026-05-14T12:42:09Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: oscal/emit.rs:733-753 (uuid_v8). The workspace derives every OSCAL UUID from a (namespace, seed) tuple via SHA-256, masking the version (8) and variant (10b) bits in place. This gives byte-identical OSCAL output for identical inputs across runs, which is what makes CI diffability and evidence-pack reproducibility actually work. Why this is correct and what a future contributor might incorrectly suggest changing: a contributor will eventually say 'just use the uuid crate.' Don't. The uuid crate's v4 (random) and v7 (time-based) UUIDs both break determinism by design; v5 (SHA-1-derived) would introduce a SHA-1 dep that the workspace explicitly avoids; v8 with arbitrary data is exactly what we have, written in 20 lines of code with no external dependency. The pkix-lint emitter is bit-for-bit reproducible because of this choice. The version+variant nibble masking is correct per RFC 9562 \u00a75.8 (version 8 = 1000b in bits 48..52; variant 10b in bits 64..66) \u2014 verified by the unit tests in this module.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.18",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Deterministic UUID derivation (RFC 9562 UUIDv8 over SHA-256) \u2014 defend against 'just use uuid crate'",
+  "updated_at": "2026-05-14T12:42:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:42:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

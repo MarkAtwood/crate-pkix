@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-y1e",
+  "title": "Review: NameConstraints + OCSP/CRL fixes",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:02Z",
+  "updated_at": "2026-06-15T17:57:02Z",
+  "closed_at": "2026-06-15T17:57:02Z"
+}

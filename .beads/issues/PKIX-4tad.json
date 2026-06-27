@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:23:34Z",
+  "compaction_level": 0,
+  "content_hash": "ecac0bab0a444ee1969debfc950408cd78fc3060488ff6b4c24d369074e9ad79",
+  "created_at": "2026-05-07T15:20:50Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs uses x509_cert::ext::pkix::constraints::name::GeneralSubtrees at 7 different sites without a local type alias. The idiomatic approach is: 'use x509_cert::ext::pkix::constraints::name::GeneralSubtrees;' or 'type Subtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;' at the module level to avoid the 60-character fully-qualified path repeated in function signatures and local variable types. This is a readability fix with no behavioral impact.",
+  "ephemeral": 0,
+  "id": "PKIX-4tad",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path (rusty): repeated full module path x509_cert::ext::pkix::constraints::name::GeneralSubtrees \u2014 add a type alias",
+  "updated_at": "2026-05-07T15:23:34Z"
+}

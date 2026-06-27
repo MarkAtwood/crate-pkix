@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T21:34:18Z",
+  "compaction_level": 0,
+  "content_hash": "370486e3091154161d40be7786db8d74a0716fa1e7997cffd6bad8154bfe158b",
+  "created_at": "2026-05-12T19:41:14Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nBoth PKIX-jy95.* (pkix-policy-zlint / pkix-policy-pkilint runtime adapters) and PKIX-hbzo.1 (pkix-difftest using zlint+pkilint as differential oracles) need substantially the same plumbing:\n\n- Subprocess spawn / args / stdin / stdout / stderr / exit-code handling\n- JSON / NDJSON parsing of upstream output\n- Mapping of upstream verdict vocabularies to workspace types\n- Error handling for missing binary / version mismatch / malformed output\n\n## Options\n\n- **A) Shared infrastructure crate.** New `pkix-zlint-bridge` and `pkix-pkilint-bridge` crates that expose 'run zlint on this cert, get parsed findings' as a function. PKIX-jy95.1 (`pkix-policy-zlint`) uses the bridge to expose findings as `Lint` impls; PKIX-hbzo.1 (pkix-difftest oracle) uses the same bridge to get findings for differential comparison. Maximum code reuse; new crate per upstream tool. Workspace bears the bridge maintenance.\n\n- **B) Each crate implements its own subprocess plumbing.** PKIX-jy95.1 has its own subprocess code; PKIX-hbzo.1 has its own. Duplication, but no inter-crate coupling. The bridge logic is small (a few hundred lines) so duplication is bounded.\n\n- **C) Hybrid: bridge crate exists but is dev-only / internal.** Ship the bridge logic as a workspace-internal helper crate (publish=false), consumed by pkix-policy-zlint AND by pkix-difftest's oracle. External consumers can't depend on the bridge directly; they consume pkix-policy-zlint. Minimal external surface, max internal reuse.\n\n## Considerations\n\n- (A) and (C) require deciding the bridge's API shape before either consumer can start.\n- (B) means both consumers can proceed independently; we discover code duplication later and refactor if it bites.\n- Workspace pattern (looking at pkix-revocation / pkix-revocation-http, pkix-truststore / pkix-truststore-system): typically NO shared 'internal' helper; each pair of crates manages its own subprocess / HTTP details. Suggests (B).\n- But: pkix-revocation-http and pkix-revocation-http-oracle (hypothetical) don't currently both exist. The duplication problem is unique to the zlint/pkilint case because BOTH are also differential oracles.\n\n## Decision-gate\n\nBest decided before EITHER PKIX-jy95.1 or PKIX-hbzo.1 implementation starts. Otherwise we'll either commit to (A)/(C) post-hoc (refactor) or end up at (B) by default.\n\n## Cross-references\n\n- PKIX-jy95 parent (the runtime adapter epic)\n- PKIX-hbzo.1 (differential oracle bead)\n- AGENTS.md non-negotiable #6 (the shared types must be cache-friendly regardless of crate-split choice)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.6",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide code-share between policy-adapter crates and pkix-difftest oracles (shared pkix-zlint-bridge crate?)",
+  "updated_at": "2026-05-12T21:34:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:41:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

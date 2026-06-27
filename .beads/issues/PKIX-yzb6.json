@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T19:36:19Z",
+  "compaction_level": 0,
+  "content_hash": "4a819a4e5175266875ae60f62e25286d07e26577e39b8c3d040d6e1e984e6f72",
+  "created_at": "2026-05-11T19:10:21Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-baac.8's live-log fixture capture script (`pkix-ct/tests/fixtures/live-log/capture_live_log.py`) had to implement RFC 6962 \u00a73.4 MerkleTreeLeaf construction from scratch in Python, because pkix-ct does not expose a Rust helper that does the same.\n\npkix-ct's own rustdoc on `SctVerifier::verify_inclusion` says:\n\n> `leaf_hash` is the RFC 6962 \u00a72.1 leaf hash: `SHA256(0x00 || MerkleTreeLeaf-bytes)`. Computing it from an SCT plus the cert it commits to is the caller's responsibility; `pkix-ct` does not currently ship a `MerkleTreeLeaf` builder (that lives one level above SCT signature verification, which is `verify_sct_for_*`).\n\nAny consumer that wants to verify inclusion proofs for SCTs they've already verified must re-implement the \u00a73.4 encoding (x509_entry or precert_entry form), or call into pkix-ct's internal `build_signed_input_*` helpers which are not pub.\n\n## What\n\nAdd a public function (probably on `SctVerifier` or as a free function in `pkix_ct`):\n\n```rust\npub fn merkle_tree_leaf_for_cert(sct: &SignedCertificateTimestamp, cert_der: &[u8]) -> Result<Vec<u8>>;\npub fn merkle_tree_leaf_for_precert(\n    sct: &SignedCertificateTimestamp,\n    leaf_cert_der: &[u8],\n    issuer_cert_der: &[u8],\n) -> Result<Vec<u8>>;\n```\n\nThese return the MerkleTreeLeaf byte string the caller can SHA-256 (after the 0x00 leaf-domain-separator) to get the inclusion proof's leaf hash. Internally these would share code with `build_signed_input_x509_entry` and `build_signed_input_precert_entry` \u2014 the only difference is the outer wrapping (MerkleTreeLeaf wraps a TimestampedEntry; the signed input for SCT signature verification is the same TimestampedEntry preceded by version + signature_type bytes per \u00a73.2).\n\n## Acceptance\n\n- [ ] Public helpers as above.\n- [ ] Tests reuse the existing live-log fixture: derive leaf_hash via the new helper, compare to the captured leaf-hash.bin, run verify_inclusion against the captured STH.\n- [ ] Capture script in `tests/fixtures/live-log/` updated to cross-check its own Python computation against the Rust helper (run-on-capture only).\n- [ ] no_std preserved.\n\n## Out of scope\n\n- Refactoring the existing `build_signed_input_*` functions \u2014 keep them private.\n- Adding a streaming / no-alloc variant.\n\n## Filed by\n\nPKIX-baac.8 implementation (2026-05-11) noticed the gap while writing capture_live_log.py.",
+  "ephemeral": 0,
+  "id": "PKIX-yzb6",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: ship a public MerkleTreeLeaf builder helper",
+  "updated_at": "2026-05-11T19:36:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T12:10:26Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

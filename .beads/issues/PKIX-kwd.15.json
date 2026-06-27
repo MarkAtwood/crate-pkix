@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:30:27Z",
+  "compaction_level": 0,
+  "content_hash": "0ec8ba80ac35d5bb0bcde7a1ddfa4939e4248c6b3d46120990b94a3e9924228d",
+  "created_at": "2026-05-06T15:18:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs lines 838-839: PolicyNode.qualifier_set is annotated #[allow(dead_code)] because it is stored but never read. The comment says 'Stored for completeness per RFC 5280 \u00a76.1.2(a) but not currently inspected'.\n\n#[allow(dead_code)] on a struct field is a code smell in production code \u2014 it suppresses a warning for a field that is allocated and written on every policy tree node but serves no runtime purpose. Two better approaches:\n\n1. Remove the field and the #[allow(dead_code)] for v0.1 (store nothing until it is needed). The field can be added back when qualifier enforcement is implemented.\n2. If it must be retained for a future API, document it with a cfg(feature) gate or a TODO in a tracking issue, not a lint suppression.\n\nThe current suppression makes auditors spend time on a field that does nothing. It also means PolicyNode carries a Vec<PolicyQualifierInfo> per node that is never freed until the whole tree drops \u2014 wasted allocation.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy: allow(dead_code) on qualifier_set field signals unfinished abstraction",
+  "updated_at": "2026-05-06T15:30:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:18:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

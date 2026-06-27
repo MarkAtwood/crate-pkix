@@ -1,0 +1,30 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "5c9625c11b305f6ebbfd9fda99dcee31f634e2817a945498b337e2a00b5b10de",
+  "created_at": "2026-05-14T15:03:25Z",
+  "created_by": "Mark Atwood",
+  "description": "Per-cert URI fan-out in `Verifier::build_with_aia` (pkix-chain/src/lib.rs:585-681) is bounded only by `AIA_MAX_DEPTH = 5` iterations and by the adapter's own request-level caps; the chain layer itself imposes no cap on `new_uris.len()` per iteration. The loop iterates every cert in the cloned pool (initially `supplied_chain`, growing on each successful fetch), pulls every HTTP(S) URI out of each orphan's AIA extension, dedups against a `HashSet` of previously-tried URIs, then calls `AiaFetcher::batch_fetch(&uri_refs)` on the whole batch.\n\nAttack: caller submits a chain `[attacker_leaf]` whose AIA extension carries 10 000 `caIssuers` URIs. Each is unique (e.g. `http://attacker.example/i.der?n=0001` \u2026 `?n=10000`). On iteration 1 the loop emits a `batch_fetch` of 10 000 URIs. The adapter (`pkix-aia-http::HttpFetcher`) issues 10 000 HTTP requests with its 10-second per-request timeout \u2014 minutes to hours of wall-clock and network bandwidth for one `verify_one` call.\n\nGoing wrong:\n- Availability: a single un-validated cert blob drives the chain layer to amplify caller-supplied input by 10000\u00d7 into the adapter's HTTP transport. Caller-side per-request caps don't help \u2014 the multiplier is the chain layer.\n- Cost: in cloud / CI environments where outbound HTTP has cost or rate caps, the attacker can exhaust them.\n- Resource fairness: a multi-tenant validator (e.g. an MTA's S/MIME validator) can be DoS'd against other tenants' requests.\n\nMitigation: enforce a `MAX_URIS_PER_CERT` cap (RFC 5280 \u00a74.2.2.1 does not bound the count, but real-world certs have 1-2 caIssuers entries; 8 is generous and 32 is paranoid) inside `aia_extract::ca_issuers_http_uris`, and a `MAX_TOTAL_FETCHES` cap inside `build_with_aia` (e.g. `AIA_MAX_DEPTH * MAX_URIS_PER_CERT`). Surface as a new `Error::AiaFanoutExceeded` or fold into `AiaDepthExceeded` with a documented meaning. Both caps belong as `pub const` so callers can audit and (optionally, see PKIX-q9hv.21) override.\n\nCrypto-security framing: this is an availability / resource-exhaustion class issue, not key-recovery. P1 because it is a live exploitable amplification primitive when a real `AiaFetcher` is wired, not a hypothetical edge case.\n\nNotes:\n- Related to PKIX-q9hv.6 (tried_uris dedup is case-sensitive \u2014 makes the fan-out even larger because `HTTP://` and `http://` count as distinct).\n- Related to PKIX-q9hv.21 (AIA_MAX_DEPTH constant has no Verifier-level override \u2014 same shape applies to a hypothetical MAX_URIS_PER_CERT).\n- `pkix-aia-http` has a body-size cap on each fetch but no per-fetcher request-count cap; the chain layer is the right place to enforce a per-verification cap.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.31",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "(SEC) AIA fan-out is unbounded per cert \u2014 attacker-controlled cert can drive O(N\u00d7depth) HTTP fetches",
+  "updated_at": "2026-05-14T15:03:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:03:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

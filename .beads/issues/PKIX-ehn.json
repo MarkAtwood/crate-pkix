@@ -1,0 +1,31 @@
+{
+  "close_reason": "All backends done: evy (P-256), gmv (RSA), 8wg (DefaultVerifier dispatch).",
+  "closed_at": "2026-05-02T06:53:11Z",
+  "compaction_level": 0,
+  "content_hash": "3ffb859f955bbe9bbfe5c4daa8a4352c37e62db919c7dc257f35b7fdb7724b65",
+  "created_at": "2026-05-02T05:49:44Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement the concrete SignatureVerifier dispatch for the RustCrypto algorithm backends. These are feature-gated in pkix-path and reused by pkix-chain-simple.\n\nBLOCKED BY: Epic PKIX-cfh (SignatureVerifier return type must be fixed to Result<(), signature::Error> before these are implemented).\n\nBackends to implement (behind feature flags):\n\nrsa feature \u2014 sha256WithRSAEncryption (OID 1.2.840.113549.1.1.11):\n  Use rsa::pkcs1v15::VerifyingKey<sha2::Sha256>. Extract RSA public key from SubjectPublicKeyInfoRef. Verify DER TBSCertificate bytes against signature bytes.\n\np256 feature \u2014 ecdsa-with-SHA256 over P-256 (OID 1.2.840.10045.4.3.2):\n  Use p256::ecdsa::VerifyingKey. Parse point from SubjectPublicKeyInfoRef. Verify.\n\nDispatch wrapper:\n  A DefaultVerifier struct (enabled when any backend feature is active) that matches on algorithm.oid and delegates to the appropriate backend, returning signature::Error for unknown OIDs. This struct is reused internally by pkix-chain-simple.\n\nBacklog (v0.2, priority 4):\n  RSA-PSS (id-RSASSA-PSS), P-384 ecdsa-with-SHA384, Ed25519 id-Ed25519.\n\nSub-issues to create:\n1. RSA-PKCS1v15-SHA-256 backend\n2. ECDSA-P256-SHA-256 backend\n3. DefaultVerifier OID dispatch wrapper\n4. (backlog) RSA-PSS backend\n5. (backlog) P-384 backend\n6. (backlog) Ed25519 backend\n\nAcceptance: unit tests with known-good OpenSSL-signed vectors for each algorithm. Clippy clean. Feature powerset check passes.",
+  "ephemeral": 0,
+  "id": "PKIX-ehn",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: pkix-path RustCrypto signature backends",
+  "updated_at": "2026-05-02T06:53:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:50:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-cfh",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

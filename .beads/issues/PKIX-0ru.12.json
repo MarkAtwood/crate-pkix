@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: removed redundant der and x509-cert from pkix-path-builder [dev-dependencies]; they're already in [dependencies] and Cargo merges them",
+  "closed_at": "2026-05-06T16:22:11Z",
+  "compaction_level": 0,
+  "content_hash": "d45a703fa103705aa812d569980b84fd179ff845ffe67cd70c0ab02714828073",
+  "created_at": "2026-05-06T16:13:18Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path-builder/Cargo.toml. der and x509-cert appear in both [dependencies] and [dev-dependencies]. The dev entries are redundant (Cargo merges them). Remove der and x509-cert from [dev-dependencies].",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: Redundant der/x509-cert in pkix-path-builder dev-dependencies",
+  "updated_at": "2026-05-06T16:22:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:13:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

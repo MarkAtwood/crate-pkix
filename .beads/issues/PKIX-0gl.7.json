@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:53Z",
+  "compaction_level": 0,
+  "content_hash": "4470f6346cf11dc097cb8689c5eca853b803f2464e481d972e541d37fe7f2f5d",
+  "created_at": "2026-05-02T22:20:42Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 696: 'apply RFC 4518 six-step preparation (Map \u2192 NFKC \u2192 Prohibit \u2192 CheckBidi \u2192 insignificant-space)' lists five steps without section citations. A v0.2 implementer must cross-reference RFC 4518 themselves to find the exact steps that apply to BMPString (vs. other string types). Add: 'RFC 4518 \u00a73.1 (Map) \u2192 \u00a73.2 (Normalize via NFKC) \u2192 \u00a73.3 (Prohibit) \u2192 \u00a73.4 (Check Bidi) \u2192 \u00a73.5 (insignificant space).'",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: BMPString v0.2 spec omits RFC 4518 section citations",
+  "updated_at": "2026-05-02T22:35:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

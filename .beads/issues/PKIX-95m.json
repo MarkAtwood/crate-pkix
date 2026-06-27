@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:31:39Z",
+  "compaction_level": 0,
+  "content_hash": "6865ab3c5b13212f493614148cd34de9bbd30213191f9f8cc07367d6dd093602",
+  "created_at": "2026-05-06T20:15:10Z",
+  "created_by": "Mark Atwood",
+  "description": "Rust idiom and style findings from today's work on pkix-lint, pkix-profiles, pkix-path, pkix-revocation, and pkix-path-builder",
+  "ephemeral": 0,
+  "id": "PKIX-95m",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "epic",
+  "updated_at": "2026-05-06T20:31:39Z"
+}

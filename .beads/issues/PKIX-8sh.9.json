@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:40:00Z",
+  "compaction_level": 0,
+  "content_hash": "43a22031431cfc69cf347279a3331611e63c26908d86fee68d71bcee9e85cefe",
+  "created_at": "2026-05-02T18:31:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs: der_failed() creates a der::Error(Failed, Length::ZERO) and wraps it in Error::OcspParseError. This is used in two places: (1) responseBytes absent in a Successful response, (2) responseType != id-pkix-ocsp-basic. Neither of these is a DER parse failure \u2014 they are structural/protocol violations. The caller sees 'OCSP response parse error: failed' for what is actually a malformed-but-DER-valid OCSP response. A dedicated Error::OcspMalformed variant (or OcspResponseFormatUnsupported) would make the error actionable and distinct from a genuine DER decode failure.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.9",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "der_failed() constructs synthetic der::Error for non-parse structural failures in OcspChecker",
+  "updated_at": "2026-05-02T18:40:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

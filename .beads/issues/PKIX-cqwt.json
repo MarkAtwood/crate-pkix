@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:55:16Z",
+  "compaction_level": 0,
+  "content_hash": "32c6690afb8a5332c4c4c95be94e20c1fc08e909a2a8f1780cb7259d7322ef16",
+  "created_at": "2026-05-11T05:28:06Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nFor indirect CRLs (RFC 5280 \u00a75.2.6) and \u00a74.5 self-issued bridge cases, the CRL is signed by a cert that is NOT the cert's direct issuer. The current pkix-revocation `CrlChecker` API requires the caller to identify the CRL signer cert and pass it as the `issuer` argument; pkix-revocation does no discovery.\n\nPKITS \u00a74.5 (self-issued CRL signer rollover) and \u00a74.14 (indirect CRL via cRLIssuer) test this. The tests at `pkix-revocation/tests/pkits_4_5.rs` work around it by mechanically matching CRL AKI to bundle SKI to find the signer cert before invoking CrlChecker. Real consumers want the library to do that walk.\n\n## What\n\n`CrlChecker` (or a new wrapper) accepts a path/bundle plus the cert to revocation-check. It walks the bundle using AuthorityKeyIdentifier / SubjectKeyIdentifier and the cRLIssuer name on the CRL's IDP extension to discover which cert in the bundle signed the CRL. RFC 5280 \u00a76.3.3(f) gating applies: the candidate CRL signer cert MUST have `cRLSign` in KeyUsage, and chain back to a trust anchor.\n\n## Acceptance\n\n- [ ] New `CrlChecker` constructor or wrapper accepts `&[Certificate]` bundle + cert to check, instead of pre-resolved `issuer`.\n- [ ] AKI/SKI walk finds the CRL signer cert deterministically.\n- [ ] cRLSign + chain-to-anchor checks performed on discovered signer.\n- [ ] PKITS \u00a74.5 and \u00a74.14 tests run without the mechanical workaround in `pkix-revocation/tests/pkits_4_5.rs`.\n- [ ] PKIX-t0w4 integration: pkix-difftest's PKITS loader doesn't need to filter CRL-signing certs from the chain when revocation is enabled.\n\n## Filed as\n\nTracker for the `pkix-revocation` `# Limitations` section and the workaround in `pkix-revocation/tests/pkits_4_5.rs:22`. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-cqwt",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Ratified 2026-05-11 (Mark): Option A (discovery only, preserves chain \u2192 revocation \u2192 path one-way dep per AGENTS.md non-negotiable #2) + ship BOTH a free helper fn `discover_crl_signer(bundle, &crl) -> Option<&Certificate>` AND a new `CrlChecker::new_with_signer_discovery(...)` constructor variant.\n\nImplementation est: ~150 LOC + 6-8 tests covering PKITS \u00a74.5 and \u00a74.14 chains.\n\nRejected: Option B (discovery + chain validation in pkix-revocation) \u2014 would invert the dep direction.\n\nReady for autonomous claim.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: path-level CRL signer discovery (RFC 5280 \u00a76.3.3(f))",
+  "updated_at": "2026-05-11T17:55:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:30:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yi7k",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

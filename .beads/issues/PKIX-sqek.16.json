@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4735ecd326b5cd3d941f8c5712b86c503f1ca569cb57d255b46de524f2f11766",
+  "created_at": "2026-05-14T18:03:12Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs line 140: pub const AIA_MAX_DEPTH: usize = 5; bounded outer loop in build_with_aia (line 607). Each iteration calls AiaFetcher::batch_fetch on caIssuers URIs of certs whose issuer is missing from the pool, then re-runs build_first_valid_path. The cap is hit by Error::AiaDepthExceeded with a distinct variant.\n\nWHY THIS IS CORRECT: without a cap, a fetched intermediate that ITSELF has a missing issuer (intermediate-of-an-intermediate-of-an-intermediate-...) would recurse indefinitely. An attacker can construct a CA where every fetched cert has an AIA URL pointing at another cert with an AIA URL pointing at another cert, ad infinitum, exhausting memory and time. The cap converts this from a DoS vector into a bounded failure.\n\n5 is a generous-but-sane default for real-world PKIs (cross-signed roots add at most one intermediate hop beyond the operating CA's own intermediate; intermediate-of-an-intermediate-of-an-intermediate is exceedingly rare).\n\nWHAT A FUTURE CONTRIBUTOR MIGHT WRONGLY SUGGEST: 'make AIA_MAX_DEPTH configurable per-verifier so users can opt into deeper chains.' That suggestion enables the DoS \u2014 a misconfigured deployment that raises the cap to 100 lets an adversarial server consume 100x the I/O and memory budget. The cap belongs as a workspace-level constant precisely because it's a safety property, not a tunable.\n\nThe constant is documented (lines 127-140) with the rationale. The error variant is distinct from Error::Aia (which surfaces underlying fetch failures) and Error::PathBuild (which surfaces builder failures inside a single iteration). The trichotomy is correct.\n\nDEFEND IF: someone suggests making the cap configurable, raising the default, removing the explicit error variant ('just return PathBuild::NoPathFound'), or replacing the iterative-deepening loop with unbounded recursion.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.16",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AIA_MAX_DEPTH cap with explicit Error::AiaDepthExceeded variant \u2014 defend against making fetch loop unbounded",
+  "updated_at": "2026-05-14T18:03:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:03:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

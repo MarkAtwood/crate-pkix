@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T19:10:25Z",
+  "compaction_level": 0,
+  "content_hash": "5fa710f0b7fcd50b36304e14eda6a7777b08e1ba69b3bc841b36e7336585a7aa",
+  "created_at": "2026-05-06T19:06:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement 6 CABF TLS BR lints: validity.max, alg.sha1_prohibited, rsa.min_key_size, san.required, eku.server_auth, bc.ca_flag. Add CabfTlsBrProfile. Tests must pass.",
+  "ephemeral": 0,
+  "id": "PKIX-3ne",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CABF TLS BR reference lints in pkix-lint",
+  "updated_at": "2026-05-06T19:10:25Z"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:57:59Z",
+  "compaction_level": 0,
+  "content_hash": "8c28063e83224f3efffc03aa73f0d60298650ea3f138c9be252184074c15ffdf",
+  "created_at": "2026-05-07T03:55:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:330 \u2014 let pool_slice: &[Certificate] = &pool.certs; has a redundant explicit type annotation. Type inference correctly deduces &[Certificate] from the coercion of &Vec<Certificate>. The annotation adds noise without conveying additional intent. Remove the type annotation: let pool_slice = &pool.certs; (or inline the reference directly into the dfs call). Clippy would catch this as needless_type_annotation.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pool_slice redundant type annotation in build_path",
+  "updated_at": "2026-05-07T03:57:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:55:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

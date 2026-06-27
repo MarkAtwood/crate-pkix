@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fc9c152be0d7f181e88987903fe13057674ada72cdbc61a3139e863f9552b87d",
+  "created_at": "2026-05-14T16:01:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1047 (field) + lib.rs:1097 (with_cert_sha256 builder) \u2014 Finding has:\n\n  pub struct Finding {\n      ...\n      #[cfg_attr(feature = \"serde\", serde(with = \"serde_helpers::cert_sha256_hex\"))]\n      pub cert_sha256: Option<[u8; 32]>,\n  }\n\n  impl Finding {\n      pub fn with_cert_sha256(mut self, cert_sha256: [u8; 32]) -> Self { ... }\n  }\n\nThe field name and the [u8; 32] type bake SHA-256-specifically into the public evidence-pack provenance API. Once 1.0 ships:\n\n- Switching to SHA-384, SHA-3-256, or BLAKE3 requires a breaking change to the field name (cert_sha256 \u2192 cert_digest) AND the type.\n- Algorithm agility \u2014 letting different deployments stamp different digests \u2014 requires a tagged-enum field type, which is also a breaking change.\n\nCALLER IMPACT: Callers writing JSON ingest code key off the literal field name `cert_sha256` in serialized Findings. The OSCAL emitter at oscal/emit.rs uses `pkix-lint.cert-sha256` as a prop name. All of this is forever-stable on the day the crate hits 1.0.\n\nThis is not theoretical:\n- NIST SP 800-131A deprecates SHA-1 for digital signatures; SHA-256 is on a similar (longer) trajectory.\n- BR-style root-program ingestion is moving toward SHA-256 minimum, with some forums considering SHA-384.\n- Post-quantum cert profiles may want a wider digest.\n\nREMEDIATION OPTIONS:\n\n1. Rename field and type to an enum:\n   pub struct Finding { ..., pub cert_digest: Option<CertDigest>, ... }\n   #[non_exhaustive] pub enum CertDigest {\n       Sha256([u8; 32]),\n       // Future: Sha384([u8; 48]), Blake3([u8; 32]), ...\n   }\n   Update serde adapter to emit { \"alg\": \"sha-256\", \"hex\": \"...\" }.\n\n2. Keep the field name and type but document the SHA-256-only forever commitment explicitly in rustdoc so callers can plan around it. This is acceptable if SHA-256 is genuinely the workspace's permanent choice; document the decision so it is not later contested.\n\nOption 1 is more flexible and pre-1.0 has zero cost. Option 2 is simpler if SHA-256 is the deliberate choice \u2014 but the current rustdoc does not state this as a stability commitment, which leaves the field's evolution unstated.\n\nPKIX-7f92.1 already flags the cert_sha256_hex DESERIALIZER as panic-prone (non-ASCII hex). That is orthogonal to this finding. Both should be resolved before 1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Finding.cert_sha256 hardcodes SHA-256 in the field name and type; algorithm-agility via CertDigest enum is foreclosed",
+  "updated_at": "2026-05-14T16:01:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:01:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

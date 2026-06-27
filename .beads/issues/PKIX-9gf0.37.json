@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:31:29Z",
+  "compaction_level": 0,
+  "content_hash": "4804903e9435187a52c88176baf797d34d2f872d5588e3cbc270e7fc9530c2b3",
+  "created_at": "2026-05-07T16:19:02Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple/src/lib.rs:403\n\n  policy.max_path_len = MAX_INTERMEDIATES as u8;\n\nMAX_INTERMEDIATES is a usize constant (value 2). The cast to u8 will silently truncate if MAX_INTERMEDIATES is ever changed to a value >= 256. Clippy pedantic flags this as 'casting usize to u8 may truncate the value'.\n\nThe fix is to use u8::try_from(MAX_INTERMEDIATES).expect(\"MAX_INTERMEDIATES must fit in u8\") or to declare MAX_INTERMEDIATES as u8 directly (currently it must be usize to be used in .len() comparisons, but the ValidationPolicy field is u8).\n\nSimplest fix: add a compile-time assertion or change the type.\n  const MAX_INTERMEDIATES: usize = 2;\n  const _: () = assert!(MAX_INTERMEDIATES <= u8::MAX as usize);\n\nThen replace the cast with u8::try_from(MAX_INTERMEDIATES).expect(\"constant fits in u8\").",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.37",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-chain-simple: MAX_INTERMEDIATES as u8 unchecked cast",
+  "updated_at": "2026-05-07T16:31:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

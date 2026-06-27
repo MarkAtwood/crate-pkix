@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6ee20cc83d37e93163ab28706ce5ffbbea6f71bd174ca33f86e33a83f0f2dfc6",
+  "created_at": "2026-05-14T18:13:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:218-223 (Error::Aia rustdoc):\n\n    /// Carries the underlying [`pkix_aia::AiaError`] from the last\n    /// fetch attempt; earlier failures are dropped because the chain\n    /// builder iterates URIs in caller-supplied order and only the\n    /// final blocker determines the outcome.\n\nThe phrase \"caller-supplied order\" is wrong. The actual URI source is the `caIssuers` AccessDescriptions in the orphan cert's `AuthorityInfoAccess` extension, extracted by `aia_extract::ca_issuers_http_uris` (pkix-chain/src/aia_extract.rs:44-65). The caller never supplies URIs directly; URIs are decoded from the cert's AIA extension and the iteration order is the order they appear in the AIA DER blob (i.e., the issuing CA's choice, not the caller's).\n\nThe verification loop (lib.rs:633-679) iterates `pool.iter()` (the working cert pool) and for each orphaned cert pulls `ca_issuers_http_uris(cert)` and appends them to `new_uris`. The final order is \"for each orphan cert in pool insertion order, every URI in AIA extension order, deduplicated against tried_uris.\"\n\nWHY IT MATTERS \u2014 what the caller will misunderstand:\n\nA caller reading this docstring believes \"if I supply my preferred mirror URLs first, that's the order they'll be tried.\" They will then file an issue when their preferred mirror is tried last (after the issuing CA's primary CRL URI). The contract docstring is the FIRST place that misconception comes from.\n\nThis is the slash-command checklist's:\n\n> Doc comments that promise something the implementation does not deliver (panics not documented, errors not documented, side effects not documented, complexity not documented).\n\nThe rest of the variant's docstring is sound; the one phrase is wrong. Fix:\n\n    /// Carries the underlying [`pkix_aia::AiaError`] from the last\n    /// fetch attempt; earlier failures are dropped because the\n    /// chain builder iterates caIssuers URIs in the order they\n    /// appear in each orphaned cert's `AuthorityInfoAccess`\n    /// extension, and only the final blocker determines the\n    /// outcome.\n\n(Or, more conservatively: \"in extraction order from each orphan cert's AIA extension.\")\n\nFiled as priority 2 because the doc inaccuracy is the *only* signal a caller has about which URI's error they get \u2014 and the signal is wrong. A caller debugging \"why did AIA fail to find my mirror\" gets the wrong mental model from the rustdoc.\n\nRelated: PKIX-sqek.6 (batch_fetch length-mismatch silent truncation), PKIX-sqek.2 (MalformedCertificate variant misuse) \u2014 both about the AIA-error surface; this one is purely a docstring-vs-implementation gap.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::Aia rustdoc claim 'iterates URIs in caller-supplied order' is factually wrong; URIs come from AIA extension extraction",
+  "updated_at": "2026-05-14T18:13:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:13:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

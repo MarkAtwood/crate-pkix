@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "cc1679be3c88579cd967415b644edfee53b815d9a0c0850dd94b03682351d10d",
+  "created_at": "2026-05-14T18:12:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:426:\n\n    pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {\n\nThe three named trait bounds (SignatureVerifier, RevocationChecker, AiaFetcher) are exposed in the public struct declaration. Two distinct leakage modes:\n\n1. **The bounds themselves are part of the public type signature.** A caller writing `fn my_validator<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher>(v: Verifier<'a, V, R, A>) { ... }` is depending on these three trait names AND on the fact that they bound V/R/A. A future workspace refactor that splits SignatureVerifier into `RsaVerifier + EcdsaVerifier` traits, or merges RevocationChecker + AiaFetcher into a unified `NetworkOracle` trait, breaks every such caller signature.\n\n2. **The number of generics is exposed.** Even before pattern-matching on the trait names, the fact that there are three positional generics (`Verifier<'_, V, R, A>`) is part of the spelling. Adding a 4th generic (the inevitable future trust-domain seam \u2014 pkix-ct, pkix-dane, pkix-composite, etc.) is breaking. Removing one (consolidating two seams into one) is breaking.\n\nThis is the slash-command leakage checklist's:\n\n> Lifetime bounds, generic constraints, or associated types that expose internal data structure choices the maintainer wants to change later.\n\nWHY IT MATTERS:\n\nThe workspace AGENTS.md commits to \"three callbacks alongside SignatureVerifier (signatures) and RevocationChecker (revocation)\" as the COMPLETE trust-domain seam. But the workspace also has five live adjacent-trust-domain skeleton crates (pkix-ct, pkix-dane, pkix-composite, pkix-ac) and a documented gap for future fetchers (pkix-policy-zlint subprocess fetcher, etc.). The \"complete\" trust-domain seam is COMPLETE-AS-CONCEIVED-2026 \u2014 and the project explicitly anticipates seam additions.\n\nThree credible escape patterns:\n\n(a) **Type-state Verifier with builder.** `Verifier<'_, Built>` with `VerifierBuilder<'_, State>` parameterized over a typestate sealed enum. The struct's public name doesn't carry the trait bounds; they live in the builder's signature. Adding a seam = adding a method on the builder + a typestate transition. Non-breaking.\n\n(b) **Bundle into one trait with associated types.** `pub trait ChainBackend { type SignatureVerifier: ...; type Revocation: ...; type Aia: ...; }` and `Verifier<'_, B: ChainBackend>`. Adding an associated type to ChainBackend is technically breaking but local: only ChainBackend impl-ors care, and there are typically zero (callers use the workspace's pre-built backend struct). The verifier's surface is unchanged.\n\n(c) **Erase to trait objects.** `Verifier<'a>` holding `&'a dyn SignatureVerifier`, `&'a dyn RevocationChecker`, `&'a dyn AiaFetcher`. Loses static dispatch on the hot signature-verify path. PKIX-sqek.4 and PKIX-sqek.20 also discuss this trade-off.\n\nClosely related findings:\n\n- **PKIX-sqek.19** (Verifier generics \u2014 adding a 4th seam breaks callers): same root concern, fewer specific options.\n- **PKIX-sqek.4** (wrappers can't opt into AIA): wrapper-layer manifestation of the same leakage.\n- **PKIX-sqek.20** (wrapper signatures locked): same shape question at the free-function layer.\n\nThe four findings (this + .4 + .19 + .20) all resolve through one shape decision; filing them separately so each angle is preserved in the bd ledger. The right resolution unifies them.\n\nPRE-1.0 FRAMING: AGENTS.md \"Project phase and decision framing\" explicitly calls out trait-shape questions as architectural-completeness territory where YAGNI does NOT apply. The complete shape of the trust-domain seam should be settled before 1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier trait bounds (V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher) leak the seam choice; consolidating later is breaking",
+  "updated_at": "2026-05-14T18:12:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:12:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

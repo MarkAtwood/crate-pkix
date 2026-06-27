@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T03:55:50Z",
+  "compaction_level": 0,
+  "content_hash": "3fe60b664a155817a12555607dd08988f49bcdda6082fbdc9741fa317da43e2f",
+  "created_at": "2026-05-13T03:28:29Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "## What\n\nImplement `ZlintBridge::run_on_certs(certs_der: &[&[u8]]) -> Vec<Result<HashMap<String, Verdict>, PerCertError>>` using zlint's multi-file invocation. Amortizes subprocess fork+exec cost across the batch.\n\nPer PKIX-jy95.3: zlint supports `zlint cert1 cert2 cert3 ...` with NDJSON output, one JSON object per cert per line, in input order. zlint does NOT support multi-cert stdin streaming.\n\n## Implementation notes\n\n- Pipeline:\n  1. For each input `cert_der`, hash + cache lookup. Collect cache hits; remaining indexes need subprocess.\n  2. Write remaining inputs to temp files. Spawn `<zlint_path> -format der <f1> <f2> ...` once. Apply timeout (proportional to batch size? fixed?). Implementation decision: keep `BridgeConfig::timeout` per invocation; document that batch size + timeout interact.\n  3. Read stdout as NDJSON. Line N corresponds to input N (the non-cached subset). Parse per line as in `run_on_cert`.\n  4. Populate cache for newly-computed entries.\n  5. Assemble final `Vec<Result<...>>` in original input order, interleaving cache hits + fresh results.\n- Per-cert error handling: if zlint emits an error line for cert N (look for the marker zlint actually emits \u2014 verify in implementation), that index's result is `Err(PerCertError::MalformedDer { detail })`. Other certs in the batch are unaffected \u2014 per PKIX-jy95.4, per-cert errors do not poison the batch.\n- Subprocess-level errors (binary not found, kill, timeout) fail the WHOLE batch \u2014 return `Vec<Err(BridgeError-mapped-as-PerCertError)>` or panic the call? Decision: do NOT swallow bridge-level errors as per-cert; surface them through the function signature. Either change return shape to `Result<Vec<Result<..., PerCertError>>, BridgeError>`, or document that callers handle `BridgeError` by checking before calling. Recommend the `Result<Vec<...>, BridgeError>` outer shape \u2014 matches `enumerate_lints` and lets callers distinguish bridge failures from per-cert failures cleanly.\n\n## Surface (proposed)\n\n`impl ZlintBridge { pub fn run_on_certs(&self, certs_der: &[&[u8]]) -> Result<Vec<Result<HashMap<String, Verdict>, PerCertError>>, BridgeError>; }`\n\n## Tests\n\n- Integration: 3-cert batch (PKITS certs available locally), one valid + one malformed + one valid. Assert outer `Ok(vec)`, vec length 3, indexes 0 and 2 are `Ok`, index 1 is `Err(MalformedDer)`.\n- Cache interaction: run batch twice; second invocation should hit cache entirely (no subprocess; assert via instrumented bridge or by deleting zlint between calls and verifying second call succeeds).\n- Empty input: `run_on_certs(&[])` returns `Ok(vec![])` (no subprocess; trivial fast path).\n- Single input: `run_on_certs(&[c])` returns same value as `run_on_cert(c)` wrapped in `Ok(vec![Ok(_)])`.\n\n## Acceptance\n\n- [ ] `run_on_certs` implementation reusing `run_on_cert`'s cache + parsing primitives\n- [ ] Tests: 3-cert batch with malformed-middle, cache equivalence, empty-input, single-input\n- [ ] cargo build / clippy --all-features -D warnings / fmt --check / doc --no-deps clean\n- [ ] CHANGELOG entry under Unreleased citing PKIX-jy95.7.4\n\n## Out of scope\n\n- Adaptive timeout based on batch size (document interaction, defer adaptation)\n- Parallel subprocess spawning for batches > N (yagni; one subprocess for arbitrary-sized batch is the design)\n\n## Cross-references\n\n- PKIX-jy95.7.1 (types)\n- PKIX-jy95.7.3 (cache + single-cert primitives this depends on)\n- PKIX-jy95.3 (multi-file batch decision)\n- PKIX-jy95.4 (per-cert vs bridge-level error discrimination)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.7.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-zlint-bridge: run_on_certs() batch via multi-file zlint invocation",
+  "updated_at": "2026-05-13T03:55:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T20:28:29Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T20:28:51Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

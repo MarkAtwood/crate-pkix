@@ -1,0 +1,88 @@
+{
+  "close_reason": "All three sub-beads closed: .7.1 (7 missing CHANGELOGs authored), .7.2 (Unreleased rolled up to 1.0.0 \u2014 TBD in all 12 1.0-scope crates with standardized ### Breaking heading), .7.3 (workspace-level RELEASE_NOTES.md drafted). CHANGELOG roll-up + workspace release notes for 1.0 complete.",
+  "closed_at": "2026-05-13T22:29:04Z",
+  "compaction_level": 0,
+  "content_hash": "5be9f823d68e3dba44b7d47445da7d269b2415e6e0d3addcae2dad8deca9200e",
+  "created_at": "2026-05-13T16:58:04Z",
+  "created_by": "Mark Atwood",
+  "description": "## CHANGELOG roll-up + workspace-level release notes for 1.0\n\nAutonomous-execution bead. Blocks on .6 (Limitations audit complete) and any in-flight implementation work that lands before 1.0 publish.\n\nFor each 1.0-included crate, produce or update its `CHANGELOG.md` to mark the 1.0.0 release. Plus a workspace-level release notes document for the 1.0 announcement.\n\n## Per-crate CHANGELOG entries\n\nFor each of the 11 crates (scope per .1):\n\n- [ ] `## 1.0.0 - YYYY-MM-DD` heading at top\n- [ ] Summary line: \"First stable release.\"\n- [ ] If 0.x \u2192 1.0 has breaking changes: enumerate them under `### Breaking`\n- [ ] If 0.x \u2192 1.0 has new features since last 0.x: enumerate under `### Added`\n- [ ] If 0.x \u2192 1.0 fixed bugs since last 0.x: enumerate under `### Fixed`\n- [ ] Link to relevant beads where useful (don't over-link; CHANGELOG is user-facing)\n\n## Workspace-level release notes\n\nSingle document, location TBD (top-level `RELEASE_NOTES.md` or similar). Contains:\n\n- Summary: \"RFC 5280 X.509 for Rust, done right from the start. 11 crates shipping at 1.0; adjacent ecosystem continues at independent 0.x cadence.\"\n- What's included (the 11 crates, one-line each)\n- What's not included (AIA online fetching, AC, CT, DANE, composite, platform trust stores, comprehensive CA/B Forum policy adapter \u2014 all available as 0.x sibling crates with independent roadmaps)\n- Quick start example (verify_tls_server hostname binding shown)\n- Stability promise (1.0 = semver stability; future breaking changes require major bump)\n- Acknowledgments (RustCrypto upstream, NIST PKITS, pyca/cryptography, OpenSSL, etc. as appropriate)\n\n## Execution\n\nAutonomous loop generates initial drafts from bead-tracked changes + git log. Mark reviews and refines wording before publish.\n\n## Acceptance\n\n- [ ] Each 1.0-included crate's CHANGELOG.md has a 1.0.0 entry\n- [ ] Workspace-level release notes drafted\n- [ ] Mark reviewed both\n- [ ] All references (beads, crates, RFCs) are accurate\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- PKIX-wlsr.6 (Limitations audit; CHANGELOG sometimes points at Limitations sections)\n- All beads closing as part of 1.0 cascade (CHANGELOG enumerates the user-visible effects)\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 gating documented] Wired 4 task-shape dep blockers (PKIX-zkjb.2/.3/.4/.9). PKIX-lwr9.4 is an epic so direct dep is disallowed by beads (tasks can only depend on tasks); it's tracked informally as a 1.0-blocker label and PKIX-wlsr.7 should not be drafted until that epic closes too. When all 5 1.0-blockers land, .7 surfaces and the CHANGELOG roll-up can be drafted against the final 1.0 state.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CHANGELOG roll-up + workspace-level release notes for 1.0 (autonomous)",
+  "updated_at": "2026-05-13T22:29:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:58:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T09:58:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:12:21Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:12:22Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:12:23Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T10:25:14Z",
+      "created_by": "bd-spin/bd-spin-20260513T171233Z-2765851",
+      "depends_on_id": "PKIX-zkjb.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T10:25:15Z",
+      "created_by": "bd-spin/bd-spin-20260513T171233Z-2765851",
+      "depends_on_id": "PKIX-zkjb.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T10:25:16Z",
+      "created_by": "bd-spin/bd-spin-20260513T171233Z-2765851",
+      "depends_on_id": "PKIX-zkjb.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T10:25:17Z",
+      "created_by": "bd-spin/bd-spin-20260513T171233Z-2765851",
+      "depends_on_id": "PKIX-zkjb.9",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

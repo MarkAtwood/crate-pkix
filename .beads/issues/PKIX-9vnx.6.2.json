@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Shipped: oscal/catalog.rs with catalog_from_lints(). Emits OSCAL Catalog v1.1.2 JSON, byte-deterministic. Each Lint becomes one Control with id, title, props (citation/severity/scope/applies-to/section-id), reference links (rfc_url), parts (description), and params (parameters). Parameters land in .6.2 rather than deferring to .6.5 \u2014 Catalog declares, Profile modifies. 8 new tests; oscal 201 / all-features 207. Commit 80556b1f.",
+  "closed_at": "2026-05-11T22:15:09Z",
+  "compaction_level": 0,
+  "content_hash": "b753b1e01ab728e82b73bb3b9450b3285940c9b512f3a034c91e77f3617faeef",
+  "created_at": "2026-05-11T18:00:40Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.6 decomposition step 2. After .6.1 lands the Lint trait carries enough metadata to project each Lint to an OSCAL Control. This bead writes the projection.\n\n## What\n\nNew function in `pkix-lint/src/oscal/emit.rs` (or new `pkix-lint/src/oscal/catalog.rs` submodule):\n\n```rust\npub fn catalog_from_lints(\n    lints: &[Box<dyn crate::Lint>],\n    catalog_id: &str,\n    catalog_version: &str,\n) -> serde_json::Value\n```\n\nOutput is OSCAL Catalog v1.1.2 JSON: top-level `{ \"catalog\": { \"uuid\": ..., \"metadata\": ..., \"controls\": [...] } }`. Each Lint becomes one Control:\n\n- `id` \u2014 Lint::id() (must be a valid OSCAL Control id; existing IDs like `cabf.br.tls.validity.max` are dot-separated and lowercase \u2014 verify against OSCAL spec).\n- `title` \u2014 Lint::title().\n- `props`: `pkix-lint.citation`, `pkix-lint.severity`, `pkix-lint.scope` (cert/path), `pkix-lint.applies-to` (leaf/intermediate/anchor-issued/any).\n- `parts`: `statement` (if Lint::description() returns Some), `assessment-objective` (if defined).\n- `links`: `rel=reference` with href=rfc_url() when present.\n- Deterministic UUIDs via the existing uuid_v8 helper (RFC 9562 \u00a75.8) seeded with the catalog_id + lint id.\n\n## Acceptance\n\n- [ ] catalog_from_lints emits a valid OSCAL Catalog JSON Value.\n- [ ] Test asserts top-level shape matches OSCAL Catalog v1.1.2 (required fields uuid, metadata, controls present).\n- [ ] Test verifies a sample Lint maps to a Control with matching id, title, citation prop, rfc-url link.\n- [ ] Output is byte-deterministic across runs with the same input.\n- [ ] Full pkix-lint suite passes; `oscal` feature gated.\n\n## Out of scope\n\n- Catalog deserialization / round-trip \u2014 that's .6.3.\n- Parameter declarations on Controls \u2014 that's .6.4.\n\n## Depends on\n\nPKIX-9vnx.6.1 (trait metadata).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL Catalog JSON serializer for registered Lints",
+  "updated_at": "2026-05-11T22:15:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T11:00:40Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T11:01:32Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

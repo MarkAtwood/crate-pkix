@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added DeviationStore::find_deviation_for_chain which scans every cert in the chain for scope matching (chain-order iteration, first-match-wins). DeviationRunner::run_path now calls a new internal apply_deviations_for_chain that uses this resolver, and the rustdoc was updated to reflect the chain-scan rule. Path-scope findings have no single 'owning' cert (RFC 5280 \u00a76.1 fires them from chain-wide properties), so the previous leaf-only scope match silently dropped deviations targeting intermediate-CA DNs \u2014 silently halving the audit trail in the worst case where the deviation said it covered a path issue but didn't actually fire. The store-insertion-order tie-breaker is preserved (same as find_deviation). Refactored to extract make_deviated() so apply_deviations and apply_deviations_for_chain share construction logic. Three regression tests directly exercise find_deviation_for_chain: matches via intermediate cert, returns None when no cert matches, store-order wins when multiple deviations both match. 259 lib tests + 7 doc tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:43:06Z",
+  "compaction_level": 0,
+  "content_hash": "9b4c8f91b85c6f4b19820c082b8fbf24a2c70e47f2ff58bc4b0607c2816fe07e",
+  "created_at": "2026-05-14T12:41:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: deviation.rs:920-938. Doc: 'For path-scope lints, scope matching uses the leaf certificate (chain[0]).' 'IssuerDnExact and SerialRange must reference the leaf certificate\\'s issuer DN \u2014 deviations scoped to an intermediate CA\\'s DN will not match.' Scenario that triggers cost: an operator wants to waive a path-scope lint that fires because of an intermediate CA's properties (e.g., 'chain depth exceeds policy max for paths through Intermediate-X'). They scope a deviation as issuer_dn_contains 'intermediate-x'. The deviation never fires because the leaf's issuer DN (which is intermediate-x's subject DN, but the chain's leaf is N-1 steps removed) is being checked. Maintenance consequence: silent wrong-attribution \u2014 the operator believes they've waived a path issue but the actual path-scope finding goes through. Worse, path findings are sometimes the ones that matter most (chain depth, key usage chaining, name constraints) because they're the cases where individual-cert lints can't see the problem. Fix: either (a) iterate all chain certs and apply the deviation if any cert matches the scope (with the finding annotated 'matched on chain[k]'); (b) introduce a new scope kind 'pkix-lint.scope.chain-has-issuer-dn-contains' that does (a) explicitly; (c) document the leaf-only limitation in the user-facing operator README, not just the code's rustdoc. Pre-1.0 is the right time to settle this.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationRunner::run_path scope-matches the LEAF cert, not the chain \u2014 silently wrong for intermediate-scoped deviations",
+  "updated_at": "2026-05-14T13:43:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "402aa2f6623a94dae483a59bd6ebce3bce3ea1570cf6e462b83b9c98a36437c8",
+  "created_at": "2026-06-15T19:45:47Z",
+  "created_by": "Mark Atwood",
+  "description": "Expand DefaultVerifier to cover the algorithms found in real-world PKIs. Without RSA-PSS and Ed25519, the library cannot validate chains from Let's Encrypt ISRG Root X2, government PKIs, or modern CAs. Existing epic PKIX-qws tracks the 4 individual algorithms. This is the single feature addition that most expands the set of certificate chains the library can validate.\n\nSubtasks (from PKIX-qws):\n- RSA-PSS-SHA256 SignatureVerifier\n- Ed25519 SignatureVerifier  \n- ECDSA P-521 + SHA-512 SignatureVerifier\n- Legacy SHA-1 RSA+ECDSA (feature-gated, off by default)\n\nAcceptance: cargo test against a corpus of real-world chains from CT logs covering each algorithm.",
+  "ephemeral": 0,
+  "id": "PKIX-77k9.1",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Algorithm coverage: RSA-PSS, Ed25519, P-521, legacy SHA-1",
+  "updated_at": "2026-06-15T19:45:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:45:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77k9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

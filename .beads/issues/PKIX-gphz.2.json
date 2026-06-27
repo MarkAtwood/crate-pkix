@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T08:12:23Z",
+  "compaction_level": 0,
+  "content_hash": "b39c74de790154b92439c7baaf077cdd551cd065b3ec5d59cda004fbf976677e",
+  "created_at": "2026-05-08T18:56:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nModern TLS, code signing, and sigstore heavily use ECDSA P-384. Currently rejected by `pkix-path`.\n\nOID: `1.2.840.10045.4.3.3` (ecdsa-with-SHA384). Algorithm parameters MUST be absent per RFC 5758 \u00a73.2.\n\n## What\n\n1. New unit struct `EcdsaP384Verifier` behind `feature = \"p384\"` in `pkix-path/src/lib.rs`. Mirror `EcdsaP256Verifier` at `lib.rs:1867`.\n2. Add `p384 = { version = \"0.13\", default-features = false, features = [\"ecdsa\", \"pkcs8\"] }` to `workspace.dependencies` and pkix-path's optional deps.\n3. OID dispatch in `DefaultVerifier` (`lib.rs:3047`) for `1.2.840.10045.4.3.3`.\n4. Update `rustcrypto` umbrella feature to include p384.\n\n## Acceptance\n\n- [ ] `EcdsaP384Verifier` impls `SignatureVerifier` and verifies a known-good signature from independent test vectors (NIST CAVS or RustCrypto p384 crate fixtures).\n- [ ] Tampered-signature test rejects cleanly.\n- [ ] At least one real-world P-384 chain added to `pkix-difftest/tests/fixtures/` and confirmed validating (suggest: a sigstore/Fulcio cert, which uses P-384).\n- [ ] `DefaultVerifier` dispatches to it.\n- [ ] No `unsafe`. `pkix-path` stays `no_std` (p384 default-features=false is no_std-capable).\n\n## Filed as\n\nPKIX-gphz child #2. Modern TLS and sigstore.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz.2",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crypto: ECDSA P-384 + SHA-384 SignatureVerifier",
+  "updated_at": "2026-05-11T08:12:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T11:56:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

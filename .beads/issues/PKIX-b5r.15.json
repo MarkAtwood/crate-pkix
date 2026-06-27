@@ -1,0 +1,31 @@
+{
+  "close_reason": "Qualifier_set field is intentionally stored but not yet used (v0.2). Added doc comment explaining this. Suppressor retain is correct.",
+  "closed_at": "2026-05-05T16:08:52Z",
+  "compaction_level": 0,
+  "content_hash": "996b222a127574c394726e891f910128e023f4e419de2e73b5f7814bdc01dfd9",
+  "created_at": "2026-05-05T15:46:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:721\u2013722\n\n    #[allow(dead_code)]\n    qualifier_set: Vec<x509_cert::ext::pkix::certpolicy::PolicyQualifierInfo>,\n\nThe field is suppressed with #[allow(dead_code)] because it is written but never read.  RFC 5280 \u00a76.1 does not require propagating qualifiers through the policy state machine for validation purposes (qualifiers are informational); reading the field is legitimately out of scope for v0.1.\n\nThe concern is different: the field is typed as Vec<PolicyQualifierInfo> \u2014 a non-zero-sized always-allocated container.  If it is genuinely unused for v0.1 validation logic, the idiomatic approach is one of:\n\n1. Type it as Vec<PolicyQualifierInfo> and document why it is carried (reserved for v0.2 output), or\n2. Remove it entirely and re-add in v0.2 when it is actually used.\n\nThe current state \u2014 allocated, populated, #[allow(dead_code)] suppressed \u2014 is the worst of both worlds: it costs memory and CPU on every cert processed, and the allow(dead_code) suppresses a compiler signal that would help reviewers notice it.\n\nAt minimum the allow(dead_code) should be accompanied by a # Limitations rustdoc comment on the field explaining that qualifiers are carried but not currently surfaced in ValidatedPath.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PolicyNode qualifier_set: Vec not Option, but #[allow(dead_code)] hides unused field",
+  "updated_at": "2026-05-05T16:08:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

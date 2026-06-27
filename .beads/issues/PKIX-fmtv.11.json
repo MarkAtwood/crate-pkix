@@ -1,0 +1,46 @@
+{
+  "close_reason": "All three implementation children closed (.11.1 pkix-identity body, .11.2 pkix-chain wrappers, .11.3 bettertls corpus wiring). RFC 6125 hostname binding work shipped. human label was stale; child .11.2 closed after the label was applied 2026-05-13.",
+  "closed_at": "2026-05-13T16:25:21Z",
+  "compaction_level": 0,
+  "content_hash": "018a263b5a28750bc1cc0baa4e4a1160824d3c30a918566b3f52a45f469991a0",
+  "created_at": "2026-05-12T02:42:15Z",
+  "created_by": "Mark Atwood",
+  "description": "**Retargeted 2026-05-11 per `.3` decision (option B):** binding code lives in new `pkix-identity` crate; pkix-chain ships the thin wrapper that calls it.\n\n## In `pkix-identity` (fills scaffold stub)\n\nImplement `verify_dns_name(cert: &Certificate, name: &ServerName) -> Result<(), IdentityError>`:\n\n- Parse leaf's SubjectAlternativeName extension; iterate `GeneralName` entries.\n- For each `GeneralName::DnsName(dns)`: apply RFC 6125 \u00a76.4 matching against `name`:\n  - **Exact** case-insensitive ASCII match.\n  - **Wildcard** rules: SAN entry `\"*.foo.com\"` matches `\"a.foo.com\"` but NOT `\"a.b.foo.com\"` (single leftmost label), NOT bare `\"*\"`, NOT `\"*.com\"` (no public-suffix check \u2014 caller responsibility), NOT embedded wildcards (`\"*.foo.*.com\"` rejected).\n  - **IDN** handling: A-label form for DNS names; if caller provides U-label, normalize via `idna` crate before compare.\n- For each `GeneralName::IpAddress(bytes)`: if `name` is an IP literal (IPv4 4 bytes / IPv6 16 bytes), byte-equal compare.\n- If any SAN entry matches: `Ok(())`. If SAN is missing or no entry matches: `Err(IdentityError::NoMatchingSan)` or `MissingSan`.\n\nAlso implement `ServerName::dns_name` and `ServerName::ip_address` constructors with input validation.\n\n## In `pkix-chain`\n\nShip two new public functions:\n\n```rust\npub fn verify_tls_server(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    name:       &ServerName<'_>,    // from pkix-identity\n    policy:     &ValidationPolicy,  // typically BasicTlsProfile.policy(now)\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n\npub fn verify_tls_client(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    identity:   Option<&ClientIdentity<'_>>,  // typically &MailboxName for rfc822 identity\n    policy:     &ValidationPolicy,\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n```\n\nBody of `verify_tls_server`:\n1. Call existing `pkix_chain::verify_chain(chain, anchors, policy, verifier, revocation)?` \u2014 produces `ValidatedPath`.\n2. Call `pkix_identity::verify_dns_name(&chain[0], name)?`.\n3. Return `Ok(ValidatedPath)`.\n\n`verify_tls_client` is the same shape with optional identity binding.\n\n`VerifyError` enum gets new variants for `HostnameMismatch`, `MalformedSan`, etc., wrapping `IdentityError`.\n\nWhether `verify_tls_client` ships in v0.x depends on `.7` (wrapper-set decision); if only `verify_tls_server` ships, that's fine.\n\n## Tests\n\n- bettertls.com hostname-matching corpus (already vendored in `pkix-difftest` per AGENTS.md).\n- RFC 6125 \u00a76.4 wildcard edge cases: leftmost-label-only, no-embedded-wildcards, no-bare-asterisk.\n- IDN: U-label input \u2192 A-label SAN match, both directions.\n- IP literal: IPv4 / IPv6 / mismatched length.\n- SAN missing \u2192 error.\n- SAN present but no match \u2192 error.\n\n## Blocks on\n\n- New scaffold child (creates the pkix-identity crate with the API stubs).\n- `.7` (decides whether `verify_tls_client` is in the v0.x wrapper set).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.11",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 closing as superseded by complete children]\n\nAll three children closed:\n- PKIX-fmtv.11.1 (RFC 6125 hostname binding body in pkix-identity) \u2014 CLOSED\n- PKIX-fmtv.11.2 (verify_tls_server / verify_tls_client wrappers in pkix-chain) \u2014 CLOSED\n- PKIX-fmtv.11.3 (bettertls dnsnames corpus wiring) \u2014 CLOSED\n\nbd-spin applied human label 2026-05-13 03:17 while .11.2 was in_progress to keep the parent off the ready surface. .11.2 has since closed. Label was stale by the time this session reviewed the frontier.\n\nClosing parent. RFC 6125 hostname binding work is complete.\n\nNote: bd-spin asked a meta-workflow question (whether bd ready should auto-exclude parent epics with claimed-by-others children). Not addressing here \u2014 that's a bd feature request, not a PKIX architecture decision. The manual human-label pattern is functional, if slightly noisy at session boundaries when children close after the label is applied. human label removed.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 6125 hostname binding in pkix-identity + verify_tls_server wrapper in pkix-chain",
+  "updated_at": "2026-05-13T16:25:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:43:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T22:04:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.21",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

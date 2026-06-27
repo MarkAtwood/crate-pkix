@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Path builder fully implemented: DFS in pkix-path-builder, integration tests, names_match already pub.",
+  "closed_at": "2026-05-05T14:43:13Z",
+  "compaction_level": 0,
+  "content_hash": "1225c7f0f8a3feded8441dd0fb149918e0384695a23a446fa828aa41764f999a",
+  "created_at": "2026-05-02T15:29:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement a path builder that discovers and orders a valid certification path from an unordered bag of certificates, enabling cross-certificate and bridge CA support.\n\nSpec references:\n- RFC 5280 \u00a76.1 \u2014 path validation requires an ordered chain; building that chain is a precondition\n- RFC 4158 \u2014 Internet X.509 PKI: Certification Path Building (the canonical algorithm reference)\n- RFC 5280 \u00a73.2 \u2014 cross-certificates and bridge CA topology\n- PKITS sections 4.14\u20134.16 \u2014 path building, bridge CA, and cross-certificate test vectors\n\nNote: cross-certificate and bridge CA handling falls out of a correct path builder; not a separate feature.",
+  "ephemeral": 0,
+  "id": "PKIX-y2j",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Path building (unordered chain discovery)",
+  "updated_at": "2026-05-05T14:43:13Z"
+}

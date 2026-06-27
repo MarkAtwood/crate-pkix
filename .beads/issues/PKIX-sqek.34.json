@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2f46fb1d31ad4e312d31ed94de712500044969f34ea727de1e08d78166593487",
+  "created_at": "2026-05-14T18:17:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:660 calls `<Certificate as der::Decode>::from_der(&der)` using fully-qualified syntax because the `Decode` trait is not in scope at the file level. The two functions in this file that decode DER values both use a different style:\n\n- aia_extract.rs:20 imports `use der::{asn1::ObjectIdentifier, Decode};` and then writes `AuthorityInfoAccessSyntax::from_der(extn_value)` (line 48) \u2014 idiomatic method-call form.\n- lib.rs:1485 and 1563 use `use x509_cert::der::Decode as _;` inside the function scope, then `ExtendedKeyUsage::from_der(...)` and `KeyUsage::from_der(...)`.\n- lib.rs:660 uses the UFCS form `<Certificate as der::Decode>::from_der(&der)` with no `use` statement at all.\n\nUFCS is correct, but it is the noisy escape hatch you reach for when there is a name conflict \u2014 there is none here. The straightforward `use der::Decode as _;` at the top of the file (or inside `build_with_aia`) eliminates the angle-bracket dance and matches the style used elsewhere in the same module.\n\nWhat goes wrong if it stays: readability cost on every `Certificate` parse site; the inconsistency between the three styles signals that the file evolved over time without a unifying style choice. A future maintainer adding another `from_der` call has three precedents to pick from.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "UFCS <Certificate as der::Decode>::from_der instead of trait-import + method-call",
+  "updated_at": "2026-05-14T18:17:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:17:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

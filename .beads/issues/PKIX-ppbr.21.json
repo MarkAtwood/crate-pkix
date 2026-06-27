@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dcd9cfef07ba0624ada72c12c9a87b0227c7ba625bb9b2eb093ac51a2a5d8d4b",
+  "created_at": "2026-05-14T17:43:03Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:592-603\n\n```rust\npub struct MerkleAuditPath {\n    pub leaf_index: u64,\n    pub tree_size: u64,\n    pub audit_path: Vec<[u8; 32]>,\n}\n```\n\nPublic fields with no constructor and no doc-comment about invariants.\nA caller can build:\n\n```rust\nMerkleAuditPath { leaf_index: 0, tree_size: 0, audit_path: vec![] }\n```\n\n\u2014 `tree_size == 0` is malformed (rejected by `verify_inclusion` as\n`Error::MerkleProofMalformed`).\n\n```rust\nMerkleAuditPath { leaf_index: 99, tree_size: 5, audit_path: vec![] }\n```\n\n\u2014 `leaf_index >= tree_size` (rejected at verify time).\n\n```rust\nMerkleAuditPath {\n    leaf_index: 0,\n    tree_size: 1024,\n    audit_path: vec![[0;32]; 99],  // way more than ceil(log2(1024)) = 10\n}\n```\n\n\u2014 overlong audit path (rejected at verify time).\n\nALL of these invariants are enforced at `verify_inclusion` time, not\nat construction time. The contract is: the type's invariants are\n\"whatever `verify_inclusion` checks\". Two problems:\n\nA. A caller writing a `Display`-impl or a logging wrapper for\n   `MerkleAuditPath` cannot tell from the type whether the values\n   they're rendering are physically sensible.\n\nB. A caller building a proof from raw u64s sourced from a CT log's\n   JSON response cannot validate the proof structurally without\n   running the full hash check. They want a constructor that returns\n   `Result<Self>` so they can fail fast on malformed proofs without\n   loading the leaf and root.\n\nRecommendation: add `MerkleAuditPath::new(leaf_index, tree_size,\naudit_path) -> Result<Self, Error>` that pre-validates the three\nstructural invariants (`tree_size > 0`, `leaf_index < tree_size`,\n`audit_path.len() <= ceil(log2(tree_size))`). The slow hash check\nstill runs in `verify_inclusion`; the fast invariant check is just\nmoved earlier. Add `#[non_exhaustive]` (per PKIX-ppbr.15) so callers\nmust go through the constructor.\n\nThis is also a defensive-forcing concern: every caller currently\nneeds to re-implement the same three checks if they want them\npre-verify.\n\nPriority P2; doesn't block correctness but does force caller-side\nduplication.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "MerkleAuditPath public fields admit invalid proofs \u2014 verify_inclusion is the only validator",
+  "updated_at": "2026-05-14T17:43:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:43:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

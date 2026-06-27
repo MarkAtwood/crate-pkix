@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "7fdb495926c8232e8477dad76c06318d194e4304d411c5402a3cfbdec3808e5d",
+  "created_at": "2026-05-14T12:49:18Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1107 and 1186:\n\n    #[cfg(feature = \\\"oscal\\\")]\n    pub fn filter_to_ids(self, ids: &[String]) -> Result<LintRunner, ...>\n\n    #[cfg(feature = \\\"oscal\\\")]\n    pub fn apply_parameter_overrides(\n        &mut self,\n        overrides: &[crate::oscal::profile::ParameterOverride],\n    ) -> Result<(), crate::oscal::parse::ParseError>\n\nThese are the only ways to:\n  - filter a LintRunner to a subset of lint IDs after construction\n  - update lint parameters on an existing LintRunner\n\nBoth are gated behind the `oscal` cargo feature. Without that feature\nenabled, a caller has zero post-construction mutation surface on\nLintRunner. The signatures of run_cert and the rest of the runner\ndon't change with the feature.\n\nThis forces:\n\n  - Callers who don't use OSCAL but DO want to filter or re-parameterize\n    have to either enable the feature (pulling in serde_json) or rebuild\n    the LintRunner from scratch each time their config changes.\n\n  - The 'lint set composition' workflow is implicitly tied to OSCAL.\n    Per AGENTS.md non-negotiable #5, OSCAL is 'one supported wire\n    format', not the canonical one. But programmatically, OSCAL is\n    the only first-class composition path.\n\n# What's leaking\n\nThe `ParameterOverride` type lives in the oscal module. Its semantics\nare general (composite param_id + value), not OSCAL-specific. But the\nmethod that consumes it is gated, and there's no oscal-feature-free\nanalogue:\n\n    // What's missing:\n    pub fn set_parameter(&mut self, lint_id: &str, param_id: &str, value: &str)\n        -> Result<(), ParameterError>;\n\nA method on LintRunner that directly delegates to\n`lint.set_parameter(...)` for the lint matching `lint_id` would give\nparameter tuning without requiring OSCAL plumbing.\n\nSame for filter_to_ids: it could trivially exist as a non-oscal-gated\nmethod taking `&[&str]` or `&[impl AsRef<str>]`, with the OSCAL\nadapter being a thin wrapper that calls it with the catalog ids.\n\n# Forward fit\n\nThis is structural: the engine has the capability but the gating\nhides it from non-OSCAL consumers. Pre-1.0 fix: introduce non-oscal\nmethods on LintRunner that do the actual work (`set_parameter`,\n`filter_to_ids` with `&[&str]`), then have the OSCAL-feature variants\nof these methods that take OSCAL types call into them.\n\n# Why P2\n\nMitigations exist (rebuild the runner; enable the feature). The\ngating is intentional and the OSCAL framing was the recent change.\nBut the contract still says 'parameter tuning is for OSCAL users' which\nis not the workspace stance.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: LintRunner exposes apply_parameter_overrides only under oscal feature, locking parameter tuning to OSCAL",
+  "updated_at": "2026-05-14T12:49:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:49:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

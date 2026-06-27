@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ec745078c791adaa0caa387b21f24d8441546524044c4b6a92b2fe88f90ebae0",
+  "created_at": "2026-05-08T18:56:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nP-521 is rare in the wild \u2014 used in some government and high-assurance PKI deployments but not common in TLS. Filed for completeness.\n\nOID: `1.2.840.10045.4.3.4` (ecdsa-with-SHA512).\n\n## What\n\n1. New `EcdsaP521Verifier` behind `feature = \"p521\"`. Mirror P-256/P-384 patterns.\n2. Add `p521` to workspace deps.\n3. OID dispatch in `DefaultVerifier`.\n\n## Acceptance\n\n- [ ] Verifier impls `SignatureVerifier`.\n- [ ] Unit tests against independent test vectors.\n- [ ] `DefaultVerifier` dispatches.\n\n## Filed as\n\nPKIX-gphz child #5. Lowest priority of the crypto-coverage set; file as P3.\n\nMay discover that `p521` crate has different no_std posture or feature flags than p256/p384; document any divergence. If `p521` is not yet stable, may need to defer or use an alternative impl.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz.5",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "crypto: ECDSA P-521 + SHA-512 SignatureVerifier",
+  "updated_at": "2026-05-08T18:56:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T11:56:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

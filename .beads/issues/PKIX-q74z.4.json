@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dd766db340e3ddd8158f6c044530ed0eab2d1a6e520a509659b16719602f8c2b",
+  "created_at": "2026-05-14T14:22:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:791,803,819,832,883,896,924,938 \u2014 build_signed_input_x509_entry / build_signed_input_precert_entry / build_merkle_tree_leaf_x509_entry / build_merkle_tree_leaf_precert_entry all do '(sct.extensions.len() as u16).to_be_bytes()'. There's a debug_assert! guarding it but only debug builds catch the overflow.\n\nIf a caller (test code, fuzz harness, or future API that constructs SCT from sources other than the wire parser) builds a SignedCertificateTimestamp with extensions.len() > 65535, the cast silently truncates to len() & 0xFFFF. Output bytes carry the wrong u16 length; downstream signature verification fails with InvalidSignature \u2014 caller sees a misleading error, not the actual cause.\n\nThe parser itself is safe (read_u16_prefixed bounds at u16::MAX). The public struct SignedCertificateTimestamp has 'pub extensions: Vec<u8>' \u2014 i.e., any caller can construct it directly with a >u16 vec. Per workspace policy (non-negotiable #6 'cache-friendly' and pre-1.0 'design closure'), the constructor should enforce this invariant or the build_* functions should return an error.\n\nSuggested fix: change debug_assert! to a real check returning Error::ParseError or a new Error::ExtensionsTooLong variant. Cheap, eliminates silent-truncation footgun.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_signed_input_*: u16 cast of sct.extensions.len() silently truncates if caller constructs SCT with >65535 extensions",
+  "updated_at": "2026-05-14T14:22:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:22:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

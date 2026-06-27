@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Shipped option (c) in commit: corrected rustdoc on both the IoFailure.kind field (lib.rs:108-130) and the io_error_kind_serde module (lib.rs:147-198) to disclose the two known costs of Debug-of-ErrorKind serialization (not a contractually stable identifier; unknown variants degrade to ErrorKind::Other). Also closes PKIX-tit4.27 (Display-vs-Debug doc mismatch) as a side-effect. Filed PKIX-tit4.28 (human) to track the architectural (a) hand-maintained u8 table vs (b) drop kind entirely vs (c) keep-current-with-honest-docs decision, since (a) and (b) would reverse PKIX-2l0v.1 D3 and want explicit human input. Workspace tests + clippy --all-features -D warnings + rustdoc -D warnings all clean.",
+  "closed_at": "2026-05-14T08:03:00Z",
+  "compaction_level": 0,
+  "content_hash": "9d9f53a749bedfcb83098b15a75eb34ef3eddd661585c33d4c2fc562b4b5f79b",
+  "created_at": "2026-05-14T04:58:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:147-198: the serde helper for io::ErrorKind serializes via format!(\"{:?}\", kind), claiming in the rustdoc that \"upstream documents this as the canonical textual identifier.\"\n\nThat claim is not accurate. io::ErrorKind upstream is a plain `#[derive(Debug)]` enum; the Debug output happens to be the variant name today, but the stdlib does NOT contractually guarantee this format. Display is the human-readable form (e.g. \"entity not found\"); there is no stable textual identifier API on io::ErrorKind at all.\n\nScenarios where this becomes a real maintenance cost:\n  1. A future Rust release renames or restructures a Debug derive (e.g. adds a struct-like wrapper). All existing serialized payloads break decoding silently \u2014 they fall through to the catch-all `_ => ErrorKind::Other` arm.\n  2. A new ErrorKind variant ships (the enum is `#[non_exhaustive]`). Producers on newer Rust emit \"FilesystemQuotaExceeded\"; consumers on older Rust silently decode this to ErrorKind::Other, losing the diagnostic. The serde_round_trip test `io_failure_unknown_kind_falls_back_to_other` even validates that this lossy degradation happens \u2014 it is described as \"forward-compat insurance\" but it is silent data loss for cache replay.\n  3. The Debug-of-ErrorKind contract is exactly the brittle \"depend on Display output for parsing\" pattern this workspace otherwise avoids.\n\nMaintenance consequence: when this breaks, it will break silently. There is no compile-time signal; cache hits with the new producer / old consumer combination silently round-trip wrong, and tests pass.\n\nFix options:\n  a) Serialize as a u8 mapped from a hand-maintained match table; treat new variants as a maintenance task on each stdlib bump.\n  b) Drop ErrorKind entirely from the wire form and keep only `message: String`. Callers needing programmatic recovery have a richer message; callers needing `kind` for branching can grep the message.\n  c) Keep the current code but rewrite the rustdoc to disclose that this is a best-effort textual representation with documented lossy degradation, not a \"canonical identifier\".\n\nOption (b) is the most honest pre-1.0 choice \u2014 it admits ErrorKind round-tripping is hard and refuses to ship a half-solution.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IoFailure serde wire form depends on undocumented stdlib Debug behavior of io::ErrorKind",
+  "updated_at": "2026-05-14T08:03:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:58:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

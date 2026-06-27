@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:07:11Z",
+  "compaction_level": 0,
+  "content_hash": "a907f8dc2a22e882f901f8cc54c8ecfc1937313be99e69311394f6d4d590567c",
+  "created_at": "2026-05-05T15:50:09Z",
+  "created_by": "Mark Atwood",
+  "description": "The pkits_crl.rs test suite covers PKITS \u00a74.15 delta CRL scenarios well, but does not test the edge case of an empty base CRL (no revoked entries) combined with a non-empty delta CRL.\\n\\nThis is relevant because with an empty base and a non-empty delta:\\n- with_delta construction should succeed (empty base is valid)\\n- check_revocation with a cert that IS in the delta should return Revoked\\n- check_revocation with a cert NOT in either should return Ok\\n\\nThe current tests all use CA1 or CA2 base CRLs that have revoked entries. The empty-base case exercises the delta_entries path without the base_entries fallback, which is a different code path at line 296-303.\\n\\nAlso missing: a test where the base CRL has a revoked serial and the delta CRL's revoked list is empty (cert should still be revoked from base). This exercises line 296-303 when delta_entries is empty.\\n\\nLocation: pkix-revocation/tests/pkits_crl.rs (no test for empty-base + non-empty-delta)\\n\\nNote: deltaCRLCA3CRL may be an empty base (it has no revoked entries per the \u00a74.15.9/4.15.10 comments). Using deltaCRLCA3CRL as base and deltaCRLCA3deltaCRL as delta would test this case. Add a dedicated test.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing test: delta CRL with empty base and non-empty delta",
+  "updated_at": "2026-05-05T16:07:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:50:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T21:58:29Z",
+  "compaction_level": 0,
+  "content_hash": "8dc900ae48da44dcc752b9eb4f53678c4dad821e47f33b8bdb7738e22c45ba79",
+  "created_at": "2026-05-11T19:45:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nEmpirical finding from PKIX-lwr9.1 (2026-05-11): of the 25 bettertls::pathbuilding fixtures imported into pkix-path-builder/tests/bettertls.rs, **23 of 25 already pass** end-to-end when routed through pkix_path_builder::build_path. Only tc60 is a genuine builder bug.\n\nRoot cause of the 47-case StricterThanWild figure in baseline-limbo.json: pkix-difftest/src/corpus/limbo.rs::build_item constructs positional chains `[peer, ..intermediates, anchor]` and feeds them DIRECTLY to pkix_path::validate_path, BYPASSING pkix-path-builder. PKIX-yn3e (AKI-based candidate selection, 2026-05-08) shipped before the limbo baseline was generated, but the limbo harness has never invoked the builder.\n\n## What\n\nUpdate pkix-difftest/src/corpus/limbo.rs::build_item (or wherever the CertPath classification path lives) to:\n\n1. Construct a cert bundle from the testcase's peer + intermediates + trust anchors\n2. Call pkix_path_builder::build_path to produce the ordered chain\n3. Feed the builder-produced chain to pkix_path::validate_path for classification\n4. Fall back to the current positional-chain behavior only if build_path fails to find any candidate\n\nThis mirrors PKIX-t0w4's PKITS harness change.\n\n## Acceptance\n\n- [ ] limbo harness routes through pkix-path-builder for chain construction\n- [ ] Re-run `cargo run --release -p pkix-difftest -- run limbo ~/GIT/x509-limbo/limbo.json --oracles pkix-path,openssl,pyca --output-md pkix-difftest/baseline-limbo.md --output-json pkix-difftest/baseline-limbo.json`\n- [ ] StricterThanWild count drops from 74 toward ~30 (empirical bettertls finding suggests most pathbuilding cases flip to Agreement)\n- [ ] Update pkix-difftest/baseline-limbo-analysis.md with new bucket counts and residual divergences\n- [ ] Residual divergences (genuine builder bugs like tc60) are filed as follow-ups against PKIX-lwr9.2/.3/.4 \u2014 those children are reframed/closed based on what actually remains\n\n## Out of scope\n\n- Implementing new RFC 4158 path-building heuristics (deferred to PKIX-lwr9.2/.3/.4 IF they survive the re-baseline)\n- The 2 tc8/tc15 cases (legacy ECDSA OID harness limitation, not path-builder)\n- online::* cases (P-384 harness limitation, PKIX-wmch)\n\n## Filed by\n\nDecision recorded 2026-05-11 on PKIX-lwr9: pick option (a) \u2014 wire pkix-path-builder into the limbo harness before working .2/.3/.4. Residual builder bugs (if any) become the actual .2/.3/.4 scope.\n\n## Refs\n\n- pkix-difftest/src/corpus/limbo.rs::build_item\n- pkix-path-builder/tests/bettertls.rs (characterization harness from .1)\n- PKIX-t0w4 (PKITS analog of this change, closed)\n- PKIX-yn3e (AKI candidate selection, shipped pre-baseline)",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: route limbo CertPath bundles through pkix-path-builder before classification",
+  "updated_at": "2026-05-11T21:58:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T12:45:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

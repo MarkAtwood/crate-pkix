@@ -1,0 +1,22 @@
+{
+  "close_reason": "decision captured in code",
+  "closed_at": "2026-05-02T22:39:20Z",
+  "compaction_level": 0,
+  "content_hash": "5270a5deab913138557e511ac0c5a9d4b4a7bfd0e3da27371ab909283727ee4e",
+  "created_at": "2026-05-02T17:15:46Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 549 uses strict equality (b_ava.oid == a_ava.oid) while normalizing only the attribute values. This is the correct boundary: OIDs are fixed-form identifiers with no semantic equivalence across different DER encodings. Prevents a subtle class of bugs where someone might try to normalize OIDs or treat different encodings as equivalent. The pattern reinforces the principle: attribute types (OIDs) are structural identifiers; attribute values are content subject to normalization rules (RFC 4518).",
+  "ephemeral": 0,
+  "id": "PKIX-b2a",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: Strict OID identity for AVA matching",
+  "updated_at": "2026-05-02T22:39:20Z"
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a1da86c0fb38158f646fea989790fa4a30e74efd3e5bf87d2cefe13999e140a0",
+  "created_at": "2026-05-14T18:58:17Z",
+  "created_by": "Mark Atwood",
+  "description": "src/clients/ureq.rs:125: `let mut bytes = Vec::with_capacity(limit.min(8192));`. If limit = 10 MiB (default), this allocates 8 KiB up front, then grows via standard Vec doubling. Final body of 1 MiB CRL needs ~5 reallocations (8K \u2192 16K \u2192 32K \u2192 ... \u2192 1 MiB), each copying the prefix.\n\nExpected impact at scale: a path-validation workload fetching CRLs in the 100-KiB-to-2-MiB range pays ~6-10 unnecessary reallocations per fetch. For one-off validation this is irrelevant; for a batch validator running millions of chains, it adds up to seconds of avoidable memcpy.\n\nreqwest::Response::content_length() would give a length hint when the responder sets Content-Length. ureq has the same: `response.headers().get(CONTENT_LENGTH)`. Use it as the with_capacity hint when present, fall back to limit.min(8192) when absent.\n\nMinor \u2014 flagged because it's a quick win with no API change. Probably not worth a separate PR but worth a comment in the with_capacity line so future contributors don't 'optimise' it into something worse.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "ReqwestFetcher streams body chunk-by-chunk; sync UreqFetcher allocates with Vec::with_capacity(limit.min(8192))",
+  "updated_at": "2026-05-14T18:58:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:58:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

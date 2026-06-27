@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "36fb7aeb1adaddfb0c69abfc73d4a5d4f41575874cf6b9c33f67d27939843c95",
+  "created_at": "2026-05-14T15:45:50Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:608-625 and DeviationStore::add use str::to_lowercase (Unicode default case mapping) on both the stored substring AND the cert-side rendered DN, not make_ascii_lowercase. The case-folding-is-unicode-aware_via_to_lowercase test pins the behavior and the test commentary calls out that pre-fix make_ascii_lowercase silently mis-matched 'M\u00fcller' vs 'm\u00fcller'.\n\nDefense: real-world CA DNs in Europe and East Asia routinely contain non-ASCII characters (Bundesdruckerei, Caisse des D\u00e9p\u00f4ts, Polish/Czech CAs). An ASCII-only fold would silently fail to match them \u2014 exactly the silent-no-match shape the workspace test discipline rules out.\n\nThe cost is one fresh String allocation per match call. Documented as acceptable; caller-side caching is the recommended remedy if profiling ever shows it's hot.\n\nWhat a contributor might suggest changing: 'to_lowercase allocates, use make_ascii_lowercase'. Counter-argument: make_ascii_lowercase is wrong on non-ASCII input \u2014 it leaves multi-byte chars untouched, so 'M\u00dcLLER' folds to 'm\u00dcller', not 'm\u00fcller'. The allocation cost is real but bounded; correctness comes first.\n\nLock this in.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.21",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Unicode-aware case folding in issuer_dn_contains (PKIX-hy2e.8)",
+  "updated_at": "2026-05-14T15:45:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

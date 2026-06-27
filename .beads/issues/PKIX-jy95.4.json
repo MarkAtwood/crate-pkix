@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T23:38:44Z",
+  "compaction_level": 0,
+  "content_hash": "f6973f2662f31516ce0fed697ad3c008bd79532bff222907a4bf13a3b3855310",
+  "created_at": "2026-05-12T19:40:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\npkix-policy-zlint depends on the `zlint` binary being on PATH (or a configured path). pkix-policy-pkilint similarly depends on pkilint. Failure modes at runtime:\n\n1. **Binary not found** \u2014 `which zlint` returns nothing; spawn() returns ENOENT.\n2. **Version mismatch** \u2014 found a zlint that's older / newer than what the adapter expects. Could be incompatible CLI args, different JSON output shape, missing checks, etc.\n3. **Malformed output** \u2014 zlint emitted something the adapter can't parse (zlint bug, corruption, partial write).\n4. **Subprocess crashed** \u2014 non-zero exit, killed by signal, hung.\n5. **Cert input rejected by upstream** \u2014 zlint refuses the cert (malformed DER, etc.); not an adapter error.\n\n## Options for each (multiple decisions, but they correlate)\n\n### Binary not found\n\n- A) Hard error at adapter construction (e.g., `PolicyZlint::new()` returns Err). Forces caller to handle.\n- B) Lazy error at first invocation. Construction succeeds; checks fail until binary is present.\n- C) Graceful degrade \u2014 emit a synthetic Finding noting 'upstream linter unavailable' and return Ok with zero real findings.\n\n### Version mismatch\n\n- A) Strict: adapter pins to a specific zlint version. Mismatch is hard error.\n- B) Best-effort: try to use whatever version is present; surface warnings about known incompatibilities.\n- C) Configurable: caller specifies acceptable version range.\n\n### Malformed output / subprocess crash\n\n- A) Hard error per-cert; abort the batch.\n- B) Hard error per-cert; continue the batch, mark that cert as 'check failed.'\n- C) Retry once, then (A) or (B).\n\n## Considerations\n\n- Strict failure modes are easier to reason about and harder to misuse.\n- Graceful degradation aligns with 'encourage adoption' \u2014 if zlint isn't installed, consumers still get PKIX validation; just no extra lint findings.\n- Cache-friendliness (non-negotiable #6): the synthetic 'upstream unavailable' Finding is cache-friendly; just include the binary version + adapter version in the cache key.\n\n## Decision-gate\n\nBlocks pkix-policy-zlint and pkix-policy-pkilint API design. Probably best decided together since the error variants will be shared.\n\n## Cross-references\n\n- PKIX-jy95 parent\n- AGENTS.md non-negotiable #6 (errors must be cache-friendly: Clone + Debug + PartialEq + Eq + Send + Sync, serde behind feature flag)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.4",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide error-handling policy for upstream-binary missing / version mismatch / malformed JSON",
+  "updated_at": "2026-05-12T23:38:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:40:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

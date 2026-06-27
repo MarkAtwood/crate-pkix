@@ -1,0 +1,31 @@
+{
+  "close_reason": "decision record: dual find_cert_ext/try_find_cert_ext design captured",
+  "closed_at": "2026-05-03T13:28:46Z",
+  "compaction_level": 0,
+  "content_hash": "49aa7dda222b1d72bf74c86d12ae7129f9626132cbad7e6e8ee1ea9850df26c1",
+  "created_at": "2026-05-03T13:15:40Z",
+  "created_by": "Mark Atwood",
+  "description": "find_cert_ext returns Option (silently ignores DER errors) and try_find_cert_ext returns Result (propagates them). This split is the correct tradeoff. from_cert uses find_cert_ext because trust anchors are typically loaded from pre-validated trust stores; a single encoding edge case in a NC extension should not block all path validation. TryFrom uses try_find_cert_ext because callers that construct anchors programmatically need the fail-closed guarantee to detect corrupt input. A future contributor might suggest collapsing to one function (either always-Option or always-Result). That would force an incorrect choice: always-Option silently discards malformed NC in strict callers; always-Result breaks infallible from_cert. The dual design is the right API surface.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Two-variant find_cert_ext: fail-open (from_cert) and fail-closed (TryFrom) are both correct and necessary",
+  "updated_at": "2026-05-03T13:28:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

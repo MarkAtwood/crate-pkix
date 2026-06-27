@@ -1,0 +1,60 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:02:17Z",
+  "compaction_level": 0,
+  "content_hash": "0f06bc47103fc11d19d2653f8f6f25fb974853a808fcc6df803bc762641c9a60",
+  "created_at": "2026-05-11T16:41:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe workspace ships executable validators and linters for X.509 certs alongside policy-selection machinery. Where each rule lives \u2014 fast Rust code vs OSCAL JSON \u2014 has been decided case-by-case across `pkix-path`, `pkix-revocation`, `pkix-profiles`, `pkix-lint`. Codifying the split prevents future drift.\n\n## The rule\n\n**Standards-body technical specifications \u2192 fast Rust validator/lint code.**\n**Policy choices \u2192 OSCAL Profiles (JSON or Rust constants producing the same shape).**\n\n### What's a standards-body technical spec\n\n- IETF RFCs (5280, 6125, 6960, 8551, 4518, 5755, 6962, 9162, ...)\n- ITU-T X.509 (upstream of RFC 5280)\n- ISO standards where they govern cert structure\n\n### What's a policy choice\n\n- Which standards-body specs to enforce in a given deployment\n- Combinations / bundles (CA/B Forum TLS BR, S/MIME BR, Code Signing BR; Mozilla CA Policy; Apple/Microsoft/Chrome Root Program; DoD PKI)\n- Deprecations of RFC-permitted things by industry consensus (no SHA-1, no MD5, no 1024-bit RSA, no CN-only identity, no certain extensions)\n- Overrides and parameter values (validity-cap dates, allowed-algorithm tables, key-size floors, identity-tier required-field tables)\n\n## What this means per crate\n\n| Crate | Standards-body content | Policy content |\n|---|---|---|\n| `pkix-path` | RFC 5280 \u00a76, RFC 6125 | (none \u2014 gates only) |\n| `pkix-revocation` | RFC 5280 \u00a75/\u00a76.3, RFC 6960 | (none \u2014 checks only) |\n| `pkix-revocation-http` | (transport mechanics) | (none) |\n| `pkix-profiles` | `BasicTlsProfile` (RFC 5280 + 6125 + serverAuth EKU), `BasicSmimeProfile` (RFC 8551 \u00a73) | (none after PKIX-amgn.4 lands the strip) |\n| `pkix-lint` | RFC-conformance Lint Catalog (Rust `Lint` impls) | (none \u2014 emits findings) |\n| `pkix-ct` | RFC 6962 / RFC 9162 | (none) |\n| `pkix-ac` | RFC 5755 | (none) |\n| `pkix-profiles-cabf` | (none) | CA/B Forum TLS BR, S/MIME BR, CS BR Profile types |\n| `pkix-lint-cabf` | (none) | `cabf.br.tls` / `cabf.br.smime` Lint bundles (OSCAL Profiles, possibly with Rust constants producing the same shape) |\n\n## Edge cases (already settled by this rule)\n\n1. **Industry deprecations of RFC-permitted things.** RFC 5280 permits SHA-1 signatures; consensus rejects them. The \"no SHA-1\" rule is a policy choice \u2192 OSCAL Profile (e.g., `cabf.br.tls` excludes SHA-1 from the allowed-algorithms parameter). `pkix-path` executes whatever `ValidationPolicy` bits get set; the Profile decides which bits to set.\n\n2. **Optional RFC bits that some Profiles require.** RFC 5280 \u00a76.1 makes `cRLSign` on intermediates optional; PKITS-conformant profiles want it. `ValidationPolicy` gains a flag (`require_crl_sign_on_cas`, per PKIX-0x9z). The fast Rust path enforces what the flag asks; whether the flag is on is a Profile decision.\n\n3. **Non-IETF standards that are de facto RFC-like.** CA/B Forum BRs are not IETF RFCs but are technical specifications for public-CA TLS at standards-document level of rigor. Under this rule they are classified as POLICY because they are authored by an industry forum, not a standards body. They live in `-cabf` reference crates marked not-authoritative.\n\n## Out of scope\n\n- IETF drafts (pre-RFC) \u2014 treated as policy until they reach RFC status.\n- Vendor-specific protocols built on X.509 (e.g., 802.1AR DevID) \u2014 case-by-case; default to policy.\n- Pure encoding crates (`x509-cert`, `der`, etc.) \u2014 those handle RFC structural encoding which is upstream of this question.\n\n## Relationship to other stances\n\n- **Extends `PKIX-amgn` (framework-not-policy):** RFC-baseline content stays in main crates; CA/B Forum / vendor policy goes to `-cabf` reference crates. This stance adds the \"what counts as RFC-baseline\" definition.\n- **Extends `PKIX-ztmr` (OSCAL as source of truth):** OSCAL is the canonical authoring format for *policy choices*; not for *rule definitions*. Rule definitions are Rust.\n- **Confirms AGENTS.md non-negotiable #6.** This stance is the per-rule operational form of the framework/policy split.\n\n## Filed by\n\nMaintainer (Mark) 2026-05-11 in conversation establishing the rule.\n",
+  "ephemeral": 0,
+  "id": "PKIX-8qz1",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Stance: standards-body specs in fast Rust validators, policy choices in OSCAL Profiles",
+  "updated_at": "2026-05-11T17:02:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:43:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.9",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:41:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:59:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:56:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo.1",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:41:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ztmr",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

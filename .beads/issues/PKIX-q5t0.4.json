@@ -1,0 +1,31 @@
+{
+  "close_reason": "Positive finding",
+  "closed_at": "2026-06-15T19:15:43Z",
+  "compaction_level": 0,
+  "content_hash": "08d4ff8f7f2747b55ae27fb756a38f1c21aa2861e940a4b5d12c24239558c99f",
+  "created_at": "2026-06-15T19:05:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs: All use-case wrappers (`verify_tls_server`, `verify_tls_client_dns`, `verify_smime_signer`, etc.) now take `V: SignatureVerifier` and `A: AiaFetcher` parameters instead of hardwiring `DefaultVerifier` and `NoAiaFetcher`. This completes the trust-domain seam design: all three callbacks (signature, revocation, AIA) are caller-pluggable at the same level. Breaking change is free pre-1.0 and the updated doc comments accurately describe the new parameters. All test call sites updated consistently.",
+  "ephemeral": 0,
+  "id": "PKIX-q5t0.4",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Good: use-case wrappers now fully generic",
+  "updated_at": "2026-06-15T19:15:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:05:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q5t0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

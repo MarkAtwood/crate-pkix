@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "DFS cycle guard now uses SPKI DER bytes instead of subject DN; duplicate-pool test added; 6 tests pass",
+  "closed_at": "2026-05-06T19:12:58Z",
+  "compaction_level": 0,
+  "content_hash": "854181bc6b15b85c55086287dde604dbdcd8a38b80e747a997f4ebad71d24872",
+  "created_at": "2026-05-06T18:12:11Z",
+  "created_by": "Mark Atwood",
+  "description": "build_path cycle detection is based on subject DN comparison. In key-rollover or bridge-CA topologies where multiple certificates share a subject DN, the path builder may fail to find valid paths. Should use SPKI fingerprint for cycle detection instead.",
+  "ephemeral": 0,
+  "id": "PKIX-r5k",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: cycle detection uses subject DN not SPKI fingerprint",
+  "updated_at": "2026-05-06T19:12:58Z"
+}

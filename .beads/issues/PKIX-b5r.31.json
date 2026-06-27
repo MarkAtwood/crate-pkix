@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:40Z",
+  "compaction_level": 0,
+  "content_hash": "f5481540d333f86124d104f59dafeea3ad05cc3a19f12b3e6efcefb9c206c8be",
+  "created_at": "2026-05-05T15:49:02Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:376\u2013384 vs 416\u2013428\n\nissuer_has_crl_sign() uses let-else on as_ref():\n\n    let Some(exts) = cert.tbs_certificate.extensions.as_ref() else { return true; };\n\ncert_is_ca_cert() uses as_deref().unwrap_or(&[]):\n\n    cert.tbs_certificate.extensions.as_deref().unwrap_or(&[]).iter().find(...)\n\nBoth patterns are correct. Within the same file, two different idioms for the same 'extensions might be None' pattern add cognitive load for reviewers who must decide if there is a deliberate reason for the difference (there is not). Standardise on one pattern throughout crl.rs.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.31",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crl.rs: inconsistent extensions-None patterns (as_deref vs let-else)",
+  "updated_at": "2026-05-05T16:06:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:49:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "310a63e894c0e68d7ee1d246fadf1e0bb749334656ac478ece3d754417d7c600",
+  "created_at": "2026-05-14T17:35:51Z",
+  "created_by": "Mark Atwood",
+  "description": "verify.rs:784-806, 811-835, 872-899, 916-940: four byte-layout builders that differ only in the byte at index 1 (SIG_TYPE_CERTIFICATE_TIMESTAMP vs MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY) and the entry_type byte. They produce identical byte streams for v1/timestamped_entry/certificate_timestamp (all three constants are u8 value 0).\n\nSuggested rewrite:\n```rust\nfn build_x509_entry(sct: &Sct, tag1: u8, cert_der: &[u8]) -> Result<Vec<u8>> { ... }\nfn build_precert_entry(sct: &Sct, tag1: u8, issuer_key_hash: &[u8; 32], tbs: &[u8]) -> Result<Vec<u8>> { ... }\n```\nWith public wrappers:\n```rust\nfn build_signed_input_x509_entry(sct, cert) = build_x509_entry(sct, SIG_TYPE_CERTIFICATE_TIMESTAMP, cert)\nfn build_merkle_tree_leaf_x509_entry(sct, cert) = build_x509_entry(sct, MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY, cert)\n```\n\nCuts 60 lines and makes the structural identity self-documenting. The existing comments at verify.rs:778-783 acknowledging the parallelism become unnecessary.\n\nCounter-argument the author would offer (and which deserves engagement): keeping them separate makes the byte-layout for each RFC 6962 structure independently auditable. A reader auditing the precert_entry signed-input doesn't have to mentally trace through a helper to confirm the bytes. That has real value for security-sensitive code.\n\nNet: weak preference for collapse, but not strong enough to block. Mark this 'opinion' if you agree the audit-friendly form wins.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.10",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_signed_input_* and build_merkle_tree_leaf_* duplicate ~60 lines of byte-layout code",
+  "updated_at": "2026-05-14T17:35:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:35:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

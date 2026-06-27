@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T16:11:34Z",
+  "compaction_level": 0,
+  "content_hash": "f562d56469a856399735f72efd086006b1887694e91ee76091a86385e66addd0",
+  "created_at": "2026-05-08T15:18:12Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPrimary external oracle. `openssl verify` is the de-facto reference for path validation behaviour in the wild. AGENTS.md names it as an acceptable test oracle for this project.\n\n## What\n\nIn `pkix-difftest/src/oracles/openssl.rs`:\n\n1. Function `verify(chain: &Chain) -> io::Result<Verdict>`.\n2. Writes chain to a tempfile (or pipes via stdin where supported).\n3. Invokes `openssl verify -CAfile <root.pem> -untrusted <intermediates.pem> <leaf.pem>`. Use `std::process::Command` with explicit args; **never shell-interpolate untrusted input**.\n4. Captures stdout + stderr; exit code 0 \u2192 `Pass`; nonzero \u2192 `Fail { reason }` with reason = the canonical OpenSSL error string from stderr (e.g., `unable to get local issuer certificate`, `certificate has expired`).\n5. Build chain layout from `Chain::leaf_first` flag.\n\n## Edge cases to handle defensively\n\n- OpenSSL not on PATH \u2192 return `Err`, do not panic.\n- Tempfile cleanup on all paths (use `tempfile` crate).\n- Multiple intermediates concatenated correctly.\n- `openssl verify` exit code 2 (usage error) is distinct from verification fail (exit 1) \u2014 propagate as `Err` so the harness can flag harness bugs separately from real verification fails.\n- Strip leading `error <number> at <depth> ...` prefix from stderr when extracting reason (it's noise).\n\n## Acceptance\n\n- [ ] `pkix-difftest::oracles::openssl::verify` callable from CLI and returns valid `Verdict`.\n- [ ] Unit test: one Pass chain, one Fail chain (use the smoke fixtures from PKIX-7nsf.1).\n- [ ] Unit test: synthetic 'OpenSSL not on PATH' (env override) returns `Err`, not panic.\n- [ ] No `unsafe`. No shell interpolation.\n- [ ] Reason strings are deterministic across runs (no timestamps).\n\n## Notes\n\n- Use `tempfile` crate (already widely used in the repo).\n- Document in module docs: 'this oracle requires `openssl` \u2265 1.1 on PATH; behaviour pinned to that of the system openssl, not a vendored copy \u2014 divergences between system openssl versions are themselves a divergence class we want the harness to surface'.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: OpenSSL oracle (subprocess + stderr parser)",
+  "updated_at": "2026-05-08T16:11:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:18:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

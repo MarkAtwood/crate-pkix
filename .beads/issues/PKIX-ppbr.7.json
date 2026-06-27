@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b2a5365839dc475faba70125bfc00b0b9d1f4de37222cb96a66120894dfb834f",
+  "created_at": "2026-05-14T17:34:46Z",
+  "created_by": "Mark Atwood",
+  "description": "verify.rs:415-424: the loop calls `verify_sct_for_precert` for each SCT in the list. Each call invokes `tbs_without_sct_list(leaf_der)` (verify.rs:963-990) which: parses the cert, mutates, re-encodes the TBS. It also invokes `issuer_key_hash_from_cert(issuer_der)` which: parses the cert, re-encodes the SPKI, SHA-256s it.\n\nBoth results are invariant across SCTs (they depend only on leaf_der and issuer_der, not on the SCT). Computing them once before the loop, then passing the byte buffers into a per-SCT helper, eliminates O(N) redundant cert parses and re-encodes.\n\nExpected impact: typical CT-logged TLS certs carry 2-3 embedded SCTs, so this saves 1-2\u00d7 cert-parse-and-reencode per call. Not catastrophic, but the cost class is wrong \u2014 a cert-parse-and-reencode is hundreds of microseconds; CT verification gets called per-TLS-handshake in some deployments. At a CDN's hundreds of thousands of handshakes per second, 'redundant cert parse per SCT' becomes a measurable hot-spot.\n\nFix: hoist the two computations outside the loop. Internal helper accepting `tbs_no_sct: &[u8]` and `issuer_key_hash: &[u8; 32]` already exists (`build_signed_input_precert_entry` takes them). `verify_sct_for_precert` can stay as the public single-SCT entry point; `verify_embedded_scts` calls a hoisted-cached internal helper.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts re-runs tbs_without_sct_list / issuer_key_hash per SCT \u2014 O(N) DER work",
+  "updated_at": "2026-05-14T17:34:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:34:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Confirmed correct per RFC 5280 \u00a74.2.1.10 mask-and-compare algorithm",
+  "closed_at": "2026-05-03T00:38:16Z",
+  "compaction_level": 0,
+  "content_hash": "d47675e2ddcfe46016822c15d4d2ebfccc4540effe44eb968c432155bcf29800",
+  "created_at": "2026-05-03T00:13:26Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_ip_address (line 1058) implements RFC 5280's IP constraint check as (subject & mask == addr & mask) for each byte. This is exactly the RFC algorithm and handles both IPv4 (4/8 bytes) and IPv6 (16/32 bytes) in one pass. It's correct and not overcomplicated. Defend against suggestions to use a CIDR library or parse prefix length separately \u2014 the RFC encodes the constraint as addr+mask bytes precisely to avoid that.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.22",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "matches_ip_address uses mask-and-compare, not CIDR calculation",
+  "updated_at": "2026-05-03T00:38:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:13:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

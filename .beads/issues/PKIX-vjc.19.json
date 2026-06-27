@@ -1,0 +1,31 @@
+{
+  "close_reason": "Test file header updated to remove stale bug list; only self-issued exemption remains",
+  "closed_at": "2026-05-03T00:34:08Z",
+  "compaction_level": 0,
+  "content_hash": "2707bd3b3e641d8c2a02313c9b537b98d468893bd68ea99ec19a6a5e0ac4a753",
+  "created_at": "2026-05-03T00:12:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkits_4_13.rs lines 16-21 reference 'Tracking issue: PKIX-nc-matching (filed separately)' and individual #[ignore] annotations cite '(tracked: PKIX-nc-matching)'. A contributor checking this issue will need to find it in the tracker. This is reasonable practice. However the reference is inconsistent: some ignores say 'PKIX-8wp' (test 18/19), others say 'PKIX-nc-matching'. Two separate tracking issues for related bugs requires the contributor to find both. Consider consolidating references or adding a bd show command output in the comment.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.19",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS test file header lists known bugs but references tracking issue that may not exist",
+  "updated_at": "2026-05-03T00:34:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

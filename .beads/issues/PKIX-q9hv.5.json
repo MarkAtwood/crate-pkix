@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c36661cb849fc468194b61ae0ffc185d4bcd508d103bf7a9805f0b3cbe980f75",
+  "created_at": "2026-05-14T14:37:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:930-1028: verify_smime_signer and verify_smime_recipient have BYTE-IDENTICAL function bodies. The rustdoc at line 939-942 says 'The signer-vs-recipient distinction is encoded in the caller-supplied Profile's ValidationPolicy: signer profiles require KeyUsage digitalSignature, recipient profiles require keyEncipherment.' But pkix-profiles ships only BasicSmimeProfile, which sets required_leaf_eku=emailProtection and require_rfc822_san=true \u2014 it does NOT set any KU requirement. There is no BasicSmimeSignerProfile / BasicSmimeRecipientProfile. So in practice both wrappers do the same thing for the only shipped profile. Trigger: caller writes verify_smime_recipient(signer_cert_chain, ...) expecting recipient-shape enforcement, gets exactly what verify_smime_signer would have returned, including for a cert with KU=digitalSignature only. Documentation promises a guarantee that the shipped profile does not deliver. Two options: (1) ship BasicSmimeSignerProfile/BasicSmimeRecipientProfile with the documented KU shapes, OR (2) reword the rustdoc to be honest that the distinction is intent-only and the caller must wire a profile that imposes the KU constraint they want. Recommend option (1) so new callers don't have to read this footnote.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_smime_signer / verify_smime_recipient distinction is documentation-only \u2014 no shipped profile enforces it",
+  "updated_at": "2026-05-14T14:37:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:37:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

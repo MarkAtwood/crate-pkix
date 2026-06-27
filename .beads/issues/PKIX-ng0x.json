@@ -1,0 +1,59 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "compaction_level": 0,
+  "content_hash": "657648fcbdff50a4f6da02eb63cc30e5c94093c2286a4aad8fb4ae6e85656105",
+  "created_at": "2026-05-08T19:01:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-ac` is at version 0.0.0 \u2014 pure skeleton. `AttributeCertificate` wraps a `Vec<u8>` of DER bytes (not actually parsed). `validate_attribute_cert()` is a const fn returning `Err(Error::AaPathInvalid(NoTrustedPath))` unconditionally. RFC 5755 \u00a75 algorithm not implemented.\n\nReal-world need: attribute certificates carry authorization claims (group membership, role, clearance) without re-issuing the holder's public-key cert. Used in some federation deployments, government PKI, and S/MIME advanced cases.\n\n## What\n\nBuild out pkix-ac:\n\n1. **AttributeCertificate parsing** \u2014 RFC 5755 \u00a74.1. Wraps the Holder, Issuer, AttCertValidityPeriod, and an Extensions sequence. Use `x509-cert` for the underlying ASN.1 building blocks; `AttributeCertificate` is its own SEQUENCE.\n2. **Holder identification** \u2014 RFC 5755 \u00a74.2.2. Holder can be: `baseCertificateID` (issuer + serial of holder's PKC), `entityName` (a GeneralNames), or `objectDigestInfo` (hash of holder's pubkey/cert/object). All three need parsing.\n3. **AttributeCertIssuer (AA) chain validation** \u2014 RFC 5755 \u00a75. The Attribute Authority signs the AC; its own cert chain must be validated independently (typically via pkix-path with an AA-specific trust set).\n4. **AttributeCertificateValidity** check \u2014 like a regular cert's notBefore/notAfter, but a separate type per RFC 5755.\n5. **Holder-PKC binding** \u2014 when Holder is `baseCertificateID` or `objectDigestInfo`, verify the AC's holder reference matches the actual PKC presented.\n6. **Attribute extraction** \u2014 public API for callers to read the attributes after validation passes.\n\n## Recommended decomposition (file children when work starts)\n\n1. AttributeCertificate ASN.1 struct + parser (~150 lines).\n2. Holder identification + binding check (~80 lines).\n3. Attribute-cert validity + AA chain validation (~80 lines).\n4. Public API for attribute extraction (~50 lines).\n5. CRL revocation for ACs (RFC 5755 \u00a76) \u2014 ACs have their own CRL profile; the existing pkix-revocation::CrlChecker likely needs an AC-aware variant. Separate sub-bead.\n\n## Acceptance\n\n- [ ] AttributeCertificate parse round-trips (parse + re-encode \u2192 identical DER).\n- [ ] Real-world AC test vectors validate (pyca/cryptography may have some; or generate via openssl).\n- [ ] Holder binding tested against three Holder shapes.\n- [ ] AA chain validated via pkix-path (compose with that crate; do not duplicate path-walking logic).\n- [ ] Crate published.\n\n## Out of scope\n\n- AC issuance.\n- Specific attribute taxonomies (group membership, clearance) \u2014 that's application-policy.\n- ACL/AC-based authorization enforcement \u2014 caller's job.\n\n## Effort\n\n~600 lines + tests across the children. 2-3 days.\n\n## Filed as\n\nLow-impact gap per audit. Lower priority than pkix-ct because attribute certs are a niche feature in modern PKI.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ng0x",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Decomposed 2026-05-10 into 5 child beads:\n- PKIX-ng0x.1 (P3): RFC 5755 \u00a74.1 AttributeCertificate ASN.1 parser + round-trip\n- PKIX-ng0x.2 (P3): RFC 5755 \u00a74.2.2 Holder identification + binding check (depends on .1)\n- PKIX-ng0x.3 (P3): AttCertValidityPeriod + AA chain validation (depends on .1, .2)\n- PKIX-ng0x.4 (P3): attribute extraction public API (depends on .3)\n- PKIX-ng0x.5 (P4): RFC 5755 \u00a76 AC CRL revocation (depends on .3)\nThe matching of children to the recommended decomposition in this bead's original description is one-to-one. Each child is small enough to fit one focused session. Total estimate (~600 LOC) preserved across children. Only PKIX-ng0x.1 is currently ready.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-ac: real RFC 5755 attribute certificate validation",
+  "updated_at": "2026-05-11T05:19:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:48:06Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:48:07Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:48:08Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:48:09Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:48:10Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

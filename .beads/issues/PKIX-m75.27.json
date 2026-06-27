@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:00:15Z",
+  "compaction_level": 0,
+  "content_hash": "75beb40ec89b4bb409e0ad1d06bd7316d3b1e892520a36497d49195d3e0a43b7",
+  "created_at": "2026-05-06T20:52:00Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: OcspChecker::check_revocation (pkix-revocation/src/ocsp.rs:91-216) and check_revocation_against_anchor (lines 234-336) share nearly identical implementations for steps (1-5) parse + status + bytes + type + BasicOCSPResponse, (6-6b) signature verify + responder ID, (7-7a) serial search + CertID hash checks, and (8-9) validity window + cert status. The two methods differ only in whether the issuer identity comes from &Certificate or &TrustAnchor. The duplicated code is ~150 lines. Fix: extract a private helper function 'check_ocsp_response(basic, issuer_name, issuer_spki, cert, now_unix)' that handles the shared logic, called by both methods after parsing and signature verification. The per-path responder ID check (verify_responder_id vs verify_responder_id_anchor) would remain distinct. This removes the maintenance hazard of needing to update two code paths for every OCSP behavior change.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: OcspChecker check_revocation paths duplicated",
+  "updated_at": "2026-05-06T21:00:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

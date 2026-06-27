@@ -1,0 +1,20 @@
+{
+  "compaction_level": 0,
+  "content_hash": "034d29be0475f223b60c8f8d599e062b2586c5d0c2b73f11285c2b68a59a418f",
+  "created_at": "2026-06-04T18:08:36Z",
+  "created_by": "Mark Atwood",
+  "description": "Skoll SECURITY MEDIUM-11 finding (PKIX-szmo.7 triage). In pkix-revocation-http, CachedHttpCrlFetcher and CachedHttpOcspFetcher return Ok(()) when a cert has no CDP/AIA URIs respectively (crl.rs:66, ocsp.rs:74). This is documented/intentional soft-fail behavior, but the RevocationChecker trait's Ok(()) return does not distinguish 'checked and not revoked' from 'could not check'. Callers wanting hard-fail revocation have no signal. This is a design-level gap, not a code bug. Potential fix: add a NoCoverageAvailable or similar variant to the revocation result type so callers can distinguish the two cases. Low priority because the current behavior matches industry practice (CRLite, OCSP stapling, etc. all soft-fail on missing coverage) and is explicitly documented in code comments.",
+  "ephemeral": 0,
+  "id": "PKIX-hk56",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-revocation-http: no-CDP/no-AIA early-return semantic gap",
+  "updated_at": "2026-06-04T18:08:36Z"
+}

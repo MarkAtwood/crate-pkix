@@ -1,0 +1,46 @@
+{
+  "close_reason": "Per-crate tags (RustCrypto convention). Per-crate CHANGELOG.md + workspace release notes via .7. Publish order: leaf-to-umbrella topological per the 12-crate list. Dry-run mandatory. Mark runs the actual publish cascade.",
+  "closed_at": "2026-05-13T17:08:28Z",
+  "compaction_level": 0,
+  "content_hash": "d77365a10c1c57cfce55e634ea9a6347eff227dcd428808bb9072c8854828706",
+  "created_at": "2026-05-13T16:58:01Z",
+  "created_by": "Mark Atwood",
+  "description": "## Release mechanics for 1.0\n\nProcedural decisions for the 1.0 publish event itself.\n\n## Decisions\n\n### Tag scheme\n\nTwo conventions in common use across Cargo workspaces:\n\n- **(a) Workspace-wide tag:** `v1.0.0` covers all crates' 1.0.0 release simultaneously. Simpler git history.\n- **(b) Per-crate tags:** `pkix-path-1.0.0`, `pkix-revocation-1.0.0`, etc. Independent crate cadence (each crate can hit 1.x.y independently). More tags but more accurate.\n\nRustCrypto convention (workspace Mark contributes to) is per-crate tags. Argues for (b).\n\n**Open: (a) or (b)?**\n\nRecommendation: **(b) per-crate tags**, matches RustCrypto convention and gives independent versioning post-1.0.\n\n### CHANGELOG style\n\n- **(a) Per-crate CHANGELOGs:** each crate has its own `CHANGELOG.md`. Releases noted per-crate. Already in place for some workspace crates.\n- **(b) Workspace-wide CHANGELOG:** single top-level `CHANGELOG.md`. All changes rolled up.\n- **(c) Both:** per-crate detail + workspace-wide summary release notes.\n\nRecommendation: **(a) per-crate**, consistent with current workspace pattern. The 1.0 release announcement (blog post, README badge, etc.) is separate from per-crate CHANGELOGs.\n\n### Publish order\n\ncargo's topological sort handles inter-crate dependencies, but the explicit order matters for human verification of each step:\n\n1. pkix-path (deepest, no workspace deps)\n2. pkix-revocation (depends on pkix-path)\n3. pkix-truststore (depends on pkix-path)\n4. pkix-path-builder (depends on pkix-path)\n5. pkix-identity (depends on pkix-path)\n6. pkix-profiles (depends on pkix-path)\n7. pkix-profiles-cabf (depends on pkix-profiles, pkix-path)\n8. pkix-lint (depends on pkix-path)\n9. pkix-lint-cabf (depends on pkix-lint, pkix-profiles)\n10. pkix-revocation-http (depends on pkix-revocation)\n11. pkix-chain (depends on most of the above)\n\n**Open: confirm this order; surface any non-obvious dep edges.**\n\n### Pre-publish dry run\n\n`cargo publish --dry-run` on each crate, in order. Verify each builds correctly with crates.io's view of its deps (which won't include in-workspace path overrides post-publish).\n\n**Recommendation: dry-run cascade is part of the release plan; not negotiable.**\n\n### Post-publish verification\n\n- Each crate appears on crates.io\n- `cargo install` / `cargo new --lib && cargo add <each crate>` works for downstream consumers\n- docs.rs builds succeed for each crate\n\n## Out of scope\n\n- crates.io publish itself (Mark's manual action; agent stops at \"ready to publish\")\n- Blog post / announcement / docs.rs metadata polish (separate concerns)\n- Long-term version policy post-1.0\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- AGENTS.md \"Git\" section (publish to remote = explicit human authorization)\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 RESOLVED: principled-default release mechanics]\n\n**Tag scheme: per-crate tags.**\nFormat: `pkix-path-1.0.0`, `pkix-revocation-1.0.0`, etc. Matches RustCrypto upstream convention (Mark contributes there ~2-3x/month per AGENTS.md). Gives independent per-crate versioning post-1.0 \u2014 pkix-chain can hit 1.1.0 while pkix-truststore stays at 1.0.x.\n\n**CHANGELOG style: per-crate CHANGELOG.md.**\nEach crate maintains its own CHANGELOG.md. Consistent with current workspace pattern. Plus workspace-level release notes (one document for the 1.0 launch announcement) tracked under PKIX-wlsr.7.\n\n**Publish order (topological from leaf to umbrella):**\n\n1. pkix-path (no workspace deps)\n2. pkix-revocation (deps: pkix-path)\n3. pkix-truststore (deps: pkix-path)\n4. pkix-path-builder (deps: pkix-path)\n5. pkix-identity (deps: pkix-path)\n6. pkix-aia (deps: pkix-path \u2014 NEW at 1.0)\n7. pkix-profiles (deps: pkix-path)\n8. pkix-profiles-cabf (deps: pkix-profiles, pkix-path)\n9. pkix-lint (deps: pkix-path)\n10. pkix-lint-cabf (deps: pkix-lint, pkix-profiles, pkix-profiles-cabf)\n11. pkix-revocation-http (deps: pkix-revocation)\n12. pkix-chain (deps: pkix-path, pkix-revocation, pkix-aia, pkix-truststore, pkix-identity, pkix-profiles, pkix-path-builder)\n\nVerify with `cargo publish --dry-run` per crate before live publish.\n\n**Pre-publish dry runs:** mandatory. cargo dry-run per crate in order; checks crates.io view of inter-crate deps (path-overrides not used post-publish).\n\n**Post-publish verification:**\n- Each crate appears on crates.io\n- A fresh `cargo new test && cargo add pkix-chain` succeeds\n- docs.rs builds for each crate (track for ~24h post-publish)\n\n**Cargo publish itself:** Mark's manual action, requires explicit per-action authorization per AGENTS.md 'Git' section discipline. Agent prepares everything to the publish step; Mark runs the cascade.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Release mechanics: tag scheme, CHANGELOG style, publish order, dry-runs",
+  "updated_at": "2026-05-13T17:08:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:58:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T09:58:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:58:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

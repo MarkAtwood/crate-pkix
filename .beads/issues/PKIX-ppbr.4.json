@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a785de0426382f67afa76eb3c19b92a10861f0f66190e6840144175d9e10e541",
+  "created_at": "2026-05-14T17:33:58Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: any real-world final cert whose original DER encoding survives `x509-cert::Certificate::from_der` \u2192 `encode_to_vec` but with a single byte different (e.g., a different choice of UTCTime vs GeneralizedTime at the 2050 boundary, BMPString preservation, a SET-OF whose original encoder didn't sort canonically, or a SEQUENCE OF with explicit-vs-implicit tagging the encoder normalizes).\n\nActual bad behavior: `precert_entry` SCT verification fails with `Error::InvalidSignature` even though the SCT is genuinely valid for the originally-submitted pre-cert. From a caller's perspective this looks like a verification failure for a perfectly good cert. There's no diagnostic telling them the failure is on the encoder side, not the cryptography side.\n\nMitigations in place:\n- The fixture self-test in `gen_precert_entry_sct.py` cross-checks pkix-ct's reconstruction against an in-Python DER walker.\n- `live_log.rs` exercises the path against a real captured log entry.\n- The doc comment (verify.rs:953-962) acknowledges the assumption.\n\nWhat's missing: a corpus test against MANY real-world certs (not just one captured live-log fixture). The single-fixture test does not establish the property holds across the millions of CT-logged certs in deployment. At minimum, the `pkix-difftest` PKITS/limbo runners should include a 'precert SCT verification' axis using a few hundred real-world precerts.\n\nMaintenance consequence: when a real-world cert hits the divergence case in production, the bug report will look like 'pkix-ct says my Let's Encrypt cert has an invalid SCT, but Chrome accepts it.' Diagnosis will require manual hex-diff between the reconstructed TBS and the original. The fix path is to either (a) preserve byte-exact original bytes via x509-cert's raw-bytes accessor (if available), or (b) bypass x509-cert and do a streaming DER edit that removes the extension at the byte level. Both are non-trivial.\n\nFile this so it doesn't surprise you in 12 months.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "tbs_without_sct_list relies on x509-cert re-encoder bit-exactness for all real-world certs",
+  "updated_at": "2026-05-14T17:33:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:33:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

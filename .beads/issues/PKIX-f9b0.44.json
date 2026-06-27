@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:28Z",
+  "compaction_level": 0,
+  "content_hash": "6cb651163fa17781ed51b4870ad52eb5774af5267b9f892f4384d8ea411d7a82",
+  "created_at": "2026-05-07T17:24:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation-http/src/lib.rs:22,23,34(x2) \u2014 The identifiers CRLDistributionPoints and AuthorityInfoAccess appear in doc comments without backtick quoting. clippy::doc_markdown (pedantic) flags all four occurrences. These are extension type names that should render as code in rustdoc. Fix: replace CRLDistributionPoints with `CRLDistributionPoints` and AuthorityInfoAccess with `AuthorityInfoAccess` in the crate-level doc block (lines 22-23) and the RevocationFetcher trait doc (line 34).",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.44",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation-http] doc_markdown: CRLDistributionPoints and AuthorityInfoAccess unquoted in 4 locations",
+  "updated_at": "2026-05-07T17:28:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:24:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

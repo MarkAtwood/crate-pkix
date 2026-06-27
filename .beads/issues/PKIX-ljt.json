@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-ljt",
+  "title": "Stub crates needing substantive content",
+  "description": "Four workspace crates are namespace-reservation stubs at 0.1.0. Track when real implementations land.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:35Z",
+  "updated_at": "2026-06-15T17:54:35Z"
+}

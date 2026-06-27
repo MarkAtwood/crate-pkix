@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:58:44Z",
+  "compaction_level": 0,
+  "content_hash": "8a3bf1608ea024978e25b439160bff38c9e30aca79c434c777e77bc8cc224d77",
+  "created_at": "2026-05-07T03:49:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:420-422, 760-786 \u2014 The Lint trait's applies_to() doc says 'The runner uses this to skip check_cert for positions that don't match'. However, run_path() does not consult applies_to() at all \u2014 it unconditionally invokes check_path on every path-scope lint. A lint declared with applies_to = Leaf and scope = Path would have its applies_to value silently ignored. The trait doc does not state this limitation. Fix: either (a) document in the applies_to() doc that it is only meaningful for Certificate-scope lints, or (b) apply applies_to() filtering in run_path by passing the leaf as the check kind.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Lint::applies_to() contract undefined for path-scope lints",
+  "updated_at": "2026-05-07T03:58:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

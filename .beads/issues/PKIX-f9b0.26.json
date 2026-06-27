@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:20Z",
+  "compaction_level": 0,
+  "content_hash": "f3721af8a5e48f288dcf48c76f0b62be22766296476af5ac848baa7c9d31840d",
+  "created_at": "2026-05-07T17:22:59Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/integration.rs:25 \u2014 format!(\"{}.crt\", name) should be format!(\"{name}.crt\") per Rust 2021 / Clippy pedantic uninlined_format_args. Mechanical fix; no semantic change.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] uninlined format arg in pkits_cert()",
+  "updated_at": "2026-05-07T18:44:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

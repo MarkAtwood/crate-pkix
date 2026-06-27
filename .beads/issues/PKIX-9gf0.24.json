@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "P1 fix (PKIX-9gf0.20) makes cert_subject_alt_names fail-closed; bypass is structurally impossible; dedicated test vector tracked for v0.3",
+  "closed_at": "2026-05-07T16:42:38Z",
+  "compaction_level": 0,
+  "content_hash": "b8e935d9d6317d4acf2892f13af305d0886a011f62ca8ad26055f30286154d5a",
+  "created_at": "2026-05-07T16:13:23Z",
+  "created_by": "Mark Atwood",
+  "description": "From finding PKIX-9gf0.20: cert_subject_alt_names uses find_cert_ext (fail-open), meaning a malformed SAN extension is silently treated as absent during NC checking.\n\nThere is no test that:\n1. Creates a cert with a present-but-malformed SubjectAltName extension\n2. Has an active permittedSubtrees or excludedSubtrees constraint for that name type\n3. Verifies that the chain is REJECTED (not silently passes because the SAN was dropped)\n\nThe lack of this test means the security bypass identified in PKIX-9gf0.20 is untested and could be silently introduced by future refactoring.\n\nP2 \u2014 test coverage gap for the malformed SAN NC bypass.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: missing test for NC check on cert_subject_alt_names returning None (malformed SAN bypass)",
+  "updated_at": "2026-05-07T16:42:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:13:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-qws.4",
+  "title": "Legacy SHA-1 SignatureVerifiers (feature-gated, off by default)",
+  "description": "Add SHA-1 based RSA and ECDSA verification behind a feature flag for legacy cert chain validation. Old: PKIX-gphz.6",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "feature",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:52:40Z",
+  "updated_at": "2026-06-15T17:52:40Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-qws",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:52:39"
+    }
+  ]
+}

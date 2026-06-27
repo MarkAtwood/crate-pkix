@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b50940aa2ee3e948e07223d06a0d1bc159c1bc94b1231ac4fdcb0955d00a6f7f",
+  "created_at": "2026-05-14T05:07:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:314-385 implements both from_pem and from_der_iter\nas 'fail-fast': the first malformed cert stops processing and the function\nreturns Err, dropping any anchors successfully decoded so far.\n\nThis is a defensible default but it is the only behavior offered. A caller\nwho needs to recover usable anchors from a partially-corrupt bundle (a\nreal production scenario \u2014 see below) has no API path.\n\nReal-world scenarios where partial-load matters:\n\n  - A distro CA bundle ships with one cert that has malformed DER in a\n    rarely-exercised extension (e.g., a malformed CertificatePolicies). The\n    cert is otherwise valid and the rest of the bundle is fine. The\n    deployment wants to load 146 anchors and warn about #84, not crash on\n    boot.\n  - A custom enterprise bundle is built by automation. One CA is in the\n    process of being rotated; the new cert is malformed because the\n    automation has a bug. The deployment wants to continue serving with\n    the old anchors while the team fixes the new one.\n  - A CT-log-scraping ingester pulls 100k roots from a public source. A\n    handful are corrupt. The ingester wants to load all good ones and log\n    the bad ones for follow-up.\n\nWhat goes wrong for callers in production today:\n\n  - Caller has two options: (i) call from_pem on the whole bundle and\n    accept all-or-nothing, or (ii) parse PEM themselves, call from_der\n    per block, accumulate errors, and call from_der_iter ... but wait,\n    from_der_iter is also fail-fast. So they need to call from_der\n    individually. That means the 'canonical adapter entry point'\n    (lib.rs:356) is unusable for the partial-load case.\n  - Callers will write their own PEM splitter, defeating the 'one place\n    for parsing' design goal (lib.rs:359-360).\n  - The fail-fast default propagates to adapter crates\n    (pkix-truststore-system, pkix-truststore-pkcs11): if those adapters\n    accumulate DER bytes and feed them to from_der_iter, one bad cert\n    from a partially-corrupt OS trust store crashes the whole load.\n    Less acceptable in HSM/KMS contexts where individual key handles can\n    fail transiently.\n\nFix options:\n\n  a) Document the fail-fast contract explicitly (the function-level doc on\n     from_pem already says 'Returns Error::Pem or Error::Der on the first\n     malformed block' \u2014 extend the same to from_der_iter).\n  b) Add a variant that collects all errors:\n       pub fn from_pem_partial(bytes: &[u8])\n         -> (Vec<TrustAnchor>, Vec<(usize, Error)>);\n     Returns both successful anchors and per-index errors.\n  c) Add a callback-based variant:\n       pub fn from_pem_with_handler<F>(bytes: &[u8], handler: F)\n         -> Result<Vec<TrustAnchor>, Error>\n       where F: FnMut(usize, &Error) -> ControlFlow<(), ()>;\n     Caller decides on each error whether to continue or stop.\n\nOption (a) is the cheap fix for the doc contract. (b) and (c) close the\nbehavioral gap. Pre-1.0 is the right window to pick.\n\nFlagged 'opinion' because reasonable libraries (e.g., rustls-webpki) do\nfail-fast and require callers to roll their own splitter; this is a real\nergonomics question but not a security issue.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "No partial-load API: one bad cert in a 147-cert bundle fails the entire load",
+  "updated_at": "2026-05-14T05:07:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:07:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

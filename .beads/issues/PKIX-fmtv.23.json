@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T04:50:34Z",
+  "compaction_level": 0,
+  "content_hash": "9f78d51453054f5b07120aad29bebcb15c31a07dd96b032ae718cfef9e0c9895",
+  "created_at": "2026-05-13T04:39:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Build a curated test corpus exercising RFC 5280 \u00a74.2.1.6 rfc822Name + RFC 8398 SmtpUTF8Mailbox binding through `verify_smime_signer` and `verify_smime_recipient`.\n\n**Created 2026-05-12** as part of PKIX-fmtv.17's rescope decision (Mark, attended session). Sibling of PKIX-fmtv.22 (TLS hostname corpus). Same rationale: PKITS leaves lack SAN; wrapper-level mailbox-binding tests require a curated corpus.\n\n## Coverage\n\n**RFC 5280 \u00a74.2.1.6 rfc822Name (ASCII)**\n- positive: SAN `user@example.com`, mailbox `user@example.com`\n- negative: SAN `user@example.com`, mailbox `other@example.com`\n- negative: SAN with malformed local-part (no @)\n\n**RFC 5321 case sensitivity**\n- positive: SAN `user@EXAMPLE.com`, mailbox `user@example.com` (domain part case-insensitive)\n- negative: SAN `User@example.com`, mailbox `user@example.com` (local-part case-sensitive per RFC 5321)\n- decision-gate inside the corpus: do we enforce strict RFC 5321 local-part case sensitivity, or follow real-world tolerant matching? Default: strict RFC 5321; document the choice; provide tolerant-match fixture cases as \"expected reject under strict, expected accept under tolerant\" for future profile work.\n\n**RFC 8398 SmtpUTF8Mailbox**\n- positive: SmtpUTF8Mailbox otherName SAN with UTF-8 local-part, mailbox matches\n- positive: mixed rfc822Name + SmtpUTF8Mailbox SANs on same leaf (RFC 8398 \u00a73)\n- negative: SmtpUTF8Mailbox with malformed UTF-8\n\n**Multi-mailbox SANs**\n- positive: leaf has 3 rfc822Name SANs; binding any one of them succeeds\n- negative: none of the SANs match the supplied mailbox\n\n**Edge cases**\n- negative: quoted local-part `\"user with space\"@example.com` \u2014 RFC 5321 syntactically valid, may or may not be supported by pkix-identity (defer to verify_mailbox behavior)\n- negative: empty mailbox (must be a parse error at MailboxName::parse before reaching the wrapper)\n- negative: leaf with no rfc822Name and no SmtpUTF8Mailbox SAN\n\n## Source\n\nHand-curated from RFC 8398 \u00a74 canonical examples + RFC 5280 \u00a74.2.1.6 + RFC 5321 \u00a74.1.2 mailbox syntax. x509-limbo's S/MIME coverage is thinner than its WebPKI coverage; expect to write most cases by hand.\n\n## Fixtures\n\nSame pyca/cryptography tooling pattern as PKIX-fmtv.22. Manifest format identical.\n\n## Tests\n\nParameterized for both `verify_smime_signer` and `verify_smime_recipient`. EKU semantics differ: signer requires id-kp-emailProtection (assumed via BasicSmimeProfile); recipient may also require it. Confirm with shipped wrapper implementation; corpus is wrapper-agnostic.\n\n## Acceptance\n\nPass-rate baseline in pkix-chain/tests/mailbox_corpus_baseline.md.\n\n## Out of scope\n\n- Differential testing against OpenSSL \u2014 that's PKIX-fmtv.18 consuming this corpus.\n- pyca differential \u2014 pyca has no S/MIME verifier; .19 documents this scope gap.\n- Code-signing / timestamping wrappers \u2014 no identity-string target; covered by targeted unit tests, not a curated corpus.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Curated RFC 8398 mailbox corpus + verify_smime_signer/recipient tests",
+  "updated_at": "2026-05-13T04:50:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T21:39:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

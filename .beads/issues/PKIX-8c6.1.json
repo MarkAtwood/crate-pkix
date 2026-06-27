@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Profile trait added to pkix-path/src/lib.rs after ValidationPolicy; no_std compatible; 87 tests pass",
+  "closed_at": "2026-05-06T18:49:56Z",
+  "compaction_level": 0,
+  "content_hash": "da22aae34b03931349b0d06f34c2cefb52323ea350b7f7adbaf97ed229466d43",
+  "created_at": "2026-05-06T18:48:50Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-8c6.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add Profile trait to pkix-path",
+  "updated_at": "2026-05-06T18:49:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T11:48:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8c6",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

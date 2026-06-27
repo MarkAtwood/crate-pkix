@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "All review findings resolved",
+  "closed_at": "2026-05-02T14:49:23Z",
+  "compaction_level": 0,
+  "content_hash": "7186b33ecf9606d22de11fed00464290816e106f7d38f1a55a9d17e88dd39b66",
+  "created_at": "2026-05-02T14:38:32Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-7os",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 The P0 dead variant issue means callers of pkix-chain-simple cannot reliably distinguish critical vs non-critical extension rejections. The P1 missing re-exports mean pkix-chain is less useful as an umbrella crate. Core path validation logic is sound.\nConfidence: 15% chance of missed bug. Least confident flags: ValidatedPath::depth semantics when trust anchor cert appears in chain (edge case, documented behavior may be surprising). Uncertainty driven by: not running the PKITS 4.3/4.6/4.7 test files, not checking all test fixtures. Would raise confidence if: ran full test suite and verified all PKITS sections pass.\nIdiom rating: ACCEPTABLE \u2014 Core path validation code is idiomatic. Main issues: reason_code as u8 instead of CrlReason enum (type safety), ValidatedPath missing derives, check_critical_extensions returning bool. No unsafe code. No unwrap in production paths. Error types are well-structured with #[non_exhaustive].\nRust idiom confidence: 10% chance of missed issue. Least confident flags: didn't check all lifetime elision opportunities in trait impls. Uncertainty driven by: didn't check generated code from derive macros or cfg combinations.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: entire PKIX project (my-oss pass 1)",
+  "updated_at": "2026-05-02T14:49:23Z"
+}

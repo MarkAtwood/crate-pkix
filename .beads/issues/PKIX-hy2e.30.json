@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "65d09fee5602ba5d557401289bb2fba6f926a8c7064b67f6e83d916e5510bdff",
+  "created_at": "2026-05-14T12:50:40Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:322:\n\n    pub struct DeviationScope {\n        pub kind: String,\n        pub props: Vec<(String, ScopePropValue)>,\n    }\n\nThe canonical kinds are `pub const SCOPE_KIND_*: &str` values \u2014 string\nliterals living in .rodata. But every constructor at lines 338-411\nallocates a new String for `kind`:\n\n    pub fn any() -> Self {\n        Self {\n            kind: SCOPE_KIND_ANY.to_string(),  // \u2190 allocation\n            props: Vec::new(),\n        }\n    }\n\n    pub fn issuer_dn_contains(substring: impl Into<String>) -> Self {\n        Self {\n            kind: SCOPE_KIND_ISSUER_DN_CONTAINS.to_string(),  // \u2190 allocation\n            props: vec![(\n                PROP_ISSUER_DN_SUBSTRING.to_string(),  // \u2190 allocation\n                ScopePropValue::Text(substring.into()),\n            )],\n        }\n    }\n\nFor a deviation store with N entries, this is N+ (one per scope) gratuitous\nString allocations. The props names are also String when they're always\none of the four canonical PROP_* constants.\n\n# What the caller pays\n\nFor a deployment with a deviation pack of, say, 200 deviations, this is\n~600 `&'static str \u2192 String` allocations just to model the canonical\nkinds and props names. None of those Strings are ever mutated.\n\n# What's leaking\n\nThe struct's type signature `pub kind: String` is part of the public\nAPI. It locks the contract to 'kind is an owned heap string,' which\nprevents:\n\n  - Comparing kind with `== SCOPE_KIND_ANY` without `.as_str()` (works,\n    but still requires the allocation in the first place).\n  - Future migration to `Cow<'static, str>` (zero-cost for canonical\n    kinds, allocating only for custom kinds) without a breaking\n    change.\n\nThe recent Cow<'static, str> migration for LintResult detail\n(PKIX-ua6q) addressed the same shape. The same pattern applies here:\ncanonical kinds known at compile time get Borrowed; custom kinds get\nOwned.\n\n# Suggested fix\n\nChange to:\n\n    pub struct DeviationScope {\n        pub kind: Cow<'static, str>,\n        pub props: Vec<(Cow<'static, str>, ScopePropValue)>,\n    }\n\nAnd constructors:\n\n    pub fn any() -> Self {\n        Self {\n            kind: Cow::Borrowed(SCOPE_KIND_ANY),\n            props: Vec::new(),\n        }\n    }\n\n    pub fn issuer_dn_contains(substring: impl Into<String>) -> Self {\n        Self {\n            kind: Cow::Borrowed(SCOPE_KIND_ISSUER_DN_CONTAINS),\n            props: vec![(\n                Cow::Borrowed(PROP_ISSUER_DN_SUBSTRING),\n                ScopePropValue::Text(substring.into()),\n            )],\n        }\n    }\n\nCustom kinds still use `Cow::Owned` and pay one allocation, same as\ntoday. Canonical kinds pay zero.\n\nThis is a public-field type change, breaking change pre-1.0. Free to\nmake.\n\n# Why P3\n\nAllocation cost is not significant in normal use (deviation stores\nhave hundreds of entries, not millions). The fix is structurally\nclean but the immediate impact is small. Worth pinning before 1.0;\nnot urgent.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: DeviationScope.kind is String not Cow<'static, str>, every constructor allocates",
+  "updated_at": "2026-05-14T12:50:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:50:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

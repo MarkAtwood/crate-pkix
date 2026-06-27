@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0d2fae5dc913b83531996f731660455949a89fbdd8e283587466860bc3ac1d03",
+  "created_at": "2026-05-14T12:57:49Z",
+  "created_by": "Mark Atwood",
+  "description": "rfc8398.rs:338 declares `fn mailbox_equivalent(rfc822: &str, smtputf8: &str) -> Result<bool, &'static str>` with three distinct error conditions ('no @ delimiter', 'empty local-part or domain', 'U-label \u2192 A-label conversion failed') encoded as string literals. The review-rusty error-handling rules explicitly flag this: 'error variants that wrap String for the message instead of structured fields'.\\n\\nThe helper is module-private, so the cost of restructuring is small. Options:\\n\\n1. Define a private `MailboxParseError` enum with three variants (MissingAt, EmptyPart { which: Field }, IdnaFailed). Internally typed errors cost ~10 LoC of impl Display.\\n2. If callers (in practice, just `check_cert`) only care 'malformed in any way', return `Option<bool>` and lose the distinction. Combined with the .unwrap_or_default() finding (PKIX-hy2e.35), this is the simpler restructuring.\\n\\nThe principled fix depends on how the call site is restructured under PKIX-hy2e.35. If the call site moves to up-front validation, the helper becomes infallible (`fn mailbox_equivalent -> bool`) and the error type goes away entirely. That's the cleanest outcome and likely the right answer; this finding then closes as a duplicate of .35.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.37",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "mailbox_equivalent uses stringly-typed &'static str error in internal helper",
+  "updated_at": "2026-05-14T12:57:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:57:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

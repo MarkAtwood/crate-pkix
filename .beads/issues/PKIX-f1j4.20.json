@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a03a90899a28279e8cd970088a0402591ac34f0af9015d1a89f01db927cd3dcc",
+  "created_at": "2026-05-14T18:59:43Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:182-188: the trait docstring says:\n\n    /// get_crl / get_ocsp MUST return None for entries whose next_update is\n    /// in the past.\n\nBut 'in the past' relative to WHAT? The reference impl uses SystemTime::now() \u2014 wall-clock \u2014 while the wrapper carries a caller-supplied now_unix. A custom RevocationCache impl reading this docstring has no way to know which clock the trait contract refers to.\n\nThis is the rustdoc half of PKIX-f1j4.1 (the correctness issue). Fixing the correctness bug (thread now_unix through the cache) will fix the docstring too. Filing separately so the reviewer doesn't accept a 'documented as wall-clock, behaviour stays as wall-clock' resolution to the correctness bug.\n\nWhatever the trait contract decides, name the time source explicitly: 'in the past relative to <X>' where X is either the caller-supplied validation time or a documented wall-clock fallback.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.20",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cache rustdoc on RevocationCache::get_* mentions 'next_update in the past' but does not name the time source",
+  "updated_at": "2026-05-14T18:59:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: the distinction is intentional and documented \u2014 producedAt future means tampered/malformed response (OcspMalformed), thisUpdate future means SingleResponse not yet valid (OcspExpired per consistent caller semantics); both doc comments explain the rationale",
+  "closed_at": "2026-05-07T04:49:09Z",
+  "compaction_level": 0,
+  "content_hash": "4c3d8ececaf631b73910abc1214ddbb97fdad4bb6ccc8d46041dfc4e9f6f09e2",
+  "created_at": "2026-05-07T04:37:46Z",
+  "created_by": "Mark Atwood",
+  "description": "In ocsp.rs check_revocation, line 176: if now < producedAt \u2192 OcspMalformed. But line 183: if now < thisUpdate \u2192 OcspExpired. Both cases mean 'the OCSP data is invalid at this point in time' but they use different error codes. The comment at line 180 explains producedAt is 'structurally suspicious' while thisUpdate is the same 'freshness failure as a past-due nextUpdate'. This asymmetry means callers cannot handle 'OCSP not yet valid' consistently \u2014 they must check two error variants. A consistent error code (or a unified OcspNotYetValid variant) would simplify callers. P3 quality issue.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.14",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP: producedAt future check returns OcspMalformed but thisUpdate future check returns OcspExpired \u2014 inconsistent error semantics",
+  "updated_at": "2026-05-07T04:49:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:37:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

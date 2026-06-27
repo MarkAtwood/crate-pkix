@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:45Z",
+  "compaction_level": 0,
+  "content_hash": "7d0934549b3ed6eaff76be995e79cc2fce29528ba28dad7d6ea62c31118e6257",
+  "created_at": "2026-05-03T00:11:48Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 1432: 'if nc_constrained_types & NC_TYPE_RFC822 != 0 || !nc_excluded.is_empty()'. The second condition '!nc_excluded.is_empty()' causes the entire email DN walk to happen whenever ANY excluded subtree exists (DNS, IP, URI, etc.), not just when RFC822 excluded subtrees exist. This is wasteful and wrong in principle: it walks every RDN looking for emailAddress attributes then checks them against nc_excluded \u2014 but the inner loop at 1445 checks 'if let GeneralName::Rfc822Name', so non-RFC822 excluded entries are silently skipped. The guard condition is misleading: it implies broader work than is needed, and a future reader may add logic that fires for all nc_excluded entries. Fix: change condition to 'nc_constrained_types & NC_TYPE_RFC822 != 0 || nc_excluded.iter().any(|st| matches!(st.base, GeneralName::Rfc822Name(_)))'.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RFC 822 emailAddress DN attribute checked even when nc_excluded is empty",
+  "updated_at": "2026-05-05T04:48:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:11:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

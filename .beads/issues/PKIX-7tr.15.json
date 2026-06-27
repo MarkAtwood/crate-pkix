@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:13:09Z",
+  "compaction_level": 0,
+  "content_hash": "4cbce4c820cc35cf1df12998c74e7dad538e9cdfb4ab4c14bef87a7d1c5cb2c7",
+  "created_at": "2026-05-02T13:41:21Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 108: .find(|r| &r.cert_id.serial_number == cert_serial). CertID in RFC 6960 \u00a74.1.1 contains issuerNameHash and issuerKeyHash in addition to serialNumber. Matching only on serialNumber means an OCSP response for a certificate from a different CA with the same serial number will match. Serial number uniqueness is only guaranteed within a single CA's issuance, not globally. An attacker who can obtain a valid OCSP 'good' response for cert X from CA-A can use it to satisfy revocation checking for cert Y from CA-B if X and Y share a serial number. This is acknowledged in the Limitations rustdoc but it is a security defect in the matching logic.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.15",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker matches SingleResponse by serial number only, ignoring issuer hashes",
+  "updated_at": "2026-05-02T14:13:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added pub(crate) truncate_for_detail helper (256-byte cap, UTF-8 char-boundary-safe, Cow-borrowed on the no-truncation fast path). Wrapped all attacker-controlled interpolation sites in rfc8398 (SAN entry strings \u2014 the bead's primary concern) and the der::Error::to_string() sites in rfc5280, rfc6125, rfc8398, rfc8551. Bounded-shape interpolations (usize, ObjectIdentifier) left as-is. Five regression tests cover the helper. 307 tests pass; clippy clean.",
+  "closed_at": "2026-05-14T17:26:18Z",
+  "compaction_level": 0,
+  "content_hash": "410f3189c6a519cfd147ad8ffe4a6d19f94b2a71410e0405511b69f12b61750d",
+  "created_at": "2026-05-14T16:16:31Z",
+  "created_by": "Mark Atwood",
+  "description": "rfc5280.rs, rfc6125.rs, rfc8398.rs, rfc8551.rs use format!() to interpolate attacker-supplied byte content from parsed certificates into LintResult::error detail strings with no upper length bound. Examples:\n\n- pkix-lint/src/rfc8398.rs:322-326 \u2014 `format!(\"rfc822Name SAN entry '{r}' is malformed ...\")` where `r` is an arbitrary-length SAN entry string parsed from the cert\n- pkix-lint/src/rfc8398.rs:331-335 \u2014 same for SmtpUTF8Mailbox entries\n- pkix-lint/src/rfc8398.rs:349-353 \u2014 same in the no-matching-equivalent branch\n- pkix-lint/src/rfc6125.rs:137-140 \u2014 `format!(\"SubjectAltName extension value is malformed DER: {e}\")` where `e` is a der::Error containing possibly arbitrary bytes\n- pkix-lint/src/rfc5280.rs:276-279, 393-398 \u2014 similar shape for malformed extension errors\n\nSection C (untrusted input at protocol boundaries). What goes wrong: integrity / availability. A malicious certificate carrying a 100MB rfc822Name SAN entry causes:\n1. A 100MB `LintResult::Error(Cow::Owned)` allocation per failing lint\n2. That detail string travels through `Finding` \u2192 OSCAL JSON emit (`risks_from_store`, `observation_for_evidence`, `finding_for_lint_result`) \u2014 at minimum a 2\u00d7 copy through serde_json\n3. Downstream OSCAL consumers ingesting the audit JSON face the same amplification on parse\n\nThe cert itself is bounded by upstream DER parser limits (x509-cert), but the rfc822Name IA5String content has no length cap that x509-cert enforces \u2014 IA5String accepts arbitrary length under SIZE constraints rfc5280 does not formally tighten.\n\nSeverity P2: not a code-exec defect, but turns a single malicious cert into worst-case 100MB\u00d7N-lints\u00d7emit-copies memory pressure on any pkix-lint pipeline. Realistic CI / OSCAL importer process gets OOM-killed.\n\nFix shapes:\n- Truncate interpolated values at a documented cap (e.g., 256 bytes) with a `(truncated)` marker, similar to how OpenSSL trims X509_NAME_oneline output\n- Or move the byte content into a separate `Finding.evidence_bytes: Option<Vec<u8>>` field with explicit caller opt-in for inclusion\n- Or replace value interpolation with index-only references (`SAN entry index 3 has malformed local-part`) and document that operators must consult the cert for byte content\n\nThis finding is in scope for crypto-security (Section C) even though pkix-lint does not handle secrets: certificates are attacker-influenced bytes crossing a protocol boundary, and bounded-output discipline is part of the protocol-boundary contract.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.52",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Unbounded attacker-controlled cert content interpolated into LintResult::error detail strings",
+  "updated_at": "2026-05-14T17:26:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:16:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

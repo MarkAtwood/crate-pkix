@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:29:22Z",
+  "compaction_level": 0,
+  "content_hash": "ad607da4bd43989bbe146626b246c63d050ab9d3fa43ef83428d4930ea4bece2",
+  "created_at": "2026-05-07T17:23:03Z",
+  "created_by": "Mark Atwood",
+  "description": "clippy::doc_markdown (pedantic) flags several identifiers in doc comments across lib.rs and crl.rs that should be wrapped in backticks for rustdoc rendering:\n\nlib.rs:122 \u2014 'KeyUsage' (in CrlSignMissing variant doc)\ncrl.rs:86  \u2014 'cRLSign' (in CrlChecker Limitations section)\ncrl.rs:87  \u2014 'KeyUsage' (same block)\ncrl.rs:335 \u2014 'cRLSign' (in check_revocation_against_anchor doc)\ncrl.rs:575 \u2014 'CRLNumber' (in crl_number() fn doc comment)\nocsp.rs:371 \u2014 'CertID' (in HashOutput enum doc)\nocsp.rs:374 \u2014 'CertID' (same)\n\nFix: wrap each identifier in backticks so rustdoc renders them as inline code.\nNo functional change.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation] doc_markdown: backtick-wrap identifiers in doc comments",
+  "updated_at": "2026-05-07T17:29:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

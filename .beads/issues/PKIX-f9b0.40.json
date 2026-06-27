@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:05Z",
+  "compaction_level": 0,
+  "content_hash": "1be0d9e4af3143ebfafd36e48f1fc1b7215bd0290067e6242cc846e8efa0f466",
+  "created_at": "2026-05-07T17:23:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-composite/src/lib.rs:73-83 \u2014 CompositeVerifier implements SignatureVerifier but the verify_signature body is a stub that unconditionally returns Err(SignatureError::new()). The doc says 'Not yet implemented'. A caller who plugs CompositeVerifier into pkix_chain::verify_chain will get silent verification failures with no indication that this is stub behavior. Fix: mark the impl or the struct with a deprecation notice, or at minimum add a compile_error!/assert in debug builds. The cleanest approach matching pkix-ct: mark CompositeVerifier with #[deprecated = \"pkix-composite is not yet implemented; all signature verifications will fail\"].",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.40",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-composite] CompositeVerifier::verify_signature stub not marked #[deprecated]",
+  "updated_at": "2026-05-07T17:28:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

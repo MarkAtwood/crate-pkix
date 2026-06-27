@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:57:20Z",
+  "compaction_level": 0,
+  "content_hash": "daedf7e6e4a4ee446cefcc0406b057c72111d5e1771b584da972b81136d925c2",
+  "created_at": "2026-05-06T20:52:21Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-revocation/src/crl.rs CrlChecker::with_delta() at lines 153-158. The function calls base_crl_number(&delta_crl) which returns None if the deltaCRLIndicator extension is absent OR if its INTEGER value cannot be decoded. Then line 155: 'if delta_base_num.is_none() { return Err(Error::DeltaCrlBaseMismatch); }' with comment 'No deltaCRLIndicator -> this is not a delta CRL.' But if has_delta_crl_indicator() returns true (extension present) and base_crl_number() returns None (value malformed), the error is still DeltaCrlBaseMismatch, which is misleading \u2014 the actual error is a parse failure. The code is fail-closed (rejects malformed delta CRL), but the error type is wrong. The function checks has_delta_crl_indicator(base_crl) first to ensure the BASE is not a delta, but the same has_delta_crl_indicator check is not done before the delta_base_num check to distinguish 'absent extension' from 'present but malformed value'. Fix: Call has_delta_crl_indicator(&delta_crl) before base_crl_number(). If has_delta_crl_indicator returns true but base_crl_number returns None, return Err(Error::CrlParseError(...)) or a new Error::DeltaCrlMalformed variant. If has_delta_crl_indicator returns false, return DeltaCrlBaseMismatch. Priority: P2 (diagnostic clarity \u2014 wrong error type confuses callers).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: with_delta() conflates malformed deltaCRLIndicator with missing indicator",
+  "updated_at": "2026-05-06T20:57:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:52:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

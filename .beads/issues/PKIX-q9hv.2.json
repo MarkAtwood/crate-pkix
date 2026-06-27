@@ -1,0 +1,30 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "8fe648feb8b6cea499c704ae5e336e9d064f0528c6e2a9b77a3b7af86e4af979",
+  "created_at": "2026-05-14T14:36:15Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1559-1566 `is_aia_recoverable` matches `SignatureInvalid` as 'repairable by adding more candidate intermediates,' driving the slow path on a wrong-key intermediate. But `build_with_aia` (line 585-681) only retries on `pkix_path_builder::Error::NoPathFound` (line 606); `NoValidPath{tried, ...}` (line 609-617) returns immediately as `Error::PathBuild(NoValidPath{...})`. When the supplied chain has a wrong-but-DN-matching intermediate, `build_first_valid_path` tries the bad cert (tried >= 1, last_error=SignatureInvalid), returns `NoValidPath`, and the slow path bails. Trigger: caller passes [leaf, wrong_intermediate] with an AIA URI on the leaf that would supply the correct intermediate; the verifier returns `PathBuild(NoValidPath{...})` without ever invoking AiaFetcher.batch_fetch. Two observable defects: (1) the original `Path(SignatureInvalid)` error is degraded to a less-specific PathBuild variant, and (2) the AIA seam never gets a chance to fix the situation. Either narrow `is_aia_recoverable` to exclude `SignatureInvalid` (and let the original Path error surface), or have build_with_aia also retry on `NoValidPath` and add AIA-fetched alternatives to the pool. The latter is what the rustdoc at lines 1543-1558 promises.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "is_aia_recoverable advertises SignatureInvalid but build_with_aia cannot recover it",
+  "updated_at": "2026-05-14T15:23:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:36:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

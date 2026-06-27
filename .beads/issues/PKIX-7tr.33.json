@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:16:06Z",
+  "compaction_level": 0,
+  "content_hash": "4874d2b6e74e69f2ad128e927f2ad1e7fe7c306ef955dfa03ea1ef2374b4c8a8",
+  "created_at": "2026-05-02T13:42:37Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy (line 214) derives neither Clone nor Debug, making it impossible to log or copy a policy. TrustAnchor (line 177) derives neither Clone nor Debug. For a no_std library these derives have zero runtime cost. Not deriving them forces callers who want to log or clone these types to wrap them, which is needless friction. Add #[derive(Clone, Debug)] to ValidationPolicy and TrustAnchor. Note: Debug on TrustAnchor will expose the SPKI bytes which is fine (it is a public key, not a secret).",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing derives on public types: ValidationPolicy, TrustAnchor, SignatureVerifier",
+  "updated_at": "2026-05-02T14:16:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "OSCAL Profile composition shipped (commit c0e63477).\n\nAcceptance:\n- [x] Profile loader + resolver supports import, include-all, include-controls.with-ids, exclude-controls.with-ids, set-parameters.\n- [x] Three example Profiles ship as test fixtures (inline json!() macro, matching pkix-lint precedent): plain, layered, override.\n- [x] Composed Profile execution yields the expected lint set + parameter values \u2014 pinned by end_to_end_profile_override_changes_runner_behavior against the leaf-rsa2048-sha1.der fixture (Default cap=20 passes 20-octet serial; override cap=10 errors with both lengths in detail string).\n- [x] Documentation in pkix-lint rustdoc explains the OSCAL Profile composition mechanism (module-level rustdoc in pkix-lint/src/oscal/profile.rs).\n\nAPI:\n- pkix_lint::oscal::profile::resolve_profile(profile, sources) -> ResolvedProfile { control_ids, parameter_overrides }\n- LintRunner::apply_parameter_overrides(&[ParameterOverride]) -> Result<(), ParseError>\n\n19 new ParseError variants for the Profile-side error surface, each exercised by a matching negative test (30 tests in oscal::profile::tests; 159 total pkix-lint tests pass under --features oscal; clippy clean; workspace builds clean).\n\nSubsumes PKIX-9vnx.6.5 (standalone parameter-overrides extractor) \u2014 set-parameters is handled here as part of broader Profile resolution. Closing .6.5 as superseded.\n\nOut of scope (left as follow-up): committed JSON Profile fixtures under pkix-lint/tests/fixtures/oscal/profiles/ for human-readable end-to-end examples \u2014 current tests use inline json!() macros matching the pkix-lint precedent for OSCAL test inputs.",
+  "closed_at": "2026-05-11T22:45:57Z",
+  "compaction_level": 0,
+  "content_hash": "03eaa9ea150ac0e6c7c5275e7b07f882233336e647cce5103a86b3dbb56fd92f",
+  "created_at": "2026-05-11T05:54:30Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nUnder Level 3, lint bundle composition uses OSCAL Profile mechanics, not bespoke Rust composition functions. An OSCAL Profile imports one or more Catalogs, selects/excludes Controls, and modifies parameters / status. Profiles can chain.\n\nThis means `cabf.br.tls` is an OSCAL Profile importing the workspace's RFC-conformance Catalog (plus possibly a cabf-specific Catalog from `pkix-lint-cabf`), selecting the relevant Controls, setting parameter values (e.g., SC-081 validity caps), and emitting the composed set.\n\n## What\n\nImplement Profile loading + composition:\n\n- Load OSCAL Profile JSON files.\n- Resolve imports (a Profile can import other Profiles or Catalogs).\n- Apply select/exclude directives (`include-controls`, `exclude-controls`).\n- Apply modify directives (`set-parameters`, `adds` to control parts).\n- Resolve to an effective Catalog (the 'resolved profile catalog' in OSCAL terms).\n- Execute lints against the resolved Catalog.\n\nComposition examples that must work:\n\n1. **Plain Profile**: import RFC-conformance Catalog, select a subset of controls, run lints.\n2. **Layered Profile**: cabf.br.tls Profile imports both the RFC Catalog and a cabf-extensions Catalog, selects from each, sets cabf-specific parameter values.\n3. **Override Profile**: a customer Profile imports cabf.br.tls Profile and disables one specific control (their organisational deviation).\n\nThis replaces any need for Rust functions like `combine_profiles`, `disable_lint`, etc. \u2014 those operations become OSCAL Profile directives.\n\n## Acceptance\n\n- [ ] Profile loader + resolver supports import, include-controls, exclude-controls, set-parameters.\n- [ ] At least three example Profiles ship as test fixtures, covering the three composition examples above.\n- [ ] Composed Profile execution yields the expected lint set + parameter values.\n- [ ] Documentation in pkix-lint rustdoc explains the OSCAL Profile composition mechanism and points users at the OSCAL Profile schema for advanced use.\n\n## Out of scope\n\n- Full OSCAL Profile semantics (alterations across all OSCAL field types, custom set-parameter contexts, etc.) \u2014 implement only what the workspace's Profile use cases require.\n- Profile authoring tools \u2014 consumers can hand-write OSCAL Profile JSON or use external OSCAL authoring tools.\n\n## Depends on\n\nPKIX-9vnx.6 (Lint-as-Control mapping \u2014 Profiles operate on Controls).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Reframed 2026-05-11 (Arch 2 \u2014 see PKIX-ztmr / PKIX-9vnx notes):\n\n- Profile composition mechanics unchanged (OSCAL Profile semantics: import/select/exclude/modify) \u2014 Arch 2 doesn't change *what* we do, just *how* we represent it in Rust.\n- Loader walks OSCAL Profile JSON. Resolver applies imports/select/exclude/set-parameters directives. Output: an 'effective Catalog' \u2014 internally a Vec<&dyn Lint> + a parameter-override map (or similar), NOT an `oscal::Catalog` Rust type.\n- The OSCAL Profile JSON is the canonical authoring format. The Rust runtime walks JSON; it doesn't deserialize it into a Rust mirror first.\n- Test fixtures remain as OSCAL Profile JSON files. Acceptance criteria unchanged.\n- No longer blocked by PKIX-9vnx.2 (closed).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Profile composition via OSCAL Profile semantics (select/exclude/modify, import chaining)",
+  "updated_at": "2026-05-11T22:45:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:54:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

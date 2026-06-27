@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:48:00Z",
+  "id": "019e1d84-74e6-75e6-bba0-abf4d4e65c41",
+  "issue_id": "PKIX-amgn",
+  "text": "Reopened 2026-05-12 -- PKIX-amgn.8 reversed from WONTFIX to open. The auto-close was correct at the moment .8 closed but is now structurally inconsistent. The framework-not-policy realignment work (other .amgn children) is complete; .8 (vendor zlint catalog metadata for pkix-lint-cabf, comprehensive scope) is the remaining open item. See PKIX-amgn.8 reversal comment + memory pkix-amgn-8-reversed-2026-05-12."
+}

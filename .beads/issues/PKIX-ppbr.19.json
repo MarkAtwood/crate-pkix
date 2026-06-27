@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "13f94c61fa1a4b270cff3d263fedc3e17d259c8dea345dbc639cd53133cecd50",
+  "created_at": "2026-05-14T17:42:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:170-238\n\nThe doc comment says:\n\n> `pkix-ct`'s `SignedCertificateTimestamp` does not carry an explicit\n> `entry_type` field (it is implied by the delivery channel \u2014 cert\n> extension \u21d2 precert_entry, OCSP / TLS-handshake \u21d2 x509_entry). This\n> function unconditionally treats the SCT as `x509_entry`; the caller\n> is responsible for picking the right entry point based on delivery\n> channel.\n\nThis is a known design choice. The contract problem: when a caller\ngets it wrong (passes a `precert_entry` SCT to `verify_sct_for_cert`,\nor vice versa), the resulting failure is `Error::InvalidSignature`.\n\nThat diagnostic is indistinguishable from:\n\n- Tampered SCT signature\n- Wrong cert bytes (caller passed pre-cert when they should have\n  passed final cert)\n- Wrong log key (caller's log list was stale and the log key\n  rotated)\n- Right log key, wrong algorithm dispatch\n\n\u2026all of which are real failure modes. A caller debugging an\nintegration cannot tell from the error which one occurred.\n\nThis is a documentation contract failure: the doc warns the caller\nto pick correctly, but provides no way to recover from picking\nwrong. Three exits:\n\nA. Add an `entry_type` field to `SignedCertificateTimestamp` derived\n   from the delivery channel, and have the verifier dispatch\n   automatically. The fields the caller would have set are now set\n   by `from_extension_value` / `sct_list_from_tls_extension` /\n   `sct_list_from_ocsp_response` \u2014 those constructors know which\n   channel they parsed. This dissolves the issue entirely.\n\nB. Return a typed `Error::EntryTypeMismatch` from the verifier when\n   the signature would have verified under the OTHER entry type. The\n   verifier would re-attempt with the alternate signed input on\n   `InvalidSignature` and surface the alternative if it succeeds.\n   Cost: 2x verification work on every error path.\n\nC. Document the failure mode prominently and add a `try_both`\n   convenience method on `SctVerifier`. Cheaper than B because the\n   caller opts in.\n\nRecommendation: A. The `entry_type` is wire-format information that\nSHOULD be on the parsed type; it being implicit is a leak of the\nparsing layer into the verification layer. PKIX-ppbr.19 is also a\ndefensive-code-forcing issue: every caller that handles SCTs from\nmixed delivery channels (OCSP + TLS handshake + embedded) has to\nmaintain its own `(sct, channel)` association and route through the\nright verifier.\n\nPriority P1 because this is a contract decision that becomes harder\nto make once the API ships and callers have written\ndelivery-channel-aware code on top.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_sct_for_cert silently treats every SCT as x509_entry \u2014 wrong-entry-type bug surfaces as InvalidSignature",
+  "updated_at": "2026-05-14T17:42:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:42:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

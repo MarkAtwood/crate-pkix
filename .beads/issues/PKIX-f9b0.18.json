@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:50Z",
+  "compaction_level": 0,
+  "content_hash": "66b85fccf14ed607c7c3a71e5add6e969ea4be2b6d69c11e4da0e9e8900a057b",
+  "created_at": "2026-05-07T17:22:45Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:659,671,750,771,799,826,936 \u2014 Test functions redeclare ID_KP_SERVER_AUTH, ID_KP_EMAIL_PROTECTION, and ID_KP_CODE_SIGNING as local ObjectIdentifier::new_unwrap() literals rather than referencing the module-level constants (super::ID_KP_SERVER_AUTH etc.). This creates a divergence risk: a typo in a local OID string would silently bypass the real check. Fix: reference super::ID_KP_SERVER_AUTH, super::ID_KP_EMAIL_PROTECTION, super::ID_KP_CODE_SIGNING directly in the tests. No new constants needed \u2014 they already exist at module scope.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-profiles] tests re-declare OID constants instead of reusing module consts",
+  "updated_at": "2026-05-07T17:32:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

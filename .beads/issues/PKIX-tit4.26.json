@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:47Z",
+  "compaction_level": 0,
+  "content_hash": "31743e69ca220eb07426a59706ce33e253918040430295be2d6c7b77681c8101",
+  "created_at": "2026-05-14T07:30:18Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/Cargo.toml:21 declares an optional `serde` feature. When\nenabled it adds `serde::Serialize + serde::Deserialize` derives to\n`Error` (lib.rs:213-216) and `IoFailure` (lib.rs:104-107), and\npropagates via `pkix-path/serde` so the re-exported `DerError`\nparticipates in the same wire form.\n\nThe rustdoc on the public API does NOT tell callers this feature\nexists or what it gates:\n\n- The crate-level `# Stability` section (lib.rs:55-58) mentions only\n  `#[non_exhaustive]` on `Error`. No mention of serde.\n- The `Error` struct docs (lib.rs:200-212) discuss cache-friendliness\n  but say nothing about `Serialize`/`Deserialize` requiring a feature.\n- The `IoFailure` struct docs (lib.rs:99-103) mention \"gaining\n  `Clone`, `Eq`, and `Serialize`\" but do not state that `Serialize`\n  requires the `serde` feature flag. To a fresh caller this reads as\n  \"always serializable.\"\n- No `# Features` section anywhere.\n\nThe per-section prompt template (api-contract,versioning) says:\n> Cargo features added that change public types or method signatures\n> conditionally \u2014 the API surface depends on the feature set in ways\n> callers may not realize.\n\nThis is exactly that.\n\nWhat goes wrong for a caller in production:\n\n1. They write `let bytes = serde_json::to_vec(&err)?;` against\n   `pkix_truststore::Error`, get `Error: !Serialize`, check docs.rs,\n   find nothing about serde, eventually figure it out by reading\n   source or Cargo.toml.\n\n2. A cross-process cache pattern (the exact use case AGENTS.md\n   non-negotiable #6 calls out): producer side builds with default\n   features (no serde), consumer side builds with `features = [\"serde\"]`.\n   They blame the cache library before realizing the dependency-graph\n   feature unification rules played a role.\n\n3. A Tier 2 sibling crate (`pkix-truststore-system`,\n   `pkix-truststore-pkcs11`) wants to re-export `pkix_truststore::Error`\n   and conditionally forward the serde behavior; without docs on what\n   the feature does, the sibling crate author must read source.\n\nCargo.toml:39-40 sets `package.metadata.docs.rs.all-features = true`,\nso docs.rs WILL render the serde-gated impls \u2014 but rendering implies\n\"always available\" rather than \"behind a feature gate.\" The\nconventional rustdoc pattern attaches `#[cfg_attr(docsrs,\ndoc(cfg(feature = \"serde\")))]` to the impls so the gate is visible in\ngenerated docs; the `#![cfg_attr(docsrs, feature(doc_cfg))]` at\nlib.rs:1 already enables this nightly attribute but no `doc(cfg(...))`\nannotations actually use it.\n\nFix (small, additive):\n\nAdd a `# Features` section to the crate-level rustdoc:\n\n```\n//! # Features\n//!\n//! `serde` (off by default) \u2014 derive `serde::Serialize` and\n//! `serde::Deserialize` for [`Error`] and [`IoFailure`] so trust-store\n//! load failures can be cached or sent across process boundaries\n//! (AGENTS.md non-negotiable #6).\n```\n\nAnd add `#[cfg_attr(docsrs, doc(cfg(feature = \"serde\")))]` to the\n`io_error_kind_serde` module + the gated derive lines so docs.rs\nrenders a visible \"Available on crate feature serde only\" badge.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "API surface depends on serde feature but rustdoc never mentions the feature exists",
+  "updated_at": "2026-05-14T08:14:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T00:30:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:33:59Z",
+  "compaction_level": 0,
+  "content_hash": "db42100244f40fad7538019fb8d4fbe6d7150d2966ee50632143cfb46beb0d3a",
+  "created_at": "2026-05-07T20:12:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-chain/src/lib.rs:18\\` carries the canonical user-facing quick-start example for chain verification:\n\n\\`\\`\\`rust,ignore\nuse pkix_chain::{verify_chain, NoRevocation, ValidationPolicy, TrustAnchor};\nlet policy = ValidationPolicy::new(now_unix_timestamp);\nlet result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation)?;\n\\`\\`\\`\n\n\\`cargo test\\` reports it as \\`ignored\\`. The workspace README presents an almost identical example as the recommended caller pattern.\n\n## Why P1\nThe marquee documentation example for the umbrella crate is not even compile-checked. If the API surface drifts (rename, signature change), the README stays plausible-looking and the doctest never catches it. Both the crate-level doctest in pkix-composite (line 17) and pkix-profiles (line 29) are in the same shape.\n\n## Fix\nConvert \\`rust,ignore\\` to \\`rust,no_run\\` and provide synthetic \\`now_unix_timestamp\\`, \\`chain\\`, \\`anchors\\`, \\`my_verifier\\` bindings (e.g. \\`unimplemented!()\\` or fixture-loaded values gated behind \\`# fn main() -> ... { ... }\\` doctest scaffolding). The pkix-chain-simple doctest at line 425 already demonstrates the pattern: \\`# let leaf_der: &[u8] = &[];\\` etc.\n\n## Scope reference\n\\`pkix-chain/src/lib.rs:18\\`. (Same shape: \\`pkix-composite/src/lib.rs:17\\`, \\`pkix-profiles/src/lib.rs:29\\`, \\`pkix-path/src/lib.rs:316,690\\` \u2014 those are addressed in a separate P3 issue.)",
+  "ephemeral": 0,
+  "id": "PKIX-bkk6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: pkix-chain crate-level doctest is rust,ignore \u2014 README example is workspace-public yet untested",
+  "updated_at": "2026-05-07T20:33:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:12:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

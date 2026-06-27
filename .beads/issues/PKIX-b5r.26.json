@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Not a bug: when policy_mapping==0, nodes with issuer_domain_policy are deleted, then prune_policy_tree() removes orphaned ancestors. stale expected_policy_set is cleaned up by pruning.",
+  "closed_at": "2026-05-05T16:09:50Z",
+  "compaction_level": 0,
+  "content_hash": "252e05d8b5b3ecf264d4c52e912350660ae9af7aca5cd40556f69e22419b5f91",
+  "created_at": "2026-05-05T15:48:20Z",
+  "created_by": "Mark Atwood",
+  "description": "When policy_mapping == 0 (mapping inhibited), nodes with issuerDomainPolicy as valid_policy are deleted at lib.rs:1863-1878. However, PARENT nodes at cert_depth-1 that had their expected_policy_set updated by a PREVIOUS cert's PolicyMappings (which changed it from {IDP} to {SDP}) still carry the SDP in their expected_policy_set. These parent nodes' expected_policy_set is now stale: the mapping that put SDP there has been inhibited, but the parent was not reverted.\\n\\nPractical impact: At the next cert (depth+1), when matching against this parent's expected_policy_set, the SDP would be matched instead of the IDP. This creates a situation where inhibiting mapping at cert N still allows the mapped policy (SDP) to be matched at cert N+1.\\n\\nThe PKITS \u00a74.11 tests cover this scenario and should catch it. If \u00a74.11.1/4.11.3/4.11.5/4.11.6 pass, then either (a) the PKITS certs are structured such that this path is never triggered, or (b) the issue is masked. Recommend adding a test specifically for the stale expected_policy_set case.\\n\\nLocation: pkix-path/src/lib.rs:1863-1878 (policy_mapping==0 branch)\\n\\nFix: When deleting a node with valid_policy=IDP at cert_depth, walk parent nodes at cert_depth-1 and revert their expected_policy_set: replace any SDP (that was put there by the now-inhibited mapping) with the original IDP. Alternatively, store the pre-mapping expected_policy_set and restore it on inhibition.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.26",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PolicyMappings: inhibited case may leave stale expected_policy_set",
+  "updated_at": "2026-05-05T16:09:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:48:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

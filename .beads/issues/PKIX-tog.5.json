@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:25:12Z",
+  "compaction_level": 0,
+  "content_hash": "fa7bc49ba2905552dfd8d72a38b1a6a42d17bda27910e016e2b706791168c2ef",
+  "created_at": "2026-05-06T23:19:42Z",
+  "created_by": "Mark Atwood",
+  "description": "DeviationScope::IssuerDnContains requires the substring to be pre-lowercased (invariant enforced only in DeviationStore::add). Direct construction like DeviationScope::IssuerDnContains(\"Agency X\".to_string()).matches(&cert) silently fails. Fix: lowercase in matches() rather than only at construction time \u2014 already paying the allocation for cert.tbs_certificate.issuer.to_string(). File: pkix-lint/src/deviation.rs lines 238-242, 306-319.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: IssuerDnContains silent no-match when constructed directly",
+  "updated_at": "2026-05-06T23:25:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:19:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

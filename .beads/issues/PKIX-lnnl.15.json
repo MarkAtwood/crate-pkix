@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ce15f379d64e828f9722b16a5dbd6783f4ce2a4a82c7caec8a48d8e723adc0aa",
+  "created_at": "2026-05-14T19:42:45Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/lib.rs:50 (replacing the prior owned newtype struct):\n\n  pub use pkix_path::DerError;\n\nThis is now the public type appearing inside Error::CrlParseError(DerError) and Error::OcspParseError(DerError). Every downstream caller that pattern-matches on those variants binds the inner type to whatever pkix-path::DerError currently is.\n\nWhat callers cannot depend on:\n\n1. **Pkix-path major-version coupling.** If pkix-path cuts a major version and the DerError shape changes (e.g., new variants on an underlying inner enum, or a switch from struct-wrapping to enum, or removal entirely), pkix-revocation's public API breaks too. Callers pinning `pkix-revocation = \"^1\"` and `pkix-path = \"*\"` (or simply rebuilding) would suddenly see breakage they didn't opt into.\n\n2. **The CHANGELOG note (PKIX-lnnl.5) already acknowledges this is breaking** for pattern matching against the old DerError struct. But the api-contract issue is forward-looking: the re-export DESIGN choice now commits pkix-revocation's stability to pkix-path's stability. That is fine if pkix-path and pkix-revocation are version-locked siblings (which they are within this workspace), but it should be deliberate, not incidental.\n\n3. **Reasoning the maintainer wants to preserve later (cache-friendly, serde-friendly, Send+Sync) all sit upstream** in pkix_path::DerError. If pkix-revocation later wants to add a property (e.g., 'must contain a context string for telemetry'), it cannot add it to DerError without changing pkix-path. The re-export forecloses an extension point.\n\nOptions:\nA. Status quo: keep pub use pkix_path::DerError. Document explicitly in pkix-revocation's lib.rs that the type is intentionally shared and that pkix-revocation's MAJOR version tracks pkix-path's MAJOR. This is what's intended; just make it explicit.\nB. Re-introduce a thin newtype:\n     pub struct DerError(pkix_path::DerError);\n   with `impl From<pkix_path::DerError>` and a Display/Debug pass-through. Costs zero runtime, decouples the public surface, lets pkix-revocation evolve independently of pkix-path. This is what was originally there before commit d531e001.\nC. Document the coupling AND export an alias  pub type DerError = pkix_path::DerError; which is syntactically equivalent to the `pub use` but signals 'aliased on purpose'.\n\nI would pick (A) \u2014 the coupling is intentional (both crates are workspace members tracked together, the design rationale is in d531e001's commit message), but the rustdoc on `pub use` does not say so. Future-self reading the code in 18 months will not know whether the coupling was deliberate or a tactical shortcut. A two-line rustdoc paragraph fixes this.\n\nAcceptance: either (A) with a rustdoc note on the re-export ('pkix-revocation's major version is intentionally locked to pkix-path's major version; both crates are workspace siblings released together'), OR (B) restoring the newtype. (C) is a typing nit-pick if (A) is chosen.\n\nCross-references: PKIX-lnnl.5 (CHANGELOG inaccuracy on pattern matching) is the migration-note half; this issue is the design-commit half.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pub use pkix_path::DerError re-export couples crate version to pkix-path major",
+  "updated_at": "2026-05-14T19:42:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:42:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

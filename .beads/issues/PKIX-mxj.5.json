@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:10:42Z",
+  "compaction_level": 0,
+  "content_hash": "79caa4a1cf232ffc6d782bbfe987b468edf0696ab66b64fa680cc08c540317b1",
+  "created_at": "2026-05-07T03:49:24Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/tests/crl_checker_tests.rs \u2014 The dedicated CRL checker unit tests (crl_checker_tests.rs) contain no tests for delta CRL behavior, including the RemoveFromCRL path and the CrlChecker::with_delta constructor. This functionality is only exercised by the PKITS corpus (pkits_crl.rs). If pkits_crl.rs fixtures are unavailable or skipped, the delta CRL merge logic has no unit test coverage. Fix: add focused unit tests in crl_checker_tests.rs for: (1) with_delta construction validation, (2) delta entry overrides base entry, (3) RemoveFromCRL in delta removes cert from base, (4) cert in delta only with RemoveFromCRL is not revoked.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No integration tests for delta CRL RemoveFromCRL in crl_checker_tests.rs",
+  "updated_at": "2026-05-07T04:10:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

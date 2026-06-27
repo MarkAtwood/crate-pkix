@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6698d25bf8b0028ade29c5a0f00189052a87bb63bebfc444901473fae10dacc4",
+  "created_at": "2026-05-14T12:49:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:823:\n\n    #[allow(unused_variables)]\n    fn set_parameter(&mut self, id: &str, value: &str) -> Result<(), ParameterError>;\n\nThe doc comment describes what to return on success and on\nUnknownParameter / InvalidValue. It does NOT state whether the lint's\ninternal state is unchanged when Err is returned. For lints with\nmultiple internal fields that get derived from the parameter value\n(e.g., a future lint that parses 'min-rsa-bits' into both `min_bits:\nusize` and `derived_strength_class: enum`), partial-update on parse\nfailure is silently possible.\n\nCompare to LintRunner::apply_parameter_overrides (lib.rs:1180-1183):\n\n    /// Errors short-circuit on the first failure \u2014 overrides applied\n    /// before the failing one remain mutated on the lints. Callers\n    /// that need atomic application should resolve and validate\n    /// overrides against the catalog before installing the lints in a\n    /// runner.\n\nThis documents the BATCH atomicity (non-atomic), already filed\nin PKIX-hy2e.6. But the trait method itself doesn't say whether\n*one* call is atomic.\n\nCurrently the only shipped lint with parameters\n(Rfc5280MaxSerialLengthLint) has one parameter and one internal\nfield (max_octets). The single-field write is naturally atomic.\nBut the trait contract does not say so.\n\n# What the caller cannot rely on\n\nA caller writing a third-party lint with multiple parameters that\ncorrelate \u2014 say, 'min-rsa-bits' and 'min-rsa-bits-after-2030' \u2014 has\nno contract that says 'either both update or neither does'. Their\nmental model is whatever the implementor decided.\n\n# Suggested fix\n\nDocument the per-call atomicity contract in the rustdoc, EITHER:\n\n  - 'set_parameter is atomic: on Err, the lint's state is identical\n    to before the call. Implementors MUST validate inputs before\n    mutating fields.'\n\n  OR\n\n  - 'set_parameter is not atomic. Implementors MAY leave the lint\n    in a partially-updated state on Err. Callers needing atomicity\n    should restore state via a known-good config replay.'\n\nThe 'MUST validate inputs before mutating fields' contract is the\nbetter default \u2014 it's also what Rfc5280MaxSerialLengthLint already\ndoes (parse first, mutate after).\n\n# Cheapest fix\n\nAdd to set_parameter rustdoc: '# Atomicity: On Err, the lint's\ninternal state is unchanged. Implementors MUST parse and validate\nthe value before mutating any state.' (Then every implementor has a\ndocumented contract to satisfy.)",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: Lint::set_parameter does not document atomicity on Err",
+  "updated_at": "2026-05-14T12:49:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:49:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

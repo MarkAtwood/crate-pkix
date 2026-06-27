@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:20Z",
+  "compaction_level": 0,
+  "content_hash": "b18b586c6a7d67c7ad7d63a69e47d2de937f73dc7c12eac1694add05efc1adfb",
+  "created_at": "2026-05-07T20:27:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-lint/Cargo.toml` is missing **three** pieces of metadata that every other workspace crate has:\n\n1. `keywords`\n2. `categories`\n3. `[package.metadata.docs.rs]` block\n\nEvery other workspace crate sets all three.\n\n```\n$ for f in pkix-*/Cargo.toml; do echo \"==$f==\"; grep -E \"keywords|categories\" \"$f\"; done\n==pkix-ac/Cargo.toml==\nkeywords    = [\"x509\", \"certificate\", \"attr-cert\", \"pki\", \"authorization\"]\ncategories  = [\"cryptography\", \"no-std\"]\n==pkix-chain/Cargo.toml==\nkeywords    = [\"x509\", \"certificate\", \"pki\", \"pkix\", \"chain\"]\ncategories  = [\"cryptography\"]\n... (every crate has both)\n==pkix-lint/Cargo.toml==\n(no keywords)\n(no categories)\n```\n\n## Impact\n\n- **Crates.io discoverability**: `pkix-lint` won't appear in the `cryptography` category browse, won't surface for keyword searches like `lint`, `x509`, `cabforum`.\n- **docs.rs**: without `[package.metadata.docs.rs]`, docs.rs builds pkix-lint with default features only. The `serde` feature's items (Serialize/Deserialize impls on Finding, DeviatedFinding, EvaluationReport) won't appear in rendered docs.\n\n## Fix\n\nAdd to `pkix-lint/Cargo.toml`:\n\n```toml\nkeywords    = [\"x509\", \"certificate\", \"lint\", \"cabforum\", \"pki\"]\ncategories  = [\"cryptography\"]\n\n[package.metadata.docs.rs]\nall-features = true\nrustdoc-args = [\"--cfg\", \"docsrs\"]\n```\n\n(Crates.io enforces `keywords \u2264 5` and only allows category names from a fixed list.)\n\n## Priority\n\nP3 \u2014 small but consistent metadata gap; affects publish hygiene.\n",
+  "ephemeral": 0,
+  "id": "PKIX-6xdl",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-lint Cargo.toml missing keywords, categories, and [package.metadata.docs.rs]",
+  "updated_at": "2026-05-07T21:25:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

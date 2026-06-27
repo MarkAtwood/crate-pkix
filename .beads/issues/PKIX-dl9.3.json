@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Clarified: removed redundant third issuer-name check from check_revocation caller; verify_delta_crl_and_collect performs the authoritative check. Updated inline comment to document this.",
+  "closed_at": "2026-05-07T01:57:26Z",
+  "compaction_level": 0,
+  "content_hash": "f65eddf8efa87589a42ce743e4bf479abbe7773317234202140b00839362ebed",
+  "created_at": "2026-05-07T01:49:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:502 \u2014 After the parse-delta-once refactor, both check_revocation and check_revocation_against_anchor now check the delta CRL issuer name before calling verify_delta_crl_and_collect. But verify_delta_crl_and_collect also performs names_match internally as its step 1. So names_match is called twice on the delta CRL issuer per check_revocation invocation. This is harmless but wasteful and the verify_delta_crl_and_collect doc comment no longer accurately describes the function contract (its doc says it does the check; callers also do it). Either the internal check should be removed (with a contract comment that callers are responsible) or the callers should remove their check and rely solely on the helper. Low impact but the doc/contract inconsistency is P3.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_delta_crl_and_collect performs redundant issuer check after caller already checked",
+  "updated_at": "2026-05-07T01:57:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:49:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

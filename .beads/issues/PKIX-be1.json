@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:18Z",
+  "compaction_level": 0,
+  "content_hash": "54ab4caf621f912b0bcf3c2a3dc5ba375c8a1868b575215c89838a4d16dc7d71",
+  "created_at": "2026-05-06T23:16:29Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 181 (check_revocation) and line 287 (check_revocation_against_anchor): when `now_unix < this_update` the code returns `Err(OcspStatusUnknown)`. A future-dated `thisUpdate` is not a responder-reported unknown status \u2014 it means the SingleResponse is not yet valid (structurally invalid or clock skew). The parallel with `producedAt` is instructive: that case (line 176) correctly returns `OcspMalformed`. A future `thisUpdate` should also return `OcspMalformed` (or a dedicated `OcspNotYetValid`) not `OcspStatusUnknown`, which callers may interpret as a hard-fail on an authoritative 'unknown' answer from the responder. As written, a future-dated SingleResponse silently triggers the same hard-fail path as a responder saying 'I do not know this cert', which obscures the actual failure mode to callers and makes it impossible to distinguish clock-skew from a genuine responder-unknown. Suggested fix: change both checks to `return Err(Error::OcspMalformed)` (mirrors the producedAt treatment) or introduce an `OcspNotYetValid` error variant.",
+  "ephemeral": 0,
+  "id": "PKIX-be1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: thisUpdate future-date uses wrong error in OCSP",
+  "updated_at": "2026-05-06T23:47:18Z"
+}

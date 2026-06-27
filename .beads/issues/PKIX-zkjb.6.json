@@ -1,0 +1,31 @@
+{
+  "close_reason": "Duplicate of PKIX-zkjb.7 (created during a failed bash invocation that mangled Rust lifetime syntax in the description). PKIX-zkjb.7 has the correct content. Closing this corrupted duplicate.",
+  "closed_at": "2026-05-13T16:21:02Z",
+  "compaction_level": 0,
+  "content_hash": "9a4f93300dc8356076cdcdafc866c38354c4d98ea073a5a80a2cdcac965c920f",
+  "created_at": "2026-05-13T16:19:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nThread `AiaFetcher` through `pkix-chain` as the third trust-domain callback alongside `SignatureVerifier` and `RevocationChecker`. Re-export `pkix_aia::AiaFetcher` and `pkix_aia::NoAiaFetcher` from pkix-chain so callers see the full seam in one crate.\n\n## API shape\n\n`Verifier` struct (from PKIX-gsd9) gains a third generic parameter:\n\n```rust\npub struct Verifier<a,",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Integrate AiaFetcher into pkix-chain Verifier and verify_chain entry points",
+  "updated_at": "2026-05-13T16:21:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:19:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

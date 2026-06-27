@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8be561baf5eb0af86b9e1935e9438202997ea0e82149d21143eb5cbba215ed18",
+  "created_at": "2026-05-12T19:24:46Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nPKIX-fmtv.13 introduces `verify_code_signer` + `verify_time_stamper` + `verify_ocsp_responder` thin wrappers. None of those are DANE-relevant. But there's a parallel question for the eventual SMTP DANE wrapper (RFC 7672) \u2014 is there a verify_smtp_dane / verify_smtp_signer / similar that also takes DANE-default-on?\n\n## Why this matters\n\nRFC 7672 SMTP-DANE has the strongest production deployment of any DANE flavor. MTAs negotiating TLS routinely use SMTP-DANE for trust. A workspace adopting DANE-default for HTTPS but not SMTP would be incomplete.\n\n## Options\n\n- **A) Yes, verify_smtp_signer / verify_smtp_dane gains DANE-default-on under same Cargo feature.** SMTP and HTTPS share the resolver + DANE primitives; only the wrapper differs (RFC 7672 SMTP-DANE has slightly different semantics \u2014 opportunistic, MX-name-derived TLSA query).\n\n- **B) No, SMTP stays a separate decision.** Maybe in pkix-chain, maybe in a sibling pkix-smtp crate.\n\n- **C) Defer.** Decide when verify_smtp_signer is actually being designed.\n\n## Considerations\n\n- 'Encourage DANE to spread' applies equally (or more) to SMTP.\n- SMTP-DANE has known operational subtleties (MX records, DNSSEC down the chain, RFC 7672 \u00a73 query construction) that may warrant its own wrapper / crate.\n\n## Decision-gate\n\nHuman-labeled. Probably resolves when verify_smtp_signer work begins.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.6",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Decide whether verify_smtp_signer (PKIX-fmtv.13) also gets DANE-default-on",
+  "updated_at": "2026-05-13T00:20:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:24:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

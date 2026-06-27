@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: lint_runner cannot have a default impl \u2014 lints() returns &[Box<dyn Lint>] (borrows, not owned) while LintRunner::new() needs Vec<Box<dyn Lint>> (owned); the two methods use intentionally distinct instances (documented at cabf_tls_br.rs:556-565)",
+  "closed_at": "2026-05-07T04:49:44Z",
+  "compaction_level": 0,
+  "content_hash": "cc5217f92dba9eb3a6a29be69a5859d8f0108feee78386f3c03c9ef3445eec97",
+  "created_at": "2026-05-07T04:41:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs LintProfile trait (lines 858-872):\n\n    pub trait LintProfile: Profile {\n        fn lints(&self) -> &[Box<dyn Lint>];\n        fn lint_runner(&self) -> LintRunner;\n    }\n\nlint_runner() is a required method even though a sound default implementation can be derived from lints():\n\n    fn lint_runner(&self) -> LintRunner {\n        // Cannot provide a default because lints() returns &[Box<dyn Lint>] \u2014 we\n        // cannot clone Box<dyn Lint> without a Clone bound on Lint.\n        // However we could provide a default if Lint: Clone, or change lints() to\n        // return an iterator of fresh instances.\n    }\n\nThe current situation forces every implementor to write a boilerplate lint_runner() method that just calls all_lints() (see CabfTlsBrProfile). If the LintProfile contract were redesigned so that lints() returned a factory (e.g., fn lints(&self) -> Vec<Box<dyn Lint>>) rather than a reference to a static pool, a blanket default for lint_runner() would be trivially derivable.\n\nThe two methods returning different instances (static OnceLock for lints(), fresh allocation for lint_runner()) is also confusing to implementors and documented awkwardly.\n\nThis is a R7 / trait-design finding: requiring a method to be implemented manually when it should have a blanket default (or the two methods should be unified).\n\nCategory: R7 (missing Default impl / unnecessary required trait method)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.22",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: LintProfile::lint_runner has no default impl despite lints() already providing the data",
+  "updated_at": "2026-05-07T04:49:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:41:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f39404087cbe8a60061833055a5b2f909e9e081e257bdf1bf04cad63c2f33617",
+  "created_at": "2026-05-14T15:45:34Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1379-1454 implements OSCAL Profile parameter overrides as a two-phase clone-and-swap: phase 1 resolves every override to (lint_index, param_id) and fails fast on any unknown id; phase 2 clones every targeted lint, applies set_parameter to clones, then swaps clones in only on full success.\n\nDefense: the obvious alternative (mutate registered lints in place, abort on first error) leaves the runner in a partially-updated state when override N+1 rejects. The tests under PKIX-hy2e.6 atomicity_on_invalid_value_keeps_default/keeps_previous_commit lock the correct behavior. A future contributor who tries to 'simplify' by removing the clone-and-swap is wrong \u2014 they would reintroduce the partial-state bug under the rationale 'the clone is overhead'.\n\nWhat a contributor might suggest changing: drop the BTreeMap, mutate lints in place, return on first error. Counter-argument: this is the canonical 'atomic batch update' shape (clone-modify-swap), used in every transactional API from filesystem rename to SQL savepoints. The clone cost is bounded by the size of the override set; for OSCAL Profiles that is a handful per call. Memory cost is documented and acceptable.\n\nLock this in. Don't let it get refactored away.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.19",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "apply_parameter_overrides clone-and-swap atomicity (PKIX-hy2e.6)",
+  "updated_at": "2026-05-14T15:45:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9507d0b1b3c400b5054d7e7f8f252bf3e2cb7be676f3e803ccc2d021da91b4f7",
+  "created_at": "2026-05-14T18:01:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs lines 1521-1534:\n\n    match eku.0.as_slice() {\n        [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),\n        [_] => Err(Error::ProfileViolation {\n            reason: Cow::Borrowed(\n                \"TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 \u00a72.3)\",\n            ),\n        }),\n        _ => Err(Error::ProfileViolation {\n            reason: Cow::Borrowed(\n                \"TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 \u00a72.3)\",\n            ),\n        }),\n    }\n\nThe [_] and _ arms produce IDENTICAL ProfileViolation values. The two arms differ only structurally (the EKU has exactly one wrong OID vs more than one); the produced error is byte-identical.\n\nSUGGESTED REWRITE:\n\n    match eku.0.as_slice() {\n        [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),\n        _ => Err(Error::ProfileViolation {\n            reason: Cow::Borrowed(\n                \"TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 \u00a72.3)\",\n            ),\n        }),\n    }\n\nThe single wildcard arm covers '0 OIDs', '1 wrong OID', '2+ OIDs (any combination)' identically and produces the same error \u2014 which is what the existing code does in two arms anyway.\n\nIf a future enhancement wants to distinguish 'wrong sole OID' from 'multiple OIDs' in the error message, that's an additive change; collapsing now does not prevent it.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.11",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "enforce_timestamping_eku_critical_and_sole has two duplicate Err arms with identical reason strings",
+  "updated_at": "2026-05-14T18:01:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:01:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

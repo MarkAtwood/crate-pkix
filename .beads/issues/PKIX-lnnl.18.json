@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "abcf0f96fc0a10d368a9db745aafd87a3fda06da108ff942c58fc31e107cb292",
+  "created_at": "2026-05-14T19:43:56Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/crl.rs:325-358 (signature of new_with_signer_discovery):\n\n  pub fn new_with_signer_discovery(\n      crl_der: impl AsRef<[u8]>,\n      bundle: &[Certificate],\n      _cert_to_check: &Certificate,      // unused; see PKIX-lnnl.4\n      now_unix: u64,\n      verifier: V,\n  ) -> crate::Result<Self>\n\nIndependent of PKIX-lnnl.4 (which is about the parameter being a no-op): the API does not specify the contract BETWEEN bundle and cert_to_check.\n\nOpen questions a caller cannot resolve from the signature or rustdoc:\n\n1. **Must cert_to_check appear in bundle?**\n   The \u00a76.3.3(f) anchor-reachability walk starts at the discovered signer and walks UP toward a self-signed cert. It does not need cert_to_check. But naively, a caller composing this with chain validation might assume cert_to_check is the leaf, the bundle is the intermediates+root, and that pkix-revocation will sanity-check the relationship. It does not.\n\n2. **Must the bundle be the SAME bundle as the one used to validate cert_to_check's chain?**\n   If a caller built cert_to_check's chain using bundle A (containing certs [leaf, intermediate, root]) and then passes bundle B = [unrelated_ca, unrelated_self_signed] to new_with_signer_discovery, the discovery walks bundle B. There is no cross-check that bundle B is consistent with cert_to_check. A bundle providing a self-signed anchor for SOME unrelated party would still satisfy reaches_self_signed, returning Ok(checker) for a cert_to_check that belongs to an entirely different trust domain.\n\n   This is a real footgun. A caller mis-wiring 'the bundle' (say, accidentally re-using a prior chain's bundle) gets no error at construction time, only an eventual Error::CrlIssuerMismatch or signature failure at check_revocation time. The caller has no telemetry path to find their mistake.\n\n3. **What if cert_to_check itself is in bundle?**\n   No documented effect. core::ptr::eq guards in find_parent skip the cert itself, but only when the walk visits cert_to_check; reaches_self_signed starts at the discovered signer, not at cert_to_check. So if cert_to_check happens to be the CRL signer (unlikely but legal \u2014 a self-issued bridge), the walk would proceed correctly because the discovery routine returns cert_to_check by SKI, and reaches_self_signed sees self.subject == self.issuer if it's actually self-signed.\n\n4. **What if bundle is empty?**\n   discover_crl_signer returns None \u2192 CrlSignerNotFound. OK. But what about a bundle of one cert that IS the CRL signer but is also self-signed? Then discover_crl_signer returns it (DN or AKI match), reaches_self_signed returns true immediately, and check_revocation proceeds with that single cert acting as both signer and anchor. Documented? No. Likely correct behavior, but the API should say so.\n\nConcrete consequences if status quo ships:\n\n- A caller writing 'CRL-only revocation check' code (no chain, just 'is this cert revoked according to this CRL?') has to construct a synthetic bundle. The rustdoc gives no guidance. They will either include cert_to_check redundantly, omit it, or pass [] and get CrlSignerNotFound and not understand why.\n\n- A pkix-chain integration that uses path-builder output as the bundle is fine \u2014 but only because pkix-chain owns both sides. An external caller has none of that context.\n\nOptions:\n(A) Add a 'Contract' section to new_with_signer_discovery's rustdoc explicitly stating:\n   - bundle MUST contain (or transitively reach) the cert that signed the CRL\n   - bundle MUST contain a self-signed cert that is the anchor for the signer's chain\n   - cert_to_check does NOT have to appear in bundle (and discovery does not consult cert_to_check)\n   - the relationship between bundle and cert_to_check is NOT checked at construction; it is the caller's responsibility to ensure bundle is the right bundle for cert_to_check\n(B) PKIX-lnnl.4's option 2 (make cert_to_check meaningful \u2014 verify some property at construction) addresses part of this by adding a cross-check, but does not solve the bundle/cert_to_check relationship as a whole.\n\n(A) is the minimum acceptable; it converts an undocumented contract into a documented one. Combined with PKIX-lnnl.4 resolution this section probably grows by 10-15 lines.\n\nAcceptance: rustdoc on new_with_signer_discovery has an explicit 'Contract' or 'Caller responsibilities' subsection covering the four bullets above.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "new_with_signer_discovery: contract between bundle and cert_to_check is unspecified",
+  "updated_at": "2026-05-14T19:43:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:43:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

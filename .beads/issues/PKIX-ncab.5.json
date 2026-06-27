@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision A (rewrite with demotion header). OSCAL.md keeps factual reference content (model coverage, Rust<->OSCAL mappings, pinned schema version); stripped of 'source of truth'/'canonical' claims and reframed as 'OSCAL output format coverage'. Applied under PKIX-ncab.9.",
+  "closed_at": "2026-05-12T16:34:00Z",
+  "compaction_level": 0,
+  "content_hash": "5090f2cf646033733ef1e5d4dd4aaa6b255b0b7a93c0cd91171e9af304b93b98",
+  "created_at": "2026-05-12T02:20:43Z",
+  "created_by": "Mark Atwood",
+  "description": "`OSCAL.md` (13K) is a dedicated workspace doc framing OSCAL as the source of truth for lint catalogs, profile composition, deviations, and assessment findings. Cited from AGENTS.md (reference now removed), pkix-lint README, pkix-lint-cabf-refresh README.\n\nDecide:\n\n- **A) Rewrite** with prominent demotion header + reframe as \"OSCAL output support documentation\" (factual content about the emit/parse code remains useful).\n- **B) Move** to `historical/OSCAL.md` or similar; replace with a 1-line stub pointing there.\n- **C) Delete**; the audit content survives in git history.\n\nDownstream: .9 applies decision.\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of OSCAL.md",
+  "updated_at": "2026-05-12T16:34:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

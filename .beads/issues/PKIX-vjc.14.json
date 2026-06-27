@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented as CheckMode { Excluded, Permitted } enum replacing the require_match: bool parameter in check_name_constraints.",
+  "closed_at": "2026-05-05T04:52:22Z",
+  "compaction_level": 0,
+  "content_hash": "b8a62e7170e13ece27cc4a1f27fb87a253b4663a599a75b4d4449add78f44c7a",
+  "created_at": "2026-05-03T00:12:15Z",
+  "created_by": "Mark Atwood",
+  "description": "check_names (line 1385) takes a bool require_match that toggles between 'excluded check' and 'permitted check' semantics. The bool parameter forces the reader to track which value means which. Suggested rewrite: two separate functions check_excluded_names and check_permitted_names, or a two-variant enum ExcludedOrPermitted. The current closure also captures subject, san, and nc_constrained_types from the enclosing scope, making it hard to read in isolation.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_names closure with bool flag is an enum in disguise",
+  "updated_at": "2026-05-05T04:52:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

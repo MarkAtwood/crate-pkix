@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4a23bef98d807f14e7fca8901a730c917e63aec38bce87f66d19643ff26535b1",
+  "created_at": "2026-05-14T14:25:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:872-940 has build_signed_input_x509_entry (28 lines) and build_signed_input_precert_entry (25 lines). pkix-ct/src/verify.rs:784-835 has build_merkle_tree_leaf_x509_entry (23 lines) and build_merkle_tree_leaf_precert_entry (25 lines). All four functions share:\n- u8 version_v1\n- u8 fixed_type_byte (SIG_TYPE_CERTIFICATE_TIMESTAMP=0 or MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY=0; both happen to be 0)\n- u64 BE timestamp\n- u16 BE entry_type\n- (optional) 32 issuer_key_hash for precert_entry\n- u24 BE length prefix + body\n- u16 BE extensions length + extensions\n\nThe signed-input and merkle-tree-leaf forms differ ONLY in the second byte (signature_type vs leaf_type) \u2014 both currently encode as 0. The x509_entry and precert_entry forms differ only in entry_type and presence of issuer_key_hash.\n\nSuggested rewrite: one builder taking (mode_byte: u8, entry: EntryKind, sct: &SCT, body: &[u8]) where EntryKind is X509 | Precert([u8;32]). The four current functions become thin wrappers. Eliminates ~100 lines of near-duplicate code; the byte-1-distinction test (verify.rs:1283-1291) becomes a single assertion on the mode parameter.\n\nThe existing test merkle_tree_leaf_second_byte_is_leaf_type_not_signature_type explicitly notes the convergence; the code structure currently hides it. A unified builder makes the relationship clear.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Duplicate signed_input + merkle_tree_leaf builders share most of their byte layout but live in 4 separate functions",
+  "updated_at": "2026-05-14T14:25:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:25:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

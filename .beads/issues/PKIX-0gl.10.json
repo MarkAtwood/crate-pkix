@@ -1,0 +1,31 @@
+{
+  "close_reason": "decision captured in code doc comment",
+  "closed_at": "2026-05-02T22:35:59Z",
+  "compaction_level": 0,
+  "content_hash": "121e210956911e714cef19ec8962635afa07f77f346b4d780af39315bf5fa064",
+  "created_at": "2026-05-02T22:20:55Z",
+  "created_by": "Mark Atwood",
+  "description": "The doc comment implicitly defines three classes: (1) Handled now: UTF8String, PrintableString, IA5String, VisibleString. (2) Deferred with clear v0.2 strategy: BMPString, UniversalString. (3) Permanent byte-exact fallback: TeletexString. This taxonomy is valuable API documentation because it lets users infer: 'BMPString matching will change in v0.2; TeletexString will not.' Worth keeping and making explicit in v0.1 rustdoc.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DECISION: three-case taxonomy (handled now / deferred with strategy / permanent fallback) is valuable",
+  "updated_at": "2026-05-02T22:35:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

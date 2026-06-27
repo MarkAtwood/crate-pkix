@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T05:05:48Z",
+  "compaction_level": 0,
+  "content_hash": "83f40e29c3a190f8154aeded5c530a9a70c0ece1f47a31f0b1783b61bca2bf66",
+  "created_at": "2026-05-07T05:04:20Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-revocation/src/ocsp.rs, the outer doc comment for OcspChecker (lines 50-66) has inconsistent leading whitespace. Lines 50-62 have one extra leading space before ///, lines 63-64 have two extra leading spaces. These were introduced by the round 1 fix that added the check_revocation_against_anchor override bullet points. The compiler and rustdoc accept this without warning, but it is cosmetically inconsistent with the rest of the file where doc comments start at column 0. Fix: remove the leading spaces to normalize all /// lines in the struct doc block.",
+  "ephemeral": 0,
+  "id": "PKIX-jkfp",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ocsp.rs: stray leading spaces before /// in struct doc (cosmetic)",
+  "updated_at": "2026-05-07T05:05:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T22:04:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kimp",
+      "metadata": {},
+      "type": "discovered-from"
+    }
+  ]
+}

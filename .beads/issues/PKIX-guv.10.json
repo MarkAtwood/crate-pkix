@@ -1,0 +1,31 @@
+{
+  "close_reason": "Design decision recorded \u2014 bidirectional AVA matching is correct and worth defending.",
+  "closed_at": "2026-05-02T20:16:24Z",
+  "compaction_level": 0,
+  "content_hash": "c3e7a4336bb4fc388f932d59df592018fa07d9045522db24b2f5b1342874f25d",
+  "created_at": "2026-05-02T20:12:25Z",
+  "created_by": "Mark Atwood",
+  "description": "names_match checks both directions (every a_ava in b, every b_ava in a). Single-direction check would incorrectly accept a={CN=Alice, CN=Alice} matching b={CN=Bob, CN=Alice} if forward-only. The bidirectional check handles this correctly. The O(n\u00b2) cost per RDN is acceptable (n=1-5 AVAs in practice). A contributor might suggest 'just check forward'. Correct response: show the malformed-cert example in the comment.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Bidirectional AVA matching in names_match: correct set semantics",
+  "updated_at": "2026-05-02T20:16:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:12:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

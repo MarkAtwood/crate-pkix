@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "defined pkix_revocation::Error with Revoked+Unavailable variants, Display, and Result alias; updated RevocationChecker and NoRevocation to return crate::Result; removed use pkix_path::Result",
+  "closed_at": "2026-05-02T06:28:46Z",
+  "compaction_level": 0,
+  "content_hash": "7a0f5f49f47e203c0dfa4149660cb71336fcbdf01b7a39bbdb41ba0b4f9548dd",
+  "created_at": "2026-05-02T05:45:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:41 -- RevocationChecker::check_revocation returns pkix_path::Result<()>, but pkix_path::Error has no Revoked variant. When CrlChecker or OcspChecker is implemented there will be no type-safe way to express certificate revocation. Fix requires: (1) define pkix_revocation::Error with at minimum a Revoked { index: usize } variant, (2) change RevocationChecker::check_revocation to return core::result::Result<(), pkix_revocation::Error>, (3) add pkix_chain::Error as a combined enum with Path(pkix_path::Error) and Revocation(pkix_revocation::Error) variants, (4) change pkix_chain::verify_chain return type to Result<ValidatedPath, pkix_chain::Error>. Currently pkix-chain re-exports pkix_path::Error as its own error which will break as soon as revocation errors exist.",
+  "ephemeral": 0,
+  "id": "PKIX-b9z",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RevocationChecker returns pkix_path::Result but pkix_path::Error has no Revoked variant",
+  "updated_at": "2026-05-02T06:28:46Z"
+}

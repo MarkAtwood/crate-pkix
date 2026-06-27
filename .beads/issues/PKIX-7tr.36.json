@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:03:17Z",
+  "compaction_level": 0,
+  "content_hash": "8587b116393c465d7e4f064481b22b7a79abf63fe4b45e06dc998d9eda718fad",
+  "created_at": "2026-05-02T13:42:50Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 127: info.revocation_reason.map(|r| r as u8). The revocation_reason field type comes from x509-ocsp/x509-cert; if CrlReason is #[repr(u32)] (as confirmed from crl.rs), then r as u8 silently truncates any value >255. Defined values are 0-10 and all fit in u8, but the cast is semantically unsound for the same reason as in crl.rs. Should use u32 or match explicitly to a u8 with a fallback.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.36",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker reason_code cast: CertStatus::Revoked reason uses r as u8",
+  "updated_at": "2026-05-02T14:03:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

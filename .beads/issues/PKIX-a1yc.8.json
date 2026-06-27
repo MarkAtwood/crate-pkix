@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "UreqFetcher impl added behind 'client-ureq' feature. ureq 3.x workspace-pinned with default-features=false + features=['rustls'] for HTTPS without cookies/brotli/charset/native-tls bloat. Maps ureq::Error::StatusCode->FetchError::HttpStatus, other ureq errors->Transport. Body read with Read::take(limit+1) to detect TooLarge cleanly. Default 10 MiB cap; with_max_response_size and with_agent builder methods. Tests are compile-shape + constructor; full HTTP behavior tests deferred to PKIX-a1yc.9 (mock-server). Committed at db036a0c.",
+  "closed_at": "2026-05-09T00:53:28Z",
+  "compaction_level": 0,
+  "content_hash": "ae7685bec502d17a4bbbf03c44e994b8f584d1ed04b1ea599d8f1a2689e8a848",
+  "created_at": "2026-05-08T23:29:25Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe crate's RevocationFetcher trait is meant to be pluggable, but consumers want to drop in a working backend. `ureq` is the right reference choice for the sync path:\n- pure Rust (no openssl-sys / native-tls C dep complexity)\n- small dep tree (vs reqwest blocking which pulls tokio runtime + hyper)\n- MSRV-friendly\n- straightforward HTTP/1.1 GET/POST API\n\n## What\n\nFeature-gated module `pkix_revocation_http::clients::ureq`:\n\n```toml\n[features]\nclient-ureq = [\"dep:ureq\"]\n[dependencies]\nureq = { version = \"...\", optional = true, default-features = false, features = [\"tls\"] }  # exact featureset TBD\n```\n\n```rust\n#[cfg(feature = \"client-ureq\")]\npub struct UreqFetcher {\n    agent: ureq::Agent,\n    max_response_size: usize,    // default 10 MiB\n}\n\n#[cfg(feature = \"client-ureq\")]\nimpl UreqFetcher {\n    pub fn new() -> Self;\n    pub fn with_agent(agent: ureq::Agent) -> Self;\n    pub fn with_max_response_size(self, n: usize) -> Self;\n}\n\n#[cfg(feature = \"client-ureq\")]\nimpl RevocationFetcher for UreqFetcher {\n    fn fetch(&self, req: &FetchRequest) -> Result<FetchResponse, FetchError> {\n        // Translate FetchRequest -> ureq::Request, set Content-Type for POST,\n        // bound response read with max_response_size, return bytes.\n    }\n}\n```\n\nMap ureq errors to FetchError variants:\n- network/transport: FetchError::Transport(Box::new(err))\n- non-2xx: FetchError::HttpStatus(status)\n- response body exceeded max_response_size: FetchError::TooLarge\n\n## Acceptance\n\n- [ ] UreqFetcher works with both GET (CRL) and POST (OCSP).\n- [ ] Content-Type header set on POST requests.\n- [ ] Response size bounded; exceeding triggers TooLarge.\n- [ ] Status code 200 -> Ok; non-2xx -> Err(HttpStatus).\n- [ ] Mock-server integration test (PKIX-a1yc.9) uses this.\n- [ ] No `unsafe`. ureq's TLS featureset chosen to avoid C deps if possible.\n\n## Out of scope\n\n- Async (PKIX-a1yc.10).\n- HTTP/2 (rare in OCSP/CRL deployments; not blocking).\n- Custom proxy / cert-pinning configuration (consumer can pass a pre-built ureq::Agent).\n\n## Effort\n\n~120 lines + tests.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Reference sync HTTP client impl (ureq feature)",
+  "updated_at": "2026-05-09T00:53:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:29:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

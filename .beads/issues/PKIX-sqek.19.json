@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c386adb6bf4e2ef1be07b6dcd02a4a34b329658b382d452b5cf7ea2600991efc",
+  "created_at": "2026-05-14T18:08:30Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:426:\n\n    pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {\n        anchors: &'a [TrustAnchor],\n        sig_verifier: &'a V,\n        rev_checker: &'a R,\n        policy: &'a ValidationPolicy,\n        aia: &'a A,\n    }\n\nThe three trait generics V/R/A are named in the public type. Every caller spelling `Verifier<'_, V, R, A>` (or even `Verifier<'_, DefaultVerifier, NoRevocation, NoAiaFetcher>`) \u2014 including the workspace's own tests \u2014 depends on the three-generic shape.\n\nWHY IT MATTERS FOR THE CALLER:\n\nThe workspace's stated architectural model (AGENTS.md crate-stack description for pkix-chain): \"A: AiaFetcher = NoAiaFetcher 3rd generic is the third trust-domain callback alongside SignatureVerifier (signatures) and RevocationChecker (revocation)\". This is the **complete** trust-domain seam *as currently conceived*. But the workspace also has live skeleton crates for adjacent trust-domain concerns:\n\n- `pkix-ct` (RFC 6962 SCT verification) \u2014 naturally wants a per-cert `LogVerifier`-style callback to decide whether an SCT chain is acceptable for the active anchors.\n- `pkix-dane` (RFC 6698 TLSA matching) \u2014 naturally wants a `TlsaLookup`-style callback.\n- `pkix-composite` (PQC composite signatures) \u2014 naturally wants extended verifier dispatch.\n\nAny of these landing on `Verifier` is a breaking change to the public generic list. Callers update from `Verifier<'_, V, R>` to `Verifier<'_, V, R, A, C>` (or whatever shape) and every wrapper signature changes.\n\nThis is the canonical \"trait bounds on public methods that constrain callers to specific upstream implementations\" leakage shape from the slash-command checklist. The fix shapes are well-known:\n\n(a) **Builder/configurator pattern.** `Verifier::new(anchors, policy).with_signature_verifier(V).with_revocation(R).with_aia(A).build()`. New seams add new `.with_*` methods; the type stays `Verifier<'a>` (or a `Verifier<'a, Phase>` if you want typestate). Adding a 4th seam is non-breaking.\n\n(b) **Single bundled trait.** `pub trait ChainBackend { type Verifier; type Revocation; type Aia; ... }` and `Verifier<'a, B: ChainBackend>`. Adding an associated type to `ChainBackend` IS breaking, but it relocates the change to ONE trait the caller has likely impl'd just once.\n\n(c) **Type-state separation.** A single Verifier owning trait-object refs (`&'a dyn SignatureVerifier`, etc.) loses static dispatch (a real cost for the hot signature-verify path) but presents a stable signature.\n\nThe doctest at lines 47-63 already commits to `Verifier::new_no_aia(...)` returning a `Verifier<'_, &DefaultVerifier, &NoRevocation>`-shaped type \u2014 so a refactor to (a) or (b) needs to keep this construction shape working.\n\nPRE-1.0 FRAMING (AGENTS.md): breaking changes are free; architectural completeness is the target. Picking (a) or (b) now costs one breaking-change minor bump and forecloses on the lock-in. Shipping `Verifier<'a, V, R, A>` at 1.0 means future trust-domain seams require a 2.0.\n\nThis is closely related to PKIX-sqek.4 (wrappers cannot opt into AIA) \u2014 fixing the wrapper-genericity issue surfaces the same shape question on the wrapper functions. A unified shape for both moves the right way.\n\nFiled as priority 1 because the cost of getting it wrong post-1.0 is a major version bump across the entire crate stack.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier exposes three named trait generics (V, R, A) \u2014 adding a 4th trust-domain seam later breaks every caller",
+  "updated_at": "2026-05-14T18:08:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:08:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

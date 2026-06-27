@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:31:23Z",
+  "compaction_level": 0,
+  "content_hash": "460dc5fac897d47d15366cda760069d8f125786ac082311a8416a819730de224",
+  "created_at": "2026-05-06T20:16:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs \u2014 check_revocation (lines 91-216) and check_revocation_against_anchor (lines 234-336) are almost identical 100-line functions. The only difference is whether the issuer identity comes from a Certificate or a TrustAnchor. Similarly in crl.rs. This violates DRY and makes bugs more likely (e.g., a fix applied to one method but not the other). Refactor: extract a helper that takes (issuer_subject: &Name, issuer_spki: &SubjectPublicKeyInfoOwned) and call it from both methods.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP check_revocation duplicates full parse-verify-check logic with check_revocation_against_anchor",
+  "updated_at": "2026-05-06T20:31:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:16:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

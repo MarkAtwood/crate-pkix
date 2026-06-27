@@ -1,0 +1,45 @@
+{
+  "closed_at": "2026-05-11T16:51:56Z",
+  "compaction_level": 0,
+  "content_hash": "8a69f82a6c8d6b63381ebc8f93940822bac5e9e2d5993472f6c5458224423091",
+  "created_at": "2026-05-11T05:45:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nCA/B Forum-specific lint bundles (`cabf.br.tls`, `cabf.br.smime`, SC-081 enforcement, etc.) get moved out of `pkix-lint` proper and into a sibling crate with the same reference-not-authoritative framing as `pkix-profiles-cabf`.\n\n## What\n\n1. Create new workspace member `pkix-lint-cabf/` (Cargo.toml, src/lib.rs, README.md).\n2. Cargo.toml deps: `pkix-lint` (framework), `x509-cert`, etc.\n3. Crate-level rustdoc header:\n\n   > # pkix-lint-cabf\n   >\n   > **Reference lint bundles for CA/B Forum Baseline Requirements. Not authoritative.**\n   >\n   > Lint rules in this crate are a snapshot of CA/B Forum BR requirements at the time of the most recent revision. CA/B Forum ballots regularly add, remove, or alter requirements; the bundles here will lag. They are intended as a starting point: fork and adapt to your deployment's current interpretation of the BR text.\n   >\n   > For the current Baseline Requirements: see https://cabforum.org/.\n   >\n   > Maintained on a best-effort basis. Production lint policies SHOULD be authored and reviewed against the live BR text by the consuming organization.\n\n4. README.md mirrors the rustdoc header.\n\n5. Move the following from `pkix-lint`:\n   - Anything keyed off a CA/B Forum ballot number (SC-081, etc.).\n   - `cabf.br.tls` / `cabf.br.smime` lint rule definitions.\n   - Any `EvaluationReport::new(\"cabf.br.tls\", ...)` test fixtures and example values that pin to CA/B Forum bundle identifiers (the `rule_bundle_version` field stays generic in `pkix-lint` rustdoc; examples may move).\n\n6. RFC-conformance lints stay in `pkix-lint` (RFC 5280, RFC 6960, RFC 4518 violations).\n\n## Acceptance\n\n- [ ] `pkix-lint-cabf` builds cleanly in the workspace.\n- [ ] `cargo check --workspace --all-features` clean.\n- [ ] Rustdoc header carries the not-authoritative caveat verbatim.\n- [ ] All cabf.br.* lints import from this crate, not from `pkix-lint`.\n- [ ] Existing tests move with the code and still pass.\n- [ ] Cargo.toml workspace member list updated.\n- [ ] Crate version 0.1.0 with publication metadata.\n\n## Out of scope\n\n- Refactoring `pkix-lint` itself to strip the moved content \u2014 that's PKIX-amgn.5.\n\n## Depends on\n\nPKIX-amgn.1 (stance anchor).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.3",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "OSCAL alignment retrofit (2026-05-11, per PKIX-ztmr stance): content of pkix-lint-cabf MUST be authored AS an OSCAL Catalog + Profile pair, not as a bespoke Rust struct collection. Specifically: the cabf lint rules become OSCAL Controls in a Catalog; cabf.br.tls becomes an OSCAL Profile selecting from that Catalog. This bead now depends on PKIX-9vnx.7 (Profile composition mechanism must exist before authoring cabf.br.tls as a Profile). The 'reference, not authoritative' rustdoc header text stays \u2014 it's about authoritativeness of the policy snapshot, orthogonal to the OSCAL data shape.\nClosed 2026-05-11: stub crate created. Scope reduced to match PKIX-amgn.2 (scope X \u2014 empty skeleton only).\n\n- Crate exists at pkix-lint-cabf/ with Cargo.toml + src/lib.rs + README.md.\n- Crate-level rustdoc carries the not-authoritative caveat verbatim.\n- README.md mirrors the rustdoc header.\n- Workspace Cargo.toml updated (members + workspace.dependencies entry at 0.1.0).\n- cargo check --workspace --all-features clean.\n- cargo publish --dry-run -p pkix-lint-cabf clean.\n\nThe original blocking dependency on PKIX-9vnx.7 (Profile composition via OSCAL) is dissolved \u2014 that machinery is needed for the substantive content (lint bundles authored as OSCAL Profiles), which lands in PKIX-amgn.5, not in the stub crate creation.\n\nPublication to crates.io is a maintainer action; see top-level summary for cargo publish command.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-lint-cabf workspace crate (reference, not authoritative)",
+  "updated_at": "2026-05-11T16:51:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:56:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T22:45:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

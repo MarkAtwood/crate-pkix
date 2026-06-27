@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:57:57Z",
+  "compaction_level": 0,
+  "content_hash": "138c76333d270e01672044cff46ee32200f69bd33a77864c5f392147bc8b21bb",
+  "created_at": "2026-05-07T03:54:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs:38 \u2014 A private de_cow_static function is defined in report.rs that is byte-for-byte identical to the crate-level de_cow_static in lib.rs (lib.rs:141). The report.rs copy shadows the crate-level one because it is in a sibling module. If the two implementations ever diverge, serde round-trips for EvaluationReport fields will silently use different deserialization logic than Finding fields. Fix: remove the duplicate in report.rs and use crate::de_cow_static (or pub(crate) it from lib.rs).",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_cow_static duplicated in report.rs vs lib.rs",
+  "updated_at": "2026-05-07T03:57:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:54:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

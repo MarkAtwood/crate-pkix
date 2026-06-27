@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:08Z",
+  "compaction_level": 0,
+  "content_hash": "b0e0e41871640cbff733184e8c6654001986bab5c9a71e0de89620403560ef69",
+  "created_at": "2026-05-07T20:28:14Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-chain-simple/src/lib.rs:466`:\n\n```rust\nconst _: () = assert!(\n    MAX_INTERMEDIATES <= u8::MAX as usize,\n    \"MAX_INTERMEDIATES must fit in u8\"\n);\n```\n\nInside `verify_simple()`, this `const _` assertion appears mid-function after several statements. Clippy: `clippy::items_after_statements`.\n\n## Why this matters\n\n`const _` is hoisted to compile time regardless of where it's written, so placing it inside the function body suggests it's \"guarding the next statement\" \u2014 but it actually fires at the top of the crate. Readers may wonder if this is a runtime check that conditionally executes.\n\n## Fix\n\nHoist to module scope:\n\n```rust\n// At the top of the module, near MAX_INTERMEDIATES definition:\nconst _: () = assert!(\n    MAX_INTERMEDIATES <= u8::MAX as usize,\n    \"MAX_INTERMEDIATES must fit in u8\"\n);\n\n// inside verify_simple(): just use MAX_INTERMEDIATES as u8 with the existing #[allow]\n```\n\n## Priority\n\nP4 \u2014 readability nit.\n",
+  "ephemeral": 0,
+  "id": "PKIX-t9a8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: const _ assertion mid-function in pkix-chain-simple verify_simple (clippy::items_after_statements)",
+  "updated_at": "2026-05-07T21:49:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

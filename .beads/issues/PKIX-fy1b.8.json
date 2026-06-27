@@ -1,0 +1,31 @@
+{
+  "close_reason": "deferred: de_static_str leak is fully documented; runtime guard is design decision; out of scope for this review pass",
+  "closed_at": "2026-05-07T04:44:12Z",
+  "compaction_level": 0,
+  "content_hash": "9988f29ab21254f5a0b4598a57d17cc26218991bcca81c8b310df2b6b44517c5",
+  "created_at": "2026-05-07T04:36:57Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-lint/src/lib.rs line 134, the de_static_str helper leaks one heap allocation per unique deserialized LintResult detail string. The documentation is thorough (lines 116-130), but there is no runtime protection against misuse in long-running services. A reasonable mitigation \u2014 at minimum a compile-time #[cfg] guard, a feature gate, or a bounded LRU interning table \u2014 would prevent silent OOM in daemon processes. The current design relies entirely on the caller reading the doc comment. This is a P2 API design issue, not just a style note.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.8",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_static_str memory leak in long-running services has no runtime guard or metric",
+  "updated_at": "2026-05-07T04:44:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

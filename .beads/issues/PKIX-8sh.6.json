@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented bidirectional AVA matching in names_match (a\u2286b AND b\u2286a). This correctly rejects {CN=Alice,CN=Alice} vs {CN=Bob,CN=Alice} where old .any() gave a false positive. O(n\u00b2) on AVA count; n\u22645 in practice; no heap needed. All 28 pkix-path unit tests pass.",
+  "closed_at": "2026-05-02T18:43:02Z",
+  "compaction_level": 0,
+  "content_hash": "6406fbf0ec445e33d66024e4158261bc67b8e825bbe3e57d32c10031354186b6",
+  "created_at": "2026-05-02T18:31:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs names_match(): the .any() loop checks that every AVA in a_rdn has a matching AVA in b_rdn, but it allows the same b_rdn entry to satisfy multiple a_rdn entries. Concrete trigger: a_rdn={CN=Alice, CN=Alice} (duplicate CN) with b_rdn={CN=Bob, CN=Alice} (len=2, count check passes). For the first a_ava=CN=Alice, .any() finds CN=Alice in b_rdn \u2192 true. For the second a_ava=CN=Alice, .any() again finds CN=Alice in b_rdn \u2192 true. Result: the two different RDNs are incorrectly considered equal. This requires an adversarially crafted cert with a duplicate OID in one RDN. While RFC 5280 \u00a75.1.2.4 says SHOULD NOT, the library processes untrusted input. A name collision could allow a forged intermediate cert's subject to match a trust anchor's name. Fix: use bijective (matched-pair) set comparison for RDN AVAs.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "names_match not bijective for RDNs with duplicate-OID AVAs",
+  "updated_at": "2026-05-02T18:43:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Async fetcher trait family landed. New module src/async_fetcher.rs defines AsyncRevocationFetcher, AsyncRevocationChecker, AsyncHttpCrlFetcher, AsyncHttpOcspFetcher (gated on async feature). Per-protocol impls in src/async_crl.rs and src/async_ocsp.rs mirror the sync impls exactly. Reference reqwest async backend at src/clients/reqwest.rs (gated on client-reqwest-async). 17 new tests: 8 async unit (crl) + 8 async unit (ocsp) + 1 trait-shape + 9 integration (wiremock-backed) \u2014 total suite 80 tests passing. Architectural choice: Option C (AsyncRevocationChecker in pkix-revocation-http, NOT pkix-revocation core) \u2014 keeps the core revocation crate sync-only and async-machinery-free. Tokio is dev-only crate dep, not workspace dep, matching parent acceptance. async-trait used (MSRV 1.73 precludes native async-fn-in-traits). All feature combos (cargo hack --depth 2) green; clippy clean; rustdoc -D warnings clean; typos clean; fmt clean. See bd memory pkix-a1yc-10-architectural-decision-option-c-asyncrevocation for design rationale.",
+  "closed_at": "2026-05-11T03:36:06Z",
+  "compaction_level": 0,
+  "content_hash": "d13349588fb29f21b2aeeb7869cf439b8091570543ec9285fc4c54bdc481f700",
+  "created_at": "2026-05-08T23:30:08Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nParent acceptance criterion: 'HTTP client is fully pluggable; trait is async-aware (use async-trait or similar). Both sync and async reference impls exist.'\n\nThe sync RevocationFetcher (PKIX-a1yc.1) covers blocking consumers. Async consumers (tokio-based services, axum/tower stacks) want to fetch CRLs/OCSP without spawning blocking-pool threads.\n\n## Architectural decision needed up front\n\npkix-revocation::RevocationChecker is **sync only** by trait surface. Three options:\n\n### Option A: Add an AsyncRevocationChecker analogue, keep two RevocationChecker impls.\n- pkix-revocation gains an async trait (or pkix-revocation-http defines it locally).\n- HttpCrlFetcher (sync) impls RevocationChecker; AsyncHttpCrlFetcher (async) impls AsyncRevocationChecker.\n- pkix-chain must learn the async trait too OR consumers handle async separately.\n\n### Option B: Async fetcher, sync HttpCrlFetcher that internally block_on.\n- AsyncRevocationFetcher is the async trait.\n- HttpCrlFetcher<F: AsyncRevocationFetcher> impls sync RevocationChecker by .block_on'ing internally \u2014 but block_on inside an async runtime is a foot-gun.\n- Not recommended.\n\n### Option C: Two parallel struct families.\n- HttpCrlFetcher<F: RevocationFetcher> (sync, sync trait impl)\n- AsyncHttpCrlFetcher<F: AsyncRevocationFetcher> (async, separate async trait that pkix-chain doesn't know about \u2014 consumer wraps it).\n- Most pragmatic; aligns with how reqwest's blocking + async clients coexist.\n\n**Recommend Option C** \u2014 confirm in implementation.\n\n## What\n\n1. Async analogue of RevocationFetcher:\n   ```rust\n   #[async_trait::async_trait]\n   pub trait AsyncRevocationFetcher {\n       async fn fetch(&self, req: &FetchRequest)\n           -> Result<FetchResponse, FetchError>;\n   }\n   ```\n\n2. Async analogue of RevocationChecker (lives in pkix-revocation-http; not in pkix-revocation core):\n   ```rust\n   #[async_trait::async_trait]\n   pub trait AsyncRevocationChecker {\n       async fn check_revocation(&self, cert, issuer) -> Result<(), Error>;\n       async fn check_revocation_against_anchor(&self, cert, anchor) -> Result<(), Error>;\n   }\n   ```\n\n3. AsyncHttpCrlFetcher and AsyncHttpOcspFetcher wrappers.\n\n4. Reference `reqwest` async impl (feature `client-reqwest-async`).\n\n## Acceptance\n\n- [ ] Architectural decision recorded in crate-level doc (which Option, why).\n- [ ] AsyncRevocationFetcher trait + AsyncHttpCrlFetcher + AsyncHttpOcspFetcher.\n- [ ] reqwest async ref impl works.\n- [ ] Async integration tests (similar to PKIX-a1yc.9 but tokio-based with httpmock or wiremock).\n- [ ] No tokio dep at workspace level if avoidable; if required, gated behind the async client feature.\n\n## Depends on\n\nPKIX-a1yc.5 + PKIX-a1yc.6 (sync impls land first; async piggybacks on the same extraction helpers).\n\n## Effort\n\n~300 lines + tests.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.10",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Async fetcher trait + reqwest async reference impl",
+  "updated_at": "2026-05-11T03:36:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:30:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

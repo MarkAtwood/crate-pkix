@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "75352c961f12472302ff2423196b5dc0af2fee62cd0cf5015ac2c8eb04a0c5f5",
+  "created_at": "2026-05-14T14:25:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:636 \u2014 `let mut fn_ = proof.leaf_index;` \u2014 the name `fn_` is chosen because `fn` is a Rust keyword. The whole verify_inclusion_inner function uses `fn_` and `sn` (the RFC 9162 \u00a72.1.3.2 notation: leaf_index becomes fn, tree_size-1 becomes sn). Mathematical notation matters in this algorithm \u2014 it makes the per-iteration invariants easy to check against the RFC.\n\nBut `fn_` is jarring. Suggested rename: `f` (for \"fn\" without the keyword collision) or `idx` (matches Rust idiom) or `node_idx`. The RFC notation is preserved in a comment block at the top of the function showing the variable mapping.\n\nThis is taste \u2014 the existing code is correct and the RFC-notation match is genuine. Marked opinion. Listing only because the convention currently puts an underscore-suffix on an internal variable that has no other namesake to disambiguate from. If anything is to change, simpler to drop to `f` than to keep `fn_`.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "fn_ variable name in verify_inclusion_inner is awkward \u2014 fn is a keyword so the trailing underscore reads as a hack",
+  "updated_at": "2026-05-14T14:25:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:25:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

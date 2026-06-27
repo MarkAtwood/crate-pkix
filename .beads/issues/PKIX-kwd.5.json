@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:11Z",
+  "compaction_level": 0,
+  "content_hash": "ac9b2365037bcfdd05b7b605c4b003cbb6ffe2d86f91d73ee503a5fe688c2368",
+  "created_at": "2026-05-06T15:11:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs check_revocation(): At line 231, the delta CRL issuer is checked against cert.tbs_certificate.issuer (the certificate being checked). This is the SAME check as line 167 for the base CRL. However, RFC 5280 \u00a75.2.4 requires that the delta CRL and base CRL be issued by the SAME CA. The with_delta() constructor validates this at construction time (line 137), but check_revocation() independently re-checks the delta issuer against cert.issuer rather than against the already-verified base CRL issuer. If the base CRL matches cert.issuer AND the delta CRL matches cert.issuer, those two separate checks don't guarantee base and delta have the same issuer (they do transitively since both equal cert.issuer, but this is the same check duplicated). The real concern: if an attacker somehow supplies a delta CRL from a different CA whose issuer happens to match cert.issuer but NOT base CRL issuer, the per-call check at line 231 would accept it. The with_delta() constructor guards this, but check_revocation() should cross-check delta.issuer == base_crl.issuer for defense-in-depth. Minor issue since with_delta() already enforces this.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "The with_delta() constructor already enforces base.issuer == delta.issuer, and check_revocation() verifies base.issuer == cert.issuer. Transitively this guarantees delta.issuer == cert.issuer. Line 231 check is a defense-in-depth redundancy, not a bug. Reclassified to P3 (code clarity/defense-in-depth opportunity).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "delta CRL issuer check uses cert issuer instead of CRL issuer cross-check",
+  "updated_at": "2026-05-06T15:35:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:11:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

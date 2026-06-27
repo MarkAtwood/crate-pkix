@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f4a93c6665fea3cd13548149be813ec4432c4de70922a3119b7878f7687c70ae",
+  "created_at": "2026-05-14T14:56:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/aia_extract.rs:82-89 (`is_http_scheme`) tests an ASCII-case-insensitive scheme prefix with a hand-rolled closure that zips each byte through .to_ascii_lowercase() and compares with Iterator::eq:\n\n    let lower_prefix = |p: &str| {\n        uri.len() > p.len()\n            && uri.as_bytes()[..p.len()]\n                .iter()\n                .map(|b| b.to_ascii_lowercase())\n                .eq(p.bytes())\n    };\n    lower_prefix(\"http://\") || lower_prefix(\"https://\")\n\nIdiomatic Rust uses <[u8]>::eq_ignore_ascii_case (stable since 1.23) or str::eq_ignore_ascii_case. The case-fold-and-zip pattern obscures intent \u2014 a reader has to puzzle out that the iterator chain is just an ASCII-case-insensitive byte compare. A direct rewrite is:\n\n    fn is_http_scheme(uri: &str) -> bool {\n        let b = uri.as_bytes();\n        (b.len() > 7 && b[..7].eq_ignore_ascii_case(b\"http://\"))\n            || (b.len() > 8 && b[..8].eq_ignore_ascii_case(b\"https://\"))\n    }\n\nor, leaning on str::get for bounds-safe indexing:\n\n    fn is_http_scheme(uri: &str) -> bool {\n        uri.get(..8).is_some_and(|p| p.eq_ignore_ascii_case(\"https://\"))\n            || uri.get(..7).is_some_and(|p| p.eq_ignore_ascii_case(\"http://\"))\n    }\n\nCost of leaving it: clarity and grep-ability. A grep for eq_ignore_ascii_case (a well-known stdlib API) misses this call site; the next person who needs to add a scheme has to re-derive the closure semantics before extending it. Functionally equivalent.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "is_http_scheme uses manual case-fold zip instead of <[u8]>::eq_ignore_ascii_case",
+  "updated_at": "2026-05-14T14:56:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:56:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

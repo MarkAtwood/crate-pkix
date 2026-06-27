@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:39:23Z",
+  "compaction_level": 0,
+  "content_hash": "f4f363afb244097ada1dfc4496d7ed380a4bf2bd339be56bd43f21c24ef67968",
+  "created_at": "2026-05-02T23:21:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd acceptance tests for NameConstraints using PKITS \u00a74.13 test vectors in pkix-path/tests/.\n\n## Algorithm\nUse the existing PKITS helper infrastructure (pkits_helper.rs) and the cert files already present in tests/pkits/certs/.\n\nCover all 38 PKITS \u00a74.13 sub-tests:\n- \u00a74.13.1\u20134.13.5: Valid/invalid path with permitted DN subtrees\n- \u00a74.13.6\u20134.13.11: Valid/invalid path with excluded DN subtrees\n- \u00a74.13.12\u20134.13.14: Permitted subtrees (RFC 822 names)\n- \u00a74.13.15\u20134.13.17: Excluded subtrees (RFC 822 names)\n- \u00a74.13.18\u20134.13.20: Permitted + excluded combination\n- \u00a74.13.21\u20134.13.26: RFC 822 name constraints\n- \u00a74.13.27\u20134.13.29: DN + RFC 822 combined\n- \u00a74.13.30\u20134.13.33, \u00a74.13.38: DNS name constraints\n- \u00a74.13.34\u20134.13.37: URI constraints (if implemented; mark ignored if not)\n\nEach test: load cert chain, call validate_path with PKITS_NOW, assert Ok or Err(NameConstraintViolation).\n\n## Test oracle\nPKITS \u00a74.13 specifies which sub-tests must pass (valid paths) and which must fail.\nAll cert files are in tests/pkits/certs/ (confirmed present in research phase).\n\n## Acceptance criteria\n- All PKITS \u00a74.13 valid-path tests return Ok\n- All PKITS \u00a74.13 invalid-path tests return Err(pkix_path::Error::NameConstraintViolation { .. })\n- No tests skipped unless URI support is explicitly out of scope for v0.1\n- Depends on: PKIX-fr4 (wire-in)",
+  "ephemeral": 0,
+  "id": "PKIX-lw8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add PKITS \u00a74.13 name constraints acceptance tests",
+  "updated_at": "2026-05-02T23:39:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fr4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features -- tests_policy_fields exits 0 with all alg_allowlist tests passing. Assertions use matches! with specific or wildcard index patterns.",
+  "assignee": "Mark Atwood",
+  "close_reason": "4 allowed_signature_algs tests added for P-256 chain; RSA chain tests in tests_policy_fields_rsa. All pass.",
+  "closed_at": "2026-05-06T04:59:30Z",
+  "compaction_level": 0,
+  "content_hash": "d7c790d683593c0564fef7c407337056b2cc76be51aee6dd8c1ae08ab86f8feb",
+  "created_at": "2026-05-06T03:45:23Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add unit tests for the `allowed_signature_algs` policy field in `pkix-path`.\n\n**Algorithm:**\nTests go in `mod tests_policy_fields` in `pkix-path/src/lib.rs`.\n\nOID constants:\n```rust\nconst ECDSA_SHA256_OID: ObjectIdentifier =\n    ObjectIdentifier::new_unwrap(\"1.2.840.10045.4.3.2\");\nconst RSA_SHA256_OID: ObjectIdentifier =\n    ObjectIdentifier::new_unwrap(\"1.2.840.113549.1.1.11\");\nconst SHA1_RSA_OID: ObjectIdentifier =\n    ObjectIdentifier::new_unwrap(\"1.2.840.113549.1.1.5\");  // forbidden by BR\n```\n\n**Test 1: `alg_allowlist_passes_when_oid_in_list`**\n- Load chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku (all P-256 ecdsa-sha256)\n- Policy: `allowed_signature_algs = Some(vec![ECDSA_SHA256_OID])`\n- Assert: `result.is_ok()`\n\n**Test 2: `alg_allowlist_fails_when_oid_not_in_list`**\n- Load chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku\n- Policy: `allowed_signature_algs = Some(vec![RSA_SHA256_OID])` (only RSA allowed, but chain uses ECDSA)\n- Assert: `matches!(result, Err(Error::AlgorithmNotAllowed { index: 2 }))`\n  - Index 2 is the root cert (outermost in the chain; chain_walk iterates from high index down, so root is checked first at i = chain.len()-1 = 2 for a 3-cert chain).\n\n**Test 3: `alg_allowlist_none_is_unconstrained`**\n- Load chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku\n- Policy: `allowed_signature_algs = None`\n- Assert: `result.is_ok()`\n\n**Test 4: `alg_allowlist_fails_on_intermediate_when_using_wrong_alg`**\n- Load chain: root-rsa2048 \u2192 int-rsa2048 \u2192 leaf-rsa2048-365d-san-eku\n- Policy: `allowed_signature_algs = Some(vec![ECDSA_SHA256_OID])` (only ECDSA, but chain uses RSA)\n- The root cert is checked first. Oracle: RSA_SHA256 OID not in allowlist \u2192 AlgorithmNotAllowed at root index.\n- Assert: `matches!(result, Err(Error::AlgorithmNotAllowed { .. }))`\n\n**Defensive programming rules:**\n- Specific `{ index: N }` assertions require knowing which cert fails first. Chain walk starts at the highest index (root-adjacent). For a 3-cert chain [root, int, leaf], the root is at index 2 in the slice.\n- If unsure of exact index, use `Err(Error::AlgorithmNotAllowed { .. })` (wildcard pattern) rather than guessing \u2014 but the research phase should have clarified this.\n- Oracle: OID values are from const_oid spec (RFC 5912). They are not derived from the code under test.\n\n**Subagent instructions:**\n- Spawn one research subagent: read the `validate_path` function to confirm the chain slice ordering (is index 0 the leaf or the root? The research found it is the leaf). Confirm which index gets `AlgorithmNotAllowed` for a root-first failure.\n- Spawn one implementation subagent: write all 4 tests.\n- Spawn one validation subagent: `cargo test -p pkix-path --all-features -- tests_policy_fields::alg 2>&1`. All 4 must pass.\n\n**Tests:**\n| Name | Condition | Oracle | Assertion |\n|---|---|---|---|\n| passes when OID in list | P-256 chain, ECDSA-SHA256 in allowlist | OID math | `is_ok()` |\n| fails when OID not in list | P-256 chain, only RSA in allowlist | OID math \u2192 reject at root | `Err(AlgorithmNotAllowed { .. })` |\n| None is unconstrained | P-256 chain, no allowlist | default = no constraint | `is_ok()` |\n| fails on intermediate | RSA chain, ECDSA-only allowlist | OID math \u2192 reject at root | `Err(AlgorithmNotAllowed { .. })` |",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Tests: allowed_signature_algs enforcement",
+  "updated_at": "2026-05-06T04:59:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:45:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

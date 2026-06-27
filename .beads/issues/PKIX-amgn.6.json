@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T18:56:33Z",
+  "compaction_level": 0,
+  "content_hash": "e38269be644f4c372fefdcc7bd47eebcdd5ed502ca01424841886c8ee5bb3d22",
+  "created_at": "2026-05-11T05:45:50Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-jbvb was filed during the 2026-05-11 audit as 'pkix-profiles: CA/B Forum S/MIME BR sub-profile families (Organization-/Sponsor-/Individual-validated).' Under the new framework-not-policy stance (PKIX-amgn), that work belongs in `pkix-profiles-cabf`, not `pkix-profiles` proper, and its framing changes from 'canonical implementation' to 'reference, not authoritative.'\n\n## What\n\n1. Rewrite PKIX-jbvb's description to target `pkix-profiles-cabf` instead of `pkix-profiles`.\n2. Update the bead's title accordingly: 'pkix-profiles-cabf: S/MIME BR sub-profile families (Organization-/Sponsor-/Individual-validated)'.\n3. Add the not-authoritative framing into the bead's acceptance criteria \u2014 each new profile type must carry the same rustdoc disclaimer header the parent crate carries.\n4. Add a dependency: PKIX-jbvb `depends on` PKIX-amgn.2 (target crate must exist) and PKIX-amgn.4 (BasicSmimeProfile must exist so the sub-profiles can compose atop it).\n\n## Acceptance\n\n- [ ] PKIX-jbvb title + description updated.\n- [ ] Dependencies set correctly.\n- [ ] Reference-not-authoritative framing in PKIX-jbvb's acceptance criteria.\n- [ ] No structural conflict with PKIX-amgn.2 / .4 work.\n\n## Out of scope\n\n- Actually implementing the three S/MIME BR sub-profiles \u2014 that's PKIX-jbvb's job, just retargeted.\n\n## Depends on\n\nPKIX-amgn.1 (stance), PKIX-amgn.2 (target crate exists).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Reparent PKIX-jbvb (S/MIME BR sub-profile families) to pkix-profiles-cabf with reference-not-authoritative framing",
+  "updated_at": "2026-05-11T18:56:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:45:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "1fdba5f6e6c24c67a541242e323cc3888b2d760f0ea03db205a192eed344b0d8",
+  "created_at": "2026-05-07T20:27:25Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\nTwo functions in `pkix-path/src/lib.rs` exceed clippy's default 100-line threshold:\n\n| Function | Lines | Location |\n|---|---|---|\n| `chain_walk<V: SignatureVerifier>` | 489 | pkix-path/src/lib.rs:1947 |\n| `check_name_constraints` | 109 | pkix-path/src/lib.rs:2794 |\n\n`chain_walk` is the RFC 5280 \u00a76.1 state-machine driver \u2014 it carries the policy tree, name-constraints state, and per-cert validation in a single body. At 489 lines it's hard to navigate, hard to test in isolation, and hard to reason about which RFC 5280 step is which.\n\n## Why this matters\n\nThis is the most security-critical function in the entire workspace. RFC 5280 \u00a76.1 has clearly named substeps (\u00a76.1.3 input checks, \u00a76.1.4 wrap-up, \u00a76.1.5 final wrap-up); a function that maps 1:1 to RFC steps would make the code easier to audit against the spec and easier to fuzz/test per step.\n\n## Suggestion\n\nRefactor `chain_walk` into named helpers per RFC 5280 \u00a76.1 substep:\n\n- `step_basic_processing` \u2014 \u00a76.1.3\n- `step_preparation_for_next` \u2014 \u00a76.1.4\n- `step_wrap_up` \u2014 \u00a76.1.5\n- carry `WorkingState { permitted_subtrees, excluded_subtrees, valid_policy_tree, ... }` between them\n\n`check_name_constraints` (109 lines) is closer to the threshold; one extraction (e.g., separating SAN-iteration from subject-DN constraint checks) would put it under.\n\n## Priority\n\nP3 \u2014 readability/auditability of the workspace's most critical function. Not a correctness bug per se. Big refactor though, so worth scoping carefully before doing.\n",
+  "design": "## chain_walk / check_name_constraints decomposition design\n\nReality vs. bead: `chain_walk` is 806 lines today (2032\u20132837), not 489. `check_name_constraints` is 159 lines (2868\u20133026), not 109. No `#[allow]` \u2014 `clippy::too_many_lines` is default-allowed. Doc-comment 2017\u20132024 explicitly argues against decomposition; any refactor must retire that comment honestly.\n\n## 1. RFC 5280 \u00a76.1 substep map\n\n- \u00a76.1.2 init: lib.rs:2042\u20132111\n- \u00a76.1.3(a)(1) signature verify: 2130\u20132152\n- \u00a76.1.3(a)(2) DN linkage / SAN-identity exception: 2154\u20132166\n- \u00a76.1.3(a)(2) validity: 2168\u20132169\n- Project max-validity: 2171\u20132191\n- Project min-RSA-bits: 2193\u20132205\n- \u00a76.1.3(d) critical-ext guard: 2207\u20132208\n- \u00a76.1.3(d)+(e) policy-tree update: 2210\u20132308 (99 lines, dominant)\n- \u00a76.1.3(f) early policy violation: 2310\u20132314\n- \u00a76.1.3(b) NameConstraints check: 2322\u20132334\n- Project leaf SAN/EKU/rfc822 (e2/e3/e4): 2336\u20132392\n- \u00a76.1.4(k) BC cA / NotCA: 2398\u20132412\n- \u00a76.1.4(n) keyCertSign: 2414\u20132425\n- \u00a76.1.4(m) pathLenConstraint: 2427\u20132438\n- \u00a76.1.4(a)+(b) PolicyMappings: 2440\u20132514 (75 lines)\n- \u00a76.1.4(h) counter decrement: 2516\u20132524\n- \u00a76.1.4(i)/(j) PC/InhibitAnyPolicy clamp: 2526\u20132548\n- \u00a76.1.4(g) NC state update: 2550\u20132657 (108 lines)\n- \u00a76.1.4(c)\u2013(f) state propagation: 2660\u20132666\n- \u00a76.1.5(a)\u2013(b) leaf finalisation: 2669\u20132698\n- \u00a76.1.5(g) intersect tree with user-initial-policy-set: 2700\u20132828 (129 lines)\n- \u00a76.1.5 final check: 2830\u20132834\n\n## 2. Natural decomposition (post-refactor order, smallest first)\n\n| # | Helper | Substeps | Lines | Risk | Vis |\n|---|---|---|---|---|---|\n| H1 | enforce_signature_alg_allowlist | algo allowlist | ~7 | low | pub(crate) |\n| H2 | check_max_validity | project max-validity | ~17 | low | pub(crate) |\n| H3 | check_min_rsa_bits | project min-RSA | ~10 | low | pub(crate) |\n| H4 | verify_cert_signature<V> | \u00a76.1.3(a)(1) | ~17 | low | pub(crate) |\n| H5 | check_issuer_linkage | \u00a76.1.3(a)(2) DN linkage | ~7 | low | pub(crate) |\n| H6 | enforce_leaf_profile | e2+e3+e4 | ~57 | low-med | pub(crate) |\n| H7 | check_intermediate_basic_constraints | \u00a76.1.4(k)+(m) | ~33 | medium | pub(crate) |\n| H8 | apply_policy_mappings | \u00a76.1.4(a)+(b) | ~75 | HIGH | pub(crate) |\n| H9 | update_policy_tree_from_cert | \u00a76.1.3(d)+(e) | ~99 | HIGH | pub(crate) |\n| H10 | update_name_constraints_state | \u00a76.1.4(g) | ~108 | HIGH | pub(crate) |\n| H11 | finalise_policy_tree_with_user_set | \u00a76.1.5(a)+(b)+(g) | ~160 | HIGH | pub(crate) |\n\n## 3. check_name_constraints decomposition\n\n- N1 check_subject_dn_against_subtrees: ~22 lines, low risk\n- N2 check_san_against_subtrees: ~19 lines, low risk\n- N3 check_email_in_dn_against_rfc822: ~72 lines, medium risk (precondition guard `has_rfc822_constraint` is non-obvious and load-bearing)\n\nOuter fn becomes a 12-line driver: excluded-pass \u2192 permitted-pass \u2192 N3.\n\n## 4. Refactor sequence\n\nIndependent (parallelisable): H1, H2, H3, H4, H5, N1, N2.\nSequenced after H4/H5: H6.\nSequenced (must land in order): H7 \u2192 H8 \u2192 H9 \u2192 H10 \u2192 H11. Each one touches a load-bearing state machine; spread across separate PRs to keep PKITS regressions attributable.\nN3 lands independently.\n\n## 5. PKITS coverage gaps (where regressions hide)\n\n- PKITS \u00a74.4 (revocation), \u00a74.5 (self-issued certs) \u2014 NOT IMPORTED. \u00a74.5 exercises is_self_issued_cert exemptions in \u00a76.1.3(b), \u00a76.1.4(h), \u00a76.1.4(m). H7, H10, H11 all touch self-issued logic; refactor regression there NOT caught by current tests.\n- PKITS \u00a74.16 (private cert extensions) \u2014 not imported.\n- 8-way `initial_*` flag matrix in \u00a76.1.5(g) \u2014 partial coverage; H11 is where this would bite.\n- PolicyMappings + anyPolicy parents when policy_mapping==0 \u2014 exercised by \u22642 tests; risky for H8.\n- NC empty-intersection via nc_constrained_types \u2014 DN/RFC822/DNS/URI tested; IPAddress and OtherName thin.\n\nSingle largest blind spot: self-issued + policy mapping + intersection emptying (H8/H10).\n\n## 6. Recommended initial-PR scope\n\nLand H1+H2+H3+H4+H5+N1+N2 in one PR. All low-risk, all pure-helper extractions, no policy/NC state-machine touch. Lines extracted: 58 from chain_walk, 41 from check_name_constraints.\n\nPost-refactor: chain_walk \u2248 760 lines (still over 100), check_name_constraints \u2248 124 (still over).\n\n**Honest conclusion: the low-risk scope does NOT bring chain_walk under 100 lines.** Three-PR plan:\n\n1. PR-1: H1\u2013H5 + N1\u2013N2. Establishes helper pattern; no policy-tree risk. Add `#[allow(clippy::too_many_lines)]` with comment pointing at follow-up bead.\n2. PR-2: H7 + H9 individually.\n3. PR-3: H8 + H10 + H11.\n\nRefusing to authorise a single-PR sub-100-line refactor is the correct call given current PKITS coverage.\n\n## 7. Risks and concerns\n\n- Author's monolith comment (2017\u20132024) is correct in spirit. Reviewers must verify each helper preserves the \"tree becomes NULL when no nodes at depth \u2265 1\" check (currently 3 identical sites: 2300\u20132303, 2509\u20132514, 2823\u20132826).\n- nc_constrained_types invariant (2067\u20132072): bits are ORed in, never cleared. H10 must preserve this. NO test fails if a helper clears a bit \u2014 type-bit accounting is an internal invariant, not PKITS-checked. HIGH CONCERN.\n- \u00a76.1.4(h) counter-decrement ordering (2516\u20132524): must be after mappings (\u00a76.1.4(b)), before clamps (\u00a76.1.4(i)/(j)). If H8+H9 both extracted, call-order in chain_walk becomes load-bearing audit point. Must be commented at call site after refactor.\n- working_issuer_is_san_identity propagation (line 2666): set after each iteration. If H5 extracts the linkage check but the assignment moves, SAN-identity exception (\u00a74.2.1.6) breaks silently for chains where issuer (not leaf) uses SAN. PKITS does not test this. MEDIUM CONCERN. Keep assignment in chain_walk, not inside H5.\n- prune_policy_tree (line 1145) has 3 call sites (2298, 2504, 2819) with matching \"tree is NULL\" checks \u2192 candidate for a small policy_tree_post_op_prune helper as a no-risk side improvement.\n- \u00a76.1.5(a) skips the RFC-mandated decrements of inhibit_any and policy_mapping with comment \"neither is read after \u00a76.1.5(a)\" (lines 2683\u20132685). Static-analysis claim, not tested invariant. If H11 is extracted, comment must move with it; if any future code reads those after H11, the optimisation becomes a bug. Document at helper boundary.\n- PKITS \u00a74.5 (self-issued) coverage gap is the single largest unmonitored regression class. Recommend filing a separate bead to import PKITS \u00a74.5 fixtures BEFORE H7/H10/H11 land, not after.",
+  "ephemeral": 0,
+  "id": "PKIX-als9",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Decomposed into 17 child beads (PKIX-als9.1 through PKIX-als9.17) on 2026-05-08. See child list under CHILDREN.\n\nStructure follows the design Section 4 sequencing:\n- Independent / parallelisable: prep2, prep3, H1, H2, H3, H4, H5, N1, N2 (9 beads)\n- After H4+H5: H6\n- After H7 (start of high-risk chain): H7 \u2192 H8 \u2192 H9 \u2192 H10 \u2192 H11 (5 beads, sequenced)\n- prep2 (WorkingState struct) gates H8\n- N3 independent\n- cleanup gates on H11 + N3, removes any clippy allow-attr added during refactor\n\nTooling note: 'bd ready' (strict) does not surface children due to the --parent relation creating an implicit parent-child dep that beads treats as a blocker. Use 'bd list --ready' (permissive) to see claimable children, or claim them directly with 'bd update PKIX-als9.<n> --claim'. The parent \u2192 child explicit deps correctly gate epic close (parent will close only when all 17 children close).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "P3: chain_walk (489 lines) and check_name_constraints (109 lines) exceed clippy 100-line threshold; chain_walk is the RFC 5280 \u00a76.1 driver",
+  "updated_at": "2026-05-11T06:29:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T16:46:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77cl",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:57:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-07T22:46:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.10",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.11",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.12",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.13",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.14",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.15",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.16",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.17",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:50:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.8",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.9",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T13:27:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features -- tests_policy_fields exits 0 with all 5+ required_eku tests passing. Tests 2 and 3 both produce Err(MissingEku) from different code paths (absent extension vs. OID mismatch).",
+  "assignee": "Mark Atwood",
+  "close_reason": "6 required_leaf_eku tests covering absent EKU, wrong EKU, exact OID matching, empty vec, None. All pass.",
+  "closed_at": "2026-05-06T04:59:39Z",
+  "compaction_level": 0,
+  "content_hash": "10b59abc0235399c20dda2d89317c77bf7a7a2d837057c15bb1352f8d43fbbb8",
+  "created_at": "2026-05-06T03:46:34Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add unit tests for the `required_leaf_eku` policy field in `pkix-path`.\n\n**Algorithm:**\nTests go in `mod tests_policy_fields` in `pkix-path/src/lib.rs`.\n\nOID constants for EKU (from const_oid::db::rfc5912):\n```rust\nconst ID_KP_SERVER_AUTH: ObjectIdentifier =\n    ObjectIdentifier::new_unwrap(\"1.3.6.1.5.5.7.3.1\");\nconst ID_KP_EMAIL_PROTECTION: ObjectIdentifier =\n    ObjectIdentifier::new_unwrap(\"1.3.6.1.5.5.7.3.4\");\n```\n\n**Test 1: `required_eku_passes_when_all_oids_present`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku (leaf has EKU: serverAuth)\n- Policy: `required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH])`\n- Assert: `result.is_ok()`\n\n**Test 2: `required_eku_fails_when_eku_extension_absent`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-no-eku (leaf has no EKU extension)\n- Policy: `required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH])`\n- Oracle: EKU extension absent, required OIDs specified \u2192 MissingEku.\n- Assert: `matches!(result, Err(Error::MissingEku))`\n\n**Test 3: `required_eku_fails_when_required_oid_not_in_list`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-wrong-eku (leaf has EKU: emailProtection only)\n- Policy: `required_leaf_eku = Some(vec![ID_KP_SERVER_AUTH])` (requires serverAuth)\n- Oracle: serverAuth OID not in cert's EKU set \u2192 MissingEku.\n- Assert: `matches!(result, Err(Error::MissingEku))`\n\n**Test 4: `required_eku_none_is_unconstrained`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-no-eku (no EKU)\n- Policy: `required_leaf_eku = None`\n- Assert: `result.is_ok()` \u2014 None means no EKU requirement.\n\n**Test 5: `required_eku_empty_vec_is_unconstrained`**\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-no-eku (no EKU)\n- Policy: `required_leaf_eku = Some(vec![])` (empty vec = no OIDs required)\n- Assert: `result.is_ok()` \u2014 Some([]) means require zero OIDs, always passes.\n\n**Test 6: `required_eku_any_eku_does_not_satisfy_specific_oid`**\n- Note: the fixture set does not include a leaf with anyExtendedKeyUsage because CA/B Forum profiles forbid it. However, this invariant must be documented.\n- Implement as a comment + link to RFC 5280 \u00a74.2.1.12 in the test module explaining the design decision.\n- Alternatively: if generating an anyEKU fixture is trivial, add `leaf-p256-365d-any-eku.der` to gen.py and add a test asserting `Err(MissingEku)` when `required_leaf_eku = Some([ID_KP_SERVER_AUTH])` and the cert has only anyExtendedKeyUsage.\n\n**Defensive programming rules:**\n- Tests 2 and 3 both assert `Err(MissingEku)` but from different root causes (absent extension vs. wrong OID). This is intentional \u2014 `MissingEku` covers both.\n- `matches!` with no index field since `MissingEku` has no fields.\n- No `unwrap()` in success cases.\n\n**Subagent instructions:**\n- Spawn one research subagent: check if `anyExtendedKeyUsage` fixture is practical to generate (5 extra lines in gen.py) \u2014 if yes, implement test 6 as a real test rather than a comment.\n- Spawn one implementation subagent: write tests 1\u20135 (and optionally 6).\n- Spawn one validation subagent: `cargo test -p pkix-path --all-features -- tests_policy_fields::required_eku 2>&1`. All must pass.\n\n**Tests:**\n| Name | Condition | Oracle | Assertion |\n|---|---|---|---|\n| passes all OIDs present | serverAuth in EKU, require serverAuth | Extension present | `is_ok()` |\n| fails EKU absent | no EKU ext, require serverAuth | Absent \u2192 reject | `Err(MissingEku)` |\n| fails wrong OID | emailProtection EKU, require serverAuth | OID mismatch \u2192 reject | `Err(MissingEku)` |\n| None unconstrained | no EKU, None | default | `is_ok()` |\n| empty vec unconstrained | no EKU, Some([]) | zero OIDs required | `is_ok()` |",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Tests: required_leaf_eku enforcement",
+  "updated_at": "2026-05-06T04:59:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:46:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d53470808577bf7550928e7b56ddca2d80c89c0b87715adcadb3f1f20afe2177",
+  "created_at": "2026-05-14T16:09:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:978-1001 (find_deviation) and 1021-1041 (find_deviation_for_chain) implement 'pick the matching deviation with highest priority, ties broken by insertion order' as a manual `for d in &self.deviations` loop with an `Option<&Deviation>` accumulator. This is what `Iterator::max_by_key` does, with the only twist being the tie-break rule.\\n\\nThe rustdoc explicitly notes 'max_by_key on (priority, -index) would also work', then chooses the manual fold anyway because `Iterator::max_by_key` returns the LAST element with the max key on ties, not the first. That subtle docs-API contract is the actual reason to write the manual loop \u2014 but the loop body would be more compact and obviously-correct as:\\n\\n```rust\\nself.deviations\\n    .iter()\\n    .filter(|d| d.target_lint == lint_id && d.applies_to(cert, now_unix))\\n    .min_by_key(|d| (Reverse(d.priority), ...stable insertion-order tiebreaker via enumerate...))\\n```\\n\\nOr more directly: `max_by_key` with negated priority and zip-with-index. The manual loop is correct but the explanatory comment 'max_by_key on (priority, -index) would also work, but iter().enumerate() lets us tie-break by insertion order' is misleading \u2014 the iter()+enumerate solution would also work, the author just chose the manual fold.\\n\\nIdiom claim: when the answer is 'pick max element by key with a non-default tie-break', the idiomatic shape is `Iterator::min_by_key(|x| (Reverse(key(x)), index(x)))`. The manual loop signals to the reader that something unusual is happening when nothing is.\\n\\nDuplicated across two methods (find_deviation, find_deviation_for_chain) \u2014 extract a helper or convert both to iterator chains. Filed as P3 chore; not a correctness issue.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.47",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "DeviationStore::find_deviation and find_deviation_for_chain reimplement max_by_key with manual fold",
+  "updated_at": "2026-05-14T16:09:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:09:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

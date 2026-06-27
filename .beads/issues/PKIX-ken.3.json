@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "smime_policy returns without panic. Listed tests pass.",
+  "assignee": "Mark Atwood",
+  "close_reason": "smime_policy implemented: 1185-day cap, SHA-1 excluded, min 2048-bit RSA, require SAN, require emailProtection EKU. Tests pass.",
+  "closed_at": "2026-05-06T05:07:26Z",
+  "compaction_level": 0,
+  "content_hash": "9bc4a51b61f2f9d003a8d221054e3391da38f64a4cbec08c726646d042b69247",
+  "created_at": "2026-05-06T03:26:46Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement smime_policy(now_unix) in pkix-profiles/src/lib.rs to return a ValidationPolicy enforcing CA/B Forum S/MIME Baseline Requirements (current version: v1.0+).\n\nThe S/MIME BR defines four mailbox types (Mailbox-validated, Organization-validated, Sponsor-validated, Individual-validated) and three key usage profiles (legacy, multipurpose, strict). This implementation targets the common Mailbox-validated / strict profile as the baseline.\n\nConstraints to set:\n- max_validity_secs: 1185 * 86400  (1185 days / ~39 months, per S/MIME BR \u00a76.3.2 for strict profile)\n- allowed_signature_algs: same SHA-1 exclusion as web_pki_policy. SHA-256/384/512 RSA and ECDSA allowed.\n- min_rsa_key_bits: 2048  (S/MIME BR \u00a76.1.5)\n- require_subject_alt_name: true  (rfc822Name SAN required for Mailbox-validated)\n- required_leaf_eku: [id-kp-emailProtection]  (1.3.6.1.5.5.7.3.4)\n\nRemove the unimplemented!() panic. Update rustdoc to list enforced constraints and note that only the Mailbox-validated/strict profile is implemented; other types (OV, SV, IV) are v0.3 scope.\n\nTests:\n- A cert with id-kp-emailProtection EKU and rfc822Name SAN passes\n- A cert missing id-kp-emailProtection is rejected\n- A cert exceeding 1185-day validity is rejected\n- SHA-1 cert rejected",
+  "ephemeral": 0,
+  "id": "PKIX-ken.3",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement smime_policy (CA/B Forum S/MIME BR)",
+  "updated_at": "2026-05-06T05:07:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:26:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:26:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

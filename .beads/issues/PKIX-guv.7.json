@@ -1,0 +1,31 @@
+{
+  "close_reason": "Beads IDs in section headers are cross-references, not TODO comments. Removing them would lose traceability. Opinion-only finding \u2014 no action.",
+  "closed_at": "2026-05-02T20:16:20Z",
+  "compaction_level": 0,
+  "content_hash": "1430e744343769684bde73f930ba2ea1b78cb46dfb2e9a1b88b89a9be5e4dc38",
+  "created_at": "2026-05-02T20:12:05Z",
+  "created_by": "Mark Atwood",
+  "description": "Comments like '(PKIX-vxf)', '(PKIX-gry)', '(PKIX-gmv)', '(PKIX-8ae)' etc. scattered throughout pkix-path/src/lib.rs reference beads issues. Once those issues are closed these become dead references that explain neither the why nor the what to a future contributor. Either replace with prose explaining the design rationale, or remove. A future contributor reading the code has no beads access context.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "stale beads IDs in source comments become dead references",
+  "updated_at": "2026-05-02T20:16:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:12:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

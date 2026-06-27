@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T21:53:05Z",
+  "compaction_level": 0,
+  "content_hash": "360f7d48d4c9ac5764a45063075ec08c51dcbba33b007520e75438e6477a3c34",
+  "created_at": "2026-05-12T19:40:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nzlint emits seven verdict levels per check: NA (Not Applicable), NE (Not Effective / pre-effective-date), pass, notice, warn, error, fatal. How do these map to the workspace's `Severity` enum on `Finding`?\n\n## Open sub-question first\n\nDoes the workspace's `Severity` enum (presumably in pkix-lint near the `Finding` struct at pkix-lint/src/lib.rs:842) actually have enough variants to absorb zlint's seven? If not, this decision blocks on a logically-prior question: extend pkix-lint's Severity enum, or accept lossy mapping?\n\nQuick audit needed before the substantive call.\n\n## Candidate mappings\n\nAssuming pkix-lint's Severity has variants like Info / Notice / Warning / Error / Fatal:\n\n- **A) Direct mapping where possible, drop NA/NE/pass.**\n  - NA -> no Finding emitted (cert was not in scope for this check)\n  - NE -> no Finding emitted (rule not yet effective for cert's date)\n  - pass -> no Finding emitted (cert satisfies the rule)\n  - notice -> Severity::Notice\n  - warn -> Severity::Warning\n  - error -> Severity::Error\n  - fatal -> Severity::Fatal (or Severity::Error if Fatal doesn't exist)\n\n- **B) Emit Finding for every check, including pass/NA/NE.**\n  Useful for audit reports that want 'every rule was evaluated.' Higher noise; possibly behind a verbose flag.\n\n- **C) Configurable mapping via adapter config.**\n  Caller provides a closure mapping zlint::Verdict -> Option<Severity>. Max flexibility, max surface.\n\n## Considerations\n\n- Cache-friendliness (non-negotiable #6): per-Finding mapping is fine; configurable closures complicate Hash / Eq on the adapter type.\n- AGENTS.md framework-not-policy stance: imposing a fixed mapping is policy-shaped. Configurable would be framework-shaped.\n- But consumers asking for severity are usually asking for 'sensible default that matches zlint's intent.'\n\n## Decision-gate\n\nBlocks pkix-policy-zlint implementation. Severity-on-Finding is a serialization-stable contract; getting it wrong is a breaking-change risk later (though we're prelaunch, so cheap to change).\n\n## Cross-references\n\n- pkix-lint/src/lib.rs:842 \u2014 Finding struct; check current Severity enum variants\n- PKIX-jy95 (parent)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.2",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide severity mapping: zlint verdicts (NA/NE/pass/notice/warn/error/fatal) -> workspace Severity",
+  "updated_at": "2026-05-12T21:53:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:40:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "close_reason": "decision captured in code",
+  "closed_at": "2026-05-02T22:39:19Z",
+  "compaction_level": 0,
+  "content_hash": "8975208a899064d58dbaabaa2bc555ae2e4db4705863868f57038befc0956026",
+  "created_at": "2026-05-02T17:15:59Z",
+  "created_by": "Mark Atwood",
+  "description": "names_match (lines 528-554) correctly implements RFC 5280 \u00a74.1.2.4: RDN sequence ordering is positional (RDN[0] vs RDN[0]), but within each RDN (a SET OF AVA), comparison is order-independent. Uses .any() to find matching AVA across the set (O(n\u00b2) acceptable for typical 3-7 AVAs). Line-count comment (lines 528-531) explains the RFC distinction clearly for future maintainers. The length checks (lines 543-545) prevent set subset attacks (e.g., CN=Alice matching CN=Alice,OU=Ops).",
+  "ephemeral": 0,
+  "id": "PKIX-3gk",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: RDN set semantics correctly implemented",
+  "updated_at": "2026-05-02T22:39:19Z"
+}

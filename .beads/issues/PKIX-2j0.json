@@ -1,0 +1,21 @@
+{
+  "close_reason": "All non-deferred children completed; 4 deferred children remain",
+  "closed_at": "2026-05-06T19:25:42Z",
+  "compaction_level": 0,
+  "content_hash": "80fce9de85996cefc26d8552f35d4fe58b1e1688e2f0afc8be1409cd9e49f376",
+  "created_at": "2026-05-06T16:49:11Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-2j0",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-rusty: commits 4b382332..ac780bbe",
+  "updated_at": "2026-05-06T19:25:42Z"
+}

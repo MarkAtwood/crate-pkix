@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Shipped. from_pem_file / from_der_file now route through read_file_capped(path, DEFAULT_FILE_SIZE_CAP) (64 MiB). Two-stage check: metadata().len() short-circuits multi-GB files, Read::take(cap+1) defends against TOCTOU and /dev/zero-style infinite streams. Oversized inputs surface as Error::Io with ErrorKind::InvalidData (MSRV 1.73 predates ErrorKind::FileTooLarge from Rust 1.83) plus a 'exceeds N-byte cap' message. Public escape hatches: from_pem_file_with_cap / from_der_file_with_cap. 5 new integration tests in tests/file_size_cap.rs cover oversized-reject, under-cap-pass, default-cap-pin. Workspace tests + clippy --all-features -D warnings + rustdoc -D warnings clean.",
+  "closed_at": "2026-05-14T08:08:49Z",
+  "compaction_level": 0,
+  "content_hash": "1169df898a4509d6bf592244f4e6601284ddfe647d22c173262095dbb5842896",
+  "created_at": "2026-05-14T05:21:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:397-400 (from_pem_file) and :410-413 (from_der_file) both call fs::read(path) which loads the entire file into a Vec<u8> with no size limit.\n\nTrigger paths:\n- Caller passes a path that resolves to /dev/zero, /dev/random, or a FIFO that streams forever -> the process hangs or OOMs.\n- Caller passes a path to a multi-GB file (a corrupted bundle, an accidentally-symlinked log file, an attacker-influenced env var like SSL_CERT_FILE pointing at a junk file) -> unbounded heap allocation, possible OOM-kill.\n- Sibling adapter crates (pkix-truststore-system) may consume paths from environment variables; an attacker-influenced or operator-typo path becomes a DoS vector.\n\nWhat goes wrong: availability. A trust-anchor loader that hangs or gets OOM-killed on a malformed file prevents the process from starting / refreshing trust state. For long-running validators (TLS servers, signing services) this is a real defect class \u2014 the equivalent class in image loaders has shipped multiple CVEs.\n\nEngineering basis (not theoretical):\n- rustls-native-certs and pyca/cryptography both apply explicit upper bounds on trust-store file size.\n- Trust-anchor files in the wild: Debian ca-certificates.crt is ~200 KB; Mozilla full bundle is ~250 KB; any path returning > a few MB is almost certainly wrong.\n- AGENTS.md non-negotiable #6 names \"cache-friendly result types\" but the cost of unbounded fs::read happens before the result exists.\n\nFix: introduce a documented size cap (suggest 64 MiB as a forgiving default; principled is < 16 MiB). Return Error::Io(IoFailure { kind: ErrorKind::FileTooLarge, ... }) or a new typed variant when exceeded. Provide an explicit opt-in (e.g. from_pem_file_with_cap(path, cap) or from_pem_file_unbounded) for callers who genuinely need to bypass.\n\nThreat-model framing: this is not a remote-attacker vulnerability \u2014 paths are deployment config. But it is a hard-to-diagnose availability defect that a Tier-1 1.0 loader should not ship. Defense-in-depth: gate the read, not just the parse.\n\nScope of fix: pkix-truststore. Does not touch pkix-path. Compatible with the no-baked-trust-data stance.\n\nRelated: not the same defect class as PKIX-tit4.1 (which is fail-open semantics in cert content); this is fail-OOM in transport.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_pem_file / from_der_file: no size cap on fs::read, allows memory-DoS via /dev/zero or oversized file",
+  "updated_at": "2026-05-14T08:08:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:21:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T08:32:08Z",
+  "compaction_level": 0,
+  "content_hash": "7ec9bf6e04261d0e0d2c21ff692b8e4df761ed33df03c5a8f818943ec83f5a43",
+  "created_at": "2026-05-11T08:18:54Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nThe first foundation piece for PKIX-baac. Every other child depends on being able to parse an SCT from bytes.\n\n## What\n\nParse a single `SignedCertificateTimestamp` (RFC 6962 \u00a73.2) and a `SignedCertificateTimestampList` wrapper (RFC 6962 \u00a73.3) from bytes.\n\n**SCT binary layout** (RFC 6962 \u00a73.2, network byte order):\n\n```\nstruct {\n    Version sct_version;          // 1 byte; v1 = 0\n    LogID id;                     // 32 bytes (SHA-256 of log pubkey DER)\n    uint64 timestamp;             // 8 bytes (ms since Unix epoch)\n    CtExtensions extensions;      // u16 length-prefixed bytes\n    digitally-signed struct {     // signed_struct = TBS-context bytes\n        HashAlgorithm hash;       // 1 byte (RFC 5246 \u00a77.4.1.4.1)\n        SignatureAlgorithm sig;   // 1 byte\n        opaque signature<0..2^16-1>;  // u16 length-prefixed\n    } signature;\n} SignedCertificateTimestamp;\n```\n\n**SCT-list wrapper** (RFC 6962 \u00a73.3): `opaque SerializedSCT<1..2^16-1>; SignedCertificateTimestampList { SerializedSCT sct_list<1..2^16-1>; }`. Outer u16 total length, then a sequence of u16-length-prefixed SCTs. When embedded in a cert extension, the extension value is itself an OCTET STRING containing the list.\n\n## Public API\n\n```rust\npub struct SignedCertificateTimestamp {\n    pub version: u8,                  // 0 for v1\n    pub log_id: [u8; 32],\n    pub timestamp_ms: u64,\n    pub extensions: Vec<u8>,          // usually empty for embedded SCTs\n    pub hash_alg: u8,                 // RFC 5246 HashAlgorithm\n    pub sig_alg: u8,                  // RFC 5246 SignatureAlgorithm\n    pub signature: Vec<u8>,           // raw signature bytes\n}\n\nimpl SignedCertificateTimestamp {\n    pub fn from_bytes(input: &[u8]) -> Result<Self, Error>;\n}\n\npub struct SctList(pub Vec<SignedCertificateTimestamp>);\n\nimpl SctList {\n    /// Parse the extension value of OID 1.3.6.1.4.1.11129.2.4.2.\n    /// Accepts either the raw SerializedSCTList bytes OR the DER OCTET STRING wrapping.\n    pub fn from_extension_value(ext_value: &[u8]) -> Result<Self, Error>;\n}\n```\n\nThe existing `SignedCertificateTimestamp` skeleton in lib.rs needs the missing fields added (extensions, hash_alg, sig_alg, signature).\n\n## Test fixtures + oracle\n\nIndependent oracle: pyca/cryptography's `cryptography.x509.certificate_transparency.SignedCertificateTimestamp` parsing, or `openssl x509 -text` pretty-printing of the SCT list extension.\n\nGet a test cert: any current TLS cert with embedded SCTs. `openssl s_client -connect badssl.com:443 -showcerts < /dev/null | openssl x509 -outform DER > pkix-ct/tests/fixtures/cert-with-scts.der` works. Or grab from the workspace's existing test fixtures if any have SCTs.\n\nCompute expected parsed values via openssl/pyca, hardcode as `hex!(...)` or committed test JSON.\n\n## Acceptance\n\n- [ ] `from_bytes` parses a single SCT.\n- [ ] `from_extension_value` parses the cert-extension list shape (with DER OCTET STRING unwrap).\n- [ ] At least 3 negative-test inputs (truncated SCT, bad length prefix, version != 0) reject cleanly.\n- [ ] At least one real-world cert from a CT-required deployment parses cleanly.\n- [ ] Test vectors come from openssl/pyca, NOT from this crate's own parsing.\n- [ ] Crate-level `#![no_std]` introduced if not already (use `alloc::vec::Vec`).\n\n## Effort\n\n~150 lines + tests. ~half a day.\n\n## Filed as\n\nChild .1 of PKIX-baac per its recommended decomposition.",
+  "ephemeral": 0,
+  "id": "PKIX-baac.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: SCT binary-format parser (RFC 6962 \u00a73.2/\u00a73.3)",
+  "updated_at": "2026-05-11T08:32:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T01:18:53Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

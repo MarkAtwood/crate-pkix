@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-81k",
+  "title": "Implement RFC 5280/8398 mailbox binding in pkix-identity + verify_smime wrappers",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:58:27Z",
+  "updated_at": "2026-06-15T17:58:27Z",
+  "closed_at": "2026-06-15T17:58:27Z"
+}

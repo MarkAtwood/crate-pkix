@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:16:02Z",
+  "compaction_level": 0,
+  "content_hash": "fcb170217f1a46a60a01c2b3f94545dba605485e5b8a8221c6bbc67a5400ff29",
+  "created_at": "2026-05-07T16:16:01Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:927 \u2014 the duplicate detection uses:\n  `if names_match(&a.issuer, &b.issuer) && a.serial_number == b.serial_number`\n\nnames_match performs bidirectional AVA matching which is O(m\u00b2) per RDN pair where m is the number of AVAs per RDN. For chains of typical length (2-5 certs), the check_inputs loop is O(n\u00b2) over cert pairs and O(m\u00b2) per RDN. This is mentioned in the comment as 'acceptable for chains of typical length'.\n\nFor adversarial chains with many duplicates or deep nesting in the DN, this could be slow. However chains are bounded by max_path_len (default 10) and real-world chains are 2-5 deep. Not a practical concern.\n\nNot a real issue. Noting here that this is not worth filing.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.35",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: duplicate certificate detection uses names_match which is O(n\u00b2) per RDN pair",
+  "updated_at": "2026-05-07T16:16:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:16:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

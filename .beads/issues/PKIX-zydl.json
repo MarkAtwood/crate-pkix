@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T04:39:16Z",
+  "compaction_level": 0,
+  "content_hash": "a3366d2e6e145b771531c8309741664bc31dac0638c3c4292cd18bbe8def057a",
+  "created_at": "2026-05-11T03:50:53Z",
+  "created_by": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "description": "## Why\n\nPKIX-lhm4 acceptance lists \"Roundtrip tests against at least three real-world\ndistro CA bundles (Debian, Alpine, Fedora)\". The initial PR shipped only the\nDebian fixture (`tests/fixtures/debian-ca-certificates.crt`) because the dev\nenvironment did not have offline access to Alpine `ca-certificates.crt` or\nFedora `ca-bundle.crt`. Per the project's no-fabrication policy, the missing\nfixtures were filed here rather than synthesised.\n\n## What\n\nAdd the following fixtures under `pkix-truststore/tests/fixtures/`:\n\n- `alpine-ca-certificates.crt` \u2014 copied from a current Alpine `ca-certificates`\n  package output of `/etc/ssl/certs/ca-certificates.crt`.\n- `fedora-ca-bundle.crt` \u2014 copied from a current Fedora `ca-certificates`\n  package output of `/etc/pki/tls/certs/ca-bundle.crt`.\n\nExtend `tests/fixtures.rs` with `alpine_bundle_loads` and `fedora_bundle_loads`\ntests that mirror `debian_bundle_loads`. Update the fixture-creation oracle\nconstants from a fresh `grep -c BEGIN CERTIFICATE`.\n\n## Acceptance\n\n- [ ] Both fixtures committed.\n- [ ] Both tests pass.\n- [ ] Provenance recorded in `tests/fixtures.rs` module-level doc (which\n      distro version, when fetched, what package supplied the bundle).",
+  "ephemeral": 0,
+  "id": "PKIX-zydl",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-truststore: add Alpine and Fedora ca-bundle fixtures",
+  "updated_at": "2026-05-11T04:39:16Z"
+}

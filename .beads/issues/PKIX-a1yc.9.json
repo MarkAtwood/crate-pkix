@@ -1,0 +1,53 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "tests/integration.rs added with 10 mockito-backed tests. UreqFetcher: GET 2xx body+content-type, POST body+content-type round-trip, non-2xx surfaces HttpStatus, body cap triggers TooLarge, body at exact cap accepted (off-by-one guard). HttpCrlFetcher: multi-CDP fallback (first 503s, second succeeds), multi-CDP all-fail aggregated description, full integration with UreqFetcher against mockito for both revoked and good leaves. HttpOcspFetcher: POST + Content-Type application/ocsp-request shape verified. Cert CDP/AIA synthesis helpers (rewrite_cdp_to_urls, rewrite_aia_ocsp) let tests point fixtures at mockito's dynamic ports without rebuilding signed certs. mockito 1.7 added as dev-dep, MSRV 1.70 within 1.73 workspace MSRV. Committed at 824e1433.",
+  "closed_at": "2026-05-09T00:58:17Z",
+  "compaction_level": 0,
+  "content_hash": "33dd6c82c6bc4da9beab97d42cb3c8d802925e721e73e040c0b81baae14c4119",
+  "created_at": "2026-05-08T23:29:46Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nParent acceptance criterion: 'Integration tests with a mock HTTP server pass.'\n\nEnd-to-end coverage: HttpCrlFetcher hits a mocked CDP URL \u2192 fetches a known-revoked CRL \u2192 reports correct status. Same for HttpOcspFetcher.\n\n## What\n\n`tests/integration.rs` (new file under `pkix-revocation-http/tests/`).\n\nUse `httpmock` (or `mockito`) \u2014 both are dev-deps, both work without async runtime.\n\nTest cases (minimum):\n\n1. **CRL hit, cert good**: mock GET /crl \u2192 canned CRL bytes (from openssl). HttpCrlFetcher::check_revocation on a non-revoked cert \u2192 Ok(()).\n2. **CRL hit, cert revoked**: same mock, cert serial is in the CRL \u2192 Err(Revoked).\n3. **CRL fetch fails (500)**: mock returns 500 \u2192 Err with surfaced URL.\n4. **CRL multi-URL fallback**: cert has two CDPs; first 500s, second succeeds \u2192 Ok.\n5. **CRL extension absent**: cert has no CDP \u2192 Ok (configured behaviour).\n6. **OCSP hit, cert good**: mock POST /ocsp \u2192 canned OCSP response, status good \u2192 Ok.\n7. **OCSP hit, cert revoked**: canned response with revoked status \u2192 Err(Revoked).\n8. **OCSP hit, status unknown**: \u2192 Err with appropriate variant.\n9. **OCSP fetch fails (500)**: \u2192 Err.\n10. **OCSP request body verification**: mock asserts received Content-Type = application/ocsp-request and body parses as OCSPRequest with expected CertID.\n\n### Fixtures\n\nGenerate via openssl in a one-shot script committed under `pkix-revocation-http/tests/fixtures/gen.sh`:\n- root CA + issuer CA + leaf cert (good) + leaf cert (revoked).\n- CRL signed by issuer, listing the revoked-leaf serial.\n- Request fixture: dump expected OCSP request DER for the (leaf, issuer) pair.\n- Response fixture: produce OCSP response signed by issuer (good) and another (revoked).\n\nCommit the .pem / .der files; do not require regen at test time.\n\n## Acceptance\n\n- [ ] All 10 cases above (or refined equivalents) pass.\n- [ ] Tests run offline (no real network).\n- [ ] Fixtures pre-committed; gen script documented for reproducibility.\n- [ ] Independent oracle: openssl x509 / openssl crl / openssl ocsp -reqout / -respout commands documented in gen script.\n\n## Depends on\n\nPKIX-a1yc.5, PKIX-a1yc.6, PKIX-a1yc.8 (UreqFetcher used as the test client).\n\n## Effort\n\n~250 lines test code + ~150 lines gen script + fixtures.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Mock-server integration tests (httpmock + canned CRL/OCSP fixtures)",
+  "updated_at": "2026-05-09T00:58:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:29:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

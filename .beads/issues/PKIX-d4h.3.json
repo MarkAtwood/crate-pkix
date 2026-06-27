@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-d4h.3",
+  "title": "SignedTreeHead and MerkleAuditPath lack #[non_exhaustive]",
+  "description": "All wire fields public. Old: PKIX-ppbr.15",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:53:49Z",
+  "updated_at": "2026-06-15T17:53:49Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-d4h",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:53:48"
+    }
+  ]
+}

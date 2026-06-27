@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed in commit 0decea2d. pkix-truststore/src/lib.rs from_pem/from_der/from_der_iter now decode via TrustAnchor::try_from rather than TrustAnchor::from_cert. Malformed NameConstraints now surface as Error::Der (from_pem, from_der) or Error::MalformedAnchor(i) (from_der_iter). 8 new integration tests in tests/malformed_nc.rs with pyca/cryptography-generated fixtures (.der and .pem) committed in tests/fixtures/. Workspace tests + clippy --all-features -D warnings + rustdoc --no-deps -D warnings + cargo doc all clean for pkix-truststore. Independent oracle: pyca x509.UnrecognizedExtension(NC_OID, b'\\\\xff\\\\xfe\\\\x00\\\\x01') marked critical=True \u2014 known-garbage DER for the NC SEQUENCE.",
+  "closed_at": "2026-05-14T07:57:51Z",
+  "compaction_level": 0,
+  "content_hash": "945b5acafab4181d1af1bb1de31d3c3d0bdb3bb72dc0c6ccd10ef598686989a8",
+  "created_at": "2026-05-14T04:57:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:334,351,378 all use TrustAnchor::from_cert, which the pkix-path rustdoc (pkix-path/src/lib.rs:696-704) explicitly documents as silently dropping malformed NameConstraints extensions and continuing.\n\nTrigger: a trust anchor with a NameConstraints extension whose DER is unparseable (truncated, wrong tag class, malformed GeneralSubtrees) is loaded by from_pem / from_der / from_der_iter.\n\nActual behavior: the anchor is accepted with name_constraints = None. The anchor will NOT enforce its NameConstraints at validation time. RFC 5280 \u00a74.2 requires a relying party to reject a certificate with an unrecognised critical extension; the constraint here is that you cannot enforce a constraint you could not parse.\n\nSeverity: for a *trust anchor* this is a fail-open: the deployment author asserted 'this root may only sign for *.example.com' via NameConstraints, the anchor file is corrupted, pkix-truststore loads it anyway, and the validator now trusts that root for any name.\n\nFix options:\n a) Use TrustAnchor::try_from(cert) and propagate Error::Der (the safer default; the strict-mode contract pkix-path already documents).\n b) Add a 'strict' loader variant alongside the lenient one and document each.\n c) Surface a per-anchor warning channel.\n\nOption (a) is the right default for a Tier-1 trust-store loader. Trust anchors are not bulk subscriber certs; loading a few hundred at startup with a strict policy is fine. The current behavior re-exports a fail-open semantics through a function that does not signal it.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor::from_cert silently swallows malformed NameConstraints on every loaded anchor",
+  "updated_at": "2026-05-14T07:57:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:57:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

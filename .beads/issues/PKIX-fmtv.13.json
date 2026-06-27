@@ -1,0 +1,38 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:09:05Z",
+  "compaction_level": 0,
+  "content_hash": "3fdab172aa1e887d5889e080c45e79cc014eac96fef98a78555bceabb5eda34a",
+  "created_at": "2026-05-12T02:42:24Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (implement policies::code_signing + time_stamping + ocsp_responder as VerificationPolicy objects) is moot: the architecture is `Profile` \u2192 `ValidationPolicy` \u2192 `verify_chain`, not a policy stack. `CodeSigningProfile` already exists in `pkix-profiles-cabf` at `pkix-profiles-cabf/src/lib.rs:310` setting `required_leaf_eku = Some(vec![ID_KP_CODE_SIGNING])`.\n\nWhat remains: **ship thin ergonomic wrappers `verify_code_signer`, `verify_time_stamper`, `verify_ocsp_responder` that compose existing profiles + `verify_chain`.** No identity binding needed for these (no caller-supplied hostname/mailbox).\n\nPer-wrapper work:\n\n- **`verify_code_signer(chain, anchors, time, revocation)`** \u2014 uses `CodeSigningProfile::policy(time)` + `verify_chain`. Profile already in `pkix-profiles-cabf`. May need a Basic version in `pkix-profiles` (RFC-baseline `id-kp-codeSigning` EKU only) per the framework-vs-policy split.\n\n- **`verify_time_stamper(chain, anchors, time, revocation)`** \u2014 needs new `BasicTimeStampingProfile` setting `required_leaf_eku = Some(vec![ID_KP_TIME_STAMPING])`. RFC 3161 says timeStamping EKU MUST be critical and sole; profile sets a flag for `validate_path` to enforce critical-and-sole.\n\n- **`verify_ocsp_responder(chain, anchors, issuer, time)`** \u2014 needs new `BasicOcspResponderProfile` setting `required_leaf_eku = Some(vec![ID_KP_OCSP_SIGNING])` + special delegation check: responder cert MUST be signed by the same `issuer` whose status it's asserting. May also need handling for the `id-pkix-ocsp-nocheck` extension (signals \"do not check revocation on this responder cert\"). The delegation check is the only non-trivial part.\n\n**Blocks on:** `.7` (wrapper set + defaults decision determines which of these three actually ship in v0.x).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement verify_code_signer + verify_time_stamper + verify_ocsp_responder thin wrappers",
+  "updated_at": "2026-05-13T02:09:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T21:56:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

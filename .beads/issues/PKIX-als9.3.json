@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Extracted enforce_signature_alg_allowlist helper. 6-line check replaced by 1-line call in chain_walk. All 262 pkix-path tests pass, no behaviour change.",
+  "closed_at": "2026-05-11T04:09:04Z",
+  "compaction_level": 0,
+  "content_hash": "9f28cb06a5028f306c278f8be095d2d384eee4fdabb8e9fdc9b1ea828f149e21",
+  "created_at": "2026-05-08T05:43:54Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract the algorithm-allowlist check into `pub(crate) fn enforce_signature_alg_allowlist(cert: &Certificate, policy: &ValidationPolicy) -> Result<()>`.\n\n## Risk\n\nLow. Pure check, no state mutation.\n\n## Acceptance\n\n- New helper in pkix-path/src/lib.rs.\n- chain_walk calls helper at the existing call point.\n- All PKITS tests pass; clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: H1 \u2014 extract enforce_signature_alg_allowlist (~7 lines)",
+  "updated_at": "2026-05-11T04:09:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

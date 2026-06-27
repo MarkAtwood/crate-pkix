@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added put_crl_if_not_rollback with atomic write-lock across get+compare+put. CrlAtomicPut trait dispatches to atomic path for InMemoryCache, fallback for dyn RevocationCache.",
+  "closed_at": "2026-06-04T19:30:15Z",
+  "compaction_level": 0,
+  "content_hash": "72ba9c5f20f4f8a63627860f6e334fd0380d26b38fa805361d3c8ba3b5c27803",
+  "created_at": "2026-05-14T18:56:09Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:659-683: maybe_populate_cache does `self.cache.get_crl(&key)` to check rollback, then `self.cache.put_crl(key, ...)`. Between the two trait calls, another thread can win the race and write a newer entry; this thread then overwrites it with an older fetched CRL.\n\nTrigger: concurrent validation of chains sharing an issuer/CDP-URL, e.g. a TLS server validating many client certs in parallel, or a batch job validating a corpus. Reproducer is simple: two threads each fetch a CRL for the same (issuer_dn, dp_uri); thread A gets CRL with CRLNumber=N, thread B gets CRLNumber=N+1. Both call check_revocation; both run maybe_populate_cache. If thread B's put completes before thread A's get sees it, thread A's get sees no entry (or an older one), is_rollback returns false, and thread A's put writes CRLNumber=N over thread B's N+1.\n\nBad behavior: defeats the RFC 5280 \u00a75.2.3 rollback protection the wrapper documents as a defense. Race window is small (microseconds) but the wrapper's purpose is to be robust against a misconfigured / hostile responder serving stale snapshots, and the race is reachable when the same hostile responder serves different chains to different concurrent validators.\n\nFix options: (a) introduce a put_crl_if_not_rollback(&self, key, candidate) trait method that lets the cache impl do an atomic compare-and-swap under its lock; (b) fold rollback into the cache impl itself (give the cache the policy); (c) hold a per-key lock around the get/put pair in the wrapper. (a) is least disruptive \u2014 extends the trait pre-1.0 once.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TOCTOU race in CachedHttpCrlFetcher::maybe_populate_cache rollback decision",
+  "updated_at": "2026-06-04T19:30:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:56:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

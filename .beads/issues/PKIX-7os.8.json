@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:51Z",
+  "compaction_level": 0,
+  "content_hash": "e5dbef2b9b1c32d7f182b9a385d8f79ec6046fd327287124d424abd3f864e490",
+  "created_at": "2026-05-02T14:39:11Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs check_revocation has two comments labeled // (4). The second one (serial number search) should be // (5). Minor but causes a re-read when auditing.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CRL check_revocation has duplicate comment step number (4)",
+  "updated_at": "2026-05-02T14:48:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:39:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

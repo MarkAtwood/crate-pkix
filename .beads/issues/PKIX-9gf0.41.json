@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "impl NormalizedIter<'_> is not valid here: fn new(bytes: &[u8]) -> Self requires naming the lifetime explicitly because Self contains it; the existing impl<'a> NormalizedIter<'a> with fn new(bytes: &'a [u8]) -> Self is already minimal and correct",
+  "closed_at": "2026-05-07T16:41:58Z",
+  "compaction_level": 0,
+  "content_hash": "073decb8f19e60f184f037224f498e7c72483955293d6e4472f50747019f30d7",
+  "created_at": "2026-05-07T16:19:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1443-1456 (NormalizedIter::new)\n\n  impl<'a> NormalizedIter<'a> {\n      fn new(bytes: &'a [u8]) -> Self {\n\nClippy pedantic flags this as 'the following explicit lifetimes could be elided: a'. The 'a lifetime on the impl block is redundant because the function signature and struct definition already relate the lifetime through the &[u8] parameter:\n\n  impl NormalizedIter<'_> {\n      fn new(bytes: &[u8]) -> Self {\n\nThis is not a correctness issue, but explicit lifetimes that Rust can elide add noise.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.41",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-path: NormalizedIter lifetime 'a can be elided",
+  "updated_at": "2026-05-07T16:41:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

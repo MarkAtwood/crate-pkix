@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:34:41Z",
+  "id": "019e1e1d-0f05-7120-b400-431fd5034214",
+  "issue_id": "PKIX-jy95.1",
+  "text": "SCOPE NOTE 2026-05-12 (cascade from PKIX-jy95.6 = A): this decision now applies to the BRIDGE crate (pkix-zlint-bridge per PKIX-jy95.7), not directly to the pkix-policy-zlint adapter. The bridge owns the Finding shape that emerges from running zlint on a cert; the adapter wraps those findings as Lint impls. Granularity decision (per-check vs umbrella) determines how the bridge SHAPES its Finding output. If per-check (700+), the bridge emits per-check Finding instances; the adapter exposes one Lint per check. If umbrella (3-4 profile families), the bridge emits family-level rollup findings; the adapter exposes one Lint per family. The decision is still binary; it just lives at the bridge layer now."
+}

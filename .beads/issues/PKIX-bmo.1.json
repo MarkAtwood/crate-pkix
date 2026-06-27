@@ -1,0 +1,31 @@
+{
+  "close_reason": "Opinion-level only; not worth addressing",
+  "closed_at": "2026-05-02T18:07:10Z",
+  "compaction_level": 0,
+  "content_hash": "becb99b27d60246db3cb4b5df54e0a1cb3592860fdd58384b795f065a87af773",
+  "created_at": "2026-05-02T18:04:18Z",
+  "created_by": "Mark Atwood",
+  "description": "Doc at TrustAnchor::from_cert says 'Prefer TrustAnchor::from when you need to keep cert alive'. This reads as 'use From by default', but from_cert (consuming) is the natural call when you own a cert from a trust store load and don't need it afterward \u2014 it avoids two unnecessary clones. The preference note should say 'use TrustAnchor::from(&cert) only if you need to use cert after this call', not imply borrow is generally preferred.",
+  "ephemeral": 0,
+  "id": "PKIX-bmo.1",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_cert 'Prefer From' doc implies always borrow, but ownership is fine when cert not reused",
+  "updated_at": "2026-05-02T18:07:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:04:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-bmo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

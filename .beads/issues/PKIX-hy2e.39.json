@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6c467785ddcd273b359b54c789598376c06a71862c26622c4201d6c818088886",
+  "created_at": "2026-05-14T13:03:28Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: a caller-supplied OSCAL Profile imports another Profile, which imports another, and so on for N distinct profiles (no cycle). The resolver tracks a HashSet<String> of currently-on-stack hrefs to reject cycles (oscal/profile.rs:170, 233-238) but does not enforce a maximum recursion depth.\n\nActual bad behavior: each call to resolve_profile_inner adds a stack frame plus a HashSet entry. With N distinct profiles chained, the stack frame count grows linearly. On a default 8 MiB thread stack with a per-frame footprint of a few hundred bytes (the function locals plus the held HashMap reference), an attacker who controls the sources HashMap can construct an input that exhausts the stack and panics or aborts the process. The cycle detection \u2014 'returns ProfileImportCycle if an import would revisit one' (rustdoc at oscal/profile.rs:50) \u2014 defends against the loop case, not the depth case.\n\nSection C \u2014 untrusted input at protocol boundary, no upper bound on variable-length field. OSCAL Profile composition is exactly the protocol-boundary case: the caller passes serde_json::Value loaded from a file or network source.\n\nFix options:\n1. Pass a depth counter through resolve_profile_inner; reject at e.g. depth > 64 with a new ParseError::ProfileImportDepth variant.\n2. Convert the recursion to an explicit work-stack loop (heap-allocated VecDeque or Vec) so depth is bounded by heap, not by stack.\n3. Document the threat and shift responsibility to the caller (acceptable but worse than #1).\n\nEvidence: oscal/profile.rs:174-393, no depth tracking; recurse on every Profile import without bound.\n\nSection: C (untrusted input at protocol boundaries)",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.39",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "OSCAL Profile resolver lacks recursion depth limit \u2014 hostile Profile chain can stack-overflow",
+  "updated_at": "2026-05-14T13:03:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T06:03:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

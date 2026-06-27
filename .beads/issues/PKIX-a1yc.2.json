@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented extract::extract_cdp_http_urls. All three DistributionPointName variants handled (FullName extracts URIs; NameRelativeToCRLIssuer + absent DPN documented and yield empty). HTTP/HTTPS schemes kept; ldap/ftp/file/other filtered. Tests covering: extension absent, single FullName URI, mixed schemes (http+https kept; ldap+ftp filtered), NameRelativeToCRLIssuer (programmatically synthesised since openssl -addext can't produce it), malformed DER. Independent oracle is openssl x509 -text -noout output, hardcoded in assertions. Committed at bb825493.",
+  "closed_at": "2026-05-09T00:19:23Z",
+  "compaction_level": 0,
+  "content_hash": "627f4e04e457a92e22da39176454b2d93def49a5f8b0e927045e949c6b14a50d",
+  "created_at": "2026-05-08T23:27:27Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\npkix-revocation-http needs to extract HTTP/HTTPS CRL Distribution Point URLs from a Certificate's cRLDistributionPoints extension (OID 2.5.29.31). No public helper exists in the workspace. The closest precedent is private `cert_crl_distribution_points` at pkix-revocation/src/crl.rs:1052-1068, plus the shape helpers `dpn_to_general_names` (lines 1092-1110).\n\n## What\n\nPublic helper in pkix-revocation-http (new module `extract` or similar):\n\n```rust\npub fn extract_cdp_http_urls(cert: &x509_cert::Certificate)\n    -> Result<Vec<String>, ExtractError>;\n```\n\nWalk `cert.tbs_certificate.extensions` for OID 2.5.29.31; DER-decode the `CrlDistributionPoints` SEQUENCE OF DistributionPoint; for each DistributionPoint:\n\n1. **DistributionPointName::FullName** \u2014 list of GeneralName; collect URIs (uniformResourceIdentifier shape).\n2. **DistributionPointName::NameRelativeToCRLIssuer** \u2014 relative DN; cannot directly yield a URL \u2014 skip (or document as deferred to caller-side resolution).\n3. **No DistributionPointName** (FullName implicit via cRLIssuer or cert.issuer) \u2014 same: skip with a doc note that fallback to cert issuer is caller's job for v0.x.\n\nFor each collected URI string, **filter to http:// and https:// prefixes only**. Reject ldap://, ftp://, file://, and unknown schemes. The acceptance criterion is HTTP-fetchable URLs, not all transport types.\n\nReturn `Vec<String>` in pool-insertion order (preserve order from extension for deterministic fetch attempts).\n\n## Acceptance\n\n- [ ] Helper handles all three DistributionPointName shapes (the two unsupported are explicitly documented).\n- [ ] http:// and https:// URLs returned; ldap/ftp/file/unknown filtered out.\n- [ ] Returns Ok(empty Vec) when extension absent.\n- [ ] Returns Err on malformed DER (parse failure).\n- [ ] Unit tests with hand-rolled Certificate fixtures (or a constants module of pre-encoded test certs) covering: extension absent, FullName with 1 URI, FullName with 2 URIs (mixed http+ldap \u2192 only http returned), nameRelativeToCRLIssuer (returns empty), malformed DER (returns Err).\n- [ ] Test oracle is openssl: `openssl x509 -in fixture.pem -text -noout` extracted CDP URLs match the helper output. Document the fixture provenance.\n\n## Out of scope\n\n- CDP / IDP scope matching (deferred from PKIX-58m to PKIX-revocation v0.2; tracked separately).\n- LDAP/FTP fetching (most modern PKI uses HTTP only; consumer can post-process).\n\n## Effort\n\n~80 lines + tests + 2-3 fixture certs.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CDP URL extraction helper",
+  "updated_at": "2026-05-09T00:19:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:27:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

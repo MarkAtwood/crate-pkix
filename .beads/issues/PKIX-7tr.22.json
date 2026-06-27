@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:15:46Z",
+  "compaction_level": 0,
+  "content_hash": "d09344d29677abfbf2d1f15d07118c7b4759def30836ca8d2083e6ad7de2fb21",
+  "created_at": "2026-05-02T13:41:49Z",
+  "created_by": "Mark Atwood",
+  "description": "HANDLED_CRITICAL_OIDS (line 338) includes OID_SUBJECT_ALT_NAME with a comment 'recognized but application-level; path validator ignores value'. RFC 5280 section 4.2.1.6 states that when SubjectAltName is critical AND the subject field is empty, the SAN MUST be used instead of the subject for name matching. By listing SAN in HANDLED_CRITICAL_OIDS without any validation, the path validator silently skips a required check: a cert with empty subject and critical SAN will pass check_critical_extensions but names_match will compare against an empty Name. This is a correctness gap that should either be fixed (check SAN when subject is empty) or explicitly documented as a v0.1 limitation with a test that demonstrates the behavior.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "HANDLED_CRITICAL_OIDS includes SubjectAltName but implementation does not validate it",
+  "updated_at": "2026-05-02T14:15:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

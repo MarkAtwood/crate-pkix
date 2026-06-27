@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision B (re-scope to format-agnostic). PKIX-amgn.8 retitled to 'vendor zlint catalog metadata for pkix-lint-cabf (output format TBD)'. .8.3+ blocked on policy-data format decision. Applied under PKIX-ncab.7.",
+  "closed_at": "2026-05-12T16:33:37Z",
+  "compaction_level": 0,
+  "content_hash": "581c5dd7117031e11d748be4bb26029237af77e776615e2f59e3e554c2b8a094",
+  "created_at": "2026-05-12T02:20:23Z",
+  "created_by": "Mark Atwood",
+  "description": "PKIX-amgn.8 is a sub-epic of PKIX-amgn whose purpose is to extract zlint NDJSON and emit OSCAL Catalog JSON consumed by pkix-lint-cabf. Closed children .8.1 (zlint binary install) and .8.2 (pkix-lint-cabf-refresh scaffold) shipped 2026-05-11. Open child .8.3+ (the actual NDJSON \u2192 OSCAL transform) has not started.\n\nWithout OSCAL centrality, decide:\n\n- **A) Close-as-WONTFIX**; zlint metadata vendoring postponed until policy-data format is decided.\n- **B) Re-scope** to format-agnostic \"zlint metadata vendoring\" (extract NDJSON, emit in some neutral form).\n- **C) Split**: keep the metadata-extraction portion; mark the OSCAL emit portion as one optional output (still ships but not primary).\n\nLinked decisions: .4 (pkix-lint-cabf-refresh crate fate).\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of PKIX-amgn.8 (epic 'vendor zlint catalog as OSCAL Catalog JSON')",
+  "updated_at": "2026-05-12T16:33:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

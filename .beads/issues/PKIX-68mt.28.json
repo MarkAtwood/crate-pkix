@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:20Z",
+  "compaction_level": 0,
+  "content_hash": "dc37f17a4d30b2c9d2a3427637d776a9ca269015c67e63d3b5e669ff782675d9",
+  "created_at": "2026-05-14T19:21:18Z",
+  "created_by": "Mark Atwood",
+  "description": "ServerName::dns_name / ServerName::ip_address / MailboxName::parse all take &str. Rust idiom would expose this via FromStr:\n\n  impl FromStr for ServerName<'static> { type Err = IdentityError; ... }\n  impl FromStr for MailboxName<'static> { type Err = IdentityError; ... }\n\n(or the equivalent on the non-'static type if PKIX-68mt.21's lifetime decision goes the other way).\n\nCaller impact:\n\n* parse::<ServerName>() works in TryFrom / TryInto patterns.\n* Serde derive can use FromStr to deserialize from a single string (avoiding the open question on internal representation).\n* clap / argh / structopt derive-from-string works out of the box.\n* Test ergonomics: 'example.com'.parse().unwrap() vs ServerName::dns_name('example.com').unwrap() \u2014 minor but pervasive.\n\nThe DNS-vs-IP disambiguation is the catch: ServerName has two text constructors. FromStr would have to do its own DNS-vs-IP detection. Recommend: ServerName::FromStr tries IP first (the IP-or-DNS grammar is unambiguous: DNS hostnames cannot start with a digit-followed-by-dot in their leftmost label*; actually they can: '1example.com' is legal LDH. The disambiguation rule used by std::net::SocketAddr is 'try to parse as IP, fall back to DNS', which is what FromStr should do).\n\n(*Per RFC 952 leading digit was forbidden; RFC 1123 \u00a72.1 relaxed this. So '1.2.3.4' parses as IP but also could in principle be a DNS hostname of 4 numeric labels; the convention is to prefer IP. Worth documenting.)\n\nFor MailboxName, FromStr trivially defers to MailboxName::parse.\n\nSeverity P3: additive (non-breaking to add later), low-impact, but standard-Rust idiomatic. Worth filing as 1.0 polish.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No FromStr impl on ServerName / MailboxName despite parse-from-str being primary use case",
+  "updated_at": "2026-06-15T18:51:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:21:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

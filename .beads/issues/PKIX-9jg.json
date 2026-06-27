@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:32:48Z",
+  "compaction_level": 0,
+  "content_hash": "5551a30b010cdeba2ff1c8f2196071dee5f59a7bae3cd98709d584c205d343ae",
+  "created_at": "2026-05-02T23:21:11Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nImplement the per-certificate NameConstraints state update in chain_walk per RFC 5280 \u00a76.1.4(b).\n\n## Algorithm\nAfter processing each intermediate CA cert (not the EE):\n1. Extract NC from this cert via cert_name_constraints()\n2. If Some(nc):\n   a. permittedSubtrees: INTERSECT current permitted_subtrees with nc.permitted_subtrees\n      - If permitted_subtrees is None (unconstrained), set to nc.permitted_subtrees\n      - If nc.permitted_subtrees is None, keep current (no further restriction)\n      - If both Some: keep only subtrees present in both (variant-by-variant intersection)\n   b. excludedSubtrees: UNION current excluded_subtrees with nc.excluded_subtrees\n      - Append nc.excluded_subtrees entries to excluded_subtrees\n\n## Defensive programming\n- Treat missing permittedSubtrees in NC as \"no additional restriction on permitted\"\n- Treat missing excludedSubtrees in NC as \"no additional exclusions\"\n- Self-issued intermediate CAs: skip NC state update (RFC 5280 \u00a76.1.4(b) exception)\n  Self-issued = issuer DN == subject DN (use existing name_matches())\n\n## Acceptance criteria\n- After processing a CA with permittedSubtrees=[.example.com], permitted_subtrees reflects that restriction\n- After processing a CA with excludedSubtrees=[.evil.com], .evil.com is in excluded_subtrees\n- Self-issued intermediate: state not updated\n- Depends on: PKIX-xlp (cert_name_constraints), PKIX-cg1 (state vars)",
+  "ephemeral": 0,
+  "id": "PKIX-9jg",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement NC state update (INTERSECTION/UNION)",
+  "updated_at": "2026-05-02T23:32:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-cg1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-02T16:21:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-xlp",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

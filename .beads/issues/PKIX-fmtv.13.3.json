@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:14:19Z",
+  "compaction_level": 0,
+  "content_hash": "f3bebe6eacc8f824ded9687c036514a1b97c024479785bc655aecac4de642b92",
+  "created_at": "2026-05-13T01:59:14Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "Ship `pkix_chain::verify_ocsp_responder` with the RFC 6960 delegation + nocheck handling. NOT a thin wrapper \u2014 the delegation check is the only non-trivial piece in PKIX-fmtv.13's scope.\n\n## RFC 6960 \u00a74.2.2.2 trust model\n\nAn OCSP responder cert MUST be one of:\n1. The CA that issued the cert being status-checked (self-signing).\n2. A cert that the CA itself **signed** for OCSP signing (delegation). The delegated responder cert MUST:\n   - Be signed by the same CA whose certs it provides OCSP responses for.\n   - Carry id-kp-OCSPSigning (1.3.6.1.5.5.7.3.9) in extKeyUsage.\n   - The CA's id-pkix-ocsp-nocheck extension MAY appear on the responder cert, signaling 'do not check revocation on this responder cert' (avoids infinite OCSP loop).\n\nThe wrapper signature differs from the other .13 wrappers because it takes an `issuer: &Certificate` arg: 'verify that this OCSP responder cert was delegated by this specific issuer CA'.\n\n## Deliverable\n\n### pkix-profiles: BasicOcspResponderProfile\n\n`required_leaf_eku = [ID_KP_OCSP_SIGNING]`. Add OID `ID_KP_OCSP_SIGNING = 1.3.6.1.5.5.7.3.9`.\n\n### pkix-chain: verify_ocsp_responder\n\n```rust\npub fn verify_ocsp_responder<P, R>(\n    chain: &[Certificate],\n    anchors: &[TrustAnchor],\n    issuer: &Certificate,       // CA whose certs the responder asserts status on\n    profile: &P,\n    now_unix: u64,\n    revocation: &R,\n) -> crate::Result<ValidatedPath>\nwhere P: Profile, R: RevocationChecker\n{\n    // Path validation + EKU check (id-kp-OCSPSigning).\n    let policy = profile.policy(now_unix);\n    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;\n\n    // Delegation check: chain[0] (responder cert) MUST be signed by the\n    // specific issuer cert passed in. The responder's issuer DN must match\n    // issuer.subject_name, and the responder's signature verifies under\n    // issuer.subject_public_key_info.\n    verify_responder_is_delegated_by(&chain[0], issuer)?;\n\n    Ok(validated)\n}\n```\n\n`verify_responder_is_delegated_by` compares issuer DNs (using pkix-path's RFC 4518 string prep DN comparison) and verifies the signature on the responder cert against the issuer's SPKI (using DefaultVerifier).\n\n### id-pkix-ocsp-nocheck handling\n\nPer PKIX-fmtv.7's resolution: 'verify_ocsp_responder additionally honors id-pkix-ocsp-nocheck per RFC 6960 \u00a74.2.2.2.1 to skip revocation of the responder cert when present.' If chain[0] carries the id-pkix-ocsp-nocheck extension (OID 1.3.6.1.5.5.7.48.1.5), the wrapper MUST skip the revocation check on chain[0]. This requires special-casing the revocation loop; the simplest implementation wraps the caller-supplied `revocation` in a shim that returns Ok(()) for chain[0] when nocheck is present.\n\n## Tests\n\n- Positive: responder cert with id-kp-OCSPSigning EKU + signed by issuer + valid chain \u2192 Ok.\n- Negative: responder cert signed by a DIFFERENT issuer than the one passed in \u2192 Error::OcspDelegation (new variant?).\n- Negative: responder cert missing id-kp-OCSPSigning EKU \u2192 Error::Path (existing).\n- Positive: responder cert with nocheck + a revocation oracle that would revoke it \u2192 Ok (nocheck wins).\n- Negative: responder cert without nocheck + revocation oracle that revokes it \u2192 Error::Revocation.\n\n## Fixture\n\nAdd `leaf-ocsp-responder.der` and `leaf-ocsp-responder-nocheck.der` to pkix-chain/tests/fixtures/. Also export the issuer cert separately so the test can pass it as the `issuer` arg.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.13.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_ocsp_responder wrapper + BasicOcspResponderProfile (RFC 6960 delegation + nocheck)",
+  "updated_at": "2026-05-13T05:14:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T18:59:14Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-fmtv.13",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

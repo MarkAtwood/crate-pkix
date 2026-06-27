@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T10:26:04Z",
+  "compaction_level": 0,
+  "content_hash": "3224b83e3f998e5ef5cb138f538e69900ac7f2940f2c1f5319b6c1add8fb617b",
+  "created_at": "2026-05-11T09:39:46Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nFinal leg of PKIX-g9vc. Produces the committed baseline data and the hand-classification artefact that the project expects (matching the PKITS pattern: `baseline-pkits.json` machine + `baseline-pkits-analysis.md` curated).\n\n## What\n\n1. Run the full corpus end-to-end:\n   ```\n   cargo run --release -p pkix-difftest -- run limbo \\\n     ~/GIT/x509-limbo/limbo.json \\\n     --oracles pkix-path,openssl,pyca \\\n     --output-md pkix-difftest/baseline-limbo.md \\\n     --output-json pkix-difftest/baseline-limbo.json \\\n     --title \"pkix-difftest baseline (x509-limbo Tier-2)\"\n   ```\n   Expected wall time: ~15 min \u00d7 3 oracles \u2248 45 min (pyca subprocess startup dominates).\n2. Commit `baseline-limbo.json` and `baseline-limbo.md`.\n3. Write `pkix-difftest/baseline-limbo-analysis.md` (curated, mirrors `baseline-pkits-analysis.md` structure):\n   - Summary table: Agreement / LooserThanWild / StricterThanWild / OracleDivergence / DiagnosticDivergence counts.\n   - Bucket every `LooserThanWild` and `StricterThanWild` divergence by failure category (policy, name constraints, EKU, signature alg, time, etc.).\n   - For each bucket: brief rationale + decide whether it's a real divergence (file follow-up bead) or expected (project policy comment, like `pkix-path-rfc-strict-vs-openssl-lenient` memory).\n4. File follow-up beads for any real divergences uncovered.\n5. Update workspace AGENTS.md or pkix-difftest/README.md to mention x509-limbo as a supported corpus.\n\n## Acceptance\n\n- [ ] `baseline-limbo.json` + `baseline-limbo.md` committed.\n- [ ] `baseline-limbo-analysis.md` committed, matches PKITS-analysis structure.\n- [ ] Every `LooserThanWild`/`StricterThanWild` entry has either a follow-up bead or an inline justification.\n- [ ] README references the limbo corpus path.\n\n## Depends on\n\n- PKIX-g9vc.1, PKIX-g9vc.2, PKIX-g9vc.3 (all of the above plumbing).\n\n## Out of scope\n\n- CI integration of limbo runs (covered by PKIX-klku).\n- Per-testcase divergence drill-down beyond bucket classification (those become individual follow-up beads).\n- Refreshing pyca `.venv` if it goes stale (operational, not in this bead).\n\n## Filed as\n\nFinal decomposition of PKIX-g9vc. Closes the umbrella when done.",
+  "ephemeral": 0,
+  "id": "PKIX-g9vc.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: run x509-limbo baseline + curated analysis",
+  "updated_at": "2026-05-11T10:26:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T02:39:46Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T02:39:52Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

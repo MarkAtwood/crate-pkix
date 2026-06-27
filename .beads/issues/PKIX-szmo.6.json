@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Review scan completed from earlier run. 21 findings (3 Medium, 9 Low, 9 Info). Report at /tmp/skoll-review-z8MJ8c.md and /tmp/skoll-review-pdQeMz.json",
+  "closed_at": "2026-06-04T18:01:47Z",
+  "compaction_level": 0,
+  "content_hash": "8bbe94ef1b3c8ae618f97be56fe1373498e88b38f2c99ec3c6b014d0f6d7f03e",
+  "created_at": "2026-06-04T17:28:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Run 'skoll review' from ~/PROJECT/PKIX. Covers code quality, API conventions, test gaps, documentation gaps, and ergonomic issues. Lower priority than rfc/security/consttime since the workspace already has extensive quality tooling (clippy -D warnings, strict rustdoc, fmt, typos), but may surface cross-crate API consistency issues the per-crate lints miss. Save output: 'skoll review --out ~/PROJECT/PKIX/reports/skoll-review.md'.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Skoll review scan \u2014 code quality and conventions",
+  "updated_at": "2026-06-04T18:01:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

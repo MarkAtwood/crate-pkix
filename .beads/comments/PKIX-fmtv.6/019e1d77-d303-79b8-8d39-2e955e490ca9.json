@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:34:13Z",
+  "id": "019e1d77-d303-79b8-8d39-2e955e490ca9",
+  "issue_id": "PKIX-fmtv.6",
+  "text": "DECISION 2026-05-12 (Mark, interactive, forced cascade from PKIX-fmtv.5): B) Parallel pipeline. pkix-chain's verify_* wrappers handle trust-decision only and return Result<ValidatedPath, Error>. pkix-lint runs separately via the existing pkix_lint::LintRunner. Callers compose: 'let path = verify_tls_server(...)?; let lints = lint_catalog.run(&path.leaf_cert());'. Cascade rationale: PKIX-fmtv.5 chose A (pass-through Result, no VerifyReport.findings vec), which mechanically rules out option A on this bead (a VerificationPolicy adapter has nothing to write into). Trade-off accepted: lint findings cannot influence the trust verdict (which is correct -- lints are advisory by definition; pkix-lint already lives in a separate crate per PKIX-amgn architecture). CASCADES TO: PKIX-fmtv.14 (originally 'Implement policies::lint_catalog adapter'). Under .6 = B, the adapter does not exist as a type. .14 either closes WONTFIX or re-scopes to 'document the recommended parallel-pipeline composition pattern in pkix-chain rustdoc + add an optional thin verify_and_lint() convenience'. Will flag .14 for re-scope or closure in a follow-up."
+}

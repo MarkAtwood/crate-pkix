@@ -1,0 +1,31 @@
+{
+  "close_reason": "Not a bug: two-way name_matches_subtree is correct for semantic equality detection. Reviewer confirmed this in the issue description.",
+  "closed_at": "2026-05-05T16:09:43Z",
+  "compaction_level": 0,
+  "content_hash": "6400083265291108d26c09ceeee1dd93038cb630b157a5d7fc6a531238bc4b40",
+  "created_at": "2026-05-05T15:47:47Z",
+  "created_by": "Mark Atwood",
+  "description": "**Issue**: At lib.rs:2025-2029, the excludedSubtrees deduplication uses a two-way `name_matches_subtree` check to determine if two entries are 'the same subtree':\n\n```rust\\nlet already_present = nc_excluded.iter().any(|existing| {\\n    same_nc_variant(&existing.base, &new_entry.base)\\n        && name_matches_subtree(&existing.base, new_entry)\\n        && name_matches_subtree(&new_entry.base, existing)\\n});\\n```\n\nThe two-way match (A matches B AND B matches A) is correct for *exact* subtree equality but fails to deduplicate cases where one subtree is a strict subset of another. For example, if nc_excluded already contains '.example.com' and a CA adds '.sub.example.com', these are NOT bi-directionally matching (sub.example.com \u2282 example.com, not equal), so both entries are kept. This is semantically correct for RFC 5280: a more-specific excluded entry is not redundant with a less-specific one; the exclusion list is a union of all excluded regions.\n\n**However**: The code comment at line 2021 says 'two entries are considered the same subtree when each matches the other (i.e., they are semantically equivalent, not just byte-equal).' This is the right framing. The two-way check correctly identifies exact duplicates. Supersets and subsets are correctly NOT deduplicated.\n\n**The actual subtle issue**: For DNS names, `name_matches_subtree(existing, new_entry)` asks 'does existing.base match the constraint new_entry?' \u2014 i.e., is existing.base within new_entry's subtree? So the two-way check asks: 'is A within B AND is B within A?' For DNS, this means both are the same hostname or subdomain relationship is symmetric \u2014 which for finite-depth subtrees only holds when they're equivalent.\n\nFor DirectoryName, `dn_within_subtree` checks prefix containment. Two-way containment means they share an exact common prefix of equal length, which again means they're equal (both have the other as a prefix \u2192 same length \u2192 same DN). This IS correct for equality detection.\n\n**Resolution**: The two-way check is semantically correct for deduplication. No bug. But add a comment explaining WHY two-way is correct (mutual containment implies equality for these name types) to prevent future readers from 'optimizing' it to one-way.\\n\\n**Location**: pkix-path/src/lib.rs:2025-2029\\n\\n**Severity**: P4 (documentation only \u2014 the code is correct but confusing)",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.23",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_excluded dedup uses two-way subtree match \u2014 semantically wrong",
+  "updated_at": "2026-05-05T16:09:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

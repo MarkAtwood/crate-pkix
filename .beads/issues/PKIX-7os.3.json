@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:40Z",
+  "compaction_level": 0,
+  "content_hash": "0c43e925d2a876501f2d996cef4bb9b7cf7e427baa3912d505ae01dfb39cf981",
+  "created_at": "2026-05-02T14:38:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain has crl and ocsp Cargo features that activate pkix-revocation/crl and pkix-revocation/ocsp. But pkix-chain::lib.rs only re-exports NoRevocation and RevocationChecker from pkix-revocation. A user who enables pkix-chain/crl and wants use pkix_chain::CrlChecker; will get a compile error. They must add pkix-revocation as a direct dependency and use pkix_revocation::CrlChecker. This defeats the point of the umbrella crate's convenience.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: crl/ocsp features don't re-export CrlChecker/OcspChecker",
+  "updated_at": "2026-05-02T14:48:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:38:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

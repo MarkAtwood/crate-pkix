@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-06T20:51:52Z",
+  "compaction_level": 0,
+  "content_hash": "39a2787d611324c5efffcea3a14d86479a7bbd455ef49e0f77c54b5803efa87b",
+  "created_at": "2026-05-06T20:51:41Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/cabf_tls_br.rs ValidityMaxLint::check_cert() at line 112: fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) \u2014 the _now_unix parameter is named with underscore prefix (correctly indicating it is intentionally unused), and the lint uses cert.tbs_certificate.validity.not_before as the issuance time instead. The doc comment at lines 83-88 explains this is correct per SC-081: 'The cap phase is evaluated at the certificate's notBefore (issuance time), not at the relying party's current time.' This is intentional and correct. However, the test at cabf_tls_br_tests.rs:96-108 (validity_max_pass_pre_sc081_evaluated_late) correctly tests that now_unix does NOT affect the result. This finding is actually NOT a bug. The code is correct and intentional. Close as P4/opinion.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING (P4/not-a-bug): ValidityMaxLint ignores now_unix intentionally per SC-081",
+  "updated_at": "2026-05-06T20:51:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

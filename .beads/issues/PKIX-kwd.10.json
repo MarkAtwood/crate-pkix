@@ -1,0 +1,31 @@
+{
+  "closed_at": "2026-05-06T15:13:06Z",
+  "compaction_level": 0,
+  "content_hash": "e316fa94a9cd6b708563fe4067e6621dc04c70c306cd547ae17c4c03c2593a95",
+  "created_at": "2026-05-06T15:12:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs \u00a76.1.5(g) cascade deletion (line 2357): 'for d in 2..=leaf_depth'. The vpns nodes (which were deleted at depth=vpns_depth) are at depth >= 1. Their children start at depth+1. If vpns nodes are at depth 1, their children at depth 2 are handled by d=2. But the tree.retain for to_delete_vpns (line 2350) handles vpns nodes themselves. After deleting vpns nodes, the cascade starts at d=2 to clean up children of deleted vpns nodes. This looks correct for the case where vpns nodes are at depth 1. BUT: the comment says vpns nodes are 'nodes whose parent has valid_policy == anyPolicy' \u2014 for deeper trees, vpns nodes can be at depth > 1 (if there are intermediate anyPolicy nodes). For a 3-cert chain with anyPolicy at depth 2, vpns nodes are at depth 3 (leaf). The cascade for their children would start at d=4 which is leaf_depth+1 \u2014 out of range, no iteration. This case (leaf-depth vpns) is correctly handled: no children exist at leaf_depth+1 so there's nothing to cascade-delete. Verify this edge case with a deeper test chain.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "FALSE POSITIVE after deeper analysis. The cascade 'for d in 2..=leaf_depth' is a general sweep that correctly propagates deletions from any depth. It doesn't need to know the depth of the vpns nodes - it sweeps all depths from 2 to leaf_depth, removing any node whose parent no longer exists. This correctly handles vpns nodes at any depth. Closing.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "\u00a76.1.5(g) cascade deletion only starts at d=2, skipping depth-1 vpns children cleanup",
+  "updated_at": "2026-05-06T15:13:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:12:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

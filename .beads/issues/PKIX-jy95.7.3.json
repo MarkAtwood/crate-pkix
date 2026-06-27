@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T03:49:11Z",
+  "compaction_level": 0,
+  "content_hash": "6f36e711845cfc52849e802020fd0a6081ff5d6d57593b794665da7b1e259396",
+  "created_at": "2026-05-13T03:28:28Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "## What\n\nImplement `ZlintBridge::run_on_cert(cert_der: &[u8]) -> Result<HashMap<String, Verdict>, PerCertError>` plus the per-cert SHA-256 verdict cache that makes the ~700-Lint adapter in `pkix-policy-zlint` viable.\n\n## Architecture\n\nPer PKIX-jy95.1: callers will spin up one Lint impl per zlint check (~700 impls), and each Lint will invoke `run_on_cert` for its check. Without a cache, that triggers 700 subprocess invocations per cert. The bridge caches by SHA-256(cert_der) -> HashMap<check_id, Verdict> so per-cert subprocess cost is paid once.\n\nCache lives on the `ZlintBridge` handle. Thread-safe (`Mutex<...>` or equivalent). Per-handle scope; if the consumer wants cross-handle persistence they layer their own.\n\n## Implementation notes\n\n- Pipeline:\n  1. Hash `cert_der` (SHA-256).\n  2. Cache lookup. If hit, return cloned `HashMap`.\n  3. Write `cert_der` to a temp file (`tempfile` crate or `std::env::temp_dir()` + uniquification). Cleanup on drop.\n  4. Spawn `<zlint_path> -format der <tempfile>`. Apply `BridgeConfig::timeout`.\n  5. Read stdout. zlint emits one JSON object: `{\"<check_id>\": {\"result\": \"<verdict_string>\"}, ...}`.\n  6. Parse verdict strings: `NA` / `NE` -> `Verdict::NotApplicable`; `pass` -> `Pass`; `notice` -> `Notice`; `warn` -> `Warn`; `error` -> `Error`; `fatal` -> `Fatal`. Unknown -> `OutputParseError`.\n  7. Populate cache, return cloned map.\n- Per-cert error mapping: zlint exits non-zero with stderr like `error parsing certificate: ...` for `MalformedDer`. Bridge maps to `PerCertError::MalformedDer { detail }`. Anything else non-zero is `Other { detail }`.\n\n## Surface\n\n`impl ZlintBridge { pub fn run_on_cert(&self, cert_der: &[u8]) -> Result<HashMap<String, Verdict>, PerCertError>; }`\n\n## Tests\n\n- Integration test against real zlint binary using a PKITS cert (already in workspace under `pkix-path/tests/pkits/certs/`):\n  - First call returns populated map with > 100 entries.\n  - Second call with same `cert_der` returns identical map (cache hit; assert no subprocess overhead via timing or instrumented bridge).\n  - Mutated `cert_der` (single byte flip in a non-signature region; or simply use a different PKITS cert) returns different map.\n- Malformed input test: pass empty `cert_der` or garbage; assert `PerCertError::MalformedDer`.\n- Verdict-mapping unit test: synthetic JSON line with each of NA/NE/pass/notice/warn/error/fatal.\n\n## Acceptance\n\n- [ ] `run_on_cert` implementation + cache layer\n- [ ] Tests: positive integration, cache equivalence, mutated input, malformed input, verdict-mapping units\n- [ ] cargo build / clippy --all-features -D warnings / fmt --check / doc --no-deps clean\n- [ ] CHANGELOG entry under Unreleased citing PKIX-jy95.7.3\n\n## Out of scope\n\n- `run_on_certs` batch (PKIX-jy95.7.4 \u2014 depends on this for cache primitives)\n- Persistent / cross-process cache (caller responsibility)\n\n## Cross-references\n\n- PKIX-jy95.7.1 (types)\n- PKIX-jy95.7.2 (enumerate_lints; sibling)\n- PKIX-jy95.1 (cache rationale)\n- PKIX-jy95.2 (verdict mapping)\n- AGENTS.md non-negotiable #6 (batch-friendliness)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.7.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-zlint-bridge: run_on_cert() + per-cert SHA-256 verdict cache",
+  "updated_at": "2026-05-13T03:49:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T20:28:28Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T20:28:50Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-jy95.7.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

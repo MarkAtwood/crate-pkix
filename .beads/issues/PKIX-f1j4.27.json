@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b279e289cb040b82a02a1a1fa9e5857da7a551b5ca6c17c8f77b470d969c3da4",
+  "created_at": "2026-05-14T19:05:01Z",
+  "created_by": "Mark Atwood",
+  "description": "HttpCrlFetcher, HttpOcspFetcher, AsyncHttpCrlFetcher, AsyncHttpOcspFetcher,\nCachedHttpCrlFetcher, and CachedHttpOcspFetcher all take \\`now_unix: u64\\` at\nconstruction (lib.rs:343, lib.rs:389, async_fetcher.rs:165, async_fetcher.rs:198)\nand freeze it for the lifetime of the value. The rustdoc on each \\`new()\\`\ndescribes the argument as \\\"current time as seconds since the Unix epoch\\\" with\nno warning that the value is captured, not re-read.\n\nCaller contract gap: a caller who builds the fetcher once at startup and reuses\nit across requests gets a validator that never advances. Validity-period\nchecks, CRL freshness, OCSP \\`nextUpdate\\` enforcement all evaluate against\nwhatever wall-clock the caller passed weeks ago. Two failure modes follow:\n\n1. Long-uptime services will accept revoked certs whose CRL has rotated past\n   the captured \\`now_unix\\`.\n2. Callers who notice and reconstruct the fetcher on every \\`check_revocation\\`\n   call rebuild the whole \\`F + V\\` state per check (clones, agent re-use lost,\n   cache pointer churn).\n\nThe rustdoc must either:\n\n- Document that \\`now_unix\\` is a per-invocation parameter and require the\n  caller to reconstruct the fetcher on every check; OR\n- Accept a \\`time_source: impl Fn() -> u64\\` callback so the validator can\n  re-read at \\`check_revocation\\` time without forcing reconstruction.\n\nThe latter is the strictly more flexible contract. Either way, the silent\nfreezing-of-time is undocumented and the doc comment misleads readers.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "now_unix captured at construction; long-lived fetchers validate against stale time",
+  "updated_at": "2026-05-14T19:05:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:05:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

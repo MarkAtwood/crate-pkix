@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done. BEGIN_BOUNDARY const moved to lib.rs:432, immediately after UTF8_BOM and before any use site.",
+  "closed_at": "2026-05-14T08:17:48Z",
+  "compaction_level": 0,
+  "content_hash": "bd99d27f5af2a119518c12239246e737611904aa94b2bfe2e8b29af27ae145f9",
+  "created_at": "2026-05-14T05:16:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:268 / 325 / 337 \u2014 `UTF8_BOM` is declared at line 268 (just before the `strip_bom` helper that uses it). `BEGIN_BOUNDARY` is first used at line 325 inside `from_pem` but is declared at line 337, AFTER the function that uses it. Rust accepts the forward reference at module scope, but the placement is awkward:\n\n1. Reader scanning top-down hits the use at line 325, has to scroll past the function body to find the declaration at 337.\n2. The two constants are conceptually related (both are PEM-parsing byte-literal sentinels) but are not co-located.\n\nFix: move `BEGIN_BOUNDARY` next to `UTF8_BOM` (line 269 or so), or group both in a single module-scope block before the first function that uses either. What goes wrong if it stays: minor code-organization debt; mildly harder to skim the module for 'what constants does this crate define'. Pure readability finding, no semantic effect.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.23",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "BEGIN_BOUNDARY const declared 12 lines after first use, separated from related UTF8_BOM",
+  "updated_at": "2026-05-14T08:17:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:16:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

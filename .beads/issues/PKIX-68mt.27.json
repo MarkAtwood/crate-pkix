@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:21Z",
+  "compaction_level": 0,
+  "content_hash": "495a431eab53d18ce96e4a64575a84c443849c0029d0a2cd18aa59713a503ff6",
+  "created_at": "2026-05-14T19:20:56Z",
+  "created_by": "Mark Atwood",
+  "description": "The crate's public surface \u2014 ServerName, MailboxName, IdentityError, verify_dns_name, verify_mailbox \u2014 has no documented contract for:\n\n1. **Panic conditions.** The crate uses idna::domain_to_ascii (FFI-ish behavior on extreme input), Vec allocations (could panic on OOM in no_std with allocator failures), and ObjectIdentifier::new_unwrap at const-eval time. The doc comments say 'Returns IdentityError::MalformedInput for ...' but never 'this function never panics' or 'panics only on allocation failure'. Callers writing panic-free integration code (e.g., a TLS server that catch_unwind's its connection handlers) cannot tell.\n\n2. **Send / Sync / UnwindSafe / RefUnwindSafe.** Auto-traits will likely apply (ServerName holds Cow<'a, str>, MailboxName holds two Cows + bool, IdentityError is plain data) but the contract is implicit, not promised. A future change that adds an Rc<...> field would silently break callers.\n\n3. **Allocation behavior.** Some paths borrow (Cow::Borrowed) and some allocate (Cow::Owned). The doc comments on ServerName mention this for the lifetime case but don't lay out the allocation contract for callers wanting to count allocs (e.g., embedded callers, zero-alloc TLS stacks).\n\n4. **Iterator-style API contract on verify_*.** Walks SAN entries; on the first match returns Ok. Order-of-walk is not documented; a SAN with both a matching wildcard and a matching exact name \u2014 which wins? Probably doesn't matter for correctness (both are Ok), but callers writing diagnostics that want to know 'how many SAN entries did we walk before matching' get no contract.\n\nRecommend: add a section to the crate-level rustdoc:\n\n  # Contract\n  - All public APIs are panic-free except on allocation failure (alloc::Vec OOM).\n  - ServerName, MailboxName, IdentityError are Send + Sync + UnwindSafe + RefUnwindSafe.\n  - Allocation: dns_name() allocates only if input is non-ASCII or non-lowercase; ip_address() never allocates; parse() allocates for the domain A-label if input is non-ASCII or non-lowercase.\n  - SAN walk order: verify_* walks SAN entries in the order x509-cert returns them; matches are short-circuit on first.\n\nSeverity P3: docs work; once written, the contract is set.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No documented panic / Send / Sync / unwind contract on public API",
+  "updated_at": "2026-06-15T18:51:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:20:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

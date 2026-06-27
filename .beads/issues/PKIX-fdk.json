@@ -1,0 +1,22 @@
+{
+  "close_reason": "Added invariant comment to NormalizedIter::next pending_space state machine",
+  "closed_at": "2026-05-02T17:20:09Z",
+  "compaction_level": 0,
+  "content_hash": "cbf3cc950f4d3cca0204dda87772fa680d4cf664995dae511828fe199673d8e3",
+  "created_at": "2026-05-02T17:15:27Z",
+  "created_by": "Mark Atwood",
+  "description": "The pending_space flag implementation is correct and handles leading/trailing/multiple-internal-space collapsing correctly. However, the coupling between the flag and position tracking (pos increments) is implicit. If a future maintainer extends this to handle other whitespace (tabs, NBSP) for v0.2 Unicode support, they could introduce double-emission or trailing-space bugs. Document the exact state machine invariant: 'after emitting a space, the next next() call must skip all consecutive space characters without advancing pos beyond non-space'. Add a comment block explaining the state transitions.",
+  "ephemeral": 0,
+  "id": "PKIX-fdk",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter: document state machine invariants for whitespace handling extensions",
+  "updated_at": "2026-05-02T17:20:09Z"
+}

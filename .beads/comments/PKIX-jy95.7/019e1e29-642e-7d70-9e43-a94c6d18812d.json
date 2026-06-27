@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:48:10Z",
+  "id": "019e1e29-642e-7d70-9e43-a94c6d18812d",
+  "issue_id": "PKIX-jy95.7",
+  "text": "DESIGN CONSTRAINT 2026-05-12 (cascade from PKIX-jy95.1 = A2): bridge crate MUST expose two complementary entry points:\n\n1. `enumerate_lints() -> Vec<ZlintLintInfo>` -- runs `zlint -listLintsJSON` (or equivalent), parses, returns metadata for every check in zlint's catalog. Called once per session by the pkix-policy-zlint adapter to discover available Lints. ZlintLintInfo carries: check ID, title, description, citation, source classification (cabf-br-tls / smime / cs / etc.), effective date.\n\n2. `run_on_cert(cert: &Certificate) -> Vec<(CheckId, Verdict)>` -- spawns zlint, feeds the cert, parses verdicts for ALL applicable checks at once. Per-cert result MUST be cached (memoize by cert hash) so that the ~700 per-check Lint impls in the adapter can each read from cache without re-spawning zlint.\n\nCache shape per non-negotiable #6: result types Clone + Send + Sync + serde behind feature flag; cache may be in-memory (HashMap<CertHash, Vec<(CheckId, Verdict)>>) with bounded LRU eviction or caller-provided. Adapter doesn't need to know cache implementation; just that run_on_cert is cheap on repeated calls.\n\nARCHITECTURAL CONSEQUENCE: bridge crate IS the authoritative source for 'what lints exist' AND 'what verdicts a cert gets'. The adapter is a thin shell that translates Verdict -> LintResult per-check."
+}

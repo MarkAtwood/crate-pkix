@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:03:23Z",
+  "compaction_level": 0,
+  "content_hash": "e36e5d688f19206974c527be7aeed3e72750e3c34bc4a96a10f2404ff732e052",
+  "created_at": "2026-05-02T13:43:12Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs lines 116-119: if single.next_update is None, the upper-bound validity check is skipped. RFC 6960 \u00a74.2.2.1 states nextUpdate is optional but when absent the response is valid indefinitely. Silently accepting an OCSP response with no nextUpdate means a stale 'good' response could be used forever. This is the same security hole as in CrlChecker for absent nextUpdate: an old cached OCSP response remains valid with no expiry.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.42",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker skips nextUpdate check when next_update is absent",
+  "updated_at": "2026-05-02T14:03:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:43:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

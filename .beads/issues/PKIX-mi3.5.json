@@ -1,0 +1,38 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:19Z",
+  "compaction_level": 0,
+  "content_hash": "1e381b1b15a082f4808b3c05c5ccf02bd78b5757a28fcac6bb277a2912b55350",
+  "created_at": "2026-05-05T14:33:36Z",
+  "created_by": "Mark Atwood",
+  "description": "After loop completes (leaf cert i==0): step (a-b) handle final explicit_policy decrement and PolicyConstraints on leaf. Step (g) intersect policy_tree with user-initial-policy-set. Final check: if explicit_policy==0 and policy_tree is None, return PolicyViolation.",
+  "ephemeral": 0,
+  "id": "PKIX-mi3.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 5280 \u00a76.1.5: wrap-up and final policy check",
+  "updated_at": "2026-05-05T15:25:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

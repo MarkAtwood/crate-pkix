@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:47Z",
+  "compaction_level": 0,
+  "content_hash": "357d9c56af3ad5e5247384dd6dbe6ae0cc1826138bb5879bda6438514d6f8ba2",
+  "created_at": "2026-05-02T20:34:27Z",
+  "created_by": "Mark Atwood",
+  "description": "In names_match, the forward pass calls ava_values_match(&a_ava.value, &b_ava.value) and the reverse pass calls ava_values_match(&b_ava.value, &a_ava.value). Since ava_values_match is symmetric, this is not a bug. But the inconsistency is a review red-flag: a reader who doesn't already know the function is symmetric will spend time convincing themselves the reversed args are intentional. Fix: make the reverse pass call ava_values_match(&a_ava.value, &b_ava.value) consistently (find a_ava matching b_ava, in the standard argument order).",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "names_match reverse-pass swaps ava_values_match argument order inconsistently",
+  "updated_at": "2026-05-02T20:36:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

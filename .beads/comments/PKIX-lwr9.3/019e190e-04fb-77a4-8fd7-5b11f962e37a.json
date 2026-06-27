@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T22:00:10Z",
+  "id": "019e190e-04fb-77a4-8fd7-5b11f962e37a",
+  "issue_id": "PKIX-lwr9.3",
+  "text": "Closed as phantom 2026-05-11 by PKIX-lwr9.6 re-baseline. Zero of the 8 'path length exceeds maximum' cases this bead was framed around are present in the post-.6 StricterThanWild residuals. Like PKIX-lwr9.2, the failures were the harness bypassing pkix-path-builder, not a missing pathLenConstraint backtracking feature."
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:41:25Z",
+  "compaction_level": 0,
+  "content_hash": "42b406398f5645be3a21d51f07748284d0815fb4cab818cc534aaf14200ca766",
+  "created_at": "2026-05-07T16:13:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:763-765 \u2014 ValidatedPath.depth doc comment:\n  'Note: this counts all certificates except the trust anchor \u2014 including self-issued intermediates that RFC 5280 \u00a74.2.1.9 excludes from the pathLenConstraint count. For chains with self-issued intermediates the depth field may be larger than the RFC 5280 path length.'\n\nThis is correctly documented. However in validate_path, depth is set as:\n  `depth: chain.len().saturating_sub(1)`\n\nFor a chain [leaf, int], depth = 1. For [leaf, int, self_issued_int], depth = 2. The pathLenConstraint check uses num_non_si_intermediates which excludes self-issued. These are intentionally different metrics.\n\nThe depth field is used in tests (e.g., ValidatedPath::depth == 1 in two_cert_chain_ok). If a caller uses depth to compare against a pathLenConstraint they copied from a certificate, they'd get the wrong answer.\n\nP3 \u2014 the doc comment is correct but the dual semantics (raw chain depth vs RFC 5280 path length) may confuse callers. Add a cross-reference in ValidatedPath.depth doc to the distinction. No code bug.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path doc: ValidatedPath depth field counts ALL intermediates including self-issued",
+  "updated_at": "2026-05-07T16:41:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:13:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

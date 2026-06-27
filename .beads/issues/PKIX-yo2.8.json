@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:52Z",
+  "compaction_level": 0,
+  "content_hash": "7d67dbba40b2a3664ee60f2d8a5893b05b4cd33d90c800cd20d20ec4026e90d5",
+  "created_at": "2026-05-02T20:34:43Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor is not signature-verified. RFC 5280 \u00a76.1.1(c) explicitly says the trust anchor's signature is not checked \u2014 it is trusted by definition. A contributor who adds signature verification of the trust anchor would diverge from the spec and would break legitimate use of expired root CAs as anchors (which is valid, per the spec). The current design is correct and should be defended.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.8",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: trust anchor not signature-verified \u2014 RFC 5280 \u00a76.1.1(c) compliance",
+  "updated_at": "2026-05-02T20:36:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Landed in c66b8ac1. Extracted policy_tree_post_op_prune helper handling the 'prune childless ancestors + collapse to NULL if no depth>=1 nodes' pattern. Sites 1 (\u00a76.1.3(d)(3)) and 3 (\u00a76.1.5(g)(iii)(4)) collapsed to single helper calls; site 2 (\u00a76.1.4(b) post-mappings) uses the helper with prune_depth=0 for the NULL-check half (the prune in that path stays inside the outer if-let-Some(tree) borrow). All 262 pkix-path tests pass; clippy clean with -D warnings. Honest note: the bead said '3 duplicate sites' but site 2 was structurally different \u2014 the prune and NULL-check were not adjacent. The helper still removes duplication of the NULL-check itself across all three sites.",
+  "closed_at": "2026-05-11T04:06:02Z",
+  "compaction_level": 0,
+  "content_hash": "3bb905f9ecf9f99ccb581e962cd151926d33b9b46740ffbc5b0405ec589dc2f7",
+  "created_at": "2026-05-08T05:43:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer PKIX-als9 design \u00a77: `prune_policy_tree` (lib.rs:1145) has 3 call sites at 2298, 2504, 2819 with matching \"tree becomes NULL when no nodes at depth \u2265 1\" checks. Refactoring these into a single helper:\n- removes ~15 lines of duplication\n- makes the \"tree becomes NULL\" invariant explicit and named\n- forms a no-risk side improvement before the higher-risk H9/H11 land that touch the same invariant\n\n## What\n\nExtract `pub(crate) fn policy_tree_post_op_prune(...)` that runs `prune_policy_tree` and applies the NULL-tree check. Replace the 3 call sites with calls to the helper.\n\n## Acceptance\n\n- New helper in pkix-path/src/lib.rs.\n- 3 call sites replaced.\n- All PKITS tests pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: prep \u2014 extract policy_tree_post_op_prune helper (3 duplicate sites)",
+  "updated_at": "2026-05-11T04:06:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

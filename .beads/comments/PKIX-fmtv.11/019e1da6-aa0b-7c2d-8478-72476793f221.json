@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T19:25:22Z",
+  "id": "019e1da6-aa0b-7c2d-8478-72476793f221",
+  "issue_id": "PKIX-fmtv.11",
+  "text": "DESIGN NOTE 2026-05-12 (Mark, interactive on PKIX-j32w DANE architecture): when verify_tls_server is designed and implemented, its shape must not foreclose on DANE composition being slotted in later behind a default-on Cargo feature (per PKIX-j32w). Specifically: (1) verify_tls_server should accept hostname AND port (port is needed for TLSA query construction _<port>._<proto>.<host>); even if the initial PKIX-only implementation doesn't use port, the parameter belongs in the signature. (2) Future DANE composition wraps the call site; either via internal feature-gated DANE path inside the existing function, or via a sibling verify_tls_server_with_config that defaults DANE on. Design for the wrapping pattern, not against it. (3) Resolver injection at the wrapper layer: the eventual DANE-enabled verify_tls_server will need to accept (or default-construct) a Resolver. Don't bake assumptions that prevent this. Cross-reference: PKIX-j32w (DANE epic), PKIX-j32w.3 (pkix-chain DANE integration; depends on this bead)."
+}

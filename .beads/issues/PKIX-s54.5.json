@@ -1,0 +1,31 @@
+{
+  "close_reason": "decision record captured; dual-constructor design (fail-open/fail-closed) is intentional and documented",
+  "closed_at": "2026-05-03T13:40:59Z",
+  "compaction_level": 0,
+  "content_hash": "d846cc09cf315ad0e5c191b41b9422fb3796ab2a392ca17723b1d35756940e95",
+  "created_at": "2026-05-03T13:31:19Z",
+  "created_by": "Mark Atwood",
+  "description": "from_cert and From<&Certificate> silently set name_constraints=None if the NameConstraints extension is malformed (lines 279-316). TryFrom<Certificate> propagates the der::Error to the caller (lines 318-342). A contributor may reasonably suggest collapsing these to always-fail or always-ignore. The split is intentional: embedded/offline callers using pre-vetted trust stores prefer not to fail on a parse quirk in an anchor cert they already trust; strict PKI callers (TLS, enterprise) need hard rejection of unparseable critical extensions per RFC 5280 \u00a74.2. The doc comment on from_cert explicitly calls this out and points to try_from. Do not collapse these constructors.",
+  "ephemeral": 0,
+  "id": "PKIX-s54.5",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor has dual constructors: from_cert/From fail-open on NC parse error, TryFrom fail-closed \u2014 this split is intentional",
+  "updated_at": "2026-05-03T13:40:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:31:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

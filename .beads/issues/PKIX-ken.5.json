@@ -1,0 +1,54 @@
+{
+  "acceptance_criteria": "No stale Limitations block in module doc. Nightly doc build clean.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Stale module-level Limitations block was removed when pkix-profiles/src/lib.rs was rewritten. Nightly doc build clean.",
+  "closed_at": "2026-05-06T05:08:00Z",
+  "compaction_level": 0,
+  "content_hash": "f070d4bd2d3e8248661dcc54ceed1007c18d2d7e8eefe1b90e753db7a924b279",
+  "created_at": "2026-05-06T03:27:04Z",
+  "created_by": "Mark Atwood",
+  "description": "After PKIX-ken.2, .3, and .4 are complete, the module-level doc in pkix-profiles/src/lib.rs still has this # Limitations block (lines 28-30):\n\n  # Limitations\n  Not yet implemented. Returned policies are identical to\n  `ValidationPolicy::default()` pending v0.2 work.\n\nRemove that block entirely (all three profile functions will be real by then). Also verify the doc table at lines 13-17 accurately describes each function's actual constraints.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Remove stale Limitations note from pkix-profiles module doc",
+  "updated_at": "2026-05-06T05:08:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:27:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:27:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:27:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:27:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

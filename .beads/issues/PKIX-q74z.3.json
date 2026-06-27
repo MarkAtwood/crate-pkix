@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "170ffc4ee87f8d67763721a1004f1836156855e0b00da4a99e4e95b0638bcb45",
+  "created_at": "2026-05-14T14:22:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/delivery.rs:88-105 \u2014 the function walks tbs_response_data.responses[*].single_extensions linearly and returns the first SCT-list it finds. RFC 6960 \u00a74.2.1 allows multiple SingleResponses in one BasicOcspResponse, each potentially carrying a different SCT-list for a different cert.\n\nTwo unusual but legitimate deployments break:\n1. OCSP responder bundles status+SCTs for multiple certs in one response (rare but legal).\n2. SCT-list extension appears in BOTH a SingleResponse and the top-level response_extensions \u2014 the SingleResponse one wins by traversal order.\n\nCaller has no way to tell which cert the returned SCT-list applies to. Caller of verify_sct_for_cert / verify_sct_for_precert then validates SCTs against an arbitrary cert they pass in; if it doesn't match the SingleResponse's CertID, signature verification fails by accident.\n\nPractical impact: low (deployed OCSP responders rarely return multi-cert responses). Design impact: the function's signature carries no way to disambiguate. Once callers depend on it, fixing the API is breaking.\n\nSuggested fix (pre-launch): take a CertID matcher as input, or return a struct that records which SingleResponse the SCTs came from. Document this constraint explicitly even if behavior stays as-is.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "sct_list_from_ocsp_response returns first SCT-list found across multiple SingleResponses without telling caller which",
+  "updated_at": "2026-05-14T14:22:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:22:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

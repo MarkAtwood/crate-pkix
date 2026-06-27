@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T13:56:02Z",
+  "compaction_level": 0,
+  "content_hash": "1f238bce4ec1b98d766692853d24af2a2a9bac90960ad3dcf4a898810a9b4d30",
+  "created_at": "2026-05-02T13:40:35Z",
+  "created_by": "Mark Atwood",
+  "description": "find_trust_anchor (line 586) only performs the SPKI comparison guard when the last cert in the chain is self-issued (issuer == subject). For a normal chain ending with an intermediate (issuer \\!= subject), name-only matching is used. If two anchors share the same DN but have different keys (key rollover scenario), the wrong anchor's SPKI will be silently accepted as long as its name matches. The SPKI guard should be applied to all anchor lookups, not only the self-issued case. The current comment ('prevent name-collision attacks') does not reflect that the same attack vector exists for cross-issued certs when an anchor store has duplicate-DN entries.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_trust_anchor SPKI guard skipped for non-self-issued last cert",
+  "updated_at": "2026-05-02T13:56:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

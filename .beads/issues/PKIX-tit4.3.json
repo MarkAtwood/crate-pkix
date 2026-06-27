@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Shipped in commit. Error::MalformedAnchor is now a struct variant { index: usize, source: DerError }. Display + source() impls both surface the inner DerError. Serde round-trip preserves the cached Display message via DerError's existing serde shape. All 25 existing pkix-truststore tests + 8 malformed_nc + 6 serde_round_trip tests pass; workspace compiles clean. Breaking change to the variant payload, accepted under non-negotiable #6 (Error is #[non_exhaustive]) and pre-1.0 design-closure framing.",
+  "closed_at": "2026-05-14T08:05:35Z",
+  "compaction_level": 0,
+  "content_hash": "360c19800d0747393e5a09d937742e9941eb528ed8881a8e55f40901606dd7bd",
+  "created_at": "2026-05-14T04:58:27Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:378: '.map_err(|_| Error::MalformedAnchor(i))' deliberately drops the der::Error from Certificate::from_der.\n\nScenario: HSM adapter feeds 500 DER blobs through from_der_iter. Entry 237 is malformed. Caller gets back Error::MalformedAnchor(237) with no information about *why* entry 237 is bad: wrong tag, wrong length, truncated, not a Certificate at all.\n\nMaintenance consequence: every adapter author (pkix-truststore-system, pkix-truststore-pkcs11, future cloud-KMS adapters) will need to either:\n  - decode anchors one-at-a-time via from_der to get the underlying error, or\n  - file user-reported 'MalformedAnchor(N) but I have no idea why' issues against pkix-truststore.\n\nThe rustdoc acknowledges the limitation ('The underlying der::Error is not currently surfaced; if you need it, decode entries one at a time with from_der') but the workaround foreseeably re-implements from_der_iter in every adapter.\n\nFix: extend the variant to Error::MalformedAnchor { index: usize, source: DerError }. Pattern matches that bind only  are unaffected; matches that bind the inner value (currently MalformedAnchor(i)) become MalformedAnchor { index: i, .. }. Semver-break for the latter, but the type is #[non_exhaustive] so adding the field is internally already prepared.\n\nPre-1.0 the bump is cheap. Post-1.0 it requires a major-version bump.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_der_iter discards underlying der::Error, leaving callers with only an index",
+  "updated_at": "2026-05-14T08:05:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:58:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

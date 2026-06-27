@@ -1,0 +1,31 @@
+{
+  "close_reason": "TrustAnchor struct doc now explains #[non_exhaustive] and construction guidance",
+  "closed_at": "2026-05-03T13:26:42Z",
+  "compaction_level": 0,
+  "content_hash": "60d8b137bfb03553917af72ac1d120125ac23239ce5f3309372e359530e0ac94",
+  "created_at": "2026-05-03T13:15:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Adding #[non_exhaustive] to TrustAnchor is a breaking change for any external caller who was constructing it with a struct literal (TrustAnchor { subject, subject_public_key_info }). No internal callers use struct literals \u2014 all use from_cert or new \u2014 but any downstream user doing so will get a compile error. The change is correct for forward compatibility but must be flagged as semver-breaking if the crate was previously published without #[non_exhaustive].",
+  "ephemeral": 0,
+  "id": "PKIX-onc.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "#[non_exhaustive] on TrustAnchor breaks struct-literal construction",
+  "updated_at": "2026-05-03T13:26:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

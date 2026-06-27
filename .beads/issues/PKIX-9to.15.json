@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:30:15Z",
+  "compaction_level": 0,
+  "content_hash": "91d713af8dd04c86fb3d89718c37e859d7b54b96ebb712e45a1457d10229e577",
+  "created_at": "2026-05-06T22:16:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:754: ValidatedPath.depth doc says 'Number of certificates in the validated chain minus one' and then adds a note that it may include self-issued intermediates that RFC 5280 \u00a74.2.1.9 excludes from pathLenConstraint. This creates confusion: a caller checking 'did the path meet the max_path_len constraint?' cannot use depth directly \u2014 they'd need to recount non-self-issued intermediates. The field should either be named chain_len_minus_one to make its raw nature clear, or the doc should include an explicit warning: 'This is NOT the RFC 5280 path length; do not compare to max_path_len.'",
+  "ephemeral": 0,
+  "id": "PKIX-9to.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "ValidatedPath.depth doc at lib.rs:755 already explains the semantics clearly: 'This equals chain.len().saturating_sub(1)' and notes it may differ from RFC 5280 path length. No change needed.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath.depth doc misleads: counts all certs minus 1, not RFC 5280 path length",
+  "updated_at": "2026-05-06T22:30:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

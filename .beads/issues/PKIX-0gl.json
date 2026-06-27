@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:25:26Z",
+  "compaction_level": 0,
+  "content_hash": "595349de7850ea116797cee51d4f708cdc07c2ba04aba7967092a725aa68c725",
+  "created_at": "2026-05-02T22:19:34Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-0gl",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 Three distinct issues create repeating support questions and v0.2 design ambiguity. TeletexString intentional byte-exact behavior will generate 'why not normalize?' questions. Incomplete spec of which string types get full RFC 4518 in v0.2 will challenge PR reviewer. 'Legacy' framing contradicts planned v0.2 support.\nConfidence: 75% chance of missed bug. Least confident: UniversalString edge cases may require deeper spec review (RFC 3629, RFC 4518 \u00a74) to determine if surrogates/out-of-range handling is documented elsewhere. Running out of real complaints: no. Three engineering issues (opening motivation, spec completeness, edge cases) + one structural critique (rustdoc should not be internal debate forum) are all valid. TeletexString taxonomy and RFC citations are worth defending.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review round 1: nip string type normalization doc",
+  "updated_at": "2026-05-02T22:25:26Z"
+}

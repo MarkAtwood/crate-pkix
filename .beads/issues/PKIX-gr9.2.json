@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:13:03Z",
+  "compaction_level": 0,
+  "content_hash": "7dced21b3568e891b9e1d00e72e9a07ecc7facf67f5d20180c0a1fa1f9131986",
+  "created_at": "2026-05-06T17:06:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation::Error (lib.rs:25) was updated in pass-1 to derive Clone and PartialEq, but Eq was not added. Both field types in the Revoked variant \u2014 SerialNumber (derives Eq) and CrlReason (derives Eq) \u2014 support it. All other variants are fieldless or hold der::Error. der::Error does not implement Eq, so Eq cannot be derived on the whole enum. The PartialEq-only state is therefore correct for structural reasons. However, this should be explicitly documented with a comment (// der::Error is not Eq, so Eq is not derivable) so the asymmetry between Clone+PartialEq (without Eq) is not mistaken for an oversight in future reviews.",
+  "ephemeral": 0,
+  "id": "PKIX-gr9.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: Error derives PartialEq but not Eq (CrlReason + SerialNumber both support Eq)",
+  "updated_at": "2026-05-06T17:13:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T10:06:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gr9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

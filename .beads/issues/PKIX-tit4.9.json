@@ -1,0 +1,31 @@
+{
+  "close_reason": "Ack. Positive finding \u2014 no code change. The 'no baked-in trust data' stance is correctly defended in lib.rs:12-25 and README.md, and matches AGENTS.md's documented stance. Recording closure as a decision-history entry; if a future contributor proposes one of the rejected refactors, this bead's reasoning is the rebuttal.",
+  "closed_at": "2026-05-14T08:12:50Z",
+  "compaction_level": 0,
+  "content_hash": "08d901b92d923a4e8d5bd4b203d1580ebeaffef978bb48a3c2ba702b2959e29e",
+  "created_at": "2026-05-14T05:00:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:12-25 and README.md:5-15 lay out the \"no compiled-in Mozilla CA bundle, no platform integration in this crate\" stance, with crisp reasoning: trust data is deployment configuration, library version cadence is the wrong coupling for it.\n\nWhat a contributor might incorrectly suggest:\n  - \"Why not add a `mozilla` feature flag that pulls in webpki-roots equivalent?\" \u2014 explicitly rejected; the README captures why (Mozilla list pins to the library release cadence; deployment-config decision wearing library clothing).\n  - \"Why not at least probe /etc/ssl/certs by default?\" \u2014 that is pkix-truststore-system's job (PKIX-8h87). Doing it here couples Tier-1 plumbing to platform discovery.\n  - \"from_der_iter is overkill, just take a Vec<Vec<u8>>.\" \u2014 the iterator-of-bytes shape is what adapter crates need so they can stream from PKCS#11 / OS keychain APIs without pre-collecting. The IntoIterator+AsRef<[u8]> bounds are correct.\n\nDefense: this is the right shape for the Tier-1 layer; the policy/scope concerns it raises are well-articulated and should not be relitigated without coordinating with PKIX-8h87 and PKIX-p8vz.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.9",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No baked-in trust data is correctly defended in the API surface",
+  "updated_at": "2026-05-14T08:12:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:00:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

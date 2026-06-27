@@ -1,0 +1,31 @@
+{
+  "close_reason": "deferred P4: typical chains are short (3-5 certs) and few lints fire per cert; pre-allocation adds complexity for marginal gain; not worth doing now",
+  "closed_at": "2026-05-07T05:00:48Z",
+  "compaction_level": 0,
+  "content_hash": "e08b68f5daef31f26de01d3e498adea3fbd7d9db6ea80e150a0d09533886f110",
+  "created_at": "2026-05-07T04:40:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs LintRunner::run_chain (lines 798-804):\n\n    let mut all = Vec::new();\n    for (i, cert) in chain.iter().enumerate() {\n        ...\n        all.extend(self.run_cert(cert, kind, i, now_unix));\n    }\n\nVec::new() allocates no capacity. For a chain of N certs with M lints each, there are N reallocations during extend (amortized, but still). The total finding count is predictable: chain.len() * self.lints.len(). Pre-allocating avoids all reallocations:\n\n    let mut all = Vec::with_capacity(chain.len() * self.lints.len());\n\nThis is in the hot path for any caller running a full chain evaluation.\n\nCategory: R5 (HashMap::new/Vec::new without capacity hint in hot paths)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.20",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: LintRunner::run_chain accumulates findings with extend instead of pre-allocated Vec",
+  "updated_at": "2026-05-07T05:00:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:40:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

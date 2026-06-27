@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:28:58Z",
+  "compaction_level": 0,
+  "content_hash": "04db5553f489bfc7210cb6f69d88ec06c1dd40e87da898a4d41ed997ee4c9923",
+  "created_at": "2026-05-06T23:20:48Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 74 in crl.rs has a leading space before /// - causing that list item to render as a standalone paragraph rather than a bullet. Other bullets use /// - without the extra space. File: pkix-revocation/src/crl.rs line 74.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crl: rustdoc indentation bug in Limitations section list item",
+  "updated_at": "2026-05-06T23:28:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

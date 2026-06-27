@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:31Z",
+  "compaction_level": 0,
+  "content_hash": "8e77b4f296a07641e2f9d6d064d812e7124156792277a0f7d7bdd80fa5c1a522",
+  "created_at": "2026-05-06T22:16:15Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:198: CertificateList::from_der(&self.crl_der) is called on every check_revocation invocation. For a chain of N certificates validated against the same CRL, this is O(N) redundant DER parsing. The doc acknowledges this ('Tracked for v0.3') but there is no tracking issue. In a production deployment validating 1000 chains/second against the same CRL, this is unnecessary CPU work. The fix is to store the parsed CertificateList in the struct at construction time (as the doc suggests).",
+  "ephemeral": 0,
+  "id": "PKIX-9to.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "CrlChecker is typically constructed per-check-call (short-lived). Pre-parsing would require CertificateList to outlive the DER Vec (lifetime issue) or Arc-wrap it. Deferring until usage patterns indicate this is a hot path.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker re-parses CRL DER on every check_revocation call",
+  "updated_at": "2026-05-06T22:29:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

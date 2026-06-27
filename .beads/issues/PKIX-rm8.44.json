@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.44",
+  "title": "pkix-profiles dep on pkix-profiles-cabf for deprecated re-exports",
+  "description": "pkix-profiles takes a runtime dep on pkix-profiles-cabf solely to serve deprecated re-exports (WebPkiProfile, SmimeProfile, CodeSigningProfile, sc081_validity_cap). The dependency direction is inverted: foundational crate depends on overlay crate. This coupling exists only for a one-release deprecation bridge (dropping in 0.4.0). Any consumer of pkix-profiles pulls in pkix-profiles-cabf transitively. Location: /home/mark/PROJECT/PKIX/pkix-profiles/Cargo.toml line 25.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:59Z",
+  "updated_at": "2026-06-15T17:07:37Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:59"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:07:19Z",
+  "compaction_level": 0,
+  "content_hash": "3e0da07ad6e9835751af3627673323348849915080f3944f60137b4e019d9bf9",
+  "created_at": "2026-05-07T03:49:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:313 \u2014 DeviationScope::IssuerDnContains matches() calls cert.tbs_certificate.issuer.to_string().to_lowercase() on every invocation. For a store with N deviations checked against each of M certs in a chain, this allocates N*M strings. The to_string() on x509_cert::name::Name is particularly expensive (formats a full DN string). Since the substring is pre-normalized to lowercase at insertion time, only the cert-side DN needs lowercasing at match time. Optimization: cache or intern the cert's issuer string, or use a non-allocating comparison. At minimum, avoid calling .to_string() + .to_lowercase() as two separate allocations \u2014 use a single fold or bytestring comparison.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains matching allocates String per call via .to_string()",
+  "updated_at": "2026-05-07T04:07:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "394765a5e4fffa3acd8a0bf015cecbc4e8c22358b69c56f0c6c9480811b49f09",
+  "created_at": "2026-05-14T15:44:24Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs:236-244: EvidenceIndex::build walks findings and tests 'if !keys.contains(&k)' \u2014 a linear scan of the keys Vec for each new finding, yielding O(N\u00b2) where N is total findings.\n\nIn realistic deployments N stays modest (a few dozen lints \u00d7 a chain of a few certs = order 100s). The O(N\u00b2) cost is invisible.\n\nAt scale this matters: a batch evidence-pack run over hundreds of chains aggregated into one report \u2014 N could reach 10\u2074 \u2014 runs into 10\u2078 key compares. The keys are (Option<[u8;32]>, Option<usize>), so each compare is cheap, but cumulatively non-trivial.\n\nTrivial fix: use std::collections::HashSet<EvidenceKey> to track seen keys plus a Vec for insertion order. Drop-in replacement, same observable output.\n\nNot P0 because no production batch shape exists yet, but easy to land and removes a future foot-gun.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "EvidenceIndex::build is O(N\u00b2) over findings via Vec::contains",
+  "updated_at": "2026-05-14T15:44:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:44:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:22:54Z",
+  "compaction_level": 0,
+  "content_hash": "6b678f3444f9e1cb72e75ddafe4e82936613a466dad36e7cc309e25c8871485c",
+  "created_at": "2026-05-06T23:20:02Z",
+  "created_by": "Mark Atwood",
+  "description": "Function signature is pub fn sc081_validity_cap(now_unix: u64) -> u64 but the doc comment and correct usage requires the certificate's notBefore, not the relying-party's current time. Any caller reading only the signature will pass the wrong value. Fix: rename parameter to not_before_unix. File: pkix-profiles/src/lib.rs line 333.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.9",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "profiles: sc081_validity_cap parameter named now_unix should be not_before_unix",
+  "updated_at": "2026-05-06T23:22:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

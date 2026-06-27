@@ -1,0 +1,31 @@
+{
+  "close_reason": "Acknowledged decision: IPv4 leading zeros rejected",
+  "closed_at": "2026-06-15T18:47:54Z",
+  "compaction_level": 0,
+  "content_hash": "7b7613e8036f21ae3857a77cca22093f1f341632cc5063f1d6c3d81d03c1a2a5",
+  "created_at": "2026-05-14T19:15:14Z",
+  "created_by": "Mark Atwood",
+  "description": "parse_ipv4 at pkix-identity/src/lib.rs:692-694 explicitly rejects parts like '01' or '007' with the comment 'avoid the octal-vs-decimal ambiguity inet_aton has historically caused'. The ip_address_v4_rejects_octal_form test locks it in.\n\nA future contributor will suggest 'be liberal \u2014 accept leading zeros as decimal, that's what the OS resolver does'. They will be wrong.\n\nDefend: pyca/cryptography rejects leading zeros for the same reason. Real-world SSRF and URL-parsing CVEs have exploited the inet_aton octal interpretation gap between parsers. The strict decimal-only parser is the cryptography-side default for cert identity matching. Liberal parsing has historically been the wrong choice in this exact problem space.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.16",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: IPv4 parser rejects leading zeros (no inet_aton octal compat)",
+  "updated_at": "2026-06-15T18:47:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:15:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

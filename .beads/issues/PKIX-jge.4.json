@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "OSCAL compatible via separate pkix-lint-oscal crate; no core changes needed; poam-item+risk is closest construct; gaps documented in notes",
+  "closed_at": "2026-05-06T19:34:34Z",
+  "compaction_level": 0,
+  "content_hash": "f3808760cdb9d05ff377b33fd3eb364b4161d03ab2c2391bd367f305e6c9a870",
+  "created_at": "2026-05-06T19:26:03Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-jge.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "OSCAL Assessment Results compatibility analysis:\n\nClosest OSCAL construct: poam-item with risk.status=deviation-approved.\n\nField mapping:\n- id -> prop(name=deviation-id) on poam-item (OSCAL requires UUID as primary key; human-readable id preserved as prop)\n- target_lint -> prop(name=lint-id, ns=pkix-lint) on risk observation (no native OSCAL lint rule concept)\n- scope (IssuerDnContains) -> prop (no native OSCAL subject selector for cert issuer DN)\n- effective_start/end -> risk-log.entry.start + risk.deadline\n- action=Suppress -> risk.status=accepted or false-positive (good fit)\n- action=DowngradeSeverityTo -> prop(name=effective-severity) on risk (no native OSCAL severity adjustment action)\n- justification -> risk.description (good fit)\n- authorized_by -> risk-log.entry logged-by (OSCAL requires party UUID declared in metadata; current free-text needs a prop)\n\nGaps: scope mismatch (biggest), authorized_by party reference, target_lint no native equivalent, DowngradeSeverityTo has no OSCAL action type.\n\nImplementation path: separate pkix-lint-oscal crate with fn to_poam_item(d: &Deviation) -> OscalPOAMItem. No changes to Deviation struct required. Two optional additions for cleaner OSCAL: id_uuid: Option<Uuid> and scope_subject_uuid: Option<Uuid> for native OSCAL linking.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: investigate OSCAL Assessment Results compatibility for deviation format",
+  "updated_at": "2026-05-06T19:34:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T12:26:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jge",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

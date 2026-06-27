@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "458dce4a77d98551ccfdc4b54aede99b0bc8d4cbb9ed10ef5acca3a23f9b404d",
+  "created_at": "2026-05-14T14:41:22Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/tests/hostname_corpus.rs uses `Rfc5280Profile` for verify_tls_server tests. pkix-chain/src/lib.rs:720 rustdoc says 'typically BasicTlsProfile or WebPkiProfile' which would REQUIRE id-kp-serverAuth. Rfc5280Profile is permissive \u2014 no EKU enforcement. The corpus tests therefore validate the SAN-binding mechanics but DO NOT verify that a non-serverAuth cert (e.g., a code-signing cert that happens to carry a DNS SAN) is correctly rejected. This is a coverage gap: a caller using BasicTlsProfile with verify_tls_server expects 'TLS server' semantics, but the test suite never confirms that the wrapper enforces the EKU. Fix: parallel run of one or two corpus cases under BasicTlsProfile, with a fixture that has a DNS SAN but lacks id-kp-serverAuth. Confirms the EKU enforcement composes with SAN matching. (Note: test case #25 'basictls_profile_exact_match' uses BasicTls but only on a cert that has the correct EKU \u2014 does not exercise the rejection path.)",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Hostname/mailbox corpus tests use Rfc5280Profile, not the profile rustdoc recommends",
+  "updated_at": "2026-05-14T14:41:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:41:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

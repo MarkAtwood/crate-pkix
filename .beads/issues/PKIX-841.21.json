@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added From<&Certificate> for TrustAnchor; also added note to from_cert() suggesting From when the cert needs to stay alive.",
+  "closed_at": "2026-05-02T17:47:09Z",
+  "compaction_level": 0,
+  "content_hash": "2b7c5d51a4db97110dcae0a466f76cd702f25cfdec8bfecafc400479525e6034",
+  "created_at": "2026-05-02T17:31:37Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor::from_cert(cert: Certificate) takes ownership but only reads two fields (subject, subject_public_key_info). Any caller that also needs the cert after construction must cert.clone() before passing it in, as seen in test one_cert_chain_ok: TrustAnchor::from_cert(cert.clone()). Idiomatic Rust: accept &Certificate, clone only the fields needed. The current signature makes a gratuitous ownership transfer the caller must pay for.",
+  "ephemeral": 0,
+  "id": "PKIX-841.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor::from_cert takes owned Certificate forcing callers to clone",
+  "updated_at": "2026-05-02T17:47:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:31:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

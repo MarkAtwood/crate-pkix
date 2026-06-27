@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2a1ab289d50412f37258e9b46672b3697cd7aecff91a75766528adb6e34de153",
+  "created_at": "2026-05-14T16:02:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1298-1303 (filter_to_ids) and 1392-1397 (apply_parameter_overrides) \u2014 Both methods are gated:\n\n  #[cfg(feature = \"oscal\")]\n  pub fn filter_to_ids(self, ids: &[String]) -> Result<Self, crate::oscal::parse::ParseError> { ... }\n\n  #[cfg(feature = \"oscal\")]\n  pub fn apply_parameter_overrides(\n      &mut self,\n      overrides: &[(String, String)],\n  ) -> Result<(), crate::oscal::parse::ParseError> { ... }\n\nTwo distinct API-contract problems:\n\nPROBLEM 1: FEATURE-LOCKING ON A NON-GATED TYPE.\nLintRunner is the core type of the crate and is NOT feature-gated. Methods on it are. A caller writing:\n\n  let runner = LintRunner::new(lints);\n  runner.filter_to_ids(&want)?;\n\nworks in their initial code. When they later set default-features = false to drop OSCAL bloat, the method disappears. The compiler error is \"no method named `filter_to_ids` found for struct `LintRunner` ... maybe enable feature `oscal`\" \u2014 a feature-lock surprise the caller didn't sign up for.\n\nThe methods are filter/override operations that, in principle, do not need OSCAL \u2014 apply_parameter_overrides takes a &[(String, String)] of parameter overrides and applies them to lints. The OSCAL-feature-gating is convention, not a hard dependency: the methods themselves don't call serde_json.\n\nPROBLEM 2: OSCAL-NAMED ERROR TYPE COUPLES LintRunner TO OSCAL MODULE.\nBoth methods return Result<_, crate::oscal::parse::ParseError>. ParseError is named for OSCAL (oscal/parse.rs:43 \u2014 variants are OSCAL-specific like ProfileImportUnresolved, ControlIdNotString, MetadataMissingProp). A caller invoking apply_parameter_overrides from non-OSCAL context (e.g., a CLI flag-based parameter override) gets back an OSCAL-named error type that has no semantic connection to their call site.\n\nThe result is that LintRunner's stable signature is forever coupled to the OSCAL module's error identity, and a caller reading LintRunner rustdoc must understand OSCAL to read the apply_parameter_overrides signature, even if they never use OSCAL.\n\nREMEDIATION:\n\nFor PROBLEM 1: Move these methods out of cfg(feature=oscal). The underlying mechanics (Vec filter, parameter clone-and-set) are not OSCAL-specific. Keep the OSCAL-feature-gated convenience wrappers in the oscal/profile.rs module that translate from ResolvedProfile.\n\nFor PROBLEM 2: Introduce LintRunnerError as a feature-independent error type:\n\n  #[non_exhaustive]\n  pub enum LintRunnerError {\n      UnknownLintId { id: String },\n      UnknownParameter { lint_id: String, param_id: String },\n      InvalidParameterValue { lint_id: String, param_id: String, source: ParameterError },\n  }\n\nConvert from LintRunnerError \u2192 ParseError at the OSCAL adapter boundary (in oscal/profile.rs) for callers who want OSCAL-style errors. LintRunner's public surface stays OSCAL-free.\n\nBoth fixes are pre-1.0 free. The Cargo feature-gating change is non-breaking-additive (broadens the feature set on which these methods are available). The error-type change is a breaking signature change but pre-1.0 permits it.\n\nALTERNATIVE: Document the cfg-feature-gating with a clear footgun warning in LintRunner's type-level rustdoc, and rename ParseError to something feature-neutral like RunnerOrOscalError. Cheaper but doesn't address the structural coupling.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner::filter_to_ids and apply_parameter_overrides are #[cfg(feature=oscal)] methods on the non-gated LintRunner type and return oscal::parse::ParseError; locks runner callers to oscal=on and exposes OSCAL-named error type at the runner level",
+  "updated_at": "2026-05-14T16:02:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:02:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

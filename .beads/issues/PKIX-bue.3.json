@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-bue.3",
+  "title": "find_san returns first SAN extension only; duplicate-extension silently ignored",
+  "description": "Old: PKIX-68mt.4",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "bug",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:30Z",
+  "updated_at": "2026-06-15T17:54:30Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-bue",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:54:30"
+    }
+  ]
+}

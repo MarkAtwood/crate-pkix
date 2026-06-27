@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c3cdd0f16faeae081a2d97bec1574432ab397c59016d87953321b26017029a4c",
+  "created_at": "2026-05-14T19:29:00Z",
+  "created_by": "Mark Atwood",
+  "description": "What is unclear and for whom: a user reading a log line at 2am sees 'AIA fetch returned HTTP status 200' (if an adapter incorrectly emits HttpStatus(200), which the variant doc says shouldn't happen but the type allows) or 'AIA fetch returned HTTP status 301'. The 301 is interesting: was the redirect followed or not? The Display impl at pkix-aia/src/lib.rs:215 produces the same shape for every code class.\n\nA small readability improvement: include the IETF reason phrase when known, or at least the class:\n\n'AIA fetch failed with HTTP status 404 Not Found'\n'AIA fetch failed with HTTP 5xx (server error): 503'\n\nCoupled to PKIX-o3op.5 (HttpStatus contract). If the contract is tightened to 'non-2xx only', the Display message can say 'failed with non-success status N' which removes the ambiguity.\n\nFiling at P4 because it's a minor user-experience polish, not a correctness or design issue.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.11",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Display for HttpStatus does not distinguish 1xx/3xx/4xx/5xx in message",
+  "updated_at": "2026-05-14T19:29:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:28:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

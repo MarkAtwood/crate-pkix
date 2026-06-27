@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bb26d47a08d0e99f511c7d5e6c2f1b6a5d715e6ce3a06d5f1fa64b16eef296aa",
+  "created_at": "2026-05-14T04:59:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:88-124 introduces a new public type IoFailure to satisfy AGENTS.md non-negotiable #6 (cache-friendly result types must be Clone+Eq+Send+Sync, optionally Serialize). This is currently the only such type in the workspace.\n\nSibling adapter crates that will eventually need an io-error equivalent in their cache-friendly error types:\n  - pkix-truststore-system (per PKIX-8h87) \u2014 will do file I/O for /etc/ssl/certs/* on Linux/BSD, plus FFI calls that produce errors.\n  - pkix-truststore-pkcs11 (per PKIX-p8vz) \u2014 PKCS#11 errors are not io::Error but it will likely do file I/O for module discovery.\n  - pkix-revocation-http \u2014 already exists; does HTTP fetch and will need io-error and net-error boundary types.\n  - any future cloud-KMS adapter.\n\nThree paths forward:\n  a) Each adapter reinvents IoFailure (or an analog). This duplicates the wire-form contract and the Debug-of-ErrorKind brittleness across N crates.\n  b) Each adapter depends on pkix-truststore solely to re-use IoFailure. That makes pkix-truststore a transitive dep of pkix-revocation-http etc., which is not architecturally clean (pkix-truststore is a Tier-1 trust-anchor loader, not an io-utility crate).\n  c) Lift IoFailure into pkix-path or a small pkix-shared crate, and have pkix-truststore re-export it (similar to the DerError pattern).\n\nOption (c) is the right shape and matches how DerError already lives in pkix-path and is re-exported. Pre-1.0 this move is cheap; post-1.0 it is a semver event.\n\nIf the answer is \"we will not have other adapters needing this\" \u2014 that conflicts with PKIX-8h87 and PKIX-p8vz which both involve file I/O for adapter discovery.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "IoFailure invented in pkix-truststore; will need to be replicated or re-exported by sibling adapter crates",
+  "updated_at": "2026-05-14T04:59:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:59:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

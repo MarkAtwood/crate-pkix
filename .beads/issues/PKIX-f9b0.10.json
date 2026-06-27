@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:34Z",
+  "compaction_level": 0,
+  "content_hash": "15fc28fdd31b27d54bbd3f0f65bed7ef2c65b1a4665754152956e50dadcb5326",
+  "created_at": "2026-05-07T17:22:32Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:151,156,215,219,274,278,315,319 \u2014 All four Profile impls return &str from id() and version(), but these methods only ever return &'static str string literals. Clippy (unnecessary_literal_bound) flags this: the lifetime is unnecessarily tied to &self. Fix: change the return types to &'static str in each impl. Note: if Profile trait in pkix-path also uses &str, the trait signature must be updated first (or the impls can use &'static str, which is covariant). The trait change in pkix-path would be the proper fix; that is a separate issue for pkix-path.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-profiles] unnecessary_literal_bound on id()/version() impls",
+  "updated_at": "2026-05-07T17:32:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

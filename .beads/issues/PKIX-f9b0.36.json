@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:27:49Z",
+  "compaction_level": 0,
+  "content_hash": "f7d0db122a9224ece94aca4b493c1a7e7d6b317e8e67fc2eadb0d7ac665424b2",
+  "created_at": "2026-05-07T17:23:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ac/src/lib.rs:94-101 \u2014 impl std::error::Error for Error returns Some(e) where e: &pkix_path::Error, but pkix_path::Error only implements std::error::Error under #[cfg(feature=\"std\")]. Because pkix-ac/Cargo.toml std feature is [features] std = [\"der/std\", \"x509-cert/std\"] without pkix-path/std, building pkix-ac with std gives E0277: pkix_path::Error does not implement std::error::Error. Fix: add pkix-path = { workspace = true, features = [\"std\"] } to the std feature array in pkix-ac/Cargo.toml: std = [\"dep:pkix-path/std\", \"der/std\", \"x509-cert/std\"].",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-ac] std feature missing pkix-path/std propagation \u2014 compile error",
+  "updated_at": "2026-05-07T17:27:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:27Z",
+  "compaction_level": 0,
+  "content_hash": "1d97fe1913ba41003efa7fdc88abeaa7a2484bdf60d380d48a172c0f748070a2",
+  "created_at": "2026-05-14T19:36:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:263 has `[`discover_crl_signer`]` with no path qualifier and no corresponding link reference. rustdoc emits broken_intra_doc_links warning: 'unresolved link to discover_crl_signer'. RFC 5280 \u00a76.3.3(f) doc references the function but the link target is unresolved. Trigger: `cargo doc -p pkix-revocation --all-features`. Bad behavior: rustdoc emits W-broken-intra-doc-links; docs.rs build (with RUSTDOCFLAGS='-D warnings' on nightly) would fail. Fix: change to `[`discover_crl_signer`][crate::discover_crl_signer]` or add a link reference at module scope (the pattern used elsewhere in this file).",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Broken intra-doc link to discover_crl_signer in crl.rs:263",
+  "updated_at": "2026-06-04T19:32:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:36:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "083ee96806786a7932b52513789799e36b195d302330dc0f037ec1c002ece90e",
+  "created_at": "2026-05-11T04:45:08Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 5 of 6. Real-world CMS message certBags\ninclude certificates that have no role in any path: other-CA intermediates,\nexpired self-signed leaves, EE certs from unrelated chains. The builder must\nwalk the right path through this noise without timing out or being misled.\n\n## What\n\nPool topology:\n\n```\nStressRoot \u2500\u2500 signs \u2500\u2500 GoodIntermediate \u2500\u2500 signs \u2500\u2500 CmsBagEE\nNoise: OtherCa1Intermediate (signed by a different unknown root),\n       ExpiredSelfSignedLeaf (expired, self-signed, irrelevant DN),\n       UnrelatedEE (a totally separate chain EE),\n       DuplicateOfGoodIntermediate (byte-identical clone of\n       GoodIntermediate to test dedup).\n```\n\nBuild steps:\n\n1. Generator issues seven DER fixtures (root, good intermediate, EE, plus\n   the four noise certs).\n2. Test (`tests/cms_bag_pool.rs`):\n   - Pool inserts all four noise certs first, then GoodIntermediate.\n   - `build_path` must succeed in bounded time and return a chain\n     containing only GoodIntermediate (no noise certs in the chain).\n   - Assert the chain length is exactly the minimum (3: EE, intermediate,\n     anchor surrogate).\n   - `validate_path` succeeds.\n3. Also verify that duplicate detection (DuplicateOfGoodIntermediate) does\n   not cause cycles or duplicate-insert errors.\n\n## Acceptance\n\n- [ ] Seven DER fixtures committed.\n- [ ] Generation reproducible via `generate.sh`.\n- [ ] One integration test verifying noise-tolerant path building.\n\n## Depends on\n\nPKIX-xj81.1.",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: CMS-bag-shaped pool with irrelevant noise fixture+test",
+  "updated_at": "2026-05-11T04:45:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:45:07Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:31Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

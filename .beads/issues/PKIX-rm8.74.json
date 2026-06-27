@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.74",
+  "title": "pkix-ct missing Send+Sync compile-time assertions",
+  "description": "pkix_ct::Error does not have compile-time Send+Sync assertions. Every other error type in the workspace (pkix-path, pkix-revocation, pkix-chain, pkix-truststore, pkix-aia, pkix-identity via pkix-chain) has const _: fn() assertions pinning Send+Sync per AGENTS.md non-negotiable #6 / PKIX-2l0v.2.\n\npkix-ct::Error currently auto-derives Send+Sync (no Rc/RefCell/raw-pointer fields), but without the compile-time assertion a future field addition could silently break the invariant.\n\nWhat goes wrong if this stays as-is: A future refactor that adds a non-Send or non-Sync field to pkix_ct::Error would not be caught at compile time in this crate. The error would surface downstream when consumers try to move the error across thread boundaries.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-ct/src/lib.rs (entire file \u2014 no Send+Sync assertion block)\n- Compare with /home/mark/PROJECT/PKIX/pkix-path/src/lib.rs lines 4332-4338 (the assertion pattern)",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:29:13Z",
+  "updated_at": "2026-06-15T16:30:51Z",
+  "closed_at": "2026-06-15T16:30:51Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:29:13"
+    }
+  ]
+}

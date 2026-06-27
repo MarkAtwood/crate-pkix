@@ -1,0 +1,38 @@
+{
+  "close_reason": "Superseded by PKIX-amgn.5 commit c70821b4: integration tests at pkix-lint/tests/cabf_tls_br_tests.rs moved to pkix-lint-cabf/tests/cabf_tls_br_tests.rs (git mv), imports rewritten pkix_lint::cabf_tls_br \u2192 pkix_lint_cabf::cabf_tls_br. OSCAL fixture-test policy resolved per recommended approach: tests in pkix-lint/src/oscal/catalog.rs and pkix-lint/src/oscal/profile.rs that referenced cabf_tls_br::all_lints() / ValidityMaxLint replaced with in-crate fixtures (PolicyShapedLint + multi_lint_fixture()). Cross-crate round-trip coverage against real CABF lint set stays in pkix-lint-cabf integration tests. 43 unit + 7 + 2 doc tests pass on pkix-lint-cabf; 84 default / 201 --all-features pass on pkix-lint.",
+  "closed_at": "2026-05-12T01:39:33Z",
+  "compaction_level": 0,
+  "content_hash": "af68d1c7c174b885ad26ec9f3bbf34e40793edb65511a98592102670a008dc1b",
+  "created_at": "2026-05-11T22:51:08Z",
+  "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "description": "## Why\n\nPKIX-amgn.5.2 moves `cabf_tls_br.rs` to `pkix-lint-cabf`. That breaks six framework unit tests in `pkix-lint/src/oscal/catalog.rs` (lines 568, 597, 600, 606) and `pkix-lint/src/oscal/profile.rs` (lines 427, 489, 501, 521, 539, 548, 564) that currently use `crate::cabf_tls_br::all_lints()` / `ValidityMaxLint` as their multi-lint fixture set. The integration test file `pkix-lint/tests/cabf_tls_br_tests.rs` also needs to move.\n\nThe integration-test move is mechanical. The fixture-test resolution is a design decision.\n\n## What\n\n### Integration tests\n\n1. `git mv pkix-lint/tests/cabf_tls_br_tests.rs pkix-lint-cabf/tests/cabf_tls_br_tests.rs`.\n2. Update the `use pkix_lint::cabf_tls_br::*` import (L27\u201330) to `use pkix_lint_cabf::cabf_tls_br::*`.\n3. Verify the `include_bytes!(\"../../pkix-path/tests/fixtures/policy-checks/\u2026\")` paths resolve \u2014 `pkix-lint-cabf`'s CARGO_MANIFEST_DIR is at the same workspace depth as `pkix-lint`'s, so the relative paths should still work, but confirm with a clean `cargo test -p pkix-lint-cabf` run.\n4. Extract `metadata_title_defaults_to_id_when_not_overridden` (lines 852\u2013891) \u2014 this test defines a synthetic `MinimalLint` and tests the default `Lint::title()` impl. It is framework-only, not CABF-specific. Move it to either `pkix-lint/tests/lint_trait_defaults.rs` (new) or fold into `pkix-lint/src/lib.rs`'s `#[cfg(test)]` block. Pick whichever the team prefers; if uncertain, file a sub-bead with the `human` label.\n\n### OSCAL fixture-test policy (THE design decision)\n\nSix framework unit tests in `pkix-lint/src/oscal/catalog.rs` and `pkix-lint/src/oscal/profile.rs` use CABF lints as their *fixture set*. After the move they cannot import `pkix_lint_cabf::cabf_tls_br::*` because `pkix-lint` cannot depend on its downstream crate.\n\nOptions:\n\n- **(i) Move framework tests to `pkix-lint-cabf`.** Couples framework round-trip tests to the downstream crate. Rejected: framework tests should live with the framework.\n- **(ii) Rewrite tests to use `pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint` + an inline synthetic `MinimalLint` for the multi-lint scenarios.** Some test rewrites required but clean architecturally. Test corpus stays in `pkix-lint`.\n- **(iii) Add `pkix-lint-cabf` as a `[dev-dependencies]` of `pkix-lint`.** Reverse-direction edge at test-time only; not a real cycle (dev-deps don't propagate). Cheapest in code-change terms, slightly ugly architecturally.\n\n**Recommendation: option (ii).** Tests document framework behaviour and should not silently rely on downstream lint definitions for their fixtures. The work is bounded \u2014 six tests, mostly id-string updates and one new inline `MinimalLint` struct for the duplicate-id case. This decision is requested as human approval; if unclear, label `human` and stop.\n\n## Acceptance\n\n- [ ] `pkix-lint-cabf/tests/cabf_tls_br_tests.rs` exists with all 46 CABF tests; `cargo test -p pkix-lint-cabf` passes.\n- [ ] `metadata_title_defaults_to_id_when_not_overridden` re-homed in `pkix-lint` and passes.\n- [ ] Six fixture tests in `pkix-lint/src/oscal/{catalog,profile}.rs` resolved per the chosen option; `cargo test -p pkix-lint --features oscal` passes.\n\n## Out of scope\n\n- README / rustdoc rewrites (PKIX-amgn.5.4).\n- Version bumps (PKIX-amgn.5.5).\n\n## Depends on\n\nPKIX-amgn.5.2.\n\n## Design question (human approval)\n\nConfirm option (ii) for the OSCAL fixture-test policy. Alternative is (iii); rejected (i).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.5.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Move CABF integration tests + resolve OSCAL fixture-test policy",
+  "updated_at": "2026-05-12T01:39:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T15:51:07Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T15:51:49Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

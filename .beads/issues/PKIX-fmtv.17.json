@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Superseded by decision (Mark, 2026-05-12, attended session): rescope per Option (A). PKITS-through-wrappers structurally infeasible (PKITS EE certs lack SAN and EKU). Replaced by PKIX-fmtv.22 (curated TLS hostname corpus + verify_tls_server tests) and PKIX-fmtv.23 (curated mailbox corpus + verify_smime_*  tests). verify_chain PKITS coverage stays where it already is (pkix-chain/tests/e2e.rs e2e_verify_chain_default_pkits_4_1_1 + pkix-difftest pkix_path oracle). Code-signing/timestamping wrappers covered by targeted unit tests, no curated corpus needed (no identity-string target). See decision rationale in superseding beads' descriptions.",
+  "closed_at": "2026-05-13T04:39:40Z",
+  "compaction_level": 0,
+  "content_hash": "aaee773d6a55a072069409a2e8770c81e5b46026201cfaa76c4d8878452a9b8f",
+  "created_at": "2026-05-12T02:42:42Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (PKITS through verify()) is partially done: `pkix-chain/tests/e2e.rs:42` (`e2e_verify_chain_default_pkits_4_1_1`) already exercises `verify_chain_default` against a PKITS chain. `pkix-difftest`'s pkix_path oracle (`pkix-difftest/src/oracles/pkix_path.rs:107`) runs `validate_path` against the full PKITS corpus.\n\nWhat remains: **PKITS regression for the NEW per-use wrappers** (verify_tls_server, verify_smime_signer, verify_code_signer, etc.) once they ship.\n\nFor each new wrapper:\n- Identify PKITS test cases applicable to its use case (e.g., the EE certs in PKITS \u00a74.1 have `id-kp-clientAuth` EKU; some \u00a74.x tests use `id-kp-emailProtection`).\n- Run the wrapper against the PKITS bundle for each applicable test.\n- Confirm outcome matches PKITS expected verdict.\n- Hostname/mailbox binding test cases (RFC 6125 \u00a76.4 wildcards, RFC 8398 internationalized mailbox) \u2014 PKITS does not exercise these; add separate curated test corpus.\n\nAcceptance: per-wrapper pass-rate documented in `pkix-difftest/baseline-pkits-wrappers.md`.\n\n**Blocks on:** `.15` (ergonomic wrappers must ship before they can be PKITS-tested).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS regression through new verify_* wrappers",
+  "updated_at": "2026-05-13T04:39:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T21:56:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.15",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

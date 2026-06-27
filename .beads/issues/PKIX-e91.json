@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Pass 2: no findings. Both passes converge (P3+ only, low miss probability). Loop complete.",
+  "closed_at": "2026-05-02T22:04:35Z",
+  "compaction_level": 0,
+  "content_hash": "6a8377fc83a0ada8d80f3b89c14cef7461c765b4c5e1c26e426a62df050113c6",
+  "created_at": "2026-05-02T22:03:51Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-e91",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: LOW \u2014 only a test and a rustdoc comment changed in pass 2.\nConfidence: 5% chance of missed bug. Least confident flags: test comment says 'rsa crate rejects absent params' \u2014 an implementation detail that could change; the assertion would still be correct if rsa crate later accepts absent params. Uncertainty driven by: nothing structural. Would raise confidence if: nothing needed.\nIdiom rating: CLEAN \u2014 !matches!(result, Err(Error::NoTrustedPath)) is idiomatic; struct literal construction for SubjectPublicKeyInfoOwned is idiomatic; no ownership or borrow issues.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review pass 2: SPKI guard + TrustAnchor doc",
+  "updated_at": "2026-05-02T22:04:35Z"
+}

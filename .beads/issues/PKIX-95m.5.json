@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:25:00Z",
+  "compaction_level": 0,
+  "content_hash": "be5cfbd8cb7a0a4acb28350879262f9c7ed14f06024330b16ae311dbb59b1029",
+  "created_at": "2026-05-06T20:15:40Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:599-600 \u2014 LintRunner::run_chain builds partial findings into a local Vec then calls all.append(&mut findings), which requires the intermediate Vec allocation. Replace with all.extend(self.run_cert(...)) to eliminate the intermediate binding and drain-via-append pattern. The deviation.rs run_chain at line 607-609 uses extend correctly.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "run_chain uses Vec::append when extend suffices",
+  "updated_at": "2026-05-06T20:25:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:15:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

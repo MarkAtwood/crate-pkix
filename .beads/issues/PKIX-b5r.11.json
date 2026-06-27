@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Not a bug: delta issuer check against cert.issuer is equivalent to checking against base issuer (base issuer == cert issuer already verified at step 2). Both paths are correct.",
+  "closed_at": "2026-05-05T16:09:19Z",
+  "compaction_level": 0,
+  "content_hash": "1e7f6d0a26e4c28e98f721bc1a2da71973056a10dbdb5a763535caa86b4d1203",
+  "created_at": "2026-05-05T15:46:24Z",
+  "created_by": "Mark Atwood",
+  "description": "**Bug**: In check_revocation at crl.rs:230, the delta CRL's issuer is validated against `cert.tbs_certificate.issuer` (the certificate being checked). But RFC 5280 \u00a75.2.4 says a delta CRL MUST be signed by the same CA that issued the base CRL \u2014 so the issuer check should compare the delta's issuer against the **base CRL's issuer**, not the cert's issuer.\n\nIn the common case these are the same value (cert issuer == base CRL issuer, already validated at line 166). But they diverge for indirect CRLs (where the CRL issuer differs from the cert issuer) or in error cases where someone passes a mismatched base+cert combination to check_revocation.\n\nMore specifically: with_delta validates at construction time (line 136) that base_crl.issuer == delta_crl.issuer. And check_revocation validates at line 166 that base_crl.issuer == cert.issuer. So transitively, delta_crl.issuer == cert.issuer. The check at line 230 is thus redundant with the construction-time check \u2014 it would only fire in a situation that's already been ruled out.\n\n**However**: The with_delta construction check is fine, but CrlChecker::new + check_revocation can receive a delta via delta_crl_der even though new() doesn't set it. The only path to delta_crl_der is through with_delta, which does the construction-time check. So in practice this is unreachable.\n\n**Real issue**: The code at line 230 says 'Verify delta CRL issuer matches the certificate's issuer' \u2014 this is checking the wrong thing (cert issuer vs delta issuer). RFC 5280 requires checking the delta issuer against the base issuer. The variable available is the already-parsed base `crl.tbs_cert_list.issuer`. The current check happens to be equivalent due to the construction invariant, but it's semantically incorrect per the RFC and misleading in the comment.\n\n**Location**: pkix-revocation/src/crl.rs:229-232\\n\\n**Fix**: Change line 230 to compare `delta_crl.tbs_cert_list.issuer` against `crl.tbs_cert_list.issuer` (the base CRL's issuer) instead of `cert.tbs_certificate.issuer`. Update the comment to cite RFC 5280 \u00a75.2.4 correctly.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.11",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crl.rs: base/delta issuer check uses cert issuer not base issuer",
+  "updated_at": "2026-05-05T16:09:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Acceptable: cycle guard checks DN equality (names_match on subjects), which is the RFC 5280 name linkage criterion. Serial number check would be stronger but not required for correctness.",
+  "closed_at": "2026-05-05T16:10:17Z",
+  "compaction_level": 0,
+  "content_hash": "7ecac9e386db8c93b1d6a86c94813e5effe746d2749a81349990326faac2a3ff",
+  "created_at": "2026-05-05T15:47:02Z",
+  "created_by": "Mark Atwood",
+  "description": "**Issue**: The cycle guard in dfs() at pkix-path-builder/src/lib.rs:181-186 detects cycles by comparing the *subject name* of the candidate against subjects already in the path. This is the correct approach per RFC 4158.\n\nHowever, it does not guard against a pool containing a self-signed certificate (subject == issuer) that is NOT the trust anchor. In this case:\n1. path = [EE], EE.issuer = 'CN=SelfSigned'\n2. Pool contains SelfSigned cert with subject='CN=SelfSigned', issuer='CN=SelfSigned', cA=TRUE\n3. The dfs finds this cert as a candidate for EE (subject matches EE.issuer) \u2014 correct\n4. Pushes it: path = [EE, SelfSigned]\n5. Recurse: current_issuer = SelfSigned.issuer = 'CN=SelfSigned'\n6. Check trust anchors: none match (SelfSigned is not an anchor)\n7. Look for pool certs with subject='CN=SelfSigned': finds SelfSigned again\n8. Cycle guard: SelfSigned.subject is already in path (at index 1) \u2192 SKIP (correct)\n9. No other candidates \u2192 backtrack\n\nSo the cycle guard DOES prevent infinite loops in this case. The self-signed non-anchor cert is tried once, backtracked, and eventually build_path returns NoPathFound. This is correct behavior.\n\n**Resolution**: No bug. The cycle guard correctly handles self-signed non-anchor pool certs. Document this case explicitly in the build_path doc comment, currently only documenting cycles detected by 'subject DNs already present in the path'.\\n\\n**Location**: pkix-path-builder/src/lib.rs:178-186\\n\\n**Fix**: Add a sentence to the doc comment: 'Self-signed certificates that are not trust anchors will be tried but immediately backtrack when the chain cannot extend further, avoiding infinite loops.'",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path cycle guard checks subject not serial",
+  "updated_at": "2026-05-05T16:10:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

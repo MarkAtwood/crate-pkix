@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f541f4dc5300a544f23bf45f1948eabd98452086cec5a4b515ff42aa82775758",
+  "created_at": "2026-05-14T17:47:27Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:461-468, 504-529\n\n`SctVerifier::verify_sct_for_cert` (lines 130-156) has a `no_run`\ndoctest example showing how to wire up a verifier and iterate\nSCTs. The other three verify-family methods do not:\n\n- `verify_sct_for_precert` \u2014 different signature (two cert\n  arguments), no example.\n- `verify_inclusion` \u2014 Merkle proof verification, no example.\n- `verify_sth` \u2014 STH signature verification, no example.\n\n`merkle_tree_leaf_for_cert`, `merkle_tree_leaf_for_precert`, and\n`merkle_leaf_hash` (the public free functions) also have no doctest\nexamples \u2014 they show the byte layout but not the pipeline of\n\"parse SCT \u2192 build MerkleTreeLeaf \u2192 hash \u2192 verify_inclusion\".\n\nThe crate-level rustdoc (lib.rs:38-40) says these helpers \"give\nconsumers the full 'parse SCT \u2192 build leaf \u2192 hash \u2192 verify\ninclusion' pipeline\", but no single doctest shows the pipeline\nrunning end-to-end.\n\nRecommendation: add a `no_run` doctest to each of:\n\n- `verify_sct_for_precert`\n- `verify_inclusion`\n- `verify_sth`\n- The crate-level rustdoc, showing the full\n  \"parse \u2192 leaf-build \u2192 hash \u2192 inclusion \u2192 STH\" pipeline\n\nThe CT verification pipeline is novel enough (most Rust devs have\nnot touched RFC 6962 internals) that a worked example is the\ndifference between \"I can use this in 20 minutes\" and \"I need to\nread the spec for two hours first\".\n\nPriority P3 because the methods are correct and the surrounding\ndocs explain the wire format; this is ergonomic documentation, not\ncontract repair.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_sth and verify_inclusion lack rustdoc examples \u2014 only verify_sct_for_cert has one",
+  "updated_at": "2026-05-14T17:47:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:47:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

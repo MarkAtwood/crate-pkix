@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features exits 0. allowed_signature_algs check is present before the tbs_buf block in chain_walk. Uses cert.signature_algorithm.oid (outer field). Check applies to every cert in the chain (no i == 0 guard). Returns Error::AlgorithmNotAllowed on mismatch.",
+  "assignee": "Mark Atwood",
+  "close_reason": "allowed_signature_algs enforced before tbs_buf block in chain_walk, fires before signature verification. All tests pass.",
+  "closed_at": "2026-05-06T04:50:06Z",
+  "compaction_level": 0,
+  "content_hash": "f057c3d9b242d7f38e94105c9abf34922b63043855f4fbc4c626e5d680679aba",
+  "created_at": "2026-05-06T03:42:33Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Enforce `policy.allowed_signature_algs` in `chain_walk`: reject any certificate whose signature algorithm OID is not in the allowlist.\n\n**Algorithm:**\n1. Read `chain_walk` in `pkix-path/src/lib.rs`. The signature-verification block (labeled '(a)') starts with `let mut tbs_buf = [0u8; 8192];`. Find its exact line.\n\n2. Immediately BEFORE the `tbs_buf` block, insert:\n   ```rust\n   // (a0) Signature algorithm allowlist check \u2014 fires before verification for clear diagnostics.\n   if let Some(ref allowed) = policy.allowed_signature_algs {\n       if !allowed.contains(&cert.signature_algorithm.oid) {\n           return Err(Error::AlgorithmNotAllowed { index: i });\n       }\n   }\n   ```\n\n3. Field note: use `cert.signature_algorithm.oid` (the outer `signatureAlgorithm` field of `CertificateInner`), not `cert.tbs_certificate.signature.oid`. RFC 5280 \u00a74.1.2.3 requires these two to be identical; the outer field is what the verifier actually checks, and checking it before signature verification gives a diagnostic `AlgorithmNotAllowed` error instead of a confusing `SignatureInvalid`.\n\n4. Scope: the check applies to **every cert in the chain** (no `i == 0` guard). This matches the epic intent \u2014 CA/B Forum profiles apply algorithm restrictions to all certificates in the chain, not just the leaf.\n\n5. `allowed.contains(&cert.signature_algorithm.oid)` uses `ObjectIdentifier: PartialEq` (by arc component value). This is correct and sufficient for a policy list expected to be 2\u20138 elements.\n\n6. Run `cargo test -p pkix-path --all-features 2>&1` to confirm no regressions.\n\n**Defensive programming rules:**\n- Check fires BEFORE signature verification \u2014 fail fast with a diagnostic error rather than `SignatureInvalid`.\n- No `unwrap()`.\n- If `allowed_signature_algs` is `None`, the block is skipped entirely.\n- `cert.signature_algorithm.oid` is always present (not `Option`).\n\n**Subagent instructions:**\n- Spawn one research subagent: read the block in `chain_walk` from the `for i in (0..chain.len()).rev()` loop start and find the exact line of the first `tbs_buf` declaration. Also confirm `cert.signature_algorithm` is of type `AlgorithmIdentifierOwned` with an `oid: ObjectIdentifier` field (not `Option<ObjectIdentifier>`).\n- Spawn one implementation subagent: apply the change.\n- Spawn one validation subagent: run `cargo test -p pkix-path --all-features 2>&1`. Confirm exit 0.\n\n**Tests:** Covered by PKIX-ken.1.10.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Enforce allowed_signature_algs in chain_walk (before signature verification)",
+  "updated_at": "2026-05-06T04:50:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:42:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

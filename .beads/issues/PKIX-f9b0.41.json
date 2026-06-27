@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:30:21Z",
+  "compaction_level": 0,
+  "content_hash": "4e63be81416886d138d85f7b6ee5393dd60310a246ef8cee7d26d4de2172d5e1",
+  "created_at": "2026-05-07T17:24:00Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:567-569 \u2014 the IssuerDnContains normalization does: let lower = s.to_lowercase(); if *s != lower { *s = lower; }. This always allocates a new String for the lowercase form before comparing. The matching code at line 340-341 correctly uses make_ascii_lowercase() in-place (zero extra allocation). Fix: use s.make_ascii_lowercase() directly (or s.to_ascii_lowercase()), consistent with the comment on line 336 that says make_ascii_lowercase avoids a second heap allocation. The caveat already documented (non-ASCII not handled) still applies either way.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.41",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-lint] DeviationStore::add: to_lowercase allocates before compare-and-discard",
+  "updated_at": "2026-05-07T17:30:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:24:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

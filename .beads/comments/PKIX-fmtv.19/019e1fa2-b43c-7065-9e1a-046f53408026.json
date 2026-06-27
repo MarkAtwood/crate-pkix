@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-13T04:40:17Z",
+  "id": "019e1fa2-b43c-7065-9e1a-046f53408026",
+  "issue_id": "PKIX-fmtv.19",
+  "text": "Cascade from PKIX-fmtv.17's rescope decision (Mark, 2026-05-12, attended):\n\nThis bead's deliverable is now well-defined. Blocks on:\n- **PKIX-fmtv.22** \u2014 TLS hostname corpus (the only corpus pyca's `PolicyBuilder` can consume)\n\n**Scope is intrinsically TLS-only on pyca's side:**\n- pyca has `PolicyBuilder().build_server_verifier(DNSName(...))` \u2014 used for verify_tls_server differential\n- pyca has `PolicyBuilder().build_client_verifier(...)` \u2014 used for verify_tls_client_dns differential (once PKIX-fmtv.11.2 client half ships)\n- pyca has **no** S/MIME verifier \u2014 verify_smime_signer / verify_smime_recipient have no pyca oracle. Differential testing for S/MIME falls entirely to PKIX-fmtv.18 (OpenSSL).\n- pyca has **no** code-signing verifier \u2014 same.\n- pyca has **no** timestamp verifier \u2014 same.\n- pyca has **no** OCSP responder verifier \u2014 same.\n\nThis scope gap is **not a defect** \u2014 it reflects pyca's intentional API surface (PolicyBuilder is TLS-focused). Documenting it explicitly in the deliverable so future contributors don't try to fill it.\n\nAcceptance: per-purpose pass-rate documented in pkix-difftest/baseline-verify-pyca.md. Two purposes (TLS server, TLS client) covered; all other wrappers explicitly noted as \"no pyca oracle available, see baseline-verify-openssl.md\".\n\nReleasing stale claim, removing human label."
+}

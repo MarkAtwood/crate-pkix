@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:12:25Z",
+  "id": "019e1d63-dda0-74a5-9846-4bf7819ad6f4",
+  "issue_id": "PKIX-amgn.8",
+  "text": "WONTFIX 2026-05-12 (Mark, interactive on PKIX-apmt). Decision: abandon zlint mirroring as the source of pkix-lint-cabf catalog metadata. pkix-lint-cabf content will be hand-authored from CA/B Forum BR PDFs going forward. Rationale: (1) PKIX-apmt's wire-format decision deferred 7 days; mirroring would have required picking a format. (2) Smallest dependency surface wins for a 'reference, not authoritative' crate. (3) zlint+pkilint remain valuable as differential oracles (PKIX-hbzo.1) -- cross-validating hand-authored interpretations against the de facto reference catches divergence bugs that a shared-upstream model would hide. Trade-offs accepted: ongoing authorial burden; loses 'track upstream living rule set' benefit; pkix-lint-cabf-refresh/ dev sub-crate is now a no-op scaffold (left on disk pending separate decision). Decision-history shipped scaffolds .8.1 (zlint local install) and .8.2 (pkix-lint-cabf-refresh skeleton) remain closed. Children .8.3-.8.6 WONTFIX in this session. Memory: pkix-amgn-8-wontfix-2026-05-12."
+}

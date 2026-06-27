@@ -1,0 +1,52 @@
+{
+  "close_reason": "12 integration tests pass covering all Error variants; dbl/p384 fixtures generated with pyca oracle",
+  "closed_at": "2026-05-02T07:29:19Z",
+  "compaction_level": 0,
+  "content_hash": "bdf470a1098e55030e5d0640fd66180f4363eddd4c8c13aac69303c0f8cd1fb3",
+  "created_at": "2026-05-02T05:54:11Z",
+  "created_by": "Mark Atwood",
+  "description": "Two related tasks for pkix-chain-simple completion:\n\n1. Wire RustCryptoVerifier to DefaultVerifier (BLOCKED BY PKIX-8wg):\n   Replace the todo!() in RustCryptoVerifier::verify_signature with a delegation to pkix_path::DefaultVerifier. RustCryptoVerifier becomes a trivial newtype wrapper:\n     struct RustCryptoVerifier(pkix_path::DefaultVerifier);\n     impl SignatureVerifier for RustCryptoVerifier {\n       fn verify_signature(...) { self.0.verify_signature(...) }\n     }\n   This eliminates the duplicate implementation concern.\n\n2. Integration tests for verify_simple (BLOCKED BY check_algorithm, check_extensions, and DefaultVerifier):\n   All test certs must be generated with an external oracle (rcgen crate in dev-dependencies, or openssl CLI). Never use the code under test as the oracle.\n\n   Happy path tests:\n     - Leaf only (self-signed treated as trust anchor) \u2014 actually invalid; leaf + anchor\n     - Leaf + 1 intermediate + anchor\n     - Leaf + 2 intermediates + anchor (MAX_INTERMEDIATES=2, should PASS)\n\n   Rejection tests:\n     - Chain with 3 intermediates + anchor \u2192 Error::ChainTooLong { len: 4 }\n     - Cert using ecdsa-with-SHA384 \u2192 Error::AlgorithmNotAllowed { index: 0 }\n     - Intermediate with CRLDistributionPoints extension \u2192 Error::UnexpectedExtension { index: 1 }\n     - Intermediate with BasicConstraints absent \u2192 Error::MissingRequiredExtension { index: 1 }\n     - Leaf cert with cA=TRUE \u2192 Error::LeafIsCA\n     - Empty chain \u2192 Error::EmptyChain\n     - Empty anchors \u2192 Error::NoTrustAnchors",
+  "ephemeral": 0,
+  "id": "PKIX-mee",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: wire RustCryptoVerifier to DefaultVerifier + integration tests",
+  "updated_at": "2026-05-02T07:29:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:54:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8wg",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:54:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9f7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:54:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hdo",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:02:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s19",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:14:20Z",
+  "compaction_level": 0,
+  "content_hash": "81851f38410e400f94794d6ed55fcfad3c2310f121e49ce50a44eaeb7e2c0fbb",
+  "created_at": "2026-05-11T05:28:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`LintResult::Warn`, `LintResult::Error`, and `LintResult::Fatal` carry `detail: &'static str`. This is cheap and allocation-free in the common path, but it has two operational consequences:\n\n1. **Serde deserialization leaks.** When the `serde` feature is on, deserializing `Finding` / `EvaluationReport` requires `'de: 'static`. The `de_static_str` helper allocates a leaked Box<str> per unique detail string. In long-running services that deserialize findings from a database or message queue (e.g. a TLS policy daemon), process memory grows without bound.\n2. **Dynamic detail messages are not possible.** Lints can only report static strings; runtime-formatted detail (e.g. 'serial `{}` exceeds CA/B Forum limit of 64 octets') has to be either skipped or encoded as a separate field with structured shape.\n\n## What\n\nMigrate `LintResult::Warn/Error/Fatal` detail field from `&'static str` to `Cow<'static, str>`. This:\n\n- Lets lints return either a `&'static str` (zero-cost, same as today) OR a runtime-formatted `String`.\n- Removes the `'de: 'static` serde bound and the leaked-allocation behavior.\n- Is a **breaking change** for any consumer that pattern-matches `LintResult::Warn { detail: &str }` \u2014 they need to adapt to `Cow<str>`.\n\n## Acceptance\n\n- [ ] `LintResult::Warn/Error/Fatal` detail field is `Cow<'static, str>`.\n- [ ] Existing static-string lint constructors still compile (via `Cow::Borrowed`).\n- [ ] One new lint added that uses `Cow::Owned` to demonstrate dynamic detail (e.g. report the actual non-conforming value).\n- [ ] Serde deserialization no longer leaks: `de_static_str` removed; `'de: 'static` bound dropped.\n- [ ] Crate version bumped (semver-breaking on pkix-lint).\n- [ ] Migration note in CHANGELOG.\n\n## Filed as\n\nTracker for pkix-lint/src/lib.rs:66, :132, :491 and report.rs:71+ comments asking for this work. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-ua6q",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: migrate LintResult detail from &'static str to Cow<'static, str>",
+  "updated_at": "2026-05-11T07:14:20Z"
+}

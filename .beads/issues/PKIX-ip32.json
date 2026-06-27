@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:21:40Z",
+  "compaction_level": 0,
+  "content_hash": "9a82bcb86809e47f7c64edddfbc773b64cc2a38e33754206c1ccbb5dc32feb4f",
+  "created_at": "2026-05-07T15:20:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:137: 'The default implementation of check_revocation_against_anchor returns Ok(()) (skip). NoRevocation, CrlChecker, and OcspChecker all inherit this default'. This is false: CrlChecker and OcspChecker both explicitly override check_revocation_against_anchor (see pkix-revocation/src/crl.rs:332 and ocsp.rs:217). Only NoRevocation inherits the default. This is the second place this incorrect claim appears (also PKIX-pnat covers the RevocationChecker trait doc). Fix verify_chain's docstring to accurately state that CrlChecker and OcspChecker DO override the method and WILL check the anchor-issued cert. This is a correctness claim in security-sensitive documentation.",
+  "ephemeral": 0,
+  "id": "PKIX-ip32",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: verify_chain docstring wrong \u2014 says CrlChecker/OcspChecker inherit default anchor check",
+  "updated_at": "2026-05-07T15:21:40Z"
+}

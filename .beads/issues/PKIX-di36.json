@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added Hash to pkix-ct::Error derive list. All four variants are unit-variant so Hash is mechanical; matches the workspace baseline (Clone, Debug, PartialEq, Eq, Hash) used by other structurally-Hashable error enums (e.g., pkix-path-builder::Error).",
+  "closed_at": "2026-05-07T23:26:17Z",
+  "compaction_level": 0,
+  "content_hash": "b56cca8f486427a5bcad99d36a2c0184581f96c13818e2e1f2473e24ac26ce46",
+  "created_at": "2026-05-07T23:03:17Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPKIX-qwzx (pass 2) commit message claims: 'Inconsistent Error derives reconciled across 8 Error types'. The reconciliation chose Clone, Debug, PartialEq, Eq as the workspace baseline and added Hash only where all variants permit it (pkix-path-builder::Error derives Clone, Debug, PartialEq, Eq, Hash).\n\n## Finding\npkix-ct::Error (pkix-ct/src/lib.rs:57) is declared as:\n\n```\n#[derive(Clone, Debug, PartialEq, Eq)]\n#[non_exhaustive]\npub enum Error {\n    NoScts,\n    NoTrustedSct,\n    InvalidSignature,\n    ParseError,\n}\n```\n\nAll four variants are unit variants \u2014 no inner data. The type is trivially Hash-able. pkix-path-builder::Error (also all-unit-variant) was given the Hash derive in pass-2; pkix-ct::Error was missed.\n\n## Why other Error types legitimately can't derive Hash\nVerified by inspection:\n- pkix-path::Error::Der(DerError(der::Error)) \u2014 der::Error derives only Copy, Clone, Debug, Eq, PartialEq (no Hash). Cannot propagate Hash.\n- pkix-revocation::Error::{CrlParseError, OcspParseError}(DerError) \u2014 same.\n- pkix-chain::Error::{Path, Revocation} \u2014 wrap the above; cannot.\n- pkix-chain-simple::Error::Path(PathError) \u2014 wraps pkix-path::Error; cannot.\n- pkix-ac::Error::AaPathInvalid(pkix_path::Error) \u2014 same.\n- pkix-revocation-http::FetchError::Transport(Box<dyn Error>) \u2014 documented exception (no Clone/PartialEq/Eq either).\n\nSo pkix-ct::Error is the only error type in the workspace that is structurally Hashable but does not derive Hash.\n\n## Severity\nP3 (idiom / consistency). Hash on Error enums is useful for users who want to dedupe errors by variant identity (e.g., 'collect distinct errors from a batch validation'). Adding a derive is non-breaking under #[non_exhaustive].\n\n## Fix\nAdd Hash to the derive list:\n```\n#[derive(Clone, Debug, PartialEq, Eq, Hash)]\n```\nNo other changes needed; all variants are unit.",
+  "ephemeral": 0,
+  "id": "PKIX-di36",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: pkix-ct::Error misses Hash derive that pass-2 reconciliation should have added",
+  "updated_at": "2026-05-07T23:26:17Z"
+}

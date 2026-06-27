@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Deviation::new now returns Result<Self, DeviationAddError> with the same EmptyField checks DeviationStore::add applies (justification + authorized_by non-empty). The 'construct empty, serialize, round-trip, only fail at add' window is closed. Three regression tests lock the new contract (rejects empty justification, rejects empty authorized_by, new+add symmetry). Module-level doctest and two in-source callers updated. 293 pkix-lint tests pass; workspace builds clean. Commit landing.",
+  "closed_at": "2026-05-14T17:10:49Z",
+  "compaction_level": 0,
+  "content_hash": "4404d10d47221ec66183a28399c0f16855d97d33d63d772d6fb8fd97762e3433",
+  "created_at": "2026-05-14T15:43:51Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:225-242 Deviation::new accepts impl Into<String> for justification and authorized_by without validating non-emptiness. The validation happens only at DeviationStore::add time (deviation.rs:879-883).\n\nFailure mode: a caller writes a config-driven Deviation builder that passes config strings directly to Deviation::new, gets back a valid-looking Deviation struct, and only discovers the empty-field error when finally calling store.add(). The Deviation can be inspected, serialized, even round-tripped through OSCAL \u2014 all without surfacing that it is unaddable.\n\nBetter shape: either (a) Deviation::new returns Result<Self, DeviationAddError> with the same EmptyField check applied at construction time, or (b) Deviation::new takes &str / NonEmptyString-like wrappers that prevent the misuse. The current shape lets the bug live in test fixtures, evidence packs, and OSCAL imports \u2014 anywhere a Deviation is constructed but not immediately added.\n\nMaintainer consequence: future bug reports of the shape 'why does my deviation silently not apply' will trace back to this \u2014 somewhere up the call stack someone called Deviation::new('', '') and forgot to call store.add().",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Deviation builder allows construction with empty justification/authorized_by but DeviationStore::add rejects",
+  "updated_at": "2026-05-14T17:10:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:43:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

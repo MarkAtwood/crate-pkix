@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3e4b1e634b9e8a1b2639b7dcd0b34cec5c17558e96c46c235f9889802bdc422c",
+  "created_at": "2026-05-14T19:41:59Z",
+  "created_by": "Mark Atwood",
+  "description": "Public signatures at pkix-revocation/src/signer_discovery.rs:87-90 and pkix-revocation/src/crl.rs (new_with_signer_discovery):\n\n  pub fn discover_crl_signer<'a>(bundle: &'a [Certificate], crl: &CertificateList) -> Option<&'a Certificate>\n  pub fn new_with_signer_discovery(crl_der: ..., bundle: &[Certificate], ...) -> Result<Self>\n\nLocks the bundle representation to a contiguous slice of owned x509_cert::Certificate.\n\nWhat callers cannot depend on / what hurts callers:\n\n1. Callers commonly hold certificates in non-contiguous storage:\n   - Arc-shared certs (Vec<Arc<Certificate>>) for cache reuse\n   - Already-borrowed slices of references (Vec<&Certificate> when the cert pool is owned elsewhere)\n   - Maps keyed by subject DN or by SHA-256 of the SPKI (HashMap<Hash, Certificate>) \u2014 typical for AIA cache integration (PKIX-zkjb.7)\n   - Iterator pipelines from a CertSource trait\n\n   Every such caller has to materialize a Vec<Certificate> via cloning before calling discover_crl_signer / new_with_signer_discovery. For pkix-chain's path-builder + revocation composition, that clone is non-trivial (each Certificate carries TBS bytes, SPKI, extensions).\n\n2. Once published, &[Certificate] is locked. Changing to impl IntoIterator<Item = &Certificate> later is a (small) breaking change. Pre-launch is when this is free.\n\n3. The clone cost compounds with PKIX-lnnl.7 (reaches_self_signed re-decodes extensions per iteration): a caller forced to clone N certs then watches each cert re-parse its extensions on each walk step.\n\nOptions:\nA. Take impl IntoIterator<Item = &Certificate> + IntoIterator<...> + Clone (the iterator must be re-iterable for the AKI walk + the DN-fallback walk + reaches_self_signed). Two passes over the bundle, so re-iterable is required.\nB. Take &[&Certificate] instead of &[Certificate] \u2014 admits Vec<Arc<Certificate>>.iter().map(|a| &**a).collect() and similar without cloning the underlying Certificate.\nC. Introduce a CertBundle trait with a single `iter(&self) -> impl Iterator<Item = &Certificate>` method that callers implement for their storage. Probably overkill at this scope.\n\n(B) is the smallest change that fixes the cloning problem. (A) is more idiomatic but requires the Clone or re-iterability bound.\n\nThis is api-contract not just performance: the choice between (current) &[Certificate] and (B/A) is a once-per-design decision that becomes a forever commitment at 1.0.\n\nAcceptance: a decision recorded in this issue, with reasoning. If status quo &[Certificate] is kept, the rustdoc on both entry points should explicitly document 'callers with non-contiguous storage must collect into Vec' so future-self does not re-litigate this.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "discover_crl_signer takes &[Certificate], excludes other bundle storage shapes",
+  "updated_at": "2026-05-14T19:41:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:41:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

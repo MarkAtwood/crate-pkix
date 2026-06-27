@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:52:08Z",
+  "compaction_level": 0,
+  "content_hash": "6604916163bddf5a8a56229ed700f50b298513c3bdf07ec8975f5ddf33cff576",
+  "created_at": "2026-05-07T04:36:27Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-path-builder/src/lib.rs line 242, cycle detection compares SubjectPublicKeyInfoOwned using derived PartialEq, which is a full field comparison including AlgorithmIdentifier parameters. For RSA, one cert may have AlgorithmIdentifier{oid=rsaEncryption, params=NULL} while another has AlgorithmIdentifier{oid=rsaEncryption, params=absent}. Both represent the same key but the derived PartialEq returns false, so the cycle guard may fail to detect a loop across encoding-variant CA certs. In practice this is unlikely in production PKIs, but is a correctness gap against adversarially crafted pools. The validate_path.rs already documents this (spki_key_matches compares oid+key bytes only); the builder should use the same approach.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: cycle detection uses SPKI equality but SPKI PartialEq may accept RSA keys with vs without NULL params as unequal",
+  "updated_at": "2026-05-07T04:52:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

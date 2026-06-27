@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:37:53Z",
+  "compaction_level": 0,
+  "content_hash": "b7be26da9a09a590d1a347c7b5709df9f5beba74360e4e9443705f2def766749",
+  "created_at": "2026-05-02T18:32:32Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs: the ECDSA P256 OID '1.2.840.10045.4.3.2' appears twice \u2014 once as a local const inside EcdsaP256Verifier::verify_signature (line ~730) and again as OID_ECDSA_P256_SHA256 at module level for DefaultVerifier. Same for the RSA OID. Duplicate OID literals are a maintenance hazard: an update or typo fix in one place won't propagate to the other. Reuse: have EcdsaP256Verifier::verify_signature reference OID_ECDSA_P256_SHA256 (or a crate-level const), and likewise for RSA.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID constants duplicated between EcdsaP256Verifier and DefaultVerifier",
+  "updated_at": "2026-05-02T18:37:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:32:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

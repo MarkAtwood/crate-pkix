@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:27:12Z",
+  "id": "019e1e16-3401-7f27-8c6a-2ca513b7ebb9",
+  "issue_id": "PKIX-wrkm",
+  "text": "NOTE: the per-Profile/per-Lint example code-block was lost during initial bead creation (shell parsed the backticks as command substitution). The intended example:\n\n    /// CA/Browser Forum TLS Baseline Requirements profile.\n    ///\n    /// Canonical source: [TLS BR \u00a77.1.2.7.12 (Subscriber Certificate Subject Alternative Name)](https://github.com/cabforum/servercert/blob/main/docs/BR.md#712712-subscriber-certificate-subject-alternative-name)\n    ///\n    /// ... (existing rustdoc continues here) ...\n\nAnchor convention: GitHub auto-generates section anchors from heading text by lowercasing, dropping spaces, and stripping punctuation. So heading \"##### 7.1.2.7.12 Subscriber Certificate Subject Alternative Name\" becomes anchor \"#712712-subscriber-certificate-subject-alternative-name\". Verify each anchor resolves before committing -- GitHub's exact slugification can include edge cases (consecutive spaces, em-dashes, etc.). Quick verify: curl -fsSL the URL; nonzero exit means the anchor is wrong."
+}

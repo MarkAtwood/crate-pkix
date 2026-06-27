@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:09:21Z",
+  "compaction_level": 0,
+  "content_hash": "762bd1d8bd3bfb4a1c01fb0c5906dcc41da8ea9178936a776064e71962e866a0",
+  "created_at": "2026-05-07T16:09:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1109-1116 \u2014 prune_policy_tree removes ancestor nodes that have no children, but the matching logic is:\n  `child_policies.iter().any(|cp| n.expected_policy_set.contains(cp))`\n\nThis checks whether any child's valid_policy appears in the PARENT's expected_policy_set. This is intentional: after policy mappings, the parent's expected_policy_set contains the OIDs that were expected to appear as children's valid_policies. If a child's valid_policy appears in the parent's expected_policy_set, the parent has a child.\n\nHowever, RFC 5280 \u00a76.1.3(d)(3) says to prune nodes that have no child nodes \u2014 meaning nodes in the TREE (no descendant node at depth i). The code checks expected_policy_set match which is semantic rather than structural. For the case where expected_policy_set was updated by PolicyMappings, a parent node may expect OID X but the cert asserted OID Y (mapped from X). In this case the child's valid_policy would be Y, but the parent's expected_policy_set was updated to contain Y by the mapping step. So this is correct.\n\nBUT: after policy mappings set expected_policy_set to [sdp] (line 2343), the prune check looks for child_policies.contains(sdp). Children are created with valid_policy = cert's policy OID. If the cert asserted sdp then the match works. If it didn't, the node should be pruned. This appears correct.\n\nNot a bug on further analysis.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "prune_policy_tree: incorrect parent-child matching uses valid_policy instead of expected_policy_set",
+  "updated_at": "2026-05-07T16:09:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:09:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T18:13:48Z",
+  "compaction_level": 0,
+  "content_hash": "1e5b53497ad7f4d6fbf2a8fc3e2db9eb0ba402d7bb4fb23a10ad1520b09b75f8",
+  "created_at": "2026-05-12T21:26:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAnnotate every public surface in pkix-profiles-cabf and pkix-lint-cabf that asserts a CA/B Forum BR rule with two things:\n\n1. A markdown link pointing to the canonical CABF source (specific section URL, not the repo root)\n2. A standardized PR invitation: 'this crate is a reference, not authoritative, interpretation of the BR text; if you find a divergence between what is enforced here and what the BR says, please open an issue or PR.'\n\nGoal: make the unprincipled-exception maintenance burden community-shareable. Anyone reading the crate who spots a divergence from current BR has a clear, low-friction path to contribute a fix, instead of needing the maintainer to notice.\n\n## Where the annotations go\n\n### Crate-level rustdoc (lib.rs top)\n\nAdd a 'Reporting divergences' section after the 'Unprincipled exception' section already present in both crates. Suggested text:\n\n> # Reporting divergences\n>\n> This crate is a snapshot interpretation of the CA/B Forum Baseline Requirements as of <ballot or doc version stamp>. The canonical source is the CA/B Forum's published BR text; this crate is reference, not authoritative.\n>\n> If you find that a constraint in this crate differs from what the current CA/B Forum BR says \u2014 wrong section reference, outdated rule, missing new ballot \u2014 please open an issue or PR at <https://github.com/MarkAtwood/crate-pkix>. Divergence fixes are welcomed from anyone in the community; you do not need to be a maintainer.\n>\n> For the canonical BR sources:\n> - TLS BR: <https://github.com/cabforum/servercert/blob/main/docs/BR.md>\n> - EV Guidelines: <https://github.com/cabforum/servercert/blob/main/docs/EVG.md>\n> - S/MIME BR: <https://github.com/cabforum/smime/blob/main/SBR.md>\n> - Code Signing BR: <https://github.com/cabforum/code-signing/blob/main/docs/CSBR.md>\n\n### Per-Profile / per-Lint rustdoc\n\nAdd a 'Canonical source' link in the rustdoc of each Profile and Lint impl pointing to the specific BR section it interprets. Example:\n\n\n\nUse the GitHub anchor IDs (which github auto-generates from heading text \u2014 e.g. '7.1.2.7.12 Subscriber Certificate Subject Alternative Name' becomes '#712712-subscriber-certificate-subject-alternative-name'). Verify each anchor resolves before committing.\n\n### Per-constant rustdoc\n\nCABF_TLS_BR_ALLOWED_ALGS, CABF_SMIME_BR_ALLOWED_ALGS, CABF_CS_BR_ALLOWED_ALGS already have doc comments citing the BR section. Add the canonical URL alongside.\n\n## Relationship to PKIX-d5rh\n\nPKIX-d5rh fixes WHAT section to cite (the section-number refresh). This bead fixes HOW citations are presented (markdown links + PR invitation). The two could be done in one PR if convenient \u2014 they touch the same files \u2014 but they have independent acceptance criteria.\n\nRecommended order: do PKIX-d5rh first (settles which sections to cite), then this bead (annotates them with URLs + PR invitation). Doing this bead first would lock in URLs that the d5rh refresh will need to update.\n\n## Acceptance\n\n- [ ] Crate-level 'Reporting divergences' section added to pkix-profiles-cabf/src/lib.rs\n- [ ] Crate-level 'Reporting divergences' section added to pkix-lint-cabf/src/lib.rs\n- [ ] Per-Profile rustdoc: WebPkiProfile, SmimeProfile, CodeSigningProfile have 'Canonical source' links\n- [ ] Per-Lint rustdoc: ValidityMaxLint, Sha1ProhibitedLint, RsaMinKeySizeLint, SanRequiredLint, EkuServerAuthLint, BcCaFlagLint have 'Canonical source' links\n- [ ] Per-constant rustdoc: CABF_*_ALLOWED_ALGS have canonical URLs\n- [ ] All URLs resolve (manually verify or write a doctest that fetches a HEAD)\n- [ ] cargo doc builds clean (no broken intra-doc-link warnings) \u2014 note: there is a pre-existing broken intra-doc-link error at pkix-lint-cabf/src/cabf_tls_br.rs:601 (`pkix_path::Profile`) that should be fixed in passing\n- [ ] CHANGELOG entries\n\n## Out of scope\n\n- Changing which section is cited (that is PKIX-d5rh)\n- Adding annotations to non-CABF crates (this is specific to the unprincipled-exception crates)\n- Adding URL links for non-BR references (RFC links, etc.) \u2014 those are independently useful but bigger scope\n\n## Audit reference\n\nFiled 2026-05-12 alongside PKIX-d5rh. Both surfaced during the CABF spec refresh session (commit 3ae0283c). Mark's design intent: the unprincipled-exception clause in AGENTS.md non-negotiable #5 accepts ongoing maintenance burden; this bead makes that burden community-shareable by inviting external contributions to fix divergences.\n\n## Cross-references\n\n- PKIX-d5rh (citation refresh \u2014 should land first)\n- AGENTS.md non-negotiable #5 unprincipled-exception clause\n- specs/cabforum-*.md (canonical local copies \u2014 these documents drive the URL targets above)\n- specs/README.md CABF section (lists source URLs)",
+  "ephemeral": 0,
+  "id": "PKIX-wrkm",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add canonical CABF spec source URLs + 'PR divergences please' invitation to -cabf crate rustdoc",
+  "updated_at": "2026-05-13T18:13:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T20:19:13Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-d5rh",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

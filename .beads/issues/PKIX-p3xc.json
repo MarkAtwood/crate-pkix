@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260514T024333Z-3287470",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T02:55:31Z",
+  "compaction_level": 0,
+  "content_hash": "e50f8b0a6751b3a7c81c78cfbe3a7dee56098c891818848d1d1f905028f0d068",
+  "created_at": "2026-05-14T02:53:18Z",
+  "created_by": "bd-spin/bd-spin-20260514T024333Z-3287470",
+  "description": "Pre-existing rustdoc warning in pkix-profiles-cabf/src/lib.rs around line 339 (was 330 before PKIX-jbvb.9.5 added new content above it):\n\n```\nerror: unresolved link to `Self::lint_runner`\n   --> pkix-profiles-cabf/src/lib.rs:339:37\n    |\n339 |     /// produced by [`lint_runner`][Self::lint_runner]: each call to\n    |                                     ^^^^^^^^^^^^^^^^^ the struct `WebPkiProfile` has no field or associated item named `lint_runner`\n```\n\nWebPkiProfile has no `lint_runner` *inherent* method \u2014 `lint_runner` is a trait method on `pkix_lint::LintProfile` which WebPkiProfile implements. `Self::lint_runner` is unresolvable via intra-doc-link.\n\nFix: change to `[`lint_runner`](#method.lint_runner)` or `<Self as pkix_lint::LintProfile>::lint_runner` or just plain backticks. Blocks workspace RUSTDOCFLAGS=-D warnings from going clean.\n\nProbably present in the original `pkix-jbvb.7` shipping commit. Touched up rather than fixed during PKIX-jbvb.9.5 (Individual Multipurpose) because out of scope for that bead.",
+  "ephemeral": 0,
+  "id": "PKIX-p3xc",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: fix broken intra-doc link [`lint_runner`][Self::lint_runner] on WebPkiProfile",
+  "updated_at": "2026-05-14T02:55:31Z"
+}

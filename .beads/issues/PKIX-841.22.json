@@ -1,0 +1,31 @@
+{
+  "close_reason": "False positive: bc.as_ref() is required because bc is consumed by bc.and_then() on the next line. Removing as_ref() causes a use-after-move compile error.",
+  "closed_at": "2026-05-02T17:47:36Z",
+  "compaction_level": 0,
+  "content_hash": "a3b92b5d9b41c7302e4cedbfdf4d5f7d021d58824e9df6fdd211a7c615fe2b11",
+  "created_at": "2026-05-02T17:31:43Z",
+  "created_by": "Mark Atwood",
+  "description": "In chain_walk: 'bc.as_ref().map(|b| b.ca) != Some(true)'. bc is Option<BasicConstraints> (owned). Calling .as_ref() before .map() is unnecessary: .map() consumes the Option<T> and b.ca is Copy, so no borrow-lifetime concern. Should be 'bc.map(|b| b.ca) != Some(true)' or more idiomatically '!bc.is_some_and(|b| b.ca)'. The .as_ref() is noise that makes the reader double-check whether bc is being preserved.",
+  "ephemeral": 0,
+  "id": "PKIX-841.22",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "bc.as_ref().map(|b| b.ca) should be bc.map(|b| b.ca) \u2014 as_ref is redundant on owned Option",
+  "updated_at": "2026-05-02T17:47:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:31:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

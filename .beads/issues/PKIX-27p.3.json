@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Already implemented: line 1385 has subject_is_empty guard; the diff I reviewed was truncated.",
+  "closed_at": "2026-05-03T02:44:04Z",
+  "compaction_level": 0,
+  "content_hash": "e775e639ab20d21142d9aee84a3f6640e785912b9741234239fc50c714e9bc77",
+  "created_at": "2026-05-03T02:41:06Z",
+  "created_by": "Mark Atwood",
+  "description": "check_name_constraints unconditionally constructs GeneralName::DirectoryName(cert.subject) and checks it against permitted DN subtrees, even when subject is an empty sequence (0 RDNs). If nc_constrained_types includes NC_TYPE_DIRECTORY_NAME, an empty subject matches no non-empty permitted DN subtree \u2192 NameConstraintViolation is returned. RFC 5280 \u00a74.2.1.6 requires empty-subject certs to have a critical SAN; the NC check should skip the subject DN and only check the SAN names. \u2192 A valid SAN-only certificate issued through a NC-constrained CA would be incorrectly rejected.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Empty subject DN fails DN permitted-subtrees check: false rejection for SAN-only certs",
+  "updated_at": "2026-05-03T02:44:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

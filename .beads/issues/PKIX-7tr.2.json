@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:13:15Z",
+  "compaction_level": 0,
+  "content_hash": "046cae784f9d8e53f1bce7aff96eb2cf2ca1d49264cb7a855e99a95a91509b7a",
+  "created_at": "2026-05-02T13:40:34Z",
+  "created_by": "Mark Atwood",
+  "description": "CrlChecker stores raw DER bytes and calls CertificateList::from_der on every invocation of check_revocation. When validating a chain of N certs against the same CRL, the CRL is parsed N times. The results are identical each time so correctness is not affected, but the repeated parse is unnecessary work and is O(N) in chain length. Should cache the parsed CertificateList.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker re-parses DER on every check_revocation call",
+  "updated_at": "2026-05-02T14:13:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

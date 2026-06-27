@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:05:31Z",
+  "compaction_level": 0,
+  "content_hash": "7cacc64fee41274a1b8d0d5b5544c6f65aabec348bc563a97628207b92086b12",
+  "created_at": "2026-05-07T03:49:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:193-196 and pkix-revocation/src/ocsp.rs:327 \u2014 Both CrlChecker::check_revocation and OcspChecker::check_revocation call from_der() to parse the full DER on every call. For a chain of N certificates validated against the same CRL/OCSP response, this is O(N) redundant parsing. The doc comments acknowledge this (Limitations v0.1, tracked for v0.3). This is a confirmed known deferral. Filing for tracking \u2014 the fix is to parse once in new()/with_delta() and store the parsed struct. Deferring until v0.3 per the existing plan unless a profiling run shows it is the bottleneck.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker re-parses DER on every check_revocation call",
+  "updated_at": "2026-05-07T04:05:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

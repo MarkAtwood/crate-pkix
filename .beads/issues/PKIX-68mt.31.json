@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.65: is_internationalized() accessor added",
+  "closed_at": "2026-06-15T18:47:53Z",
+  "compaction_level": 0,
+  "content_hash": "2e2967ae82aeb881669c68460f4f6bcaaba063021af86113789b87536bfc78ff",
+  "created_at": "2026-05-14T19:22:09Z",
+  "created_by": "Mark Atwood",
+  "description": "MailboxName carries a is_internationalized: bool internal field (line 236) that gates whether the mailbox can match an rfc822Name SAN (ASCII only) or only an SmtpUTF8Mailbox SAN (RFC 8398).\n\nCallers \u2014 e.g., a CA that wants to *issue* a cert and know in advance which SAN form to use, or a logging layer that wants to record 'this validation was for an internationalized address' \u2014 cannot read this flag back without re-running parse() and inspecting through the verify path.\n\nCombined with PKIX-68mt.18 (no accessors generally), this is the most visibly missing accessor on the type because it's a documented public behavior of verify_mailbox: 'An internationalized MailboxName (non-ASCII local-part) can only match an otherName(SmtpUTF8Mailbox) SAN entry' (rustdoc lines 455-458). The user is told what the type does based on this flag but cannot observe the flag.\n\nTrivial fix:\n\n  impl MailboxName<'_> {\n      pub fn is_internationalized(&self) -> bool { self.is_internationalized }\n  }\n\nSeverity P3 (folded into PKIX-68mt.18's accessor surface, but worth calling out separately because the docs already promise behavior gated on this hidden flag \u2014 that's a contract leak).",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "MailboxName has no separate is_internationalized() accessor \u2014 flag locked inside private field",
+  "updated_at": "2026-06-15T18:47:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:22:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

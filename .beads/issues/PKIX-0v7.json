@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:23:26Z",
+  "compaction_level": 0,
+  "content_hash": "a31ddab8c31a896bb38e42283c0ff3d09dc6b4dbd17984bf938a2e3cf1d189ef",
+  "created_at": "2026-05-02T23:20:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd the NameConstraints OID constant and register it in HANDLED_CRITICAL_OIDS so the critical-extension check in pkix-path does not reject certs that carry it.\n\n## Algorithm\n- Add `const OID_NAME_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap(\"2.5.29.30\");` in pkix-path/src/lib.rs\n- Add `OID_NAME_CONSTRAINTS` to the `HANDLED_CRITICAL_OIDS` array/slice\n\n## Acceptance criteria\n- A cert with critical NameConstraints does not return UnhandledCriticalExtension\n- Constant is private (pub(crate) or module-local)",
+  "ephemeral": 0,
+  "id": "PKIX-0v7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add OID_NAME_CONSTRAINTS to handled critical OIDs",
+  "updated_at": "2026-05-02T23:23:26Z"
+}

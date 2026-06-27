@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-06T20:54:06Z",
+  "compaction_level": 0,
+  "content_hash": "24cba20a2535d7e9ce2edf20c21ce16c9fbe18fec58e9309744338a9cb09a4db",
+  "created_at": "2026-05-06T20:50:01Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/lib.rs LintRunner::lints() at line 493 and LintRunner::bundle_version() at line 498-500 are missing #[must_use]. The crate has #![warn(missing_docs)] but there is no lint for missing #[must_use] on pure accessor methods. Since lints() returns a slice reference and bundle_version() returns &'static str, calling these methods for their side effects is meaningless \u2014 they should be #[must_use]. Also: EvaluationReport::has_findings() at report.rs:126, EvaluationReport::findings_at_or_above() at report.rs:135, and DeviationStore::all() at deviation.rs:449, DeviationStore::active_at() at deviation.rs:454, DeviationStore::active_for_lint() at deviation.rs:461, DeviationStore::expired_at() at deviation.rs:474 all lack #[must_use] despite being pure read-only methods. Fix: Add #[must_use] to these accessor methods. Priority: P3 (API hygiene; compiler doesn't warn without it).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING (duplicate/covered by PKIX-m75.16): LintRunner::lints() missing #[must_use]",
+  "updated_at": "2026-05-06T20:54:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:50:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

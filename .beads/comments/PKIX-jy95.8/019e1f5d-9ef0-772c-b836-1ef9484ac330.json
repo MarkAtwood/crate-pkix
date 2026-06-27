@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T03:24:50Z",
+  "id": "019e1f5d-9ef0-772c-b836-1ef9484ac330",
+  "issue_id": "PKIX-jy95.8",
+  "text": "Blocking pending pkilint local install + CLI/output-format validation.\n\nThe bead's own \"Local install status\" section flags this: \"pkilint is NOT yet installed locally. PKIX-hbzo.1 description says install would be via 'pip install pkilint' or vendored Python script under pkix-difftest/python/. Implementation work here will likely require a parallel 'install pkilint locally' setup bead.\"\n\nImplementation work is genuinely blocked on:\n1. pkilint installed in this environment (pip install pkilint, or equivalent)\n2. Validation of pkilint's CLI shape \u2014 multi-file batch invocation per PKIX-jy95.3, JSON output format flag, exit code semantics\n3. Sample real pkilint output to anchor the parser against\n4. Test fixtures from pkilint's test corpus\n\nRecommended path: ship PKIX-jy95.7 (pkix-zlint-bridge) first as the template \u2014 zlint IS installed locally per memory `pkix-amgn-8-1`, and the bridge crate's overall shape (per the .1/.2/.3/.4/.6 design decisions) is symmetric between zlint and pkilint. .7 establishes the pattern; .8 then becomes \"do the same thing for pkilint\" once the install is sorted out.\n\nNot autonomously filing a \"install pkilint locally\" setup bead \u2014 that's a planning surface decision (where it lives, scope, etc.) that wants explicit direction.\n"
+}

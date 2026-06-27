@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.35",
+  "title": "pkix-ct Error missing Send+Sync compile-time assertion",
+  "description": "pkix-ct::Error is auto-Send+Sync (all variants are value types) but lacks the `const _: fn() = || { fn _assert_send_sync<T: Send + Sync>() {} _assert_send_sync::<Error>(); };` block that every other substantive crate (pkix-path, pkix-revocation, pkix-chain, pkix-aia, pkix-truststore, pkix-lint, pkix-zlint-bridge) uses to pin the invariant.\n\nAGENTS.md non-negotiable #6: public result/error types 'MUST be Send + Sync'. The auto-derivation satisfies this today, but a future field addition (e.g. an `Rc<T>` or raw pointer) would silently break it without a compile-time sentinel.\n\nThe compile-time assertion is a one-line workspace-standard pattern that costs nothing and prevents a class of silent regressions.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-ct/src/lib.rs (no Send+Sync assertion block present)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:28Z",
+  "updated_at": "2026-06-15T16:58:27Z",
+  "closed_at": "2026-06-15T16:58:27Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:27"
+    }
+  ]
+}

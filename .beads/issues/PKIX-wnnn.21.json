@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "29ac7c63a7a5cf44c7f0f853b446d763c1dd64dc1f61da615ea518bfdc12e147",
+  "created_at": "2026-05-14T18:36:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:195-200 \u2014 `Error::NoValidPath { tried, last_error: String }`. The variant rustdoc (lib.rs:171-194) explains:\n\n> last_error is the [pkix_path::Error::Display] rendering of the last candidate's validation failure. It is carried as a String rather than a pkix_path::Error so [Error] retains its Hash derive\u2026\n\nWhat it does NOT say: **the format of that string is not stable across versions**. The `Display` impl for `pkix_path::Error` is free to change wording, punctuation, formatting, and embedded context across minor versions without breaking any documented contract.\n\nTwo predictable caller failure modes:\n\n1. **Substring-matching.** A caller writes:\n   ```rust\n   Err(Error::NoValidPath { last_error, .. }) if last_error.contains(\"SignatureInvalid\") => { \u2026 }\n   ```\n   This works today, breaks silently when pkix-path renames the variant or adjusts the Display rendering. Failure mode: latent, observed only when behavior diverges in production.\n\n2. **Logging-pinned tests.** A consumer's test asserts the rendered string matches a snapshot. Snapshot drift on every pkix-path patch bump.\n\nThe doc already steers programmatic-match callers toward `build_path_candidates` + per-candidate `validate_path`. That's correct but not sufficient \u2014 it doesn't tell the caller doing **logging-only** consumption that they cannot pin tests to the string.\n\nRequired doc (on the variant): \"`last_error` is intended for human display only. The format may change in any non-breaking release. Callers MUST NOT substring-match this field or pin tests to its exact rendering.\"\n\nRelated: PKIX-wnnn.5 covers the typed-inner-error question. This finding is the orthogonal \"what callers must NOT depend on\" docs concern. They should both be addressed together.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::NoValidPath.last_error string format stability is not documented",
+  "updated_at": "2026-05-14T18:36:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:36:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

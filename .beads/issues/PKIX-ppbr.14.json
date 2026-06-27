@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:36:13Z",
+  "compaction_level": 0,
+  "content_hash": "e8912000189882c6c1ed333ff696187fc218f02e097bc409c775189bf4c65040",
+  "created_at": "2026-05-14T17:41:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:26-53\n\n`CtLog` is `pub struct` with seven public fields and no\n`#[non_exhaustive]`. Real-world CT log metadata that a v0.2 might\nneed to surface but cannot be added without a major bump:\n\n- `operator_id` / `operator_name`: required by CA/B Forum TLS BR\n  \u00a73.2.2.9 for diversity policy (\"at least two SCTs from logs\n  operated by two different operators\").\n- `mmd_seconds`: Maximum Merge Delay; consumers checking SCT freshness\n  against log-claimed MMD need it.\n- `log_type`: prod vs test; tile vs RFC-6962 v1; Static-CT vs classic.\n- `monitor_url` separate from `submission_url` (Argon does this).\n- `temporal_interval_ms`: shard logs have a per-shard time window\n  that is narrower than `usable_from..retired_at` and excludes SCTs\n  outside the temporal interval as fraud.\n\nAll five are real metadata fields exposed by Chrome's\n`log_list.json` v3 schema. The Google parser at\n`pkix-ct/src/log_list.rs:120-228` already deserializes some of them\nimplicitly (via `#[serde(default)]` ignoring unknown fields) but the\n`CtLog` struct cannot store them without a breaking change.\n\nRecommendation: `#[non_exhaustive]` plus a `CtLog::builder()` or\n`CtLog::new(log_id, key_der)` returning a value that callers can\nupdate via setter methods. Direct field literals become inadmissible,\nbut accessor methods on `&CtLog` can stay stable.\n\nCaller impact: every shard-aware policy check, every operator-diversity\ncheck, and every MMD-freshness check has to wait for a major bump or\nwork around the absent fields by maintaining its own parallel\n`log_id -> metadata` map.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CtLog lacks #[non_exhaustive] \u2014 adding fields like operator_id, mmd, log_type is breaking",
+  "updated_at": "2026-06-15T18:36:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:41:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

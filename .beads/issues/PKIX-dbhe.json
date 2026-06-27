@@ -1,0 +1,22 @@
+{
+  "close_reason": "Absorbed into PKIX-9vnx.5 (Deviation/DeviationStore \u2192 OSCAL Risk + Risk store). Under PKIX-ztmr stance, the Risk store IS the persistence layer \u2014 it serializes as OSCAL JSON arrays of Risk objects, possibly alongside Assessment Plan / POA&M for full OSCAL context. Bespoke DeviationStore persistence shape is retired; OSCAL is the persistence schema.",
+  "closed_at": "2026-05-11T05:55:36Z",
+  "compaction_level": 0,
+  "content_hash": "5a8b90d63e3fda39eefd422d1943f7b25d8898a2dffb84c420f89433ab46abad",
+  "created_at": "2026-05-11T05:29:11Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`DeviationStore` is currently in-memory and append-only. For deployment, operators need:\n\n1. **Update existing deviations** \u2014 adjusting scope, expiry, or rationale without re-creating.\n2. **Delete deviations** \u2014 removing entries that no longer apply.\n3. **Persistence** \u2014 surviving process restart; a file-backed JSON or OSCAL-shaped store on disk.\n\n## What\n\n1. `DeviationStore::update(id, deviation)` \u2014 replace an entry by ID.\n2. `DeviationStore::delete(id)` \u2014 remove an entry by ID.\n3. `DeviationStore::save_to_file(path)` and `DeviationStore::load_from_file(path)` \u2014 JSON round-trip; OSCAL shape optional.\n4. `Deviation` gains a stable `id` field (UUID or content-hash) for the update/delete operations.\n\n## Acceptance\n\n- [ ] update / delete methods on `DeviationStore` with appropriate Result return types.\n- [ ] File-backed save/load round-trips identically.\n- [ ] Concurrent-modification semantics documented (probably 'don't' for v0.1 of this; advisory note).\n- [ ] Crate version bumped (mix of additive and breaking depending on how id is added).\n\n## Filed as\n\nTracker for pkix-lint/src/deviation.rs:504 'append-only ... Future versions may add update/delete and persistence' comment. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-dbhe",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: DeviationStore update/delete operations and file-backed persistence",
+  "updated_at": "2026-05-11T05:55:36Z"
+}

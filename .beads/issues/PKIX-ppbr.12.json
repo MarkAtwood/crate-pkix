@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4ea6846fd1208af34898ba824583da7caa991f038a8caea78da027e09b69fe7a",
+  "created_at": "2026-05-14T17:36:25Z",
+  "created_by": "Mark Atwood",
+  "description": "verify.rs delegates all cryptographic verification through `pkix_path::SignatureVerifier`. pkix-ct itself contains zero algorithm-specific code; the TLS-tag \u2192 X.509-OID map (`tls_alg_to_x509_oid`) is the only algorithm-aware code, and it's pure data.\n\nA future contributor might suggest:\n- 'pkix-ct should bring its own ECDSA backend, since CT logs almost always use P-256.'\n- 'The SignatureVerifier trait is overkill for the simple case.'\n\nBoth suggestions should be rejected. The whole point of pkix-path's SignatureVerifier trait (AGENTS.md non-negotiable #3: 'SignatureVerifier is the only place algorithm-specific code lives in pkix-path') is that the same algorithm-backend choices apply across the workspace. pkix-ct inheriting that decision automatically is the correct architecture. The fact that pkix-ct ended up with zero algo code is the validation that the abstraction works.\n\nAlso defend: the duplication of OID constants in verify.rs:91-99 (rather than re-exporting from pkix-path). The author's comment at verify.rs:86-89 explains: pkix-path's copies are private and feature-gated. Re-exporting them would force a feature dependency that pkix-ct doesn't actually have. Acceptable trade.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.12",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Algorithm dispatch via pkix-path::SignatureVerifier \u2014 keeps pkix-ct algo-agnostic",
+  "updated_at": "2026-05-14T17:36:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:36:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

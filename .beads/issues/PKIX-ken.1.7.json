@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features exits 0. cargo clippy exits 0. required_leaf_eku check uses try_find_cert_ext (not tbs_certificate.get). OID_EXTENDED_KEY_USAGE constant reused from existing definition. Returns Error::MissingEku when EKU absent or required OID not present. anyExtendedKeyUsage does not satisfy a specific OID check.",
+  "assignee": "Mark Atwood",
+  "close_reason": "required_leaf_eku enforced in chain_walk using try_find_cert_ext, guarded by i == 0. anyExtendedKeyUsage not treated as satisfying specific OID. Tests pass.",
+  "closed_at": "2026-05-06T04:50:15Z",
+  "compaction_level": 0,
+  "content_hash": "d1791f6912f2bc1b301aaf623586c8da463d0bdd13ebe5559755c5c2f093f4c2",
+  "created_at": "2026-05-06T03:44:06Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Enforce `policy.required_leaf_eku` in `chain_walk`: when `Some(oids)`, the leaf certificate (index 0) must explicitly assert every listed OID in its ExtendedKeyUsage extension.\n\n**Algorithm:**\n1. Read `chain_walk` to find the leaf-only section (around the `if i == 0` checks). The EKU check goes adjacent to the SAN check (Wave 1D bead), immediately before the `if i > 0` CA-only block.\n\n2. `OID_EXTENDED_KEY_USAGE` is already defined in `pkix-path/src/lib.rs` at line 639:\n   ```rust\n   const OID_EXTENDED_KEY_USAGE: der::asn1::ObjectIdentifier =\n       der::asn1::ObjectIdentifier::new_unwrap(\"2.5.29.37\");\n   ```\n   Do NOT redefine it. Do NOT import `ExtendedKeyUsage::OID`.\n\n3. `ExtendedKeyUsage` is `pub struct ExtendedKeyUsage(pub Vec<ObjectIdentifier>)` (x509-cert). Its `.0` is `Vec<ObjectIdentifier>`.\n\n4. Use the existing codebase helper `try_find_cert_ext` (defined at line ~854 in lib.rs), NOT `tbs_certificate.get::<ExtendedKeyUsage>()`. Using `try_find_cert_ext` is the established style for all other extension lookups in this file, avoids the spurious criticality-flag destructure from `.get()`, and is fail-closed on malformed DER:\n   ```rust\n   // (e3) Required leaf EKU OID check.\n   if i == 0 {\n       if let Some(ref required_ekus) = policy.required_leaf_eku {\n           use x509_cert::ext::pkix::ExtendedKeyUsage;\n           match try_find_cert_ext::<ExtendedKeyUsage>(cert, OID_EXTENDED_KEY_USAGE)\n               .map_err(|_| Error::MalformedCertificate { index: 0 })?\n           {\n               None => {\n                   if !required_ekus.is_empty() {\n                       return Err(Error::MissingEku);\n                   }\n               }\n               Some(eku) => {\n                   for req_oid in required_ekus {\n                       if !eku.0.iter().any(|e| e == req_oid) {\n                           return Err(Error::MissingEku);\n                       }\n                   }\n               }\n           }\n       }\n   }\n   ```\n\n5. Check whether `use x509_cert::ext::pkix::ExtendedKeyUsage;` is already in scope in `chain_walk`. If so, omit the local `use`. Look at existing imports inside the function first.\n\n6. Run `cargo test -p pkix-path --all-features 2>&1` to confirm no regressions.\n\n**Defensive programming rules:**\n- Guard with `i == 0` \u2014 only leaf is checked.\n- Use `try_find_cert_ext` (fail-closed): malformed EKU DER on the leaf is mapped to `Error::MalformedCertificate { index: 0 }`, not silently ignored.\n- `anyExtendedKeyUsage` (OID 2.5.29.37.0) MUST NOT be treated as satisfying a specific OID requirement \u2014 `e == req_oid` is bitwise OID comparison, which is correct.\n- `required_ekus.is_empty()` guard: `Some([])` (empty vec) trivially passes \u2014 no EKUs required if the list is empty.\n- No `unwrap()`.\n\n**Subagent instructions:**\n- Spawn one research subagent: (a) read the `try_find_cert_ext` function signature at line ~854 of `pkix-path/src/lib.rs`; (b) confirm `ExtendedKeyUsage` implements `der::DecodeOwned` (required by the `T: der::DecodeOwned` bound on `try_find_cert_ext`); (c) check whether `use x509_cert::ext::pkix::ExtendedKeyUsage` already appears in `chain_walk`.\n- Spawn one implementation subagent: apply the change.\n- Spawn one validation subagent: run `cargo test -p pkix-path --all-features 2>&1` and `cargo clippy -p pkix-path --all-features -- -D warnings 2>&1`. Both must exit 0.\n\n**Tests:** Covered by PKIX-ken.1.13.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Enforce required_leaf_eku in chain_walk (leaf cert only)",
+  "updated_at": "2026-05-06T04:50:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:44:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

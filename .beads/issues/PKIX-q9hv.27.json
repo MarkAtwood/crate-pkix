@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d1d28c7398deaaef20f267d8282832bc5406ab7e4eb5ea979e5d276df1ffc750",
+  "created_at": "2026-05-14T14:56:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Six OID constants in this PR are hand-declared with ObjectIdentifier::new_unwrap() literals instead of importing from const_oid::db, which is already in pkix-chain's transitive dep graph (via der/x509-cert/const-oid 0.9.6):\n\n  - aia_extract.rs:27 OID_AUTHORITY_INFO_ACCESS  '1.3.6.1.5.5.7.1.1' \u2192 const_oid::db::rfc5280::ID_PE_AUTHORITY_INFO_ACCESS\n  - aia_extract.rs:33 OID_AD_CA_ISSUERS         '1.3.6.1.5.5.7.48.2' \u2192 const_oid::db::rfc5280::ID_AD_CA_ISSUERS\n  - lib.rs:1318       OID_OCSP_NO_CHECK         '1.3.6.1.5.5.7.48.1.5' \u2192 const_oid::db::rfc6960::ID_PKIX_OCSP_NOCHECK\n  - lib.rs:1417       OID_EXTENDED_KEY_USAGE    '2.5.29.37' \u2192 const_oid::db::rfc5280::ID_CE_EXT_KEY_USAGE\n  - lib.rs:1419       ID_KP_TIME_STAMPING       '1.3.6.1.5.5.7.3.8' \u2192 const_oid::db::rfc5280::ID_KP_TIME_STAMPING\n  - lib.rs:1495       OID_KEY_USAGE             '2.5.29.15' \u2192 const_oid::db::rfc5280::ID_CE_KEY_USAGE\n\nConfirmed against the const-oid 0.9.6 source (db/gen.rs). pkix-profiles/src/lib.rs:167 already declares ID_KP_TIME_STAMPING with the same dotted string, so the workspace is now carrying the same OID literal in three places (pkix-profiles, pkix-chain/lib.rs, and would-be-fourth if any other crate adds one).\n\nWhat goes wrong with hand-redefinition:\n  (1) literal duplication invites OID typos that won't be caught by the type system (const ObjectIdentifier::new_unwrap is checked at compile time but produces a 'wrong-OID compiles fine' result, not a build break);\n  (2) grep across the workspace for 'who uses id-kp-timeStamping?' returns the literal string rather than a canonical symbol \u2014 refactors get harder;\n  (3) when const-oid 1.0 ships and the workspace migrates, six call sites need updating instead of one import path.\n\nIdiomatic Rust convention for RustCrypto-formats consumers is to import from const_oid::db::* (or, equivalently, x509_cert::ext::pkix::*::oid where re-exported), then use the named constant. Hand-defining a private const with the same dotted string is the same anti-pattern as redefining E in std::f64 inside your own module.\n\nCost-cheap fix: replace the 6 const declarations with use statements. Existing match-arm syntax (e.g. 'if *oid == ID_KP_TIME_STAMPING') works unchanged because both sides are ObjectIdentifier.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "OID constants hand-redefined; const_oid::db::rfc5280/rfc6960 already supplies all six",
+  "updated_at": "2026-05-14T14:56:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:56:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Applied the only viable change: replaced 'b_rdns.iter()' with 'b_rdns' inside the zip() at line 1369. The other two sites flagged in the issue (current.iter() at ~2582, rdn.0.iter() at ~2973) cannot be migrated: 'current' is a &mut Vec from a &mut binding so &current resolves to &&mut Vec, and rdn.0 is a SetOfVec<AttributeTypeAndValue> which does NOT implement IntoIterator for &T. Verified by compile failure (E0277) on those rewrites. The issue's claim that all three were trivial migrations was incorrect; the two non-migratable sites are correct as-is.",
+  "closed_at": "2026-05-07T22:34:59Z",
+  "compaction_level": 0,
+  "content_hash": "5bf8db06f92504399a7f3f4c945d57641f46107c1cf556ba9dd3a0a2ee776126",
+  "created_at": "2026-05-07T22:16:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nThree sites in `pkix-path/src/lib.rs` use `for x in y.iter() { ... }` where\n`for x in &y { ... }` is idiomatic. Rust 2018+ implicitly converts `&Vec<T>`\ninto an iterator of `&T` via `IntoIterator`; the explicit `.iter()` is\nredundant.\n\nSites:\n\n`pkix-path/src/lib.rs:1365`:\n```rust\nfor (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns.iter()) {\n```\nCould be: `for (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns) {` (at minimum drop\nthe second `.iter()`).\n\n`pkix-path/src/lib.rs:2578`:\n```rust\nfor c in current.iter() {\n```\nShould be: `for c in &current {` \u2014 assuming `current` is the local\n`Vec<...>` from line ~2570 (the `let current = ...;` binding).\n\n`pkix-path/src/lib.rs:2969`:\n```rust\nfor ava in rdn.0.iter() {\n```\nShould be: `for ava in &rdn.0 {` \u2014 `rdn.0` is a `SetOfVec<...>` whose\n`&` reference iterates `&AttributeTypeAndValue`.\n\nThese are caught by `clippy::explicit_iter_loop` (style category, default-warn);\nthey only escape current CI because `pkix-path/src/lib.rs:4` uses\n`#![warn(missing_docs, rust_2018_idioms)]` rather than `#![warn(clippy::style)]`.\nThe lint is independent of any pedantic/nursery tier.\n\nFix: rewrite each site to use the implicit `IntoIterator for &T` form. No\nbehavior change.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.25",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: for x in y.iter() instead of for x in &y at three sites in pkix-path",
+  "updated_at": "2026-05-07T22:34:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:16:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

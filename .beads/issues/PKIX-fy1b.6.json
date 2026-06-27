@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: matches() normalizes the issuer string with make_ascii_lowercase() before the contains() check; the stored substring IS pre-lowercased by add(); invariant is consistent",
+  "closed_at": "2026-05-07T04:48:45Z",
+  "compaction_level": 0,
+  "content_hash": "39599df5b4f26c6b199e851aa86c0b6bad772a5eb19876bd98b4a4da7cba8e1c",
+  "created_at": "2026-05-07T04:36:44Z",
+  "created_by": "Mark Atwood",
+  "description": "In deviation.rs, DeviationStore::add() normalizes IssuerDnContains to lowercase (line 544). However, DeviationScope::matches() (line 317) calls cert.tbs_certificate.issuer.to_string() and then make_ascii_lowercase() for comparison. This is correct when the scope was added via the store (normalized). But DeviationScope::matches() is a public method called directly (bypassing the store), and callers constructing DeviationScope::IssuerDnContains directly with a mixed-case string will get incorrect non-matches at runtime because the doc comment says 'Direct construction...should use a pre-lowercased string to preserve the invariant' \u2014 but this is only advisory, not enforced. The matches() method silently fails for mixed-case direct constructions. A constructor or invariant enforcement would close this gap.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationStore::add normalizes IssuerDnContains but does not normalize the substring used in matches() \u2014 inconsistent invariant",
+  "updated_at": "2026-05-07T04:48:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

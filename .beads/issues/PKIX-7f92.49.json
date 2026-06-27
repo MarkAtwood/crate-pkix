@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b5bec0cc7291d66aae785b7da8d9ec944fd1c786d5db3ec117b4e222ec50435f",
+  "created_at": "2026-05-14T16:10:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:218-225 (de_cow_static / cert_sha256_hex deserializer) decodes 64 hex chars to 32 bytes as:\\n\\n```rust\\nfor (i, byte) in out.iter_mut().enumerate() {\\n    let hi = u8::from_str_radix(&hex[i * 2..i * 2 + 1], 16)\\n        .map_err(|_| serde::de::Error::custom(\"non-hex char in cert_sha256\"))?;\\n    let lo = u8::from_str_radix(&hex[i * 2 + 1..i * 2 + 2], 16)\\n        .map_err(|_| serde::de::Error::custom(\"non-hex char in cert_sha256\"))?;\\n    *byte = (hi << 4) | lo;\\n}\\n```\\n\\nProblems:\\n\\n1. Two str-radix parses per output byte. Each one validates the slice is valid UTF-8 (it is, by construction, but the API call does the check anyway), then walks str_radix's general 36-base machinery to recognise one digit.\\n2. PKIX-7f92.1 already flags that this PANICS on non-ASCII 64-byte UTF-8 input because the slice indices `hex[i*2..i*2+1]` land mid-codepoint. That is the correctness bug.\\n3. The lossy 'non-hex char in cert_sha256' message discards which index and which char, complicating debug.\\n\\nIdiomatic shape: walk `hex.as_bytes()` (which IS what the boundary should be after PKIX-7f92.1 fixes the codepoint slicing), with a small `fn hex_value(b: u8) -> Option<u8>` matcher:\\n\\n```rust\\nfn hex_nibble(b: u8) -> Option<u8> {\\n    match b {\\n        b'0'..=b'9' => Some(b - b'0'),\\n        b'a'..=b'f' => Some(b - b'a' + 10),\\n        b'A'..=b'F' => Some(b - b'A' + 10),\\n        _ => None,\\n    }\\n}\\n\\nfor (i, byte) in out.iter_mut().enumerate() {\\n    let hi = hex_nibble(hex.as_bytes()[i*2]).ok_or_else(|| ...)?;\\n    let lo = hex_nibble(hex.as_bytes()[i*2+1]).ok_or_else(|| ...)?;\\n    *byte = (hi << 4) | lo;\\n}\\n```\\n\\nThis is one match per nibble, no allocation, no UTF-8 re-validation, and the bounds check on `as_bytes()[idx]` panics with a sensible message rather than slicing into a codepoint interior. It also dovetails with the PKIX-7f92.1 fix \u2014 once you decide the byte-array indexing path, the str_radix call is the wrong tool.\\n\\nFiled as a chore P3 because PKIX-7f92.1 is the priority-0 correctness issue; this is the cleanup that should land in the same commit.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.49",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "cert_sha256_hex deserializer uses 4-byte slice for 2 nibble decodes \u2014 slice::get_unchecked-shaped pattern with str-radix overhead",
+  "updated_at": "2026-05-14T16:10:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:10:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

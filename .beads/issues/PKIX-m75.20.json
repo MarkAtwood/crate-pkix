@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:36Z",
+  "compaction_level": 0,
+  "content_hash": "990233cd464282f7ac0a65690f5b8f97bd161e601816b6b4dd50255711728171",
+  "created_at": "2026-05-06T20:50:35Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: LintResult (pkix-lint/src/lib.rs:201) and Finding (line 370) do not implement std::fmt::Display. These are the primary output types of the lint engine. Without Display: (1) users cannot write 'println!(\"{}\", finding.result)' to format a lint result for human consumption, (2) the types cannot be used with tracing/log macros that expect Display, (3) error reporting code must format fields manually. Severity also lacks Display, making it impossible to write the variant name without Debug formatting. Fix: implement Display for LintResult (showing 'Pass', 'NotApplicable', 'Warn(detail)', 'Error(detail)', 'Fatal(detail)'), for Severity (showing 'Info', 'Warn', 'Error', 'Fatal'), and a convenience Display for Finding showing 'LINT [lint_id] result at cert[N]'. Note: error::Error is not appropriate here since these are not error types \u2014 Display alone is sufficient.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: LintResult and Finding missing Display impl",
+  "updated_at": "2026-05-06T20:58:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:50:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

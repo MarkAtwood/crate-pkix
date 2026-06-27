@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:03:32Z",
+  "compaction_level": 0,
+  "content_hash": "7c4c99ef61d82e273814a22e2bb846648279007801bd429ed008f2d566cff46b",
+  "created_at": "2026-05-06T16:51:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/Cargo.toml:11\n\n`pkix-profiles/Cargo.toml` declares:\n```toml\ncategories  = [\"cryptography\"]\n```\n\nThis is fine. But the crate's lib.rs doc comment explicitly states:\n```\n//! # `std` requirement\n//!\n//! This crate requires `std`. It does not support `no_std` in v0.1\n```\n\nWhile the categories don't include `no-std`, there is no missing `#![cfg_attr(not(feature = \"std\"), no_std)]` guard in the crate root, which is correct. However, unlike `pkix-path` and `pkix-revocation`, `pkix-profiles` has no explicit `std` feature gate and doesn't warn users attempting `no_std` usage at compile time with a meaningful error.\n\nAdditionally, `pkix-profiles` depends on `pkix-path = { workspace = true }` without any feature flags. `pkix-path` defaults to enabling `rsa` and `p256` backends. This means `pkix-profiles` unconditionally pulls in the `rsa` and `p256` crates (large compile-time cost) even for users who want only the `smime_policy()` function.\n\nFix: Add an explicit dependency on `pkix-path` with `default-features = false` and enable only the features actually needed, or add a feature-gating mechanism.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: no_std claim in categories but crate requires std",
+  "updated_at": "2026-05-06T17:03:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

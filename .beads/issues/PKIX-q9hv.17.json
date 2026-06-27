@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a58e76140c79143e76d9663d1654f7fb1eb5731b0ab0b64731d00f39d0d28d5b",
+  "created_at": "2026-05-14T14:49:08Z",
+  "created_by": "Mark Atwood",
+  "description": "README.md contains code blocks marked ` ```rust ` (not no_run) that no longer\nmatch the public API surface. Two examples won't compile:\n\n1. README.md:65 \u2014 verify_chain with 5 arguments:\n\n       let result = verify_chain(&chain, &anchors, &policy, &my_verifier, &NoRevocation)?;\n\n   The current `verify_chain` signature (src/lib.rs:374) is 6 arguments;\n   it takes `aia: &A` after `revocation`. The example needs a `&NoAiaFetcher`\n   (or other `AiaFetcher`) tail argument. This was introduced by commit\n   ec9bb744 / 50e43963 (Verifier 3rd generic for AiaFetcher) and not\n   propagated to the README.\n\n2. README.md:35-39, 45-47, 53-56 \u2014 CrlChecker::new() / with_delta() / OcspChecker::new()\n   are bound directly:\n\n       let checker = CrlChecker::new(crl_der, unix_now(), DefaultVerifier);\n       let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;\n\n   `CrlChecker::new` and friends return `Result<Self>` (pkix-revocation/src/crl.rs).\n   Binding the Result and then passing `&checker` will not type-check\n   \u2014 `&Result<CrlChecker>` does not implement `RevocationChecker`. The\n   examples need either `.unwrap()`, `?`, or a `let checker = CrlChecker::new(...)?;`.\n\nBoth examples are in the README's primary onboarding flow; a new caller\ncopy-pasting them will hit cargo errors before they learn anything useful.\n\nSuggested fix: add the README as a `#[doc = include_str!(\\\"../README.md\\\")]`\nin lib.rs (or include the snippets directly) so `cargo test --doc` exercises\nthem; or convert the README to ```rust,ignore``` blocks. The former is\nbetter \u2014 keeps the contract honest.\n\nCaller impact: every new user.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "README examples for verify_chain and CrlChecker won't compile",
+  "updated_at": "2026-05-14T14:49:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:49:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

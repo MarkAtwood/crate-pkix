@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:20Z",
+  "compaction_level": 0,
+  "content_hash": "12f4212edf8a42f645e8bb5b655a30d635d5282b75826552e8b891e3584c71e6",
+  "created_at": "2026-05-06T16:51:33Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/tests/pkits_crl.rs:45-64\\n\\nThe test comment for pkits_4_15_1_invalid_delta_no_base_construction_fails says:\\n'supplying it as the *base* should fail because a base CRL must NOT have deltaCRLIndicator, and supplying it as the delta with itself as base should fail because its BaseCRLNumber won\\u2019t match GoodCACRL\\u2019s CRLNumber.'\\n\\nHowever, the actual assertion is:\\n    CrlChecker::with_delta(good_base, delta, PKITS_NOW, DefaultVerifier).is_err()\\n\\nThis uses GoodCACRL as base and deltaCRLIndicatorNoBaseCACRL as the delta. The comment says 'invert: the deltaCRLIndicatorNoBaseCACRL IS a delta (has the extension)' but then describes both orderings. This double-explanation is confusing and one branch is misleading \u2014 the code only tests one configuration.\\n\\nThe delta's BaseCRLNumber won't match GoodCACRL's CRLNumber because they're from different CAs (different issuers), so the name-check at line 143-148 should trigger DeltaCrlBaseMismatch BEFORE the CRL number check. The comment says 'BaseCRLNumber won't match' but the actual failure reason is 'issuers don't match.'\\n\\nThis is a test documentation issue but it may mask the actual behavior being tested, making it harder to verify the right invariant is enforced.\\n\\nFix: Clarify the test comment to accurately describe what configuration is being tested and why it fails (issuer mismatch, not CRL number mismatch).",
+  "ephemeral": 0,
+  "id": "PKIX-taa.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkits_4_15_1 test comment inverts delta/base CRL semantics",
+  "updated_at": "2026-05-06T16:58:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

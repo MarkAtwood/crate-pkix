@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:03:39Z",
+  "id": "019e15d9-3c55-750d-b3b4-1e46d9485f02",
+  "issue_id": "PKIX-0x9z",
+  "text": "Has explicit 'Decision needed' section with two reasonable positions: (1) add ValidationPolicy::require_crl_sign_on_cas (default false) and restore PKITS conformance; (2) document as intentional RFC-literal divergence in INTEROP.md, keep cRLSign enforcement out of pkix-path. do-beads loop cannot pick a stance. Bead's own default recommendation is option 1 (additive, configurable, off-by-default preserves current behavior) \u2014 maintainer to ratify."
+}

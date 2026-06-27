@@ -1,0 +1,31 @@
+{
+  "close_reason": "FALSE ALARM: matches_rfc822_name handles .domain syntax correctly (tests 21,23 pass)",
+  "closed_at": "2026-05-03T00:33:59Z",
+  "compaction_level": 0,
+  "content_hash": "e080d20a54fbd9789fd90d914583382eb8d57e70877c4a71d0d873b7003f0453",
+  "created_at": "2026-05-03T00:10:40Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_rfc822_name: when constraint starts with '.' (e.g. '.testcertificates.gov'), the apex exclusion check (lines 997-998) compares domain.eq_ignore_ascii_case(suffix) where suffix is 'testcertificates.gov'. If domain == 'testcertificates.gov' this returns false (correct apex exclusion). But PKITS 4.13.21 uses constraint '.testcertificates.gov' and subject 'Testing@testcertificates.gov'. The domain part is 'testcertificates.gov', apex check fires, returns false \u2014 subject is REJECTED. But PKITS says it must VALIDATE. This means the apex exclusion logic for RFC822 .domain constraints is wrong: RFC 5280 \u00a74.2.1.10 says '.domain' matches any address AT that domain (apex included, unlike DNS). The apex exclusion in matches_rfc822_name is incorrect for the email case; it should only apply to DNS-style subdomain-only semantics. Three PKITS tests (21, 23, 25) are ignored because of this.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RFC 822 domain suffix (.domain) constraint not matched \u2014 false permit",
+  "updated_at": "2026-05-03T00:33:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:10:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

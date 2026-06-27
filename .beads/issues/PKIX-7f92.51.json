@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0574898192a7b9906484f91e6ae8d17d545e256f2b0a29dd1ea6c6997c044770",
+  "created_at": "2026-05-14T16:11:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1146 LintRunner has fields { lints: Vec<Box<dyn Lint>>, bundle_version: Cow<'static, str> }. Both are Clone-able: Cow is Clone-by-derive, and Box<dyn Lint>: Clone is supplied by the LintClone supertrait blanket impl (lib.rs:689-693). So `#[derive(Clone)]` on LintRunner compiles and produces the correct behavior.\\n\\nIt is not derived. The struct ships with no Clone impl.\\n\\nSame for pkix-lint/src/deviation.rs:1114 DeviationRunner { runner: LintRunner, store: DeviationStore }. DeviationStore already derives Clone (line 854). Once LintRunner derives Clone, DeviationRunner can too.\\n\\nWhy it matters:\\n\\n* AGENTS.md non-negotiable #6 explicitly names 'callbacks-not-closed-structs admit caller-side caching by design' and 'public result/result types MUST derive Clone + Debug + PartialEq + Eq \u2026 cache-friendliness'. LintRunner is the entry-point closure for evaluation; a caller that wants to keep a base runner and several parameter-tweaked clones can't, because Clone isn't derived.\\n* The infrastructure to make this work (LintClone supertrait) already exists and is justified in the rustdoc by 'apply_parameter_overrides clones lints internally to provide atomicity'. The internal clone path uses clone_box exactly because Vec<Box<dyn Lint>> isn't Clone-derivable without LintClone \u2014 and that bridge is already built. Not exposing the Clone derive leaves the bridge half-finished.\\n* Finding-prefix existing .26 audits Send+Sync coverage but not Clone coverage.\\n\\nFix: add #[derive(Clone)] to LintRunner (remove the existing manual Debug impl if derive(Debug) also satisfies \u2014 manual Debug currently elides the lint list, so keep manual Debug). Same on DeviationRunner.\\n\\nFiled P2: this is about API-shape closure (every user of the runner expects to be able to clone), pre-1.0 free to fix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.51",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner and DeviationRunner missing Clone derive despite Box<dyn Lint>: Clone via LintClone supertrait",
+  "updated_at": "2026-05-14T16:11:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:11:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

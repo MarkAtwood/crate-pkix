@@ -1,0 +1,31 @@
+{
+  "close_reason": "Known gap, tracked separately: CDP/IDP name matching is documented as v0.2 in CrlChecker limitations. The 3 ignored tests are correctly marked.",
+  "closed_at": "2026-05-05T16:10:27Z",
+  "compaction_level": 0,
+  "content_hash": "54e4a96f50380814c88a9a851d1d12c4cd3bf8fb28edc63b710dc9d2f19499db",
+  "created_at": "2026-05-05T15:48:36Z",
+  "created_by": "Mark Atwood",
+  "description": "The CRL test file pkits-revocation/tests/pkits_crl.rs has \u00a74.14.3, \u00a74.14.8, and \u00a74.14.9 tests marked `#[ignore]` with the reason 'requires CDP name matching against IDP (not implemented in v0.1)'. These represent tests that will incorrectly return Ok when they should return Err.\n\nThe ignore annotations are appropriate for v0.1, but:\n1. \u00a74.14.3 uses `distributionPoint1CACRL` for a cert whose CDP points to a DIFFERENT distribution point. Our checker returns Ok() (serial not in revoked list) when it should return an error or 'not covered' that propagates as a failure.\n2. \u00a74.14.8 and \u00a74.14.9 have similar CDP/IDP name mismatch scenarios.\n\nThe risk is: any CRL provided to CrlChecker that has an IDP with a distribution point NAME (not just scope flags) will silently apply to ALL certs from that issuer, even those whose CDP points to a different distribution point. This is a silent security bypass: an attacker who compromises ONE distribution point can provide that CRL to check revocation of certs that should be checked against a DIFFERENT distribution point.\\n\\nThe `parse_issuing_dp` function only checks the scope flags (onlyContainsXxx). It does NOT extract or check the distributionPoint NAME field from the IDP. The IssuingDistributionPoint struct has a `distribution_point` field that is not used.\\n\\nLocation: pkix-revocation/src/crl.rs:207-221 (parse_issuing_dp / IDP check)\\n\\nSeverity: The doc comment at crl.rs:62-64 explicitly lists 'CDP/IDP name matching (CDP vs IDP name) is not implemented' as a v0.1 limitation. The risk is present but documented. P2 because this is a silent bypass with real-world impact for multi-DP PKIs.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS \u00a74.14 tests: CDP/IDP name matching tests ignored but not tracked",
+  "updated_at": "2026-05-05T16:10:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:48:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

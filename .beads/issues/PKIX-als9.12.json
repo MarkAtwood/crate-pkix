@@ -1,0 +1,43 @@
+{
+  "compaction_level": 0,
+  "content_hash": "714c97319e89334091bb93abc2d80ec54cdf0b1c6afd9f701e050bfadbde6772",
+  "created_at": "2026-05-08T05:45:15Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.4(a)+(b) PolicyMappings (lines 2440\u20132514) into `pub(crate) fn apply_policy_mappings(cert: &Certificate, state: &mut WorkingState, ...) -> Result<()>`.\n\n## Risk\n\nHIGH.\n\n## PKITS coverage gap (PKIX-als9 design \u00a75)\n\n> \"PolicyMappings + anyPolicy parents when policy_mapping==0 \u2014 exercised by \u22642 tests; risky for H8.\"\n\nReviewers should consider whether to import additional PKITS policy-mapping fixtures BEFORE landing H8. Out of scope for this bead; flag in PR review.\n\n## Ordering invariant (PKIX-als9 design \u00a77)\n\n> \"\u00a76.1.4(h) counter-decrement ordering: must be after mappings (\u00a76.1.4(b)), before clamps (\u00a76.1.4(i)/(j)). If H8 extracted, call-order in chain_walk becomes a load-bearing audit point. Must be commented at call site after refactor.\"\n\n## Dependencies\n\n- H7 (sequenced).\n- prep2 (WorkingState struct \u2014 needed for `state` param).\n\n## Acceptance\n\n- New helper.\n- chain_walk call site has explicit comment: \"Order matters: H8 (mappings, \u00a76.1.4(b)) must run before \u00a76.1.4(h) counter decrement.\"\n- PKITS \u00a74.8\u2013\u00a74.12 (policy-mapping suite) all pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: H8 \u2014 extract apply_policy_mappings (~75 lines, \u00a76.1.4(a)+(b))",
+  "updated_at": "2026-05-08T05:45:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-07T22:46:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.11",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-316",
+  "title": "Review: refactor pass \u2014 NC invariant + find_ext + docs",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:38Z",
+  "updated_at": "2026-06-15T17:57:39Z",
+  "closed_at": "2026-06-15T17:57:39Z"
+}

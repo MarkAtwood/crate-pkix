@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:40Z",
+  "compaction_level": 0,
+  "content_hash": "4c819e56ee942da63f5080540124a94437e4d34b11c1005711f4169ec36c1fef",
+  "created_at": "2026-05-06T22:17:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint design: LintRunner returns Vec<Finding> and never returns Err or panics. Fatal only stops further lint evaluation, not chain validation. This is the correct design for a compliance advisory layer \u2014 enforcement (reject a TLS connection, block cert issuance) belongs at the integration boundary where the calling context is known. A contributor might suggest making Fatal return an Err for 'more obvious' handling; that would conflate advisory signals with hard failures and break the audit use-case (you always want all findings recorded, even for malformed certs).",
+  "ephemeral": 0,
+  "id": "PKIX-9to.18",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Advisory-only lint architecture correctly separates enforcement from evaluation",
+  "updated_at": "2026-05-06T22:29:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:17:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

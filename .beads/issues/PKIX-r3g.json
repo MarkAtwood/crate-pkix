@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:52:09Z",
+  "compaction_level": 0,
+  "content_hash": "b5cbafa90ada90a77ae5203916fbc464e038c371f7d1dd70e48e715e42054c55",
+  "created_at": "2026-05-06T23:17:20Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs lines 279-316: in check_revocation, when a delta CRL is present the DER bytes are parsed into a CertificateList twice. First at line 281 to extract and cross-check the issuer name, then a second time inside verify_delta_crl_and_collect at line 488. This is O(2) parsing per check_revocation call with a delta, and allocates the CertificateList structure twice. The redundant parse happens because the name-check block (lines 279-293) was written as a separate 'defense-in-depth' guard before calling the helper, but the helper immediately re-parses the same bytes. Suggested fix: refactor verify_delta_crl_and_collect to accept an already-parsed CertificateList (or add a separate parse-only helper), so the outer block can perform its name-check on the already-parsed structure and pass it to the helper rather than triggering a second parse.",
+  "ephemeral": 0,
+  "id": "PKIX-r3g",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: Delta CRL parsed twice in check_revocation (redundant allocation)",
+  "updated_at": "2026-05-06T23:52:09Z"
+}

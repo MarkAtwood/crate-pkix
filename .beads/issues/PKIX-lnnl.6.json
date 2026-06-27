@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e24b1021135da3758e9a85ae675497cd37238e4764171f6732f7f63a839e9185",
+  "created_at": "2026-05-14T19:37:41Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:565-569 skips the cert.issuer == crl.issuer DN-equality check whenever crl_issuer_cert.is_some(). That covers two flows:\n\n(a) Legacy indirect (new_with_crl_issuer): cert.issuer \u2260 crl.issuer is correct per RFC 5280 \u00a75.2.6.\n(b) Discovery (new_with_signer_discovery): for the \u00a74.5 PKITS case, cert.issuer == crl.issuer happens to hold by DN coincidence; for \u00a74.14.22-26-style indirect-via-discovery, they differ by design.\n\nThe comment on lines 559-564 claims 'Discovery mode also skips this check: the \u00a74.5 case has cert.issuer == CRL.issuer by DN, so the DN-equality test still holds.' That is true for \u00a74.5 but misleadingly justifies skipping the check via 'it would pass anyway.' For arbitrary discovery-mode callers it does NOT pass \u2014 discovery handles BOTH \u00a74.5 and \u00a74.14.22-26.\n\nDefense-in-depth gap: a caller using discovery mode with a malformed bundle where cert.issuer DN does not match crl.issuer DN bypasses one of the four redundant identity checks in check_revocation. Remaining checks:\n- signer_subject == crl.issuer (line 538) \u2014 still enforced via discovered signer's subject\n- issuer.subject == cert.issuer (line 550) \u2014 still enforced\n\nSpecifically what is no longer enforced in discovery mode is: 'the supplied issuer cert's subject must equal the CRL's stated issuer.' For PKITS \u00a74.5 this is automatic. For non-PKITS callers it could mask a bundle-construction bug where the issuer-of-cert and the CRL-signer are from different namespaces.\n\nScenario that would trigger bad behavior: a caller using new_with_signer_discovery passes (a) a CRL signed by some 'CRL Authority X', (b) a bundle containing X plus 'CA Y', (c) cert.issuer == Y, (d) cert is on the CRL by serial. Discovery finds X as signer. signer_subject(X) == crl.issuer(X) holds. issuer.subject(Y) == cert.issuer(Y) holds. The cert.issuer(Y) != crl.issuer(X) mismatch is NOT detected. The cert is flagged revoked even though X has no authority over certs issued by Y.\n\nThis is the EXACT case the per-entry certificateIssuer extension (RFC 5280 \u00a75.3.3) exists to handle \u2014 but find_matching_entry only walks certificateIssuer when is_indirect (line 971). The 'is_indirect' flag is derived from `crl_issuer_cert.is_some()` (line 681). Discovery mode sets is_indirect = true, so the per-entry check WILL run \u2014 IF the CRL has \u00a75.3.3 extensions. For \u00a74.5 CRLs (no per-entry certificateIssuer), all entries inherit the CRL's own issuer as effective_issuer, and the names_match(effective, cert_issuer) on line 978 IS the missing cross-check.\n\nConclusion: the gap is closed by the per-entry walk for the \u00a74.5 case (effective == crl.issuer, which must match cert.issuer for the find to succeed). The defense-in-depth check on line 565 is genuinely redundant under those conditions. BUT the code path is subtle enough that future refactoring could break the implicit invariant.\n\nFix: either\n1. Add an explicit pre-check at the top of check_revocation in discovery mode: 'if cert.issuer is in a different namespace than crl.issuer AND the CRL has no \u00a75.3.3 entries, reject' (this is what the find loop would do anyway, just earlier).\n2. Add a regression test that constructs the scenario above and asserts the right outcome (Revoked or CrlIssuerMismatch).\n\nOption 2 is sufficient. The current code is correct; the risk is regression.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Discovery mode bypasses cert.issuer == crl.issuer defense-in-depth check",
+  "updated_at": "2026-05-14T19:37:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:37:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

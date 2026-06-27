@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:33:38Z",
+  "compaction_level": 0,
+  "content_hash": "543228d01a769b668aa06fef224636532aaa0cae20da7863201b63e794d9f17a",
+  "created_at": "2026-05-07T16:14:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs:222-223 \u2014 SmimeProfile sets:\n  `p.max_validity_secs = Some(1185 * 86_400);`\n\nIn pkix-path chain_walk, max_validity_secs is checked for EVERY certificate in the chain (comment at line 2051: 'Applies to every cert in the chain per the epic intent'). This means intermediate CA and root CA certificates with validity periods greater than 1185 days (~3.25 years) will be rejected when using smime_policy.\n\nCA/B Forum S/MIME BR \u00a76.3.2 sets the validity cap specifically for subscriber (end-entity) certificates. Root and intermediate CA certificates in S/MIME hierarchies routinely have validity periods of 10-20 years.\n\nUsing smime_policy() with a chain that has a typical CA hierarchy (e.g., 10-year intermediate) will fail with ValidityPeriodExceedsMax on the intermediate cert, even though the S/MIME BR cap applies only to end-entity certificates.\n\nThis is the same issue as CodeSigningProfile: the max_validity_secs field applies to all chain members. The correct approach would be to only enforce the cap on the leaf cert.\n\nP2 \u2014 SmimeProfile and CodeSigningProfile cannot be used with typical CA hierarchies that have long-lived CA certificates.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles SmimeProfile: max_validity_secs applies to ALL certs; CA certs may exceed 1185 days",
+  "updated_at": "2026-05-07T16:33:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:14:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

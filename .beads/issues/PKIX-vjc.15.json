@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Introduced NcTypeMask newtype with inherent constants and BitOrAssign impl. All NC_TYPE_* sites updated to use .contains() instead of & != 0.",
+  "closed_at": "2026-05-05T04:52:28Z",
+  "compaction_level": 0,
+  "content_hash": "91d5063f35fbdbc22b79fafe435fd0b07ff19f31195e1766d15be422dae5c3f5",
+  "created_at": "2026-05-03T00:12:28Z",
+  "created_by": "Mark Atwood",
+  "description": "NC_TYPE_RFC822, NC_TYPE_DNS, etc. are bare u32 consts. nc_constrained_types is u32. The bitmask operations are correct but the type offers no protection: passing any u32 as nc_constrained_types compiles without complaint. A newtype wrapping u32 with named bit operations, or the bitflags crate, would make the intent self-documenting and prevent accidental mixing. The current approach is functional but the problem domain (name type constraints) has a fixed, closed set of variants that maps naturally to a bitflags struct.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC_TYPE_* constants should be a bitflags or u32 newtype, not bare u32 consts",
+  "updated_at": "2026-05-05T04:52:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:21Z",
+  "compaction_level": 0,
+  "content_hash": "ef60c8748d4bc3ed84e7cf80ee04ecb310e852bdfcbe5d9041d6b4ff88753f1e",
+  "created_at": "2026-05-14T18:36:13Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:195-200 introduces the first struct-style variant on the public Error enum:\n\n```rust\nNoValidPath {\n    tried: usize,\n    last_error: alloc::string::String,\n}\n```\n\nThe Error enum carries #[non_exhaustive] at the enum level, which permits ADDING new variants in future versions without breaking callers (Rust API guideline C-EXHAUSTIVE). However, #[non_exhaustive] at the enum level does NOT extend to struct-variant fields \u2014 within a struct variant, the field set is exhaustive. A caller writing\n\n```rust\nErr(Error::NoValidPath { tried, last_error }) => ...\n```\n\nbinds both fields by name; if the maintainer adds a third field later (e.g., a typed partial_chains: Vec<\u2026>, a kind: NoValidPathKind disambiguator, or the typed pkix_path::Error that PKIX-wnnn.5 contemplates), every caller that destructures NoValidPath without `..` breaks. Adding `..` to existing match arms requires source-modification of every caller's match site \u2014 a breaking change under cargo-semver-checks.\n\nThis matters specifically because the existing PKIX-wnnn.5 finding suggests the maintainer should add a typed inner error in a future version. Combining that future change with \"add a field to NoValidPath\" forces a coordinated breaking change.\n\nTwo principled fixes:\n\n1. Apply #[non_exhaustive] to the variant itself: `#[non_exhaustive] NoValidPath { tried, last_error }`. This forces all callers to use `..` from day one, preserving the maintainer's freedom to add fields. Cost: callers' destructuring patterns become slightly more verbose.\n\n2. Wrap in a dedicated #[non_exhaustive] payload struct: `NoValidPath(NoValidPathDetails)` where `NoValidPathDetails` is its own #[non_exhaustive] struct with accessor methods. Callers cannot construct or exhaustively destructure NoValidPathDetails; they go through the API. Cost: an extra type and accessors.\n\nEither approach is a one-time breaking change pre-1.0 that buys forever flexibility. Doing it AFTER 1.0 ships requires a 2.0 cut.\n\nNote: The other Error variants are all unit variants (NoPathFound, DepthExceeded, BudgetExceeded, MalformedIntermediate) so they have no field-evolution concern. NoValidPath is the first struct variant; it's the natural place to set the pattern.\n\nBears on AGENTS.md non-negotiable #6 (cache-friendly result types \u2014 serde format evolution depends on field stability) and on the prelaunch framing: breaking changes are free pre-1.0; \"design for the eventual complete shape.\"",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::NoValidPath struct-variant fields are exhaustive \u2014 adding fields later is a breaking change",
+  "updated_at": "2026-06-15T18:51:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:36:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

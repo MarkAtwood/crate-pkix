@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:27:00Z",
+  "compaction_level": 0,
+  "content_hash": "a5f8b540b2e318b1a4fdd27b5947453c43a38632d32d4671a595d58f5e36f082",
+  "created_at": "2026-05-06T22:15:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:236: check_revocation_against_anchor has a default impl returning Ok(()) silently. The doc warns about this at length, but the Rust trait system provides no way to force an override. Any implementor who forgets to override silently skips revocation for the anchor-issued cert. The warning is good documentation, but the API would be safer if the method had no default and required explicit implementation (with a recommended 'return Ok(())' body for cases that intentionally skip). The current design means new implementors must read the full doc to discover the security implication \u2014 a contributor who skims the trait will miss it.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "RevocationChecker default-skip is extensively documented with MUST language. Three doc comments explain it. This is the documented API contract.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RevocationChecker::check_revocation_against_anchor silent-skip default is a security foot-gun",
+  "updated_at": "2026-05-06T22:27:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:15:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

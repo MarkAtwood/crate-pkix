@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Took option (a): removed literal '(10)' from DepthExceeded variant doc and Display string; both now reference 'configured maximum'/PathBuilderConfig::max_depth/DEFAULT_MAX_DEPTH. Variant remains a unit (no breaking change).",
+  "closed_at": "2026-05-07T23:26:49Z",
+  "compaction_level": 0,
+  "content_hash": "b76d585248a7d17621e314e8278a763ecbe45f72608eeccb8f9a51c3066d18e8",
+  "created_at": "2026-05-07T22:49:47Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPass-2 commit e586bc49 closed PKIX-qwzx.8 (\"pkix-path-builder doc 'tries 1..10' is stale for build_path_with_config\"). The Algorithm rustdoc was updated correctly (pkix-path-builder/src/lib.rs:18-26 now references PathBuilderConfig::max_depth and DEFAULT_MAX_DEPTH).\n\n## Finding\nTwo doc-vs-code sites still hardcode '(10)':\n\npkix-path-builder/src/lib.rs:133\n```rust\n/// the maximum depth (10) this builder supports.\nDepthExceeded,\n```\n\npkix-path-builder/src/lib.rs:155 (Display impl)\n```rust\nSelf::DepthExceeded => f.write_str(\n    \"maximum intermediate chain depth (10) exceeded; the chain may require a deeper path than this builder supports\",\n),\n```\n\nWhen a caller supplies `PathBuilderConfig { max_depth: 5, ... }`, the resulting Display string still says \"depth (10) exceeded\". This is misleading.\n\n## Severity\nP3. Pure docs; no behavior wrong. But it's the same user-visible drift PKIX-qwzx.8 was filed to fix \u2014 closure was incomplete.\n\n## Fix\nEither (a) drop the literal \"(10)\" from both sites and reference PathBuilderConfig::max_depth, OR (b) thread the actual max_depth into the error variant (`DepthExceeded { max_depth: usize }`) \u2014 the latter is a minor breaking change.\n\nOption (a) is the lower-risk close: the variant doc and Display string both can say \"the configured maximum (default DEFAULT_MAX_DEPTH = 10)\".\n\n## Pass-2 attribution\nPKIX-qwzx.8 closure: partial.",
+  "ephemeral": 0,
+  "id": "PKIX-wxgh",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder DepthExceeded Display/doc still hardcodes '(10)' after PathBuilderConfig::max_depth was made configurable",
+  "updated_at": "2026-05-07T23:26:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:50:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yydv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

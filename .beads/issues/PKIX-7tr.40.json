@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:13:32Z",
+  "compaction_level": 0,
+  "content_hash": "ee76a4ca50197992a4e02415ba0b52a0ca4c36d37de17a0b4ba8c8f4c48858f9",
+  "created_at": "2026-05-02T13:43:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs line 59: impl std::error::Error for Error is unconditional. pkix-chain is not no_std (it depends on std indirectly via pkix-revocation which requires std for CRL/OCSP features). However pkix-chain/src/lib.rs does not have #\\![cfg_attr(not(feature = \"std\"), no_std)] nor does it declare a std feature. If pkix-chain is ever made conditionally no_std, this unconditional std impl will break. Minor: the impl should either be gated on a std feature or the crate should be documented as std-only. Currently pkix-revocation's crl/ocsp features require std, but pkix-chain itself does not enforce this.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.40",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain Error does not implement std::error::Error conditionally",
+  "updated_at": "2026-05-02T14:13:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:43:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "65c41b2dd250b4a54d4ce56a6a14ec9237184a958ebbfc3e0146d6d3b02f3265",
+  "created_at": "2026-05-08T18:56:31Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nEd25519 (RFC 8410) is increasingly common for TLS server certs, code signing, and SSH-CA-style chains. `pkix-path` currently rejects.\n\nOID: `1.3.101.112` (id-Ed25519). Algorithm parameters MUST be absent per RFC 8410 \u00a73.\n\n## What\n\n1. New unit struct `Ed25519Verifier` behind `feature = \"ed25519\"` in `pkix-path/src/lib.rs`.\n2. Add `ed25519-dalek` (or pure-Rust `ed25519` + a backend) to workspace deps. Default features OFF for `no_std`.\n3. OID dispatch in `DefaultVerifier`.\n4. Update `rustcrypto` umbrella feature.\n\n**Decision point**: `ed25519-dalek` v2 has `zeroize` and works no_std with `alloc`. If a stricter no_std posture is needed, use `ed25519` + `ed25519-compact` or similar. Document the choice.\n\n## Acceptance\n\n- [ ] `Ed25519Verifier` impls `SignatureVerifier`.\n- [ ] Verifies known-good signatures from RFC 8032 test vectors (independent oracle).\n- [ ] Tampered-signature test rejects.\n- [ ] At least one real-world Ed25519-signed chain in `pkix-difftest/tests/fixtures/` (suggest: a CT-log self-signed log key cert, or generate one with openssl).\n- [ ] `DefaultVerifier` dispatches.\n- [ ] no_std preserved.\n\n## Filed as\n\nPKIX-gphz child #3.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz.3",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "crypto: Ed25519 SignatureVerifier",
+  "updated_at": "2026-05-08T19:15:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T11:56:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision recorded in comment (Option 3, attended session 2026-05-12): ship two functions verify_tls_client_dns(Option<&ServerName>) + verify_tls_client_mailbox(Option<&MailboxName>). Implementation lives under parent PKIX-fmtv.11.2's client half.",
+  "closed_at": "2026-05-13T04:30:52Z",
+  "compaction_level": 0,
+  "content_hash": "bb8cd79fa92c069eabe14955ea831d739843edce202ab56eee0258c4592137b3",
+  "created_at": "2026-05-13T01:51:49Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "PKIX-fmtv.7's (D1) resolution constrains identity args to pre-parsed `&ServerName<'_>` / `&MailboxName<'_>`. It does not pin down which (or both) `verify_tls_client` accepts. The original bead description on .11.2 suggested an enum `ClientIdentity<'_>` but (D1) ruled out introducing new identity types in this round.\n\nTLS client auth identity in practice:\n\n- **EAP-TLS / device certs:** identity in subject DN, rarely SAN. Neither `ServerName` nor `MailboxName` fits.\n- **Personal S/MIME client certs (very common):** identity is mailbox (rfc822Name SAN). `MailboxName` fits.\n- **Service-to-service mTLS (common):** identity is DNS-name (dNSName SAN). `ServerName` fits.\n\nCandidate shapes (all consistent with (D1)):\n\n1. **`Option<&MailboxName<'_>>`** \u2014 covers personal S/MIME flow. Service-to-service mTLS must drop to `verify_chain` + `verify_dns_name` manually.\n2. **`Option<&ServerName<'_>>`** \u2014 covers service mTLS. S/MIME flow must drop to `verify_chain` + `verify_mailbox` manually.\n3. **Two separate fns:** `verify_tls_client_mailbox(..., mailbox: &MailboxName)` and `verify_tls_client_dns(..., name: &ServerName)`. Both ship; caller picks at call site by name. Cleanest type discipline, larger API surface.\n4. **`Option<&dyn SomeIdentityTrait>`** \u2014 introduces a new abstraction. Violates 'no new identity types beyond ServerName / MailboxName' implied by (D1).\n\n`verify_tls_server` (the matching pair) is now shipped at `pkix_chain::verify_tls_server` taking `&ServerName<'_>`. The asymmetry between server and client is unavoidable since TLS client auth identity types are inherently more varied than server identity (where DNS / IP literal cover essentially everything).\n\nRecommendation (mine, low confidence): option 3 (two separate functions). It avoids `Option<>` (TLS client auth without identity binding is rare in practice \u2014 those callers can just call `verify_chain` directly), preserves type discipline, and lets the function name communicate the binding shape at the call site (`verify_tls_client_mailbox` is self-documenting). Cost: doubles the wrapper count from 7 to 8.\n\nAsking Mark to pick. Once decided, ship the wrapper(s) and close this bead + the parent .11.2 client half.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.11.2.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_tls_client identity shape clarification",
+  "updated_at": "2026-05-13T04:30:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T18:51:49Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-fmtv.11.2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

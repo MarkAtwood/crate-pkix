@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:20Z",
+  "compaction_level": 0,
+  "content_hash": "e6ff339e5a52c5d5cf82c313601244ae73b87c0326f09a0a21c952942a5d9e6d",
+  "created_at": "2026-05-06T23:17:12Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs Error enum: CrlExpired exists but there is no OcspExpired. The OCSP checker uses OcspStatusUnknown for both 'stale response' (nextUpdate expired or absent) and 'server returned unknown status'. The Error type therefore cannot represent 'OCSP response was stale' as a distinct diagnostic. This is an API design asymmetry: CRL callers can distinguish CrlExpired (fetch a fresh CRL) from other errors, but OCSP callers cannot distinguish a stale response from a genuine unknown. In a hard-fail policy both are fatal, but in a soft-fail or retry policy the distinction matters. Adding OcspExpired and using it for the staleness path would align the error taxonomy between CRL and OCSP and make the API clearer. This is related to but separate from PKIX-ibo (which covers the immediate behavior change); this issue tracks the type-level design change.",
+  "ephemeral": 0,
+  "id": "PKIX-7n3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: Missing OcspExpired error variant creates asymmetry with CrlExpired",
+  "updated_at": "2026-05-06T23:47:20Z"
+}

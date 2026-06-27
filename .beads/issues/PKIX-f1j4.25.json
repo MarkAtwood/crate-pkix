@@ -1,0 +1,31 @@
+{
+  "close_reason": "Positive finding: sequential URL fetch in document order",
+  "closed_at": "2026-06-15T18:47:56Z",
+  "compaction_level": 0,
+  "content_hash": "0475372c7451704567bfd45874b844d55b62f7a8aa53373a1ed8ac8b90e09737",
+  "created_at": "2026-05-14T19:01:21Z",
+  "created_by": "Mark Atwood",
+  "description": "src/async_crl.rs:46-54, src/async_ocsp.rs:54-57: explicit comments rejecting parallel fan-out via futures::join_all. The reasoning: 'RFC 5280 \u00a76.3.3 path-validation CRL checking is described as a per-CDP-URL sequence; mirroring that here preserves the no-CRL-fetched-after-first-success property that operators rely on for rate-limit / quota planning.'\n\nWhat a future contributor will incorrectly suggest:\n\n1. 'Fan out the URL fetches in parallel; the async runtime is the whole point of async.' \u2014 Misunderstands the contract. The first-success-wins property is consumer-observable: an operator running validations against their own internal CDP+OCSP responders relies on 'one cert generates at most one HTTP fetch per protocol' for capacity planning. Fanning out makes that observable contract 'one cert generates up to N HTTP fetches', changing the operator-observable load profile.\n\n2. 'Race the first two URLs in parallel to reduce p99 latency.' \u2014 Hedged requests are a real optimization for some workloads. But the workload pattern here is 'fetch a CRL once, cache it, every subsequent check is cached'. The cache amortizes; hedged requests cost responder load on every cache miss. The cost ratio rarely favors hedging.\n\nDefending this decision: the design choice is explicit, comment is in the code, the trade-off is recorded. If a consumer's specific workload wants hedging, they implement their own AsyncRevocationFetcher that does it; the wrapper above stays serial.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.25",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Async fetcher serializes URLs in document order (no futures::join_all fan-out)",
+  "updated_at": "2026-06-15T18:47:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:01:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

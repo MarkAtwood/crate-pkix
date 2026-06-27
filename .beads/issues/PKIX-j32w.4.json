@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "25dc0cc9d4e930fb46d529565dea22031ed1f6bd934308caedb84e862c24c4fc",
+  "created_at": "2026-05-12T19:24:23Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nWhen DNS resolution or DNSSEC validation fails during verify_tls_server's DANE attempt, what happens?\n\n## Options\n\n- **A) Opportunistic.** DNS / DNSSEC failure -> use PKIX result. Behaves like a soft suggestion. Active attacker blocking DNS can downgrade to PKIX-only. Matches RFC 7672 SMTP-DANE deployment reality. Best for adoption (won't break consumers in flaky-network environments).\n\n- **B) Strict-DANE.** DNS / DNSSEC failure = verification failure. Refuses to fall back. Stronger security; brittle in flaky-network environments. Matches strict-security stances.\n\n- **C) Operator-configurable, default opportunistic.** Both modes available; default opportunistic for adoption-friendliness. Strict-security deployments opt into strict mode via runtime config. Adds one knob.\n\n## Considerations\n\n- HTTPS-DANE has no standardized failure-mode answer.\n- SMTP-DANE (RFC 7672) specifies opportunistic.\n- 'Encourage DANE to spread without consumer code change' goal aligns with opportunistic default (won't break working PKIX validations).\n- Strict mode is occasionally requested by regulated / high-assurance consumers.\n\n## Deferred\n\nMark 2026-05-12: deferred. Needs answer before PKIX-j32w.3 (pkix-chain integration) lands.\n\n## Decision-gate\n\nHuman-labeled. Surface when implementation work on .3 starts.",
+  "ephemeral": 0,
+  "id": "PKIX-j32w.4",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "Decide DANE failure mode (opportunistic vs strict-DANE vs operator-configurable)",
+  "updated_at": "2026-05-13T00:20:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:24:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-j32w",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

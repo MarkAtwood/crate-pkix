@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:42Z",
+  "compaction_level": 0,
+  "content_hash": "3dff3230a1b39b944a3c932fb14fe028be48506b3cb15bb19c0b69d59319d9c8",
+  "created_at": "2026-05-02T20:34:09Z",
+  "created_by": "Mark Atwood",
+  "description": "web_pki_policy(), smime_policy(), and code_signing_policy() all return ValidationPolicy::default() with only current_time_unix set. They do NOT enforce any CA/B Forum Baseline Requirements: no 398-day validity cap, no SHA-1 prohibition, no SAN requirement, no minimum RSA key size. A caller who reads the function name and its doc comment will trust that CA/B Forum constraints are applied; they will not be. This is a silent footgun \u2014 no error, no panic, just a policy that looks valid but enforces only RFC 5280 defaults. The functions should either return Err, panic with a clear 'not yet implemented' message, or not be in the public API until implemented.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles stubs silently return default policy \u2014 wrong CA/B Forum enforcement",
+  "updated_at": "2026-05-02T20:36:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

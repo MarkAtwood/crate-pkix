@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Not a bug: RFC 5280 \u00a76.1.3(d)(1)(i) says create a child for EACH matching parent node \u2014 multiple parents can independently constrain the same policy. Duplicate valid_policy at depth d is correct tree semantics.",
+  "closed_at": "2026-05-05T16:09:12Z",
+  "compaction_level": 0,
+  "content_hash": "7a59451b11683b7233d1d25bb7e100f5618a9b04089759e35868546caa574b7f",
+  "created_at": "2026-05-05T15:45:47Z",
+  "created_by": "Mark Atwood",
+  "description": "**Bug**: In the \u00a76.1.3(d)(1)(i) implementation at lib.rs:1613-1635, when multiple parent nodes at depth i-1 have the same policy P in their expected_policy_set, the code pushes one new child node *per parent* into new_nodes (the loop at line 1623: 'for _ in &parents_with_match'). \n\nRFC 5280 \u00a76.1.3(d)(1)(i) says to create ONE child node, not one per parent. The spec says: 'create a child node as follows' (singular). With multiple parents matching the same policy P (which can happen when anyPolicy was expanded at a previous depth creating multiple nodes with the same expected_policy_set), you get duplicate nodes at cert_depth with the same valid_policy. This duplicates the policy in the tree without RFC 5280 basis.\n\n**Scenario**: If depth i-1 has nodes [anyPolicy(exp={P1}), anyPolicy(exp={P1})] (two anyPolicy nodes, which could happen if the root anyPolicy was expanded multiple times), and cert has P1, then the code creates TWO P1 nodes at depth i. The RFC mandates one.\n\n**Practical impact**: In PKITS-style chains this is unlikely since the root (depth 0) has exactly one anyPolicy node. But for pathological chains with multiple anyPolicy nodes at intermediate depths (from aggressive anyPolicy expansion), duplicated nodes would lead to incorrect policy tree structure and potentially wrong final results.\n\n**Location**: pkix-path/src/lib.rs:1612-1635\\n\\n**Fix**: The inner loop should push at most ONE node for policy P at depth cert_depth (regardless of how many parents match). Change the loop to use a boolean flag:\\n\\n```rust\\nif !parents_with_match.is_empty() {\\n    matched_via_i = true;\\n    new_nodes.push(PolicyNode {\\n        depth: cert_depth,\\n        valid_policy: *p_oid,\\n        ...\\n    });\\n}\\n```",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "policy (d)(1)(i): node count inflated by multi-parent match",
+  "updated_at": "2026-05-05T16:09:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:45:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

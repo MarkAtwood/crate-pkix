@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:34:50Z",
+  "id": "019e1e1d-2f80-7a7b-ab2b-888044963603",
+  "issue_id": "PKIX-jy95.2",
+  "text": "SCOPE NOTE 2026-05-12 (cascade from PKIX-jy95.6 = A): severity mapping is now a property of the BRIDGE crate (pkix-zlint-bridge per PKIX-jy95.7), not the pkix-policy-zlint adapter directly. The bridge defines a Verdict or Severity type that captures zlint's seven verdict levels in a workspace-shaped way; the adapter maps bridge Verdict to pkix-lint Severity (which may be lossy depending on bridge type richness). Pre-question still applies: audit whether pkix-lint's Severity enum (presumably in pkix-lint/src/lib.rs near Finding at line 842) has enough variants to absorb zlint's seven; if not, either extend pkix-lint Severity or accept lossy mapping at the adapter layer."
+}

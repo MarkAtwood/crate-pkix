@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "00ab1ba0343fcc137c7d2a388fec0fe9277f9dafd60c2c0c6a7a7b147d353adb",
+  "created_at": "2026-05-14T17:47:12Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/sct.rs:137-138\n\n```rust\n#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]\npub struct SctList(pub Vec<SignedCertificateTimestamp>);\n```\n\nPKIX-ppbr.8 already filed this from the \"callers can bypass parser\ninvariants\" angle. The API-contract / defensive-forcing angle:\n\n`SctList::from_extension_value` and `from_serialized_list` are the\n\"validated\" paths \u2014 they enforce RFC 6962 \u00a73.3's\n`sct_list<1..2^16-1>` constraint (no empty list) and per-SCT\nparsing constraints (version=0, well-formed wire layout).\n\n`SctList(vec![])` is the \"trust-me\" path \u2014 callers can build any\nlist, including an empty one. The verifier's\n`verify_embedded_scts` path (lines 400-404) re-checks `is_empty()`\nand returns `Error::NoScts` for an empty list. But every other\ncaller that walks `SctList::0` directly skips that check.\n\nReal callers (e.g., `pkix-chain::verify_one`) iterate over\n`sct_list.0` and verify each. An empty list means \"zero\nverifications, threshold not met\". Some callers may not check\nlength and may silently treat empty as \"no SCTs to verify, pass\".\n\nRecommendation:\n\n```rust\n#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]\npub struct SctList(Vec<SignedCertificateTimestamp>);\n\nimpl SctList {\n    pub fn as_slice(&self) -> &[SignedCertificateTimestamp] { &self.0 }\n    pub fn into_inner(self) -> Vec<SignedCertificateTimestamp> { self.0 }\n}\n\nimpl std::ops::Deref for SctList {\n    type Target = [SignedCertificateTimestamp];\n    fn deref(&self) -> &Self::Target { &self.0 }\n}\n\nimpl IntoIterator for SctList { ... }\n```\n\nNow construction is only through the parsers; iteration and slice\naccess work via `Deref`. The tuple-field becomes private and the\ninvariants from the parser are preserved.\n\nCost: existing callers using `&sct_list.0` need to switch to\n`&sct_list[..]` or `sct_list.as_slice()` \u2014 but the `Deref` impl\nmakes this trivial. PKIX-ppbr.8 should land this fix.\n\nPriority P2 because:\n- defensive-forcing: callers must re-check invariants\n- immutability: the `pub` field is locked once shipped\n- both already-filed PKIX-ppbr.8 carries the bug angle.\n\nThis issue is filed under defensive-forcing to keep the per-section\ncounts honest; the actual fix should converge on PKIX-ppbr.8.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.35",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctList(pub Vec<...>) tuple-struct admits construction with invalid SCTs \u2014 every caller validates",
+  "updated_at": "2026-05-14T17:47:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:47:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

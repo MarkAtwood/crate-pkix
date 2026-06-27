@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:24:42Z",
+  "compaction_level": 0,
+  "content_hash": "9c334b9baea2326a68a33ed61681d11471f7b3d6d7728882ab7d8da6cb9d7872",
+  "created_at": "2026-05-07T15:19:55Z",
+  "created_by": "Mark Atwood",
+  "description": "NcTypeMask::IP_ADDRESS (lib.rs:1510) is defined and name_type_bit returns it for IpAddress GeneralNames (line 1544), but check_name_constraints never checks whether IP address names are constrained (nc_constrained_types.intersects(NcTypeMask::IP_ADDRESS)). The CheckMode::Permitted path in check_names (line 2793) calls type_constrained(name) which correctly uses nc_constrained_types.intersects(name_type_bit(name)), so IP_ADDRESS IS handled correctly via that path. However there is no inline direct-comparison path for IpAddress in the subject DN treatment (there cannot be \u2014 IP addresses don't appear in DNs). This is fine. Verify no coverage gap exists for SAN IpAddress entries and document why IpAddress has no DN-direct-comparison code path (it is already covered by the SAN loop). Currently misleading because the bitmask bit exists but looks unused to readers.",
+  "ephemeral": 0,
+  "id": "PKIX-e9b3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: NcTypeMask::IP_ADDRESS defined but never checked in nc_constrained_types",
+  "updated_at": "2026-05-07T15:24:42Z"
+}

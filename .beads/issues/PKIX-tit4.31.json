@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a9ad9adfef83fa82ff3d9581a4a3ca0c56c684b0fbfa31368e9963d714f9a3a5",
+  "created_at": "2026-05-14T12:27:10Z",
+  "created_by": "Mark Atwood",
+  "description": "PKIX-tit4.24's fix (file-size cap) shipped using `Error::Io(IoFailure { kind: ErrorKind::InvalidData, message: \\\"trust-anchor file ... exceeds N-byte cap\\\" })` rather than a dedicated typed variant. This is documented behavior, but it commits the public API to two MSRV-fragile contract clauses that callers must respect \u2014 and the rustdoc itself acknowledges one of them will change.\n\n**Current contract surface (from rustdoc + test pins):**\n\n1. `pkix-truststore/src/lib.rs:605-611` (from_pem_file Errors block):\n   > \\\"[`Error::Io`] \u2014 the file could not be opened or read, or its contents exceed [`DEFAULT_FILE_SIZE_CAP`] bytes (the wrapped [`IoFailure::kind`] is [`io::ErrorKind::InvalidData`] in the cap-exceeded case, and the message starts with \\\\\\\"trust-anchor file ... exceeds ...-byte cap\\\\\\\"; MSRV 1.73 predates `ErrorKind::FileTooLarge`).\\\"\n\n2. `pkix-truststore/tests/file_size_cap.rs:53-66` pins the contract:\n   ```rust\n   match from_pem_file_with_cap(&path, 1024) {\n       Err(Error::Io(failure)) => {\n           assert_eq!(failure.kind, ErrorKind::InvalidData);\n           assert!(failure.message.contains(\\\"exceeds\\\") && failure.message.contains(\\\"cap\\\"));\n       }\n       ...\n   }\n   ```\n\n**Engineering basis for filing:**\n\na) **MSRV-fragile kind.** The rustdoc explicitly anticipates a kind change: \\\"MSRV 1.73 predates `ErrorKind::FileTooLarge`.\\\" When the workspace bumps MSRV past 1.83, the implementation will rationally want to switch from `InvalidData` to `FileTooLarge`. Any caller that branched on `failure.kind == InvalidData` for cap-exceeded silently breaks. The test pin at file_size_cap.rs:55 will catch this at the workspace level, but downstream callers won't.\n\nb) **Message format as contract.** The rustdoc commits the message prefix (\\\"trust-anchor file ... exceeds ...-byte cap\\\"); the test pins the substrings (\\\"exceeds\\\" + \\\"cap\\\"). Callers writing diagnostic UI or log parsers may key on this prefix. Future implementation changes \u2014 e.g., when MSRV bumps and the implementation simplifies, or when an unbounded variant `from_pem_file_unbounded` is added with a different message \u2014 must honor the documented prefix or break callers silently.\n\nc) **No programmatic distinguishability without string matching.** A caller wanting to surface \\\"your trust-anchor file is too large; raise the cap\\\" as a distinct UI message from \\\"permission denied; check file perms\\\" or \\\"file not found; check the path\\\" must parse the message. Both end up as `Error::Io(IoFailure { kind: InvalidData/PermissionDenied/NotFound, message: ... })`. The other two have OS-supplied messages; ours has the synthetic \\\"exceeds N-byte cap\\\" message. Distinguishability is by message-prefix only.\n\nd) **Inconsistent with the IoFailure boundary's own rationale.** The crate already introduced `IoFailure` (PKIX-2l0v.1, lib.rs:208-220) as a principled boundary that drops `os_error` and gains `Clone + Eq + Serialize`. The cited motivation was \\\"std::io::Error is intentionally not Clone+...; IoFailure is the principled boundary.\\\" Extending that principle: cap-exceeded is a synthetic error category we own, not a syscall error we forward. Naming it typed is consistent with the IoFailure-boundary design philosophy.\n\n**Suggested principled close (pre-1.0 design closure):**\n\nAdd a new variant `Error::FileTooLarge { actual: Option<u64>, cap: u64 }` and have `read_file_capped` return that instead of synthesizing an `io::Error`. `actual` is `Some` on the metadata fast-path and `None` on the TOCTOU read-path (where we don't know the exact size, only that it exceeded cap+1). Callers gain:\n\n- Programmatic dispatch without message matching.\n- MSRV-stable error shape (no FileTooLarge kind dependency).\n- Diagnostic context (actual file size when known).\n\nCost: one new enum variant, three test-file updates, one rustdoc edit on each of from_pem_file / from_pem_file_with_cap / from_der_file / from_der_file_with_cap. Compatible with serde feature (variant derives apply transitively).\n\n**Alternative defensible stance:** keep current shape and document explicitly that the typed-distinguishability is not part of the contract, and that callers needing it must parse the message. Industry comparable (rustls-pemfile, rustls-native-certs) also returns plain io::Error without a typed FileTooLarge variant \u2014 so \\\"all IO errors are equivalent\\\" is a viable maintainer call. But those crates don't have an IoFailure boundary either; they surface std::io::Error directly. Once we have the IoFailure layer, the marginal cost of one more typed variant is small.\n\n**Priority justification (P3, not P2):** Engineering basis is real but mild. The test-pinning works as a self-checkpoint for the workspace, and callers in practice usually treat all IO errors uniformly. Filing as P3 (\\\"would be cleaner; not a correctness bug\\\") rather than P2 (\\\"will hurt callers\\\"). Cross-reference: PKIX-tit4.24 (parent ship), PKIX-tit4.4 / .27 / .28 (IoFailure wire-form decisions, sibling concerns about kind stability).",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cap-exceeded reuses Error::Io(InvalidData) + message prefix instead of typed FileTooLarge variant",
+  "updated_at": "2026-05-14T12:27:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:27:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

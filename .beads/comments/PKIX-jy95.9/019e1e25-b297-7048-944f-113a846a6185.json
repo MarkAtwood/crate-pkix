@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:44:08Z",
+  "id": "019e1e25-b297-7048-944f-113a846a6185",
+  "issue_id": "PKIX-jy95.9",
+  "text": "WONTFIX 2026-05-12 (Mark, interactive on PKIX-jy95.5 reversal). The decision to file this implementation epic was based on PKIX-jy95.5 = A (file pkix-policy-oscal as new crate). That decision was reversed to C (skip) when Mark surfaced the underlying question 'can OSCAL make decisions?' Answer: no -- OSCAL is compliance-vocabulary, not policy-DSL, and OSCAL Profile JSON is functionally equivalent to a TOML config file for selecting Lints. The workspace doesn't ship a TOML config consumer either; consumers needing OSCAL Profile JSON write 50 lines of serde_json + filter + LintRunner::new themselves using the already-public Lint trait and pkix-lint OSCAL parsing types. See PKIX-jy95.5 closure for full rationale. Memory: pkix-jy95-5-skip-oscal-2026-05-12."
+}

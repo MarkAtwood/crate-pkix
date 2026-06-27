@@ -1,0 +1,31 @@
+{
+  "close_reason": "try_find_cert_ext now has full three-case contract doc comment",
+  "closed_at": "2026-05-03T13:37:59Z",
+  "compaction_level": 0,
+  "content_hash": "4dc02b995be8af31cb7c4b597a747b57e6401ba31bc48d64e3bc6d8569ebade5",
+  "created_at": "2026-05-03T13:31:02Z",
+  "created_by": "Mark Atwood",
+  "description": "try_find_cert_ext (lib.rs line 655) has no doc comment \u2014 add one explaining: returns Ok(None) when absent, propagates der::Error on malformed DER, and is the fail-closed counterpart to find_cert_ext",
+  "ephemeral": 0,
+  "id": "PKIX-s54.2",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "try_find_cert_ext: add doc comment",
+  "updated_at": "2026-05-03T13:37:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:31:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

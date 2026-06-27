@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:22Z",
+  "compaction_level": 0,
+  "content_hash": "6a9ed6a12230ed8ca67b58ebb7ccb640fa3b895a090aba0fa6836e3849207dda",
+  "created_at": "2026-05-07T20:14:44Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-revocation/src/lib.rs:65,113\\`:\n\\`\\`\\`rust\nCrlParseError(der::Error),\nOcspParseError(der::Error),\n\\`\\`\\`\n\nThe \\`Display\\` impl simply forwards \\`{e}\\` to \\`der::Error\\`, which often produces messages like \\\"asn1 error\\\" with no context. Callers cannot distinguish \\\"the IDP extension was malformed\\\" from \\\"the outer SEQUENCE length was wrong\\\" from \\\"the BIT STRING had too many trailing bits.\\\"\n\n## Why P3\n- Operational diagnostic UX issue, not a correctness problem.\n- A CA whose CRL contains a single malformed extension cannot easily debug which extension is the problem from this error alone.\n- pkix-path took the opposite stance: \\`Error::Der\\` documented as opaque, but most error paths use \\`Error::MalformedCertificate { index }\\` to localize the problem to a specific cert.\n\n## Fix\nTwo options:\n1. Add a \\`context: &'static str\\` field to \\`CrlParseError\\` / \\`OcspParseError\\` indicating which structural region failed (e.g., \\`\\\"deltaCRLIndicator extension\\\"\\`, \\`\\\"BasicOCSPResponse signature_algorithm\\\"\\`).\n2. Add a CRL/OCSP parse-context map_err sites to attach a category enum.\n\nOption 2 is more typed.\n\n## Scope reference\n\\`pkix-revocation/src/lib.rs:65,113,161,174\\` (Display impl), all \\`map_err(Error::CrlParseError)\\` sites in \\`crl.rs\\` and \\`ocsp.rs\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-6sml",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-revocation Error::CrlParseError exposes opaque der::Error to callers",
+  "updated_at": "2026-05-07T21:25:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

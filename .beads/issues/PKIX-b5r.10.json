@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:07:17Z",
+  "compaction_level": 0,
+  "content_hash": "92bf10d04cf842d4029ed8216f1da7c269819406d6256af21151798f49be0604",
+  "created_at": "2026-05-05T15:46:22Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1585, 1737, 1783, 1902, 1917\n\nFive separate 'use x509_cert::ext::pkix::...' statements appear inside curly-brace blocks within chain_walk's per-cert loop body:\n\n    { use x509_cert::ext::pkix::certpolicy::CertificatePolicies; ... }\n    { use x509_cert::ext::pkix::PolicyConstraints; ... }\n    { use x509_cert::ext::pkix::PolicyMappings; ... }\n    { use x509_cert::ext::pkix::PolicyConstraints; ... }  // repeated\n    { use x509_cert::ext::pkix::InhibitAnyPolicy; ... }\n\nPolicyConstraints appears twice (lines 1737 and 1902).  In Rust 2021 there is no namespace-pollution reason to scope these inside blocks; they do not conflict with anything at the module level.  Block-scoped 'use' is appropriate when a name would shadow an outer name \u2014 that is not the case here.\n\nThe block-scoped pattern reads as if these types are somehow exotic or risky to import globally.  Moving them to the module top (or at least to the top of chain_walk) makes the function's dependencies visible at a glance and eliminates the repeated PolicyConstraints import.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.10",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "inline 'use' in function bodies for extension types \u2014 move to crate top",
+  "updated_at": "2026-05-05T16:07:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

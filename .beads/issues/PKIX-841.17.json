@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:49:20Z",
+  "compaction_level": 0,
+  "content_hash": "f9bbc41f38e42615751c10755d0498022e4d299be73c6e8ebe80c62117ded80b",
+  "created_at": "2026-05-02T17:29:02Z",
+  "created_by": "Mark Atwood",
+  "description": "cert_basic_constraints() and has_key_cert_sign() both return None on DER decode errors. The callers treat None as 'constraint not met' \u2014 None from cert_basic_constraints triggers NotCA, None from has_key_cert_sign triggers KeyUsageMissing. This fail-closed pattern is correct for a security-critical library: a cert with an undecodable BasicConstraints extension will be rejected rather than silently accepted. A contributor might argue 'we should return Err on decode failure for better diagnostics' \u2014 but that would complicate the calling code, potentially add new error paths, and create the question of what index to attach to the error. The current design sacrifices a small amount of diagnostic precision for simplicity and correctness. Worth defending.",
+  "ephemeral": 0,
+  "id": "PKIX-841.17",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "fail-closed design throughout: decode errors treated as absent",
+  "updated_at": "2026-05-02T17:49:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:29:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

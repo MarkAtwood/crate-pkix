@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a91d1b0933fec9f7ce7ff91658c11428ee3904f7caba067d6a21e8c02225f7ed",
+  "created_at": "2026-05-14T19:14:46Z",
+  "created_by": "Mark Atwood",
+  "description": "MailboxName::parse at pkix-identity/src/lib.rs:275-279 iterates the local-part and rejects: whitespace, NUL, '<', '>', ',', '\"'. For ASCII-only local-parts, validate_ascii_local_part (line 296) further restricts to atext + '.'.\n\nFor non-ASCII local-parts, the only rejection is the small set above. Format characters that are not whitespace \u2014 U+200B zero-width space, U+200E LRM, U+200F RLM, U+2060 word joiner, U+FEFF BOM \u2014 are accepted as-is.\n\nConsequence: a target like `'alice\\u{200B}@example.com'` (alice + zero-width space) is parseable; byte-equal comparison means it doesn't match a SAN that carries a plain 'alice'. This is fail-closed. But homoglyph confusion is possible if a malicious actor controls one side and the consumer surfaces the un-normalized form to a human.\n\nAction: document the choice. Either:\n- Add a 'No Unicode normalization or confusable-detection' bullet to the module Limitations.\n- Or apply NFC normalization to non-ASCII local-parts at parse time (RFC 8398 \u00a73 explicitly mentions normalization concerns but does not mandate NFC).\n\nPure documentation suffices for 0.x. NFC application is a semantic change that affects matching.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "MailboxName::parse accepts non-ASCII control / format chars in local-part",
+  "updated_at": "2026-05-14T19:14:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

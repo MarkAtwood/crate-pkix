@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced the match-on-Option in parse_issuing_dp with the canonical Option::map().transpose() recipe. Functionally identical; expression form is one chain.",
+  "closed_at": "2026-05-07T23:26:50Z",
+  "compaction_level": 0,
+  "content_hash": "232a189c76af01f8cecd5264b32d1ef4fdfa113868af5ec3e11108fdb425f83e",
+  "created_at": "2026-05-07T23:05:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-revocation/src/crl.rs:708-729 \u2014 fn parse_issuing_dp.\n\n## Finding\n```\nlet ext = crl.tbs_cert_list.crl_extensions.as_deref().unwrap_or(&[])\n    .iter().find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT);\n\nmatch ext {\n    None => Ok(None),\n    Some(e) => {\n        let idp = IssuingDistributionPoint::from_der(e.extn_value.as_bytes())\n            .map_err(|e| Error::CrlParseError(crate::DerError(e)))?;\n        Ok(Some(idp))\n    }\n}\n```\n\nThis is the canonical 'Option<T> + (T -> Result<U, E>) -> Result<Option<U>, E>' shape. Idiomatic Rust uses Option::map followed by Option::transpose:\n\n```\ncrl.tbs_cert_list.crl_extensions.as_deref().unwrap_or(&[])\n    .iter()\n    .find(|e| e.extn_id == OID_ISSUING_DISTRIBUTION_POINT)\n    .map(|e| IssuingDistributionPoint::from_der(e.extn_value.as_bytes())\n        .map_err(|err| Error::CrlParseError(crate::DerError(err))))\n    .transpose()\n```\n\nFunctionally identical. The map+transpose form:\n- Is one expression, no intermediate let binding.\n- Removes the explicit None match arm.\n- Is the standard recipe in std-lib doc examples for this exact transformation.\n\n## Counter-argument\nThe match form is arguably more obvious to readers unfamiliar with .transpose(). The current code is correct and readable.\n\n## Severity\nP4 (pure stylistic / opinion). No correctness, perf, or API impact. clippy does not flag it (option_map + transpose is not a configured lint).\n\n## Recommendation\nDefer or close as opinion. File for completeness as part of the rusty pass.",
+  "ephemeral": 0,
+  "id": "PKIX-v87s",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: parse_issuing_dp match-on-Option could be Option::map().transpose()",
+  "updated_at": "2026-05-07T23:26:50Z"
+}

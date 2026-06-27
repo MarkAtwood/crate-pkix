@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "pkix-lint crate: Lint/LintResult/LintRunner/LintProfile/SubjectKind traits; 19 tests; workspace green",
+  "closed_at": "2026-05-06T19:05:18Z",
+  "compaction_level": 0,
+  "content_hash": "a32de69742029f72bb3771a12fe046ffd63c7ad1148b9ec4692e437c39cf248f",
+  "created_at": "2026-05-06T18:48:52Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-btq.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "New pkix-lint crate: Lint/LintResult/LintRunner traits",
+  "updated_at": "2026-05-06T19:05:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T11:48:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-btq",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

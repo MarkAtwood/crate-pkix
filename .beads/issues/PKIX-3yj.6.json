@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:51:36Z",
+  "compaction_level": 0,
+  "content_hash": "c9a29844ee8adb7aecb13d5dcaa67d6d745787a44e18d1171a1b2d020b7f4bdc",
+  "created_at": "2026-05-06T23:15:05Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-3yj.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: ValidatedPath.depth counts self-issued intermediates \u2014 documented but misleading field semantics",
+  "updated_at": "2026-05-06T23:51:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:15:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-3yj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

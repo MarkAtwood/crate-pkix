@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "57ffb8b6b1a4f32a6f2fb68dfc45c11e0a41bc551895a2dadaa31e1985335e45",
+  "created_at": "2026-05-14T19:29:30Z",
+  "created_by": "Mark Atwood",
+  "description": "Why this choice is correct: the &self receiver on AiaFetcher::fetch (pkix-aia/src/lib.rs:566) is the load-bearing call that admits caller-side caching without any trait-surface acknowledgment. Caching wrappers use RefCell (single-threaded) or Mutex/RwLock (concurrent) for interior mutability, fitting through the &self bound. AGENTS.md non-negotiable #6 explicitly requires this design: 'Callbacks not closed structs. \u2026 Do not collapse callbacks into closed structs that hide the seam.'\n\nA future contributor might suggest changing the receiver to &mut self ('clearer when the impl actually mutates internal state'). That change would break every caching wrapper and force callers to put the entire fetcher behind a Mutex. Reject any such proposal: the &self bound IS the caching seam.\n\nThe CachingFetcher doctest at lines 503-525 demonstrates the pattern using no_std-portable BTreeMap+RefCell. This doctest should be defended too \u2014 it is the executable specification for 'here is how you actually wrap this trait'.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.13",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Decision: &self receiver on AiaFetcher admits interior-mutability caching wrappers",
+  "updated_at": "2026-05-14T19:29:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

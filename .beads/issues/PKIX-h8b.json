@@ -1,0 +1,31 @@
+{
+  "close_reason": "Marked opinion by SEC7: premise is factually incorrect (the value() calls in the None,None branch are first access, not redundant extraction)",
+  "closed_at": "2026-05-02T17:21:36Z",
+  "compaction_level": 0,
+  "content_hash": "86be48ba26e698e834a22cac48c43c0db7ae1e21333e3144b3cfae5cb1683f4a",
+  "created_at": "2026-05-02T17:15:14Z",
+  "created_by": "Mark Atwood",
+  "description": "In ava_values_match (line 567), when both any_to_str_bytes() calls return None (non-string tag), the fallback comparison re-extracts a.value() and b.value() that were already implicitly extracted during tag matching. Minor efficiency: both calls are O(1) but involve redundant field access. Consider storing values in ava_values_match() instead of re-extracting in fallback. Low impact for typical X.509 names (string-type AVAs predominate).",
+  "ephemeral": 0,
+  "id": "PKIX-h8b",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Minor: Redundant value() calls in ava_values_match fallback",
+  "updated_at": "2026-05-02T17:21:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:15:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-itb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

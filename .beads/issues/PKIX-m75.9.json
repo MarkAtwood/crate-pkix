@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:13:51Z",
+  "compaction_level": 0,
+  "content_hash": "0aafa9199b7e3b5016722a9f18a5ef0bf63c83c53cf15c99a8aeebfd77f79261",
+  "created_at": "2026-05-06T20:48:42Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: Three lint check_cert implementations in pkix-lint/src/cabf_tls_br.rs (SanRequiredLint::check_cert line 343-347, EkuServerAuthLint::check_cert line 402-405, BcCaFlagLint::check_cert line 463-471) use the pattern: 'let extensions = match &cert.tbs_certificate.extensions { Some(exts) => exts, None => return LintResult::Error(...) };'. MSRV is 1.73 and let-else was stabilized in 1.65. The idiomatic Rust 1.65+ form is: 'let Some(extensions) = &cert.tbs_certificate.extensions else { return LintResult::Error(...); };'. This is a readability/style improvement (P4 \u2014 opinion), not a correctness or performance issue. The current code is functionally correct.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: let-else preferred over match-return in cabf_tls_br lints",
+  "updated_at": "2026-05-06T21:13:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

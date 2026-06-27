@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T19:00:01Z",
+  "compaction_level": 0,
+  "content_hash": "bbff0c48cdcbafb59ea4bf1abfd829dde28f923b156e3860ce8743378c643e0a",
+  "created_at": "2026-05-11T18:46:21Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "pkix-path/Cargo.toml:21-23 says:\n\n    # RustCrypto algorithm backends \u2014 disable all to bring your own SignatureVerifier.\n    # Currently implemented: RSA-PKCS1v15-SHA-256, ECDSA-P-256-SHA-256, and\n    # ECDSA-P-384-SHA-384. Additional algorithms (Ed25519, RSA SHA-384/512)\n    # are future work; see project tracker (PKIX-gphz).\n\nBut PKIX-gphz.4 already shipped RsaPkcs1v15Sha384Verifier and RsaPkcs1v15Sha512Verifier (see bd memory pkix-gphz-4-rsa-pkcs1v15-sha-384-sha). The comment should be updated to reflect that RSA SHA-384/512 are implemented; Ed25519 remains future work.\n\nTrivial doc fix. Surfaced during PKIX-wmch implementation.",
+  "ephemeral": 0,
+  "id": "PKIX-54mj",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: stale Cargo.toml comment claims SHA-384/512 are future work",
+  "updated_at": "2026-05-11T19:00:01Z"
+}

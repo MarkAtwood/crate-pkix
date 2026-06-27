@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "AiaFetcher trait shipped in pkix-aia. Required fetch(&self,uri) + default-impl batch_fetch(&self,uris). &self admits caching wrappers; trait not Send+Sync supertrait (per-use-site bound, rustdoc explains); synchronous; raw DER bytes; no timeout parameter; batch_fetch return Vec<Result<_,_>> aligned by index. Worked caching-wrapper doctest using alloc::BTreeMap+core::cell::RefCell so the pattern is demonstrable on no_std+alloc. 33 tests pass --all-features (19 lib + 12 round_trip + 2 doctest); 17 default. cargo clippy -D warnings clean on 4 feature combos; cargo fmt clean; strict rustdoc clean. Committed 3f90285b.",
+  "closed_at": "2026-05-13T20:45:40Z",
+  "compaction_level": 0,
+  "content_hash": "227b2ea1262a76e341da7e2fbc143ca5c418de0cd852c1fe664b0e595999eda6",
+  "created_at": "2026-05-13T16:19:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nDefine `pkix_aia::AiaFetcher` trait per PKIX-zkjb constraints 1, 3, 5.\n\n```rust\npub trait AiaFetcher {\n    fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError>;\n\n    fn batch_fetch(&self, uris: &[&str]) -> Vec<Result<Vec<u8>, AiaError>> {\n        uris.iter().map(|uri| self.fetch(uri)).collect()\n    }\n}\n```\n\nKey shape decisions (locked):\n\n- `&self` not `&mut self` \u2014 admits caching wrappers via interior mutability or Arc\n- Sync (no async on the core trait \u2014 async lives in adapter crates)\n- Returns `Vec<u8>` of certificate DER bytes (not parsed Certificate \u2014 parsing is the caller's job; the trait is \"fetch bytes\")\n- `batch_fetch` default-impl loops to `fetch` \u2014 implementers pipeline when it helps\n- No timeout parameter on the trait (timeout is a fetcher-impl concern, configured at construction time)\n\n## Acceptance\n\n- [ ] `pkix_aia::AiaFetcher` trait public, with `fetch` required method and `batch_fetch` default-impl\n- [ ] Trait `Sync + Send` (auto if impls are; document the expectation)\n- [ ] Rustdoc explains: caller responsibility for parsing returned bytes; trait is dumb-bytes-fetch\n- [ ] Doctest showing how to wrap a fetcher with a caching layer (caller side, demonstrates &self enables this)\n- [ ] CHANGELOG entry on pkix-aia\n\n## Out of scope\n\n- HTTP impl (PKIX-zkjb.5)\n- verify_chain integration (PKIX-zkjb.6)\n- NoAiaFetcher (PKIX-zkjb.4)\n\n## Cross-references\n\n- PKIX-zkjb (parent, constraints 1, 3, 5)\n- pkix-revocation::RevocationChecker (existing trait pattern reference)\n- pkix-path::SignatureVerifier (existing trait pattern reference)",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Define AiaFetcher trait in pkix-aia with fetch + batch_fetch",
+  "updated_at": "2026-05-13T20:45:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:19:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:36:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:19:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

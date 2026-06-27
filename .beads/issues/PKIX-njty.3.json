@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "ee1a6ded52cfaf3ebff663cee2ca2e51d6378072bec6df30f819bb924339281c",
+  "created_at": "2026-05-14T18:46:49Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: code review or reading lib.rs:2221-2250.\n\nTest name claims to verify 'TLS, SMIME, and CS each have their own allowed_algs \u2026 the Vec pointers are different objects (not shared).'\n\nBut every Profile::policy() call returns a fresh ValidationPolicy whose allowed_signature_algs is built via .to_vec(), which always allocates. So modifying the cloned Vec was never going to affect a different allocation. The test would PASS even if all three profiles shared a single static CABF_TLS_BR_ALLOWED_ALGS constant \u2014 because .to_vec() decouples them at every call.\n\nWhat the test actually verifies: 'each policy() call returns a fresh allocation'. What the test claims to verify: 'the three constants are structurally separate'. These are different invariants.\n\nBad behavior: a future refactor consolidates the three constants into one (perfectly innocuous given the current spec parity), and this test silently keeps passing despite the test's stated purpose being broken. The independence comment block at lib.rs:156-164 makes a real correctness claim ('do not share a single CABF_ALLOWED_ALGS constant'); this test does not enforce that claim.\n\nFix: assert that the three constant slice pointers are distinct ((&CABF_TLS_BR_ALLOWED_ALGS as *const _) != (&CABF_SMIME_BR_ALLOWED_ALGS as *const _), etc.) or remove the test and trust the source-level invariant.",
+  "ephemeral": 0,
+  "id": "PKIX-njty.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "per_profile_alg_lists_are_independent_constants tests something other than its name",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:46:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-njty",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

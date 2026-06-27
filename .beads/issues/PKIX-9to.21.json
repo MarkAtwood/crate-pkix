@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:43Z",
+  "compaction_level": 0,
+  "content_hash": "a9a7f171bc0fb6b40a1b3c8c1f2e8930b64f7de3e7ea243961ea713c1c486666",
+  "created_at": "2026-05-06T22:17:41Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1280: names_match uses bidirectional AVA matching (forward AND reverse pass). The comment explains why: for a malformed RDN {CN=Alice, CN=Alice} vs {CN=Bob, CN=Alice}, the forward pass matches both, but the reverse pass finds no match for CN=Bob, correctly returning false. A unidirectional check would return true incorrectly. A contributor might simplify to one-directional; that is wrong for the duplicate-OID case.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.21",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Bijective AVA matching in names_match handles malformed duplicate-OID RDNs correctly",
+  "updated_at": "2026-05-06T22:29:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:17:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

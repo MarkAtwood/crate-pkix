@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-ljt.2",
+  "title": "pkix-truststore-system: OS-native trust store loading",
+  "description": "macOS, Windows, iOS, Android. Currently a stub. Old tracker: PKIX-8h87",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "feature",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:44Z",
+  "updated_at": "2026-06-15T17:54:44Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-ljt",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:54:43"
+    }
+  ]
+}

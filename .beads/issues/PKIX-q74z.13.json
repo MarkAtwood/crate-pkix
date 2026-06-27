@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "79237ca024fb8f76244dd8b5d535402577032a78b17c25a2fae461c919988da4",
+  "created_at": "2026-05-14T14:25:13Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:406-413 \u2014 verify_embedded_scts takes &Certificate parameters, then immediately re-encodes them to DER (encode_to_vec) so it can call verify_sct_for_precert(&[u8], &[u8]).\n\nThe caller almost certainly has the original DER bytes available (they parsed the Certificate FROM those bytes). The re-encode is wasted work, AND introduces the round-trip canonicalization risk discussed in PKIX-q74z.5 (re-encoded TBS may differ from the original DER if the cert was non-canonically encoded).\n\nFor the round-trip canonicalization issue specifically: if the caller parsed leaf from PEM and re-encodes, the re-encoded TBS might not match what the log signed over (the log signed over the original-parse-via-cryptography bytes, which might use different INTEGER encoding than x509-cert produces). Today verify_embedded_scts produces wrong signed-input bytes in that case, returning Ok(0) instead of correct counts.\n\nSuggested fix: take &[u8] (DER bytes) as input alongside the &Certificate, OR change the signature to take only DER and parse internally. Match what tbs_without_sct_list does (parse from DER directly). This also fixes the canonicalization issue.\n\nLower-priority because the re-encode bug is masked by the bigger round-trip dependency (PKIX-q74z.5) and most real CT-logged certs survive both round-trips. But the API shape locks in an unnecessary double-conversion.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts: leaf+issuer DER re-encoded in N=1 case wastes work since cert was already provided as Certificate",
+  "updated_at": "2026-05-14T14:25:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:25:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

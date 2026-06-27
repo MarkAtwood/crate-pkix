@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:07:13Z",
+  "compaction_level": 0,
+  "content_hash": "ed3581412f650cd3dd63101807c151a3da2d0cc220f0f7c79edf46cb8eda0bdf",
+  "created_at": "2026-05-13T01:59:00Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "Ship `pkix_chain::verify_time_stamper` and a Basic time-stamping profile.\n\n## RFC 3161 \u00a72.3 constraint\n\nThe TimeStamping Authority cert MUST have:\n- id-kp-timeStamping (1.3.6.1.5.5.7.3.8) in extKeyUsage.\n- extKeyUsage MUST be critical.\n- timeStamping MUST be the SOLE EKU.\n\nThe 'critical and sole' rule is not expressible by the current ValidationPolicy.required_leaf_eku field (which checks 'contains' not 'equals'+'critical'). Two options:\n\n**A)** Add `require_eku_sole: bool` and `require_eku_critical: bool` flags to `pkix_path::ValidationPolicy`. validate_path enforces them. Cleanest, but touches pkix-path (a non-negotiable-stable crate).\n\n**B)** Enforce the rule inline in `verify_time_stamper` after `verify_chain` returns. Parse chain[0]'s EKU extension, check critical bit + extKeyUsages.len()==1. Doesn't touch pkix-path.\n\n**C)** Add the flags as a profile-side opt-in but check them inside the wrapper (not validate_path). Same as B mechanically; profile-side just for discoverability.\n\nRecommend **B** for v0.x. Inline check is small (~15 lines), keeps pkix-path unchanged, can be promoted to A later non-breakingly. Profile (`BasicTimeStampingProfile`) still sets `required_leaf_eku = [ID_KP_TIME_STAMPING]` so existing validation catches the 'EKU is present at all' case; wrapper does the additional critical+sole verification.\n\n## Deliverable\n\n### pkix-profiles: BasicTimeStampingProfile\n\n`required_leaf_eku = [ID_KP_TIME_STAMPING]`. Add OID `ID_KP_TIME_STAMPING = 1.3.6.1.5.5.7.3.8`. Symmetric to BasicCodeSigningProfile.\n\n### pkix-chain: verify_time_stamper\n\n```rust\npub fn verify_time_stamper<P, R>(\n    chain: &[Certificate],\n    anchors: &[TrustAnchor],\n    profile: &P,\n    now_unix: u64,\n    revocation: &R,\n) -> crate::Result<ValidatedPath>\nwhere P: Profile, R: RevocationChecker\n{\n    let policy = profile.policy(now_unix);\n    let validated = verify_chain(chain, anchors, &policy, &DefaultVerifier, revocation)?;\n    enforce_timestamping_eku_critical_and_sole(&chain[0])?;\n    Ok(validated)\n}\n```\n\n`enforce_timestamping_eku_critical_and_sole` reads the EKU extension, returns `Error::Path(_)` (use an existing variant like `MissingEku` for missing-critical, or add a new variant) on failure.\n\nOpen shape decision (file a sub-bead if non-trivial): which Error variant to return when EKU is not critical or has extra EKUs. Existing pkix-path Error variants may or may not fit; could add `Error::TimeStamping` to pkix-chain wrapping the failure mode.\n\n## Tests\n\n- Positive: leaf with critical+sole id-kp-timeStamping EKU + valid chain.\n- Negative: leaf with timeStamping EKU but not critical.\n- Negative: leaf with timeStamping EKU + another EKU (not sole).\n- Negative: leaf without timeStamping EKU at all (caught by existing EKU enforcement).\n\n## Fixture\n\nAdd `leaf-timestamping.der` + `leaf-timestamping-not-critical.der` + `leaf-timestamping-not-sole.der` to pkix-chain/tests/fixtures/.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.13.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_time_stamper wrapper + BasicTimeStampingProfile (critical-and-sole EKU)",
+  "updated_at": "2026-05-13T02:07:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T18:59:00Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-fmtv.13",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:36:46Z",
+  "compaction_level": 0,
+  "content_hash": "51aa58d1323249f2f595907cb1f6b007d27061f455352a3357b63eb549dcf344",
+  "created_at": "2026-05-02T18:32:34Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation-http/src/lib.rs: FetchError::Transport(String) stores the error as a formatted string, discarding the original error type and chain. This makes it impossible for callers to match on the specific transport error (e.g., timeout vs. connection refused) or inspect the source chain. Idiomatic Rust would use FetchError::Transport(Box<dyn std::error::Error + Send + Sync>) or a concrete type. Using String for error messages is the error-handling antipattern flagged in the Rusty review prompt: structured fields keep values accessible to callers who want to handle them.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FetchError::Transport(String) loses error chain from underlying transport error",
+  "updated_at": "2026-05-02T18:36:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:32:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

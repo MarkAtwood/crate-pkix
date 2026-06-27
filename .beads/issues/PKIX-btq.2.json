@@ -1,0 +1,38 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "6 CABF TLS BR lints (validity/sha1/rsa/san/eku/bc) + CabfTlsBrProfile; 26 tests pass",
+  "closed_at": "2026-05-06T19:10:54Z",
+  "compaction_level": 0,
+  "content_hash": "8d8d5911c4910489d12416a883fa63a99e7107ea1958a60ee3af17a8fb42e133",
+  "created_at": "2026-05-06T18:48:53Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-btq.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: CABF TLS BR reference lints (validity, algorithm, SAN, EKU, BC)",
+  "updated_at": "2026-05-06T19:10:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T11:48:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-btq",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-06T11:48:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-btq.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

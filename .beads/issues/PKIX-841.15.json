@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:48:54Z",
+  "compaction_level": 0,
+  "content_hash": "6c6e11497e9d59aaf2b8e7397bdf101d86955714d86830deb0af6b6be78057fe",
+  "created_at": "2026-05-02T17:28:32Z",
+  "created_by": "Mark Atwood",
+  "description": "The max_path_len field is documented as 'Maximum chain depth, not counting the trust anchor.' and the example says '[leaf, intermediate, root] is depth 1 (one intermediate)'. RFC 5280 \u00a76.1.2 defines 'max_path_length' as the number of certs in the path including the EE but excluding the anchor (which is the same count as our intermediates+1). The docs should explicitly note this difference from the RFC variable name and semantics, so a security reviewer comparing the implementation against RFC 5280 \u00a76.1.2 step (l) does not get confused or file a 'max_path_len is off by one' issue.",
+  "ephemeral": 0,
+  "id": "PKIX-841.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "max_path_len docs diverge from RFC 5280 \u00a76.1.2 without explanation",
+  "updated_at": "2026-05-02T17:48:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:28:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

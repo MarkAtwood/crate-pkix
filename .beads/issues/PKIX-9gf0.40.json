@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:26Z",
+  "compaction_level": 0,
+  "content_hash": "c477feb773a146dc5d8788d2229c2589eb066447f96cf0dd1a742f86d6fb2a9f",
+  "created_at": "2026-05-07T16:19:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:576 (active_at) and :596 (expired_at)\n\nBoth methods return an Iterator and have no side-effects. Clippy pedantic flags them as 'this method could have a #[must_use] attribute'. Silently discarding the result of either is almost certainly a bug.\n\n  pub fn active_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation>\n  pub fn expired_at(&self, now_unix: u64) -> impl Iterator<Item = &Deviation>\n\nBoth should have #[must_use] added.\n\nAlso: cabf_tls_br::all_lints() at line 549 is flagged as 'this function could have a #[must_use] attribute' \u2014 callers that forget to assign the Vec get silently wasted work.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.40",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-lint: DeviationStore::active_at and expired_at missing #[must_use]",
+  "updated_at": "2026-05-07T16:36:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

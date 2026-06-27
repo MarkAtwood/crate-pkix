@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added std requirement note to pkix-profiles crate doc, clarifying it's std-only in v0.1 with future no_std+alloc planned",
+  "closed_at": "2026-05-06T16:17:49Z",
+  "compaction_level": 0,
+  "content_hash": "0d5d0da4aa39967dc70caaf5890e485df2b714cc300829377849155f342ff647",
+  "created_at": "2026-05-06T16:12:56Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-profiles/Cargo.toml. Crate has no [features] table and no #![no_std] declaration, yet uses Vec via ValidationPolicy. Either document it as std-only (preferred for v0.1) or add proper no_std plumbing with alloc. Add a note to crate-level doc comment clarifying std requirement.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: pkix-profiles std story underspecified \u2014 no features table, no no_std declaration",
+  "updated_at": "2026-05-06T16:17:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:12:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

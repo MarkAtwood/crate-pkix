@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "752a591b9a6ef4df59db0e5a44412cd6f098d71a5a965d6c49612c80475b2d34",
+  "created_at": "2026-05-14T12:27:41Z",
+  "created_by": "Mark Atwood",
+  "description": "The rustdoc for `from_pem_file_with_cap` and `from_der_file_with_cap` documents the upper sentinel value (`u64::MAX` = disable cap) but does not address what `cap = 0` means.\n\n**Current rustdoc surface** (pkix-truststore/src/lib.rs:619-625, mirrored at :659-664):\n\n```rust\n/// Same shape as [`from_pem_file`] but accepts an explicit byte cap.\n/// Pass [`u64::MAX`] to disable the cap entirely; doing so is the\n/// caller's responsibility \u2014 see [`DEFAULT_FILE_SIZE_CAP`] for the\n/// rationale behind the default.\n///\n/// # Errors\n///\n/// Same as [`from_pem_file`], substituting `cap` for the default.\n```\n\n**Actual behavior at cap=0** (traced from `read_file_capped` at lib.rs:168-201):\n\n1. `fs::File::open(path)` succeeds (file exists, perms ok).\n2. `metadata().len() > 0` check: for any non-empty file, true \u2192 returns `Error::Io(IoFailure { kind: InvalidData, message: \\\"trust-anchor file is N bytes; exceeds 0-byte cap\\\" })`.\n3. For an empty file: `metadata().len() > 0` is false \u2192 fall through. `take(0.saturating_add(1)) = take(1).read_to_end(...)` reads 0 bytes. `0 as u64 > 0` is false \u2192 returns `Ok(Vec::new())`. Then `from_pem(b\\\"\\\")` returns `Error::NoCertificates` (no BEGIN_BOUNDARY found).\n\nSo `cap=0` is effectively \\\"only accept zero-byte files (and even then, parsing fails because they have no certs).\\\"\n\n**Why this is a real API contract gap:**\n\na) **Plausible-but-wrong caller mental models.** Different Unix-influenced APIs use 0 differently:\n   - `setrlimit(RLIMIT_FSIZE, 0)` \u2192 \\\"hard zero limit\\\" (current behavior)\n   - `mmap(NULL, 0, ...)` \u2192 \\\"degenerate, undefined\\\"\n   - `dd bs=0` \u2192 error\n   - Many newer Rust APIs treat 0 as \\\"no limit\\\" (e.g., `tokio_util::codec::Decoder::max_frame_length = 0` means unbounded in some configurations)\n   \n   A caller passing `from_pem_file_with_cap(path, 0)` expecting \\\"no limit\\\" silently rejects all non-empty files. They get `Error::Io(InvalidData, \\\"...exceeds 0-byte cap\\\")` and may misdiagnose.\n\nb) **The disable-cap sentinel is at the wrong end.** The rustdoc says \\\"Pass u64::MAX to disable the cap entirely\\\" \u2014 but `u64::MAX` is an unusual value to type literally. Most APIs that use a sentinel for \\\"unbounded\\\" pick 0 (because 0 is easier to type/remember and idiomatic for \\\"unset\\\" in many contexts). The current contract inverts this expectation: 0 means \\\"reject everything\\\" and u64::MAX means \\\"unbounded.\\\"\n\nc) **`cap: u64` does not encode the invariant.** Using `NonZeroU64` for cap would prevent the cap=0 case at the type level (since 0 is degenerate). Using `Option<u64>` (None = unbounded, Some(n) = limit) would replace the u64::MAX sentinel with explicit nullability. The current shape (raw u64 with magic sentinel) is the least type-system-pristine option but is documented at the upper end only.\n\n**Suggested fixes (any of these closes):**\n\n1. **Documentation-only (cheapest):** Extend the rustdoc to document the cap=0 behavior explicitly. Example:\n   ```\n   /// `cap = 0` rejects any non-empty file (every file fails the 0-byte\n   /// check). To disable the cap entirely, pass [`u64::MAX`].\n   ```\n\n2. **Type-system fix (cleaner; pre-1.0 design closure):** Change `cap: u64` to `cap: NonZeroU64`. Callers passing 0 get a compile-time error (\\\"NonZeroU64::new(0).unwrap() panics; new(N).unwrap() succeeds\\\"). Forces deliberate cap choice. Adds one ergonomic wart (NonZeroU64 construction). Compatible with the existing u64::MAX disable sentinel (which IS NonZero).\n\n3. **`Option<u64>` shape:** Change to `cap: Option<u64>` where None = unbounded and Some(n) = limit. Removes the magic sentinel entirely. More idiomatic. Adds Option wrapping at every call site, even with the default cap.\n\n**Priority justification (P3, not P2):** Caller-discovery-by-reading-code is annoying but not silently dangerous \u2014 passing 0 produces an `Error::Io` with a clear \\\"exceeds 0-byte cap\\\" message that the caller will see in their first test run. The defect is documentation-as-contract clarity, not silent corruption. Engineering basis: real (caller mental model mismatch, magic-sentinel awkwardness) but mild.\n\nCross-references:\n- PKIX-tit4.16 (open, P3) \u2014 free-function lock-in on extensibility seams (Option<u64> / NonZeroU64 / LoadOptions struct would have addressed this too)\n- PKIX-tit4.24 (closed, P2) \u2014 the parent fix that introduced this API surface\n- PKIX-tit4.31 (open, P3) \u2014 typed FileTooLarge variant (sibling api-contract concern on the same fix)",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "from_*_file_with_cap rustdoc only covers cap=u64::MAX; cap=0 semantics undocumented",
+  "updated_at": "2026-05-14T12:27:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:27:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

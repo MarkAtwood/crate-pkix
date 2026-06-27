@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Deviation struct, DeviationScope, DeviationAction, DeviatedFinding, DeviationStore; 16 tests pass",
+  "closed_at": "2026-05-06T19:27:51Z",
+  "compaction_level": 0,
+  "content_hash": "85ecddab2eb60937aeaf2993467fe81f3a865d578ecff49c764e37ca3b9d9c82",
+  "created_at": "2026-05-06T19:26:00Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-jge.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: Deviation struct, schema, and in-memory store",
+  "updated_at": "2026-05-06T19:27:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T12:26:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jge",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

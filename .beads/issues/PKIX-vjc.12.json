@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:59Z",
+  "compaction_level": 0,
+  "content_hash": "791a2df3408446f44b189d1154c7478ad72fc4cb2540c2239d704e0217e0799e",
+  "created_at": "2026-05-03T00:12:02Z",
+  "created_by": "Mark Atwood",
+  "description": "The intersection loop at lines 1290-1327 is O(current \u00d7 new) per cert. With k CA certs each adding m subtrees, the intersection is O(m\u00b2) per cert \u00d7 k certs = O(k \u00d7 m\u00b2). For typical chains (k\u22645, m\u226410) this is fine. However nc_excluded uses extend() (union, append-only): excluded list grows monotonically with no deduplication. check_name_constraints calls nc_excluded.as_slice() and iterates it for every name in every cert. With a 100-cert chain each adding 10 excluded entries, nc_excluded has 1000 entries, and checking each cert's SAN list (say 5 names) requires 5000 comparisons. Not catastrophic but O(certs\u00b2 \u00d7 names). The deduplication miss in nc_excluded is the main concern \u2014 excluded entries from the same constraint repeated across multiple certs via extend cause redundant work. Expected impact: negligible for chains \u226420 certs and \u226420 SANs; may matter for long enterprise chains.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC permitted subtree intersection is O(n\u00b2) per cert \u00d7 O(n) certs = O(n\u00b3)",
+  "updated_at": "2026-05-05T04:48:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

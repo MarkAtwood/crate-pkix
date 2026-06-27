@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "03bb79eb0ba97e99534ba232a0df976adf4da6730e44cbafe75d722d6607d02a",
+  "created_at": "2026-05-14T02:12:40Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nPure rustdoc clarification. Document on the `now_unix` parameter that\nit selects the moment at which validity-period checks are evaluated,\nNOT the moment whose rules are in force. Catches the conceptual trap\nexposed by the temporal-posture principle (PKIX-e3nl) before users\nwalk into it.\n\n## Why\n\nThe 2026-05-13 chat surfaced an ambiguity in the existing API. Callers\nmay intuit that passing an older `now_unix` (e.g. `now_unix =\n2024-08-15`) gives them \"the rules in force at that older time.\"\nIt doesn't. It gives them the workspace's CURRENT BR snapshot,\nevaluated at that older moment for validity-period checks only.\n\nThis is fine if documented; surprising if not. The temporal-posture\nnon-negotiable (PKIX-e3nl) explicitly calls this out \u2014 this bead\nships the corresponding API documentation.\n\n## Sites to clarify\n\n### `pkix-path/src/lib.rs`\n\n- **`ValidationPolicy::new(now_unix)`** \u2014 add a paragraph stating:\n  > `now_unix` selects the moment at which validity-period checks\n  > (`notBefore <= now <= notAfter`) are evaluated. It does NOT select\n  > which version of the rules are in force; the rules are always the\n  > current set encoded in the surrounding `ValidationPolicy` fields.\n  > For evaluation against rules in force at a past time, use\n  > `pkix-policy-zlint` with a version-pinned lint set.\n\n- **`Profile::policy(&self, now_unix: u64)` trait method** \u2014 add a\n  paragraph stating the same semantic. The `now_unix` parameter\n  is plumbed into `ValidationPolicy::new(now_unix)`; the contract is\n  identical.\n\n- **`pkix_path::validate_path(...)`** \u2014 link to the `now_unix`\n  semantic on `ValidationPolicy::new` and/or restate it briefly. The\n  function takes `&ValidationPolicy`, so the `now_unix` was already\n  baked in when the policy was constructed; the clarification points\n  callers back to the policy constructor.\n\n### `pkix-profiles-cabf/src/lib.rs`\n\n- Each `Profile` impl's `policy(&self, now_unix: u64)` \u2014 short note\n  pointing to `ValidationPolicy::new`'s rustdoc. The Profile types\n  don't add separate semantics for `now_unix`; they pass it through.\n- Each free-function alias (`web_pki_policy`, `smime_policy`,\n  `code_signing_policy`, etc.) \u2014 `# `now_unix` semantic` section\n  pointing to the same clarification.\n\n### `pkix-profiles` (RFC-baseline crate)\n\n- Same clarification on `Profile::policy` impls and free-function\n  aliases (`basic_tls_policy`, `basic_smime_policy`, etc.). Check\n  whether the impls are thin pass-throughs that can link to the\n  pkix-path doc, or whether they need their own copies.\n\n### `pkix-chain` use-case wrappers\n\n- `verify_tls_server`, `verify_smime_signer`, etc. \u2014 each takes\n  `now_unix`. Document the same semantic on the wrapper's rustdoc.\n  Pointing back to one canonical clarification is fine; the wrappers\n  don't need to restate the whole thing.\n\n## Acceptance\n\n- All sites above have a `# now_unix semantic` paragraph (or\n  equivalent inline note) clarifying validity-evaluation vs\n  rules-in-force.\n- One canonical, full statement on `ValidationPolicy::new`; all\n  other sites can link back.\n- Workspace-level `RUSTDOCFLAGS=\"--cfg docsrs -D warnings\" cargo\n  +nightly doc --no-deps --all-features --workspace` succeeds.\n- No behavior change. CHANGELOG entries note pure-docs.\n- Commit message: `docs: clarify now_unix is validity-eval moment,\n  not rules-in-force moment (PKIX-e3nl)`.\n\n## Out of scope\n\n- Renaming `now_unix` or splitting it into two parameters (would be\n  a breaking API change; the current name is correct under the\n  clarified semantic).\n- Adding a separate `rules_in_force_at` parameter to any API (out\n  per PKIX-e3nl \u2014 the workspace doesn't offer that knob).\n\n## Cross-references\n\n- **PKIX-e3nl** (temporal-posture non-negotiable; this bead is the\n  rustdoc half of the principle)\n- **PKIX-4bip** (phased-rule helper catalog; sibling implementation\n  bead; will reference this rustdoc once landed)\n- existing `sc081_validity_cap` rustdoc, which already states the\n  not_before_unix vs relying-party-clock distinction correctly \u2014\n  use as the model for the new clarifications\n\n## Not blocked\n\nThis bead does not need to wait for PKIX-e3nl to land \u2014 the `now_unix`\nsemantic is true regardless of whether the principle is codified.\nPKIX-e3nl makes the architectural reason explicit; this bead makes the\nAPI surface match. Either can land first.\n",
+  "ephemeral": 0,
+  "id": "PKIX-kgnk",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path / pkix-profiles-cabf: clarify now_unix rustdoc (validity-evaluation moment, NOT rules-in-force moment)",
+  "updated_at": "2026-05-14T02:12:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:12:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-e3nl",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

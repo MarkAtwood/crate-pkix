@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "SHA-384/512 added to hash_certid_input; 3 new tests with Python3 oracle",
+  "closed_at": "2026-05-06T19:20:01Z",
+  "compaction_level": 0,
+  "content_hash": "522a94504b3827c4aaf2da7a58374e69fec1b39a6acd877214313503c0e91253",
+  "created_at": "2026-05-06T18:11:42Z",
+  "created_by": "Mark Atwood",
+  "description": "hash_certid_input in pkix-revocation only handles SHA-1 and SHA-256. Any other OID returns Err(Error::OcspMalformed). SHA-384 and SHA-512 support needed for CertID hashing per RFC 6960.",
+  "ephemeral": 0,
+  "id": "PKIX-y5k",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP: SHA-384 and SHA-512 not supported for CertID hashing",
+  "updated_at": "2026-05-06T19:20:01Z"
+}

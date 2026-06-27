@@ -1,0 +1,46 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:31:26Z",
+  "compaction_level": 0,
+  "content_hash": "9d387f4b6923a6326b3625253a5db3399010128bb4542eb69db9ac02695246d5",
+  "created_at": "2026-05-02T23:21:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nImplement the per-certificate name constraint enforcement check in chain_walk per RFC 5280 \u00a76.1.4(b)(1)\u2013(2).\n\n## Algorithm\nFor each cert in the chain (including EE), collect its names:\n1. Build name set N:\n   - Always include subject DN as DirectoryName\n   - If SAN present: include all GeneralName entries from SAN\n   - If SAN absent: only the subject DN (RFC 5280 \u00a74.2.1.6)\n\n2. For each name n in N:\n   a. EXCLUDED check: if any excluded subtree matches n \u2192 return Err(NameConstraintViolation { index })\n   b. PERMITTED check: if permitted_subtrees is Some(permitted) AND no permitted subtree matches n \u2192\n      return Err(NameConstraintViolation { index })\n\n3. Self-issued intermediates (not the leaf): skip this check (RFC 5280 \u00a76.1.4(b)(1) exception)\n\n## Defensive programming\n- Only check name types for which we have constraints (skip unimplemented types silently)\n- Run excluded check first (fail fast)\n- index = the chain position (0-based) being checked\n\n## Acceptance criteria\n- Cert with SAN dNSName=foo.evil.com where .evil.com is excluded \u2192 Err(NameConstraintViolation)\n- Cert with SAN dNSName=foo.example.com where permitted=[.example.com] \u2192 Ok\n- Cert with SAN dNSName=foo.other.com where permitted=[.example.com] \u2192 Err\n- Self-issued intermediate with forbidden name: no error\n- Depends on: PKIX-mew (matchers), PKIX-f0m (SAN extractor), PKIX-pjz (error variant)",
+  "ephemeral": 0,
+  "id": "PKIX-xji",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement per-cert NC constraint check",
+  "updated_at": "2026-05-02T23:31:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f0m",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-02T16:21:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mew",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-02T16:21:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-pjz",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

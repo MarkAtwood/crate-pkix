@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added PartialEq, Eq to pkix-path::DerError to match pkix-revocation::DerError. Both opaque newtypes now have identical derives. Builds clean.",
+  "closed_at": "2026-05-07T22:28:26Z",
+  "compaction_level": 0,
+  "content_hash": "5571e62a7f1fc235ff7ba532af3ee1877ff6157817dccabdb122a92d465bce1f",
+  "created_at": "2026-05-07T22:13:44Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nTwo crates each define an opaque `pub struct DerError(der::Error)` newtype with the\nidentical purpose: insulate the public API from `der::Error` semver breakage.\nTheir derives differ:\n\n`pkix-path/src/lib.rs:71-72`:\n```rust\n#[derive(Clone, Debug)]\npub struct DerError(der::Error);\n```\n\n`pkix-revocation/src/lib.rs:42-43`:\n```rust\n#[derive(Clone, Debug, PartialEq, Eq)]\npub struct DerError(der::Error);\n```\n\n`der::Error` does derive `PartialEq, Eq` upstream (verified by the fact that the\nrevocation version compiles), so both could and should have the same derives.\n\nPicking either way is fine, but they MUST agree. The pragmatic answer is to add\n`PartialEq, Eq` to `pkix-path::DerError` to match `pkix-revocation` \u2014 this is a\nprerequisite for adding `PartialEq, Eq` to `pkix-path::Error` (see PKIX-qwzx.15).\n\nFix: align derives. Either drop them from `pkix-revocation::DerError` (semver\nbreak for that crate) or add them to `pkix-path::DerError` (no break).\n\nRecommend: add `PartialEq, Eq` to `pkix-path::DerError`.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.16",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: pkix-path::DerError lacks PartialEq/Eq while pkix-revocation::DerError has them \u2014 same newtype, different derives",
+  "updated_at": "2026-05-07T22:28:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:13:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

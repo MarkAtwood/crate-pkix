@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:53Z",
+  "compaction_level": 0,
+  "content_hash": "327385a2db1895c6908617a90d41a17574db2ef4cc1b0035712340fdb1b63f0b",
+  "created_at": "2026-05-03T00:12:09Z",
+  "created_by": "Mark Atwood",
+  "description": "cert_subject_alt_names is called once inside check_name_constraints (line 1376) and potentially again elsewhere. More critically, cert_name_constraints is called at line 1262 inside the i>0 block, which also decodes all extensions. cert_subject_alt_names walks cert.extensions twice per cert that has both SAN and NC extensions (once in check_name_constraints, once in cert_name_constraints). This is not a hot path issue for typical chain lengths but for embedded/no_std targets with tight cycles it adds unnecessary extension scanning. The SAN decode is the larger cost. Caching the SAN decode result per cert would eliminate the double-scan.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_subject_alt_names called twice per certificate in NC path",
+  "updated_at": "2026-05-05T04:48:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

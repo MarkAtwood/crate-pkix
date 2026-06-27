@@ -1,0 +1,30 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "a68c55e38350a577944f76064a8f6f014a0b1f1e18101e7d2d62b8190049c4ff",
+  "created_at": "2026-05-14T15:03:51Z",
+  "created_by": "Mark Atwood",
+  "description": "`Verifier::build_with_aia` (pkix-chain/src/lib.rs:585-681) is invoked exactly when the fast-path `pkix_path::validate_path` returned `ChainBroken`, `NoTrustedPath`, or `SignatureInvalid` \u2014 i.e. **before any trust has been established on any cert in the caller-supplied chain**. The slow path then iterates `pool.iter()` (initialised from `supplied_chain.iter().cloned()`) and, for every cert whose issuer is unresolvable, extracts every `http(s)` URI from the cert's `AuthorityInfoAccess` extension and hands them to `AiaFetcher::batch_fetch`.\n\nThis is server-side request forgery (SSRF). Attack: caller submits `[attacker_leaf, attacker_intermediate]` where each cert's `caIssuers` URI points at an internal endpoint:\n- `http://169.254.169.254/latest/meta-data/iam/security-credentials/` (AWS instance metadata)\n- `http://localhost:8080/admin/shutdown`\n- `http://10.0.0.5/internal/api`\n- `http://kubernetes.default.svc.cluster.local/api/v1/secrets`\n\nA real `AiaFetcher` (`pkix-aia-http::HttpFetcher`) has a body-size cap and an HTTP-scheme guard but **no allowlist / denylist on the host portion of the URI**. The fetched bytes flow back into `build_with_aia` and are tried as `Certificate::from_der` \u2014 on parse failure they're recorded as `AiaError::MalformedCertificate(uri)` and discarded. So the attacker doesn't directly receive the fetched body, but:\n\nGoing wrong:\n- **Integrity**: any URL that triggers a side-effect on a bare GET (legacy admin endpoints, webhook-style triggers, cache invalidation hooks) is exercised.\n- **Confidentiality (limited)**: timing of `Error::Aia` returns leaks whether the internal endpoint responded, what HTTP status, and (via `MalformedCertificate(uri)`) the URI \u2014 useful for internal host/port scanning.\n- **Confidentiality (escalated)**: if a cache-poisoning intermediary or downstream observer can see the outbound request, the attacker reads internal hostnames the verifier is willing to talk to.\n- **Cloud metadata service compromise**: on AWS EC2, GCP, Azure, the metadata service responds with credentials and tokens on a plain GET to `169.254.169.254`; `HttpFetcher` requests reach it because they share the workload's network namespace.\n\nWhat this finding asks for:\n1. **Module rustdoc Limitations section** (pkix-chain/src/lib.rs:68-107) must add a 'Security model: AIA fetch trust' bullet documenting that the `AiaFetcher` adapter receives URIs extracted from un-validated certificates and must implement its own URI allowlist / network-policy / SSRF protection. State explicitly that `pkix-chain` does not firewall the host portion of AIA URIs.\n2. **`Verifier::verify_one` rustdoc** (line 480-526) Chain reassembly section must say 'AIA fetches are issued on URIs extracted from certificates that have NOT yet been path-validated; an attacker who supplies a chain controls the URIs the fetcher receives. Implementations of `AiaFetcher` are responsible for any required URL allowlist or private-network deny rules.'\n3. **`pkix-aia-http::HttpFetcher` (separate crate, not this epic)** should grow a `reject_private_addresses: bool` or `host_allowlist: Vec<String>` configuration knob and default it to safe \u2014 but that is its own finding.\n\nCrypto-security framing: this is a confidentiality + integrity class issue depending on what the attacker can reach. P1 because the trust-model property is undocumented and the documentation gap is the live defect \u2014 code is already written to issue these requests; callers reading the existing rustdoc would not know to firewall their adapter.\n\nNote: `NoAiaFetcher` (the default) issues no fetches and is safe. The finding only bites when a real fetcher is wired in, which is the entire point of PKIX-zkjb.7.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.32",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "(SEC) AIA fetches are issued against URIs from un-validated, attacker-controlled certs \u2014 SSRF surface not documented",
+  "updated_at": "2026-05-14T15:03:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:03:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

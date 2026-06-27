@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:05Z",
+  "compaction_level": 0,
+  "content_hash": "6d605ced91b6bd95dd3b85eb5d503c5198a838e92478fa921e12c14cc3fbea21",
+  "created_at": "2026-05-07T20:28:27Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-path/tests/pkits_helper.rs:39`:\n\n```rust\npub fn pkits_cert(name: &str) -> Certificate { ... }\n```\n\nFunction panics (via `.unwrap_or_else(|| panic!(...))` for missing fixtures, and `Certificate::from_der(...).expect(...)` for parse failures) but has no `# Panics` doc section. Clippy: `clippy::missing_panics_doc`.\n\n## Context\n\nTest helper. Panicking for missing fixtures is the desired behavior \u2014 the test should fail loudly if the test corpus is missing. The lint just wants this documented.\n\n## Fix\n\n```rust\n/// Load and parse a PKITS certificate fixture by name.\n///\n/// # Panics\n///\n/// Panics if the named fixture file does not exist or fails to parse as DER.\n/// Tests using this helper should ensure the PKITS test corpus has been\n/// extracted to `pkix-path/tests/pkits/`.\npub fn pkits_cert(name: &str) -> Certificate { ... }\n```\n\n## Priority\n\nP4 \u2014 test helper doc nit.\n",
+  "ephemeral": 0,
+  "id": "PKIX-sx4u",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: pkits_cert helper panics but missing # Panics doc section",
+  "updated_at": "2026-05-07T21:49:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

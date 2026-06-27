@@ -1,0 +1,22 @@
+{
+  "close_reason": "Review pass 2 complete: 1 finding filed (vpns scope), determined to be false alarm after test validation. The implementation is correct.",
+  "closed_at": "2026-05-05T16:18:32Z",
+  "compaction_level": 0,
+  "content_hash": "c6fc9766c4e08e4a0bde54cd55565e119fe6311be9de62e120823f13e2c2d1cb",
+  "created_at": "2026-05-05T16:14:22Z",
+  "created_by": "Mark Atwood",
+  "description": "Second review pass checking convergence after b5r fixes",
+  "ephemeral": 0,
+  "id": "PKIX-ddq",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review pass 2",
+  "updated_at": "2026-05-05T16:18:32Z"
+}

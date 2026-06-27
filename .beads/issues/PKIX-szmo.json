@@ -1,0 +1,20 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9918606432ef4fa8b827bf973ac0b2e877392f7f819a71325635a1d5b8faf4e5",
+  "created_at": "2026-06-04T17:27:58Z",
+  "created_by": "Mark Atwood",
+  "description": "Run wolfSSL/fenrir Skoll CLI against the PKIX workspace for automated security review, RFC conformance checking, bug hunting, and code quality analysis. Skoll uses Claude CLI under the hood with battle-tested prompt templates from the fenrir project. PKIX is an RFC 5280 X.509 path validation workspace \u2014 the rfc, security, and consttime scan types are the highest-signal modes. Since PKIX is not a wolfSSL ecosystem project, Skoll will use adaptive auto-detection to build an ephemeral scan config from repo evidence (tracked files, README, build signals, language mix, domain keywords like x509/pkix/rfc5280/der/asn1). Each scan produces both JSON (/tmp/skoll-review-*.json) and Markdown (/tmp/skoll-review-*.md) output. After all scans complete, triage the findings: deduplicate across scan modes, assess severity, dismiss false positives, and file fix beads for real issues.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Skoll security audit of PKIX workspace",
+  "updated_at": "2026-06-04T17:27:58Z"
+}

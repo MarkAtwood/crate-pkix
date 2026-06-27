@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "cargo check --workspace passes; pkix-chain::Error does not re-export pkix_path::Error; verify_chain returns pkix_chain::Result<ValidatedPath>; clippy -D warnings passes.",
+  "assignee": "Mark Atwood",
+  "close_reason": "done as part of PKIX-b9z \u2014 pkix_chain::Error defined with Path+Revocation variants, Display (uses {:?} for path errors until PKIX-e9v lands), std::error::Error with source()=None pending PKIX-e9v, and From impls; verify_chain updated to return crate::Result",
+  "closed_at": "2026-05-02T06:28:51Z",
+  "compaction_level": 0,
+  "content_hash": "fafad2435aa5c8fbba960987e58dbe62883581b491badabcda4b234b2afc7467",
+  "created_at": "2026-05-02T06:01:59Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Define pkix_chain::Error as a combined error enum with Path and Revocation variants, replacing the current re-export of pkix_path::Error, so that pkix_chain::verify_chain can correctly type-check both path validation errors and revocation errors.\n\nBLOCKED BY: PKIX-b9z (pkix_revocation::Error must exist first), PKIX-e9v (Display/Error impl pattern).\n\n**Algorithm:**\n1. In pkix-chain/src/lib.rs, remove the re-export line:\n   pub use pkix_path::{self, Error, Result, ...};\n   Replace with selective re-exports that do NOT include Error or Result.\n2. Define:\n   #[non_exhaustive]\n   pub enum Error {\n       Path(pkix_path::Error),\n       Revocation(pkix_revocation::Error),\n   }\n   pub type Result<T> = core::result::Result<T, Error>;\n3. impl fmt::Display for Error: delegate to inner error Display.\n4. #[cfg(feature=std)] impl std::error::Error for Error with source() returning the inner error.\n5. impl From<pkix_path::Error> for Error: Error::Path(e)\n6. impl From<pkix_revocation::Error> for Error: Error::Revocation(e)\n7. Update verify_chain return type to Result<ValidatedPath, Error> i.e. pkix_chain::Result<ValidatedPath>.\n8. Update the ? on validate_path call: now propagates via From<pkix_path::Error>.\n9. Update the ? on check_revocation call: now needs .map_err(Error::Revocation)? or From impl covers it.\n10. Update the pkix-chain re-exports: still re-export pkix_path::{SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy} but not pkix_path::Error or pkix_path::Result.\n\n**Defensive programming rules:**\n- Every From impl must be exhaustive (not use _); add a compile_error! if new variants are added to inner types without updating this enum.\n- Display must not expose any certificate contents \u2014 only the error kind and the source error's Display.\n- No unwrap() in any impl.\n\n**Subagent instructions:**\nSpawn one research subagent to read the current pkix-chain/src/lib.rs and pkix_revocation after PKIX-b9z lands, then one implementation subagent. Do not begin implementation until PKIX-b9z is closed.\n\n**Tests:**\n- test_from_path_error: construct pkix_path::Error::NoTrustedPath, call Error::from(), assert matches Error::Path(pkix_path::Error::NoTrustedPath). Oracle: type system.\n- test_from_revocation_error: construct pkix_revocation::Error::Revoked{...}, call Error::from(), assert matches Error::Revocation(_). Oracle: type system.\n- test_display_path: Error::Path(pkix_path::Error::PathTooLong).to_string() must not be empty and must not contain raw certificate bytes.\n- compile-time test: verify_chain return type is pkix_chain::Error, not pkix_path::Error \u2014 confirmed by cargo check.",
+  "ephemeral": 0,
+  "id": "PKIX-m49",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: define pkix_chain::Error combined enum",
+  "updated_at": "2026-05-02T06:28:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:02:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b9z",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:02:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-e9v",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

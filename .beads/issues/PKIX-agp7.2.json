@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "28 files swept. Category-A version-gating removed from crate code, rustdoc, READMEs, INTEROP.md, baseline docs, and test #[ignore] reasons. Acceptance grep returns only Category-C/factual matches (rule_bundle_version string values, historical 'legacy v0.2' refs, README version column which is data-freshness not policy \u2014 separate bead PKIX-a94w). cargo check and cargo check --tests both clean. Commit db466178.",
+  "closed_at": "2026-05-11T05:15:30Z",
+  "compaction_level": 0,
+  "content_hash": "9bf4863400482181a36e0b684bf2340e98926742d60274696de83c0f7e59713e",
+  "created_at": "2026-05-11T05:06:46Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nWalk every file flagged by the 2026-05-11 grep and strip Category-A version-gating language. Keep Category B and C untouched. Replace '(tracked for v0.x)' with '(tracked as PKIX-xxx)' when a bead exists; file a follow-up bead and link it if none does.\n\n## Files (per 2026-05-11 grep)\n\n### Affected \u2014 Category-A strip required\n\n```\nAGENTS.md                                          # handled by .1, do not touch here\n\npkix-revocation-http/src/extract.rs:76             # 'out of scope for v0.x of this helper' \u2192 strip v0.x qualifier\npkix-revocation-http/src/crl.rs:53                 # 'for v0.x we lump cert-level malformation' \u2192 'we currently lump'\n\npkix-revocation/src/crl.rs:464                     # 'tracked for v0.2' \u2192 'tracked as PKIX-xxx' or just describe\npkix-revocation/src/crl.rs:541                     # '# Limitations (v0.1)' \u2192 '# Limitations' (drop qualifier, keep section)\npkix-revocation/tests/pkits_4_5.rs:22,23           # 'v0.1 does not / deferred to v0.2' \u2192 describe current state\n\npkix-difftest/README.md:195,205,219                # '(currently just / out of v0.1 harness scope / Out of scope for v0.1)'\npkix-difftest/python/limbo-to-pem-tree.py:25,69    # 'out of v0.1 harness scope' / 'pkix-difftest v0.1 scope'\npkix-difftest/baseline-pyca.md:3,25,59,69,90,94    # 'v0.1 deliverable / v0.1 input contract / v0.1 baseline / v0.1 differential harness / v0.1 surfaces'\npkix-difftest/baseline-pkits-analysis.md:81        # 'pkix-path does not support DSA in v0.1'\npkix-difftest/src/main.rs:3                        # 'v0.1, PKIX-7nsf.1'\npkix-difftest/src/lib.rs:13,120,131                # 'v0.1 status / Limitation (v0.1) / Always true in v0.1'\npkix-difftest/src/oracles/pyca.rs:13               # 'for v0.1 (PKITS = 249 chains \u00d7 30ms)'\npkix-difftest/src/oracles/mod.rs:7                 # 'v0.1 status'\npkix-difftest/src/corpus/pem_tree.rs:101           # 'for v0.1'\npkix-difftest/src/oracles/pkix_path.rs:45          # 'root_in_chain = false is not supported in v0.1'\n\npkix-lint/src/deviation.rs:376                     # 'out of scope for v0.2' \u2192 strip\npkix-lint/src/lib.rs:66,262                        # 'planned for v0.3' \u2192 describe current state\n\npkix-ct/src/lib.rs:44,102                          # 'not yet implemented (tracked for v0.2)' \u2192 '(tracked as PKIX-baac)'\n\npkix-chain-simple/src/lib.rs:482                   # 'implementation tracked in pkix-chain-simple v0.1' \u2014 read context, decide\n\npkix-profiles/src/lib.rs:202,210,449               # 'planned for v0.3'\npkix-profiles/README.md:82                         # 'profiles are planned for v0.3'\n\npkix-path/tests/pkits_4_1_4_2.rs:46-121            # 8 #[ignore = '... not supported in v0.1 (tracked for v0.2)'] reasons\npkix-path/tests/pkits_4_6_4_7.rs:403,406,421       # 'v0.1 does not check cRLSign'\npkix-path/README.md:99                             # 'transcoding is deferred to v0.3'\n```\n\n### Do not touch (Category B or C or untouchable)\n\n- All 24 `# Limitations` rustdoc sections (Category C; one exception: pkix-revocation/src/crl.rs:541 has `(v0.1)` qualifier to strip, section body stays).\n- All 'out of scope for THIS CRATE' partition statements in pkix-path/src/lib.rs, pkix-profiles/src/lib.rs, pkix-revocation/src/lib.rs, pkix-revocation/src/ocsp.rs, pkix-revocation/src/crl.rs:463, pkix-path-builder/src/lib.rs:640, pkix-revocation-http/src/extract.rs:104,153 \u2014 Category B.\n- `specs/*` \u2014 vendored RFCs and CABF BR.\n- CHANGELOG.md historical entries (lines 352, 375).\n\n## Rewrite patterns\n\n| Before | After |\n|---|---|\n| `(tracked for v0.2)` | `(tracked as PKIX-xxx)` if bead exists; else file bead and link |\n| `planned for v0.3 via X` | `planned via X` or describe-only |\n| `v0.1 does not support X` | `Does not currently support X` |\n| `# Limitations (v0.1)` | `# Limitations` |\n| `(deferred to v0.2)` in #[ignore] | `(tracked as PKIX-xxx)` |\n\n## Acceptance\n\n- [ ] `rg -n 'v0\\.[0-9]|tracked for v|deferred to v|planned for v|out of scope for v|in v0\\.' --glob '!specs/' --glob '!CHANGELOG.md' --glob '!target' --glob '!.beads'` returns zero matches in tracked source files.\n- [ ] Every Category-A removal that referenced a follow-up version has a linked PKIX-xxx bead, OR has had a new bead filed and linked.\n- [ ] No `# Limitations` section body deleted; only the `(v0.1)` qualifier on one heading.\n- [ ] Compile clean: `cargo check --workspace --all-features`.\n- [ ] Test runs unchanged: `cargo test --workspace --all-features` (ignore reasons changed but ignored tests still ignored).\n\n## Depends on\n\nPKIX-agp7.1 (anchor first).",
+  "ephemeral": 0,
+  "id": "PKIX-agp7.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Sweep Category-A version-gating from crate code, rustdoc, READMEs, and test ignore reasons",
+  "updated_at": "2026-05-11T05:15:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:06:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-agp7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:06:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-agp7.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

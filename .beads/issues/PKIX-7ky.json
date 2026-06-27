@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Review complete. Found 1 P2 (stale Display message), 1 P2 (delta CRL cRLSign gap doc), 1 P3 (Box::leak memory growth). No P0/P1 found. Full findings in review output.",
+  "closed_at": "2026-05-06T21:46:35Z",
+  "compaction_level": 0,
+  "content_hash": "71fb16250b43ab96e15db744e1022ce16ea6678f6e8aeaef4c657372408c81e4",
+  "created_at": "2026-05-06T21:45:41Z",
+  "created_by": "Mark Atwood",
+  "description": "Second correctness review pass after fixes from PKIX-p23",
+  "ephemeral": 0,
+  "id": "PKIX-7ky",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 2 2026-05-06",
+  "updated_at": "2026-05-06T21:46:35Z"
+}

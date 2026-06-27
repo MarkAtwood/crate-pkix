@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:15:05Z",
+  "compaction_level": 0,
+  "content_hash": "7617c3d1454dc303e315679ed38e119f9449be417d9a4aaf27da07466bed5982",
+  "created_at": "2026-05-03T02:33:27Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-27p",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 NC implementation is the first genuinely complex algorithm in this codebase; the bitmask invariant and trust-anchor NC gap are the two places most likely to generate a maintenance surprise.\nConfidence: 15% chance of missed bug. Least confident flags: the NC intersection algorithm correctness under pathological multi-CA overlap (hard to trace mentally); the empty-subject DN false rejection (no PKITS test exercises this case). Uncertainty driven by: NC state machine has many interaction paths; PKITS covers only standard conforming certs. Would raise confidence if: a test with empty-subject cert through an NC-constrained CA were added.\nIdiom rating: CLEAN \u2014 Clippy passes with -D warnings. The only Rust-specific finding is a cargo fmt failure on two lines in pkix-chain (not in the new NC code itself). The NC implementation uses idiomatic Rust: no gratuitous clones, proper use of iterators, no unwrap outside tests.\nRust idiom confidence: 90% chance of no missed issue. Least confident flags: the GeneralSubtrees clone() pattern in NC intersection (necessary but could be restructured with Cow if allocation becomes a concern). Uncertainty driven by: no profiling data on chain validation hot paths.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: NameConstraints + OCSP/CRL fixes",
+  "updated_at": "2026-05-06T17:15:05Z"
+}

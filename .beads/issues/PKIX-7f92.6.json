@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced i64::try_from(unix).expect() with .unwrap_or(i64::MAX) in unix_to_rfc3339. Overflowing u64 inputs saturate to i64::MAX (year ~292 billion) and emit a well-formed multi-digit-year RFC 3339 date with deterministic output. The civil_from_days arithmetic is i64 throughout and stays in range. Documented as 'never panics' on any u64 input. Regression test covers three boundary inputs (i64::MAX, i64::MAX+1, u64::MAX) and asserts no-panic + ASCII output + saturation determinism. 296 tests pass; clippy clean.",
+  "closed_at": "2026-05-14T17:14:57Z",
+  "compaction_level": 0,
+  "content_hash": "8ba628e9bc9e7c208baab8ca7dc3010d9e7f3e870c091cab06165250fa839009",
+  "created_at": "2026-05-14T15:43:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs:851-855: i64::try_from(unix).expect('unix seconds out of i64 range') panics for any unix > i64::MAX. The rustdoc dismisses this as 'in practice the cap is u64::MAX and no realistic input triggers it' \u2014 true for wall-clock time today, false for attacker-controlled JSON input.\n\nTrigger: EvaluationReport carries evaluated_at_unix: u64 directly from caller input. A malicious or malformed JSON Finding payload (or an OSCAL Profile composition that sets evaluated_at_unix to a value above 9.2 \u00d7 10^18) will panic the emitter mid-OSCAL-write, killing any host process emitting evidence packs from untrusted inputs.\n\nMaintainer consequence: same shape as the cert_sha256_hex panic (PKIX-7f92.1) \u2014 a host process that handles untrusted Findings or EvaluationReports can be DOSed via JSON. The deserializer trusts u64 (correct range) but the formatter then panics on the high half.\n\nFix: change the formatter to take u64 internally and saturate or return a sentinel ('+overflow') for values that don't fit, rather than panicking. The civil_from_days algorithm itself wants i64 arithmetic, but the input clamp lives in a single function and is easy to swap to .unwrap_or(i64::MAX) with a sentinel year suffix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "unix_to_rfc3339 panics on u64 timestamps above i64::MAX",
+  "updated_at": "2026-05-14T17:14:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:43:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

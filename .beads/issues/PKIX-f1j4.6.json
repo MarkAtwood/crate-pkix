@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "972ec486dffbdb94bfde893275d345c00d953ec3bfc6ef4d402367268cde825f",
+  "created_at": "2026-05-14T18:57:35Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:826-839: CachedHttpOcspFetcher::maybe_populate_cache writes the just-fetched OCSP entry to the cache unconditionally \u2014 no equivalent of CRL's is_rollback check. RFC 6960 does not define a CRLNumber-equivalent monotonic counter, but `producedAt` is a comparable timestamp and is already extracted into CachedOcspResponse.\n\nScenario: a misconfigured (or hostile) OCSP responder serves an older signed-and-still-in-window response. Concurrent validators race; one fetches the stale response after another fetched the fresh one. Stale overwrites fresh. Equivalent to the CRL rollback the wrapper explicitly defends against on the CRL side.\n\nMaintenance consequence: an operator reports 'OCSP cache occasionally serves stale responses after a responder restart' \u2014 the failure is intermittent (depends on the order of concurrent fetches) and the wrapper documents that it DOES protect against rollback on the CRL side, so the operator expects the same protection on OCSP. Surprise gap.\n\nRecommendation: compare producedAt; reject incoming response with producedAt < cached.produced_at. Same shape as is_rollback() but on a timestamp instead of a CRLNumber. Mirror the CRL-side protection so the two checkers have a consistent contract.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cached fetcher's CachedHttpOcspFetcher::maybe_populate_cache silently caches stale OCSP over fresh",
+  "updated_at": "2026-05-14T18:57:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

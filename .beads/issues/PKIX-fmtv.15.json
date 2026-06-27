@@ -1,0 +1,38 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:08:46Z",
+  "compaction_level": 0,
+  "content_hash": "457a7db62cacffcf2fb5646f1c9b9b69fc1842fe520ed463f361338483c402e1",
+  "created_at": "2026-05-12T02:42:33Z",
+  "created_by": "Mark Atwood",
+  "description": "Ship the canonical single-call wrappers per the `.7` decision.\n\nEach wrapper:\n- Constructs a sane `&[&dyn VerificationPolicy]` stack.\n- Calls `verify()`.\n- Returns `VerifyReport`.\n\nExpected wrapper set (final list from `.7`):\n\n- `verify_tls_server(cert_bundle, trust, hostname, time)` \u2014 required.\n- `verify_tls_client`, `verify_smime_signer`, `verify_code_signer` \u2014 likely.\n- `verify_smime_recipient`, `verify_time_stamper`, `verify_ocsp_responder` \u2014 maybe.\n\nEach wrapper bakes the defaults chosen in `.7` (revocation mode, lint catalog inclusion, profile, time-source).\n\nDocumentation: each wrapper's rustdoc shows the equivalent explicit-stack call so users can graduate from the wrapper to the explicit `verify()` form.\n\nTest surface: each wrapper exercised against a positive and negative cert chain for its use case.\n\n**Blocks on:** .7 (wrapper set + defaults).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement ergonomic single-call wrappers",
+  "updated_at": "2026-05-13T02:08:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:44:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

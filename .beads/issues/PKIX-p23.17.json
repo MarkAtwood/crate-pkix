@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:14Z",
+  "compaction_level": 0,
+  "content_hash": "bdff7335d93855430315b805eed26152bd8af3f3a83f35fe7bcdc36d57e8ef92",
+  "created_at": "2026-05-06T21:33:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:606-626\n\nDeviationRunResult derives Clone, Debug, Default but not PartialEq. Its fields (Vec<Finding>, Vec<DeviatedFinding>) both implement PartialEq. Adding PartialEq would allow test code to use assert_eq!(result, expected) for full structural equality instead of checking individual fields.\n\nFix: add PartialEq to derive.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M1: DeviationRunResult missing PartialEq derive",
+  "updated_at": "2026-05-06T21:42:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:33:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

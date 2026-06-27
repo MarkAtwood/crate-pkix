@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:21Z",
+  "compaction_level": 0,
+  "content_hash": "14c6f0e88c29ab90a67ea9edca888d30fcb746ab173e7118966dc396869cbb17",
+  "created_at": "2026-05-14T19:14:13Z",
+  "created_by": "Mark Atwood",
+  "description": "OID_SUBJECT_ALT_NAME at pkix-identity/src/lib.rs:111 is a top-of-file const. OID_SMTP_UTF8_MAILBOX at line 498 is defined adjacent to its single use site.\n\nSuggested rewrite: move OID_SMTP_UTF8_MAILBOX next to OID_SUBJECT_ALT_NAME under a single 'OIDs' comment block. Both are RFC-defined constants reachable from multiple code paths (the SmtpUTF8 constant is used by san_entry_matches_mailbox via the OtherName.type_id match guard); grouping them is the conventional shape for x509-cert consumers.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID_SMTP_UTF8_MAILBOX defined mid-file rather than alongside OID_SUBJECT_ALT_NAME",
+  "updated_at": "2026-06-15T18:51:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

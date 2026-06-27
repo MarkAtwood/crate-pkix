@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: updated crate-level doc to remove stale claim that policies are unimplemented.",
+  "closed_at": "2026-05-05T16:08:39Z",
+  "compaction_level": 0,
+  "content_hash": "b3d85f9574dfe9e558b594c54affcc44f79b51d5a004811df75e7326b0257b75",
+  "created_at": "2026-05-05T15:47:14Z",
+  "created_by": "Mark Atwood",
+  "description": "**Doc error**: The crate-level module documentation for pkix-path/src/lib.rs at lines 24-29 states:\\n\\n```\\nv0.1 does **not** implement:\\n- PolicyConstraints / certificate policy validation (\u00a74.2.1.9, \u00a76.1.5)\\n```\\n\\nBut commit 6276e4e ('feat: policy validation, delta CRLs, IDP checking') and commit 3f922ad implemented certificate policy validation. The Limitations section is now incorrect \u2014 policy validation IS implemented.\\n\\n**Location**: pkix-path/src/lib.rs:24-29\\n\\n**Fix**: Remove 'PolicyConstraints / certificate policy validation (\u00a74.2.1.9, \u00a76.1.5)' from the Limitations list. Update the doc to reflect that \u00a76.1 policy validation (CertificatePolicies, PolicyMappings, PolicyConstraints, InhibitAnyPolicy) is implemented in v0.1, with a note about remaining gaps (NameConstraints for X.400, EDI-party names; cross-cert path building).",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.18",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crate-level doc still claims policies not implemented",
+  "updated_at": "2026-05-05T16:08:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

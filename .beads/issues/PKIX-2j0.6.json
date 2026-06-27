@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2b60fa0192c170128d0c46ee30ce9d1b52e157f72bdd656b1d2f676e25e76a2e",
+  "created_at": "2026-05-06T16:50:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:85-92\n\n`CertPool` implements `IntoIterator for &'a CertPool` (yielding borrowed certificates) but does not implement `IntoIterator for CertPool` (consuming the pool, yielding owned `Certificate` values).\n\nRust convention for collection types is to implement all three:\n- `IntoIterator for &Collection` (already done)\n- `IntoIterator for &mut Collection` (yielding `&mut Item`)  \n- `IntoIterator for Collection` (consuming, yielding `Item`)\n\nWithout the consuming impl, callers who want to move certificates out of the pool after building (e.g., to pass them elsewhere) must call `pool.certs.into_iter()` \u2014 which doesn't compile since `certs` is private. They'd need to clone all certificates.\n\nFix: add\n```rust\nimpl IntoIterator for CertPool {\n    type Item = Certificate;\n    type IntoIter = std::vec::IntoIter<Certificate>;\n    fn into_iter(self) -> Self::IntoIter {\n        self.certs.into_iter()\n    }\n}\n```\n\nThe `&mut` impl is less urgent since there's no setter beyond `add`, but the owned consuming impl should be added for completeness.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Nice-to-have ergonomic improvement. Deferred to v0.2.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: CertPool should impl IntoIterator for owned value (consuming)",
+  "updated_at": "2026-05-06T17:03:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:50:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

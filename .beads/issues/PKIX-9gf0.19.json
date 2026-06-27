@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "doc comment updated to reflect v0.2 implementation; dedicated test fixture for empty-subject+critical-SAN chain tracked for v0.3 since it requires custom DER cert construction",
+  "closed_at": "2026-05-07T16:42:30Z",
+  "compaction_level": 0,
+  "content_hash": "a5fb9f518f3fea7c468b35eb358362daee6a5d164021b2418b98de4e2bc89682",
+  "created_at": "2026-05-07T16:12:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:994-1001 \u2014 the comment documents a known v0.1 limitation:\n  'cert with an empty Subject and critical SAN will pass this check but fail name linkage since names_match compares against the empty Subject. This is tracked for v0.2 (RFC 5280 \u00a74.2.1.6).'\n\nThe cert_has_san_identity function (line 1344-1356) correctly identifies such certs. The chain_walk code at line 2039-2043 correctly skips DN-based name linkage for such certs. The SAN-identity handling appears to be implemented.\n\nHowever, there is no test that:\n1. Validates a chain where an intermediate CA has empty Subject + critical SAN\n2. Confirms that such a cert does NOT trigger ChainBroken when the next cert's issuer field doesn't match\n\nThis is a P2 test coverage gap: the code path is implemented but untested with a real certificate fixture.\n\nAdditionally, the HANDLED_CRITICAL_OIDS comment at line 998-1000 says SAN value is 'not inspected by path validation \u2014 name matching still uses the Subject DN.' This is now partially incorrect (cert_has_san_identity is called and working_issuer_is_san_identity changes behavior). The comment should be updated.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: no test for empty-subject cert with critical SAN (RFC 5280 \u00a74.2.1.6 edge case)",
+  "updated_at": "2026-05-07T16:42:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:12:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

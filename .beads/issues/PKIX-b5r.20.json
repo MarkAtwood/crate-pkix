@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:07:04Z",
+  "compaction_level": 0,
+  "content_hash": "951869748a1df7da0e2bcac4f1a189fd54279103b1502b5e51c66c6f08ccdf64",
+  "created_at": "2026-05-05T15:47:29Z",
+  "created_by": "Mark Atwood",
+  "description": "**Test gap**: The pkix-path-builder integration tests (pkix-path-builder/tests/integration.rs) test empty pool, wrong pool, and correct two-cert chain. There is no test confirming that build_path correctly handles a pool containing a self-signed certificate that is NOT the trust anchor.\n\n**Why it matters**: The cycle guard for self-signed non-anchor certs depends on subject-name matching (lib.rs:181-186). A test would confirm this guard actually prevents unbounded recursion and returns NoPathFound rather than hanging or panicking.\n\n**Proposed test**:\\n\\n```rust\\n/// A self-signed cert in the pool that is not the trust anchor must\\n/// not cause an infinite loop \u2014 the cycle guard must detect it.\\n#[test]\\nfn test_build_path_self_signed_non_anchor_in_pool() {\\n    let ee = pkits_cert(\"ValidCertificatePathTest1EE\"); // issuer = GoodCA\\n    let anchor = pkits_trust_anchor(); // TrustAnchorRootCertificate (subject = root)\\n\\n    // A self-signed cert (subject == issuer) that is unrelated to the chain.\\n    // TrustAnchorRootCertificate is self-signed but IS the anchor; use a different self-signed cert.\\n    // Since we don't have a spare self-signed cert in the fixture set, use the anchor cert\\n    // *not* registered as an anchor \u2014 it IS self-signed and a CA.\\n    let ta_cert = pkits_cert(\"TrustAnchorRootCertificate\");\\n    let mut pool = CertPool::new();\\n    pool.add(ta_cert); // self-signed but not registered as anchor\\n\\n    // build_path should find no path because GoodCACert is not in the pool.\\n    let err = build_path(&ee, &pool, &[anchor])\\n        .expect_err(\"build_path must fail when only a self-signed non-anchor is in pool\");\\n    assert!(matches!(err, pkix_path_builder::Error::NoPathFound));\\n}\\n```\\n\\n**Location**: pkix-path-builder/tests/integration.rs (currently 122 lines, add after line 122)",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "no test for build_path with self-signed non-anchor in pool",
+  "updated_at": "2026-05-05T16:07:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

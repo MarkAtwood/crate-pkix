@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:31:24Z",
+  "compaction_level": 0,
+  "content_hash": "9371d09b8d8da999b622fea5711edffee80dd4fe3c8bea2cd6217faadcda07b1",
+  "created_at": "2026-05-06T20:17:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:check_inputs uses chain[i].tbs_certificate.subject_public_key_info == chain[j].tbs_certificate.subject_public_key_info (structural equality via PartialEq) for duplicate detection. This is correct only if the derived PartialEq on SubjectPublicKeyInfoOwned does byte-level comparison. But spki::SubjectPublicKeyInfoOwned derives PartialEq which compares all fields including AlgorithmIdentifier parameters (NULL vs absent) \u2014 so two certs with the same key but differing NULL/absent parameter encoding would NOT be flagged as duplicates. The path-builder cycle detection uses spki_der_bytes (actual DER encoding) which would also treat them as different nodes. These are consistent with each other, but both differ from the spki_key_matches function (which compares OID + key bytes, ignoring parameters). Inconsistency is confusing and one of the three approaches is probably wrong for the security goal.",
+  "ephemeral": 0,
+  "id": "PKIX-512.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "duplicate cert detection uses structural equality not SPKI bytes",
+  "updated_at": "2026-05-06T20:31:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

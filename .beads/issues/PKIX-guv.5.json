@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:16:44Z",
+  "compaction_level": 0,
+  "content_hash": "1280138427aabe26d846d9deabb8b85cc9dd064c1d3accd92e20f8876558634f",
+  "created_at": "2026-05-02T20:11:51Z",
+  "created_by": "Mark Atwood",
+  "description": "check_oid_consistency compares cert.signature_algorithm != cert.tbs_certificate.signature using PartialEq, which compares the full AlgorithmIdentifier including the parameters field. For sha256WithRSAEncryption, RFC 3279 says parameters SHOULD be NULL, but many legacy CA implementations generate certs where the outer signatureAlgorithm has parameters=Some(NULL) and the inner TBS.signature has parameters=None (or vice versa). These certs are accepted by OpenSSL and rustls-webpki via OID-only comparison, but pkix-path rejects them with MalformedCertificate. Any enterprise PKI or government PKI using older CAs from 2010-2018 era is likely to hit this. Maintenance consequence: user opens issue, presents valid cert, validator rejects it.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RSA AlgorithmIdentifier NULL-vs-absent params causes MalformedCertificate",
+  "updated_at": "2026-05-02T20:16:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:11:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

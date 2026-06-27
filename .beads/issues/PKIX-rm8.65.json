@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.65",
+  "title": "ServerName and MailboxName expose private repr via #[non_exhaustive] but no field access",
+  "description": "pkix_identity::ServerName and pkix_identity::MailboxName are both #[non_exhaustive] pub structs with private internal repr fields. This is good from an immutability standpoint \u2014 callers construct via the parse methods and cannot access internals.\n\nHowever, neither type exposes any accessor methods for the parsed content. ServerName has no way for a caller to retrieve the normalized DNS name or IP bytes. MailboxName has no way for a caller to retrieve the parsed local-part, domain, or internationalized flag. The types are opaque boxes that can only be passed to verify_dns_name/verify_mailbox.\n\nThis limits the types' utility as general-purpose parsed-identity types. Callers who want to do anything with the parsed identity (display it, log it, compare it to something other than a SAN) must re-parse the original input.\n\nWhat goes wrong if this stays as-is: Callers cannot extract the normalized form of the identity after parsing. The types are parse-only, verify-only. This is a minor usability gap \u2014 the types serve their primary purpose (feeding into verify_*) correctly. But it forces callers who want the normalized DNS name (e.g. for logging or display) to normalize it themselves.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-identity/src/lib.rs lines 129-133 (ServerName struct, repr is private)\n- /home/mark/PROJECT/PKIX/pkix-identity/src/lib.rs lines 221-236 (MailboxName struct, all fields are private)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:15Z",
+  "updated_at": "2026-06-15T17:13:28Z",
+  "closed_at": "2026-06-15T17:13:28Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:15"
+    }
+  ]
+}

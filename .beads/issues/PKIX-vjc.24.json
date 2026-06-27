@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:29Z",
+  "compaction_level": 0,
+  "content_hash": "e5d038a5dd0022628d2685f1e2a8fd5a0be18170ddc56a13654b0f59139ef419",
+  "created_at": "2026-05-03T00:14:00Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 1375: let subject = GeneralName::DirectoryName(cert.tbs_certificate.subject.clone()). This clones the entire subject DN to wrap it in GeneralName for use in name_matches_subtree comparisons. The clone exists only because name_matches_subtree takes &GeneralName by reference. The DN is owned by the certificate and lives for the duration of chain_walk; a borrow would suffice. However GeneralName wraps an owned Name, so constructing a GeneralName::DirectoryName without cloning would require either restructuring name_matches_subtree to accept Name separately for the DirectoryName case, or making the function take a reference. For no_std this is an avoidable heap allocation per certificate during NC check.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "GeneralName::DirectoryName clone in check_name_constraints is unnecessary",
+  "updated_at": "2026-05-05T04:48:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:14:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

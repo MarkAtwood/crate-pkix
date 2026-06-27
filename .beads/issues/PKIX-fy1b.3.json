@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:44:58Z",
+  "compaction_level": 0,
+  "content_hash": "319f700c547fe11a6c1c05217c7a61041f3e1a3413c2da4d3e7c4df170c3a857",
+  "created_at": "2026-05-07T04:36:17Z",
+  "created_by": "Mark Atwood",
+  "description": "In crl.rs:parse_issuing_dp() (lines 675-687), the function uses .and_then(|e| IssuingDistributionPoint::from_der(...).ok()) \u2014 if the IssuingDistributionPoint extension is present but its DER is malformed, the function returns None and the caller proceeds as if no IDP extension exists. IssuingDistributionPoint MUST be critical (RFC 5280 \u00a75.2.5). Silently ignoring a malformed critical extension is fail-open: a CRL with a corrupted IDP that would otherwise scope-exclude the checked certificate would now pass through and report Ok(not-revoked) instead of an error. The fix is to propagate the DER error rather than using .ok().",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "parse_issuing_dp silently discards malformed IssuingDistributionPoint \u2014 fail-open on critical extension",
+  "updated_at": "2026-05-07T04:44:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

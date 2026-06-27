@@ -1,0 +1,31 @@
+{
+  "close_reason": "deferred P4 doc: build_path is not required to be called with leaf certs; validate_path enforces chain structure; this is a minor doc enhancement not a correctness issue",
+  "closed_at": "2026-05-07T04:50:12Z",
+  "compaction_level": 0,
+  "content_hash": "aa7271d56632baf661697b02f788a93d31e7ae8bfe4e222218c65185abde05ec",
+  "created_at": "2026-05-07T04:37:38Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-path-builder/src/lib.rs, build_path() (line 323) accepts any Certificate as target and does not check whether it is a leaf. A caller passing an intermediate CA cert as target would receive a chain [ca_cert, parent_ca, ...] which, when passed to validate_path, would fail because validate_path assumes chain[0] is the leaf. There is no doc comment clarifying that target must be a leaf cert. This is a missing # Panics / # Errors note at minimum, and ideally a structural guard or explicit documentation.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.13",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder build_path does not reject the case where target is a CA cert (no leaf-first ordering guarantee)",
+  "updated_at": "2026-05-07T04:50:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:37:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}
