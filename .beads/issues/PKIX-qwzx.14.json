@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Extended OcspChecker # Limitations to cover delegated responders (RFC 6960 \u00a74.2.2.2), absence of OCSP request generation/nonce, and no AIA-based responder discovery (RFC 6960 \u00a73.1). Cross-referenced pkix-revocation-http for the online story.",
+  "closed_at": "2026-05-07T22:27:34Z",
+  "compaction_level": 0,
+  "content_hash": "6a3d7b8c57615cbee3cbd1220331ffd2c276ab78586c953f414a9686c2d1d70e",
+  "created_at": "2026-05-07T22:03:13Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs:347 (inside parse_and_verify_basic_response):\n  // Current limitation: assumes the response is signed directly by the issuer.\n\nThis is an important limitation \u2014 RFC 6960 \u00a74.2.2.2 delegated OCSP responders (signed by a separate cert with id-kp-OCSPSigning EKU) are not supported. A delegated response will fail with OcspSignatureInvalid because the issuer's SPKI does not verify the response signature.\n\nFail-closed behaviour is correct (so this is not a security defect). But the limitation belongs in the structured `# Limitations` section of OcspChecker, not as a one-line inline comment. The README's 'Not yet implemented' list (line 150) does mention 'Delegated OCSP responders' so it is acknowledged at the project level, but pkix-revocation's own crate-level docs and OcspChecker docs do not.\n\nFix: add a 'Limitations' subsection to OcspChecker's docstring (around pkix-revocation/src/ocsp.rs:35-65) covering:\n  - No delegated responder support (RFC 6960 \u00a74.2.2.2)\n  - No OCSP request generation (response DER must be supplied; nonce is not checked)\n  - No AIA-based responder discovery (RFC 6960 \u00a73.1)\n\nSeverity: P4. The behavior is fail-closed and the README mentions it; this is purely doc-discoverability for the rustdoc reader.\n\nPass-1 attribution: not addressed. Pass 1 P3 commit PKIX-1z05 added doc(cfg(...)) on feature-gated items but didn't restructure limitation prose.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.14",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: pkix-revocation OCSP delegated responder limitation only documented in inline comment, not in # Limitations",
+  "updated_at": "2026-05-07T22:27:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:03:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:49:11Z",
+  "compaction_level": 0,
+  "content_hash": "d6dfaa0cf8622279b240ac33ffc4d098f7e7aaa3135a205b58bacafd9012a0e3",
+  "created_at": "2026-05-06T15:40:49Z",
+  "created_by": "Mark Atwood",
+  "description": "smime_policy_server_auth_eku_rejected (line 505) is a verbatim subset of smime_policy_requires_email_protection_eku_and_rejects_wrong_eku (line 479). Both load the same fixture, same anchor, same policy, assert the same Err(MissingEku). The combined test also asserts the field value; the standalone adds no new coverage. Should remove smime_policy_server_auth_eku_rejected or fold it into the combined test.",
+  "ephemeral": 0,
+  "id": "PKIX-k7e.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "smime_policy: duplicate rejection test",
+  "updated_at": "2026-05-06T15:49:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:40:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-k7e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:03Z",
+  "compaction_level": 0,
+  "content_hash": "f8bf185ebcdb0c1943854867968a28d86ef9a5a6b4ca9734879742d2d3e89acb",
+  "created_at": "2026-05-14T17:59:51Z",
+  "created_by": "Mark Atwood",
+  "description": "verify_ocsp_responder uses LeafIdent (lines 1409-1432) to recognize the responder leaf cert inside the RevocationChecker callback so the id-pkix-ocsp-nocheck bypass applies only to chain[0]. The identity is captured as (&issuer DN, &serial number) and matched via:\n\n    self.serial == &cert.tbs_certificate.serial_number\n        && self.issuer == &cert.tbs_certificate.issuer\n\nThis uses x509_cert::name::Name's derived PartialEq, which compares the underlying DER bytes verbatim. pkix-path/src/lib.rs:634 documents this exact gotcha for TrustAnchor:\n\n    PartialEq is byte-level, not semantic: The derived PartialEq compares fields verbatim. Two anchors representing the same CA may compare unequal if their DER encodings differ \u2014 for example, one AlgorithmIdentifier with explicit NULL parameters and another with absent parameters are both valid for RSA (RFC 3279 \u00a72.3.1) but will not be equal under ==. Do not use == to deduplicate a trust store; use names_match...\n\nThe shim has the same hazard. The DN-level mismatch is the bigger concern: RFC 4518 string prep + RFC 5280 \u00a77.1 say two DNs that DIFFER in encoding (PrintableString vs UTF8String, with vs without trailing whitespace, lowercase vs uppercase) MUST be considered equal. The derived == on Name does NOT honor string prep.\n\nSCENARIO that triggers the cost: in the fast path, chain[0] is the responder cert. LeafIdent borrows from chain[0] directly. When the shim compares, it sees chain[0] vs chain[0] \u2014 trivially equal. No bug TODAY.\n\nIn the SLOW path (AIA-augmented build), build_with_aia returns Vec<Certificate> with cloned certs. The clone preserves DER encoding, so derived == still matches. No bug TODAY.\n\nBUT: any future refactor that introduces a normalization step (e.g. canonicalize DNs during pool ingestion, or have a fetcher return a re-encoded cert) breaks the LeafIdent match. The shim then fails to recognize the responder cert, the bypass doesn't fire, and a revoking RevocationChecker reports Revoked on the responder \u2014 even when id-pkix-ocsp-nocheck is present. The user sees an unhelpful Error::Revocation that contradicts the spec.\n\nThe bug class is 'silent over-rejection of a valid cert', which is a security-functional regression (denial-of-service on a legitimately delegated responder). Not a CVE but real maintenance burden when it surfaces.\n\nMAINTENANCE CONSEQUENCE: a contributor who adds 'canonical DN' or 'cert re-encoding' anywhere in the slow path will silently break the nocheck bypass without a test failure (the existing tests use the IDENTICAL cert in both seats). The bug only surfaces when the chain in revocation check is NOT the same memory as the chain handed to verify_ocsp_responder.\n\nFIX: use pkix_path::names_match for the issuer DN comparison (it already exists and applies RFC 4518 string prep). The serial number IS bytewise opaque per RFC 5280 \u00a74.1.2.2 so derived == there is correct. Specifically:\n\n    pkix_path::names_match(self.issuer, &cert.tbs_certificate.issuer)\n        && self.serial == &cert.tbs_certificate.serial_number",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NoCheckShim leaf identity matches by derived PartialEq, but pkix-path documents PartialEq as byte-level not semantic",
+  "updated_at": "2026-06-04T19:51:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:59:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

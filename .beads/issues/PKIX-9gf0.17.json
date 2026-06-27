@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:33:31Z",
+  "compaction_level": 0,
+  "content_hash": "9153d06e2e036cb77336d9fb12dad91a5f97d27eb2fed28a9bf0e1ea7a5e76d8",
+  "created_at": "2026-05-07T16:11:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs:263-269 \u2014 CodeSigningProfile sets:\n  `p.max_validity_secs = Some(1185 * 86_400);`\n\nThe doc comment says:\n'CS BR \u00a76.3.2: certificates issued before 2026-03-01 may be valid for up to 39 months; ... Certificates issued on or after 2026-03-01 are limited to 460 days (CS BR v3.8). This profile implements the pre-2026-03-01 rule (1185 days).'\n\nAs of today (2026-05-07), the post-2026-03-01 rule (460 days) is now in effect. The profile is actively wrong for new certificates issued after 2026-03-01.\n\nUnlike WebPkiProfile (which defers to pkix-lint ValidityMaxLint for phased enforcement), CodeSigningProfile hardcodes 1185 days via max_validity_secs. This is a policy enforcement hole: the profile claims to enforce CS BR but does not enforce the 460-day cap for certs issued after 2026-03-01.\n\nSuggested fix: Either implement a SC-081-style phased cap in pkix-profiles, or update the profile to use 460 days (breaking change for certs issued between 2024 and 2026-03-01). At minimum, add a doc comment warning that the profile is stale after 2026-03-01.\n\nP2 \u2014 the profile actively misrepresents current CS BR requirements.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles CodeSigningProfile uses pre-2026-03-01 rule; post-2026 460-day cap not enforced",
+  "updated_at": "2026-05-07T16:33:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:11:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

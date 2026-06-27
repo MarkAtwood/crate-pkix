@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated the stale 'structural clone' comment on verify_delta_crl_and_collect to reflect the post-cache state (delta_crl borrows from self.delta_crl). Refactor to return Option<&[RevokedCert]> noted as a feasible follow-up perf cleanup; not done in this pass to keep scope minimal.",
+  "closed_at": "2026-05-07T23:26:49Z",
+  "compaction_level": 0,
+  "content_hash": "88422cd5dc98a2314be646ad595febaf25d3755191ba44a8eaca3946ddbef87d",
+  "created_at": "2026-05-07T23:02:56Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-revocation/src/crl.rs lines 567-582 (verify_delta_crl_and_collect return statement).\n\n## Finding\nThe function ends with this comment block:\n\n```\n// NOTE: The clone here is a structural requirement. Returning &[RevokedCert]\n// (Option A) is not possible because delta_crl is a caller-local variable; a\n// reference into it cannot outlive the if let block at both call sites without\n// a significant lifetime refactor of check_revocation and\n// check_revocation_against_anchor. A borrow-based design would require either\n// pre-parsing the delta CRL into self at construction time (deferred to v0.3\n// caching work) or passing the parsed CertificateList in from the caller and\n// restructuring both call sites. ...\nOk(delta_crl\n    .tbs_cert_list\n    .revoked_certificates\n    .clone()\n    .unwrap_or_default())\n```\n\nThe claim 'delta_crl is a caller-local variable' was correct under the pre-cache design where each check_revocation call decoded delta_crl_der locally. The pass-1/pass-2 parse-once refactor removed that locality: self.delta_crl: Option<CertificateList> is now stored in the struct, and at both call sites delta_crl: &CertificateList is borrowed via &self.delta_crl (pkix-revocation/src/crl.rs:309 and :433). The borrow lives as long as &self, which outlives the function call.\n\nThis means the comment's stated rationale ('caller-local') is stale and the function could now legitimately return Option<&[RevokedCert]> to avoid the clone. The comment also explicitly anticipates this future state: 'A borrow-based design would require ... pre-parsing the delta CRL into self at construction time (deferred to v0.3 caching work)' \u2014 but pre-parsing has already happened. The comment was not updated when the cache landed.\n\n## Why this matters\nStale comments mislead future maintainers. A reader who trusts this comment would believe the clone is structurally required (it is not) and skip the available perf improvement. The clone allocates a fresh Vec<RevokedCert> on every check_revocation call when a delta CRL is configured.\n\n## Severity\nP3 (idiom / opinion / minor perf):\n- Documentation accuracy is a code-review concern, not a correctness issue.\n- The clone bound is small (proportional to delta CRL size, typically tens of entries) and runs once per check call.\n- Touching this requires a coordinated lifetime refactor at both call sites in CrlChecker.\n\n## Fix options\n1. Minimal: update the comment to remove the 'caller-local' claim and document the actual reason for the clone (e.g., 'returning Option<&[RevokedCert]> would require restructuring both call sites; deferred as low-priority cleanup').\n2. Idiomatic: refactor the function to return Option<&[RevokedCert]>, restructure call sites to consume the borrow before self.delta_crl goes out of scope. Avoids one clone per call. This is what the comment originally promised would be possible 'in v0.3 caching work' \u2014 that work has landed.\n\nEither is acceptable; the stale comment must not remain as-is.",
+  "ephemeral": 0,
+  "id": "PKIX-h8bf",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: stale 'structural clone' comment in verify_delta_crl_and_collect after parse-once cache landed",
+  "updated_at": "2026-05-07T23:26:49Z"
+}

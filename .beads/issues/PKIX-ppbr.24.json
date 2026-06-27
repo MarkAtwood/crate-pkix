@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e69becf4bcb64a5bff1df7f6e0385576c0bb1172b2b9866f6deec05deae0ceef",
+  "created_at": "2026-05-14T17:43:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:38-41\n\n```rust\n/// Submission base URL of the log. RFC 6962 \u00a73 / \u00a74 paths\n/// (`ct/v1/add-chain`, `ct/v1/get-proof-by-hash`, etc.) are\n/// resolved relative to this URL.\npub url: String,\n```\n\nThe field is typed as `String`. The doc says it's a URL but provides\nno guarantee that:\n\n- It parses as a URL (could be `\"\"`, `\"not a url\"`, `\"http://[::1\"`).\n- It ends in a trailing `/` (RFC 6962 \u00a73 paths are resolved\n  relative; the canonical join behavior depends on the trailing\n  slash convention).\n- It uses `https` (a `http://` log endpoint is a downgrade\n  vulnerability if accepted by an online fetcher).\n\nToday, all values come from `CtLogList::from_google_log_list_json`\nwhich doesn't validate. A caller writing an online CT submission\nadapter has to re-validate every `log.url` defensively.\n\nRecommendation: keep the field public as `String` for `no_std`\ncompatibility (a `url::Url` newtype pulls in `url` dep, which is\nstd+alloc only and may not be welcome here). But add an accessor\n`CtLog::submission_url() -> Result<&str, Error>` that lazily\nvalidates structure (non-empty, parses-as-URL via a hand-rolled or\nfeature-gated check). Or document explicitly:\n\n> No guarantee is made that this string is a syntactically valid\n> URL. Callers feeding it to an HTTP client must validate the format\n> themselves.\n\nPriority P3; not a correctness bug, just a defensive-forcing concern.\n\nNote: `pkix-ct` is `no_std`, so a typed URL is awkward. Hand-rolled\nvalidation in a `#[cfg(feature = \"url-validation\")]` adapter is the\nlikely best compromise.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CtLog::url: String has no doc-stated URL invariant \u2014 caller must validate",
+  "updated_at": "2026-05-14T17:43:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:43:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

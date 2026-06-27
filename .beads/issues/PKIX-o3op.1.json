@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:29Z",
+  "compaction_level": 0,
+  "content_hash": "e82f20328c9fcff2c00239b2588ce91ebd252aa691bc20c7447aa5dcd528c5a9",
+  "created_at": "2026-05-14T19:26:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: pkix-aia compiled by a consumer on a modern stdlib (rustc 1.74+, very likely all consumers in practice). When the consumer constructs AiaError::IoFailure { kind: ErrorKind::HostUnreachable, ... } (or any other ErrorKind variant added to stdlib after the variants enumerated in label_for), serde_json::to_string emits \"kind\":\"Other\".\n\nThe label_for match table at pkix-aia/src/lib.rs:289-314 enumerates 20 ErrorKind variants (NotFound \u2026 Other). Every other variant \u2014 including HostUnreachable, NetworkUnreachable, NetworkDown, NotADirectory, IsADirectory, DirectoryNotEmpty, ReadOnlyFilesystem, FilesystemLoop, StaleNetworkFileHandle, StorageFull, NotSeekable, FilesystemQuotaExceeded, FileTooLarge, ResourceBusy, ExecutableFileBusy, Deadlock, CrossesDevices, TooManyLinks, InvalidFilename, ArgumentListTooLong, Uncategorized \u2014 falls through to the wildcard arm '_ => \"Other\"' on line 312.\n\nThe exact release in which each was stabilized varies (some in 1.83, some earlier in the io_error_more series). For the purposes of this finding the important fact is: each of them IS stable on a modern toolchain, the workspace MSRV floor is 1.73, and the helper claims at lines 251-253 to cover '1.74 expansions (InvalidFilename, ArgumentListTooLong, etc.)' but does not.\n\nBad behaviors:\n1. Information loss on the serialize side. The cache record loses the actual ErrorKind category and stores 'Other' instead.\n2. Collision on disk. Cache entries that should be distinct (HostUnreachable vs CrossesDevices vs Uncategorized) all collapse to 'Other'.\n3. Doc/impl mismatch. The rustdoc claims '1.74 expansions' coverage and 'stable across stdlib releases \u2014 variant names do not change' (lines 251-253, 268), but the code does not implement what the doc claims. A reader believes the cache preserves ErrorKind fidelity; the cache does not.\n4. Existing test 'label_round_trip_covers_recognized_variants' at lines 350-386 only exercises the 20 listed variants; it cannot catch this regression because it does not enumerate variants outside the table.\n\nFix options:\n(a) Extend the table to enumerate every ErrorKind stable as of the workspace MSRV (1.73). This bakes in a maintenance commitment to update the table with each stdlib release that adds variants.\n(b) Use format!(\"{kind:?}\") in serialize. The Debug impl for ErrorKind emits the variant name and is documented as stable in std. Deserialize keeps the explicit table as a normalization step and resolves unknown labels to Other. This is what the rustdoc comment at line 266-270 ALREADY CLAIMS the implementation does, so it would bring impl in line with the existing comment.\n(c) Store the Debug-spelling String directly in the variant payload at construction time, dropping the table entirely.\n\nOption (b) is the smallest fix and matches the existing rustdoc. Option (a) is the existing approach extended; recurring tax.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "io_error_kind_serde::label_for silently drops 20+ stable ErrorKind variants",
+  "updated_at": "2026-06-04T19:32:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:26:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

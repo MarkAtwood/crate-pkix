@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:48:19Z",
+  "id": "019e1e29-8929-7c80-9cf4-5f81619a6349",
+  "issue_id": "PKIX-jy95.8",
+  "text": "DESIGN NOTE 2026-05-12 (related to PKIX-jy95.1 = A2): the per-check + runtime-enumerated pattern adopted for pkix-zlint-bridge is the natural template for pkix-pkilint-bridge too. pkilint's lint organization is module-based (cabf_serverauth, cabf_smime, etsi, common, etc.) with individual checks within each module -- different organization than zlint's flat catalog, but the same architectural fit:\n\n- enumerate_lints() runs pkilint listing (verify CLI flag; pkilint may need a 'list' subcommand or expose this differently) and returns per-check metadata\n- run_on_cert() spawns pkilint, feeds the cert, parses verdicts for all applicable checks; caches per-cert result\n\nCAVEAT: this is a TENTATIVE design note, not a formal decision. pkilint's CLI / output format may not support the enumerate pattern out of the box. If pkilint can only run all-its-checks (no enumeration without invocation), then enumerate_lints() may need to spawn pkilint on a dummy cert to learn the catalog -- ugly but workable. Implementation-time decision; not a maintainer-decision-gate.\n\nIf pkilint's organization doesn't fit the per-check pattern (e.g., it groups checks in ways that resist individual addressing), the bridge can fall back to per-module Lint instances -- still finer-grained than pure umbrella. Decision deferred to implementation time."
+}

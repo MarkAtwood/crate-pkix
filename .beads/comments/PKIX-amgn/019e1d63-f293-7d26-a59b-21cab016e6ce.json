@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:12:30Z",
+  "id": "019e1d63-f293-7d26-a59b-21cab016e6ce",
+  "issue_id": "PKIX-amgn",
+  "text": "Epic auto-closed 2026-05-12 as a side effect of PKIX-amgn.8 closing as WONTFIX (last open child). The framework-not-policy realignment work itself is complete: pkix-profiles + pkix-lint stripped of CA/B Forum content; pkix-profiles-cabf + pkix-lint-cabf created as 'reference, not authoritative' reference crates. The zlint-vendoring goal (PKIX-amgn.8) was the only remaining work item and was abandoned per Mark's PKIX-apmt decision -- see .8 closing comment. Future pkix-lint-cabf content will be hand-authored."
+}

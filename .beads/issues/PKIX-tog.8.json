@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:22:49Z",
+  "compaction_level": 0,
+  "content_hash": "096b9acbf04c0e7b412e051a4aca6861debe1903a4165f7ab2915bea203e51f1",
+  "created_at": "2026-05-06T23:19:57Z",
+  "created_by": "Mark Atwood",
+  "description": "When issuer.subject != cert.issuer (line 102) or anchor.subject != cert.issuer (line 228), returns Err(OcspSignatureInvalid) though no signature was attempted. Misleads callers into looking for algorithm/key mismatch. Fix: return Err(Error::OcspCertIdMismatch) or add OcspIssuerMismatch variant. File: pkix-revocation/src/ocsp.rs lines 102, 228.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.8",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ocsp: issuer DN mismatch returns OcspSignatureInvalid",
+  "updated_at": "2026-05-06T23:22:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:19:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

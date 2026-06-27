@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "implemented check_algorithm: checks outer==inner OID per RFC 5280 \u00a74.1.1.2 and OID against ALLOWED_SIG_ALGS whitelist",
+  "closed_at": "2026-05-02T06:32:58Z",
+  "compaction_level": 0,
+  "content_hash": "d8e428e48bf17d9b7b06478a30092480ebba6e68baf6434b2a241b5a39e46141",
+  "created_at": "2026-05-02T05:53:46Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement check_algorithm() in pkix-chain-simple/src/lib.rs (currently todo!() at line 321).\n\nBLOCKED BY: PKIX-cfh (API fixes must be complete; in particular the SignatureVerifier return type fix from PKIX-q13 since this crate interacts with that layer).\n\nWhat to implement:\n  1. Compare cert.signature_algorithm.oid against ALLOWED_SIG_ALGS constant.\n     Return Error::AlgorithmNotAllowed { index } if not found.\n  \n  2. Verify outer signatureAlgorithm == inner TBSCertificate.signature per RFC 5280 \u00a74.1.1.2.\n     x509-cert exposes: cert.signature_algorithm (outer) and cert.tbs_certificate.signature (inner).\n     These must be equal: same OID, same parameters.\n     A mismatch is a sign of certificate tampering and must be rejected.\n     Return Error::AlgorithmNotAllowed { index } on mismatch (or a dedicated variant \u2014 decide and document).\n\nNote: the algorithm check is applied to every cert in the chain including intermediates, because the simplicity contract requires a uniform algorithm profile throughout the chain. A mixed-algorithm chain (RSA leaf, ECDSA intermediate) is not considered 'simple'.",
+  "ephemeral": 0,
+  "id": "PKIX-9f7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: implement check_algorithm",
+  "updated_at": "2026-05-02T06:32:58Z"
+}

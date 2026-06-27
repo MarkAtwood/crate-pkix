@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:03:59Z",
+  "compaction_level": 0,
+  "content_hash": "7a2c34f708cf8755fd701a66fa4a6517ebae385cb3a51c5a75d94db92b396c4f",
+  "created_at": "2026-05-06T20:48:11Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-profiles/src/lib.rs lines 163-164 have a comment that says '2026-03-15T00:00:00Z = 1_742_000_000 (approx). Use 1_741_996_800 exactly.' but 1_741_996_800 is 2025-03-15T00:00:00Z (verified: python3 calendar.timegm((2025,3,15,0,0,0,0,0,0)) = 1741996800). The actual constant SC081_200D_EPOCH = 1_773_532_800 is correct. The comment is wrong \u2014 it describes a different year. The code constant and the sc081_validity_cap() function doc comment are both correct. Fix: remove the incorrect inline comment at WebPkiProfile::policy() or correct it to read '2026-03-15T00:00:00Z = 1_773_532_800'. Severity: P3 (doc/comment bug; code is correct).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: WebPkiProfile comment has wrong 2025-03-15 epoch for SC-081",
+  "updated_at": "2026-05-06T21:03:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

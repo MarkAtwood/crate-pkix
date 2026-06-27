@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1be03ac52db1f134fd96aeb09b9d12af6555d4dcb6fea64a9aea72627f6e989b",
+  "created_at": "2026-05-11T04:44:53Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 3 of 6. Two trust anchors with the same\nissuer/subject DN but different SPKIs. The pool builds a chain whose\nterminal cert is signed by one of the two keys. The builder must pick the\nright anchor (matching SPKI) and not fail just because two anchors share a DN.\n\n## What\n\nPool topology:\n\n```\nTwinAnchorA  (subject=\"CN=Twin Root\", SPKI=keyA, self-signed with keyA)\nTwinAnchorB  (subject=\"CN=Twin Root\", SPKI=keyB, self-signed with keyB)\nTwinIntermediate (issuer=\"CN=Twin Root\", signed with keyA,\n                  subject=\"CN=Twin Intermediate\", AKI=keyA-SKI)\nTwinEE       (signed by TwinIntermediate)\n```\n\nBuild steps:\n\n1. Generator issues two TA certs with identical subject DN, different keys.\n   Plus one intermediate signed by keyA, plus EE.\n2. Test (`tests/ta_collision.rs`):\n   - Anchor list: `[TwinAnchorA, TwinAnchorB]`.\n   - Pool: `[TwinIntermediate]`.\n   - `build_path(&ee, &pool, &anchors)` must succeed.\n   - `validate_path(&chain, &anchors, ...)` must succeed and the verifier\n     must accept the keyA anchor (NOT keyB) \u2014 confirm by introspecting\n     anchor SPKI bytes against the path-chain[1] AKI.\n3. Negative: a variant where TwinIntermediate is signed by keyA but `AKI`\n   is missing. Pool builder should still find a path (tries both anchors\n   and one verifies), then `validate_path` succeeds. Document this lenient\n   behaviour in the test.\n\n## Acceptance\n\n- [ ] Four DER fixtures committed.\n- [ ] Generation reproducible via `generate.sh`.\n- [ ] Two integration tests: one with AKI guidance, one without.\n\n## Depends on\n\nPKIX-xj81.1 (shared generator + helpers).",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: trust-anchor name-collision fixture+test",
+  "updated_at": "2026-05-11T04:44:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:44:53Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:29Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-z1w",
+  "title": "Implement RFC 6125 hostname binding in pkix-identity + verify_tls_server",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:58:26Z",
+  "updated_at": "2026-06-15T17:58:26Z",
+  "closed_at": "2026-06-15T17:58:26Z"
+}

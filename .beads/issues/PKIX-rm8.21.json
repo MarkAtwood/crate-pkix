@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.21",
+  "title": "CertPool has no upper bound on pool size",
+  "description": "CertPool (pkix-path-builder/src/lib.rs) accepts an unbounded number of certificates via add() and FromIterator/Extend. The DFS path builder operates on this pool with a node-visit budget (DEFAULT_DFS_BUDGET = 10,000) that bounds CPU, but the memory consumed by the pool itself has no cap. An adversarial input (e.g., a CMS SignedData.certificates bag containing millions of valid Certificate values) can force unbounded heap allocation before the path builder ever runs.\n\nWhat goes wrong (availability): Memory exhaustion / OOM before the DFS budget check is reached. The budget guards CPU time, not memory.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-path-builder/src/lib.rs lines 90-131 (CertPool::add, FromIterator, Extend)\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 603 (supplied_chain.iter().cloned().collect() into CertPool in build_with_aia)\n\nSuggested fix: Add an optional max_certs field to PathBuilderConfig (default: something generous like 1000). CertPool::add / Extend / FromIterator could enforce a cap, or the builder functions could check pool.len() against config before proceeding. This is defense-in-depth -- callers controlling their own inputs are unaffected, but callers processing untrusted CMS bags get a bound.\n\nNote: the DFS budget already mitigates the CPU side of adversarial pools. This finding is specifically about the memory side.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "bug",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:56Z",
+  "updated_at": "2026-06-15T17:07:39Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:55"
+    }
+  ]
+}

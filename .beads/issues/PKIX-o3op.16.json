@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e2a97e051ece6c70c42c360a7f53cb4ed514b918d6424b5fd2bc0ae7e34c8b09",
+  "created_at": "2026-05-14T19:29:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Why this choice is correct: pkix-aia/src/lib.rs:664-668 contains:\n\nconst _: fn() = || {\n    fn _assert_send_sync<T: Send + Sync>() {}\n    _assert_send_sync::<AiaError>();\n    _assert_send_sync::<NoAiaFetcher>();\n};\n\nThis compile-time assertion catches any future field addition that would break the Send+Sync invariant \u2014 a raw pointer, an Rc<T>, a non-Send handle. It costs zero at runtime, costs nothing in the public surface (the const _ is private), and fails fast at the build that introduces the regression rather than at a downstream consumer's load-test.\n\nA future contributor might suggest removing it ('Send+Sync is auto-derived; this is redundant'). Reject: the assertion is precisely for the case where a future field SILENTLY breaks the auto-derive. The const _ trick is the workspace-standard pattern (per memory send-sync-invariant-in-pkix-workspace-pkix-2l0v); it should be preserved here and mirrored in every result/error type the workspace ships.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.16",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Decision: Send+Sync compile-time assertion via const _ trick",
+  "updated_at": "2026-05-14T19:29:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

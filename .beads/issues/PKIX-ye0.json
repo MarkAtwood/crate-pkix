@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "IssuerDnExact + SerialRange scopes; serial_lex_ge/le; 11 new tests; 60 total pass",
+  "closed_at": "2026-05-06T19:59:49Z",
+  "compaction_level": 0,
+  "content_hash": "d8c3df4cdb68b2ac92086f4b187de3bf31eaeea483d1244870c048f24f2795a5",
+  "created_at": "2026-05-06T19:50:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Add two new scope variants: IssuerDnExact(String) \u2014 RFC 4518-normalized DN match using pkix_path::names_match semantics \u2014 and SerialRange { issuer_dn: String, start: Vec<u8>, end: Vec<u8> } for scoping deviations to a specific issuance batch from a CA. Both are additive (non-breaking). Existing Any and IssuerDnContains are unchanged.",
+  "ephemeral": 0,
+  "id": "PKIX-ye0",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: DeviationScope::SerialRange and IssuerDnExact",
+  "updated_at": "2026-05-06T19:59:49Z"
+}

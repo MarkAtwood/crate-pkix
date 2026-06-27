@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T060707Z-154326",
+  "close_reason": "Wrote OSCAL.md at workspace root. Documents: pinned OSCAL v1.2.2; in-scope models (Catalog, Profile, Assessment Results, Finding, Observation, Risk) with concrete Rust-type \u2192 OSCAL-element mappings for current pkix-lint types (Lint, LintProfile, EvaluationReport, Finding, Deviation/DeviationStore, DeviatedFinding); passthrough (Assessment Plan stub); out-of-scope (Component Definition, SSP, Mapping, Rego); deferred (POA&M); inherited non-negotiables from PKIX-ztmr; cross-refs to PKIX-9vnx.2-.7 and the amgn epic. Foundation laid for PKIX-9vnx.2 (binding choice).",
+  "closed_at": "2026-05-11T06:10:16Z",
+  "compaction_level": 0,
+  "content_hash": "0a16706325338e09a16eda2aecb0f3c63019fdc8b52e917bf7ea988686619c06",
+  "created_at": "2026-05-11T05:52:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nBefore writing code, settle which OSCAL models the workspace touches and which it explicitly does NOT. This bounds the scope of the alignment and informs the binding-choice decision in PKIX-9vnx.2.\n\n## What\n\nDocument, in a checked-in `OSCAL.md` or similar (in the workspace root or pkix-lint/), the OSCAL model touch surface:\n\n**Models we DO use:**\n\n- Catalog (lint rule definitions \u2014 pkix-lint authors PKIX-domain Catalogs)\n- Profile (lint bundle composition \u2014 `cabf.br.tls` as a Profile selecting from Catalogs)\n- Assessment Results (lint execution outputs)\n- Finding (per-finding records inside Assessment Results)\n- Observation (raw evidence underlying a Finding)\n- Risk (with status=deviation-approved \u2014 replaces bespoke Deviation)\n\n**Models we minimally touch / pass-through:**\n\n- Assessment Plan (referenced from Assessment Results' `import-ap`; we emit a minimal stub or accept caller-supplied reference)\n\n**Models we DO NOT use:**\n\n- Component Definition (system-component-implements-control mapping \u2014 out of scope; we're a validator, not a system inventory)\n- System Security Plan (full system documentation \u2014 out of scope)\n- POA&M (plan of action \u2014 may revisit if there's downstream demand)\n\n## Acceptance\n\n- [ ] Document committed to repo with the breakdown above plus per-model rationale.\n- [ ] Cross-references to NIST OSCAL model JSON Schema versions targeted (pin to a specific OSCAL release, e.g. v1.1.2).\n- [ ] Foundation for PKIX-9vnx.2 (binding choice) \u2014 i.e., the audit tells us how much of OSCAL the binding needs to cover.\n\n## Out of scope\n\n- Actually implementing the bindings or types \u2014 that's .2 and onward.\n\n## Depends on\n\nNone (audit is the entry point).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL model coverage audit: which models we use, which Rust types map to each",
+  "updated_at": "2026-05-11T06:10:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:52:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:54:04Z",
+  "compaction_level": 0,
+  "content_hash": "7ed22c716b66e175a2ae02ed7bec16efdde382e2c088370884900280d2c60abc",
+  "created_at": "2026-05-08T23:29:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nParent acceptance criterion: 'Cache keys are correct (CRL: (issuer, distribution point); OCSP: (cert serial, issuer key hash, responder URL)).'\n\nReal consumers refetch the same CRL/OCSP response many times within a short window; without caching, each path validation re-pulls from the network.\n\n## What\n\nCache wrapper types that compose with `HttpCrlFetcher` and `HttpOcspFetcher`. Pluggable cache trait so consumers can swap the backing store (HashMap, moka, redis-backed, etc.).\n\nAPI shape (Shape D, decided 2026-05-11 \u2014 see `--design` and comment thread for rejected alternatives):\n\n```rust\npub trait RevocationCache: Send + Sync {\n    fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>>;\n    fn put_crl(&self, key: CrlCacheKey, entry: CachedCrl);\n    fn invalidate_crl(&self, key: &CrlCacheKey);\n\n    fn get_ocsp(&self, key: &OcspCacheKey) -> Option<Arc<CachedOcspResponse>>;\n    fn put_ocsp(&self, key: OcspCacheKey, entry: CachedOcspResponse);\n    fn invalidate_ocsp(&self, key: &OcspCacheKey);\n}\n\n#[derive(Clone, Debug, PartialEq, Eq, Hash)]\npub struct CrlCacheKey {\n    /// DN of the CRL issuer (cert issuer, OR cRLIssuer if indirect CRL).\n    pub issuer_dn_der: Vec<u8>,\n    /// CRL DP URI from the cert. `None` = \"the\" CRL for this issuer.\n    /// `Some(uri)` for partitioned / multiple-DP cases (RFC 5280 \u00a75).\n    pub distribution_point_uri: Option<String>,\n}\n\npub struct CachedCrl {\n    /// RFC 5280 \u00a75.2.3 monotonic version metadata \u2014 freshness comparator, NOT a key field.\n    pub crl_number: Option<Vec<u8>>,\n    pub this_update: SystemTime,\n    pub next_update: Option<SystemTime>,\n    pub bytes: Vec<u8>,\n}\n\n#[derive(Clone, Debug, PartialEq, Eq, Hash)]\npub struct OcspCacheKey {\n    pub cert_serial: Vec<u8>,\n    pub issuer_key_hash: Vec<u8>,\n    pub responder_url: String,\n}\n\npub struct CachedOcspResponse {\n    pub produced_at: SystemTime,\n    pub this_update: SystemTime,\n    pub next_update: Option<SystemTime>,\n    pub bytes: Vec<u8>,\n}\n\npub struct InMemoryCache { /* HashMap-based + RwLock or DashMap */ }\nimpl RevocationCache for InMemoryCache { /* ... */ }\n\npub struct CachedHttpCrlFetcher<F, V, C> { /* wrapper */ }\npub struct CachedHttpOcspFetcher<F, V, C> { /* wrapper */ }\n```\n\nFor CRL: extract CRLNumber + thisUpdate + nextUpdate from the parsed `CertificateList` (RFC 5280 \u00a75.2.3 / \u00a75.1.2.4 / \u00a75.1.2.5) and store in `CachedCrl`. TTL based on nextUpdate.\n\nFor OCSP: parse the response just enough to extract producedAt + thisUpdate + nextUpdate; cache until nextUpdate (or producedAt + a configurable max-age fallback when nextUpdate is absent).\n\n## Acceptance\n\n- [ ] `CrlCacheKey` keys by `(issuer_dn_der, distribution_point_uri)` \u2014 both known a-priori to the wrapper.\n- [ ] `OcspCacheKey` keys by `(cert_serial, issuer_key_hash, responder_url)` \u2014 all known a-priori to the wrapper.\n- [ ] `CachedCrl` carries `crl_number` as freshness metadata (NOT a key field).\n- [ ] `RevocationCache` trait is `Send + Sync`.\n- [ ] `invalidate_crl` / `invalidate_ocsp` exist for explicit cache busts.\n- [ ] `InMemoryCache` reference impl works.\n- [ ] `CachedHttpCrlFetcher` and `CachedHttpOcspFetcher` delegate to underlying fetchers on miss; serve from cache on hit.\n- [ ] TTL respected \u2014 expired entries return `None` from `get_*`.\n- [ ] `CachedHttpCrlFetcher` compares fetched CRLNumber against cached CRLNumber on refresh and rejects rollback (newer is monotonic).\n- [ ] Concurrent access safe (RwLock or DashMap).\n- [ ] Unit tests: hit, miss, expiry, concurrent insert, invalidate, partitioned-CRL (`Some(uri)`) keying.\n- [ ] Returns `Arc<CachedCrl>` / `Arc<CachedOcspResponse>` (not `Arc<Vec<u8>>`) so callers see freshness metadata without re-parsing.\n- [ ] No persistence layer (in-memory only; documented).\n\n## Out of scope\n\n- Disk persistence (consumer's job; trait is the extension point).\n- Cache size bounds (LRU/LFU eviction) \u2014 start with unbounded HashMap; consumer with a large fleet uses a moka-backed `RevocationCache` impl.\n- Async cache variant \u2014 sync only per PKIX-a1yc.10.\n- LDAP / file:// CRL distribution points \u2014 pkix-revocation-http is HTTP-only; non-HTTP fetchers will live in sibling crates and reuse the same trait.\n\n## Effort\n\n~250 lines + tests.\n\n## Depends on\n\nPKIX-a1yc.5 (HttpCrlFetcher), PKIX-a1yc.6 (HttpOcspFetcher).\n",
+  "design": "Shape D, decided 2026-05-11 by Mark. See the description for the full trait code and the comment thread for the rejected alternatives.\n\n## The key insight\n\nThe bead's original sketch put `CRLNumber` in the cache key. That's wrong for two independent reasons:\n\n1. **CRLNumber is unknown at lookup time.** The wrapper's `check_revocation` flow reads the cert's issuer DN and CRL DP URL, then asks the cache. It only learns CRLNumber after fetching and parsing the CRL. A pre-fetch lookup can't construct a `(issuer, crl_number)` key.\n2. **CRLNumber is a freshness comparator, not an identity.** RFC 5280 \u00a75.2.3 makes CRLNumber monotonic per CRL series. You never legitimately cache two CRLNumbers for the same series \u2014 you keep the newest. Therefore CRLNumber belongs on the value side as metadata, used to detect rollback on refresh.\n\nThe legitimate axis for partitioning CRLs by one issuer is the **distribution point** (RFC 5280 \u00a75 \u2014 partitioned by reason, scope, or indirect cRLIssuer). The DP URI is known a-priori from the cert's CRL DP extension, so it CAN be a key field.\n\n## Decided trait surface\n\n- CRL key: `(issuer_dn_der: Vec<u8>, distribution_point_uri: Option<String>)`. `None` covers the common \"one CRL per issuer\" case; `Some(uri)` covers partitioning.\n- CRL value: `CachedCrl { crl_number, this_update, next_update, bytes }`.\n- OCSP key: `(cert_serial, issuer_key_hash, responder_url)` \u2014 unchanged from bead sketch; all components are known a-priori.\n- OCSP value: `CachedOcspResponse { produced_at, this_update, next_update, bytes }`.\n- Trait is `Send + Sync` \u2014 `RevocationCache` will be shared across validation threads.\n- `invalidate_crl` / `invalidate_ocsp` included for explicit cache busts (operator pulls a CRL, or a cert is revoked between scheduled refreshes).\n- Return type is `Arc<CachedCrl>` / `Arc<CachedOcspResponse>` (not `Arc<Vec<u8>>`) so callers can compare freshness without re-parsing bytes.\n\n## Rejected alternatives\n\n- **A** \u2014 issuer-DN-only key, CRLNumber as metadata. Clean but paints us into a corner if anyone shows up with a partitioned CRL.\n- **B** \u2014 `(issuer, crl_number)` key + separate `get_crl_any_for_issuer` scan method. Two read paths; the scan method is the only one anyone actually calls from the wrapper. Smell.\n- **C** \u2014 store each entry under both `(issuer, None)` AND `(issuer, Some(N))`. Double-writes per entry signal the abstraction is wrong; the `(issuer, None)` row is a hidden alias.\n\n## Deferred to impl (not trait surface)\n\n- Whether `InMemoryCache` uses `RwLock<HashMap>` or `DashMap` \u2014 impl choice, no trait impact.\n- Whether `CachedHttpCrlFetcher` compares fetched CRLNumber to cached CRLNumber to detect rollback \u2014 yes, but that's wrapper logic, not trait surface.\n- Eviction policy \u2014 out of scope; consumers needing it bring a backend that does it.\n\n## Anchors\n\n- Sync-only per PKIX-a1yc.10 (parallel `AsyncRevocationFetcher` lives in pkix-revocation-http; cache stays sync).\n- Trait is part of the public API of `pkix-revocation-http` and version-binding once published.\n",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "In-memory cache layer for fetched CRLs and OCSP responses",
+  "updated_at": "2026-05-11T07:54:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:29:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

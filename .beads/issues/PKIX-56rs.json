@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:22:08Z",
+  "compaction_level": 0,
+  "content_hash": "d32a16da0adb9bdb6400ce9e184cda7e22d0b0fe163246fc654d2358b893acf2",
+  "created_at": "2026-05-07T15:19:05Z",
+  "created_by": "Mark Atwood",
+  "description": "prune_policy_tree (lib.rs:1071) has two consecutive break conditions: 'if d == 0 { break; }' followed immediately by 'if prune_depth == 0 { break; }' where prune_depth = d - 1. The first check 'd == 0' is unreachable because d starts at cert_depth (always >=1 when this function is called meaningfully) and the second check catches the actual boundary case (d==1 \u2192 prune_depth==0). The d==0 guard is dead code. Remove the unreachable 'd == 0' guard to clarify the invariant.",
+  "ephemeral": 0,
+  "id": "PKIX-56rs",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: prune_policy_tree loop has redundant break condition",
+  "updated_at": "2026-05-07T15:22:08Z"
+}

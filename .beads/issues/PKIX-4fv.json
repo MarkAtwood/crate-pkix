@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:50:18Z",
+  "compaction_level": 0,
+  "content_hash": "d01e0507f65f667d5d41627bcfe0ecabac8c6f0de9588fb52e1c5ce624ecb3dc",
+  "created_at": "2026-05-06T21:47:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs: The 'search for serial number in delta then base' pattern (~27 lines) at lines 322-349 is repeated nearly verbatim at lines 432-456.\n\nExtract: fn lookup_serial(cert_serial, delta_entries, crl) -> Result<()>",
+  "ephemeral": 0,
+  "id": "PKIX-4fv",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M6: CRL serial-number lookup block duplicated between check_revocation and check_revocation_against_anchor",
+  "updated_at": "2026-05-06T21:50:18Z"
+}

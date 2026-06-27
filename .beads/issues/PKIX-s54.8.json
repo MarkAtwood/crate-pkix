@@ -1,0 +1,31 @@
+{
+  "close_reason": "fixed: inline step letters now (f)(g)(h)(i) matching chain_walk doc header",
+  "closed_at": "2026-05-03T13:37:53Z",
+  "compaction_level": 0,
+  "content_hash": "9f41a479dff0582f846315f0aafcae595276ee626c502d01aed3d80dcafbefec",
+  "created_at": "2026-05-03T13:32:23Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk docstring labels steps (e)-(i). Inside the loop, BasicConstraints is labelled (e) and KeyUsage labelled (f) in inline comments, but per the outer list these are (f) and (g). Maintenance consequence: contributors cross-referencing RFC 5280 steps against code will follow wrong labels, risking misplaced future checks.",
+  "ephemeral": 0,
+  "id": "PKIX-s54.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk step labels mismatch RFC walk list",
+  "updated_at": "2026-05-03T13:37:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:32:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

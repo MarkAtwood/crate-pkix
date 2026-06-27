@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision records, no code change needed",
+  "closed_at": "2026-05-02T14:49:16Z",
+  "compaction_level": 0,
+  "content_hash": "43ea60da4dd4fd3e5bc8b75173464bada6fb4e2ae491ed790f7d6690fcc2fccd",
+  "created_at": "2026-05-02T14:39:30Z",
+  "created_by": "Mark Atwood",
+  "description": "NormalizedIter implements RFC 4518 whitespace/case normalization as an iterator without allocating. The pending_space state machine is non-obvious but well-tested and necessary for no_std. A contributor may suggest replacing it with a simpler Vec-based implementation. Don't: the allocation is forbidden in no_std paths.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter: allocation-free RFC 4518 normalization is worth keeping",
+  "updated_at": "2026-05-02T14:49:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:39:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

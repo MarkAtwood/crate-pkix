@@ -1,0 +1,22 @@
+{
+  "close_reason": "Review loop complete. All 38 findings triaged: 16 fixed, 14 closed as false alarms/design decisions, 8 deferred or opinion-level.",
+  "closed_at": "2026-05-05T16:12:01Z",
+  "compaction_level": 0,
+  "content_hash": "3f48b6205e03ebcab541b258540ca46b6c51c3f4099ac07596a2e086faa80157",
+  "created_at": "2026-05-05T15:43:12Z",
+  "created_by": "Mark Atwood",
+  "description": "Pre-merge review of the three commits from the last 24 hours: dcdc963 (NameConstraints hardening), 3f922ad (path builder, policy scaffolding, CRL OIDs), 6276e4e (policy state machine, delta CRL, IDP). Files in scope: pkix-path/src/lib.rs, pkix-path-builder/src/lib.rs, pkix-revocation/src/crl.rs, pkix-revocation/src/lib.rs, and their tests.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review loop: last 24h work (NameConstraints + policy + path-builder + delta CRL)",
+  "updated_at": "2026-05-05T16:12:01Z"
+}

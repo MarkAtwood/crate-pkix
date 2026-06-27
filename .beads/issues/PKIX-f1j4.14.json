@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ff0bce1e81505e043c425b72d838bd1d500bdcd4fc3c01130b3ed20e0c1befc7",
+  "created_at": "2026-05-14T18:58:21Z",
+  "created_by": "Mark Atwood",
+  "description": "src/crl.rs:73 / src/ocsp.rs:79 / src/async_crl.rs:55 / src/async_ocsp.rs:58: `let mut failures: Vec<String> = Vec::with_capacity(urls.len());` is allocated unconditionally. When the first URL succeeds (the common case for well-configured certs with one CDP), the Vec is allocated and never written to.\n\nCost: one allocation per check_revocation. Tiny (~24 bytes for the Vec header + a few cap-len heap bytes). At 1M revocation checks/day on a large TLS server, this is 24 MB of churn \u2014 well under noise threshold.\n\nMitigation: lazy allocation \u2014 only construct the Vec when we have a failure to record. This is the standard 'don't pay for the failure path on the success path' pattern.\n\nMinor. Flagged so a future profiler-driven sweep finds it and prevents the next reviewer from re-discovering.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Async ocsp.rs/crl.rs: failures Vec allocated even when first URL succeeds",
+  "updated_at": "2026-05-14T18:58:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:58:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

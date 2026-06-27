@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T01:16:04Z",
+  "compaction_level": 0,
+  "content_hash": "659d07ce8a07f3d840ea5577a5fb13a3298166e9e316c32d096c15f5102b67b3",
+  "created_at": "2026-05-12T00:11:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nbettertls::pathbuilding::tc60 diagnosis (see PKIX-lwr9.4 comment of 2026-05-11): pkix-path-builder correctly enumerates 4 candidate chains via build_path_candidates. The first DFS-order candidate uses SHA-1 ECDSA intermediates (rejected by DefaultVerifier per project policy). A valid SHA-256-only path exists at candidate position N>0. The pkix-difftest limbo loader calls build_path() (single-shot wrapper returning only the first candidate), so it never sees the valid alternatives.\n\nThis is the same pattern PKIX-t0w4 fixed on the PKITS side.\n\n## What\n\n1. In the pkix-difftest limbo loader (path TBD by implementor; grep for build_path callsites), replace the single-shot build_path() call with an iteration over build_path_candidates that tries each via validate_path until one returns Ok or the iterator is exhausted.\n2. Re-run the limbo baseline (cargo test -p pkix-difftest --test limbo or equivalent).\n3. tc60 should flip from StricterThanWild(Fail) to Agreement(Pass).\n4. Confirm no regression on other limbo cases.\n\n## Acceptance\n\n- [ ] limbo loader iterates build_path_candidates and selects first valid chain.\n- [ ] tc60 flips to Agreement in baseline-limbo.json.\n- [ ] StricterThanWild count drops by 1 (26 -> 25 or fewer).\n- [ ] No regression on PKITS or other limbo cases.\n- [ ] baseline-limbo-analysis.md updated to reflect new counts.\n\n## Out of scope\n\n- The build_first_valid_path<V> helper API in pkix-path-builder (filed as PKIX-lwr9.4.2).\n- The other 6 residual bettertls::pathbuilding::* cases (gt_agreement=true; pkix-path correctly stricter).\n\n## Filed by\n\nSplit from PKIX-lwr9.4 after Mark chose 'both' (harness fix + helper API) 2026-05-11.",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.4.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: limbo loader iterates build_path_candidates when validate_path fails",
+  "updated_at": "2026-05-12T01:16:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:11:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

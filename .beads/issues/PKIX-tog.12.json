@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:27:59Z",
+  "compaction_level": 0,
+  "content_hash": "f154c49a172aba2ad9d0fe9b1a841e5946ba13f41339677828e4e62185e73004",
+  "created_at": "2026-05-06T23:20:14Z",
+  "created_by": "Mark Atwood",
+  "description": "rsa_modulus_byte_len calls der_peel_tlv then der_tlv_value_len on the same input \u2014 both parse the same tag+length bytes. The first call's only purpose is validation, but der_tlv_value_len already returns None on tag mismatch. Remove the der_peel_tlv call entirely. File: pkix-lint/src/cabf_tls_br.rs lines 271-279.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.12",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cabf: rsa_modulus_byte_len parses INTEGER TLV twice",
+  "updated_at": "2026-05-06T23:27:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

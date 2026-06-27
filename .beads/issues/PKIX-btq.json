@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "pkix-lint crate complete: traits + 6 CABF TLS BR lints + LintProfile; workspace green",
+  "closed_at": "2026-05-06T19:10:54Z",
+  "compaction_level": 0,
+  "content_hash": "4b3c386afe85b1d053070af819aa730ff3a1418e1bffd5b037712fe23b5d068f",
+  "created_at": "2026-05-06T18:44:25Z",
+  "created_by": "Mark Atwood",
+  "description": "Everything is currently hard pass/fail: Result<ValidatedPath, Error>. There is no Warning, no advisory, no structured 'this cert would fail under profile X'. This means a profile cannot express 'this cert is technically valid per RFC 5280 but violates CABF BR \u00a77.1.4.2' without throwing a hard error that aborts the chain.\n\nA lint/diagnostic layer is needed for:\n- Profile enforcement that distinguishes Error (reject) from Warn (log, don't reject)\n- Compliance checking tools (would this cert pass issuance checks?)\n- Audit trails (which rules were evaluated, which passed/warned/failed)\n- Cross-profile contradiction surfacing (Profile A says X, Profile B says not-X)\n\nDesign requirements (informed by zlint lessons):\n- Lint is the unit, Profile is a bundle of lints\n- Each lint has: stable ID, citation (spec + version + section), severity, scope (cert vs path), subject kind (CA/subscriber/etc), effective TimeRange\n- LintResult: Pass | NotApplicable | Warn(detail) | Error(detail) | Fatal(detail)\n- Path-level lints receive the full ValidatedPath + policy tree, not just a single cert\n- Runner takes a SystemTime for temporality \u2014 'evaluate as of issuance time' vs 'evaluate now'\n- Finding IDs must be stable across crate versions (treat as public API)\n\nThis is a significant new API surface. Scope for v0.2: define the traits and the runner; ship CABF TLS BR lints as the reference implementation. Defer FPKI/DoD/ETSI lint bundles to v0.3.\n\nNew crate: pkix-lint (engine + traits). pkix-profiles gains lint impls alongside the existing ValidationPolicy factories.",
+  "ephemeral": 0,
+  "id": "PKIX-btq",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix: add lint/diagnostic layer \u2014 structured soft-fail and advisory results",
+  "updated_at": "2026-05-06T19:10:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T11:48:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8c6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

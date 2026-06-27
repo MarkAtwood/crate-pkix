@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c6b32c2ea3b33caa89663d879b62170c8319ae11ab188877e807e60ba32dcbb3",
+  "created_at": "2026-05-14T17:46:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:106-117\n\n```rust\nfn tls_alg_to_x509_oid(hash_alg: u8, sig_alg: u8) -> Option<ObjectIdentifier>\n```\n\nThe set of (hash_alg, sig_alg) pairs `pkix-ct` will accept is\nhardcoded in this private function. A caller wanting to know,\nbefore they fetch an SCT, \"is the algorithm pair (h, s) supported?\"\nhas only three options:\n\n1. Read the rustdoc table in the module-level comment (which is\n   informational, not authoritative \u2014 the implementation could\n   diverge).\n2. Construct a synthetic SCT with the algorithm pair, call\n   `verify_*`, and inspect for `Error::UnsupportedSignatureAlgorithm`.\n3. Pin to a specific pkix-ct version that they've reviewed.\n\nThis information ought to be a contract clause. Either:\n\n- Make `tls_alg_to_x509_oid` `pub fn` (rename to\n  `pub fn supported_signature_oid` to emphasize it's a public\n  interface), OR\n- Expose a `pub const SUPPORTED_TLS_ALGORITHMS: &[(u8, u8)] =\n  &[(4, 3), (5, 3), (4, 1), (5, 1), (6, 1)];`, OR\n- Expose an iterator `pub fn supported_algorithms() ->\n  impl Iterator<Item = (u8, u8)>`.\n\nThis matters for:\n\n- Caller setup code that wants to declare its capabilities to a CT\n  log monitor (e.g. an upstream component asks \"which algorithms\n  can your verifier handle? we'll filter our SCT stream\").\n- Conformance test tooling that wants to exercise every supported\n  algorithm.\n\nPriority P3 because the workaround (trust the rustdoc) works for\ncareful callers, but a programmatic check is what a downstream\nlibrary author would want.\n\nAlso: `pkix-path::SignatureVerifier` exposes a similar contract; if\n`pkix-ct` exposes its own table, the two need to remain in sync.\nPKIX-ppbr.12 (algorithm dispatch via pkix-path) is the structural\nfix for this \u2014 once both crates share a single source of truth, the\ntable here vanishes. So priority P3 also because PKIX-ppbr.12 is\nthe better long-term answer.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "tls_alg_to_x509_oid is private \u2014 caller cannot enumerate supported (hash_alg, sig_alg) without trial-and-error",
+  "updated_at": "2026-05-14T17:46:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:46:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

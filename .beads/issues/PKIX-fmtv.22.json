@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T04:54:30Z",
+  "compaction_level": 0,
+  "content_hash": "38910f6b9442b7f5826609862a0d6bf6024e9285caa4be8216b9023b1ba18d36",
+  "created_at": "2026-05-13T04:39:15Z",
+  "created_by": "Mark Atwood",
+  "description": "Build a curated test corpus exercising RFC 6125 hostname binding through `verify_tls_server` (and `verify_tls_client_dns` once shipped per PKIX-fmtv.11.2 client-half).\n\n**Created 2026-05-12** as part of PKIX-fmtv.17's rescope decision (Mark, attended session). Supersedes the \"PKITS through verify_tls_server\" half of .17 \u2014 PKITS leaves lack SAN and EKU, so PKITS regression at the wrapper layer is structurally infeasible without re-issuing every leaf. Wrapper-level differential testing requires a SAN-bearing curated corpus.\n\n## Coverage\n\n**RFC 6125 \u00a76.4.1 \u2014 exact-match dNSName SANs**\n- positive: SAN `foo.example.com`, hostname `foo.example.com`\n- negative: SAN `bar.example.com`, hostname `foo.example.com`\n\n**RFC 6125 \u00a76.4.2 \u2014 wildcard matching**\n- positive: SAN `*.example.com`, hostname `foo.example.com`\n- negative: SAN `*.example.com`, hostname `example.com` (wildcard does not match parent)\n- negative: SAN `*.example.com`, hostname `foo.bar.example.com` (wildcards match single label only)\n- negative: SAN `f*o.example.com`, hostname `foo.example.com` (partial-label wildcards reject per RFC 6125 \u00a77.2)\n\n**RFC 6125 \u00a76.4.3 \u2014 leftmost-label-only wildcard pinning**\n- negative: SAN `foo.*.example.com`, hostname `foo.bar.example.com`\n\n**IDN / Punycode (RFC 5891)**\n- positive: A-label SAN `xn--bcher-kva.example` matching A-label hostname `xn--bcher-kva.example`\n- caller-side U-label normalization documented (wrapper expects pre-normalized ServerName::dns_name)\n\n**IP literal SANs (RFC 5280 \u00a74.2.1.6)**\n- positive: iPAddress SAN matches IP literal hostname\n- negative: iPAddress SAN mismatch\n- negative: malformed iPAddress extension\n\n**Case folding (RFC 4343)**\n- positive: SAN `FOO.example.com`, hostname `foo.example.com`\n\n**SAN-absent rejection (RFC 6125 \u00a76.4.4)**\n- negative: leaf with CN-only subject (no SAN extension), hostname `foo.example.com` MUST reject\n\n## Source\n\nx509-limbo's `webpki` test corpus has RFC 6125 cases. Pre-filter to RFC 6125-relevant cases; supplement with hand-curated cases for gaps (IDN, IP literal). x509-limbo is already pulled in by pkix-difftest, so consuming it doesn't add a new dependency.\n\n## Fixtures\n\nGenerate via the existing pyca/cryptography fixture-generation tooling in pkix-chain/tests/fixtures-tools/ (or wherever the current generation lives \u2014 leaf-tls-server.der etc. came from somewhere). Each fixture = leaf cert (with specified SAN) + chain + expected verdict + hostname-to-bind metadata.\n\nFixture metadata format: small TOML / JSON manifest alongside the .der files describing each case's hostname-to-bind and expected verdict. Loadable by the test harness.\n\n## Tests\n\nParameterized test driving the corpus. Each case:\n1. Load chain + anchors from fixture\n2. Parse hostname via `ServerName::dns_name(hostname)?`\n3. Call `verify_tls_server(chain, anchors, &server_name, &BasicTlsProfile, NOW, &NoRevocation)`\n4. Assert verdict matches expected\n\n## Acceptance\n\nPass-rate baseline tracked in pkix-chain/tests/hostname_corpus_baseline.md (or pkix-difftest baseline file if cross-crate).\n\n## Out of scope\n\n- Differential testing against OpenSSL / pyca \u2014 that's PKIX-fmtv.18 / .19 consuming this corpus.\n- verify_tls_client_dns coverage \u2014 uses the same corpus, but is gated on PKIX-fmtv.11.2's client half shipping first.\n- Mailbox / rfc822Name binding \u2014 that's PKIX-fmtv.21.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Curated RFC 6125 hostname corpus + verify_tls_server tests",
+  "updated_at": "2026-05-13T04:54:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T21:39:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

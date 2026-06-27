@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "73c95c8c5014486eff4a069b0a7d5c585d7e67a2ba1d3d86113533fe698e50b8",
+  "created_at": "2026-05-14T12:41:44Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: lib.rs:708-777. The trait carries four methods where two would suffice: spec_section_id (the new name), rfc_section_id (deprecated alias), spec_url (new name), rfc_url (deprecated alias). The deprecated aliases are independent default impls returning None, NOT shims that forward to the new methods. Doc explicitly warns 'calling the deprecated alias on a lint that overrides only spec_section_id returns None.' This means callers who do lint.rfc_section_id() on a forward-ported Lint impl get None even when the lint has a section id. The 'deprecated alias' is not an alias; it's a different method that happens to share documentation. Cleaner: either (a) implement rfc_section_id as a forwarding default (fn rfc_section_id() -> Option<&str> { self.spec_section_id() }), so old callers transparently get the new value; (b) remove the deprecated alias entirely now (we're pre-1.0 \u2014 semver permits it). Option (a) makes the deprecation actually useful as a migration mechanism. Option (b) lets us strip the dead surface. The current shape is worse than either.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "spec_section_id / rfc_section_id deprecated-alias pattern doubles the API surface for a soft rename",
+  "updated_at": "2026-05-14T12:41:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

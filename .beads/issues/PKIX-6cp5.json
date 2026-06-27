@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:22Z",
+  "compaction_level": 0,
+  "content_hash": "2da89b50419e2ef3de7561ae64dc1400b5848a6ea0af0ddcb348275ec372e106",
+  "created_at": "2026-06-04T18:08:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Skoll REVIEW MEDIUM-6 finding (PKIX-szmo.7 triage). In pkix-lint/src/deviation.rs around line 256, Deviation::new validates that justification and authorized_by are non-empty, but does not validate id or target_lint. An empty id creates a Deviation that cannot be looked up by ID. An empty target_lint creates a Deviation that silently matches no lint (inert but confusing). Fix: add non-emptiness checks for id and target_lint in Deviation::new, returning the existing DeviationAddError or a new validation error.",
+  "ephemeral": 0,
+  "id": "PKIX-6cp5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: Deviation::new allows empty id and target_lint",
+  "updated_at": "2026-06-15T18:51:22Z"
+}

@@ -1,0 +1,54 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "validate_path fully implemented with chain_walk, DefaultVerifier, all 17 tests passing",
+  "closed_at": "2026-05-02T07:08:59Z",
+  "compaction_level": 0,
+  "content_hash": "d095a8e9a5cfec553630e82e973ffbf7cfdbc3f24256a7e8a9e50382efde4fe4",
+  "created_at": "2026-05-02T05:51:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Wire PKIX-6vu (input guards), PKIX-yqb (trust anchor), PKIX-vxf (walk loop),\nand PKIX-gry (validity/ext/CA/pathLen) into the single public validate_path() function.\n\n## What\n\nvalidate_path<V>(chain, anchors, policy, verifier) -> Result<ValidatedPath>:\n  1. check_inputs(chain, anchors)?                     // PKIX-6vu\n  2. check_oid_consistency(chain)?                     // PKIX-6vu\n  3. let anchor_index = find_trust_anchor(...)?        // PKIX-yqb\n  4. initialize working_issuer_name, working_spki      \n  5. for i in (0..chain.len()).rev():                  // PKIX-vxf + PKIX-gry\n       verify_signature(...)?, names_match(...)?,\n       check_validity(...)?, check_critical_extensions(...)?,\n       [if intermediate: CA/pathLen/KeyUsage checks]\n  6. return Ok(ValidatedPath { anchor_index, depth: chain.len() - 1 })\n\n## Documentation fix\nAdd to ValidationPolicy::current_time_unix rustdoc:\n  '/// Warning: passing u64::MAX causes all notAfter checks to pass \u2014 treat as permissive mode.'\n\n## Tests\n- Happy-path 1-cert chain (self-signed leaf as anchor) -> Ok(ValidatedPath { anchor_index: 0, depth: 0 })\n- Happy-path 3-cert chain (leaf + intermediate + root) -> Ok(ValidatedPath { anchor_index: 0, depth: 2 })\n- Verify anchor_index is correct when anchors slice has multiple entries\n- Verify depth is chain.len() - 1\n\n## Depends on\nPKIX-6vu, PKIX-yqb, PKIX-vxf, PKIX-gry",
+  "ephemeral": 0,
+  "id": "PKIX-h6z",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "SECURITY REQUIREMENTS (from security surface analysis \u2014 all must be implemented in this bead):\n\n1. EMPTY CHAIN GUARD: validate_path must check chain.is_empty() as its FIRST action. Return Err(Error::NoTrustedPath) or add a new EmptyChain variant. A bare loop over 0..chain.len()-1 panics on empty chain in debug mode (usize underflow).\n\n2. ALGORITHM OUTER/INNER CONSISTENCY: RFC 5280 \u00a74.1.1.2 requires cert.signature_algorithm (outer) == cert.tbs_certificate.signature (inner). This check belongs in validate_path, not only in pkix-chain-simple. Check for every cert in the chain before calling the SignatureVerifier. Return Err(Error::SignatureInvalid { index }) on mismatch. Oracle: openssl verify rejects these certs.\n\n3. TRUST ANCHOR MATCHING MUST COMPARE SPKI, NOT ONLY NAME: find_trust_anchor must compare both subject name AND SubjectPublicKeyInfo against TrustAnchor fields. Name-only matching allows a self-signed leaf with the same subject name as a real anchor to spoof the trust anchor. After PKIX-o76, TrustAnchor holds subject + SPKI directly.\n\n4. CRITICAL NAMECONSTRAINTS MUST BE REJECTED IN V0.1: v0.1 scope is 'no NameConstraints enforcement' \u2014 but if a cert carries a CRITICAL NameConstraints extension (OID 2.5.29.30), it MUST be rejected via Error::UnhandledCriticalExtension. Silently ignoring a critical NameConstraints extension is a security vulnerability. The critical-extension guard (PKIX-ad6) must include NameConstraints in its 'reject if critical' list.\n\n5. PER-CERT pathLenConstraint ENFORCEMENT: state machine must track max_path_length dynamically per RFC 5280 \u00a76.1.4(l)(m). It is NOT sufficient to compare chain.len() against policy.max_path_len only. When a cert has pathLenConstraint present and less than current max_path_length, update max_path_length. Use checked/saturating arithmetic \u2014 never bare u8 decrement. A pathLenConstraint of 4294967295 (u32::MAX from x509-cert) must be handled without overflow when stored/compared as u8.\n\n6. u64::MAX TIME IS PERMISSIVE: now_unix = u64::MAX passes all notAfter checks. Add a note to the validity period check that this is a caller footgun; the implementation itself is correct (it follows the spec), but the docstring of ValidationPolicy::current_time_unix must warn about this.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: validate_path final assembly",
+  "updated_at": "2026-05-02T07:08:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:14:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-6vu",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gry",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vxf",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yqb",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

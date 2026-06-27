@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.2",
+  "title": "general_name_matches: DER re-encoding for non-DN comparison",
+  "description": "Location: pkix-revocation/src/crl.rs, general_name_matches() (line ~1308-1326)\n\nFor non-DirectoryName GeneralName variants (URI, dNSName, rfc822Name, iPAddress, registeredId, etc.), the function encodes BOTH sides to DER via .to_der() and compares the resulting byte vectors:\n\n  _ => match (a.to_der(), b.to_der()) {\n      (Ok(a_der), Ok(b_der)) => a_der == b_der,\n      _ => false,\n  }\n\nThis is correct but allocates two Vecs on every non-DN comparison. These types have cheap-to-compare inner values (e.g., Ia5StringRef for URIs/dNSName, OctetString for IP addresses) that could be compared structurally using derived PartialEq or by matching on the same variant and comparing inner values directly.\n\nWhat goes wrong: in the IDP/CDP distribution-point matching path (check_idp_dp_scope -> general_names_intersect), this is called O(m*n) times where m = |IDP names|, n = |CDP names|. Each call re-encodes both sides. For typical certs with 1-2 CDP entries this is negligible, but it is a hidden allocation in what reads like a comparison function.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:23:53Z",
+  "updated_at": "2026-06-15T17:30:27Z",
+  "closed_at": "2026-06-15T17:30:27Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:23:53"
+    }
+  ]
+}

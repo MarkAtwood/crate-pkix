@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "157f362ad1f40594ca6988a53171278244349847259b1bcc90904f912ba2908d",
+  "created_at": "2026-05-14T18:30:15Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/tests/fixtures/bettertls/README.md:98-102 instructs regenerating the baseline via `cargo test ... -- --nocapture | awk '/^\\{\\$/,/^\\}\\$/' > tests/fixtures/.../baseline-pkix-path.json`. This works today but is fragile: if any future test (or cargo test framework output) prints a line containing exactly `{` and later exactly `}`, the awk range filter slurps that too. Likewise, panic output (RUST_BACKTRACE=full prints brace-delimited lines) would corrupt the baseline. Cleaner alternatives: (1) write the discover output to a known file path inside the test (let the test do its own File::create), eliminating the pipeline entirely; (2) emit a unique start/end sentinel like `---BASELINE-BEGIN---` and `---BASELINE-END---`. Option 1 is simplest \u2014 the test prints \"wrote baseline to <path>\" instead of dumping to stdout, and the readme just says \"run with the env var set, then commit the file\". No interpreter pipeline, no fragility.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "discover-mode regeneration via awk is fragile \u2014 depends on no test producing { on a line by itself",
+  "updated_at": "2026-05-14T18:30:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

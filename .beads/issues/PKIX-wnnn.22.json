@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0ca8836cc4567c12a0226f8fd897193f9245902ee235e267af7b62320b196023",
+  "created_at": "2026-05-14T18:37:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:956-974 (`build_first_valid_path`) and lib.rs:987-1048 (`build_first_valid_path_with_config`). The rustdoc covers when to use it, what errors it returns, and what's out of scope (async, caching, promoting build_path) \u2014 but does **not** characterize the worst-case work the helper performs per call.\n\nThe complexity contract callers need is:\n\n- **Candidate iteration**: bounded by `PathBuilderConfig::dfs_budget` (default DEFAULT_DFS_BUDGET = 10_000). This is the hard cap on DFS frame entries; the helper inherits it from the underlying `PathCandidates` iterator.\n- **Per-candidate `pkix_path::validate_path` cost**: unbounded by this crate. Each yielded chain is independently fed through `validate_path`, which runs the full RFC 5280 \u00a76.1 state machine plus signature verification per intermediate.\n- **Worst case under defaults**: roughly `O(dfs_budget * chain_length * signature_verification_cost)`. With default `max_depth = 10`, that's up to ~10,000 candidates \u00d7 ~10-cert chains \u00d7 per-cert signature work. In adversarial cross-signed pools where many candidates differ only in deep intermediate selection, this can be substantial wall-clock \u2014 far more than callers extrapolate from `build_path`'s single-shot cost.\n\nCallers in latency-sensitive paths (TLS handshake, OCSP responder, on-line signing services) need this number to make informed timeout decisions. The current doc gives them no signal \u2014 they have to read the source to discover the iterator-driven retry loop.\n\nSpecifically called out:\n\n- The \"Out of scope\" section says async / parallel evaluation is not supported. Good. But that's a feature-scope statement, not a complexity bound \u2014 it tells the caller \"you can't make this faster,\" not \"here's how slow it can get.\"\n- The relationship table says `build_first_valid_path` returns \"First candidate that passes `validate_path`\" \u2014 accurate, but the cost of \"first that passes\" depends on how many fail first.\n\nRequired additions to the rustdoc:\n\n1. Explicit complexity section: \"Worst-case work per call: O(dfs_budget) DFS frame entries \u00d7 O(per-candidate validate_path cost). Per-candidate cost is `pkix_path::validate_path`'s responsibility; this crate bounds candidate count but not per-candidate work.\"\n\n2. Cross-link to `PathBuilderConfig::dfs_budget` so callers tightening the iteration bound see the helper as the consumer.\n\n3. Note that callers wanting a per-call wall-clock bound should drop down to `build_path_candidates` and limit the iteration count themselves (the doc on `PathCandidates` already suggests this for the case \"want to limit the number of candidates tried\"; the cross-link from `build_first_valid_path` is missing).\n\nThe undocumented complexity is a real footgun for callers who model `build_first_valid_path` as a thin wrapper over `build_path`.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path time-complexity contract not documented; per-candidate validate_path cost unbounded by crate",
+  "updated_at": "2026-05-14T18:37:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:37:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

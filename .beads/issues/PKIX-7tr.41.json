@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:09:16Z",
+  "compaction_level": 0,
+  "content_hash": "874f1393176b0da1e1ea6b8eae5ea60e0a436e6bad8b1ab83cc84cce73a4fb68",
+  "created_at": "2026-05-02T13:43:10Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk (line 747) applies BasicConstraints and KeyUsage checks for all i > 0. chain[chain.len()-1] is the last certificate in the chain, which is issued by a trust anchor. If chain.len() >= 3, chain[chain.len()-1] is an intermediate and correctly gets CA checks. But chain[chain.len()-1] is also the cert whose signature is verified against the anchor SPKI \u2014 it is NOT the anchor itself. For a 2-cert chain [leaf, intermediate], i=1 gets CA checks (correct). For a 1-cert chain [leaf], i=0 and the check is skipped (correct, leaf is not an intermediate). However: for a 1-cert self-signed chain where the cert IS a CA, i=0 so BasicConstraints/KeyUsage are NOT checked. A self-signed non-CA leaf used as the only chain element will pass all intermediate checks because i=0 is excluded. This is correct behavior (RFC 5280 does not require the EE to be a CA) but it means a trust anchor that is itself presented as chain[0] without any intermediates bypasses ALL CA property checks. Document this explicitly.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.41",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk checks intermediate CA constraints at i>0 but trust anchor is at i=chain.len()-1",
+  "updated_at": "2026-05-02T14:09:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:43:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

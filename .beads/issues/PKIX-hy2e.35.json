@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Refactored Rfc8398SmimeMailboxEquivalenceLint::check_cert to pre-validate every rfc822/SmtpUTF8Mailbox SAN address via a new validate_mailbox_for_equivalence helper BEFORE entering the cross-match loop. Malformed addresses (no '@', empty local-part, empty domain, IDN-conversion failure) now surface as a specific LintResult::error naming the offending entry and the structural problem, rather than being silently treated as 'no match' against every counterpart (the unwrap_or_default conflation). The cross-match loop now uses .expect('pre-validation ensures inputs are well-formed') on mailbox_equivalent, which carries the invariant in the type. Five regression tests cover the helper directly: accepts well-formed ASCII, accepts well-formed U-label, rejects missing '@', rejects empty local-part, rejects empty domain. 254 lib tests + 7 doc tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:36:47Z",
+  "compaction_level": 0,
+  "content_hash": "a1af4caac2ee133717c079b1c2e39f8ebbad51209bc8b948eab463589d41aea8",
+  "created_at": "2026-05-14T12:57:24Z",
+  "created_by": "Mark Atwood",
+  "description": "rfc8398.rs:298-313 calls `mailbox_equivalent(r, u).unwrap_or_default()` twice inside the SAN-equivalence check loop. `mailbox_equivalent` returns `Result<bool, &'static str>`; `.unwrap_or_default()` collapses `Err(_)` to `false`. This silently conflates two distinct conditions: (a) the two addresses do not match under the equivalence rule (legitimate Ok(false)) vs (b) one of the addresses is malformed (no '@', empty local-part/domain, IDN conversion failed). When a SAN entry is malformed, the current code drops the error, treats it as 'no match', and either succeeds (if another pairing matches) or returns a misleading 'no matching SmtpUTF8Mailbox' error that doesn't name the real problem (the malformed input).\\n\\nIdiomatic Rust handles the Result variants explicitly. Two principled options:\\n\\n1. `if let Ok(true) = mailbox_equivalent(r, u) { ... }` \u2014 uses Result's variants directly. Errors propagate up to a top-level malformed-input lint result.\\n2. Restructure `mailbox_equivalent` to return `Option<bool>` (None on malformed input) and do address-validity checking once before the cross-match loop, surfacing the validity check as a separate LintResult::error early. Cleaner separation.\\n\\nFix: validate every rfc822 and smtputf8 address first via a small validate_mailbox helper returning Result<(), &'static str>. On any Err, return LintResult::error naming the malformed address. Then the cross-match loop can use `bool`-returning equivalence and `unwrap_or_default` becomes `unwrap` (infallible because validation already passed).",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.35",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "mailbox_equivalent(...).unwrap_or_default() conflates 'no match' with 'malformed input'",
+  "updated_at": "2026-05-14T13:36:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:57:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

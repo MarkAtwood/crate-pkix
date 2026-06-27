@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:14Z",
+  "compaction_level": 0,
+  "content_hash": "269f74cdb1a27839edc38515fef7ebf2032816aa0eedaea04eb6aa834d3d9f25",
+  "created_at": "2026-05-06T15:12:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/tests/fixtures/policy-checks/gen.py: The module docstring at line 22 states 'Oracle: openssl verify -CAfile <root.pem> -untrusted <int.pem> <leaf.pem>' but this oracle command cannot be run for webpki-self-signed-365d.der (which is self-signed: no separate root/int). The file also doesn't include a comment showing the actual openssl command used to verify the self-signed fixture. For reproducibility, a comment like 'Oracle: openssl verify -CAfile webpki-self-signed.pem webpki-self-signed.pem \u2192 OK' should be added near the fixture generation. Minor doc issue.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "gen.py does not include webpki-self-signed fixture in OpenSSL oracle comments",
+  "updated_at": "2026-05-06T15:35:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:12:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

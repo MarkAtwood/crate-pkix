@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Inlined the three named-capture sites in oscal/emit.rs (Deviation title risk_for, risk_for_deviation, and downgrade action label). The unix_to_rfc3339 format!() also collapsed to inline capture. Three of the bead's six listed sites were already inlined by earlier do-beads work. cargo clippy with default lints + -W uninlined-format-args is clean. 307 tests pass.",
+  "closed_at": "2026-05-14T17:28:34Z",
+  "compaction_level": 0,
+  "content_hash": "52af546ddd635c95dbb7a7ff423317d32f874e04802019a6723c8aca9e0b4c2c",
+  "created_at": "2026-05-14T16:08:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs has six format! calls with positional arguments where inline capture would read more clearly and matches the rest of the codebase: line 391 `format!(\"Deviation {} applied to {}\", df.deviation_id, df.lint_id)`, line 471 `format!(\"Deviation {} for lint {}\", d.id, d.target_lint)`, line 652 `format!(\"downgrade:{}\", severity_label(*s))`, line 745 (uuid_v8) with 16 positional byte args, line 875 (unix_to_rfc3339) with 6 positional time-component args. clippy::uninlined_format_args fires on each. Rationale: inline {x} capture binds the value to the variable at the call site, removing one scan-back when reading. The rest of pkix-lint (e.g. rfc5280.rs:156, deviation.rs:103) uses inline capture; these are the holdouts. Fix is mechanical (rustfmt + clippy --fix). No behavior change.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.42",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "uninlined format args in pkix-lint/src/oscal/emit.rs (uuid_v8, unix_to_rfc3339, descriptions)",
+  "updated_at": "2026-05-14T17:28:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:08:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

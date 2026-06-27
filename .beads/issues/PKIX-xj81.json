@@ -1,0 +1,73 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "compaction_level": 0,
+  "content_hash": "08167afc5c77843e47668d11a00d61ae46339725cad2187121c22d44d5784f4a",
+  "created_at": "2026-05-08T19:17:37Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAudit found integration tests in `pkix-path-builder/tests/integration.rs` cover only PKITS \u00a74.1.1 happy-path topologies and the adversarial-budget stress test. None of the S/MIME stress patterns (bridge CA cross-cert, key rollover with same-DN-different-SPKI, TA name collision, multiple-valid-paths disambiguation) have integration coverage.\n\nThis means PKIX-yn3e (AKI selection) and PKIX-mszo (next-candidate iterator) ship with no regression-protecting test corpus. Filing this as a sibling so both can reference it.\n\n## What\n\nBuild out integration test fixtures and tests covering:\n\n1. **Bridge CA cross-cert with AKI disambiguation** \u2014 pool with two intermediates sharing issuer DN but different SPKIs; target's AKI uniquely identifies one. Test that AKI-aware selection (PKIX-yn3e) finds the verifying path on first DFS pass, and that without AKI handling the wrong candidate is selected first.\n2. **Key rollover (old-key signs new-key cert)** \u2014 pool with old-key root + cross-cert from old-key root to new-key. Target signed by new-key. Verify both topology layers are walked correctly.\n3. **TA name collision** \u2014 anchors set with two trust anchors sharing DN but with different SPKIs. Pool builds a chain whose terminal cert's issuer DN matches both anchors. Verify that `build_path` returns one path and `validate_path` succeeds against the matching anchor.\n4. **Multiple-valid-paths disambiguation** \u2014 pool admits two same-length valid paths to anchors. Document the deterministic tiebreak (pool-insertion order today; AKI-preference once PKIX-yn3e lands). Test the contract.\n5. **CMS-bag-shaped pool** \u2014 irrelevant context certs in pool (other-CA intermediates, expired self-signed, EE certs from unrelated chains). Verify the builder finds the right path through the noise.\n6. **Three-cert loop A\u2192B\u2192C\u2192A** \u2014 verify cycle guard terminates without hitting the budget (currently the audit notes loop detection is correct but only stress-tested via the 30-self-loop budget test, not a true 3-cycle).\n\n## Acceptance\n\n- [ ] At least one fixture per stress pattern committed under `pkix-path-builder/tests/fixtures/`. Generate via openssl with explicit AKI/SKI extensions where needed; document the generation script for reproducibility.\n- [ ] Integration tests covering each pattern, asserting both the topology returned (via `build_path`) and the end-to-end verdict (via `validate_path`).\n- [ ] When PKIX-yn3e and PKIX-mszo land, these tests demonstrate the new behaviour. Until then, tests can xfail-style document the current limitation.\n- [ ] No additional runtime deps. `std` may be used (this is dev tooling).\n\n## Out of scope\n\n- Real-world bridge-CA cert fixtures (those involve government PKI roots that are heavyweight to vendor in-tree). Synthetic openssl-generated fixtures are sufficient for the topology tests.\n- pyca / x509-limbo integration as test source (that's PKIX-g9vc).\n\n## Filed as\n\nS/MIME-in-production audit follow-up. Provides regression coverage for PKIX-yn3e and PKIX-mszo.",
+  "ephemeral": 0,
+  "id": "PKIX-xj81",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Decomposed 2026-05-10 into 7 child beads (PKIX-xj81.1 shared infra + PKIX-xj81.2 through .7, one per stress-pattern topology). Each topology depends on the shared infra. Epic blocked on all children closing. Decomposition rationale: 6 fixture topologies with OpenSSL-crafted AKI/SKI extensions is a high-blast-radius task that benefits from focused, individually-reviewable beads rather than one large undifferentiated commit. PKIX-xj81.1 is the only currently-ready child; topology beads (.2 through .7) unblock when .1 closes.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: bridge CA / cross-cert / TA collision integration test corpus",
+  "updated_at": "2026-05-11T04:45:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:45:33Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:34Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:36Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:37Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:38Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:39Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:45:40Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

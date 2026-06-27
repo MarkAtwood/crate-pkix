@@ -1,0 +1,31 @@
+{
+  "close_reason": "PKITS oracle disproves this finding. NIST PKITS \u00a74.6.8/4.6.14 explicitly place CA certs (cA=TRUE) at chain[0] and require MUST-VALIDATE. RFC 5280 \u00a76.1 path validation does not require chain[0] to be an EE cert \u2014 that is an application-layer check (EKU/purpose). The i>0 guard is correct behavior per the normative test suite.",
+  "closed_at": "2026-05-02T17:43:15Z",
+  "compaction_level": 0,
+  "content_hash": "cc9bc33a913c641de3d5d1ef2283cf5c1572be21d9f35d240377d52a61233486",
+  "created_at": "2026-05-02T17:25:41Z",
+  "created_by": "Mark Atwood",
+  "description": "chain[0] is never checked for BasicConstraints cA=TRUE or cA=FALSE. A CA certificate placed at chain[0] (the leaf position) passes all BasicConstraints and KeyUsage checks because the i>0 guard skips all CA-only checks for the leaf. An attacker or misconfigured caller can pass a CA cert as the end-entity and the path validator accepts it. RFC 5280 \u00a73.3 and common path-validator practice require the EE to not be a CA cert.",
+  "ephemeral": 0,
+  "id": "PKIX-841.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "leaf cert with cA=TRUE not rejected",
+  "updated_at": "2026-05-02T17:43:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:25:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

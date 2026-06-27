@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9c428044be356b81e4d8a7baca6b4f42c3423761e3f104f65e4ae889f057081c",
+  "created_at": "2026-05-14T17:43:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:504-529\n\n```rust\npub fn verify_sth(&self, log_id: &[u8; 32], sth: &SignedTreeHead)\n    -> Result<&CtLog>\n```\n\nThe `log_id` argument is the SHA-256 of the log's SPKI DER. The\n`SignedTreeHead` struct (lines 568-583) does NOT carry a `log_id`\nfield. The caller must source the log_id from somewhere else\n(typically from the SCT they're verifying inclusion for, or from\nthe log's HTTPS endpoint metadata).\n\nContrast with `verify_sct_for_cert(&self, sct: &SCT, cert_der:\n&[u8])`: the SCT carries `log_id` inline, so the caller doesn't have\nto pass it separately.\n\nTwo problems:\n\n1. Inconsistent contract: `verify_sct_*` is \"look up log_id from the\n   parsed object\"; `verify_sth` is \"caller, you bring the log_id\".\n   Callers writing wrapper code have to remember which is which.\n\n2. Wire-format `TreeHeadSignature` (RFC 6962 \u00a73.5) does NOT include\n   `log_id` in the signed structure. That's a real constraint: the\n   STH wire form doesn't carry log_id, so the caller MUST track it\n   externally. But the API can still help \u2014 `SignedTreeHead` could\n   carry a `log_id` field that the caller fills in at parse time\n   (analogous to how the SCT struct's `log_id` is filled in by\n   the SCT parser).\n\nRecommendation: add `log_id: [u8; 32]` to `SignedTreeHead` (PKIX-ppbr.15\nunblocks this with #[non_exhaustive]), and drop the separate\nparameter from `verify_sth`:\n\n```rust\npub fn verify_sth(&self, sth: &SignedTreeHead) -> Result<&CtLog> {\n    let log = self.logs.get(&sth.log_id).ok_or(Error::UnknownLog)?;\n    ...\n}\n```\n\nThe caller still has to source the log_id, but they store it in the\ntyped struct where it belongs, not as a parallel parameter.\n\nPriority P3; this is a consistency/idiomatic-Rust issue more than a\ncorrectness one.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_sth takes log_id separately even though typical caller has SCT with matching log_id",
+  "updated_at": "2026-05-14T17:43:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:43:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

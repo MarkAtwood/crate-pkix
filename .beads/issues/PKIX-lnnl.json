@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "53a640a616256122119e1b404aaae6ac567f21a1b433eab2c67c7ac899ab029b",
+  "created_at": "2026-05-14T19:33:13Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T193229Z-170002",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T193229Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-revocation since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Maintainer risk: LOW \u2014 new path-level CRL signer discovery adds structural anchor reachability without inverting workspace dependency direction. Surface concerns are documentation accuracy (intra-doc link, CHANGELOG migration note) and one parameter (_cert_to_check) that is API surface but no-op. No correctness issues affecting PKITS \u00a74.5 outcomes; all 8 cases verified passing including 3 negative-path discovery tests. Test oracle (NIST PKITS narrative + vectors.json) is independent of code under test.\nConfidence: 85% chance of missed bug. Least confident flags: PKIX-lnnl.6 (defense-in-depth gap argument is subtle and relies on the per-entry certificateIssuer walk catching the case implicitly; I could not exhaustively rule out an attacker-crafted bundle that exploits the gap). Uncertainty driven by: (a) I could not run the probe needed to construct a bundle exercising the cert.issuer != crl.issuer + no-\u00a75.3.3-entries case in discovery mode (read-only review constraint); (b) I did not exhaustively walk every code path in find_matching_entry under is_indirect=true with empty crl_entry_extensions, which is the exact safety mechanism PKIX-lnnl.6 relies on; (c) the bundle order semantics (PKIX-lnnl.8) are first-wins by inspection but not exercised by test, so a future refactor could silently change it. Would raise confidence if: (1) a regression test for the PKIX-lnnl.6 scenario, (2) the bundle order tests in PKIX-lnnl.8, (3) the find_parent vs discover_crl_signer alignment in PKIX-lnnl.2.\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-revocation since 24701180",
+  "updated_at": "2026-05-14T19:44:54Z"
+}

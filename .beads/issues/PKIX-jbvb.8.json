@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decided yes (Mark 2026-05-13) \u2014 ship Multipurpose Profile types as siblings to the Strict tier types, after the Strict surface is complete. Rationale: AGENTS.md prelaunch framing (design for eventual complete shape; no-consumer-asking is not informative); PKIX-mzsk spec-taxonomy principle names all BR cells as in-scope; PKIX-e3nl temporal-posture principle is neutral on this (Multipurpose is parallel current-tier, not historical). Surface cost is bounded: 8 new public identifiers in pkix-profiles-cabf (4 types + 4 fns), 0 new crates, ~4 new test fixtures, 0 new pkix-chain wrappers (use-case wrappers are Profile-parameterized already). Implementation plan filed as PKIX-jbvb.9 epic with 5 children (1 rename + 4 Multipurpose tiers).",
+  "closed_at": "2026-05-14T02:38:35Z",
+  "compaction_level": 0,
+  "content_hash": "5e2b90cde911f3de848199e6d8f0fc3b053a7020f956202d08e6d983a7837693",
+  "created_at": "2026-05-14T00:36:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAfter PKIX-jbvb.7 lands, `pkix-profiles-cabf` will ship one canonical Profile\ntype per S/MIME validation tier (Mailbox / Sponsor / Individual / [pending\nPKIX-jbvb.1] Organization), each targeting the Strict generation. This bead\ncaptures the open architectural question: should the crate eventually ship\n**multi-generation** Profile types, e.g. `SmimeSponsorValidatedMultipurpose`\nalongside `SmimeSponsorValidated` (Strict)?\n\n## Context\n\nS/MIME BR \u00a77.1.6.1 names 12 distinct subscriber-cert profile cells:\n4 validation tiers \u00d7 3 generations (Legacy / Multipurpose / Strict), each\nwith its own reserved policy OID:\n\n| Validation type | Legacy `.1` | Multipurpose `.2` | Strict `.3` |\n|---|---|---|---|\n| Mailbox-validated | `2.23.140.1.5.1.1` (banned) | `.1.2` | `.1.3` |\n| Organization-validated | `.2.1` (banned) | `.2.2` | `.2.3` |\n| Sponsor-validated | `.3.1` (banned) | `.3.2` | `.3.3` |\n| Individual-validated | `.4.1` (banned) | `.4.2` | `.4.3` |\n\nLegacy is banned for new issuance per \u00a77.1.6.1 line 2600 (effective\n2025-07-15). Remaining modern surface: 4 \u00d7 2 = 8 cells.\n\nMark's 2026-05-13 decision (PKIX-jbvb.6) picked the **one-Profile-per-\nvalidation-type, Strict-targeted** shape for now. PKIX-jbvb.7 implements that.\n\n## The open question\n\nShould the eventual complete shape ship 8 Profile types (Strict + Multipurpose\n\u00d7 4 tiers) or stay at 4 (one per tier, Strict only)?\n\n### Arguments for staying at 4 (status quo after PKIX-jbvb.7)\n\n- The spec-taxonomy principle (PKIX-mzsk) lists *validation-type* variants\n  (Mailbox/Org/Sponsor/Individual) as in-scope, not generation variants.\n- Strict is the BR's stated \"long term target profile\" (glossary \u00a7372);\n  Multipurpose is a transitional bridge for document-signing crossover.\n- Each generation primarily differs in EKU permissiveness (line 2053-2054:\n  Strict requires emailProtection-only; Multipurpose/Legacy allow others).\n  The current `ValidationPolicy` shape doesn't have an \"EKU is exactly\n  this set\" predicate, so multi-generation Profile types would currently\n  produce nearly-identical `ValidationPolicy` outputs differing only in\n  policy-OID assertion.\n- Maintenance cost: doubles the type surface; each BR refresh has to\n  audit 8 Profile types instead of 4.\n\n### Arguments for shipping 8\n\n- BR \u00a77.1.6.1 explicitly names all 12 cells; each has its own OID. By\n  strict reading of \"ships Profile types for each subscriber-cert profile\n  named in the BR,\" that's the target.\n- Prelaunch framing (AGENTS.md): \"design for the eventual complete shape,\"\n  \"breaking changes are free.\" Pre-1.0 is when surface expansion is\n  cheapest.\n- `pkix-policy-zlint`'s comprehensive-coverage role is *predicate*\n  coverage, not *taxonomy* coverage. The `-cabf` crate is supposed to own\n  the taxonomy axis.\n- Multipurpose certs exist in the field (document-signing crossover).\n  Validators may need to assert \"this cert is conforming Multipurpose\n  Individual-validated\" distinctly from Strict.\n\n### Hybrid options\n\n- (a) Ship 4 now, file 4 follow-up beads for Multipurpose Profile types,\n  prioritize based on demand signals when they surface.\n- (b) Ship 8 now under the prelaunch \"design for eventual complete shape\"\n  framing. Pre-1.0 surface expansion is cheap.\n- (c) Add a `Generation` enum parameter to each Profile type, so one\n  `SmimeSponsorValidated` carries `(Generation::Strict | Generation::Multipurpose)`.\n  Avoids doubling the type count; trades for a different ergonomic surface.\n- (d) Stay at 4 forever (Strict-only); document that Multipurpose cert\n  validation requires hand-construction of `ValidationPolicy` or use of\n  `pkix-policy-zlint`.\n\n## Filing rationale\n\nThis decision touches the spec-taxonomy principle in AGENTS.md and is\npost-PKIX-jbvb.7 architectural shape. Defer until at least one of:\n\n1. PKIX-jbvb.1 (Organization-validated) ships \u2014 gives us 4 complete\n   tier types to evaluate the \"4 vs 8\" question against concrete code.\n2. A concrete consumer ask surfaces for Multipurpose distinction.\n3. A separate review sweep flags the gap.\n\nMarking `human` to keep it out of the autonomous ready queue.\n\n## Cross-references\n\n- PKIX-jbvb.6 (decision on Strict vs Multipurpose for Sponsor/Individual)\n- PKIX-jbvb.7 (implementation of the Strict-only shape)\n- PKIX-mzsk (AGENTS.md spec-taxonomy principle)\n- AGENTS.md \"Project phase and decision framing\" section\n- specs/cabforum-smime-BR.md \u00a77.1.6.1\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.8",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: decide whether to ship multi-generation Profile types (Strict + Multipurpose \u00d7 4 validation tiers)",
+  "updated_at": "2026-05-14T02:38:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T17:36:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

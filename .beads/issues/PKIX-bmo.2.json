@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision records filed for documentation; no action required",
+  "closed_at": "2026-05-02T18:07:03Z",
+  "compaction_level": 0,
+  "content_hash": "2ac2afd46716f583ea63efdcef98fad1bd31b42e10b936f7cf9235b724ffcb55",
+  "created_at": "2026-05-02T18:04:29Z",
+  "created_by": "Mark Atwood",
+  "description": "The NormalizedIter trims trailing spaces in new() rather than at emit time, so the main loop never has to distinguish 'is this the last space'. A contributor might suggest 'simplify' by checking trailing in next() \u2014 this would re-introduce the trailing-space bug. The current design is correct and deliberate.",
+  "ephemeral": 0,
+  "id": "PKIX-bmo.2",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter: zero-allocation, correct trailing-space semantics",
+  "updated_at": "2026-05-02T18:07:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:04:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-bmo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

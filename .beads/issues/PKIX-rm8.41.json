@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.41",
+  "title": "PathCandidates iterator clones every Certificate on every yield",
+  "description": "In pkix-path-builder/src/lib.rs, the PathCandidates iterator clones the target cert at construction (line 566), clones each candidate cert pushed onto the path (line 714), and clones the entire path vector when yielding a chain (line 645). x509_cert::Certificate is a large struct containing parsed DER trees; each clone involves deep allocation. For a typical 3-cert chain with 1 retry, this is 4 Certificate clones per yield + 3 per push = ~10 clones per build_first_valid_path call. For adversarial pools with many candidates, clone cost scales linearly with DFS visits. What goes wrong: in a high-throughput verifier (TLS terminator, CT log monitor), the allocator cost of cloning Certificates dominates wall time. This is not a correctness bug but an API-contract concern: the iterator's Item type is Vec<Certificate> (owned), which forces callers to accept the clone cost. An alternative would be returning indices into the pool + target, but that would require a different API shape. Flagging as a 'contract that forces callers to pay a cost' issue per the review checklist. Location: /home/mark/PROJECT/PKIX/pkix-path-builder/src/lib.rs lines 566, 645, 714.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:46Z",
+  "updated_at": "2026-06-15T16:27:23Z",
+  "closed_at": "2026-06-15T16:27:23Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:46"
+    }
+  ]
+}

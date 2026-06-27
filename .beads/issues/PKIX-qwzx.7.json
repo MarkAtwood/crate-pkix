@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Updated public docstring to say 'algorithm OID + raw public-key bits' instead of 'DER identity', and cross-referenced the inline comment explaining why parameters are excluded (RSA NULL ambiguity). Doc rebuilds with -D warnings.",
+  "closed_at": "2026-05-07T22:24:00Z",
+  "compaction_level": 0,
+  "content_hash": "e9341048079e695abfcf8028fb76552ff76ca9a08c708cea6b2c2cc63f6ff445",
+  "created_at": "2026-05-07T22:01:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:375 (build_path doc):\n\n  // Limitations\n  Cycle detection is based on `SubjectPublicKeyInfo` DER identity rather than\n  subject DN.\n\nBut the actual code at lines 268-273 deliberately does NOT compare full SPKI DER:\n\n  let candidate_spki = &candidate.tbs_certificate.subject_public_key_info;\n  let already_in_path = path.iter().any(|in_path| {\n      let s = &in_path.tbs_certificate.subject_public_key_info;\n      s.algorithm.oid == candidate_spki.algorithm.oid\n          && s.subject_public_key == candidate_spki.subject_public_key\n  });\n\nThe comment block at lines 259-267 explains why DER-equality is intentionally NOT used (RSA NULL vs absent parameters issue). That rationale is correct. But the high-level docstring at line 375 contradicts it by saying 'DER identity'.\n\nFix: in the public docstring, replace 'DER identity' with 'algorithm OID + raw key bits' (or copy the rationale from lines 259-267 into a 'Cycle detection' bullet).\n\nPass-1 attribution: not flagged. The internal comment is correct; the public-facing doc was not updated when the SPKI comparison was hardened.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.7",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder doc claims SPKI DER cycle detection but compares only OID + key bytes",
+  "updated_at": "2026-05-07T22:24:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

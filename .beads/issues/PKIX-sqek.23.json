@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3c5ada538e1ed72bc6ee90701ed6dd217f911bb0383be698130ad13756b4d873",
+  "created_at": "2026-05-14T18:09:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:481-487:\n\n    /// Borrow the `AiaFetcher` this verifier holds.\n    ///\n    /// Exposed for diagnostic purposes; callers debugging chain-build\n    /// failures can inspect which fetcher is wired in.\n    pub fn aia(&self) -> &A {\n        self.aia\n    }\n\nThe docstring describes the use case (\"diagnostic\") but does not document the contract. Open questions a caller would ask:\n\n1. **Is the returned reference stable across verify_one calls?** Today, yes \u2014 the Verifier holds a &'a A and the borrow just hands it through. But the caller cannot tell from the contract.\n\n2. **Does mutation through interior-mutability on A affect subsequent verify_one calls?** Today, yes \u2014 verify_one captures `self.aia` (a copy of the &'a A pointer) and calls `batch_fetch` on it during the slow path. An AiaFetcher with `Cell<Counter>` for hit counts will reflect through Verifier::aia(). The caller cannot tell from the contract whether this is supported or implementation-detail.\n\n3. **Why is there only `aia()` and not `revocation()`, `signature_verifier()`, `anchors()`, `policy()`?** The Verifier has five private fields; only one is exposed. The selection is arbitrary from the API perspective. A future caller wanting to diagnose \"which RevocationChecker is wired in\" has the same need but no method to call. They will file an issue asking for symmetric accessors, OR pkix-chain will grow `revocation()`, `signature_verifier()`, etc. \u2014 and at that point each one is a forever commitment.\n\nWHY IT MATTERS:\n\nFor a debugging-only accessor, the contract gaps are mostly harmless (callers debug, they don't depend). But the inclusion of `aia()` while OTHER fields stay private is itself an API decision. Either:\n\n(a) Drop `aia()`. Make the debugging facility a `Debug` impl on `Verifier` (printing the type name of A; it's all the diagnostic info you can get from a generic without further trait bounds). The current `aia()` is essentially this with a friendlier API.\n\n(b) Symmetrize. Add `revocation() -> &R`, `signature_verifier() -> &V`, `anchors() -> &[TrustAnchor]`, `policy() -> &ValidationPolicy`. Now the Verifier is a transparent handle to its components, and the contract is \"you can re-read what you put in.\" Documented as such.\n\n(c) Keep just `aia()` but document why it's special (e.g. AIA is the only seam likely to need runtime inspection because it's the only one with built-in choices like `NoAiaFetcher`).\n\nThe current shape is option (a) but spelled as a method instead of a Debug impl. The minor naming/discoverability gap is the underspecification: a contributor reading lib.rs has no way to know whether `aia()` is \"the start of a getter family\" or \"a one-off because A is special.\" A future PR adding `revocation()` becomes a coin-flip decision.\n\nLOW PRIORITY. This is the smallest of the immutability/underspecification issues \u2014 the wrong choice doesn't break callers, it just adds slight API noise. Filing for completeness; flag with the opinion label if you'd prefer not to track it.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier::aia() returns &A but contract is silent on staleness, mutation, and whether the fetcher is captured by verify_one",
+  "updated_at": "2026-05-14T18:09:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:09:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

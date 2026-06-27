@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.64",
+  "title": "pkix-chain-simple uses pkix_path types without full re-export",
+  "description": "In pkix-chain-simple/src/lib.rs, the public API uses pkix_path::Error (in Error::Path variant, line 330), pkix_path::TrustAnchor and pkix_path::ValidatedPath (in function signatures and return types). The imports on lines 72-74 bring these in, but the crate does not re-export pkix_path itself.\n\nWhat goes wrong: A caller matching on Error::Path(pkix_path::Error::...) must add pkix-path as a direct dependency. If pkix-chain-simple bumps its pkix-path dependency, the caller's version may conflict.\n\nLocation: pkix-chain-simple/src/lib.rs:72-77, 330\n\nRecommendation: Add 'pub use pkix_path;' or at minimum re-export the types that appear in the public API.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:02Z",
+  "updated_at": "2026-06-15T17:19:06Z",
+  "closed_at": "2026-06-15T17:19:06Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:01"
+    }
+  ]
+}

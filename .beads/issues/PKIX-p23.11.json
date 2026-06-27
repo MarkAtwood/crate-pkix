@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Generated leaf-rsa2048-sha1.der fixture via openssl; removed #[ignore]; test now passes",
+  "closed_at": "2026-05-06T21:43:32Z",
+  "compaction_level": 0,
+  "content_hash": "119c1decfc73e5a671e29dc0baac1170f383280728b706164f4d08e1cb6c581b",
+  "created_at": "2026-05-06T21:31:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/tests/cabf_tls_br_tests.rs lines 308-324: The only negative test for Sha1ProhibitedLint (a cert that should Error) is marked #[ignore] because the fixture does not exist. The test instructions are in the comment (openssl req -x509 ... -sha1). Without the fixture, the \"SHA-1 cert returns Error\" path is not tested at all. The sha1_prohibited_oid_detection_logic test (lines 272-291) only verifies that two OID constants are different from known SHA-256 OIDs \u2014 it does not verify the lint returns Error for a SHA-1 cert. The ignored test should be generated and committed per test integrity requirements.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: Sha1ProhibitedLint has no fixture test for SHA-1 cert (positive case) \u2014 negative test is #[ignore]d",
+  "updated_at": "2026-05-06T21:43:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

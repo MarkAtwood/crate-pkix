@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:51:38Z",
+  "compaction_level": 0,
+  "content_hash": "b0903ae4585e69adf2d4fad4024f8aae23a95029b69fbef41327ce982e61a960",
+  "created_at": "2026-05-06T23:17:44Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs lines 211-215 (check_revocation doc): the important caveat that Ok(()) can mean either 'not revoked' OR 'not covered by this CRL' is explained in the body of the CrlChecker struct doc (lib.rs lines 59-70) and partially in the trait doc, but the trait method's own doc comment only has a short 'dual semantics' note in the tail. Callers implementing the RevocationChecker trait or using it generically will read the trait-method doc first; the full explanation lives on the struct. Hard-fail callers may miss this and incorrectly treat Ok(()) as a definitive 'not revoked' signal. Suggested fix: promote the dual-semantics warning to a NOTE: or # Security admonition at the top of the check_revocation doc comment on the trait, not just in the CrlChecker struct-level doc.",
+  "ephemeral": 0,
+  "id": "PKIX-alc",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: lib.rs doc comment: 'Ok(()) dual semantics' warning is buried",
+  "updated_at": "2026-05-06T23:51:38Z"
+}

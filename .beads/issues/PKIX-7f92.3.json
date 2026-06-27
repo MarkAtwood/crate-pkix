@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Verified x509-cert 0.2.5 AlgorithmIdentifier<Any> derives PartialEq with bitwise (Tag, BytesOwned) comparison on Any; the lint behaves as documented. Added three negative-path tests covering all distinguishable mismatch shapes (outer-NULL/inner-absent, outer-absent/inner-NULL, OID-mismatch) plus a DER round-trip oracle confirming decode preserves the Option discriminant. Updated rustdoc to record x509-cert's representation and remove the 'fixture generation out of scope' caveat. Commit fbbd3a33.",
+  "closed_at": "2026-05-14T16:26:57Z",
+  "compaction_level": 0,
+  "content_hash": "5335ddcc509ccc0bbf1b540ec2b83416aeba8ed9c18911f3d5a45c69f14d6251",
+  "created_at": "2026-05-14T15:43:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/rfc5280.rs:516-525 implements the \u00a74.1.1.2 outer-vs-inner signatureAlgorithm match by comparing two AlgorithmIdentifier values with x509-cert's derived PartialEq impl. The rustdoc claims this catches 'NULL parameters on one side, absent parameters on the other' for RFC 4055 \u00a72.1 RSA-PKCS1.\n\nVerification gap: no negative-path fixture exists in the workspace (the rustdoc acknowledges this \u2014 'Fixture generation requires custom DER-level synthesis and is out of scope here'). The lint's positive tests pass on well-formed RSA and ECDSA fixtures, but those tests do not exercise the NULL-vs-absent distinguishing path.\n\nIf x509-cert's AlgorithmIdentifier::Parameters is decoded into a normalized form (e.g. both Some(Null) and None decode to the same internal representation) the lint would silently no-op on the exact real-world case it claims to catch. Mozilla SC-068-era CAs produced this mismatch shape.\n\nHypothesis: derived PartialEq on AlgorithmIdentifier { algorithm: ObjectIdentifier, parameters: Option<Any> } compares parameters field bitwise: Some(Any) != None, and Some(Any { encoded NULL bytes }) != Some(Any { different encoded bytes }). If that holds, the lint behaves as documented.\n\nProbe needed: either (a) read x509-cert/src/ext/* and the Any type's PartialEq impl in der crate, or (b) write a hand-crafted DER cert with mismatched outer/inner identifiers (custom Vec<u8> assembly, not via x509-cert encoder) and feed it through Decode + the lint. If the lint returns Pass on that input, this is a P0 correctness bug. If Error, the lint is correct but the negative test should be added to lock the behavior. Either way the rustdoc claim should be substantiated by an in-tree fixture or external oracle, not a comment.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc5280SignatureAlgorithmMatchLint relies on undocumented x509-cert AlgorithmIdentifier PartialEq behavior",
+  "updated_at": "2026-05-14T16:26:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:43:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "NoAiaFetcher shipped: zero-sized unit struct, #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)], impl AiaFetcher returns FetchingDisabled for every URI; batch_fetch uses the default-impl. Compile-time Send+Sync asserted. 5 dedicated NoAiaFetcher tests + 1 doctest. 40 tests pass --all-features; 24 default. cargo clippy -D warnings clean on all 4 feature combos (caught + fixed a clippy::clone-on-copy on the Copy type \u2014 dropped redundant .clone() call). Strict rustdoc clean; fmt clean. PKIX-zkjb's in-pkix-aia trio (.2 .3 .4) now complete; PKIX-zkjb.9 (Verifier 3-generic API freeze) unblocked. Committed 7e1708ae.",
+  "closed_at": "2026-05-13T20:48:54Z",
+  "compaction_level": 0,
+  "content_hash": "3f34de87bdce5f632a4d373db50111e5d0ba89f282e3de0250d1176795f27822",
+  "created_at": "2026-05-13T16:19:18Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nImplement `pkix_aia::NoAiaFetcher` per PKIX-zkjb constraint 4. Zero-cost default that always returns `AiaError::FetchingDisabled`. Never panics.\n\n```rust\npub struct NoAiaFetcher;\n\nimpl AiaFetcher for NoAiaFetcher {\n    fn fetch(&self, _uri: &str) -> Result<Vec<u8>, AiaError> {\n        Err(AiaError::FetchingDisabled)\n    }\n    // batch_fetch uses default-impl, returns Vec of all FetchingDisabled\n}\n```\n\n## Acceptance\n\n- [ ] `pkix_aia::NoAiaFetcher` is a public unit struct with `impl AiaFetcher`\n- [ ] Returns `AiaError::FetchingDisabled` for any URI\n- [ ] No allocation in fetch (besides the Err return)\n- [ ] Unit test: fetch returns Err(FetchingDisabled) regardless of URI\n- [ ] Unit test: batch_fetch returns Vec of Err(FetchingDisabled), one per URI\n- [ ] Doctest: usage as `verify_chain(chain, anchors, policy, verifier, revocation, &NoAiaFetcher)` (after PKIX-zkjb.6 lands)\n\n## Out of scope\n\n- Configurable default that fetches sometimes \u2014 that's a real fetcher (pkix-aia-http) or a caller-side wrapper, not NoAiaFetcher\n\n## Cross-references\n\n- PKIX-zkjb (parent, constraint 4)\n- pkix-revocation::NoRevocation (existing default pattern reference)",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 do-beads loop escalation] PKIX-zkjb.4 surfaces as autonomous-ready, but cannot be implemented autonomously without prerequisite work that the bd dep graph appears to gate incorrectly:\n\nPROBLEM:\n- PKIX-zkjb.4 says 'Implement pkix_aia::NoAiaFetcher.' That requires:\n  (a) pkix-aia crate exists in workspace \u2014 currently does NOT (no pkix-aia/ directory).\n  (b) pkix_aia::AiaError type defined \u2014 PKIX-zkjb.2 (status: open).\n  (c) pkix_aia::AiaFetcher trait defined \u2014 PKIX-zkjb.3 (status: open).\n- PKIX-zkjb.4 has zero blocking deps in bd ('depends on PKIX-zkjb' parent-child only).\n- Meanwhile, PKIX-zkjb.3 (the trait it would implement) shows as 'depends on .4, .5, .6, .7'. That's structurally backwards \u2014 the trait must exist before the impl. Confirmed by inspecting 'bd show PKIX-zkjb.3 --json'.\n- PKIX-zkjb.2 shows 'depends on PKIX-zkjb.3' \u2014 meaning the AiaError type is gated on the trait, which is also backwards (you define the error before the trait that returns it).\n\nINTERPRETATION (two readings):\n(i) The dep graph was wired backwards by accident. Correcting it: .2 (no blockers, ready) \u2192 .3 (blocks on .2) \u2192 .4 (blocks on .3) \u2192 .9 (blocks on .4). Then .4 surfaces naturally after .3 closes.\n(ii) The dep graph encodes 'parent .3 blocks on child .4 closing' as a semantic for 'parent epic closes when all children close'. But .3 isn't an epic \u2014 it's a task. And task-on-task 'depends on' in bd should mean 'blocker' per the existing parent-child convention used in PKIX-wlsr.6/.7.\n\nRECOMMEND: (i) \u2014 fix the dep wiring. Re-wire to:\n  bd dep remove PKIX-zkjb.2 PKIX-zkjb.3   # remove backward dep\n  bd dep remove PKIX-zkjb.3 PKIX-zkjb.4   # remove backward dep\n  bd dep remove PKIX-zkjb.3 PKIX-zkjb.5   # remove backward dep\n  bd dep remove PKIX-zkjb.3 PKIX-zkjb.7   # remove backward dep\n  bd dep add PKIX-zkjb.3 PKIX-zkjb.2      # .3 trait depends on .2 error type\n  bd dep add PKIX-zkjb.4 PKIX-zkjb.3      # .4 impl depends on .3 trait\n  bd dep add PKIX-zkjb.5 PKIX-zkjb.3      # .5 adapter depends on .3 trait\n  bd dep add PKIX-zkjb.7 PKIX-zkjb.3      # .7 integration depends on .3 trait\n  bd dep add PKIX-zkjb.9 PKIX-zkjb.4      # .9 Verifier 3-generic depends on .4\nAfter the fix, the natural autonomous order is .2 \u2192 .3 \u2192 .4 \u2192 .9 (with .5 and .7 paralleling after .3).\n\nNOT FIXING IN-LOOP because: (a) bd dep rewiring touches Mark's design intent, not just my bead's scope; (b) the inversion suggests this might actually be a pattern Mark deliberately used (e.g., a 'parent depends on children for closure-gating' that bd doesn't explicitly model); (c) AGENTS.md 'destructive action guardrails' covers rewiring of work products implicitly \u2014 confirming with Mark before re-pointing 4 dep edges is the conservative move.\n\nLoop moves on per step 7 (human label, leave open).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement NoAiaFetcher zero-cost default in pkix-aia",
+  "updated_at": "2026-05-13T20:48:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:19:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:36:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

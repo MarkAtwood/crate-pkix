@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Resolved together with PKIX-hy2e.1 as a single shared-shape fix. See PKIX-hy2e.1 close note for the full rationale (documentation + trait rustdoc + regression tests for the operator mutual-exclusion contract). All three sibling SMIME/TLS lints (Rfc6125TlsServerSanLint, Rfc8398SmimeSanLint, Rfc8551EkuEmailProtectionLint) received the same '# Use-case applicability \u2014 operator contract' rustdoc treatment.",
+  "closed_at": "2026-05-14T13:23:44Z",
+  "compaction_level": 0,
+  "content_hash": "f6fcdcbd4988c4e31e5f7987534f4607acd9f412b617724de0fb08ca05d16c13",
+  "created_at": "2026-05-14T12:39:51Z",
+  "created_by": "Mark Atwood",
+  "description": "Same systemic issue as PKIX-hy2e.1, filed separately because the fixes are in different modules. Trigger and bad behavior identical: each lint declares applies_to() = SubjectKind::Leaf and applies its rule to every leaf regardless of intended cert use case. - rfc6125::Rfc6125TlsServerSanLint requires SAN dNSName or iPAddress \u2014 wrong for S/MIME leaves and code-signing leaves. - rfc8398::Rfc8398SmimeSanLint requires SAN rfc822Name or SmtpUTF8Mailbox \u2014 wrong for TLS server leaves and code-signing leaves. - rfc8551::Rfc8551EkuEmailProtectionLint requires EKU id-kp-emailProtection \u2014 wrong for TLS server leaves and code-signing leaves. Concrete contradiction: there is NO single leaf certificate that satisfies all four lints (rfc5280 EKU server-auth + rfc6125 TLS-server SAN + rfc8398 S/MIME SAN + rfc8551 emailProtection EKU) at once. A caller who naively registers 'all the RFC-conformance lints' against any leaf gets at least 2 mutually-exclusive Error findings. The pkix-profiles crate's BasicTlsProfile and BasicSmimeProfile presumably register only the appropriate subset, but the lints themselves don't enforce this and the rustdoc doesn't document that each lint is use-case-specific. Tracked as a single fix because the four lints share the same shape problem and the resolution is one design decision.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc6125TlsServerSanLint and Rfc8398SmimeSanLint share the Rfc5280EkuServerAuthLint false-positive shape",
+  "updated_at": "2026-05-14T13:23:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:39:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

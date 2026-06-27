@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Extracted verify_cert_signature<V> helper (RFC 5280 \u00a76.1.3(a)(1)). 23-line block replaced by 1-line call. working_spki update remains in chain_walk per design \u00a76/\u00a77. All 262 tests pass, no behaviour change.",
+  "closed_at": "2026-05-11T04:11:56Z",
+  "compaction_level": 0,
+  "content_hash": "a499a824de43d47d96f9359e81785064c72b3c7684f8f1452af33c43a51aec72",
+  "created_at": "2026-05-08T05:43:57Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.3(a)(1) signature verification (lines 2130\u20132152) into `pub(crate) fn verify_cert_signature<V: SignatureVerifier>(cert: &Certificate, working_spki: &SubjectPublicKeyInfoBorrowed, verifier: &V, index: usize) -> Result<()>`.\n\n## Risk\n\nLow. Pure cryptographic check.\n\n## Notes\n\n- `index: usize` is needed for `Error::SignatureInvalid { index }` construction.\n- Do NOT move the `working_spki` update into the helper \u2014 that update belongs in `chain_walk` (next-iteration state).\n\n## Acceptance\n\n- New helper.\n- chain_walk calls helper at the existing call point.\n- Tests + clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: H4 \u2014 extract verify_cert_signature<V> (~17 lines, \u00a76.1.3(a)(1))",
+  "updated_at": "2026-05-11T04:11:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4edbb8060cbed5bb6bd9debefe72fdfc69645ac2325589895d7a852ee218720f",
+  "created_at": "2026-05-14T19:44:16Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/lib.rs:226 (inside Error::Revoked):\n\n  #[cfg_attr(feature = \"serde\", serde(with = \"pkix_path::serde_der\"))]\n  serial: SerialNumber,\n\nThe `serde` feature on Error commits to a wire format. The wire format for the SerialNumber field is whatever pkix_path::serde_der currently produces. Callers persisting Error (audit logs, cache files, IPC) bind their wire layout to pkix-path's serde shape.\n\nWhat goes wrong:\n\n1. **Cross-crate wire-format coupling.** If pkix-path's serde_der module changes representation (e.g., from base64 to hex, from a string to an integer, from a JSON number to a JSON string), all persisted pkix-revocation::Error values from prior versions become unparseable. Callers cannot pin pkix-revocation independently of pkix-path for wire stability.\n\n2. **No documented stability contract on pkix_path::serde_der itself.** I have not read pkix-path's docs (read-only review of the diff), but for the api-contract analysis to give callers confidence, pkix-revocation's Error variant docs should either:\n   - state explicitly 'serialized form follows pkix-path::serde_der; see that module for stability guarantees', or\n   - include a doctest demonstrating the exact wire shape for forward compatibility checking.\n\n3. **CrlReason wire format is documented (PKIX-lnnl.12) but Error wire format is not.** The asymmetry is jarring: someone who reads PKIX-lnnl.12's careful documentation of CrlReason serialization is going to look for a similar explanation of SerialNumber and find none. Either both, or neither.\n\n4. **Serde features are described in non-negotiable #6 as 'SHOULD support serde::Serialize + Deserialize behind a `serde` feature flag for cross-process / persistent caches.'** That requirement implies wire-format stability matters; otherwise the cross-process use case is unreliable.\n\nRecommendation:\n- Add a rustdoc paragraph under #[cfg_attr(feature = \"serde\", ...)] OR on the Error enum itself stating: 'When the `serde` feature is enabled, Error::Revoked serializes via pkix_path::serde_der for the serial field. The wire format follows pkix-path's stability contract; pkix-revocation does not introduce an independent stability boundary for that field.'\n- Either ship a wire-format compatibility test, or note that callers needing wire stability across versions should pin both pkix-revocation and pkix-path together.\n\nThis is api-contract,versioning because the public commitment 'Error: Serialize' has unspecified semantics for the format. Pre-launch is the right moment to either document the format or commit to one.\n\nAcceptance: explicit rustdoc on Error::Revoked.serial's serde behavior, similar in spirit to PKIX-lnnl.12's CrlReason coverage.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "serde wire-format compatibility with pkix-path::serde_der is undocumented",
+  "updated_at": "2026-05-14T19:44:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:44:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

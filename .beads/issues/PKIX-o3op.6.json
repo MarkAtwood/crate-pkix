@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:02Z",
+  "compaction_level": 0,
+  "content_hash": "0b28fe09acc6d286a6af47da1f95d4b82f55351e2ed1ced1dfc98148022d1843",
+  "created_at": "2026-05-14T19:28:07Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: caller writes 'if let AiaError::UriUnsupported(scheme) = e { metrics::inc(\"aia.unsupported.\".to_string() + &scheme); }' expecting the payload to be the URI scheme.\n\nMaintenance consequence: pkix-aia/src/lib.rs:171-178 says: 'The inner String is typically the offending URI or its scheme (e.g. \"ldap://example.com/cn=ca\" or \"ldap\").' That is two distinct shapes \u2014 a full URI vs just the scheme \u2014 and the wording 'typically \u2026 or' explicitly accepts both. Downstream consumers cannot reliably split on '://', cannot reliably URL-parse, cannot reliably build metrics keys.\n\nWorse, two adapters can both emit UriUnsupported with different conventions, and the consumer cannot tell which one produced which. The serde-friendly Eq invariant (non-negotiable #6) means cache replay sees these as distinct, so the same upstream condition can produce two cache entries.\n\nFix options:\n(a) Pick scheme-only. Adapters strip to the scheme before constructing UriUnsupported. Easy to consume; loses the URI for logging (but the chain-build layer typically has the URI elsewhere).\n(b) Pick full URI. Adapters MUST pass the entire URI through. Consumers parse out the scheme.\n(c) Split into two variants: UriSchemeUnsupported(String) and UriMalformed(String). More precise; expands the surface.\n\nPicking either (a) or (b) is a doc fix plus an adapter contract note. The current text invites the divergence; this needs to be tight before pkix-aia-http and any future adapters land.\n\nThe existing test at lines 853-861 happens to use the full URI ('ldap://ca.example/cn=ca'). That is the test, not the contract. The contract is the rustdoc.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "UriUnsupported(String) payload semantics undefined: scheme vs full URI",
+  "updated_at": "2026-06-04T19:51:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:28:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

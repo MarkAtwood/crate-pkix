@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "citation and evaluated_at_unix added to Finding; cert_sha256/bundle_version deferred to v0.3 with doc note",
+  "closed_at": "2026-05-06T19:32:19Z",
+  "compaction_level": 0,
+  "content_hash": "74435124ca3fb4e49cce0a74aab0a8ffa8a70bb81fa9349597c84726382a8bb4",
+  "created_at": "2026-05-06T19:20:40Z",
+  "created_by": "Mark Atwood",
+  "description": "The current Finding struct (lint_id, result, cert_index) lacks the metadata needed for an 'evidence pack' export: a one-click bundle containing cert + path + findings + rule citations + rule provenance that operators can attach to CA help-desk tickets.\n\nAdd to Finding or to a new EvaluationReport wrapper:\n- rule_citation: &'static str (already in Lint::citation(), just needs threading through)\n- rule_bundle_version: &'static str (e.g. 'pkix-lint/cabf_tls_br v0.2.0, sourced from TLS BR SC-081')\n- evaluated_at_unix: u64 (when was the lint run)\n- cert_sha256: [u8; 32] (hash of the DER cert this finding applies to)\n\nThe evidence pack format is: JSON export of EvaluationReport, structured so SIEM/GRC tools can ingest it. OSCAL Assessment Results is the target schema for federal customers.\n\nThis is the highest-leverage feature for the CA ticket-filing workflow: eliminates the 'send me the cert details' round-trip.",
+  "ephemeral": 0,
+  "id": "PKIX-1p1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: Finding struct needs provenance metadata for evidence pack export",
+  "updated_at": "2026-05-06T19:32:19Z"
+}

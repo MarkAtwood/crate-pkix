@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T18:54:23Z",
+  "compaction_level": 0,
+  "content_hash": "8f4f0e1ce2072f0ab317498defb057aaded7d2c039fe26b33917a65e8b975dec",
+  "created_at": "2026-05-11T07:16:28Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why this is human-bound\n\nThe parent bead PKIX-emf1's description says:\n\n> pyca oracle: pass CRL bytes to the verifier (cryptography supports CRL with PolicyBuilder).\n\nThat premise is **incorrect** as of cryptography 48.0.0 (verified). cryptography.x509.verification.PolicyBuilder exposes only: build_client_verifier, build_server_verifier, extension_policies, max_chain_depth, store, time. There is no .crls(), no .with_revocation(), no integrated CRL checking. PolicyBuilder cannot consume CRL bytes.\n\ncryptography can PARSE CRLs (x509.load_pem_x509_crl) and check revocation state manually (CertificateRevocationList contains revoked entries) \u2014 but this requires implementing the CRL checker logic ourselves in the Python sidecar. That defeats the 'independent oracle' value of pyca to the extent the implementation reuses our own CRL parsing logic structurally.\n\n## Options\n\n1. **Roll a hand-written pyca CRL oracle.** Sidecar parses the CRL via cryptography's CRL types, looks up the EE's serial in the revoked list, and reports Fail/Pass accordingly. Honest oracle: independently implemented, uses cryptography's CRL parser (not its absent CRL-aware verifier). Adds ~50 LOC to the sidecar.\n\n2. **Drop pyca from CRL testcases.** When Chain.crls is non-empty, the pyca oracle returns a new 'unsupported' verdict (or skips and the classifier treats it as 'no data'). Only OpenSSL + pkix-path are compared for CRL behavior. Loosens the parent bead's '3 oracles' criterion.\n\n3. **Add a fourth oracle later (e.g., Bouncy Castle).** Out of scope per parent bead's 'no Bouncy Castle' constraint. Mentioned for completeness only.\n\n## Recommendation\n\nOption (1). Pyca's CRL TYPES are independently implemented (different DER decoder, different serial-number encoding, different reason-code mapping) even if we drive them by hand. A hand-written sidecar CRL check using pyca's CRL types is still a meaningful independent oracle for: CRL parse (does pyca accept this DER?), serial match (does pyca encode serials the same way?), and validity window check. The 'logic' we write in Python is the simple serial-search loop, which has near-zero divergence risk against our Rust loop.\n\nThe bead is human-labeled because (1) involves a non-trivial Python-side design (CRL validity window check policy, indirect-CRL handling, etc.) that maintainer should ratify, and (2) the parent bead's premise needs correcting in the description so future readers see the actual landscape.\n\n## Acceptance (if option 1)\n\n- [ ] pyca_oracle.py accepts crls (list of base64 DER) in the input JSON.\n- [ ] Sidecar parses CRLs via x509.load_der_x509_crl.\n- [ ] After verifier.verify() succeeds, sidecar iterates each cert in chain (or just the EE per RFC 5280 \u00a76.3.3 baseline) and looks up its serial in each CRL's revoked list.\n- [ ] If a serial is found: verdict = fail with reason 'pyca: certificate <serial> revoked by CRL'.\n- [ ] CRL validity window: reject CRLs whose nextUpdate is in the past.\n- [ ] CRL issuer match: only consider CRLs whose issuer matches the cert's issuer.\n- [ ] No indirect-CRL or delta-CRL handling \u2014 out of scope; document as 'CRL handling matches RFC 5280 \u00a76.3 baseline; indirect/delta CRLs untested'.\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Ratified 2026-05-11 (Mark): Option 1 \u2014 hand-roll ~50 LOC pyca CRL check in pyca_oracle.py.\n\nSidecar implementation:\n- Parse CRLs via x509.load_der_x509_crl on each entry of the input JSON's crls field (base64 DER).\n- Reject CRLs whose nextUpdate is in the past (validity window check).\n- Match CRL.issuer to cert.issuer; ignore CRLs whose issuer doesn't match the cert under check.\n- After verifier.verify() succeeds, look up EE cert's serial in each matching CRL's revoked-cert list.\n- If found: verdict = fail with reason 'pyca: certificate <serial> revoked by CRL'.\n- Document scope: 'CRL handling matches RFC 5280 \u00a76.3 baseline; indirect/delta CRLs untested.'\n\nRejected: Option 2 (drop pyca from CRL testcases \u2014 loses 3-oracle comparison).\n\nReady for autonomous claim.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide pyca oracle CRL strategy (no PolicyBuilder revocation support)",
+  "updated_at": "2026-05-11T18:54:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:28Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

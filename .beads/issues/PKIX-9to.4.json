@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:25:15Z",
+  "compaction_level": 0,
+  "content_hash": "155637b49508dbb2d4351160ff80853f1e2e4b1b25fe49b01e7e334ecde475ad",
+  "created_at": "2026-05-06T22:15:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs check_revocation_against_anchor (around line 348): verifies that crl.issuer matches anchor.subject, but does NOT verify that cert.tbs_certificate.issuer matches anchor.subject. OcspChecker::check_revocation_against_anchor correctly performs this check (ocsp.rs:225). A caller passing a cert issued by CA-B with an anchor for CA-A will receive Ok(()) (cert not found in CA-A's CRL) instead of an error indicating the wrong revocation source was used. In hard-fail revocation mode this silently passes a cert that should be checked against a different CRL.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker::check_revocation_against_anchor omits cert.issuer == anchor.subject check",
+  "updated_at": "2026-05-06T22:25:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:15:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

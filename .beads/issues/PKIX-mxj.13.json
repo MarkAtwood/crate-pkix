@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:59:29Z",
+  "compaction_level": 0,
+  "content_hash": "94043a28c091637339ca34414eec7e3ca57fdab725b2484a090b82f5e08a93df",
+  "created_at": "2026-05-07T03:51:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/tests/pkits_4_6_4_7.rs:311-316 \u2014 basic_constraints_corrupt_der_returns_malformed_certificate uses std::fs::read at runtime to load test fixtures, while all other tests in the file use pkits_cert() which also uses fs::read via CARGO_MANIFEST_DIR. Both approaches work but the corrupt-bc fixtures are stored in tests/fixtures/ (a different path than the PKITS fixtures in tests/pkits/certs/). Consider using include_bytes! for test/fixtures/ DER files to make the test hermetic and prevent breakage if the working directory changes. Minor: the comment says 'See pkix-path/tests/fixtures/gen-corrupt-bc.py if present, or the test comment in git' but neither reference is reliably available.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path test basic_constraints_corrupt_der uses fs::read instead of include_bytes",
+  "updated_at": "2026-05-07T03:59:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:51:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

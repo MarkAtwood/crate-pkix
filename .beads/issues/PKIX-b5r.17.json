@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: removed spurious #[allow(dead_code)] from OID_ANY_POLICY.",
+  "closed_at": "2026-05-05T16:08:34Z",
+  "compaction_level": 0,
+  "content_hash": "c5f4e373e654b5bec129432436dbab9310edff7514e4dcb2fd26d6e850d44a85",
+  "created_at": "2026-05-05T15:47:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:658\u2013660\n\n    /// OID for the anyPolicy wildcard (2.5.29.32.0 \u2014 a child of id-ce-certificatePolicies).\n    #[allow(dead_code)] // used by the policy state machine in a future child issue\n    const OID_ANY_POLICY: der::asn1::ObjectIdentifier = ...;\n\nThe comment says 'used by the policy state machine in a future child issue', but OID_ANY_POLICY is already referenced at 15 locations in the same file (lines 732, 734, 1598, 1642, 1789, 1790, 1823, 1842, 2062, 2070, 2094, 2118, 2131, 2136, 2154).  The allow(dead_code) attribute is now stale \u2014 the constant is clearly in use and the compiler would not warn about it.\n\nRemove the allow(dead_code) and update the comment to remove the 'future child issue' note.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID_ANY_POLICY has spurious #[allow(dead_code)] \u2014 it is used",
+  "updated_at": "2026-05-05T16:08:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

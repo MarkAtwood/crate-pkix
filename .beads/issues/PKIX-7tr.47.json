@@ -1,0 +1,31 @@
+{
+  "close_reason": "duplicate of PKIX-7tr.33",
+  "closed_at": "2026-05-02T13:45:51Z",
+  "compaction_level": 0,
+  "content_hash": "6a426d1fc6c0a06ec3fc8c22ffb8d08b8ae5c6df0941513f216a6aeec7165f70",
+  "created_at": "2026-05-02T13:45:30Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor and ValidationPolicy are public configuration types that callers will commonly want to inspect (Debug) and duplicate (Clone). Neither derives Clone or Debug. Their fields are x509_cert::name::Name (derives Clone, Debug) and spki::SubjectPublicKeyInfoOwned (derives Clone, Debug) for TrustAnchor; and u8, u64, bool for ValidationPolicy \u2014 all Clone+Debug capable. Without Clone, callers building dynamic trust stores must reconstruct TrustAnchor from raw fields. Without Debug, error messages and test assertions cannot print the policy or anchor. Add #[derive(Clone, Debug)] to both types. Also add PartialEq to ValidationPolicy (all fields are PartialEq) since it's useful in tests.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.47",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing Clone and Debug derives on TrustAnchor and ValidationPolicy",
+  "updated_at": "2026-05-02T13:45:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:45:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

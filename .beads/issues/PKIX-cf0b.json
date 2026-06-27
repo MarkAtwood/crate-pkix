@@ -1,0 +1,20 @@
+{
+  "compaction_level": 0,
+  "content_hash": "5b48c0b96f42f9870b52e6e3b5a299b4a84d477ea4f7dfad285a91e92f2b76f6",
+  "created_at": "2026-06-04T18:08:30Z",
+  "created_by": "Mark Atwood",
+  "description": "Skoll REVIEW MEDIUM-12 finding (PKIX-szmo.7 triage). In pkix-lint/src/oscal/profile.rs around line 334, resolve_profile uses available_ids.retain(|id| wanted.contains(id)) which silently drops any control ID present in the Profile's include-controls but absent from the source Catalog. A typo in a Profile JSON control ID is silently ignored rather than surfaced as an error. Fix: after retain, check if wanted has entries not in the retained set and return a new ParseError variant (e.g., UnknownControlId) for the first unrecognized ID.",
+  "ephemeral": 0,
+  "id": "PKIX-cf0b",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-lint: OSCAL profile resolver silently drops unknown control IDs",
+  "updated_at": "2026-06-04T18:08:30Z"
+}

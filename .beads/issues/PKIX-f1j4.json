@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "1e4a005d867b94e78a9957c6f54bdc9134365bda2ed7896553d0460709e3d181",
+  "created_at": "2026-05-14T18:53:20Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T185245Z-130764",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T185245Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-revocation-http since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 async fetcher and cache are coherent designs that mirror the sync side faithfully. Two correctness bugs (cache time-source mismatch, rollback TOCTOU) are real; default-no-timeout reference clients are a real DoS footgun. None are unrecoverable pre-1.0; all are pre-launch-window fixes. The biggest risk is that the reference clients ship as the de-facto default before timeout defaults are added.\nConfidence: 75% chance of missed bug. Least confident flags: f1j4.2 (TOCTOU race \u2014 I have not constructed a stress test; the analysis is by reading; race may have a guard I missed in the InMemoryCache impl I didn't dig into deeply). Also f1j4.5 (replicated anchor-default footgun \u2014 sync pkix-revocation has it too and this could be a deliberate decision I'm second-guessing). Uncertainty driven by: (a) not having run the test suite to confirm behaviour matches docstrings, (b) not having inspected pkix-revocation's CrlChecker / OcspChecker internals to confirm the validity-window re-check that masks the f1j4.1 correctness bug actually exists in current code, (c) not having traced reqwest 0.12's exact timeout-default semantics \u2014 I'm asserting 'no default timeout' from prior knowledge of reqwest 0.11; 0.12 may have changed (low probability). Would raise confidence if: I could run `cargo test --all-features -p pkix-revocation-http` and confirm no behavioural regressions, AND read pkix-revocation/src/crl.rs to verify CrlChecker::new still re-checks the validity window after parse, AND skim reqwest 0.12.28's CHANGELOG for timeout-default changes.\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-revocation-http since 24701180 (async fetcher + cache)",
+  "updated_at": "2026-05-14T19:05:33Z"
+}

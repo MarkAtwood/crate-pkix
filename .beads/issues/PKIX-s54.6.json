@@ -1,0 +1,31 @@
+{
+  "close_reason": "fixed: subject clone moved after subject_is_empty guard",
+  "closed_at": "2026-05-03T13:37:55Z",
+  "compaction_level": 0,
+  "content_hash": "9f7b6fa499c38d2b1ff11008d20727211ea9cc7c09914ebfd0c5c905ff7808c7",
+  "created_at": "2026-05-03T13:31:54Z",
+  "created_by": "Mark Atwood",
+  "description": "O(1) heap alloc per cert \u2014 line 1444 clones subject Name into GeneralName::DirectoryName unconditionally before subject_is_empty check on line 1445. Empty-subject certs incur a wasted allocation. Fix: check subject_is_empty first, defer the clone to the branch that uses it.",
+  "ephemeral": 0,
+  "id": "PKIX-s54.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_name_constraints: clone subject before empty check",
+  "updated_at": "2026-05-03T13:37:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:31:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "cRLSign enforcement already has #[ignore] tests in \u00a74.7.4/\u00a74.7.5 with documented reason. Tracked for future policy layer.",
+  "closed_at": "2026-05-02T17:48:12Z",
+  "compaction_level": 0,
+  "content_hash": "ce9298d0bda05cdd676555189654ed06972feb25561a9d63eead470ff1283a35",
+  "created_at": "2026-05-02T17:26:27Z",
+  "created_by": "Mark Atwood",
+  "description": "PKITS \u00a74.7.4 and \u00a74.7.5 require that an intermediate with KeyUsage cRLSign=false MUST NOT validate. However, the certs in question (keyUsageCriticalcRLSignFalseCACert) DO have keyCertSign set. PKITS is testing a stricter policy than RFC 5280 \u00a76.1 \u2014 the RFC only requires keyCertSign for path validation, not cRLSign. The current #[ignore] annotation and its comment ('RFC 5280 \u00a76.1 only requires keyCertSign') are correct. The issue: the test body asserts result.is_err() but provides no comment explaining WHY we deviate from PKITS here. A future maintainer reading this will be confused. The ignore comment is correct, but the test body should document that our implementation is RFC-conforming and that PKITS \u00a74.7.4/4.7.5 test a stricter-than-RFC policy. This is a readability/documentation issue, not a correctness bug.",
+  "ephemeral": 0,
+  "id": "PKIX-841.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "KeyUsage cRLSign-only intermediate accepted (PKITS \u00a74.7.4/\u00a74.7.5)",
+  "updated_at": "2026-05-02T17:48:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:26:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented option (a) from the bead: added AssessmentResultsOptions struct (with Default returning the documented placeholder, plus with_import_ap_href builder) and assessment_results_with_options entry point. Bare assessment_results stays as a thin wrapper using default options. Operators wiring real OSCAL toolchains can now override import-ap.href to a real Assessment Plan URI. Two regression tests lock both paths. New type added to Send+Sync compile-time assertion block. 302 tests pass; workspace builds clean.",
+  "closed_at": "2026-05-14T17:21:07Z",
+  "compaction_level": 0,
+  "content_hash": "8ac5b05cf1aeae61fb6cf5467bddc015517fe4f6c1ab2f6f9ec90b6a72ab225a",
+  "created_at": "2026-05-14T15:43:18Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs:170-175 hardcodes import-ap.href = '#assessment-plan-placeholder'. The comment says 'Real deployments override.' but the public API offers no override slot \u2014 the assessment_results() function takes only an EvaluationReport.\n\nFailure mode: every consumer who emits OSCAL with this crate and passes the output through a real OSCAL toolchain (oscal-cli validate, Trestle, etc.) will get a validation failure on day one. The first one to hit it will file a 'pkix-lint emits invalid OSCAL' bug, and the fix is either (a) add an emit_with_options builder, (b) document loudly that callers MUST post-edit the returned Value, or (c) accept that this is a half-built emitter not ready for downstream validators.\n\nMaintainer consequence: this is a class of issue reports waiting to be filed. The bd tracker should record it before it gets reported externally. Pick one: a) ship the option, b) put a #[deprecated(since=..)] on the bare function until an emit_with_options ships, or c) add a panicking debug_assert that an override env var is set so devs hit it locally.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL assessment_results emits placeholder import-ap.href that produces invalid OSCAL by default",
+  "updated_at": "2026-05-14T17:21:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:43:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

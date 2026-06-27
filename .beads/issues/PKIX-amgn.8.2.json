@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T00:26:15Z",
+  "compaction_level": 0,
+  "content_hash": "68e9cf1b40c92b58f9236628e7c04aec393d3b13d4c299147531871ce04c534b",
+  "created_at": "2026-05-12T00:16:51Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer PKIX-amgn.8 decisions (2026-05-11): the maintainer-only 'run zlint -listLintsJSON, transform to OSCAL Catalog JSON, write vendored output' tool lives as a Rust dev-only sub-crate in the workspace. publish=false. Reuses OSCAL types from pkix-lint at compile time; avoids JSON-transform duplication.\n\n## What\n\n1. Add new workspace member: `pkix-lint-cabf-refresh` under workspace root.\n2. Cargo.toml:\n   - `publish = false`\n   - `rust-version` matches workspace MSRV\n   - Binary target (default), no library\n   - Deps:\n     - `serde = { workspace = true, features = [\"derive\"] }`\n     - `serde_json = { workspace = true }`\n     - `pkix-lint = { workspace = true, features = [\"oscal\"] }` (for OSCAL types if needed)\n     - `clap = { workspace = true, features = [\"derive\"] }` (CLI args; or anyhow + simpler args, TBD by impl)\n3. src/main.rs stub:\n   - Parses CLI args: --zlint-output <path>, --output-dir <path>, --zlint-sha <sha>\n   - Currently prints args and exits 0 (transform logic lands in PKIX-amgn.8.3)\n4. README.md at crate root describing the maintainer workflow.\n5. Workspace Cargo.toml: add `pkix-lint-cabf-refresh` to members list.\n\n## Acceptance\n\n- [ ] `cargo check -p pkix-lint-cabf-refresh` clean.\n- [ ] `cargo run -p pkix-lint-cabf-refresh -- --help` shows CLI usage.\n- [ ] Workspace publish-check (`cargo publish --dry-run -p <crate>`) skips this crate due to publish=false.\n- [ ] No source code transforms yet (PKIX-amgn.8.3 does that).\n\n## Out of scope\n\n- Implementing the zlint JSON -> OSCAL Catalog transform (PKIX-amgn.8.3).\n- Vendoring the first catalog output (PKIX-amgn.8.4).\n\n## Depends on\n\nPKIX-amgn.8.1 (local zlint setup \u2014 for end-to-end smoke test of the stub).\n\n## Filed by\n\nDecomposed from PKIX-amgn.8 per Mark's 2026-05-11 decisions.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-lint-cabf-refresh dev-only sub-crate skeleton",
+  "updated_at": "2026-05-12T00:26:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:16:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T17:16:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

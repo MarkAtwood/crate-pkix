@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.18",
+  "title": "CrlChecker docstring claims Ok(()) for not-covered IDP scope, but code returns OutOfScope",
+  "description": "In pkix-revocation/src/crl.rs, the CrlChecker struct-level rustdoc (lines 68-80) claims that check_revocation returns Ok(()) in two cases: (1) not revoked, and (2) not covered by IDP scope flags. It explicitly says 'These two outcomes are indistinguishable from the caller's perspective.' However, the actual code (lines 620-636) returns Err(Error::OutOfScope(...)) for IDP scope mismatches, which IS distinguishable. The rustdoc is stale \u2014 it predates the OutOfScope variant addition. What goes wrong: a caller reading the struct-level doc believes Ok(()) may mean 'not covered' and writes defensive code to handle that ambiguity, when in fact OutOfScope is now a distinct error. Conversely, a caller who only reads the struct doc may not realize they need to handle OutOfScope in their error matching. Location: /home/mark/PROJECT/PKIX/pkix-revocation/src/crl.rs lines 66-80.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:50Z",
+  "updated_at": "2026-06-15T16:58:16Z",
+  "closed_at": "2026-06-15T16:58:16Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:50"
+    }
+  ]
+}

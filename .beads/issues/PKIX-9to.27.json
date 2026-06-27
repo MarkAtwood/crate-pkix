@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:27:21Z",
+  "compaction_level": 0,
+  "content_hash": "7251573fd366cbad3a2912474a41b3337067a1b3af21cf3bb12e1668476ef7cf",
+  "created_at": "2026-05-06T22:20:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:329-333: DeviationScope::IssuerDnContains matching calls cert.tbs_certificate.issuer.to_string() (one String allocation) then .to_lowercase() (second String allocation) on every call to matches(). The pre-lowercased invariant already handles the substring, so the double allocation is inherent to the current approach of comparing through the Display impl of x509_cert::name::Name. Idiomatic fix: store the issuer DN as a pre-lowercased String at DeviationScope construction time (enforced at DeviationStore::add) and compare with to_lowercase() on the cert string only, or cache the lowercased issuer string in the hot loop. This is the O(N) allocations problem on the hot path noted in the architecture (each cert evaluation allocates two Strings).",
+  "ephemeral": 0,
+  "id": "PKIX-9to.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "The to_string().to_lowercase() is inherent to case-insensitive substring matching against a Name. Avoiding it would require storing the lowercased DN string in the cert index, which is out of scope. Deviations are evaluated rarely (< 10 per chain). Not worth refactoring.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "IssuerDnContains::matches double-allocates on every call",
+  "updated_at": "2026-05-06T22:27:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

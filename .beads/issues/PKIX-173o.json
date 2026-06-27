@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:41:57Z",
+  "compaction_level": 0,
+  "content_hash": "95586ce59f009dc85adb653a64a355f9814af84311cfc59da2ee6b3f8572a679",
+  "created_at": "2026-05-07T20:27:44Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n99 occurrences across the workspace use the type's own name inside `impl` blocks where `Self` would be more idiomatic. Clippy's `clippy::use_self` flags every one.\n\n## Examples\n\n```\npkix-lint/src/lib.rs:376:13\n            LintResult::Pass => f.write_str(\"Pass\"),\n            ^^^^^^^^^^ help: use the applicable keyword: `Self`\n\npkix-lint/src/lib.rs:377:13\n            LintResult::NotApplicable => f.write_str(\"NotApplicable\"),\n\npkix-path/src/lib.rs:1540:18 (and many others in same impl blocks)\n```\n\n## Distribution\n\nSample by crate (count of `unnecessary structure name repetition` warnings):\n\n- pkix-lint: ~50+ (LintResult, DeviationAddError, DeviationAction, Deviation, etc.)\n- pkix-path: ~25 (Error, NcTypeMask)\n- pkix-revocation: ~15\n- others: scattered\n\n## Fix\n\nMechanical \u2014 `cargo clippy --fix --workspace -- -W clippy::use_self` handles most. Best to do alongside the `clippy::doc_markdown` cleanup (separate finding) since both are bulk autofix passes.\n\n## Priority\n\nP3 \u2014 bulk idiom fix; not a bug. Filed as one issue rather than 99 because the fix is uniform.\n",
+  "ephemeral": 0,
+  "id": "PKIX-173o",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: 99 instances of clippy::use_self across workspace (Type::Variant inside impl blocks)",
+  "updated_at": "2026-05-07T21:41:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

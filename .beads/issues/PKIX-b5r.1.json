@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added has_delta_crl_indicator() that checks OID presence without parsing value, used in with_delta() base check.",
+  "closed_at": "2026-05-05T16:08:04Z",
+  "compaction_level": 0,
+  "content_hash": "ad4b3cd96e91a603390ddf180651511dca00af00484233f4ef13a523c317ff35",
+  "created_at": "2026-05-05T15:45:08Z",
+  "created_by": "Mark Atwood",
+  "description": "**Bug**: `with_delta` at crl.rs:124 checks `base_crl_number(&base_crl).is_some()` to detect whether the supplied base is itself a delta CRL. But `base_crl_number` looks for `OID_DELTA_CRL_INDICATOR` (2.5.29.27), and the check is \"if present, fail\". So a base CRL that happens to NOT have deltaCRLIndicator passes this check correctly.\n\nHowever the function is named `base_crl_number` but actually returns the *BaseCRLNumber* from the *deltaCRLIndicator* extension, while `crl_number` returns the plain CRLNumber (2.5.29.20). The names are confusing and the comment at crl.rs:122-126 reads 'The base CRL MUST NOT itself be a delta CRL \u2014 checked by base_crl_number returning Some'. This is semantically correct but a maintenance trap: anyone reading the code will expect `base_crl_number` to return the base CRL's number, not the delta indicator.\n\n**Real correctness bug**: if the base CRL happens to have a malformed deltaCRLIndicator extension (present but with unparseable content), `base_crl_number` returns `None` (fails silently) and the check passes \u2014 meaning a malformed delta CRL would be accepted as a base CRL. A properly-structured delta CRL with a parseable indicator is caught; a delta CRL with a *corrupt* indicator is let through as a 'base'.\n\n**Location**: pkix-revocation/src/crl.rs:122-126, functions base_crl_number (line 354) and crl_number (line 332).\n\n**Fix**: Rename `base_crl_number` to `delta_crl_indicator` or similar. Add a separate check: look for the *presence* of the OID_DELTA_CRL_INDICATOR extension (regardless of whether it decodes) to classify a CRL as a delta. If the extension is present but unparseable, treat it as a delta (fail-closed). Proposed:\\n\\n```rust\\nfn is_delta_crl(crl: &CertificateList) -> bool {\\n    crl.tbs_cert_list\\n        .crl_extensions\\n        .as_deref()\\n        .unwrap_or(&[])\\n        .iter()\\n        .any(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)\\n}\\n```\\n\\nAnd use `is_delta_crl(&base_crl)` at line 124 and `!is_delta_crl(&delta_crl)` at line 130.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "with_delta: base detection uses wrong OID",
+  "updated_at": "2026-05-05T16:08:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:45:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

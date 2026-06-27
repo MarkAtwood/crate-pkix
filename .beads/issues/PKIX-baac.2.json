@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T08:45:08Z",
+  "compaction_level": 0,
+  "content_hash": "9d723047b84293f27aa8baa48678ea26173bb04792709a1cd5b04b9dc91099a1",
+  "created_at": "2026-05-11T08:19:06Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nSecond foundation piece for PKIX-baac. SCT signature verification (child C) needs the log's public key keyed by log_id; the log list is where that comes from.\n\n## What\n\nA pluggable `CtLogList` type that maps log_id (SHA-256 of pubkey DER, 32 bytes) \u2192 log public key DER. Plus a loader for Google/Chrome's log_list.json schema.\n\n**Google log_list.json schema** (https://www.gstatic.com/ct/log_list/v3/log_list.json):\n\n```json\n{\n  \"operators\": [\n    {\n      \"name\": \"Google\",\n      \"logs\": [\n        {\n          \"description\": \"Google 'Argon2024' log\",\n          \"log_id\": \"<base64 SHA-256(pubkey)>\",\n          \"key\": \"<base64 DER subjectPublicKeyInfo>\",\n          \"url\": \"https://ct.googleapis.com/logs/argon2024/\",\n          \"state\": { \"usable\": { \"timestamp\": \"...\" } },\n          \"temporal_interval\": { ... }\n        }\n      ]\n    }\n  ]\n}\n```\n\n## Public API\n\n```rust\npub struct CtLogList {\n    logs: BTreeMap<[u8; 32], CtLog>,\n}\n\npub struct CtLog {\n    pub log_id: [u8; 32],\n    pub key_der: Vec<u8>,          // SubjectPublicKeyInfo\n    pub description: alloc::string::String,\n    pub url: alloc::string::String,\n    pub usable_from_ms: Option<u64>,\n    pub retired_at_ms: Option<u64>,\n}\n\nimpl CtLogList {\n    pub fn new() -> Self;\n    pub fn insert(&mut self, log: CtLog);\n    pub fn get(&self, log_id: &[u8; 32]) -> Option<&CtLog>;\n    pub fn len(&self) -> usize;\n    pub fn is_empty(&self) -> bool;\n\n    /// Parse Chrome/Google log_list.json schema v3.\n    /// Behind feature 'log-list-json' so the core crate stays no_std + zero JSON deps.\n    #[cfg(feature = \"log-list-json\")]\n    pub fn from_google_log_list_json(json: &str) -> Result<Self, Error>;\n}\n```\n\nThe JSON loader gets its own feature flag \u2014 keep the core `CtLogList` no_std with no JSON deps. Consumers who don't want JSON can populate via `insert()` directly.\n\n## Validation\n\n- log_id MUST equal SHA-256(pubkey_der) \u2014 verify this when inserting; reject mismatches.\n- `state.usable.timestamp` (ms since epoch) \u2192 `usable_from_ms` for time-windowed validation later.\n\n## Test fixtures + oracle\n\nFetch a current log_list.json snapshot into `pkix-ct/tests/fixtures/log_list_v3_snapshot.json` with a one-line provenance comment in the test file. Independent oracle: Chrome's published list \u2014 what we parse must match Chrome's view.\n\n## Acceptance\n\n- [ ] `CtLogList` with insert/get/len/is_empty.\n- [ ] log_id \u21d4 SHA-256(pubkey_der) consistency check enforced.\n- [ ] `from_google_log_list_json` parses a real snapshot, behind feature `log-list-json`.\n- [ ] Tests parse the snapshot and assert log count, look up at least 3 known log_ids by their public-record SHA-256.\n\n## Effort\n\n~150 lines + tests. ~half a day.\n\n## Filed as\n\nChild .2 of PKIX-baac per its recommended decomposition.",
+  "ephemeral": 0,
+  "id": "PKIX-baac.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: CT log list type and Google-format JSON loader",
+  "updated_at": "2026-05-11T08:45:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T01:19:06Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

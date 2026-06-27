@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added [features] default=[]/std=[...] to pkix-ct/Cargo.toml, #![cfg_attr(not(feature='std'), no_std)] to lib.rs, gated impl std::error::Error behind #[cfg(feature='std')]. Builds both with and without --all-features. Now consistent with pkix-ac.",
+  "closed_at": "2026-05-07T22:25:12Z",
+  "compaction_level": 0,
+  "content_hash": "f72ca39d0ac368ee67127b36444af5068d6e039547b283f7a9b37bba0046b0a9",
+  "created_at": "2026-05-07T22:02:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Peer stub crates pkix-ac, pkix-composite both have:\n  #![cfg_attr(not(feature = \"std\"), no_std)]\n  [features]\n  default = []\n  std     = [...]\n  impl std::error::Error for Error  -> behind #[cfg(feature = \"std\")]\n\npkix-ct/src/lib.rs is std-only with no `std` feature gate at all (line 79 has `impl std::error::Error for Error` unconditionally), and Cargo.toml has no [features] section. The crate-level `# Limitations` says only 'Not yet implemented'.\n\nThis is inconsistent: pkix-ct is the only non-no_std stub. If it stays std-only, that's a deliberate choice and should be documented. If the intent is for pkix-ct to eventually be no_std-capable (parsing SCT extensions doesn't require networking), the std feature should be added now to lock in the surface.\n\nSeverity: P3 / opinion. Not a defect of the current implementation; a consistency/forward-compat concern.\n\nFix: add to pkix-ct/Cargo.toml:\n  [features]\n  default = []\n  std     = [\"der/std\", \"x509-cert/std\"]\n\nAnd to lib.rs:\n  #![cfg_attr(not(feature = \"std\"), no_std)]\n  ...\n  #[cfg(feature = \"std\")]\n  impl std::error::Error for Error {}\n\nPass-1 attribution: not addressed \u2014 the stub-crate version bump (PKIX-gdvf) only changed Cargo.toml versions, not feature shape.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.10",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-ct uses std::error::Error unconditionally without an std feature gate (inconsistent with peer stubs)",
+  "updated_at": "2026-05-07T22:25:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:02:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "44c0b99060f60debae4f01ecf11aa8ea4d27e565a50ed3727cec61db9baa7629",
+  "created_at": "2026-05-14T18:11:17Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/Cargo.toml lines 23-30:\n\n    serde = [\n        \"dep:serde\",\n        \"pkix-path/serde\",\n        \"pkix-path-builder/serde\",\n        \"pkix-revocation/serde\",\n        \"pkix-identity/serde\",\n        \"pkix-aia/serde\",\n    ]\n\nEnabling pkix-chain's `serde` feature transitively enables `serde` on five upstream crates. The Error type (lines 147-243) carries variants that wrap each upstream's error types (Error::Path(pkix_path::Error), Error::Revocation(pkix_revocation::Error), etc.). The serde wire format of pkix_chain::Error is therefore the union of:\n\n- pkix_path::Error's serde format (every variant + field representation)\n- pkix_revocation::Error's serde format\n- pkix_identity::IdentityError's serde format\n- pkix_aia::AiaError's serde format\n- pkix_path_builder::Error's serde format\n\nPLUS pkix-chain's own ProfileViolation, OcspDelegation, and AiaDepthExceeded variants.\n\nWHY IT MATTERS:\n\nThe slash-command checklist for versioning calls out:\n\n> Cargo features added that change public types or method signatures conditionally \u2014 the API surface depends on the feature set in ways callers may not realize.\n\nTwo concrete consequences:\n\n1. **Serialized errors are a cross-crate contract.** A consumer persisting `serde_json::to_string(&pkix_chain::Error)` to a database / IPC channel / log file is depending on five upstream crates' serde formats simultaneously. Any one of them renaming a variant or restructuring a field changes the serialized output. Cross-version interop (one node on pkix-aia 0.1, another on 0.2) requires every upstream to maintain serde stability.\n\n2. **Future serde-format choices are foreclosed.** If pkix-aia's maintainer decides to switch from variant-as-enum to variant-as-tagged-object for better forward-compat, every pkix-chain consumer is impacted on the next minor bump. pkix-chain has zero visibility into this decision and no veto.\n\nThe CHANGELOG entry for PKIX-2l0v.1 acknowledges adding serde derives but does NOT document the cross-crate version dependency this creates. AGENTS.md non-negotiable #6 names serde support as \"SHOULD support `serde::Serialize + Deserialize` behind a `serde` feature flag for cross-process / persistent caches\" \u2014 but the workspace policy does not pin the serde format itself.\n\nOPTIONS:\n\n(a) **Document the cross-crate serde version pin.** Add a \"Stability\" section to lib.rs's module rustdoc, and to the CHANGELOG, stating that \"the serde wire format of pkix_chain::Error is the union of the serde formats of all wrapped upstream errors; changes to those formats are transitively breaking for pkix-chain consumers.\" Consumers then know to pin pkix-chain alongside its upstreams in lockstep, the same way the workspace already does for inter-crate releases.\n\n(b) **Use a local serializable error representation.** Implement `Serialize` on pkix_chain::Error manually by mapping each variant to a stable wire format owned by pkix-chain. Deserialize cannot recover the inner upstream Error structure without an inverse map, but a stable string-based representation (variant tag + message + source-chain Display strings) gives consumers a stable diagnostic format. Less expressive, more stable.\n\n(c) **Document but don't constrain.** Accept the lock-in as the natural cost of carrying upstream errors and leave it at (a)'s documentation step. The maintenance burden is real but the contract is clear.\n\nThis is closely related to PKIX-sqek.25 (the broader `pub use pkix_X::{self, ...}` lock-in) \u2014 both surface variants of the same underlying decision: pkix-chain is a re-exporting facade, not a wrapping abstraction. The serde feature makes the lock-in worse because it adds a wire-format dimension on top of the type-level dimension.\n\nPRE-1.0 FRAMING: locking the serde wire format pre-1.0 is free. The CHANGELOG and a Stability section together create the contract; once 1.0 ships, every upstream serde-format change is a workspace-coordinated event. Either pkix-chain accepts the upstream's serde format as part of its own contract, or it doesn't expose upstream errors at all (option b).",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "serde feature is all-or-nothing across upstream crates: serde wire format becomes a cross-crate stability contract",
+  "updated_at": "2026-05-14T18:11:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:11:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

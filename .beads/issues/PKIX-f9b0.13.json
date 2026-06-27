@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "enumerate is already idiomatic from prior fix; windows(2) would complicate anchor handling",
+  "closed_at": "2026-05-07T17:32:25Z",
+  "compaction_level": 0,
+  "content_hash": "85d361e041331bc48764e43eda8fd7252d33fe5b76e5e3fa5d8424f2852334ae",
+  "created_at": "2026-05-07T17:22:36Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:160-169 \u2014 The revocation loop uses manual index arithmetic (`i + 1 < chain.len()`, `chain[i + 1]`) to pair each cert with its issuer. Rust idiom is to use `.windows(2)` for adjacent-pair iteration, reducing index noise and making the pairing intent explicit. The last-cert / anchor case can be handled by processing the `chain.last()` element separately before or after the windows loop. This is a readability improvement with no functional impact; the current code is correct. Fix sketch:\\n\\n```rust\\nfor window in chain.windows(2) {\\n    revocation.check_revocation(&window[0], &window[1])?;\\n}\\nif let Some(last) = chain.last() {\\n    revocation.check_revocation_against_anchor(last, &anchors[validated.anchor_index])?;\\n}\\n```",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-chain] revocation loop: index arithmetic, prefer windows(2) idiom",
+  "updated_at": "2026-05-07T17:32:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

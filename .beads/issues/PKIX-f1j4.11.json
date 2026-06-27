@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1d7f303b98193c32552cc8a0d4a9a0453faeb16ac9cae5dae863c98fc814f851",
+  "created_at": "2026-05-14T18:57:47Z",
+  "created_by": "Mark Atwood",
+  "description": "src/crl.rs:101-104, src/ocsp.rs:104-110, src/cache.rs:640-643/809-815, async_crl.rs:79-81, async_ocsp.rs:79-85: every all-URLs-failed path constructs `RevocationFetchFailed { description: format!(\"all {} URL(s) failed: {}\", N, joined) }`. The per-URL details \u2014 URL, FetchError variant, status code \u2014 are baked into a String.\n\nOperator scenarios that the unstructured format defeats:\n- 'Alert me if any single OCSP URL hits >50% 503 rate' \u2014 must regex-scrape the description string.\n- 'Retry the URL that failed with HTTP 502, skip the one that failed with TLS error' \u2014 same.\n- 'Track per-CA OCSP availability' \u2014 same.\n\nMaintenance consequence: every consumer that wants telemetry will either parse the description string (fragile to format drift), or implement their own RevocationChecker wrapper that bypasses the all-failed aggregation. The crate could expose a structured form:\n\n    pub struct PerUrlFailure { pub url: String, pub error: FetchOrParseError }\n\nand wrap it as either a new Error variant or as RevocationFetchFailed { failures: Vec<PerUrlFailure> } \u2014 the latter is a pkix-revocation::Error change, out of scope. The former \u2014 adding a new variant \u2014 could be done downstream of #non_exhaustive being already on pkix_revocation::Error.\n\nRecommendation: leave description as a fallback string, but propose a follow-up in pkix-revocation to add a RevocationFetchFailedWithFailures { failures: Vec<...> } variant and have the http crate emit the new variant. Cross-crate change. Track separately.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "RevocationFetchFailed.description is unstructured \u2014 operators can't telemetry per-URL failures",
+  "updated_at": "2026-05-14T18:57:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

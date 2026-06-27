@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:02Z",
+  "compaction_level": 0,
+  "content_hash": "813063de6e387f37426c4f45da14b30baf70ac3338ea9bf2eae6316880fc0be4",
+  "created_at": "2026-05-14T19:37:18Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: pkix-revocation/CHANGELOG.md lines 22-24 (the 1.0.0 entry for the serde feature) says: 'pkix-revocation::DerError is now a re-export of pkix_path::DerError rather than an independent type with identical shape; pattern matches still work, constructions via the (formerly tuple) DerError(e) syntax now use DerError::new(e).'\n\nVerifiable claim: 'pattern matches still work.'\n\nActual state: pkix_path::DerError is now `pub struct DerError { inner: Option<der::Error>, message: BoxStr }` with both fields private (pkix-path/src/lib.rs:130-148). External consumers cannot use ANY positional or named-field pattern. A consumer who previously wrote:\n\n    if let Error::CrlParseError(DerError(_)) = err { ... }\n\nnow sees a hard compile error: 'expected tuple struct or tuple variant, found struct `DerError`.' The migration story in the CHANGELOG is wrong.\n\nBad behavior: a 1.0 consumer reading the migration notes will believe their pattern matches still compile, hit a compile error, and have to figure out the actual fix on their own.\n\nFix: rewrite the CHANGELOG sentence to:\n'Pattern matches against the inner DerError tuple form no longer compile (DerError is now a struct with private fields, not a tuple struct). Match the outer Error::CrlParseError(_) variant instead, or bind by name and call Display: `if let Error::CrlParseError(e) = err { eprintln!(\"{e}\"); }.`'\n\nTradeoff: this is pre-1.0 (0.x version is allowed to break things per AGENTS.md framing). The fix is purely documentation accuracy.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CHANGELOG: 'pattern matches still work' for DerError refactor is inaccurate",
+  "updated_at": "2026-06-04T19:51:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:37:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

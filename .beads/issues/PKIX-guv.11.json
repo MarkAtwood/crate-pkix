@@ -1,0 +1,31 @@
+{
+  "close_reason": "Design decision recorded \u2014 producedAt future-date hard-fail is correct and worth defending.",
+  "closed_at": "2026-05-02T20:16:26Z",
+  "compaction_level": 0,
+  "content_hash": "9ff46a4aea602df738355aaedaa049f425b0cfeff636bacb345a50ac6820c328",
+  "created_at": "2026-05-02T20:12:26Z",
+  "created_by": "Mark Atwood",
+  "description": "OcspChecker rejects responses with producedAt > now (returns OcspStatusUnknown). A contributor might suggest this is too strict since the response content could still be valid. Correct response: a future-dated producedAt indicates clock skew or a pre-generated response \u2014 neither situation should be trusted for revocation status, and hard-fail is the only safe default for a security-sensitive check.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker producedAt future-date rejection: correct hard-fail",
+  "updated_at": "2026-05-02T20:16:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:12:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

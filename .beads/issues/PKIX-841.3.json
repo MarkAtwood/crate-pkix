@@ -1,0 +1,31 @@
+{
+  "close_reason": "Already tracked and documented in rustdoc. The max_path_len comment explains the counting convention clearly. Self-issued counting ties to PKIX-841.2 scope.",
+  "closed_at": "2026-05-02T17:36:06Z",
+  "compaction_level": 0,
+  "content_hash": "bc818f6c625ab126ae1d73c41f8a93fdce06128c7e8bb571f9dc3f7086747b93",
+  "created_at": "2026-05-02T17:25:57Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path computes num_intermediates = chain.len() - 1 and compares against policy.max_path_len. The rustdoc on ValidationPolicy says 'chain of [leaf] is depth 0; [leaf, intermediate, root] is depth 1 (one intermediate).' However RFC 5280 \u00a76.1.2 initialises max_path_length = n (the number of certs in the path including the EE but excluding the anchor). The current semantics (max_path_len = max intermediates) is defensible but is NOT the RFC variable and creates confusion: the existing test path_too_long_returns_error with max_path_len=0 and a 2-cert chain correctly fails, but the semantics diverge from RFC when a caller reads the RFC and sets max_path_len expecting RFC meaning. Additionally, the pathLenConstraint check inside chain_walk uses a DIFFERENT formula (i-1 = intermediates below position i), mixing two different counting conventions in the same codebase. This is a specification conformance bug.",
+  "ephemeral": 0,
+  "id": "PKIX-841.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "max_path_len check is off by one vs RFC 5280 \u00a76.1.2(l)",
+  "updated_at": "2026-05-02T17:36:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:25:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

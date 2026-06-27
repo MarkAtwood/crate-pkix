@@ -1,0 +1,31 @@
+{
+  "closed_at": "2026-05-11T18:57:10Z",
+  "compaction_level": 0,
+  "content_hash": "4b2b53df86aa2aa96d516497f0fc962876498894e6c5ebcb1630ea586dbd869d",
+  "created_at": "2026-05-11T05:30:09Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe differential harness currently compares **path-validation** verdicts across pkix-path, OpenSSL, and pyca. Revocation is excluded \u2014 `has-crl` testcases in x509-limbo are filtered out, PKITS \u00a74.4 / \u00a74.14 chains land in `StricterThanWild` because pkix-path's path-only validation can't see the CRL, and the per-testcase verdict shape doesn't carry CRL bytes.\n\nThis blocks a real source of divergence (OpenSSL vs pyca vs pkix-revocation in CRL parsing, IDP scope matching, delta CRL merging, indirect CRL signer discovery).\n\n## What\n\nExtend the differential harness to optionally carry a CRL bundle per testcase, and have each oracle's `verify()` apply it:\n\n1. **`Chain` extension**: add `crls: Vec<Vec<u8>>` field (DER-encoded). Empty = no CRL revocation check.\n2. **Oracle hooks**:\n   - `pkix_path` oracle wraps `pkix-path::validate_path` with a `pkix-revocation::CrlChecker` constructed from the CRL bundle.\n   - `openssl` oracle: pass `-CRLfile` + `-crl_check`.\n   - `pyca` oracle: pass CRL bytes to the verifier (cryptography supports CRL with PolicyBuilder).\n3. **Corpus loaders**:\n   - PKITS loader gains a CRL-bundle resolver per chain (PKITS `vectors.json` lists CRLs separately).\n   - PEM-tree loader recognises a `crls/` subdirectory.\n   - Limbo loader stops filtering `has-crl` and threads the testcase's `crls` field through.\n\n## Acceptance\n\n- [ ] `Chain.crls` field present, plumbed through all 3 oracles.\n- [ ] PKITS \u00a74.4 (Separate Cert/CRL Keys) chains run end-to-end with CRL revocation enabled; verdicts compared.\n- [ ] Limbo `has-crl` testcases stop being filtered; they run and classify.\n- [ ] At least one new divergence found and documented (or written-out justification that all agree).\n- [ ] Baseline JSON regenerated; classifier handles the new shape without regressing prior buckets.\n\n## Out of scope\n\n- OCSP revocation in the harness (separate bead if needed; requires either a stapled-OCSP corpus or a network-fetch harness mode which we don't want).\n\n## Filed as\n\nTracker for pkix-difftest/README.md, baseline-pkits-analysis.md, and python/limbo-to-pem-tree.py 'CRL revocation is out of harness scope' notes. Surfaced by PKIX-agp7.2 sweep audit. Closely related to PKIX-cqwt (path-level CRL signer discovery) \u2014 that bead's resolution removes the \u00a74.5 / \u00a74.14 workaround needed for indirect CRLs in this harness.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "All 7 children closed; rolling up epic. Final summary: pkix-difftest now exercises CRL revocation across all three oracles (pkix-path via CrlChecker, OpenSSL via -CRLfile/-crl_check, pyca via hand-rolled RFC 5280 \u00a76.3 baseline). PKITS baseline regenerated; 14 \u00a74.4/\u00a74.14/\u00a74.15 cases flipped StricterThanWild\u2192DiagnosticDivergence as pyca joined pkix-path in correctly rejecting revoked-by-CRL Invalid tests. See bd memory pkix-emf1-4-shipped-2026-05-11-pyca for technical detail.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: CRL revocation in the differential harness",
+  "updated_at": "2026-05-11T18:57:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:29:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

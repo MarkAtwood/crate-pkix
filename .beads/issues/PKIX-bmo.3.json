@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision records filed for documentation; no action required",
+  "closed_at": "2026-05-02T18:07:05Z",
+  "compaction_level": 0,
+  "content_hash": "72ee6c8dd8eb1cf49e87a6355d5d3ecfa2f672095a5972ef674af633f7851f61",
+  "created_at": "2026-05-02T18:04:33Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path checks anchor.subject_public_key_info == last_cert.subject_public_key_info when the last cert is self-issued. A contributor might remove this as 'redundant with signature verification'. It is not: signature verification returns SignatureInvalid, not NoTrustedPath; the guard ensures a key-collision attacker cannot craft a different-SPKI root that passes name matching and then survives sig verification under a different anchor.",
+  "ephemeral": 0,
+  "id": "PKIX-bmo.3",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SPKI guard for self-issued certs prevents name-collision attack",
+  "updated_at": "2026-05-02T18:07:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:04:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-bmo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

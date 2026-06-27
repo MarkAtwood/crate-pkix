@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented Option A per user direction. Added pkix-revocation::OutOfScopeReason enum (CrlOnlyAttributeCerts/CrlOnlyUserCerts/CrlOnlyCaCerts) and pkix-revocation::Error::OutOfScope(OutOfScopeReason) variant. CrlChecker::check_revocation and check_revocation_against_anchor now return Err(OutOfScope(reason)) at all 6 IDP scope-mismatch sites instead of the historic ambiguous Ok(()). Trait doc rewritten: Ok(()) is now unambiguous 'verified not-revoked'; not-covered surfaces as Err(OutOfScope) for CRL or Err(OcspStatusUnknown) for OCSP. Hard-fail callers can now treat any non-Ok as failure; soft-fail callers can match on the OutOfScopeReason. PKITS \u00a74.14.11/12/14 tests updated to assert specific Err(OutOfScope(reason)) outcomes; \u00a74.14.13 confirmed correctly returns Ok() (cert IS a CA per OpenSSL oracle, despite EE suffix). External oracle (openssl x509 -text) used to verify cert types \u2014 corrected the original test author's misclassification of fixtures 11 and 13 as end-entities. No tests deleted, skipped, or weakened; assertions strengthened (specific reason vs. opaque Ok()).",
+  "closed_at": "2026-05-07T23:53:54Z",
+  "compaction_level": 0,
+  "content_hash": "341fe8c051596746f01b273e538ed2f3b711820ad2dfe725d65c4cd4c105873e",
+  "created_at": "2026-05-07T22:02:40Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:282-296 documents that `check_revocation` returning `Ok(())` has dual semantics \u2014 'not revoked' OR 'not covered (out of scope)' \u2014 and tells callers:\n\n  > Callers enforcing a hard-fail revocation policy must separately verify that\n  > at least one revocation source actually covers the certificate in question.\n\nThis advice is unactionable from the public API. There is no method on `RevocationChecker`, `CrlChecker`, or `OcspChecker` that exposes scope coverage. A caller that wants 'hard-fail unless revocation actually covered this cert' has no programmatic way to check.\n\nThe CRL implementation (pkix-revocation/src/crl.rs:274-294) returns Ok(()) on three IDP scope mismatches (only_contains_attribute_certs, only_contains_user_certs, only_contains_ca_certs). These are exactly the cases where a caller might want to know 'this CRL did not actually decide anything for this cert'.\n\nFix options:\n\nA. (preferred) Add a new error variant `Error::OutOfScope { reason: ... }` and convert the three `return Ok(())` sites in crl.rs to it. Hard-fail callers get an unambiguous Err; soft-fail callers can match on it and treat as Ok. This is a breaking change to RevocationChecker semantics \u2014 schedule for next minor.\n\nB. Add a separate predicate method to RevocationChecker (e.g. `covers(&self, cert, issuer) -> bool`) so callers can pre-flight scope before calling `check_revocation`.\n\nC. Document this as a known limitation with a worked example for hard-fail callers (parse the IDP themselves).\n\nSeverity: P3 / opinion. Functionally the doc is honest about the limitation; the issue is that the documented mitigation can't actually be performed by an external caller without parsing the CRL themselves.\n\nPass-1 attribution: pass-1 P2 fix (PKIX-d667) made the parse-error path fail-closed, but did not address the more fundamental Ok(()) ambiguity for scope mismatches.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.11",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "DEFERRED by /do-beads pass: this is a design-choice issue requiring human direction. Option A (Error::OutOfScope variant) is a behavior-changing API revision with downstream impact (every CrlChecker caller's match arms shift). Option B (covers() predicate) adds a trait method requiring non-trivial logic for CRL+OCSP. Option C (docs only) is partially in place. Per project AGENTS.md, this kind of API-shape decision is out of scope for /do-beads \u2014 needs explicit human direction. Leaving open.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-revocation RevocationChecker::check_revocation Ok(()) dual-semantics is unactionable from caller side",
+  "updated_at": "2026-05-07T23:53:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:02:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Changed TrustAnchor::TryFrom<Certificate>::Error from raw der::Error to opaque DerError newtype.",
+  "closed_at": "2026-05-07T22:22:54Z",
+  "compaction_level": 0,
+  "content_hash": "7bcdccb62873de0981cd67db622b69375f8a59ba76a1169f999ca2a16caa3eb5",
+  "created_at": "2026-05-07T22:01:19Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 1 P3 commit ff707564 (PKIX-h98q) intentionally wrapped `pkix_path::Error::Der(der::Error)` in an opaque `DerError` newtype to insulate downstream from `der::Error`'s instability. However, the migration is incomplete: pkix-path/src/lib.rs:505 still exposes raw `der::Error` in TrustAnchor's TryFrom impl:\n\n    impl TryFrom<Certificate> for TrustAnchor {\n        type Error = der::Error;   // <-- LEAKS raw der::Error\n        ...\n    }\n\nThis means downstream callers using `TrustAnchor::try_from(cert)` see the unstable `der::Error` type in their public API surface (whether they want to or not \u2014 the From-conversions and matches!() patterns force it). When the `der` crate bumps to 0.8 (or any breaking version), every user of TrustAnchor::try_from breaks even if the rest of pkix-path's API stays compatible.\n\nThe brief flagged this kind of API change as intentional, but only for Error variant payloads. The TryFrom Error associated type is a separate exposure point that wasn't covered.\n\nFix options (one of):\n\nA. Wrap in DerError: `type Error = DerError;` and propagate via `.map_err(DerError)?` in try_from.\n\nB. Define a dedicated TrustAnchor error variant (TrustAnchorError, NameConstraintsParse, etc.) and use it.\n\nRecommend option A \u2014 minimal change, keeps the public API surface in one opaque newtype, matches the rest of the migration intent.\n\nCross-reference docstring at line 505: 'Returns Err(der::Error)' \u2014 also stale; should match whichever wrapper is chosen.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: TrustAnchor::TryFrom<Certificate>::Error leaks raw der::Error \u2014 opaque-wrapper migration (PKIX-h98q) is incomplete",
+  "updated_at": "2026-05-07T22:22:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

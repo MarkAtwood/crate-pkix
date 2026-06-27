@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fa2db6e4835ed8dede1adf8dd52ba32ba6ddca0311454f5d557147ef4ef99a66",
+  "created_at": "2026-05-14T18:17:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:426 declares:\n\n```rust\npub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    sig_verifier: &'a V,\n    rev_checker: &'a R,\n    policy: &'a ValidationPolicy,\n    aia: &'a A,\n}\n```\n\nThe trait bounds `V: SignatureVerifier`, `R: RevocationChecker`, `A: AiaFetcher` are then repeated verbatim on both impl blocks (lines 434-438, 459-462).\n\nThe Rust API Guidelines explicitly recommend against this pattern under [C-STRUCT-BOUNDS](https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bound):\n\n> Generic type parameters of data structures should not be bound by traits unless the bound is required by the type definition itself.\n\nThe bounds on `Verifier` are required by the impl methods that call trait methods on the borrowed values, NOT by the struct itself \u2014 the struct could hold `&V: ?Sized` for any `V` and still store it. Storing references to anchors/verifiers/policy does not require any of the trait bounds.\n\nThe idiomatic shape is:\n\n```rust\npub struct Verifier<'a, V, R, A = NoAiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    sig_verifier: &'a V,\n    rev_checker: &'a R,\n    policy: &'a ValidationPolicy,\n    aia: &'a A,\n}\n\nimpl<'a, V, R, A> Verifier<'a, V, R, A>\nwhere\n    V: SignatureVerifier,\n    R: RevocationChecker,\n    A: AiaFetcher,\n{\n    // ...methods that need the bounds...\n}\n```\n\nWhat goes wrong if it stays:\n\n1. **Constructor flexibility is artificially constrained.** A caller cannot construct a `Verifier` value at all without satisfying all three bounds, even though the verifier doesn't *use* the bounds until `verify_one` is called. With bounds on impls only, this restriction lifts to the call site where it belongs.\n\n2. **Maintenance burden.** When a new trait method is added to `SignatureVerifier` requiring an additional bound (e.g. `+ Send` for parallel `verify_batch`), the bound must be added in three places (struct + 2 impls) instead of one. Bound drift between the three sites is a real compile-time failure mode.\n\n3. **Reads as \"this struct fundamentally requires these traits\"** to the reader. It doesn't \u2014 only the methods do.\n\nThis is one of the most-cited Rust API guideline violations and the fix is mechanical.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Trait bounds repeated on Verifier struct definition violate Rust API guideline C-STRUCT-BOUNDS",
+  "updated_at": "2026-05-14T18:17:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:17:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

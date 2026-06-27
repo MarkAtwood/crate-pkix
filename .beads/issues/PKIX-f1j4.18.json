@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "abddb0269a93d7cbddb26fcef9056a5e84f228ab29cd4f051ef1fd225a565120",
+  "created_at": "2026-05-14T18:59:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Cargo.toml:24-34: client-ureq enables only `dep:ureq`. client-reqwest-async enables only `async` + `dep:reqwest`. Neither pulls in crl or ocsp.\n\nResult: `cargo add pkix-revocation-http --features client-ureq` gives a build with a UreqFetcher and nothing to feed it into \u2014 HttpCrlFetcher and HttpOcspFetcher are both cfg-gated on crl/ocsp respectively. Same for the async side.\n\nThe user-facing intent of client-ureq is 'I want a working CRL+OCSP fetch over HTTP'. The current minimal feature for that is `crl,ocsp,client-ureq`. The crate could imply that:\n\n    client-ureq = [\"crl\", \"ocsp\", \"dep:ureq\"]\n    client-reqwest-async = [\"async\", \"crl\", \"ocsp\", \"dep:reqwest\"]\n\nDefensible reason to NOT do this: a consumer who wants CRL-only or OCSP-only would then pay for the other. Counter: features are additive in Cargo; if a consumer ALSO sets default-features=false and only crl=true, the explicit crl wins. The implication is just 'the default with this client is both.'\n\nEither decision is fine; flagging so the choice is made deliberately rather than inheriting whichever the first feature configuration happened to be.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.18",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cargo.toml: client-ureq feature does not imply crl or ocsp; user has to remember to enable both",
+  "updated_at": "2026-05-14T18:59:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added Clone, Copy, Debug, Default to EcdsaP256Verifier, RsaPkcs1v15Sha256Verifier, DefaultVerifier.",
+  "closed_at": "2026-05-02T17:46:29Z",
+  "compaction_level": 0,
+  "content_hash": "ad9df9525bfa91b0ba5474a1828c9592d5f0b0e7b8a94ec8b8387ffbf4db5315",
+  "created_at": "2026-05-02T17:33:06Z",
+  "created_by": "Mark Atwood",
+  "description": "EcdsaP256Verifier, RsaPkcs1v15Sha256Verifier, and DefaultVerifier are public unit structs with no derives at all. Unit structs naturally implement Copy, Clone, Debug, Default, PartialEq, Eq, and Hash with zero cost. Missing these means: callers cannot println!(\"{:?}\", verifier), cannot store verifiers in types requiring Debug, cannot use verifiers as Default::default(). All three should carry #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)].",
+  "ephemeral": 0,
+  "id": "PKIX-841.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Public verifier unit structs missing Debug/Clone/Copy/Default derives",
+  "updated_at": "2026-05-02T17:46:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:33:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

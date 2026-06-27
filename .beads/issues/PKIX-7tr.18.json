@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:12Z",
+  "compaction_level": 0,
+  "content_hash": "c3dd1efc3a1e8c20d19b2ec75bb59f815d6c363092128f76ef38424bf911ae5f",
+  "created_at": "2026-05-02T13:41:32Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor has all-public fields (lines 179-182) and a new() constructor that does no validation. A caller can write TrustAnchor { subject: ..., subject_public_key_info: empty_spki } or call new() with an empty/zeroed SPKI and chain_walk will attempt to use it for signature verification, likely producing an opaque SignatureInvalid or panic in the backend. The constructor should validate that subject_public_key_info.subject_public_key is non-empty and return a Result, or the fields should be private with only from_cert() and new() as constructors.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor pub fields allow construction with empty SPKI",
+  "updated_at": "2026-05-02T14:19:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

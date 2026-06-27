@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "created_at": "2026-05-13T23:20:59Z",
+  "id": "019e23a4-bc15-7372-9d2a-79099f3ee1c7",
+  "issue_id": "PKIX-jbvb",
+  "text": "Marking blocked autonomously (do-beads loop 2026-05-13T23:20Z). All three substantive sub-tasks (PKIX-jbvb.1 SmimeOrganizationValidated, PKIX-jbvb.2 SmimeSponsorValidated, PKIX-jbvb.3 SmimeIndividualValidated) are blocked on PKIX-jbvb.5 (human decision on fixture-sourcing model). The umbrella itself has no actionable scope independent of its children \u2014 every acceptance criterion is delivered through .1/.2/.3. Without an explicit dep edge, the umbrella surfaces on the autonomous ready frontier as a pure container, which is the frontier-cycling pattern. Adding the dep edge below; un-block when .5 is resolved and .1/.2/.3 unblock. Reassigning to NULL so the umbrella picks back up on the ready frontier once dep resolves."
+}

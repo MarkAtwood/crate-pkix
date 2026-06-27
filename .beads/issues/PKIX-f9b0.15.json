@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:42Z",
+  "compaction_level": 0,
+  "content_hash": "7e0cac6c67c1baf379873bbdfac20e204932f414bc2456d9909518023054be73",
+  "created_at": "2026-05-07T17:22:39Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:369,371,373,375 \u2014 sc081_validity_cap returns expressions like 47 * 86_400, 100 * 86_400, 200 * 86_400, 398 * 86_400. The day counts (47, 100, 200, 398) are meaningful SC-081 thresholds; 86_400 is seconds-per-day. Fix: introduce const SECS_PER_DAY: u64 = 86_400 and named constants SC081_398_DAYS, SC081_200_DAYS, SC081_100_DAYS, SC081_47_DAYS so the return expressions read as SC081_200_DAYS * SECS_PER_DAY, improving greppability and reducing silent-edit risk if the spec values ever change.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-profiles] magic numbers in sc081_validity_cap: name 86_400 and day counts",
+  "updated_at": "2026-05-07T17:32:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

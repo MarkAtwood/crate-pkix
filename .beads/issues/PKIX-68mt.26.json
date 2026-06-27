@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:20Z",
+  "compaction_level": 0,
+  "content_hash": "02488271b3f96f52ebad3b3b90798ea38d9f8da89ecbd1aeeaa08fb6a4f6322a",
+  "created_at": "2026-05-14T19:20:36Z",
+  "created_by": "Mark Atwood",
+  "description": "ServerName::ip_address only takes &str. A caller who already has a std::net::IpAddr (from a parsed config), a [u8; 4] (from a TCP socket peer addr), or a [u8; 16] must:\n\n  let s = ip_addr.to_string();\n  let server_name = ServerName::ip_address(&s)?;\n\nThis is parse-then-stringify-then-reparse: 2 unnecessary allocations and 1 round-trip through textual normalization, all to land in the exact same internal [u8; 4] / [u8; 16] representation IpRepr already holds.\n\nMissing constructors (all non-breaking to add later, but absence today is a defensive-code-forcing footgun):\n\n  pub fn ip_v4(octets: [u8; 4]) -> Self\n  pub fn ip_v6(octets: [u8; 16]) -> Self\n\nAnd with std feature gate:\n\n  #[cfg(feature = \"std\")]\n  pub fn from_ip_addr(ip: std::net::IpAddr) -> Self\n  #[cfg(feature = \"std\")]\n  pub fn from_ipv4_addr(ip: std::net::Ipv4Addr) -> Self\n  #[cfg(feature = \"std\")]\n  pub fn from_ipv6_addr(ip: std::net::Ipv6Addr) -> Self\n\nThese are infallible (raw byte forms cannot fail validation \u2014 they always represent some IP address).\n\nCaller impact: TLS server callers receiving SocketAddr::ip().octets() pay 2 alloc + ~\u00b5s CPU per request to round-trip through string form. For a TLS server doing 10k handshakes/sec this is measurable. For a no_std embedded caller doing it on every TLS handshake, the alloc may not even be available.\n\nSeverity P2: additive, non-breaking to add later. But pre-1.0 is the right time to settle on the IP-construction surface; otherwise the textual-only API will calcify in caller code.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No constructor from std::net::IpAddr / [u8; 4] / [u8; 16] \u2014 IP-bytes callers forced to stringify-and-reparse",
+  "updated_at": "2026-06-15T18:51:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:20:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

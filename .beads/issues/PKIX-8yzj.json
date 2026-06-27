@@ -1,0 +1,21 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3edaecd6e3ae5393c19b62d46d74db093720088fc3c2268eb0649075040f463b",
+  "created_at": "2026-05-08T19:00:47Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-composite` is at version 0.0.0 \u2014 pure skeleton. The `CompositeVerifier<C, P>` struct exists but its `SignatureVerifier::verify_signature` impl returns `Err(SignatureError::new())` unconditionally.\n\nThe underlying spec (`draft-ietf-lamps-pq-composite-sigs`) is still an IETF draft and the wire format has been changing across draft revisions. Implementing today against draft-N and having to refactor for draft-N+1 is wasted effort.\n\n## What\n\nWait for `draft-ietf-lamps-pq-composite-sigs` (or its eventual RFC) to stabilize, then:\n\n1. **Composite OID dispatch** \u2014 composite signatures advertise themselves via specific OIDs (one OID per composite combination, e.g. ML-DSA-65 + ECDSA-P-256). Map OIDs \u2192 component verifiers.\n2. **SubjectPublicKeyInfo splitting** \u2014 composite SPKI is a SEQUENCE of two component SPKIs. Parse and dispatch.\n3. **Signature splitting** \u2014 composite signature is a SEQUENCE of two component signatures.\n4. **Verification** \u2014 verify both components; both MUST verify (logical AND, NOT OR). Document this clearly \u2014 this is the security property that 'composite' provides.\n5. **Component verifiers** \u2014 likely needs an ML-DSA / Dilithium verifier as one of the components. This pulls in `crystals-dilithium` or similar (no_std-capable, but verify).\n\n## Acceptance\n\n- [ ] Track draft progress; do not start work until the wire format is in WGLC or has an RFC number.\n- [ ] When started: at least one composite combination (ML-DSA-65 + ECDSA-P-384 is the most likely standardized choice) verifies real test vectors from the draft's Appendix.\n- [ ] Both-must-verify semantics tested with adversarial inputs (signature where only one component verifies \u2192 reject).\n- [ ] no_std preserved.\n\n## Out of scope (now)\n\n- Premature implementation of in-flight draft.\n- Specific PQ algorithm impls beyond what's needed for the composite component (those are sibling crates).\n\n## Filed as\n\nLow-impact gap per audit. Lowest priority because the spec isn't stable. Should be re-evaluated annually until either the draft stabilizes or composite signatures stop being a likely deployment path.",
+  "ephemeral": 0,
+  "id": "PKIX-8yzj",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked blocked 2026-05-10: bead's own description says 'do not start work until the wire format is in WGLC or has an RFC number'. draft-ietf-lamps-pq-composite-sigs is still in flux; tracking is the action, implementation is not. Unblock when the draft reaches WGLC or RFC stage.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-composite: real composite-PQC signature verification (when draft stabilizes)",
+  "updated_at": "2026-05-11T04:48:41Z"
+}

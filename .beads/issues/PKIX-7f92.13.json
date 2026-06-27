@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f79f5104e59d19c6662d066941c39a0c396ebfd8499894e557211bcf6546fd16",
+  "created_at": "2026-05-14T15:44:38Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1577-1582 (run_chain) calls run_cert per cert position, and run_cert (lib.rs:1494) calls cert_sha256_of(cert) once per call. If a caller's chain contains the same Certificate at multiple positions (e.g. a self-signed CA tested at both Leaf and AnchorIssued positions for shape tests, as in the lib.rs tests at line 2126-2134), the hash is recomputed each time.\n\nHashing a DER-encoded cert is a few microseconds \u2014 negligible for short chains. Becomes meaningful for batch evidence-pack runs where the same trust anchor appears at the top of every chain.\n\nFix shape: a SHA-256 cache keyed on a cheap cert identity. The cheapest identity is &Certificate as a pointer-equality key (rejects clones but matches the test pattern of cert.clone() at multiple positions). Or: hash on first encounter and stuff the result into a Vec<Option<[u8;32]>> parallel to chain[].\n\nNot P0 \u2014 current performance is dominated by signature verification in real chains, not hashing. Worth a follow-up bead so the hot path is visible if it becomes hot.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "run_chain rehashes the same cert at each chain position",
+  "updated_at": "2026-05-14T15:44:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:44:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:54Z",
+  "compaction_level": 0,
+  "content_hash": "542b10075b91fc562cd30ed5ceae51ed46e7a866e9e8f9b2e252da14e659e1e0",
+  "created_at": "2026-05-02T22:21:36Z",
+  "created_by": "Mark Atwood",
+  "description": "Lines 702-708 cite RFC 4518 \u00a72.1 and RFC 5280 \u00a77.1 regarding TeletexString mapping and OPTIONAL status. These quotes are not provided in full context. The reasoning is logically sound (no standard mapping \u2192 byte-exact comparison is correct long-term), but should be verified: (1) Is the RFC 4518 quote accurate and from \u00a72.1? (2) Does RFC 5280 \u00a77.1 actually classify TeletexString as OPTIONAL? (3) Can we verify OpenSSL/NSS/GnuTLS use different mappings? This supports a good design decision but UNVERIFIED CLAIMS should be called out.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.13",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Unverified RFC 4518/5280 quotes about TeletexString",
+  "updated_at": "2026-05-02T22:35:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:21:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

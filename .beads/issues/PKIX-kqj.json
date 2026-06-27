@@ -1,0 +1,22 @@
+{
+  "close_reason": "decision captured in code",
+  "closed_at": "2026-05-02T22:39:21Z",
+  "compaction_level": 0,
+  "content_hash": "dd21e2374bb3e99ace52e6f6bdb0fdeb900769526a6d02f25f6ddefc22ebc243",
+  "created_at": "2026-05-02T17:15:32Z",
+  "created_by": "Mark Atwood",
+  "description": "NormalizedIter (lines 600-650) uses a stateful iterator with pending_space flag to normalize in-place without allocating intermediate strings. This is the correct pattern for hot paths in no_std contexts. Unwraps are confined to the non-hot constructor (lines 610, 616) where sentinel values (unwrap_or) are safe. The technique is unforgeable at the type level: the state machine cannot emit double spaces or trailing spaces because the boolean flag makes consecutive space handling deterministic.",
+  "ephemeral": 0,
+  "id": "PKIX-kqj",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: Zero-allocation iterator for hot-path normalization",
+  "updated_at": "2026-05-02T22:39:21Z"
+}

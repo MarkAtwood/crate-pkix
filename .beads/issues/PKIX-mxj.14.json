@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:58:32Z",
+  "compaction_level": 0,
+  "content_hash": "34bd9fe529df929cd54779ab4efc3813f4af4ce632cad9487b9c67fa15868581",
+  "created_at": "2026-05-07T03:51:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:610 \u2014 DeviationRunResult is a public struct with two pub Vec fields but is not marked #[non_exhaustive]. Adding a new field (e.g. suppressed: Vec<Finding> for a future Suppress-action audit path) would be a semver-breaking change. ValidatedPath in pkix-path has #[non_exhaustive] with explicit documentation of the stability guarantee. DeviationRunResult should follow the same pattern. Fix: add #[non_exhaustive] and document that callers should not use struct literal syntax to construct DeviationRunResult.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationRunResult missing #[non_exhaustive]",
+  "updated_at": "2026-05-07T03:58:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:51:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e694c331c1a438edc873b8825654fb4a04de9b6d50558fc3e7b9372eda23ec7d",
+  "created_at": "2026-05-14T18:01:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs lines 982-1038. verify_smime_signer (982-1005) and verify_smime_recipient (1015-1038) have IDENTICAL function bodies:\n\n    let policy = profile.policy(now_unix);\n    let validated = verify_chain(\n        chain,\n        anchors,\n        &policy,\n        &DefaultVerifier,\n        revocation,\n        &NoAiaFetcher,\n    )?;\n    pkix_identity::verify_mailbox(&chain[0], mailbox)?;\n    Ok(validated)\n\nThe rustdoc on verify_smime_recipient (lines 1007-1014) acknowledges this:\n\n    Identical mechanics to verify_smime_signer; see that function's rustdoc...\n    The two wrappers differ only in name so callers can communicate signer-vs-recipient intent at the call site.\n\nThe signer-vs-recipient distinction is encoded entirely in the caller-supplied Profile (the profile decides whether to require digitalSignature or keyEncipherment in the leaf's KeyUsage). The function name is a marker visible at the call site, not a code-path difference.\n\nSUGGESTED REWRITE: pick one. Either:\n\n(a) Single verify_smime_mailbox(chain, anchors, mailbox, profile, now, revocation) that's role-agnostic; let the caller pick the profile to communicate intent. The intent IS in the Profile already; the wrapper name is a redundant signal.\n\n(b) Keep both names but factor the body:\n\n    pub fn verify_smime_signer(...) -> Result<...> {\n        verify_smime_role(chain, anchors, mailbox, profile, now_unix, revocation)\n    }\n    pub fn verify_smime_recipient(...) -> Result<...> {\n        verify_smime_role(chain, anchors, mailbox, profile, now_unix, revocation)\n    }\n    fn verify_smime_role(...) -> Result<...> { /* the shared body */ }\n\n(b) preserves the call-site readability and avoids the duplicate body. (a) is cleaner but is a public API change (one fewer exported function).\n\nNOT URGENT \u2014 the duplication is small (5 lines) and the docstring is honest about it. Flag for the next refactor pass. The same pattern doesn't apply to verify_tls_server vs verify_tls_client_dns because those take DIFFERENT identity types (ServerName vs Option<ServerName>) and the body uses verify_dns_name unconditionally vs only when Some, so the bodies actually differ.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_smime_signer and verify_smime_recipient have byte-identical bodies; differ only by function name",
+  "updated_at": "2026-05-14T18:01:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:01:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

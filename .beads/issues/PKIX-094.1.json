@@ -1,0 +1,32 @@
+{
+  "close_reason": "opinion-level doc gap, no code change needed for v0.1; tracked for awareness",
+  "closed_at": "2026-05-02T20:38:33Z",
+  "compaction_level": 0,
+  "content_hash": "cf6da83c4d0981d6309e02eaa474a8b9a1077f851ad9b2f67f0b62ec6d3a7af9",
+  "created_at": "2026-05-02T20:38:24Z",
+  "created_by": "Mark Atwood",
+  "description": "any_to_str_bytes in pkix-path handles UTF8String, PrintableString, IA5String, VisibleString but not NumericString (Tag::NumericString = 0x12). The existing limitation comment mentions TeletexString and BMPString but not NumericString. NumericString appears in real CAs for the serialNumber attribute (OID 2.5.4.5). If one cert encodes serialNumber as NumericString and the matched cert encodes it as PrintableString (same content, different tag), they'd fall into the (None, Some) branch and compare as unequal. Fix for doc: add NumericString to the 'not handled' list in the any_to_str_bytes comment. Alternatively, NumericString could be added to the handled set (NumericString contains only digits and spaces, identical semantics to PrintableString for normalization purposes).",
+  "design": "Adding NumericString to any_to_str_bytes is safe: digits and ASCII space have the same normalized form as PrintableString. This would fix a practical gap for serialNumber attributes. But deferred until a concrete failing case is identified.",
+  "ephemeral": 0,
+  "id": "PKIX-094.1",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes omits NumericString \u2014 limitation doc incomplete",
+  "updated_at": "2026-05-02T20:38:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:38:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-094",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:29Z",
+  "compaction_level": 0,
+  "content_hash": "8e9c8f6b302d23415eb85a5d8e9157a4ddc53caa9afcaab733adba55f41a7992",
+  "created_at": "2026-05-14T18:28:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:474 \u2014 the PathCandidates rustdoc body has `[AKI-ranked order](rank_candidates)` but rank_candidates is a private fn. With RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps -p pkix-path-builder --all-features (the workspace pre-push check per AGENTS.md) this fails with: error: public documentation for `PathCandidates` links to private item `rank_candidates`. Trigger: any pre-1.0 doc-deny-warnings run, any docs.rs build with default settings if the crate's metadata uses --cfg docsrs (it does). Fix: remove the intra-doc link (just say \"in AKI-ranked order\") or document the algorithm inline instead of cross-linking the private helper.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cargo doc --all-features fails: PathCandidates rustdoc links to private rank_candidates",
+  "updated_at": "2026-06-04T19:32:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:28:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

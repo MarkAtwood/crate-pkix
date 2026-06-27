@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:49Z",
+  "compaction_level": 0,
+  "content_hash": "6f5ea932bff01d0bb8c438131d8665ef7aeaea4b2661e8095965cfb2ccbe9f31",
+  "created_at": "2026-05-03T00:14:55Z",
+  "created_by": "Mark Atwood",
+  "description": "Lines 1452-1463: 'if nc_constrained_types & NC_TYPE_RFC822 != 0 { if let Some(permitted) = nc_permitted { ... } }' is inside a loop over AVAs and again inside a loop over RDNs. The nc_permitted check is invariant across all iterations \u2014 it never changes inside this loop. The result: the same Option is unwrapped on every emailAddress AVA found. This should be hoisted to before the loop: 'let permitted_rfc822 = nc_permitted.and_then(|p| ...filter rfc822 entries...);' computed once. In practice chains have \u22645 email AVAs so the cost is trivial, but the structural issue is that an invariant condition is re-evaluated in a loop.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.26",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_permitted unwrapped inside inner loop per email attribute",
+  "updated_at": "2026-05-05T04:48:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:14:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

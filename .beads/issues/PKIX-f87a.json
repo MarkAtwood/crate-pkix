@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Filing this Beads issue IS the tracking mechanism requested by the doc comment. No code change needed.",
+  "closed_at": "2026-05-07T15:24:27Z",
+  "compaction_level": 0,
+  "content_hash": "fa6358cb0f95002b9ebf676150a34fbeea30a9580743b7d0c6f07491a2cc3e3e",
+  "created_at": "2026-05-07T15:19:22Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:113 documents that de_static_str leaks one heap allocation per unique deserialized string permanently, and says 'Or file an issue to accelerate the v0.3 migration'. No Beads issue exists tracking this. File a P3 issue for migrating LintResult detail fields from &'static str to Cow<'static, str> so long-running services that deserialize Finding values don't accumulate unbounded memory.",
+  "ephemeral": 0,
+  "id": "PKIX-f87a",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: de_static_str memory leak documented but no migration path filed as tracked issue",
+  "updated_at": "2026-05-07T15:24:27Z"
+}

@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:44:21Z",
+  "id": "019e1e25-e6f3-7ef7-aae1-814f91442c75",
+  "issue_id": "PKIX-jy95",
+  "text": "EPIC SCOPE NARROWED 2026-05-12 (cascade from .5 reversal): pkix-policy-oscal is OUT. The workspace's industry-forum / vendor-policy adapter pattern now covers two upstream tools: zlint (via pkix-zlint-bridge + pkix-policy-zlint) and pkilint (via pkix-pkilint-bridge + pkix-policy-pkilint). OSCAL Profile JSON consumption is not implemented; consumers needing OSCAL-driven config write their own glue against the already-public pkix-lint Lint trait + LintRunner public API + pkix-lint OSCAL parsing types (behind the existing 'oscal' feature flag). The workspace continues to EMIT findings as OSCAL Assessment Results JSON (PKIX-9vnx-shipped pkix-lint/src/oscal/emit code); the asymmetry between emit and consume is intentional and reflects the value asymmetry (emit-for-compliance-reporting is useful; consume-for-config is bounded since OSCAL is not a policy-DSL)."
+}

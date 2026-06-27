@@ -1,0 +1,32 @@
+{
+  "acceptance_criteria": "New fields present on ValidationPolicy. Each field enforced in chain_walk with a distinct Error variant. Unit tests green. No existing tests broken.",
+  "close_reason": "All child beads completed: Error variants, ValidationPolicy fields, enforcement in chain_walk, DER fixtures, tests, regression verification.",
+  "closed_at": "2026-05-06T05:01:19Z",
+  "compaction_level": 0,
+  "content_hash": "5e98548b1e4d910ecd81251dbfbd406e9ca145a29d131c1091d2b70468769fb5",
+  "created_at": "2026-05-06T03:26:20Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy in pkix-path/src/lib.rs currently has no way to express:\n- Maximum certificate validity period (seconds or days)\n- Allowed signature algorithm OIDs (allowlist)\n- Minimum RSA key size (bits)\n- Required extensions (e.g. SAN must be present on leaf)\n- Required EKU OIDs on leaf\n\nThese are needed by all three CA/B Forum profile functions in pkix-profiles. Without them the profiles cannot set any constraints that validate_path will actually enforce.\n\nWork:\n1. Add fields to ValidationPolicy (all optional / None = unconstrained):\n   - max_validity_secs: Option<u64>  \u2014 reject any cert whose (notAfter - notBefore) exceeds this\n   - allowed_signature_algs: Option<Vec<ObjectIdentifier>>  \u2014 if Some, reject any cert whose signature algorithm OID is not in the list\n   - min_rsa_key_bits: Option<u32>  \u2014 reject RSA public keys smaller than this\n   - require_subject_alt_name: bool  \u2014 if true, leaf must have a non-empty SAN extension\n   - required_leaf_eku: Option<Vec<ObjectIdentifier>>  \u2014 if Some, leaf must assert all listed EKU OIDs\n\n2. Enforce each field in chain_walk / check_leaf (pkix-path/src/lib.rs). Add a new Error variant for each new rejection reason (e.g. Error::ValidityPeriodExceedsMax, Error::AlgorithmNotAllowed already exists \u2014 reuse if applicable, Error::KeyTooSmall, Error::MissingSan, Error::MissingEku).\n\n3. Update ValidationPolicy::new() and Default to leave all new fields as None / false.\n\n4. Update #[non_exhaustive] note in rustdoc.\n\n5. Unit tests in pkix-path for each new field: one test that passes with the constraint, one that fails.\n\nNote: allowed_signature_algs may overlap with existing algorithm dispatch. Be precise about where in chain_walk the check fires (it should fire before signature verification so the error is diagnostic, not a confusing SignatureInvalid).",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Extend ValidationPolicy with profile-enforcement fields",
+  "updated_at": "2026-05-06T05:01:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:26:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-11T05:20:31Z",
+  "compaction_level": 0,
+  "content_hash": "3f8006f3f6d29a0fcb30e033206482f76534e8266457fe102314fd9950c73789",
+  "created_at": "2026-05-11T05:06:06Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPolicy shift (2026-05-11): no work is gated by version milestone. We drive to full RFC 5280 + adjacent-RFC coverage. The 'v0.1 deliverable' framing in AGENTS.md and the scattered '(tracked for v0.2)' / 'deferred to v0.3' comments are retired.\n\n## Three categories of 'out of scope' language in the repo\n\n(Settled in chat 2026-05-11 with Mark.)\n\n- **Category A** \u2014 version-gating (\"out of scope for v0.1\", \"tracked for v0.2\", \"planned for v0.3\"). KILL these everywhere except CHANGELOG history and `specs/` (vendored upstream).\n- **Category B** \u2014 crate-level work-partition (\"X is out of scope for THIS CRATE \u2014 see pkix-Y\"). KEEP. Load-bearing architecture documentation.\n- **Category C** \u2014 `# Limitations` rustdoc sections describing current shipped behavior. KEEP. Truthful user-facing disclosures; shrink when the underlying code lands the feature, not by editorial fiat.\n\n## Magnitude (from grep 2026-05-11)\n\n- 27 literal \"out of scope\" matches in repo (mixed A/B; ~13 are Category A).\n- 50 v0.x version-gating matches (nearly all Category A).\n- 24 `# Limitations` rustdoc sections (all Category C, keep).\n- \u22652 beads with v0.x in title; \u22652 deferred-status beads with Category-A reasons.\n\n## Acceptance\n\n- [ ] AGENTS.md has no Category-A language and no 'v0.1 deliverable' section.\n- [ ] No repository file outside `specs/` and CHANGELOG.md history contains '(tracked for v0.x)', 'deferred to v0.x', 'planned for v0.x', or 'out of scope for v0.x'.\n- [ ] All Category-A deferred-status beads either re-opened or re-justified on non-version-gate grounds.\n- [ ] CHANGELOG entry recording the policy shift with date.\n- [ ] PKIX-t0w4 reframed: with the v0.1 path-building gate dropped, the default option becomes 'use pkix-path-builder' (which already exists as a crate).\n\n## Out of this epic's scope\n\n(Category B language, used correctly!)\n\n- Actually implementing the deferred features (DSA, NameConstraints expansion, Unicode NFKC in names_match, etc.). Those have their own beads which become workable after this sweep lands.\n- Editing `specs/*` (vendored RFC + CABF BR text).\n- Rewriting historical CHANGELOG entries.\n\n## Children\n\n- AGENTS.md + CHANGELOG anchor (`.1`)\n- Code/docs sweep across affected crates (`.2`)\n- Bead description + deferred-status sweep (`.3`)",
+  "ephemeral": 0,
+  "id": "PKIX-agp7",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Drop v0.x milestone gating; commit to full RFC scope",
+  "updated_at": "2026-05-11T05:20:31Z"
+}

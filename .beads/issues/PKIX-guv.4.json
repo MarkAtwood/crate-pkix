@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:16:42Z",
+  "compaction_level": 0,
+  "content_hash": "081a8c0eb98742bae9ac4674725229a16b7313a325ccf75d0b5a7fcc8e2c8d0e",
+  "created_at": "2026-05-02T20:11:47Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk allocates an 8 KiB stack buffer to re-encode TBSCertificate for signature verification. Certs with TBS > 8 KiB return Error::Der with an error message from the der crate that does not mention the stack buffer limit. The implementation limit is documented in the Error::Der variant doc, but not in the validate_path function doc. A no_std embedded developer who hits this will see a mysterious DER encoding error on a cert that OpenSSL validates successfully. The Error::Der doc says 'An implementation limit, not a certificate defect' which is good, but users who match on Error::Der to detect malformed certs will also catch this case.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "8 KiB TBS limit not documented in validate_path signature",
+  "updated_at": "2026-05-02T20:16:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:11:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

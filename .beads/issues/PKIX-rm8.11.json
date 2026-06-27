@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.11",
+  "title": "Inconsistent lint attr trio across crates",
+  "description": "14 crates use `#![warn(missing_docs, rust_2018_idioms)]` as the standard warn set. 5 crates (pkix-aia, pkix-aia-http, pkix-lint-cabf, pkix-truststore-system, pkix-truststore-pkcs11) split the lints into a different shape: `#![deny(rust_2018_idioms, unreachable_pub)]` + `#![warn(missing_docs)]`. The 3 differing crates add `unreachable_pub` and promote `rust_2018_idioms` from warn to deny, while the 14 standard crates do not. pkix-difftest uses `#![warn(clippy::pedantic)]` only, which is reasonable given it is dev tooling.\n\nImpact: a contributor working in one crate and copy-pasting the lint header to a new crate gets different lint strictness depending on which crate they copied from. New crates may miss the `unreachable_pub` lint, or conversely be surprised by `deny`-level `rust_2018_idioms` that is only `warn`-level elsewhere.\n\nCrates with the divergent shape: pkix-aia, pkix-aia-http, pkix-lint-cabf, pkix-truststore-system, pkix-truststore-pkcs11. All other non-difftest crates use the standard shape.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:34Z",
+  "updated_at": "2026-06-15T17:03:33Z",
+  "closed_at": "2026-06-15T17:03:33Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:34"
+    }
+  ]
+}

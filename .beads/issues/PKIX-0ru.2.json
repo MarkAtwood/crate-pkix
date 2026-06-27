@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: moved issuer_has_crl_sign check to before verify_signature in crl.rs",
+  "closed_at": "2026-05-06T16:16:06Z",
+  "compaction_level": 0,
+  "content_hash": "7b3f4af18cfafd8a251b546572205bf005365bd1de45e7b3e49d5ec1b334ddaa",
+  "created_at": "2026-05-06T16:12:31Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/src/crl.rs ~line 175-192. CRL signature is verified before issuer_has_crl_sign is checked. RFC 5280 \u00a76.3.3 step (f) requires the cRLSign bit check first. Move the cRLSign KeyUsage check to before the verify_signature call.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: CRL: cRLSign check must occur before signature verification per RFC 5280 \u00a76.3.3(f)",
+  "updated_at": "2026-05-06T16:16:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:12:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

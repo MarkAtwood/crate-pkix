@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:20Z",
+  "compaction_level": 0,
+  "content_hash": "aafbc243d905fa5c2a80b3fc65bc0cc6567ab587666141dc69883fb013b67a62",
+  "created_at": "2026-05-07T17:24:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:100 \u2014 pub fn verify_scts returns Result<()> but has no # Errors section in its rustdoc. clippy::missing_errors_doc (pedantic) flags this. The variants that can be returned (NoTrustedSct, etc.) should be listed. Fix: add a # Errors section documenting that the function currently always returns Err(Error::NoTrustedSct), and listing other variants that will be returned once implemented.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.43",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-ct] verify_scts missing # Errors doc section",
+  "updated_at": "2026-05-07T17:28:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:24:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

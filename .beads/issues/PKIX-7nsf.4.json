@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T16:20:36Z",
+  "compaction_level": 0,
+  "content_hash": "94ade6e4a3c6eef27cf9916fabd9f52788f063aa787346d79d01b6686bd4ffc2",
+  "created_at": "2026-05-08T15:18:51Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe harness is only as good as the corpus it can ingest. Two tier-1+2 shapes need first-class loaders.\n\n## What\n\nIn `pkix-difftest/src/corpus/`:\n\n1. `mod.rs` \u2014 public trait `Corpus`:\n   ```rust\n   pub trait Corpus {\n       /// Iterator of (name, expected_verdict_opt, chain).\n       fn iter(&self) -> Box<dyn Iterator<Item = io::Result<(String, Option<Verdict>, Chain)>>>;\n   }\n   ```\n   `expected_verdict_opt` is `Some` for corpora that have ground truth (PKITS `ShouldValidate`), `None` for in-the-wild corpora.\n\n2. `pkits.rs` \u2014 reads `pkits/vectors.json`, resolves cert filenames against `pkits/certs/`, returns chains in the order `CertPath` lists (root-first per RFC 5280). Sets `expected_verdict_opt` from `ShouldValidate`.\n\n3. `pem_tree.rs` \u2014 walks a directory looking for `chain.pem` files (or files matching a glob). Each chain.pem is concatenated PEM. Auto-detects ordering. `expected_verdict_opt = None`.\n\n4. `pem_multi.rs` \u2014 single chain from CLI args (multiple files: leaf, intermediates..., root). Used for ad-hoc debugging.\n\n## Acceptance\n\n- [ ] `Corpus` trait implementations for PKITS, pem_tree, pem_multi.\n- [ ] PKITS loader: 249 chains enumerated, every `CertPath` entry resolves to a real cert file.\n- [ ] PEM-tree loader: handles concatenated PEM, ignores non-cert blocks (e.g., embedded key blobs), errors clearly on malformed input.\n- [ ] Auto-detect ordering test: a leaf-first chain.pem and a root-first chain.pem produce the same `Chain` once normalised.\n- [ ] No silent skipping of corpus entries \u2014 every entry produces either a chain or an `io::Error` (visible in the report).\n\n## Out of scope\n\n- Tier 3 (CT log scrape) \u2014 separate bead.\n- Tier 4 (hand-curated quirks set) \u2014 populated as Tier 2 surfaces them.\n- Per-corpus expected error categories (e.g., 'this should fail with reason X'). v1 only checks Pass/Fail.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: corpus loader (PKITS vectors.json + PEM-tree)",
+  "updated_at": "2026-05-08T16:20:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:18:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-chain e2e passes; all three test functions pass; clippy -D warnings passes; this is the final gate before the v0.1 release checklist runs.",
+  "assignee": "Mark Atwood",
+  "close_reason": "3 e2e tests pass: verify_chain_default happy path, expired (ValidityPeriod), explicit DefaultVerifier",
+  "closed_at": "2026-05-02T07:30:29Z",
+  "compaction_level": 0,
+  "content_hash": "75cd3251068fa6e0e37f66f3e0ef1b11a4f3f8cf560fd0ed928e57c173ebe65e",
+  "created_at": "2026-05-02T06:03:40Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** End-to-end test confirming that a user can call pkix_chain::verify_chain_default() with a real certificate chain and receive Ok(ValidatedPath) \u2014 the definitive 'done' signal for the v0.1 release.\n\nBLOCKED BY: PKIX-jws (wire DefaultVerifier), PKIX-0w9 (validate_path unit tests must pass first), PKIX-mee (pkix-chain-simple integration tests must pass first).\n\nThis is the Rule 7 E2E bead. It depends on every other implementation bead being complete. When this test passes, the v0.1 release checklist can proceed.\n\n**Algorithm:**\n1. Create pkix-chain/tests/e2e.rs.\n2. Use one of the PKITS chains from the fixture directory (PKIX-6vd) \u2014 specifically PKITS 4.1.1 (TrustAnchorRootCertificate.crt + GoodCACert.crt + ValidCertificatePathTest1EE.crt).\n3. Load each cert with Certificate::from_der(include_bytes!(...)).unwrap().\n4. Construct TrustAnchor::from_cert(root_cert).\n5. Set now_unix to a value within the PKITS cert validity windows (check actual cert notBefore/notAfter values from the fixture).\n6. Call pkix_chain::verify_chain_default(&chain, &anchors, &policy, &NoRevocation).\n7. Assert Ok(ValidatedPath { anchor_index: 0, depth: _ }).\n8. Assert depth == 1 (one intermediate: GoodCACert).\n\nSecond test: negative path \u2014 same chain but now_unix set to 0. Assert Err(pkix_chain::Error::Path(pkix_path::Error::ValidityPeriod { .. })).\n\nThird test: verify_chain with explicit DefaultVerifier (not verify_chain_default) to confirm the generic API also works end-to-end. Same chain and anchors. Assert Ok.\n\n**Defensive programming rules:**\n- Test cert DER is loaded from committed binary fixtures (include_bytes!), not from network.\n- now_unix must be a compile-time constant derived from the actual cert validity period, documented in a comment: // PKITS certs valid from <date> to <date>, using Unix timestamp <value>.\n- All assertions use assert_matches! or explicit variant destructuring \u2014 not just assert!(result.is_ok()).\n\n**Subagent instructions:**\nSingle subagent. Confirm the PKITS fixture path and cert validity dates before writing the test. Check the actual notBefore/notAfter fields of the PKITS certs using openssl x509 -in ... -text.\n\n**Tests (the test IS the bead):**\n- e2e_verify_chain_default_pkits_4_1_1: see Algorithm step 3-8. Oracle: PKITS document specifies this test MUST pass.\n- e2e_verify_chain_default_expired: see Algorithm step 9. Oracle: PKITS cert dates are known.\n- e2e_verify_chain_explicit_verifier: see Algorithm step 10. Oracle: same as first test.",
+  "ephemeral": 0,
+  "id": "PKIX-7eu",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: verify_chain end-to-end smoke test",
+  "updated_at": "2026-05-02T07:30:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:03:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0w9",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:03:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jws",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:03:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mee",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced assert!(a == b, msg) with assert_eq!(a, b, msg) in LintRunner::new's debug-only duplicate-id check, for richer assertion diagnostic output.",
+  "closed_at": "2026-05-07T22:36:17Z",
+  "compaction_level": 0,
+  "content_hash": "24ffd0f352e55fb75c9cd3e87335f90ed0dbb0496489c1dbfa09adf6e95b319b",
+  "created_at": "2026-05-07T22:16:38Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\n`pkix-lint/src/lib.rs:636-639` uses `assert!` with an equality predicate where\n`assert_eq!` is idiomatic and gives better error messages:\n\n```rust\nassert!(\n    ids.len() == original_len,\n    \\\"duplicate lint IDs will produce confusing deviation behavior\\\"\n);\n```\n\nIdiomatic:\n```rust\nassert_eq!(\n    ids.len(), original_len,\n    \\\"duplicate lint IDs will produce confusing deviation behavior\\\"\n);\n```\n\nDifference at runtime: `assert_eq!` prints both sides of the comparison\n(`assertion `left == right` failed: ...; left: 3; right: 4`), which is\nsignificantly more useful than \\\"assertion failed: ids.len() == original_len\\\".\n\nThis is wrapped in `#[cfg(debug_assertions)]` so it only fires in dev builds,\nbut the diagnostic improvement is the whole point.\n\nCaught by clippy's `unnecessary_cast` \u2194 wait, no \u2014 actually by\n`clippy::manual_assert` and `clippy::eq_op` neighborhood; specifically\n`clippy::assertions_on_constants` does not catch this either. The lint that\ncatches it is `clippy::nonminimal_bool` only sometimes; in practice this is a\nmanual-spot finding, not a lint hit.\n\nFix: change `assert!(a == b, msg)` to `assert_eq!(a, b, msg)`.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.27",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: assert!(a == b, ...) instead of assert_eq!(a, b, ...) in LintRunner::new debug check",
+  "updated_at": "2026-05-07T22:36:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:16:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Already addressed as part of PKIX-qwzx.2 fix in same README block.",
+  "closed_at": "2026-05-07T22:23:12Z",
+  "compaction_level": 0,
+  "content_hash": "65c9ed0dc80ac27fee694bc6fb8c0a29c3e1fb65f94cf04a6eaa28e6eed82cfc",
+  "created_at": "2026-05-07T22:01:42Z",
+  "created_by": "Mark Atwood",
+  "description": "README.md line 81:\n  let crl_checker = CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier);\n  let validated = verify_chain_default(&chain, &anchors, &policy, &crl_checker)?;\n\nAfter P3 commit ff707564 (PKIX-xjbw, 'parse CRL/OCSP once at construction; CrlChecker/OcspChecker::new return Result'), the type of `crl_checker` is now `Result<CrlChecker<DefaultVerifier>, Error>`, not `CrlChecker<...>`. The example would fail with a type error at the `&crl_checker` argument.\n\nFix: `let crl_checker = CrlChecker::new(crl_der_bytes, now_unix, DefaultVerifier)?;`\n\nSeverity: P3 because this is part of the same README block flagged at P2 in PKIX-qwzx.2; one PR can fix both.\n\nPass-1 attribution: a side effect of PKIX-xjbw \u2014 the README wasn't updated when the API changed.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: README.md CRL example uses pre-P3 CrlChecker::new signature (now returns Result)",
+  "updated_at": "2026-05-07T22:23:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

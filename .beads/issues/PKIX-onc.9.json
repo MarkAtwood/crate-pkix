@@ -1,0 +1,31 @@
+{
+  "close_reason": "TryFrom<Certificate> now moves subject and spki from owned cert",
+  "closed_at": "2026-05-03T13:26:03Z",
+  "compaction_level": 0,
+  "content_hash": "7bd5329f196025c410a779b30209d892bd0d71c7793291d4d585b0cef44b4062",
+  "created_at": "2026-05-03T13:15:38Z",
+  "created_by": "Mark Atwood",
+  "description": "The TryFrom<Certificate> impl calls cert.tbs_certificate.subject.clone() and cert.tbs_certificate.subject_public_key_info.clone() even though it owns cert. These should be direct moves to avoid two unnecessary heap allocations. The maintenance consequence: this pattern will be copy-pasted if anyone adds similar converters, spreading the inefficiency.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TryFrom<Certificate> unnecessarily clones owned fields",
+  "updated_at": "2026-05-03T13:26:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "8 KiB buffer is already documented with a comment explaining the size choice and the v0.2 heap plan. No change needed.",
+  "closed_at": "2026-05-02T17:47:50Z",
+  "compaction_level": 0,
+  "content_hash": "c9699066fb3e08eca4e4911533847dfed27b33942765c46f40ffa0aa840f3b74",
+  "created_at": "2026-05-02T17:27:22Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk allocates [0u8; 8192] on the stack to encode TBSCertificate for signature verification. Certs with large embedded public keys (e.g. RSA-4096), many SANs, or large custom extensions can exceed 8 KiB. The failure mode is Error::Der, which is indistinguishable from an actual DER encoding error in the cert structure. Callers will file issues saying 'my cert fails with DER error' and it will be hard to diagnose. The comment says 'typical TLS certs are 1\u20133 KiB' which is true but code-signing certs from Microsoft/Adobe can reach 4\u20136 KiB, and enterprise CA certs with many extensions routinely exceed 5 KiB. For no_std this buffer is the right approach, but it needs: (a) a dedicated Error variant like TbsTooLarge, (b) a const or doc comment documenting the exact limit, and (c) if std feature is enabled, the option to use heap allocation instead.",
+  "ephemeral": 0,
+  "id": "PKIX-841.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "8 KiB TBS stack buffer silently rejects large certs",
+  "updated_at": "2026-05-02T17:47:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:27:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

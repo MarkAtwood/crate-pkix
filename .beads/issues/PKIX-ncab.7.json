@@ -1,0 +1,52 @@
+{
+  "close_reason": "Applied .1/.2/.3 decisions: PKIX-9vnx renamed to 'OSCAL emit/parse (historical alignment epic \u2014 superseded by PKIX-ncab)' with supersession note. PKIX-amgn.8 renamed to 'vendor zlint catalog metadata for pkix-lint-cabf (output format TBD)' with re-scope note. PKIX-amgn.8.3-.6 labeled human + frozen pending replacement format decision. PKIX-9vnx.9 framing note appended (API stands; OSCAL framing removed from descendant scope).",
+  "closed_at": "2026-05-12T16:35:55Z",
+  "compaction_level": 0,
+  "content_hash": "579420fff0957eff914770a72a93e8a468c19fcb91b9defb67e69b9a64551540",
+  "created_at": "2026-05-12T02:20:55Z",
+  "created_by": "Mark Atwood",
+  "description": "Once .1, .2, and .3 land, update the affected beads' titles, descriptions, labels, and status per the maintainer decisions:\n\n- PKIX-9vnx (per .1)\n- PKIX-amgn.8 (per .2) \u2014 and its open children .8.3+\n- PKIX-9vnx.9 + PKIX-9vnx.9.2 (per .3)\n\nSpecifics depend on the chosen option. No code changes; pure beads metadata updates.\n\nBlocks on: .1, .2, .3.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Apply beads metadata decisions to PKIX-9vnx, PKIX-amgn.8, PKIX-9vnx.9",
+  "updated_at": "2026-05-12T16:35:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:21:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T19:21:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T19:21:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8fd57fe0300bb63feaa1cfa81dbadffa824f580b2b32d878f2f0a33c066f66e4",
+  "created_at": "2026-06-04T18:08:21Z",
+  "created_by": "Mark Atwood",
+  "description": "Skoll BUGS MEDIUM-1 finding (PKIX-szmo.7 triage). In pkix-path/src/lib.rs around line 3347, the anyPolicy expansion loop builds an already_covered Vec to skip duplicates, but the Vec is a snapshot taken before the loop starts. When two parent nodes have overlapping expected_policy_set (possible after PolicyMappings per RFC 5280 \u00a76.1.4), the loop can insert duplicate PolicyNode entries for the same policy OID at the same tree depth. Fix: move already_covered accumulation inside the loop so each iteration sees nodes added by prior iterations, or use a HashSet of policy OIDs.",
+  "ephemeral": 0,
+  "id": "PKIX-6p6p",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path: anyPolicy expansion produces duplicate PolicyNode entries",
+  "updated_at": "2026-06-04T18:08:21Z"
+}

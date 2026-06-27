@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:27:38Z",
+  "compaction_level": 0,
+  "content_hash": "bb6e8401a7c436c14c93fc22a9e0e92cfa70c03126a519ff8d42b07320cf6551",
+  "created_at": "2026-05-02T22:25:31Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-2oe",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Review complete: Section 0 (correctness) \u2014 tag check fixes encoding collision bug in unhandled string types. Section 1 (maintainer burden) \u2014 low; longer doc is well-structured. Section 2 (efficiency) \u2014 negligible overhead. Section 3 (elegance) \u2014 clean. Section 4 (readability) \u2014 improved. Section 6 (what is good) \u2014 fail-closed design, roadmap clarity. No real engineering issues found.\nMaintainer risk: LOW \u2014 changes are minimal, non-breaking, and fix a real correctness gap. Tag check is defensive (fail-closed). No API changes, no test breakage expected.\nConfidence: 99% correct. Least confident: whether real-world certificates with TeletexString/BMPString DN components exist whose byte content coincidentally matches across encodings (extreme edge case). Running out of real complaints: yes \u2014 scanned for API breakage, perf impact, doc accuracy, encoding edge cases, and integration. All clear.\nReview converged after 2 rounds. Final round: P0=0 P1=0 P2=0 (both non-zero findings were confirmations of already-applied fixes, not new issues). Reviewer stated: running out of real complaints.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review round 2: nip string normalization doc + tag fix",
+  "updated_at": "2026-05-02T22:27:38Z"
+}

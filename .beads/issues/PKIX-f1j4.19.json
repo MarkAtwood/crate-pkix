@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "991d766ddef048ecf7daabd295dd60e784b5c5f2b6c06dd52ab79eed0faaa043",
+  "created_at": "2026-05-14T18:59:10Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:477-501: is_rollback and crl_number_gt have opposite semantic polarity \u2014 is_rollback returns true when the new entry is OLDER, crl_number_gt returns true when the incoming is NEWER. Reading the call site:\n\n    if is_rollback(self.cache.get_crl(&key).as_deref(), meta.crl_number.as_deref()) { return; }\n\nrequires the reader to keep both inversions in head. is_rollback is the right verb for the caller's intent \u2014 flagging this as opinion only because the alternative (single comparator + clear ordering at the call site) sacrifices readability of the call site for symmetry of the helpers.\n\nSkip if disagreeing. Marked opinion.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.19",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "is_rollback / crl_number_gt naming: both functions; one returns 'is this a rollback' the other 'is incoming greater'",
+  "updated_at": "2026-05-14T18:59:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6cb72b63894c7cfdf931b252e8f627dd943d755d420cb25b7f2bc7c5177041d7",
+  "created_at": "2026-05-14T14:26:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:57 has 'use alloc::vec::Vec;' at the top. Then verify.rs:543-551 (build_signed_input_tree_head) uses fully-qualified 'alloc::vec::Vec::with_capacity(...)' and 'let mut out = alloc::vec::Vec::with_capacity(...)'. Other helper functions in the same module (build_signed_input_x509_entry at line 887, build_merkle_tree_leaf_x509_entry at line 795, etc.) just write 'Vec'.\n\nThis is a minor consistency wart. Pick one: either fully-qualify everywhere (the no_std habit) or rely on the top-level import. Inconsistency is more confusing than either choice on its own \u2014 a future reader sees alloc::vec::Vec and wonders if it means something different from Vec.\n\nMarked opinion \u2014 choice does not matter, consistency does.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify.rs uses both alloc::vec::Vec (qualified) and Vec (imported) inconsistently across functions",
+  "updated_at": "2026-05-14T14:26:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:26:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

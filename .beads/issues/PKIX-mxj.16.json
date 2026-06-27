@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:59:13Z",
+  "compaction_level": 0,
+  "content_hash": "7c986c228c277f6f69e0b8ffaeb4cd782a4325bd6ba648429ac621b52e639d1b",
+  "created_at": "2026-05-07T03:53:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:103-117 \u2014 CrlChecker::new() accepts any DER-encoded CertificateList, including delta CRLs. A caller who passes a delta CRL to new() gets incomplete revocation coverage (delta CRLs only contain entries since the last base CRL; entries in the base are not checked). The current documentation says 'To also apply a delta CRL, use CrlChecker::with_delta' but does not warn that passing a delta CRL to new() is an incorrect usage that silently under-covers revocations. Fix: add a # Security note in CrlChecker::new() that warns 'Do not pass a delta CRL (one containing a deltaCRLIndicator extension) as the sole CRL. Delta CRLs only contain partial revocation information; use CrlChecker::with_delta(base, delta, ...) for correct delta CRL handling.'",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker::new() silently accepts delta CRL without warning",
+  "updated_at": "2026-05-07T03:59:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:53:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:20Z",
+  "compaction_level": 0,
+  "content_hash": "e0f7b3d7812ea12647e77bcda3250ffd5557c71b59fc41216b07aa79f3c80454",
+  "created_at": "2026-05-06T23:16:48Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs check_revocation_against_anchor, lines 400-410: the delta CRL path calls verify_delta_crl_and_collect with the anchor's subject/SPKI. This is correct if the base CRL and the delta CRL have the same issuer, but the anchor path does NOT perform the defense-in-depth cross-check that check_revocation does at lines 282-291 (verify delta issuer == base CRL issuer AND cert issuer before calling the helper). If the delta CRL's issuer DN were somehow different from the base CRL's issuer DN (e.g., a corrupt or substituted delta), the anchor path would only catch it via the verify_delta_crl_and_collect name match (anchor.subject), while the cert's issuer check is also absent. The non-anchor path has three name checks; the anchor path has one. Practically the missing check is mitigated by with_delta() validating issuer names at construction, but that validation is bypassed if someone constructs CrlChecker with a raw field access. The defense-in-depth pattern is inconsistent between the two paths. Suggested fix: add the same guard before calling verify_delta_crl_and_collect in check_revocation_against_anchor: verify that the parsed delta issuer matches both the base CRL issuer and cert.tbs_certificate.issuer (via anchor.subject).",
+  "ephemeral": 0,
+  "id": "PKIX-pi5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: Delta CRL anchor path missing cross-check vs base CRL issuer",
+  "updated_at": "2026-05-06T23:47:20Z"
+}

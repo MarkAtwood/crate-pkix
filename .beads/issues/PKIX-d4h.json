@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-d4h",
+  "title": "pkix-ct API hardening",
+  "description": "Harden the Certificate Transparency crate's public API. 10 P1 issues plus P2/P3 polish from old review pass PKIX-ppbr.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:53:36Z",
+  "updated_at": "2026-06-15T17:53:36Z"
+}

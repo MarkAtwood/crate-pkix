@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:25Z",
+  "compaction_level": 0,
+  "content_hash": "285a0566fc073b711c79ca8902a3e58e596117a5a32cea9641ed83f900106df7",
+  "created_at": "2026-05-06T21:30:10Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs line 112: ValidityMaxLint::check_cert signature accepts now_unix: u64 but the implementation on lines 113-128 uses only cert.tbs_certificate fields. The cap is computed via pkix_profiles::sc081_validity_cap(not_before) \u2014 correct for issuance-mode. But the Lint trait check_cert contract (lib.rs line 405) passes now_unix so callers can use either issuance-time or current-time evaluation. When called via LintRunner::run_cert with the current wall-clock time (operational mode), the lint silently ignores now_unix and still evaluates as if called in audit mode \u2014 producing the same result regardless of which mode the caller intended. This is a semantic mismatch between the contract and the implementation: the now_unix parameter is documented as the evaluation time, but is silently dropped.\n\nSpecifically: a caller using operational mode (passing current time to run_cert) would get the same result as audit mode (passing notBefore), even if they wanted to evaluate the certificate against the cap currently in force at the relying partys time. The comment on line 120 says \"The cap is determined by issuance time (notBefore), not validation time\" which is the SC-081 correct behaviour, but the method ignores now_unix entirely rather than using it at all, so it cannot support the operational mode use case documented in LintRunner.\n\nSuggested fix: the implementation is correct for the audit mode requirement. Mark the now_unix parameter with #[allow(unused_variables)] and add a doc comment noting this lint always uses notBefore, not now_unix, for the cap phase lookup. Alternatively, document in the trait default that some lints may ignore now_unix when their spec mandates issuance-time evaluation.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: ValidityMaxLint ignores now_unix parameter entirely \u2014 wrong for operational-mode use",
+  "updated_at": "2026-05-06T21:36:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:30:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "clone unavoidable given mutable-accumulator design; documented with inline comment; Cow approach deferred to v0.2",
+  "closed_at": "2026-05-03T13:37:57Z",
+  "compaction_level": 0,
+  "content_hash": "68ce1464a2f5e2a04558c84c75c34cff7d5915aab9dfc716f7dfb6e2bd5662fe",
+  "created_at": "2026-05-03T13:32:03Z",
+  "created_by": "Mark Atwood",
+  "description": "O(NC_size \u00d7 A) allocations \u2014 lines 1245-1246 clone permitted_subtrees and excluded_subtrees from anchor.name_constraints at the top of every chain_walk call. During key rollover with N matching anchors, each attempt clones the full NC collections. Expected impact: reduced heap pressure in multi-anchor or large-NC scenarios; the anchor NC data is immutable and could be borrowed as a starting reference rather than cloned.",
+  "ephemeral": 0,
+  "id": "PKIX-s54.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk: clones anchor NC subtrees on every anchor attempt",
+  "updated_at": "2026-05-03T13:37:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:32:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

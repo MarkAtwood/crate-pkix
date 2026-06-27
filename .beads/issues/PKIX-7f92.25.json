@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added #[derive(Clone, PartialEq, Eq)] to ParseError. All payload fields already satisfy the bounds (DeviationAddError, ParameterError, String, usize, &'static str), so the change is purely additive. 286 pkix-lint tests pass with --all-features; clippy clean. Send+Sync coverage was already added on PKIX-7f92.26.",
+  "closed_at": "2026-05-14T16:58:27Z",
+  "compaction_level": 0,
+  "content_hash": "2cf6d61da3cb3dba1411c39853b6706f3275211a6859d226c4b504ac5e148b40",
+  "created_at": "2026-05-14T16:00:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/parse.rs:43 \u2014 ParseError derives only Debug.\n\nAGENTS.md non-negotiable #6 mandates: \"Public result/error types ... MUST derive Clone + Debug + PartialEq + Eq and MUST be Send + Sync. They SHOULD support serde::Serialize + Deserialize behind a serde feature flag.\"\n\nDeviationAddError (deviation.rs:69) DOES derive Clone + PartialEq + Eq + thiserror::Error and complies. ParseError does not. The two error types are returned from adjacent modules in the same crate; the asymmetry is unintentional.\n\nEvery payload variant of ParseError is already Clone + PartialEq + Eq compatible:\n- String  (Clone + PartialEq + Eq)\n- usize   (Clone + PartialEq + Eq)\n- &'static str (Clone + PartialEq + Eq)\n- DeviationAddError (Clone + PartialEq + Eq via derive)\n- crate::ParameterError (Clone + PartialEq + Eq via derive, lib.rs:498)\n\nso adding the derives is mechanical.\n\nCALLER IMPACT: A caller cannot:\n- Clone ParseError to log it and propagate it\n- Compare ParseError values in test assertions (assert_eq! on Err arms requires PartialEq)\n- Persist ParseError across process boundaries via a serialization-cache layer\n\nThis is the exact \"cache-friendly result types\" requirement from non-negotiable #6.\n\nREMEDIATION: Add #[derive(Clone, PartialEq, Eq)] to ParseError. Add a Send+Sync compile-time assertion in the const block at lib.rs:1465 (currently only Finding is asserted; see related finding on Send+Sync coverage gap).\n\nThis is a pre-1.0 free fix \u2014 adding derives is non-breaking.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ParseError missing Clone/PartialEq/Eq derives; violates AGENTS.md non-negotiable #6 cache-friendliness contract",
+  "updated_at": "2026-05-14T16:58:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:00:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

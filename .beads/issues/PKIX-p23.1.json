@@ -1,0 +1,31 @@
+{
+  "close_reason": "Withdrawn: re-read confirms the per-cert loop is correct",
+  "closed_at": "2026-05-06T21:33:34Z",
+  "compaction_level": 0,
+  "content_hash": "3619a604aefa049fedce79739cd63de5c3aae7496dd4f82e06bd623fa2923a0d",
+  "created_at": "2026-05-06T21:29:23Z",
+  "created_by": "Mark Atwood",
+  "description": "In DeviationRunner::run_chain (pkix-lint/src/deviation.rs:724-735), apply_deviations is called with a single cert but processes raw findings that include findings from ALL certs (from run_cert for that iteration). Actually no \u2014 it's called once per cert (per-loop), so each cert's findings are passed to apply_deviations with that cert. This looks correct on re-read. Demote.\n\nActually: the code calls runner.run_cert(cert, kind, i, now_unix) and then self.apply_deviations(raw, cert, now_unix) in the same loop iteration, so cert is the same in both calls. The scope check in find_deviation also uses that same cert. This is correct.\n\nWithdrawal: no finding here.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: DeviationRunner.run_chain applies single cert deviation to all certs in chain",
+  "updated_at": "2026-05-06T21:33:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:29:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

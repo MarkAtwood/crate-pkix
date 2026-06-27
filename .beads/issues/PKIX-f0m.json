@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:23:41Z",
+  "compaction_level": 0,
+  "content_hash": "31f1bd4136f85af2ee2b6fc0613e4c0465dc392a38b09d8934ef968df417e85a",
+  "created_at": "2026-05-02T23:20:30Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd a private helper `cert_subject_alt_names(cert) -> Option<&SubjectAltName>` in pkix-path/src/lib.rs that extracts the SAN extension from a certificate's extensions list.\n\n## Algorithm\n- Iterate `cert.tbs_certificate.extensions` (if Some)\n- Match on `OID_SUBJECT_ALT_NAME` (2.5.29.17)\n- Decode the extension value as `SubjectAltName` and return it\n- Return None if extension absent or on parse error (treat missing SAN as empty set)\n- Also add OID_SUBJECT_ALT_NAME constant\n\n## Acceptance criteria\n- Returns Some(&san) for a cert that has SAN\n- Returns None for a cert without SAN extension\n- Does not panic on malformed extension value (returns None)",
+  "ephemeral": 0,
+  "id": "PKIX-f0m",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add cert_subject_alt_names() extractor helper",
+  "updated_at": "2026-05-02T23:23:41Z"
+}

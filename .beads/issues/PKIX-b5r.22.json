@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:11Z",
+  "compaction_level": 0,
+  "content_hash": "a05f5c3211fc921feedd7ffa8c5748484cd5962611962cb49e49f8384d8926b9",
+  "created_at": "2026-05-05T15:47:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:141\u2013146\n\n    let current_issuer = path\n        .last()\n        .expect(\"path is never empty\")\n        .tbs_certificate\n        .issuer\n        .clone();\n\nThe comment 'path is never empty' is an invariant maintained by the caller (build_path always pushes target before the first call).  Using .expect() on an invariant that holds by construction is correct but results in a panic with a string message in release builds.\n\nIdiomatic Rust for caller-maintained invariants is:\n- debug_assert!(!path.is_empty(), \"path is never empty\") before the .last()\n- Then use path.last().unwrap() or path.last_mut().unwrap() (or expect if preferred)\n\nAlternatively, restructure dfs to accept the current cert directly rather than re-extracting it from the path:\n\n    fn dfs(current: &Certificate, path: &mut Vec<Certificate>, ...) -> bool\n\nThis eliminates the invariant entirely and avoids the clone of current_issuer (which is cloned only to avoid a simultaneous immutable + mutable borrow \u2014 a separate issue). The restructured signature is cleaner and the invariant disappears.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.22",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "dfs() uses bare .expect() on path.last() \u2014 prefer debug_assert",
+  "updated_at": "2026-05-05T16:06:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

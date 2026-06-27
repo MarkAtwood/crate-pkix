@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "794e8fc6387f4a83e4d8f7d8a76815f1c23939d116a3bd7c8eb34b98904c04ad",
+  "created_at": "2026-05-14T18:29:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:619-627: when build_first_valid_path returns NoValidPath, build_with_aia returns immediately without trying to fetch more caIssuers URIs. The reasoning given (\"NoValidPath means topology was OK but every candidate failed validate_path\") is locally correct but misses a real case: in cross-signed bridge/federal-PKI topologies a partially-loaded pool can yield a topologically valid chain whose anchor-end intermediate is the wrong cross-cert, validate_path rejects all candidates as SignatureInvalid, and the missing piece IS retrievable via AIA from one of the so-far-rejected intermediates. The current logic surfaces a final NoValidPath in that case even though one more AIA hop could have repaired it. Recommended action: not in pkix-path-builder per se, but the helper's rustdoc should make clear that AIA composition needs to retry on NoValidPath as well as NoPathFound, with caveats about not creating an infinite retry loop (the AIA depth cap already bounds this). Alternative: pkix-chain's loop classifies recoverable errors differently. Either way, the framing in pkix-chain currently mis-handles this. Cross-references PKIX-zkjb.7 (AIA wiring) and the doc gap in pkix-path-builder/src/lib.rs:929-938 (build_first_valid_path Errors section).",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-chain treats NoValidPath as non-recoverable, foreclosing AIA recovery on validate_path failure",
+  "updated_at": "2026-05-14T18:29:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:13:00Z",
+  "compaction_level": 0,
+  "content_hash": "3d8df3606c41b468fcb276418f845242c1adadfb2c4121408e7b856d11991a79",
+  "created_at": "2026-05-06T17:08:53Z",
+  "created_by": "Mark Atwood",
+  "description": "Commit 66eb8531 added a # Errors section to RevocationChecker::check_revocation that uses two nonexistent Error variant names:\n\n- Error::CertRevoked \u2192 should be Error::Revoked\n- Error::OcspExpired \u2192 no such variant; OCSP expiry returns OcspStatusUnknown; CRL expiry uses CrlExpired\n\nThese are broken intra-doc links. Reproduces with:\n  RUSTDOCFLAGS='--cfg docsrs -D warnings' cargo +nightly doc --no-deps --all-features -p pkix-revocation\n  error: unresolved link to `Error::CertRevoked`\n  error: unresolved link to `Error::OcspExpired`\n\nThis would cause docs.rs builds to fail under -D warnings (the standard docs.rs setting).\n\nFix: change the # Errors section to reference the real variants: Error::Revoked and Error::CrlExpired / Error::OcspStatusUnknown.",
+  "ephemeral": 0,
+  "id": "PKIX-t4s.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: check_revocation doc references nonexistent Error::CertRevoked and Error::OcspExpired variants",
+  "updated_at": "2026-05-06T17:13:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T10:08:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-t4s",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ce0fa2d533abfa6079ed14ca9749bb421a709583c0841005e41a59aed6f07d5e",
+  "created_at": "2026-05-14T17:42:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:80-87\n\n```rust\npub fn insert(&mut self, log: CtLog) -> Result<()> {\n    let expected: [u8; 32] = Sha256::digest(&log.key_der).into();\n    if expected != log.log_id {\n        return Err(Error::ParseError);\n    }\n    self.logs.insert(log.log_id, log);\n    Ok(())\n}\n```\n\nDoc:\n\n> Inserting a log with a `log_id` already present overwrites the\n> previous entry.\n\nThe return value `Result<()>` only discriminates \"log_id matches\nkey_der hash\" vs \"consistency check failed\". It does NOT tell the\ncaller whether they just silently overwrote a different log with the\nsame `log_id`.\n\nThis matters in two real scenarios:\n\n1. Caller stitches Apple + Google + Cloudflare log lists together.\n   Two sources may publish the same log under slightly different\n   metadata (different description string, slightly different\n   usable_from timestamp). Caller wants to detect duplicate\n   submissions, perhaps merge metadata. Currently they cannot.\n\n2. Caller is incrementally refreshing the log list: insert all new\n   logs, then check `len` to spot net additions. Today the net count\n   tells them nothing because `insert` may have overwritten existing\n   entries.\n\n`BTreeMap::insert` returns `Option<V>` \u2014 the previous value. This\ncrate's wrapper discards that information.\n\nFix: change signature to `pub fn insert(&mut self, log: CtLog) ->\nResult<Option<CtLog>>` \u2014 Ok(None) for fresh insert, Ok(Some(prev))\nfor overwrite. The doc comment already states overwrite is the\nbehavior, so this is just exposing the information that's already\nthere. Non-breaking-with-deprecation if a separate\n`insert_overwriting` accessor is added.\n\nActually fix earlier: add a separate `insert_unique` returning Err\nif log_id already present, leaving `insert` to its current overwrite\nsemantics with the upgraded return type.\n\nPriority P2: the contract is documented (overwrite happens) but\ncallers cannot detect or react to it. Defensive-forcing because\ncallers wanting overwrite-detection have to clone the prior list,\ncheck membership, and clone the new list \u2014 wasteful.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CtLogList::insert overwrite semantics undocumented in return value \u2014 silent dropped logs",
+  "updated_at": "2026-05-14T17:42:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:42:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "21c78dfa1f1c36f363ec9bac61d4b9a29ce6f29773c5d2dc896a7eac445e97c5",
+  "created_at": "2026-05-14T14:23:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:963-990 \u2014 tbs_without_sct_list() parses the leaf cert via Certificate::from_der(), retains the extensions vector minus the SCT-list extension, drops Option<extensions> if empty, and re-encodes via encode_to_vec(). For precert_entry signature verification to succeed, the re-encoded bytes must match \u2014 byte-for-byte \u2014 what the log saw at submission time, modulo the removed extension and its enclosing SEQUENCE length adjustment.\n\nThe docstring (verify.rs:954-962) acknowledges this and asserts that real-world canonically-encoded certs round-trip cleanly. The integration test tbs_reconstruction_is_bit_exact + the oracle's precert-tbs-no-sct.bin oracle confirm this for one synthetic fixture, and live_log.rs confirms it against ONE captured cert from one CT log.\n\nRisk: this is a load-bearing dependency on x509-cert's encoder being a bit-exact round-trip for every TBSCertificate it parses. Counter-examples that would silently break this:\n- An issuer that emitted non-canonical INTEGER (leading zero byte) which x509-cert's encoder canonicalizes on output.\n- An issuer that used implicit DEFAULTs (e.g., 'version: v1' encoded as a zero INTEGER vs omitted).\n- An issuer that emitted indefinite-length encodings (illegal in DER but seen in BER-leak certs).\n\nPer workspace test discipline ('Never write a test that uses the code under test as its own oracle'): the current test base is small. PKITS or limbo corpora would broaden coverage. Worth filing as 'add differential round-trip test against the full PKITS corpus' \u2014 if any PKITS cert fails round-trip, the precert SCT verification would silently produce InvalidSignature for that cert in production.\n\nSuggested follow-up: epic-level task to run tbs_without_sct_list against every cert in PKITS that has the SCT-list extension OID (or any cert, for the round-trip check minus the strip) and assert bit-exactness, mirroring pkix-path's existing chain-signature verification round-trip behavior.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "tbs_without_sct_list relies on x509-cert re-encoding being byte-identical for ALL un-stripped fields, not just structurally equivalent",
+  "updated_at": "2026-05-14T14:23:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:23:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

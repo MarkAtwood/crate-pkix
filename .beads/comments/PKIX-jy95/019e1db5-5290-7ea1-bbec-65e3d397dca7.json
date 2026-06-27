@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T19:41:23Z",
+  "id": "019e1db5-5290-7ea1-bbec-65e3d397dca7",
+  "issue_id": "PKIX-jy95",
+  "text": "DECOMPOSITION 2026-05-12 (Mark, interactive): the 6 buried-in-description decisions surfaced earlier in this session have been filed as discrete child decision beads for visibility on the human-frontier list. Children filed: .1 (lint granularity), .2 (severity mapping), .3 (batch interface shape), .4 (error-handling policy), .5 (pkix-policy-oscal file or skip), .6 (code-share with pkix-difftest oracles). NOTE: these are decision beads, not the implementation children. The implementation work for pkix-policy-zlint and pkix-policy-pkilint will be filed as separate epics WHEN the relevant gating decisions land \u2014 most of these decisions need to resolve before implementation can start coherently. Original 'three candidate adapter crates' framing in this epic's description (the .1/.2/.3 sub-sections under 'What') is retained as architectural-intent documentation; the actual decision children now have the per-decision detail."
+}

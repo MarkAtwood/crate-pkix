@@ -1,0 +1,38 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T03:56:14Z",
+  "compaction_level": 0,
+  "content_hash": "1a79da47a9ca56c82ef037723f891ff52148998b0d63c3cadba0a9bf4b7e84c0",
+  "created_at": "2026-05-12T21:35:25Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nNew workspace crate `pkix-zlint-bridge`. Std-only. Provides shared subprocess plumbing and result-parsing infrastructure for running zlint on certificates, consumed by:\n\n- `pkix-policy-zlint` (PKIX-jy95.1 area) \u2014 runtime adapter exposing zlint findings as workspace Lint impls\n- `pkix-difftest`'s zlint oracle (PKIX-hbzo.1) \u2014 differential testing against zlint's verdicts\n\n## Scope\n\n- Subprocess spawn (zlint binary on PATH or configured path)\n- Stdin/stdout/stderr handling\n- Exit code interpretation\n- NDJSON output parsing (zlint -format json)\n- Verdict vocabulary normalization (NA / NE / pass / notice / warn / error / fatal)\n- BridgeError type covering binary-not-found / version-mismatch / malformed-output / subprocess-crash\n- Single-cert and batch entry points (batch is mandatory per AGENTS.md non-negotiable #6)\n- Test fixtures sourced from zlint's own testdata (Apache-2.0, citable)\n\n## Cross-references\n\n- PKIX-jy95.6 (decision that filed this crate)\n- PKIX-jy95.1 / .2 / .3 / .4 (open shape decisions that now scope to THIS crate's API)\n- PKIX-hbzo.1 (consumer; differential oracle)\n- AGENTS.md non-negotiable #6 (cache-friendly types, batch API mandatory)\n\n## Open shape decisions inherited\n\nThese decisions now scope to this bridge crate, not the pkix-policy-zlint adapter:\n\n- PKIX-jy95.1 \u2014 granularity (per-check Finding vs umbrella Finding)\n- PKIX-jy95.2 \u2014 severity mapping (zlint Verdict -> workspace Severity)\n- PKIX-jy95.3 \u2014 batch interface shape (stdin streaming / file-per-cert / array)\n- PKIX-jy95.4 \u2014 error-handling policy\n\n## Open shape decisions added at bridge level\n\n- Sync vs async: default sync; async via separate trait or fn if needed (matches pkix-revocation / pkix-revocation-http precedent where sync is core and async is additive)\n- zlint version pinning: which zlint version(s) does the bridge support? Pin a minimum; refuse older with helpful error.\n- Test corpus: vendor zlint's testdata/ or fetch on demand?\n\n## Out of scope\n\n- Implementing pkix-policy-zlint or pkix-difftest's oracle (separate beads).\n- Cgo / FFI integration (per PKIX-jy95 Mark 2026-05-12: subprocess/IPC only, FFI not preferred).\n- Pkilint coverage \u2014 pkix-pkilint-bridge is a separate sibling crate (PKIX-jy95.8).\n\n## Acceptance\n\n- [ ] Crate exists in workspace Cargo.toml as a published library\n- [ ] Subprocess plumbing with configurable zlint path\n- [ ] NDJSON parsing for zlint -format json output\n- [ ] Verdict normalization to a workspace-shaped Verdict enum\n- [ ] BridgeError satisfies non-negotiable #6\n- [ ] Single-cert + batch entry points\n- [ ] Cargo feature 'serde' enables Serialize/Deserialize derives\n- [ ] Test fixtures cite their zlint testdata source\n- [ ] CHANGELOG + AGENTS.md inventory entry",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.7",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-zlint-bridge crate (shared subprocess + parsing infrastructure for zlint)",
+  "updated_at": "2026-05-13T03:56:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T14:35:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T09:23:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95.10",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

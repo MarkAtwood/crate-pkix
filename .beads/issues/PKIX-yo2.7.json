@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:51Z",
+  "compaction_level": 0,
+  "content_hash": "0730bf6af201e5b2aeb81723ad047ce82c43e1918c942aa742c8907ec9eca766",
+  "created_at": "2026-05-02T20:34:42Z",
+  "created_by": "Mark Atwood",
+  "description": "EKU is listed in HANDLED_CRITICAL_OIDS even though its value is not inspected. This is correct: RFC 5280 \u00a76.1 path validation does not require inspecting EKU values. Rejecting a cert with critical EKU as UnhandledCriticalExtension would break TLS server cert validation (CA/B Forum requires critical EKU on many cert types). A contributor might suggest removing EKU from the handled set to 'be stricter' \u2014 this would be wrong.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.7",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: OID_EXTENDED_KEY_USAGE in HANDLED_CRITICAL_OIDS is deliberate and correct",
+  "updated_at": "2026-05-02T20:36:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

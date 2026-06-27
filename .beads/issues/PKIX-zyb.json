@@ -1,0 +1,21 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f82f3e96fc99808bbd345b3b086bcda1d391bc9aaad0927d86bceb9dbca6e78b",
+  "created_at": "2026-05-02T17:09:55Z",
+  "created_by": "Mark Atwood",
+  "defer_until": "2026-08-01T00:00:00Z",
+  "description": "Add full RFC 4518 \u00a72.3 NFKC normalization to NormalizedIter. Requires adding unicode-normalization crate. Currently NormalizedIter only ASCII-case-folds. Spec: RFC 4518 \u00a72.2 (map), \u00a72.3 (NFKC), \u00a72.4 (prohibit), \u00a72.5 (bidi). Scope: apply after any_to_str_bytes extracts the string bytes; use unicode_normalization::UnicodeNormalization::nfkc() on the str. Also add Step 2 mapping (soft hyphen U+00AD removal, control character removal per RFC 3454). Testing: need Unicode test vectors from RFC 4518 or LDAP conformance suite.",
+  "ephemeral": 0,
+  "id": "PKIX-zyb",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Unicode NFKC normalization in names_match",
+  "updated_at": "2026-05-11T05:18:05Z"
+}

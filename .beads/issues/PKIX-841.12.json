@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:48:34Z",
+  "compaction_level": 0,
+  "content_hash": "968f32c50ac587716563c16e017b19fb95989442323776e1b0c02b5ef11ab219",
+  "created_at": "2026-05-02T17:28:07Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path computes is_self_issued before the anchor loop (lines 365-368). This evaluation happens even when no anchors share the last cert's issuer name. The variable is then used inside the loop only when an anchor's name matches. Suggested rewrite: move is_self_issued computation inside the loop body, evaluated lazily after the names_match filter. This removes a computation that pays in the common no-match case and makes the logic flow clearer: the self-issued SPKI guard is part of the anchor-match logic, not a pre-filter.",
+  "ephemeral": 0,
+  "id": "PKIX-841.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "is_self_issued computed unconditionally; used only in anchor loop",
+  "updated_at": "2026-05-02T17:48:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:28:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f90d13278a5797e94ea85bc6a0d21e11145187253a66e1c89726a9b0fca1bc16",
+  "created_at": "2026-05-14T16:00:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:671 \u2014 LintClone is declared pub and is the supertrait of Lint. The crate ships a blanket impl:\n\n  impl<T: 'static + Lint + Clone> LintClone for T { fn clone_box(&self) -> Box<dyn Lint> { ... } }\n\nso any Lint impl that also derives Clone gets LintClone for free. This is the only legitimate use.\n\nPROBLEM: Because LintClone is unsealed, a downstream crate can write:\n\n  struct MyLint { /* not Clone */ }\n  impl Lint for MyLint { ... }\n  impl LintClone for MyLint {\n      fn clone_box(&self) -> Box<dyn Lint> {\n          // Hand-rolled, returns a DIFFERENT lint than self\n          Box::new(MyLint { ... different state ... })\n      }\n  }\n\nThis violates the implicit invariant that clone_box returns an instance equivalent to self. apply_parameter_overrides (lib.rs:1394) and the LintRunner clone-and-swap path depend on clone_box producing semantic equivalents. A hand-rolled implementation can silently corrupt the apply_parameter_overrides atomicity guarantee.\n\nCALLER IMPACT: pkix-lint's stability contract around apply_parameter_overrides (\"clone-and-swap; original runner unchanged on error\" \u2014 see PKIX-7f92.19) is contingent on every Lint's clone_box being well-behaved. With LintClone public-and-unsealed, the maintainer cannot enforce this; a buggy downstream lint silently breaks the contract for that runner's other lints.\n\nREMEDIATION: Seal LintClone via the standard \"private supertrait of a private module\" pattern:\n\n  mod sealed {\n      pub trait Sealed {}\n      impl<T: 'static + Clone + super::Lint> Sealed for T {}\n  }\n  pub trait LintClone: sealed::Sealed {\n      fn clone_box(&self) -> Box<dyn Lint>;\n  }\n\nThis keeps the blanket impl working for downstream Lint + Clone types but prevents hand-rolled clone_box from outside the crate.\n\nPre-1.0 free fix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintClone trait is public and unsealed; downstream impl can bypass the T: Clone invariant the blanket impl provides",
+  "updated_at": "2026-05-14T16:00:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:00:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

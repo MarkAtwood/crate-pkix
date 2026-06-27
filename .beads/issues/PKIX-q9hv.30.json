@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a2b7f6c1abb24293415312e0a7f63c14ec56bf4e334e064b1118680edd22f1f9",
+  "created_at": "2026-05-14T14:57:11Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1422-1434 has two sequential .ok_or(...) early-returns that surface the same fixed string for two structurally distinct conditions:\n\n    let exts = leaf.tbs_certificate.extensions.as_ref().ok_or(Error::ProfileViolation {\n        reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n    })?;\n    let ext = exts.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE).ok_or(Error::ProfileViolation {\n        reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n    })?;\n\nThe first arm rejects 'cert has no extensions field at all' (the SEQUENCE was absent). The second rejects 'cert has extensions but EKU isn't among them.' From the caller's perspective via Error::ProfileViolation, these are indistinguishable today (same reason string), so the structural distinction in the source serves only the reader of this function \u2014 and at the cost of duplicated error-construction boilerplate.\n\nIdiomatic Rust collapses this to a single .ok_or:\n\n    let ext = leaf\n        .tbs_certificate\n        .extensions\n        .as_deref()\n        .unwrap_or(&[])\n        .iter()\n        .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)\n        .ok_or(Error::ProfileViolation {\n            reason: Cow::Borrowed(\"TSA certificate has no ExtendedKeyUsage extension\"),\n        })?;\n\nSame observable behaviour, fewer lines, no risk of the two error strings drifting (a future maintainer who edits one and forgets the other ships a confusing error).\n\nWhat goes wrong if left as-is: maintenance hazard. The two strings will eventually drift (one will get a more-specific suffix), and then the caller sees inconsistent error text for the same condition. Idiomatic Rust convention is 'one happy-path Option chain, one .ok_or at the bottom.'\n\nRelated to PKIX-q9hv.15 (duplicate match arms further down the same function) and PKIX-q9hv.28 (extension-helper consolidation). A unified fix sweep would apply all three.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "enforce_timestamping_eku_critical_and_sole has two ok_or arms with identical error strings; collapse via .as_deref().unwrap_or(&[])",
+  "updated_at": "2026-05-14T14:57:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:57:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Generated fixtures and added critical_eku_accepted test in pkix-path and verify_simple_critical_eku_accepted in pkix-chain-simple. All tests pass.",
+  "closed_at": "2026-05-02T20:19:27Z",
+  "compaction_level": 0,
+  "content_hash": "f542378ab5a3c0b4bf954c4abc70a9b474a9d4c4d6b5fa46a01bee99ae4085c1",
+  "created_at": "2026-05-02T20:19:27Z",
+  "created_by": "Mark Atwood",
+  "description": "Adding EKU to HANDLED_CRITICAL_OIDS and CRITICAL_OK_LEAF_EXTENSIONS introduced new behavior with no test coverage. Generated eku-critical-self-signed.der (pkix-path) and eku-root.der/eku-leaf.der (pkix-chain-simple) using pyca/cryptography and added tests confirm the new behavior. Fixed in this round.",
+  "ephemeral": 0,
+  "id": "PKIX-hqm.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing test for critical EKU acceptance (new behavior in round 1)",
+  "updated_at": "2026-05-02T20:19:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:19:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hqm",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

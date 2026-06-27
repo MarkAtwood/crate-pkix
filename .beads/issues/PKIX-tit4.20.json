@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done in commit. Replaced format!(\"{:?}\", kind) with format!(\"{kind:?}\").",
+  "closed_at": "2026-05-14T08:10:02Z",
+  "compaction_level": 0,
+  "content_hash": "5b6a4a4b413ad0585601c7623b008424a06b7739ad7d8dbe518737c274af6ce7",
+  "created_at": "2026-05-14T05:16:03Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:167 \u2014 `s.serialize_str(&format!(\"{:?}\", kind))` uses the positional format-string form. Rust 1.58+ supports captured identifiers; clippy::uninlined_format_args (pedantic, on by default in many house lint configs) flags this and prefers `format!(\"{kind:?}\")`. Inconsistency check: the rest of the diff uses the inlined form throughout (e.g., `panic!(\"expected MalformedAnchor(0), got {other:?}\")` at fixtures.rs:191, `write!(f, \"i/o error: {e}\")` at lib.rs:242), so this one line is the outlier. Fix: `s.serialize_str(&format!(\"{kind:?}\"))` or, while there, drop the intermediate String entirely with `s.collect_str(&format_args!(\"{kind:?}\"))` to avoid the heap allocation. What goes wrong if it stays: micro-readability inconsistency with the rest of the crate; clippy::pedantic warning.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.20",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "format!(\"{:?}\", kind) uses positional format args instead of inlined form",
+  "updated_at": "2026-05-14T08:10:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:16:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

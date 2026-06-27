@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:22:56Z",
+  "compaction_level": 0,
+  "content_hash": "f5ee97e10072a82e981a3b851f9e2968d8ff568eb65ce1e4d421513898d95eca",
+  "created_at": "2026-05-07T15:19:45Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk (lib.rs:2109): the fold used to detect whether any parent matched and simultaneously push new_nodes has a logic smell: 'fold(false, |_, _parent| { new_nodes.push(...); true })'. The closure ignores the accumulator '_ ' and always returns true \u2014 which means matched_via_i is true iff ANY parent matched (at least one iteration ran), and the push always fires. This is equivalent to: 'let matched_via_i = tree.iter().filter(...).fold(false, |acc, parent| { new_nodes.push(...); true });'. The discard of acc is correct (we only care about whether at least one match fired), but the idiom of fold with discarded accumulator is unusual and confusing. Replace with: 'let matched_via_i = tree.iter().filter(...).count() > 0; for _ in tree.iter().filter(...) { new_nodes.push(...); }' or use .inspect() + .count() for clarity.",
+  "ephemeral": 0,
+  "id": "PKIX-v90x",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: matched_via_i fold closure discards accumulator, returning only last value",
+  "updated_at": "2026-05-07T15:22:56Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "All revocation epic issues complete: Error enum, CrlChecker, OcspChecker",
+  "closed_at": "2026-05-02T13:27:02Z",
+  "compaction_level": 0,
+  "content_hash": "9e2e18b4590b1e8023ecebed462aae84751f276e25e7e32441a130ecc3d9a8cd",
+  "created_at": "2026-05-02T05:50:15Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement the pkix-revocation crate: define its own Error type, implement CrlChecker (offline), implement OcspChecker (offline).\n\nBLOCKED BY: Epic PKIX-cfh (PKIX-b9z in particular \u2014 RevocationChecker must return pkix_revocation::Result before this epic can proceed).\n\nError type (pkix_revocation::Error):\n  Revoked { serial: SerialNumber, reason_code: Option<u8> }\n  CrlExpired { this_update: ... , next_update: ... }\n  CrlSignatureInvalid\n  OcspSignatureInvalid\n  OcspStatusUnknown\n  ParseError(der::Error)\n  The error type needs Display and std::error::Error (behind std feature) per PKIX-e9v.\n\nCrlChecker (crl feature flag):\n  Input: caller provides DER-encoded CRL bytes at construction time (offline \u2014 no network).\n  On check_revocation:\n    1. Parse CRL using x509-cert (or der directly \u2014 confirm x509-cert has CRL types)\n    2. Verify CRL signature against issuer SPKI from the issuer Certificate argument\n    3. Check thisUpdate <= now and now <= nextUpdate (need time passed in \u2014 design TBD)\n    4. Look up cert serial number in revokedCertificates list\n    5. Return Ok(()) if not found, Err(Revoked { ... }) if found\n  Test vectors: generate with openssl ca -gencrl and openssl ca -revoke. Commit as DER fixtures.\n\nOcspChecker (ocsp feature flag):\n  Input: caller provides DER-encoded OCSP response bytes at construction time.\n  On check_revocation:\n    1. Parse OCSP BasicOCSPResponse\n    2. Verify responder signature\n    3. Check producedAt validity window\n    4. Match cert by issuerNameHash + issuerKeyHash + serialNumber\n    5. Return based on CertStatus (good/revoked/unknown)\n  Note: x509-ocsp crate version TBD (see workspace.dependencies TODO comment)\n  Test vectors: generate with openssl ocsp. Commit as DER fixtures.\n\nSub-issues to create:\n1. Define pkix_revocation::Error enum with Display\n2. CRL parsing and signature verification helper\n3. CrlChecker implementation + test vectors\n4. OcspChecker implementation + test vectors\n5. pkix-chain integration: wire revocation into verify_chain with correct pkix_chain::Error\n\nAcceptance: CrlChecker and OcspChecker pass against OpenSSL-generated test vectors. pkix-chain::verify_chain returns pkix_chain::Error properly.",
+  "ephemeral": 0,
+  "id": "PKIX-ahk",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: pkix-revocation error type, CRL checker, OCSP checker",
+  "updated_at": "2026-05-02T13:27:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:50:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-cfh",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

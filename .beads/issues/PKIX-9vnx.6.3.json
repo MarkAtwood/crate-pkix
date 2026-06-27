@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Shipped: lint_ids_from_catalog + LintRunner::filter_to_ids (oscal-gated), round-trip closure test on 6 CABF lints, 7 new ParseError variants (Catalog-shaped + UnknownLintId). 10 new tests; oscal 211 / all-features 217. Commit 3008d9be.",
+  "closed_at": "2026-05-11T22:19:28Z",
+  "compaction_level": 0,
+  "content_hash": "438628a74eadd138156453572b0dc27539c5f42e78e7ea207364a1bb91ca1559",
+  "created_at": "2026-05-11T18:00:54Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.6 decomposition step 3. The Catalog emit half lands in .6.2; this bead closes the round-trip loop required by the parent's acceptance criterion 'Catalog round-trips: deserialize OSCAL JSON, run lints, get same set of Controls as the hardcoded Catalog.'\n\n## What\n\n1. New function in `pkix-lint/src/oscal/parse.rs`:\n\n```rust\npub fn lint_ids_from_catalog(value: &Value) -> Result<Vec<String>, ParseError>\n```\n\nWalks an OSCAL Catalog JSON Value and returns the ordered list of Control ids. Parser is intentionally narrow (matches what catalog_from_lints emits, not arbitrary OSCAL catalogs).\n\n2. New method on `LintRunner` (or free function in the runner module):\n\n```rust\npub fn filter_to_ids(self, ids: &[String]) -> LintRunner\n```\n\nReturns a new LintRunner containing only the lints whose `id()` appears in `ids`, in the order `ids` lists them. Missing ids (Catalog declares an id with no matching Lint impl) trigger an error variant.\n\n3. Round-trip test:\n   - Build a LintRunner from the 6 CABF lints.\n   - Catalog = catalog_from_lints(&runner.lints(), \"cabf-tls-br\", \"2.0.0\").\n   - serde_json::to_string \u2192 from_str.\n   - ids = lint_ids_from_catalog(&catalog).\n   - runner2 = LintRunner::new(...).filter_to_ids(&ids).\n   - Run both runners on a fixture chain.\n   - Assert findings_eq(report1, report2) (sorted by lint id + cert_index).\n\n## Acceptance\n\n- [ ] lint_ids_from_catalog parses Catalog JSON.\n- [ ] LintRunner::filter_to_ids implemented.\n- [ ] Round-trip test asserts identical Findings.\n- [ ] Missing-id error path covered by a negative test.\n- [ ] Full pkix-lint suite passes; `oscal` feature gated.\n\n## Out of scope\n\n- Decoding Control props back into metadata-mutated Lint impls (parameter override) \u2014 that's .6.5.\n\n## Depends on\n\nPKIX-9vnx.6.2 (catalog serializer).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL Catalog round-trip + id-pair runner",
+  "updated_at": "2026-05-11T22:19:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T11:00:54Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T11:01:33Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

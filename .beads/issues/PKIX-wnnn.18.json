@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c4cc8b05c825b38f190e1a2ebbd8c61dba4c6022ae7f1eadd86a1bb034d383b8",
+  "created_at": "2026-05-14T18:30:36Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/build_first_valid_path.rs:122-128 \u2014 after asserting build_first_valid_path returned a valid chain, the test asserts that chain != bp_chain (the chain build_path picks first). This is non-obvious testing discipline: it guards against the failure mode where DFS ordering shifts such that build_path now picks a valid candidate first, making the iteration the test is trying to demonstrate vacuous. The panic message names exactly that scenario. A future contributor will suggest dropping this assertion (\"if both helpers return a valid chain, the test passes \u2014 what more do you want?\"). They are wrong: a passing test that doesn't exercise the code path it claims to is worse than a failing test. The assert_ne! turns \"test silently became vacuous\" into a hard failure. Worth defending verbatim in any PR review.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.18",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "tc60 test's assert_ne! defensive guard is excellent",
+  "updated_at": "2026-05-14T18:30:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

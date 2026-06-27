@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-02T22:47:53Z",
+  "compaction_level": 0,
+  "content_hash": "049d0003aa86e80334cfe984fbca5b0c84eebb28acb77fa2bb5d2971628fa28c",
+  "created_at": "2026-05-02T18:23:12Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-8sh",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 The three unimplemented stub functions (verify_scts, build_path, validate_attribute_cert) all return misleading operational errors instead of a not-implemented signal; these will cause integration bugs. The OcspChecker's serial-only CertID matching is a documented but real security gap that will be missed by callers who don't read the full Limitations section. The TBS 8 KiB fixed buffer produces confusing error messages for valid certs. The chain-simple crate's allowlist rejects all public-PKI TLS certs despite claiming to handle them.\nConfidence: 15% chance of missed bug. Least confident flags: the pathLenConstraint calculation (i-1 formula) is correct but subtle \u2014 I verified it manually against RFC 5280 but did not run PKITS \u00a74.5 path-length tests. Uncertainty driven by: not tracing through the full PKITS test suite to confirm all boundary conditions; not reviewing the PKITS test infrastructure in tests/pkits_4_1_4_2.rs / pkits_4_3.rs. Would raise confidence if: ran the PKITS tests and confirmed all 4.5.x (pathLenConstraint) cases pass.\nIdiom rating: ACCEPTABLE \u2014 No unsafe code (all crates have #![forbid(unsafe_code)]). No .unwrap() in production paths. Error types are #[non_exhaustive] enums throughout. The main idiom issues are: (1) FetchError::Transport(String) loses error chain; (2) CertPool missing IntoIterator; (3) for-loop extension searches that should be .find().and_then() chains; (4) duplicated OID literals. None are soundness issues.\nRust idiom confidence: 10% chance of missed issue. Least confident flags: did not exhaustively check lifetime elision across all trait signatures (there are very few explicit lifetime annotations in the codebase \u2014 mostly clean). Uncertainty driven by: pkix-revocation-http and pkix-path-builder are unimplemented stubs; their idiom issues are low-signal.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: full project fresh-eyes pass",
+  "updated_at": "2026-05-02T22:47:53Z"
+}

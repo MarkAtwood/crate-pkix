@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:42:40Z",
+  "compaction_level": 0,
+  "content_hash": "9fc478257951de0c443a5c26732b37d3f1ea2d0a8ff99ecfb2c82a0cef6902db",
+  "created_at": "2026-05-12T02:21:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Walk every module doc, rustdoc comment, and inline comment in `pkix-lint/src/oscal/`. Identify and reframe assertions that claim OSCAL is \"canonical,\" \"the wire format,\" \"the source of truth,\" or equivalent.\n\nFunctional code does not change. Tests do not change. This is purely a documentation framing audit on existing shipped code.\n\nExpected output:\n- Inventory of asserted phrases that need softening (list of file:line)\n- Applied patch\n- Confirmation that `cargo doc --no-deps -p pkix-lint` still builds without warnings\n\nIndependent of Phase 1 decisions; can ship in parallel with .8. Coordinate framing with .11 if .6 chooses a rename so the language is internally consistent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Audit pkix-lint/src/oscal/* module docs for 'OSCAL is canonical' assertions",
+  "updated_at": "2026-05-12T05:42:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:21:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

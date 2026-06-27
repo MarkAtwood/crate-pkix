@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:11:37Z",
+  "compaction_level": 0,
+  "content_hash": "22ae7b7f3af6bb3dc1da54ba44c95a52ba5c3e01f7ea463825454c7cf6dc0237",
+  "created_at": "2026-05-12T02:43:00Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (migrate verify_chain() callers + CHANGELOG) is mostly moot: `verify_chain()` exists at `pkix-chain/src/lib.rs:156\u2013184` and stays. No callers need migration; new wrappers ship alongside.\n\nWhat remains:\n\n- **CHANGELOG entries** for each new wrapper (`verify_tls_server`, `verify_smime_signer`, `verify_code_signer`, `verify_time_stamper`, `verify_ocsp_responder` \u2014 final set per `.7` decision).\n- **AGENTS.md `pkix-chain` description update** \u2014 current text describes `pkix-chain` as providing `verify_chain()` for the 90% case. Update to include the new per-use wrappers as the 90%-case entry points; `verify_chain()` stays as the lower-level composable form.\n- **README updates** in `pkix-chain` reflecting new public API.\n- **Semver bump** of `pkix-chain` for the new public API surface (additive \u2014 minor version bump).\n\nNo deprecation needed for `verify_chain` itself.\n\n**Blocks on:** `.15` (wrappers must exist before being documented).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CHANGELOG + AGENTS.md updates for new verify_* wrappers",
+  "updated_at": "2026-05-13T02:11:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:43:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:44:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.15",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

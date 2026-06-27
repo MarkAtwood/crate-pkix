@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4d967955b57900e9a4bf3eed32ac455d23bac903e0272eeb079dd62e8e98b767",
+  "created_at": "2026-05-14T17:35:23Z",
+  "created_by": "Mark Atwood",
+  "description": "verify.rs:461-468: `verify_inclusion` is documented as 'hash-only \u2014 does not use self.logs or self.verifier.' It's still placed on `SctVerifier<V: SignatureVerifier>` for 'API discoverability.' That means a caller who wants ONLY Merkle inclusion proof verification (no SCT signature verification, no log list) must instantiate an SctVerifier with a dummy CtLogList and a dummy SignatureVerifier. They cannot.\n\nConcrete consequence: a CT monitor that has a captured STH and just wants to verify proofs in a tight loop has to either:\n- Build a phony `SctVerifier::new(CtLogList::new(), some_verifier)` for each verification, or\n- Reimplement `verify_inclusion_inner` because the underlying function is private.\n\nAPI lock-in: once `verify_inclusion` is on `SctVerifier`, it cannot be moved off without a breaking change. Pre-1.0 is the time to decide.\n\nFix: expose `verify_inclusion` as a free function at the module level (matching the placement of `merkle_leaf_hash` already at verify.rs:697). Keep the SctVerifier method as a thin forwarder if you want it on the type for discoverability. Same applies to `verify_sth` \u2014 wait, no, verify_sth needs the log list. Just verify_inclusion.\n\nPre-1.0 framing per AGENTS.md: the question is 'what is the COMPLETE shape of this API?' A function that doesn't use any of the struct's state should not be a method on that struct. The architectural mismatch is real.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_inclusion / verify_sth API discoverability \u2014 hash-only ops live on SctVerifier despite not using its state",
+  "updated_at": "2026-05-14T17:35:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:35:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

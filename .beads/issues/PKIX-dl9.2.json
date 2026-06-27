@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: both thisUpdate-in-future checks in OcspChecker now return OcspExpired instead of OcspMalformed for consistent caller semantics",
+  "closed_at": "2026-05-07T01:57:10Z",
+  "compaction_level": 0,
+  "content_hash": "ef11533b34fc063bdfa4ec30b4a5fb7300c67d868935fece588efefcd350387b",
+  "created_at": "2026-05-07T01:49:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs:180-182 (and :286-288) \u2014 when now_unix < thisUpdate, the code returns Err(Error::OcspMalformed). However, OcspExpired is documented as covering 'now < thisUpdate' (clock skew or future-dated response), while OcspMalformed is described as structural invalidity. RFC 6960 \u00a74.2.2 specifies that a thisUpdate in the future indicates the response isn't yet valid \u2014 this is an expiry/window condition, not a structural error. Callers parsing error codes to decide whether to retry or hard-fail will get incorrect signals. The fix: map now < thisUpdate to OcspExpired, consistent with the CRL analogues in crl.rs which correctly return CrlExpired for the equivalent condition.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP thisUpdate-in-future returns OcspMalformed, not OcspExpired",
+  "updated_at": "2026-05-07T01:57:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:49:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

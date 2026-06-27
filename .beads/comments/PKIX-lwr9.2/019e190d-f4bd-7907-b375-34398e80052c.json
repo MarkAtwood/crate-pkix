@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T22:00:06Z",
+  "id": "019e190d-f4bd-7907-b375-34398e80052c",
+  "issue_id": "PKIX-lwr9.2",
+  "text": "Closed as phantom 2026-05-11 by PKIX-lwr9.6 re-baseline. Zero of the 22 'no path to a trusted anchor' cases this bead was framed around are present in the post-.6 StricterThanWild residuals. The failures were the harness bypassing pkix-path-builder entirely; PKIX-yn3e (AKI-based candidate selection, shipped 2026-05-08) already provides the cross-signed candidate selection this bead would have added."
+}

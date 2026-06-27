@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:41:49Z",
+  "compaction_level": 0,
+  "content_hash": "73d648cabc82de5abbcc25cc43871db9084af88f4f29f6e79fa958ba6aa56393",
+  "created_at": "2026-05-07T20:27:30Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`ValidationPolicy` at `pkix-path/src/lib.rs:516` has 5 `bool` fields:\n\n```\nenforce_key_usage: bool\ninitial_explicit_policy: bool\ninitial_any_policy_inhibit: bool\ninitial_policy_mapping_inhibit: bool\nrequire_subject_alt_name: bool\nrequire_rfc822_san: bool   // 6th!\n```\n\nActually 6 if you count `require_rfc822_san`. Clippy's `clippy::struct_excessive_bools` (default threshold 3) flags this.\n\n## Why it matters\n\n`ValidationPolicy { enforce_key_usage: true, initial_explicit_policy: false, initial_any_policy_inhibit: false, initial_policy_mapping_inhibit: false, ...}` is hard to read at a callsite and easy to typo. The fields are also semantically related \u2014 three of them (`initial_*_policy*`) are RFC 5280 \u00a76.1.1 inputs that travel together, and two (`require_subject_alt_name`, `require_rfc822_san`) gate one another (the rfc822 flag has no effect unless the SAN flag is set, per docs).\n\n## Suggestion\n\nTwo clusters could be enums:\n\n```rust\npub enum PolicyMode {\n    None,                       // initial_explicit_policy=false, etc\n    RequireExplicit,\n    InhibitAnyPolicy,\n    InhibitPolicyMapping,\n    // or a bitflag-style PolicyFlags\n}\n\npub enum SanRequirement {\n    None,\n    Required,\n    RequireRfc822,              // implies Required\n}\n```\n\nThis is opinion-territory \u2014 the current shape is RFC-faithful. P3 because the dependency between `require_subject_alt_name` and `require_rfc822_san` is a real footgun that the type system could enforce.\n\n## Priority\n\nP3 \u2014 opinion. Not a bug; a hardening idiom.\n",
+  "ephemeral": 0,
+  "id": "PKIX-cl3c",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: ValidationPolicy has 6 bool fields; require_rfc822_san depends on require_subject_alt_name without type-system enforcement",
+  "updated_at": "2026-05-07T21:41:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:25:04Z",
+  "compaction_level": 0,
+  "content_hash": "6ceb4f64b7be1b7510ca77cc66732fe0f4f88cb848d8b4787ad2ea68421ce8a3",
+  "created_at": "2026-05-02T22:20:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Doc header says 'v0.1 limitation \u2014 legacy string types not normalized', grouping BMPString/UniversalString/TeletexString as historical baggage. But then immediately says BMPString/UniversalString *will* be normalized in v0.2, while TeletexString will never be. This contradictory framing confuses users: they read 'legacy' and assume all three are unsupported indefinitely. Support question: 'Why is BMPString legacy if you're adding it in v0.2?' Recommend: reframe as 'currently-unsupported string types: BMPString (planned v0.2), UniversalString (planned v0.2), TeletexString (intentionally not normalized due to vendor incompatibility)'.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Framing BMPString/UniversalString as 'legacy' contradicts v0.2 support plan",
+  "updated_at": "2026-05-02T22:25:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

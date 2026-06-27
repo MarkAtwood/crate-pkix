@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decided per Mark 2026-05-13: refined Option A \u2014 switch to Strict generation .3 (not Multipurpose .2). Implementation tracked in PKIX-jbvb.7. Multi-generation surface deferred to PKIX-jbvb.8.",
+  "closed_at": "2026-05-14T00:36:41Z",
+  "compaction_level": 0,
+  "content_hash": "00fa8ffefbe9cd1666d3005effb231482b4f98bfef9c73f3895ffe4ea3faccb5",
+  "created_at": "2026-05-14T00:16:32Z",
+  "created_by": "bd-spin/bd-spin-20260513T233709Z-3219518",
+  "description": "## The discrepancy\n\nPKIX-jbvb.{2,3} shipped with DN rules that ENFORCE attributes the CA/B Forum S/MIME BR Legacy generation tier marks as MAY (optional). The bead descriptions conflated the BR's Multipurpose/Strict generation requirements with the Legacy generation policy OID (`2.23.140.1.5.X.1` suffix is Legacy).\n\nPer BR \u00a77.1.4.2.5 (Sponsor-validated) Legacy column:\n- organizationName: SHALL\n- organizationIdentifier: SHALL  \u2190 also required, was missed by all 3 beads\n- givenName / surname / pseudonym: MAY  \u2190 but PKIX-jbvb.2 requires (givenName+surname OR pseudonym)\n- serialNumber: MAY  \u2190 but PKIX-jbvb.2 requires it\n- Note 1: 'Legacy Generation profiles MAY omit the subject:givenName, subject:surname, and subject:pseudonym attributes and include only the subject:commonName'\n\nPer BR \u00a77.1.4.2.6 (Individual-validated) Legacy column:\n- organizationName: SHALL NOT\n- All other tier-distinguishing attrs (givenName/surname/pseudonym/serialNumber): MAY\n- Note 1: same Legacy permissive note\n\nPer BR \u00a77.1.4.2.4 (Organization-validated) Legacy column:\n- organizationName: SHALL\n- organizationIdentifier: SHALL\n- givenName/surname/pseudonym: SHALL NOT\n- serialNumber: MAY\n\n## Why this matters\n\nThe shipped Profile types REJECT certs that the BR Legacy tier allows. For a Profile claiming 'CA/B Forum S/MIME BR Legacy generation conformance', that's a false negative \u2014 rejecting valid certs.\n\n## Options\n\n**Option A: Switch Profile types to Multipurpose generation (policy OID suffix `.2`).**\n- DN rules I shipped align with \u00a77.1.4.2.5 / .6 Multipurpose column Note 2: 'SHALL include either subject:givenName and/or subject:surname, or the subject:pseudonym'\n- Requires also adding `organizationIdentifier` for Org-validated and Sponsor-validated tiers (SHALL in all three columns)\n- Smallest correction to the shipped code (change policy OID suffix, add OrgIdentifier for Org/Sponsor)\n- Multipurpose generation has a different max_validity_secs (per \u00a76.3.2: ?days, need to look up)\n\n**Option B: Loosen DN rules to match Legacy generation.**\n- DN rules become very permissive (basically nothing required beyond what Mailbox-validated requires)\n- Tier discrimination collapses to just the policy OID\n- Less useful as a marquee reference (the whole point of a tier-specific Profile is to capture the tier's distinguishing predicates)\n- Need to ADD organizationIdentifier as SHALL for Org and Sponsor\n\n**Option C: Ship Legacy + Multipurpose + Strict variants per tier (9 new types instead of 3).**\n- Most spec-accurate\n- Doubles/triples the Profile surface\n- Likely overkill for a marquee reference\n\n## Cascading correction work (regardless of option)\n\n1. **Add organizationIdentifier (OID 2.5.4.97) to OID constants.** Required by BR Org and Sponsor tiers across ALL generations.\n2. **PKIX-jbvb.2 (Sponsor) shipped without organizationIdentifier requirement.** Needs amendment.\n3. **PKIX-jbvb.3 (Individual) shipped with serialNumber as SHALL.** BR Legacy makes it MAY; Multipurpose/Strict make it MAY too actually. So this rule is over-strict in ALL cases. The bead author may have meant 'serialNumber as a discriminator from CN-only certs' but BR doesn't require it.\n\n## Recommendation\n\n**Option A** with a follow-on bead documenting that the per-tier Profile types target Multipurpose generation (OID suffix `.2`), not Legacy (`.1`). This:\n- Validates the DN rules I shipped (with the OrgIdentifier addition)\n- Keeps the tier discrimination meaningful\n- Matches the marquee-reference value of -cabf crates\n\nIf Option A is chosen, PKIX-jbvb.1 (Organization) ships with the new OID suffix and DN rule `AllOf([organizationName, organizationIdentifier])` (consistent with Org Multipurpose). PKIX-jbvb.2 and .3 amendments file as new beads.\n\nIf Option B is chosen, all three Profile types' DN rules need to loosen.\n\n## Cross-references\n\n- PKIX-jbvb (parent)\n- PKIX-jbvb.1 (blocked until this decision)\n- PKIX-jbvb.2 (shipped, may need correction)\n- PKIX-jbvb.3 (shipped, may need correction)\n- PKIX-jbvb.4 (ValidationPolicy fields \u2014 unaffected, the new fields are correct for any option)\n- PKIX-jbvb.5 (fixture sourcing \u2014 unaffected)\n- BR \u00a77.1.4.2.4/.5/.6 in `specs/cabforum-smime-BR.md`\n\n## Blocks\n\nThis bead blocks PKIX-jbvb.1 (Organization-validated cannot ship until DN-rule strictness is decided).\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide: S/MIME tier Profile DN rules: Legacy generation vs Multipurpose/Strict",
+  "updated_at": "2026-05-14T00:36:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T17:16:31Z",
+      "created_by": "bd-spin/bd-spin-20260513T233709Z-3219518",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

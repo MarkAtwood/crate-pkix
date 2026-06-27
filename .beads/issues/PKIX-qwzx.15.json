@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Aligned all public Error types to Clone+Debug+PartialEq+Eq baseline. pkix-revocation-http::FetchError documented as exception (Box<dyn Error> in Transport variant prevents Clone/PartialEq). pkix-path-builder retains Hash (was already there). pkix-lint::DeviationAddError already had the baseline. Workspace builds; full test suite passes (no regressions).",
+  "closed_at": "2026-05-07T22:29:45Z",
+  "compaction_level": 0,
+  "content_hash": "3d8cebf184ebdd924924ad5f4456ffa96c79464a5302330eb0176aa13bde41fc",
+  "created_at": "2026-05-07T22:13:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nThe 8 public `Error` types across the workspace have inconsistent derive sets:\n\n| Crate | Error type | Derives |\n|-------|------------|---------|\n| `pkix-path` | `Error` | `Clone, Debug` |\n| `pkix-revocation` | `Error` | `Clone, Debug, PartialEq, Eq` |\n| `pkix-path-builder` | `Error` | `Clone, Debug, PartialEq, Eq, Hash` |\n| `pkix-chain` | `Error` | `Debug` |\n| `pkix-chain-simple` | `Error` | `Debug` |\n| `pkix-ac` | `Error` | `Debug` |\n| `pkix-ct` | `Error` | `Debug` |\n| `pkix-revocation-http` | `FetchError` | `Debug` |\n| `pkix-lint::deviation` | `DeviationAddError` | `Clone, Debug, PartialEq, Eq` |\n\nThe Rust idiomatic baseline for an error type is `Clone + Debug + PartialEq + Eq` so callers can:\n- store errors in result-aggregating containers (`Vec<Error>`, snapshot tests)\n- compare errors in unit tests (`assert_eq!(result.unwrap_err(), Error::X)`)\n- propagate errors through layers without `Box<dyn>` workarounds\n\nLocations:\n- `pkix-path/src/lib.rs:88-89`  \n- `pkix-revocation/src/lib.rs:59-61`  \n- `pkix-path-builder/src/lib.rs:111-113`  \n- `pkix-chain/src/lib.rs:54-55`  \n- `pkix-chain-simple/src/lib.rs:268-270`  \n- `pkix-ac/src/lib.rs:69-71`  \n- `pkix-ct/src/lib.rs:55-57`  \n- `pkix-revocation-http/src/lib.rs:51-53`\n\nConstraint: `pkix-path::Error` contains `Der(DerError)` where `DerError(der::Error)` is not `PartialEq` (deliberately, but `pkix-revocation::DerError` IS \u2014 see separate finding). To add `PartialEq, Eq` to `pkix-path::Error`, `pkix-path::DerError` would also need them. `pkix-chain::Error` and `pkix-chain-simple::Error` wrap typed inner errors; `Clone` is feasible if the inner errors are.\n\nFix: pick a workspace-wide minimum (suggest `Clone + Debug + PartialEq + Eq`) and reconcile all error types to it, with documented exceptions where a contained foreign type prevents one of the derives.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.15",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: inconsistent Error derives across 8 Error types (Clone/PartialEq/Eq/Hash form varying subset)",
+  "updated_at": "2026-05-07T22:29:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:13:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

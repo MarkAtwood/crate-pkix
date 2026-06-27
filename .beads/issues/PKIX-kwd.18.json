@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:38Z",
+  "compaction_level": 0,
+  "content_hash": "45b528d1906d54c74ff50a2835b19012d6d90a4d7cc7b9dc7de14ce23644a9e1",
+  "created_at": "2026-05-06T15:18:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs has three map().unwrap_or() chains that clippy pedantic (map_unwrap_or) says should be map_or():\n\n1. Line 1217-1221: .rposition(|&b| b != b' ').map(|i| start + i + 1).unwrap_or(start)\n   Fix: .rposition(|&b| b != b' ').map_or(start, |i| start + i + 1)\n\n2. Line 1474: rest.split_once('@').map(|(_, h)| h).unwrap_or(rest)\n   Fix: rest.split_once('@').map_or(rest, |(_, h)| h)\n\n3. Line 1994: san.as_ref().map(|s| !s.0.is_empty()).unwrap_or(false)\n   Fix: san.as_ref().is_some_and(|s| !s.0.is_empty())   (or map_or)\n\nAlso in pkix-path-builder/src/lib.rs line 124-125: .map(|bc| bc.ca).unwrap_or(false)\n   Fix: .map_or(false, |bc| bc.ca)   (or .is_some_and(|bc| bc.ca))\n\nThese are readability improvements; no behavior change.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "map().unwrap_or() pattern should use map_or() \u2014 3 sites in pkix-path",
+  "updated_at": "2026-05-06T15:24:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:18:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

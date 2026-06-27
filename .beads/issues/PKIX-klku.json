@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T10:37:50Z",
+  "compaction_level": 0,
+  "content_hash": "1ca43b2140be52373e0be36ca79c1cd7d77c5ebb28dcfc1163e1e5a16fa1e339",
+  "created_at": "2026-05-08T15:20:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nRun the divergence harness on a schedule (or on PR) to surface regressions. Deferred per PKIX-7nsf parent bead until the divergence rate is known and the baseline is stable.\n\n## What\n\n1. GitHub Actions workflow (or whichever CI the project ends up on) that runs `pkix-difftest run pkits ... --output-json` and diffs against committed baseline.\n2. Failure semantics: any new divergence (entry not in baseline) fails CI; oracles agreeing in a way that disagrees with baseline is also flagged.\n3. Optional: scheduled (nightly) full pyca-corpus run, with results stored as build artefacts.\n\n## Out of scope\n\n- Live CT-log diff (very high volume; PKIX-5bab covers Tier 3 corpus first).\n- pyca venv caching tuning (a follow-up if CI run time becomes a problem).\n\n## Acceptance\n\n- [ ] CI workflow file committed.\n- [ ] Demonstrably catches a synthetic regression (intentionally introduced + reverted).\n- [ ] Documentation in pkix-difftest/README.md updated to reference CI integration.\n\n## Filed as\n\nFollow-up to PKIX-7nsf, deferred per the parent bead's 'Recommended decomposition' step (10).",
+  "ephemeral": 0,
+  "id": "PKIX-klku",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked blocked 2026-05-10: bead's own description says 'Deferred per PKIX-7nsf parent bead until the divergence rate is known and the baseline is stable'. Unblock when PKIX-7nsf baseline is stable and divergence rate is characterised.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: CI integration",
+  "updated_at": "2026-05-11T10:37:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:29:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

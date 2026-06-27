@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "97593b30f0e206fdb3c586a4b66be62eca7ae1379238213aa6cc2dcf95b8f994",
+  "created_at": "2026-05-14T18:10:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:109-120:\n\n    pub use pkix_aia::{self, AiaError, AiaFetcher, NoAiaFetcher};\n    pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};\n    pub use pkix_path::{\n        self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,\n    };\n    pub use pkix_revocation::{self, NoRevocation, RevocationChecker};\n\nThe `self` re-exports \u2014 `pub use pkix_aia`, `pub use pkix_identity`, `pub use pkix_path`, `pub use pkix_revocation` \u2014 re-publish each upstream crate's ENTIRE public surface under `pkix_chain::*`. A caller can write:\n\n    pkix_chain::pkix_aia::HttpFetcher\n    pkix_chain::pkix_path::validate_path_with_profile\n    pkix_chain::pkix_revocation::ocsp::OcspResponse\n\n\u2026and depend on every symbol those crates export.\n\nWHY IT MATTERS:\n\nThe slash-command checklist for versioning calls out:\n\n> Re-exports from upstream crates that lock the major version. If you `pub use foo::Bar` and `foo` cuts a major version, your crate's API is broken too. Either re-export through your own newtype or document the upstream version pin.\n\nWith `pub use pkix_aia::{self, ...}` the re-export is BROADER than the checklist scenario: pkix-chain is locked to the entire surface of pkix-aia, not just AiaError/AiaFetcher/NoAiaFetcher. Every breaking change in pkix-aia transitively breaks pkix-chain \u2014 even changes to types pkix-chain does not itself consume.\n\nConcrete scenarios where the lock-in fires:\n\n1. pkix-aia 0.2.0 renames a non-AIA-trait type (say, an internal `AiaCacheKey` becomes `AiaCacheId`). The module-level re-export means pkix-chain consumers who reached through `pkix_chain::pkix_aia::AiaCacheKey` now have a broken import. Even though pkix-chain itself doesn't use this type.\n\n2. pkix-revocation 0.4.0 changes the `ocsp` submodule layout. pkix-chain consumers reaching through `pkix_chain::pkix_revocation::ocsp::*` now have broken imports. pkix-chain has no use of those internals but is implicated in the break.\n\n3. The MSRV-bump scenario: pkix-aia raises rust-version to 1.80 to use a stable-only feature. pkix-chain's MSRV (currently 1.73) is force-bumped because of the transitive module re-export \u2014 even if pkix-chain itself uses no 1.80 features.\n\nThe Cargo.toml line 4 already acknowledges the cost (\"transitively breaking: pkix-path 0.3 ValidatedPath re-export\"). That comment captures awareness of the issue for ValidatedPath specifically; the broader `pub use pkix_path::{self, ...}` extends the same risk to everything in pkix-path.\n\nOPTIONS:\n\n(a) **Drop the `self` re-exports.** Keep the named-symbol re-exports (`AiaError`, `AiaFetcher`, \u2026) but remove `pub use pkix_aia` (the crate module). Callers who genuinely need the full upstream API import the upstream crate directly, with their own version pin. pkix-chain's API surface becomes \"only the named symbols we use.\"\n\n(b) **Newtype the upstream types** pkix-chain consumes directly (TrustAnchor, ValidationPolicy, ValidatedPath, etc.). This breaks the zero-cost identity between pkix_chain::TrustAnchor and pkix_path::TrustAnchor (a constraint the test `default_verifier_reexport_type_identity` lines 1668-1673 already pins), so it's the heavyweight option.\n\n(c) **Document the version-pin contract**: a rustdoc paragraph at the top of lib.rs explicitly says \"pkix-chain MAJOR version follows pkix-path / pkix-aia / pkix-revocation / pkix-identity \u2014 any major bump in those crates triggers a pkix-chain major bump.\" This makes the lock-in legible to consumers but does not remove it.\n\nThe current CHANGELOG header (line 4: \"transitively breaking\") already implies (c) is operative for pkix-path's ValidatedPath. Extending the same documented pin to pkix-aia, pkix-revocation, pkix-identity makes the contract explicit; dropping the `self` re-exports per (a) makes the lock-in much narrower at the cost of one breaking minor bump now.\n\nPRE-1.0 FRAMING: deciding between (a), (b), (c) is free pre-1.0. After 1.0 each pkix-chain major bump requires forcing every downstream consumer through migration; the cost compounds with the workspace's \"RFC 5280 done right from the start\" goal.\n\nFiled as priority 1 because the lock-in shape is wider than typical for this kind of finding (four upstream crates, not just one); and because PKIX-2l0v.1 (serde derives) already widens the contract footprint by gating serde impl through the same module path.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pub use of entire upstream crate modules (pkix_aia, pkix_path, pkix_revocation, pkix_identity) locks pkix-chain to every upstream change",
+  "updated_at": "2026-05-14T18:10:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:10:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added PartialEq, Eq to ValidationPolicy derive.",
+  "closed_at": "2026-05-02T17:46:19Z",
+  "compaction_level": 0,
+  "content_hash": "089c6d1fb02b3e388da35b2896d8dd79b2a2271ef38766ff725ee10ffdedc60e",
+  "created_at": "2026-05-02T17:31:58Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy is a public struct containing only primitive fields (u8, u64, bool), all of which implement PartialEq/Eq. Without derives, callers cannot compare policy values in tests or assertions, write policy deduplication logic, or use ValidationPolicy as a map key. The derives are trivially correct and expected on any struct of plain data. Should add #[derive(PartialEq, Eq)].",
+  "ephemeral": 0,
+  "id": "PKIX-841.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy missing PartialEq/Eq derives",
+  "updated_at": "2026-05-02T17:46:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:31:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

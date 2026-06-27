@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:41:39Z",
+  "compaction_level": 0,
+  "content_hash": "fa900673c5e0a5fc67ca9a2ad412860f0d1ff9f2f5758a5864c368ce11192d93",
+  "created_at": "2026-05-07T16:20:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1657\n\nClippy pedantic flags 'this could be rewritten as let...else':\n\n  let domain = match subject.split_once('@') {\n      Some((_, d)) => d,\n      None => return false, // malformed subject\n  };\n\nThe idiomatic form since Rust 1.65 is:\n\n  let Some((_, domain)) = subject.split_once('@') else {\n      return false; // malformed subject\n  };\n\nMSRV is 1.73, so let-else is available. The let-else form is cleaner and reduces one level of nesting.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.45",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-path: matches_rfc822_name let-else can replace if let",
+  "updated_at": "2026-05-07T16:41:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:20:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

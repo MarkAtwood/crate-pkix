@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T21:35:06Z",
+  "id": "019e1e1d-6e77-70ee-bfa9-bc4877529153",
+  "issue_id": "PKIX-jy95.4",
+  "text": "SCOPE NOTE 2026-05-12 (cascade from PKIX-jy95.6 = A): error-handling policy is now a property of the BRIDGE crate (pkix-zlint-bridge and pkix-pkilint-bridge per PKIX-jy95.7 / .8). Bridge crates define their Error enum covering binary-not-found / version-mismatch / malformed-output / subprocess-crash / cert-rejected. Adapters surface those errors through their Lint failure modes. Bridge BridgeError must satisfy AGENTS.md non-negotiable #6 (Clone + Debug + PartialEq + Eq + non_exhaustive + Send + Sync, serde behind feature flag). Decision still has the same options but they live at the bridge layer now."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.52",
+  "title": "Genuinely well-done: signer_discovery AKI-present-but-no-SKI-match returns None, not DN fallback",
+  "description": "In pkix-revocation/src/signer_discovery.rs lines 100-106, when the CRL has an AKI keyIdentifier but no bundle cert's SKI matches, discover_crl_signer returns None immediately without falling back to DN matching. This is a deliberate and correct security choice: the AKI is the definitive signal in key-rollover/bridge-CA topologies where multiple certs share a DN. Falling through to DN match when AKI is present but unmatched would silently select a wrong-key cert \u2014 exactly the attack AKI is designed to prevent. The comment at line 100-106 documents this reasoning. Worth defending if someone suggests 'try DN too' as a lenient fallback.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:21Z",
+  "updated_at": "2026-06-15T17:15:52Z",
+  "closed_at": "2026-06-15T17:15:52Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:21"
+    }
+  ]
+}

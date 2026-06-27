@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:22:48Z",
+  "compaction_level": 0,
+  "content_hash": "0b903488eae43985cc6050458aecef98b4f6c1c87b07b6e4170d233c135ce43a",
+  "created_at": "2026-05-11T07:16:44Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nMake the two remaining corpus loaders aware of CRLs.\n\n## What\n\n### pem_tree (pkix-difftest/src/corpus/pem_tree.rs)\n\n- Recognize a 'crls/' subdirectory beside the chain dir.\n- Each crls/*.crl or crls/*.pem in the dir gets loaded as DER and added to chain.crls.\n- Document the convention in module rustdoc.\n\n### limbo (python/limbo-to-pem-tree.py + corpus/pem_tree.rs)\n\n- Limbo testcases have a 'crls' field (list of base64 DER strings).\n- limbo-to-pem-tree.py currently filters has-crl testcases out \u2014 remove that filter and write the CRLs into the pem-tree output's crls/ subdir as PEM (header CERTIFICATE -> X509 CRL? Or DER directly? \u2014 match whatever the pem_tree loader expects).\n\n## Acceptance\n\n- [ ] pem_tree loader picks up CRLs from crls/.\n- [ ] limbo-to-pem-tree.py writes CRLs into crls/.\n- [ ] limbo has-crl testcases stop being filtered.\n- [ ] At least one limbo has-crl testcase loads with chain.crls non-empty.\n\n## Depends on\n\nPKIX-emf1.1.\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PEM-tree + limbo corpus loaders: thread CRL bytes through Chain",
+  "updated_at": "2026-05-11T07:22:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:44Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T00:17:05Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

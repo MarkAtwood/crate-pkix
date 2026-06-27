@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T23:18:38Z",
+  "compaction_level": 0,
+  "content_hash": "fa26666a41d67967639e7d280c1687026ba5f5290ee596ad3177f92a22df9fc2",
+  "created_at": "2026-05-12T19:40:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAGENTS.md non-negotiable #6 requires pkix-policy-zlint to expose a batch API (per-cert subprocess invocation is a 1000x asymptotic cost penalty). The HIGH-LEVEL shape is settled (batch must exist). The SPECIFIC shape of how certs flow to the subprocess is open.\n\n## Options\n\n- **A) Stdin streaming.** Spawn one `zlint` process; feed certs to its stdin (one DER cert per record, length-prefixed or separated by some sentinel). zlint reads them in a loop and emits NDJSON findings on stdout. Pro: zero filesystem touch; minimal IPC overhead; stream-friendly. Con: zlint must support stdin-streaming mode (need to verify; zlint CLI may only accept file paths today).\n\n- **B) File-per-cert in a temp directory.** Write each cert to a temp file; invoke `zlint -format json <path>` for each, OR `zlint -format json <dir>` if zlint supports directory mode. Pro: matches zlint's existing single-cert CLI shape; minimal protocol invention. Con: filesystem touch per batch; cleanup needs care; symlink / TOCTOU concerns at high concurrency.\n\n- **C) Single-call-with-array via a custom protocol.** Define a small protocol (e.g., JSON-RPC) and run zlint via a wrapper that speaks it. Pro: most flexible; supports incremental result streaming. Con: requires authoring/maintaining a wrapper.\n\n- **D) Long-running zlint daemon over a Unix socket / named pipe.** Spawn once at adapter init; reuse for the life of the process. Pro: amortizes setup across multiple batch invocations. Con: zlint binary doesn't ship in daemon mode today; would need upstream change or a wrapper.\n\n## Considerations\n\n- zlint's current CLI: `zlint [-format json] <path-to-cert.der>`. Check whether it accepts stdin (`-` convention) or multiple paths in one invocation.\n- Cache-friendliness (non-negotiable #6): all options are cache-friendly at the adapter API surface; just differ in subprocess economics.\n- pkix-difftest's zlint oracle (PKIX-hbzo.1) faces the same question; whatever's decided here probably wants to apply there too.\n\n## Decision-gate\n\nBlocks pkix-policy-zlint implementation. Probably best resolved by reading zlint source / docs to see what's actually supported, then picking.\n\n## Cross-references\n\n- PKIX-jy95 parent \u2014 bead-thread captures broader batch / subprocess considerations\n- AGENTS.md non-negotiable #6\n- PKIX-hbzo.1 (related question for difftest oracle)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.3",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide batch interface shape for pkix-policy-zlint: stdin streaming / file-per-cert / single-call-with-array",
+  "updated_at": "2026-05-12T23:18:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:40:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

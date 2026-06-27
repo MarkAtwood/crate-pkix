@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "baf0a59ac718bb9dfe7e3afb519e6ec9ba214ad8d46eaeef89878e9570cab74d",
+  "created_at": "2026-05-14T18:00:09Z",
+  "created_by": "Mark Atwood",
+  "description": "AGENTS.md non-negotiable #6 (Cache-friendly result types) requires public result/error types to be Send+Sync with a compile-time assertion. pkix-chain/src/lib.rs only asserts Send+Sync for Error (lines 1609-1612):\n\n    const _: fn() = || {\n        fn _assert_send_sync<T: Send + Sync>() {}\n        _assert_send_sync::<Error>();\n    };\n\nBut Verifier<'a, V, R, A> is also public surface. The non-negotiable explicitly lists 'verify_batch' and prevalidation as 'must remain possible' patterns. verify_batch ALREADY exists on Verifier; concurrent batching (multiple chains across a thread pool) is a natural consumer. Without a Send+Sync guarantee, callers either avoid Verifier in concurrent setups (forcing them back to verify_chain free-function calls with per-call setup cost) or discover the missing bound during a refactor.\n\nVerifier is Send+Sync iff &'a [TrustAnchor], &'a V, &'a R, &'a ValidationPolicy, &'a A are all Send+Sync. The refs are Send+Sync iff the underlying types are Sync. TrustAnchor and ValidationPolicy already derive trivially-Send-and-Sync data. The trait bounds on V, R, A don't require Sync \u2014 so the Verifier impl IS implicitly Send+Sync only for V/R/A that happen to be Sync.\n\nSCENARIO that triggers the cost: a contributor adds a NewBuiltInFetcher to pkix-aia (e.g. with internal Cell<T> or RefCell<T> for connection pooling) that is NOT Sync. Verifier<'_, V, R, NewBuiltInFetcher> becomes !Sync silently. Anyone who tries to use it across rayon par_iter() or a tokio task gets a compile error pointing at the consumer, not at the offending fetcher. The error message blames the wrong layer.\n\nMAINTENANCE CONSEQUENCE: a Send+Sync regression in any of V/R/A propagates silently to consumers. A const _ assertion in pkix-chain that names the bounds explicitly catches the regression at its source.\n\nFIX: add an assertion like\n\n    const _: fn() = || {\n        fn _assert_send_sync<T: Send + Sync>() {}\n        _assert_send_sync::<Verifier<'_, DefaultVerifier, NoRevocation, NoAiaFetcher>>();\n    };\n\nThe concrete-type assertion is sufficient: if the default backends aren't Send+Sync, nothing else will be either; if they are, the generic Verifier becomes Send+Sync exactly when its parameters are. This is the same pattern already used for Error.\n\nThe CHANGELOG entry for c64dc840 ('chore: add Send+Sync compile-time assertions') claims this is done. It's done for Error only; the wider claim is incorrect.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier has no Send+Sync compile-time assertion despite AGENTS.md non-negotiable #6 requirement",
+  "updated_at": "2026-05-14T18:00:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:00:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

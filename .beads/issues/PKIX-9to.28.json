@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:26:45Z",
+  "compaction_level": 0,
+  "content_hash": "45cfbbc2db687b5b46f4b39c70672ffa86114f783334cf3fa4554af33e07bf02",
+  "created_at": "2026-05-06T22:21:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:239: DeviationScope is a public enum without #[non_exhaustive]. The doc comment explicitly notes planned additions (SubjectDnContains, PolicyOid). Adding new variants without #[non_exhaustive] is a semver-breaking change. Idiomatic Rust: mark all public enums that are expected to grow with #[non_exhaustive], especially when the doc comment lists planned variants.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationScope missing #[non_exhaustive]",
+  "updated_at": "2026-05-06T22:26:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:26:44Z",
+  "compaction_level": 0,
+  "content_hash": "9a7a77cb0f3a505b89107bef23cc09baec1a8a6e21b54ecdbd7cb2a11effd20b",
+  "created_at": "2026-05-06T22:20:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs: NoRevocation derives Clone, Copy, Debug, Default but not PartialEq, Eq, or Hash. As a ZST with no fields, all three are trivially derivable. Missing these prevents NoRevocation from being used as a HashMap key, stored in a HashSet, or compared in tests. Idiomatic Rust ZST types should derive the full set of value-equality traits when they have no data to compare.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NoRevocation missing PartialEq, Eq, Hash derives",
+  "updated_at": "2026-05-06T22:26:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

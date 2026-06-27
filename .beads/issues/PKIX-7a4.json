@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "cert_has_san_identity() + working_issuer_is_san_identity flag; skips DN check for RFC 5280 \u00a74.2.1.6 certs; test added",
+  "closed_at": "2026-05-06T19:24:10Z",
+  "compaction_level": 0,
+  "content_hash": "5225b7a81cb6a44350bfd3a5a1144abe1bc33262ffa943eb4b77124b8827d1a0",
+  "created_at": "2026-05-06T18:11:56Z",
+  "created_by": "Mark Atwood",
+  "description": "A certificate with an empty Subject and a critical SubjectAltName passes the critical extension guard but fails name linkage because names_match compares against the empty Subject DN. RFC 5280 \u00a74.2.1.6 requires that when Subject is empty and SAN is critical, the SAN is used as the identity.",
+  "ephemeral": 0,
+  "id": "PKIX-7a4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: empty Subject + critical SAN fails name matching (RFC 5280 \u00a74.2.1.6)",
+  "updated_at": "2026-05-06T19:24:10Z"
+}

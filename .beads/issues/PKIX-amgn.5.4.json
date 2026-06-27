@@ -1,0 +1,38 @@
+{
+  "close_reason": "Superseded by PKIX-amgn.5 commit c70821b4 + PKIX-amgn.7 commit 27d67955: pkix-lint/README.md intro rewritten to 'framework + RFC-conformance lints' scope, 'Built-in lints' table now lists only rfc5280.* (1 entry) and points users at pkix-lint-cabf for CABF bundles; usage example imports pkix_lint_cabf::cabf_tls_br::CabfTlsBrProfile. Crate-level rustdoc cross-references in pkix-lint/src/rfc5280.rs updated. Example version strings in lib.rs/report.rs/oscal/emit.rs doc comments updated 'pkix-lint/cabf_tls_br v0.2.0' \u2192 'pkix-lint-cabf/cabf_tls_br v0.2.0'.",
+  "closed_at": "2026-05-12T01:39:37Z",
+  "compaction_level": 0,
+  "content_hash": "514d3a2743318b9ac389a7d8c023832b5e76e07dee4df723ebae8ad649dfee52",
+  "created_at": "2026-05-11T22:51:29Z",
+  "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "description": "## Why\n\nAfter PKIX-amgn.5.2 moves `cabf_tls_br` out of `pkix-lint`, the README and rustdoc still market the crate as CA/B Forum-shaped. They need to reframe `pkix-lint` as \"framework + RFC-conformance lints\" and absorb the CABF content into `pkix-lint-cabf`'s docs.\n\n## What\n\n### `pkix-lint/README.md`\n\n- L3, 10, 42 \u2014 replace narrative CA/B Forum references with RFC 5280 framing where the framework intent is meant; remove where they refer specifically to BR rule content.\n- L47 \u2014 section header `## Built-in lints (`pkix-lint::cabf_tls_br`)` \u2192 `## Built-in lints (`pkix-lint::rfc5280`)`. Replace six-lint table with the `Rfc5280MaxSerialLengthLint` row (and any RFC-conformance lints landed by the time this bead runs).\n- L63 \u2014 section header `### Run built-in CA/B Forum TLS BR lints against a chain` \u2192 `### Run built-in RFC 5280 lints against a certificate`. Rewrite the code example to use `Rfc5280MaxSerialLengthLint`.\n- L66 \u2014 `use pkix_lint::cabf_tls_br::{CabfTlsBrProfile, LintProfile};` \u2192 `use pkix_lint::rfc5280::Rfc5280MaxSerialLengthLint;` + framework usage.\n- L115, 117 \u2014 deviation example: keep `cabf.br.tls.validity.max` as an illustrative string IF the framework's deviation example clearly shows it as an example of a CABF identifier handled by a downstream crate, OR replace with an RFC-baseline lint id.\n- L129, 138 \u2014 `EvaluationReport::new(\"cabf.br.tls\", \u2026)` examples: rewrite as `EvaluationReport::new(\"rfc5280.core\", \u2026)` for the framework crate.\n- L148, 149 \u2014 \"Standards\" section: narrow to RFC 5280 + adjacent IETF RFCs.\n\n### `pkix-lint-cabf/README.md`\n\nExpand from current 19-LOC stub to a real README:\n- Crate-purpose paragraph (reference / not authoritative status).\n- The six-lint table (originally in `pkix-lint/README.md` L51\u201356).\n- The usage example (originally in `pkix-lint/README.md` L63\u201378), updated to import from `pkix_lint_cabf::cabf_tls_br`.\n- Pointer to `pkix-lint` for the framework + RFC-conformance lints.\n\n### `pkix-lint/src/lib.rs` rustdoc\n\n- L11, L34, L35, L50, L69 \u2014 module-level rustdoc with CABF examples: replace with RFC 5280 examples where the framework intent is the focus.\n- L606, L612, L651, L671, L675 \u2014 `Lint` trait method rustdoc: keep CABF examples where they're illustrating cross-source citation (`<source>-<section>` format intentionally spans RFC and CABF), but ensure the discussion notes that CA/B Forum lint examples live in `pkix-lint-cabf`.\n- L817, L969 \u2014 `Finding::rule_bundle_version` / `LintRunner::with_bundle_version` rustdoc: replace \"pkix-lint/cabf_tls_br v0.2.0\" example string with \"pkix-lint/rfc5280 v0.5.0\" or similar.\n\n### `pkix-lint/src/rfc5280.rs` rustdoc\n\n- L19, L21\u201322: PKIX-amgn.5.2 already updates these to point at `pkix_lint_cabf`. This bead may need to refine further if the framing of the comment changes substantively.\n\n## Acceptance\n\n- [ ] `pkix-lint/README.md` no longer markets the crate as CABF-shaped.\n- [ ] `pkix-lint-cabf/README.md` carries the CABF content (table + usage example).\n- [ ] `pkix-lint/src/lib.rs` rustdoc examples reframed (`cabf.br.tls.*` strings retained only where intentionally illustrating cross-source identifier patterns).\n- [ ] `cargo doc -p pkix-lint -p pkix-lint-cabf --all-features` clean (no new warnings).\n\n## Out of scope\n\n- `report.rs`, `oscal/emit.rs`, `oscal/parse.rs` illustrative-string scrubbing \u2014 those use `\"cabf.br.tls\"` as opaque profile-id example values; a separate rustdoc tidying pass.\n- Version bumps + CHANGELOG (PKIX-amgn.5.5).\n\n## Depends on\n\nPKIX-amgn.5.2 (can run in parallel with PKIX-amgn.5.3 once .2 lands).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.5.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Reframe pkix-lint README + rustdoc post-CABF-move",
+  "updated_at": "2026-05-12T01:39:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T15:51:28Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T15:51:50Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

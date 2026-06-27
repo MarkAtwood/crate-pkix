@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:15:52Z",
+  "compaction_level": 0,
+  "content_hash": "e178b8595b2d7903a9c8d006ecfa8ae7d7d88776fadf0dd57d7e4b49f094c883",
+  "created_at": "2026-05-02T13:42:16Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy has all-public fields and derives Default. There is no constructor that requires current_time_unix to be provided. This means every caller must either use ..Default::default() (which gets time=0 silently) or write out all fields. A constructor fn new(current_time_unix: u64) -> Self would make it impossible to accidentally use time=0. Without one, the common pattern ValidationPolicy { max_path_len: N, ..Default::default() } is a footgun. The type should enforce that current_time_unix is always explicitly set.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy has no constructor \u2014 only Default or field init",
+  "updated_at": "2026-05-02T14:15:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

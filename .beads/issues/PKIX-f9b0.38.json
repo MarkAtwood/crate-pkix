@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:27:57Z",
+  "compaction_level": 0,
+  "content_hash": "27f737f2487c4e11150ee342550a4449cc4a4f9b424a50d9edd02fd23663f700",
+  "created_at": "2026-05-07T17:23:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ac/src/lib.rs:120 \u2014 validate_attribute_cert is a non-functional stub that always returns Err(AaPathInvalid(NoTrustedPath)). The doc says 'Not yet implemented'. compare pkix-ct/src/lib.rs:99 which correctly marks verify_scts #[deprecated = \"...\"] with a message explaining the stub behaviour. validate_attribute_cert must have the same treatment so callers get a compile-time warning when they depend on a no-op function. Fix: add #[deprecated = \"pkix-ac is not yet implemented; this function always returns AaPathInvalid\"] above the fn.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.38",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-ac] validate_attribute_cert stub not marked #[deprecated]",
+  "updated_at": "2026-05-07T17:27:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

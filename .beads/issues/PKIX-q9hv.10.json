@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a426f870f48514b27c0f45ecf6b579d56fc5ba071ea06fa34649e29369f9dfab",
+  "created_at": "2026-05-14T14:38:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:527-552: The two-tier verify_one design (try validate_path on caller chain first, only fall through to AIA on is_aia_recoverable) is the right shape. It preserves zero-cost behaviour for complete chains, surfaces non-recoverable cert defects (expired, KU wrong, etc.) directly without ever invoking the AIA seam, and bounds the slow-path cost to genuine missing-intermediate cases. A naive design would always go through path_builder; that would force a needless CertPool construction on every verify call. A future contributor might suggest 'simplify by always going through build_first_valid_path' \u2014 defend the split: the fast path is the steady-state for callers who supply complete chains (the documented best practice), and bypassing the builder there is a documented optimization, not premature.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Fast-path / slow-path split in Verifier::verify_one \u2014 preserve",
+  "updated_at": "2026-05-14T14:38:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:38:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

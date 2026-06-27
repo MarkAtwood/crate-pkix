@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a51229a4c1734022a30b88d35466a524d69442584bb533db99ced4a3e3788849",
+  "created_at": "2026-06-15T19:45:48Z",
+  "created_by": "Mark Atwood",
+  "description": "Create integration crates that let the existing Rust TLS ecosystem use PKIX as the certificate verifier. Without this, PKIX is a better engine that nobody can install in their car.\n\nDeliverables:\n1. pkix-rustls-provider: impl rustls::crypto::CryptoProvider or rustls::ServerCertVerifier backed by pkix-chain + DefaultVerifier. This is the highest-impact integration \u2014 rustls is the dominant Rust TLS library.\n2. pkix-ring-verifier: impl SignatureVerifier backed by ring (for callers who want ring's asm-optimized crypto instead of RustCrypto).\n3. Example: reqwest + pkix-rustls-provider working end-to-end.\n4. Example: hyper + pkix-rustls-provider working end-to-end.\n\nApproach: We may need to PR upstream to rustls to expose the right extension points, or work with the rustls ServerCertVerifier trait as-is. Research required.\n\nMay also want: pkix-wolfcrypt-verifier as the FIPS story (wolfSSL's own product).\n\nAcceptance: A reqwest HTTPS client validates a real TLS connection using PKIX path validation + system trust store, with no rustls-webpki in the dep tree.",
+  "ephemeral": 0,
+  "id": "PKIX-77k9.4",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Rust TLS ecosystem integration: rustls, ring, reqwest",
+  "updated_at": "2026-06-15T19:45:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:45:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77k9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

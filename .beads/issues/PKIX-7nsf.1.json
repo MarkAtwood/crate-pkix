@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T15:53:49Z",
+  "compaction_level": 0,
+  "content_hash": "39a66b171a42484b29cee9258194d62cd2e418ac2deb6d409231316bd6a16a48",
+  "created_at": "2026-05-08T15:17:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nFoundation for the rest of PKIX-7nsf. Without a buildable skeleton, no oracle, corpus loader, or classifier work can land.\n\n## What\n\nCreate a new workspace member `pkix-difftest` (`publish = false`) with:\n\n1. `Cargo.toml` \u2014 depends on `pkix-path`, `pkix-chain`, `x509-cert`, `pem-rfc7468`, `clap` (CLI). No `pkix-revocation` (out of v1 diff scope).\n2. `src/main.rs` \u2014 argument parsing skeleton with subcommands:\n   - `pkix-difftest single <chain.pem>` \u2014 verify a single concatenated-PEM chain (leaf-first or root-first auto-detected).\n   - Stub: `pkix-difftest pkits <pkits-dir>` and `pkix-difftest pem-tree <dir>` for later.\n3. `src/lib.rs` \u2014 public types: `Verdict { Pass, Fail { reason: String } }`, `OracleName`, `Chain { certs_der: Vec<Vec<u8>>, leaf_first: bool }`. No oracle logic yet (returns `unimplemented!()` from a placeholder `pkix_path_oracle` for now).\n4. PEM chain loader: reads concatenated-PEM file, returns `Chain`. Detects leaf-first vs root-first by checking which cert is self-signed (root-first: last cert is self-signed; leaf-first: first cert).\n5. Wire `pkix-path` oracle: invokes `pkix_path::validate_path` with a default `ValidationPolicy` and `DefaultVerifier` (or no_std equivalent), returning `Verdict`.\n\n## Acceptance\n\n- [ ] `cargo build -p pkix-difftest` succeeds.\n- [ ] `cargo run -p pkix-difftest -- single tests/fixtures/good-chain.pem` runs and prints a verdict from the pkix-path oracle.\n- [ ] `cargo run -p pkix-difftest -- single tests/fixtures/bad-chain.pem` runs and prints Fail.\n- [ ] `Cargo.toml` workspace member added to root `Cargo.toml`.\n- [ ] `publish = false` on `pkix-difftest/Cargo.toml`.\n- [ ] No new deps added to `pkix-path` itself.\n\n## Out of scope\n\n- OpenSSL or pyca oracles (separate children).\n- Corpus loaders other than the single-chain one.\n- Verdict classifier (separate child).\n\n## Test fixtures\n\nEmbed two minimal chains under `pkix-difftest/tests/fixtures/`:\n- `good-chain.pem` \u2014 a known-good chain (e.g., extract one from PKITS `Test1` \u2014 root-EE).\n- `bad-chain.pem` \u2014 a known-bad chain (e.g., PKITS Test2 with bad signature).\n\nThese are smoke fixtures, not the main corpus.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: skeleton \u2014 pkix-difftest workspace member + CLI",
+  "updated_at": "2026-05-08T15:53:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:17:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

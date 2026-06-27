@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:31:54Z",
+  "compaction_level": 0,
+  "content_hash": "4725dcf3f9efd27be028e60258f58715f8ac6e3c38fa742dfb4a0700649855a3",
+  "created_at": "2026-05-07T17:22:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:96,144 \u2014 Both public functions return `crate::Result<ValidatedPath>`. Dropping the return value silently discards both the validation outcome and the `ValidatedPath` (anchor_index, depth). Adding `#[must_use]` causes the compiler to warn if the result is discarded, preventing a class of caller bugs. Fix: annotate both functions with `#[must_use = \"discarding the result silently skips chain validation\"]`.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-chain] #[must_use] missing on verify_chain and verify_chain_default",
+  "updated_at": "2026-05-07T17:31:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

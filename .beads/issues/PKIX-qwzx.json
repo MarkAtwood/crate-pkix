@@ -1,0 +1,22 @@
+{
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-07T23:53:59Z",
+  "compaction_level": 0,
+  "content_hash": "5929d6c4c7e80568bbfcc8662f7f0983b516d6fe1bf4ef5245be68cb38f7da49",
+  "created_at": "2026-05-07T21:53:31Z",
+  "created_by": "Mark Atwood",
+  "description": "Deep pre-merge review pass 2 of the workspace, anchored on the 5 commits that closed pass-1 epic PKIX-hxu1 (41 of 42 findings closed; PKIX-als9 deferred). Focus: verify code state matches commit message claims, catch regressions, and find anything pass 1 missed.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Pass 2 review of pass 1 review-loop fixes (5-commit anchor 0d3e5db6..01908663)",
+  "updated_at": "2026-05-07T23:53:59Z"
+}

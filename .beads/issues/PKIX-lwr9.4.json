@@ -1,0 +1,54 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "All acceptance criteria met. Both children .4.1 (limbo loader iterates build_path_candidates) and .4.2 (build_first_valid_path<V> helper) closed and shipped. Verified 2026-05-13 by do-beads loop: (1) regression test 'tc60_build_first_valid_path_succeeds_where_build_path_fails' in pkix-path-builder/tests/build_first_valid_path.rs passes, (2) tc60 is now Agreement (all 3 oracles pass) in baseline-limbo.json with ground_truth_agreement=true, (3) StricterThanWild count is 23 (better than the 25 target), (4) all 26 pkix-path-builder integration tests pass with no regressions. 1.0-blocker satisfied.",
+  "closed_at": "2026-05-13T18:30:06Z",
+  "compaction_level": 0,
+  "content_hash": "a08057c306c73f5a8e2692bf236db240cbe877fc7a24448256a78bfdc8a1f4ba",
+  "created_at": "2026-05-11T16:30:03Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAfter PKIX-lwr9.6 wired the limbo harness through `pkix_path_builder::build_path` (2026-05-11), the original 47-case StricterThanWild bucket collapsed to 26 residuals, of which only **one** is a genuine pkix-path-builder bug:\n\n* `bettertls::pathbuilding::tc60` \u2014 depth-6 chain, corpus expects SUCCESS (`ground_truth_agreement=false`), pkix-path-builder selects a wrong intermediate at depth 3, signature verification fails at chain index 3.\n\nThe other 6 residual `bettertls::pathbuilding::*` cases (tc8/tc15/tc41/tc47/tc74/tc80) all have `gt_agreement=true` \u2014 pkix-path correctly rejects what the corpus expects to fail. They are not builder bugs; they are correct strictness (legacy ECDSA-with-SHA1 OID not dispatched, or signature linkage genuinely broken in negative-test bundles).\n\nThis bead was originally framed around ~10 cases ('signature invalid at chain index 5/6' + 2 non-CA-at-depth-6). Empirical re-baseline shows the only residual at any depth-5/6 boundary is tc60 (single case, depth-6 chain, sig invalid at index 3 not 5/6).\n\n## What\n\n1. Add a regression test fixture in `pkix-path-builder/tests/fixtures/bettertls/` for tc60 specifically (its PEM payloads from `limbo.json`).\n2. Diagnose why the builder picks the wrong intermediate at depth 3. Likely candidates:\n   - the chosen candidate has matching SubjectDN but the AKI/SKI hint points elsewhere\n   - alternative sibling intermediate exists in the bundle but is not enumerated as a backtracking option\n   - depth-3 candidate is the right shape positionally but signs with a key that does not match depth-4's TBS-issuer linkage\n3. Fix the builder to enumerate alternative candidates at depth 3 when the first choice signature-fails.\n4. Re-run the limbo baseline; tc60 should flip from StricterThanWild(Fail) to Agreement(Pass).\n\n## Acceptance\n\n- [ ] Regression test for tc60 in `pkix-path-builder/tests/`.\n- [ ] tc60 flips to Agreement in `baseline-limbo.json` post-fix.\n- [ ] StricterThanWild count drops from 26 to 25 (or fewer, if related cases surface).\n- [ ] No regression on PKITS or other limbo cases.\n\n## Out of scope\n\n- The other 6 residual `bettertls::pathbuilding::*` cases (gt_agreement=true; pkix-path correctly stricter \u2014 see baseline-limbo-analysis.md).\n- The 4 `online::*` P-384 cases (PKIX-wmch, harness limitation not builder).\n- The 10 `bettertls::nameconstraints` malformed-cert cases (pkix-path correctly stricter).\n\n## Filed by\n\nRe-scoped from original ~10-case framing to tc60-only by PKIX-lwr9.6 re-baseline (2026-05-11).",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.4",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Inherited human label removed 2026-05-11 (Mark): the human label was inherited from PKIX-lwr9 at creation time, not a per-bead pending decision. These children are blocked by PKIX-lwr9.6 (limbo harness wiring) and will either become genuine builder bugs to fix or close as superseded once .6 re-baselines.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest harness + pkix-path-builder API: resolve bettertls::pathbuilding::tc60 (split)",
+  "updated_at": "2026-05-13T18:30:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:30:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:30:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:30:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T12:45:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

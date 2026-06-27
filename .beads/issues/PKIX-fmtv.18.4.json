@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:39:59Z",
+  "compaction_level": 0,
+  "content_hash": "511dd10b7bfd29f2435b2563d1abe2f232c80d9737a550b1527d54b601b3b303",
+  "created_at": "2026-05-13T05:30:40Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Wrapper-level differential test for pkix_chain::verify_smime_signer and verify_smime_recipient against 'openssl verify -purpose smimesign/smimeencrypt -verify_email X'.\n\nSource corpus: pkix-chain/tests/fixtures/ mailbox-*.der (authored under PKIX-fmtv.23). The signer wrapper uses smimesign purpose; the recipient wrapper uses smimeencrypt purpose (despite the name, this is the recipient/encryption-target purpose in OpenSSL's vocabulary).\n\nAcceptance:\n- pkix-difftest/tests/verify_wrapper_openssl_smime.rs covers both wrappers.\n- baseline-verify-openssl.md gets a S/MIME section.\n\nBlocks on PKIX-fmtv.18.1.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: verify_smime_signer/recipient vs -purpose smimesign/smimeencrypt -verify_email",
+  "updated_at": "2026-05-13T05:39:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:39Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T22:30:58Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

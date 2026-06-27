@@ -1,0 +1,22 @@
+{
+  "close_reason": "MSRV 1.73 means trim_ascii unavailable; document as future improvement when MSRV bumps",
+  "closed_at": "2026-05-07T15:21:06Z",
+  "compaction_level": 0,
+  "content_hash": "d6a91cefb6e818e98755ae1fd3f9738080a5c782df222cfa3594ae7d8eae6bb0",
+  "created_at": "2026-05-07T15:20:58Z",
+  "created_by": "Mark Atwood",
+  "description": "NormalizedIter::new (lib.rs:1440-1453) manually computes start/end indices to strip leading/trailing spaces: 'let start = bytes.iter().position(|&b| b != b' ')...'; 'let end = bytes[start..].iter().rposition(...)''. In idiomatic Rust the standard library's trim_ascii (stable since 1.80) or the pre-1.80 pattern 'bytes.trim_ascii_start().trim_ascii_end()' expresses this more directly. As-is it is correct but more code than needed. Consider: 'let trimmed = bytes.trim_ascii(); Self { bytes: trimmed, pos: 0, pending_space: false }'. (Check MSRV: rust-version = 1.73, so trim_ascii is NOT yet available. Document that this is deferred to when MSRV bumps to 1.80+.)",
+  "ephemeral": 0,
+  "id": "PKIX-lkgp",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path (rusty): NormalizedIter::new uses manual start/end index computation \u2014 use trim idiom",
+  "updated_at": "2026-05-07T15:21:06Z"
+}

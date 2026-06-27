@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:30Z",
+  "compaction_level": 0,
+  "content_hash": "7e430c298942569b3d1150dd3b3bea277c7a03f57d8a49b01b5fb14b46e7e3a0",
+  "created_at": "2026-05-02T13:42:29Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs: The Limitations rustdoc section states delegated OCSP responders are not supported. However, a caller who passes a delegated-responder OCSP response will receive OcspSignatureInvalid because the signature is verified against the issuer's SPKI, not the delegated responder's key. This is cryptographically correct behavior but the error gives no indication that the cause is a delegated responder rather than a corrupt signature. Add a note to the OcspSignatureInvalid rustdoc and/or the check_revocation doc that this error can occur when a delegated responder is used.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Delegated OCSP responder gives OcspSignatureInvalid with no explanation",
+  "updated_at": "2026-05-02T14:19:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a390340a7b8885c223b6fff963e6ca55dc2e1a160c9e18437dc55fb1d109be36",
+  "created_at": "2026-05-14T16:10:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/parse.rs ParseError has two variants that wrap foreign error types:\\n\\n* `ParseError::AddFailed { index: usize, source: DeviationAddError }` (line 154)\\n* `ParseError::InvalidParameterOverride { param_id: String, source: ParameterError }` (referenced in lib.rs:1444)\\n\\nNeither has a `From<DeviationAddError>` or `From<ParameterError>` impl. Result: every call site that wants to propagate has to spell out the wrap by hand:\\n\\n```rust\\nstore.add(dev).map_err(|source| ParseError::AddFailed { index: idx, source })?;\\nclone.set_parameter(...).map_err(|source| ParseError::InvalidParameterOverride { param_id: ..., source })?;\\n```\\n\\nThe wrapping is mechanical and adds boilerplate. For `AddFailed` specifically the additional context (`index`) is what blocks a na\u00efve `From` impl \u2014 without the index, the variant cannot be reconstructed. That is a real reason; not every error wrap is From-able.\\n\\nBut at minimum:\\n\\n* The author could ship a constructor: `impl ParseError { fn from_add_failed(index: usize, source: DeviationAddError) -> Self }` so call sites read `store.add(dev).map_err(|e| ParseError::from_add_failed(idx, e))?` \u2014 same boilerplate but at least the variant construction is centralised.\\n* Or restructure so the index lives in the call-site context (e.g., a fresh `ParseError::AddFailed` that doesn't carry index, with the index recorded separately).\\n\\nThe canonical anti-pattern from the error-handling section: 'Error variants that wrap String for the message instead of structured fields' \u2014 this isn't that exactly, but it's the cousin: 'Error variants that wrap structured errors without providing the ergonomic `?`-friendly conversion.' Pre-1.0 there is room to redesign; post-1.0 the boilerplate gets locked in.\\n\\nFile is P2: not a correctness issue, real ergonomic tax on every internal call site, fix is a redesign that wants thinking-time rather than mechanical fixing.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.50",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "oscal::parse::ParseError wraps DeviationAddError and ParameterError but ships no From impls \u2014 forces .map_err() at every call site",
+  "updated_at": "2026-05-14T16:10:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:10:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

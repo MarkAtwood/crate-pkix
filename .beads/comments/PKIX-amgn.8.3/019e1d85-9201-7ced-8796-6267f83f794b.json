@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:49:13Z",
+  "id": "019e1d85-9201-7ced-8796-6267f83f794b",
+  "issue_id": "PKIX-amgn.8.3",
+  "text": "IMPLEMENTATION PREREQUISITE (added 2026-05-12 as part of .8 reversal): the pkix-lint-cabf-refresh dev sub-crate that this bead was supposed to fill in WAS DELETED in commit 82acfa68 on 2026-05-12 as part of PKIX-ncab.10 (OSCAL demotion cleanup). Before resuming work on this bead, the scaffold must be restored from git history: 'git show 82acfa68~1 -- pkix-lint-cabf-refresh' will retrieve it; standard restore via git apply or hand-recreating Cargo.toml + src/main.rs + README.md. Also: workspace Cargo.toml needs the member entry re-added. The scaffold itself is 60 lines of clap-derive boilerplate -- restoration is mechanical, not a design decision. Also: the eventual transform's TARGET FORMAT depends on PKIX-apmt's resolution. If apmt = Rust-only, the transform emits .rs codegen instead of OSCAL Catalog JSON; the bead title and description text need updating at that point."
+}

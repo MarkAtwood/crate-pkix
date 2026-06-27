@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "DuplicateCertificate error; SPKI-based O(n\u00b2) scan in check_inputs; test added",
+  "closed_at": "2026-05-06T19:36:44Z",
+  "compaction_level": 0,
+  "content_hash": "a01ffe7d25b5c3594d079ca837f489855977aca53574551cd33d271babe060ec",
+  "created_at": "2026-05-06T18:12:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Duplicate certificates in the chain are not detected. They fail with SignatureInvalid or ChainBroken rather than a dedicated diagnostic. Should detect duplicates and return a specific error.",
+  "ephemeral": 0,
+  "id": "PKIX-ce7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: no duplicate certificate detection in chain",
+  "updated_at": "2026-05-06T19:36:44Z"
+}

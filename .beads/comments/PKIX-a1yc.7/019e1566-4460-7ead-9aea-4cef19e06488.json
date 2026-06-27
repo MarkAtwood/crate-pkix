@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-11T04:58:04Z",
+  "id": "019e1566-4460-7ead-9aea-4cef19e06488",
+  "issue_id": "PKIX-a1yc.7",
+  "text": "Resolved 2026-05-11 by Mark: Shape D adopted (see description + design fields). CRLNumber is freshness metadata not a key field \u2014 RFC 5280 \u00a75.2.3 monotonicity means only one cached version per series. CRL key is (issuer_dn_der, distribution_point_uri: Option<String>); the latter is the legitimate per-issuer partitioning axis (RFC 5280 \u00a75) and is known a-priori from the cert's CRL DP extension. Trait gains Send+Sync and invalidate_*. Returns Arc<CachedCrl>/Arc<CachedOcspResponse> not raw bytes so callers can read freshness metadata without re-parsing. OCSP shape unchanged. Bead is now ready for a fresh claim \u2014 original bd-spin assignee cleared."
+}

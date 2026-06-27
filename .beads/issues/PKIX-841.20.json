@@ -1,0 +1,31 @@
+{
+  "close_reason": "OID const deduplication is a refactoring item deferred to v0.2.",
+  "closed_at": "2026-05-02T17:48:26Z",
+  "compaction_level": 0,
+  "content_hash": "a285eff8f78796d428ff2756daa4d54106ae4edbeb25798ce19592b23a0e9eb6",
+  "created_at": "2026-05-02T17:31:32Z",
+  "created_by": "Mark Atwood",
+  "description": "EcdsaP256Verifier::verify_signature defines a local 'const OID = new_unwrap(\"1.2.840.10045.4.3.2\")' and RsaPkcs1v15Sha256Verifier does the same for SHA256WithRSA. Module-level consts OID_ECDSA_P256_SHA256 and OID_SHA256_WITH_RSA with identical values are then declared for DefaultVerifier. Two definitions of the same OID string means they can drift. The local consts in the verifier impls should reference the module-level consts (or vice versa), eliminating the duplication.",
+  "ephemeral": 0,
+  "id": "PKIX-841.20",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID consts duplicated between verifier impls and DefaultVerifier",
+  "updated_at": "2026-05-02T17:48:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:31:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

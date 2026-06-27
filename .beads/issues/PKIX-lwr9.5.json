@@ -1,0 +1,45 @@
+{
+  "close_reason": "Superseded by PKIX-lwr9.6, which both wired the harness AND regenerated the baseline + analysis as a single integrated change. baseline-limbo.json, baseline-limbo-allfeatures.json, and baseline-limbo-analysis.md are all updated and committed (2026-05-11). All acceptance criteria for .5 are satisfied.",
+  "closed_at": "2026-05-11T22:00:23Z",
+  "compaction_level": 0,
+  "content_hash": "4990a4ecf04381ac5a24bd38613c4451919445283cc72715263db9c4400db5b0",
+  "created_at": "2026-05-11T16:30:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAfter PKIX-lwr9.2/.3/.4 land, the x509-limbo Tier-2 baseline needs re-running to confirm the 43 SUCCESS-expected bettertls::pathbuilding cases flip from StricterThanWild to Agreement(Pass), and to surface any cases that did NOT flip (those become follow-up beads).\n\n## What\n\n1. Run `cargo run --release -p pkix-difftest -- run limbo ~/GIT/x509-limbo/limbo.json --oracles pkix-path,openssl,pyca --output-md pkix-difftest/baseline-limbo.md --output-json pkix-difftest/baseline-limbo.json` after .2/.3/.4 close.\n2. Verify the StricterThanWild count drops from 74 toward ~30 (the expected residual: tc8/tc15 outliers + the 4 online::* P-384 cases + ~24 webpki:: P-384/Ed25519/PSS cases, all of which are crypto-feature limitations not path-builder issues).\n3. Update `pkix-difftest/baseline-limbo-analysis.md` to reflect the new bucket counts and confirm which residual cases require which crypto features (tracked under PKIX-wmch).\n4. If any bettertls::pathbuilding case did NOT flip, file a follow-up bead under PKIX-lwr9 (e.g., PKIX-lwr9.6) documenting the residual failure mode. Acceptance per PKIX-lwr9: residual non-flips are filed as follow-ups, not failure of the umbrella.\n\n## Acceptance\n\n- [ ] baseline-limbo.{json,md} regenerated and committed.\n- [ ] baseline-limbo-analysis.md updated with new counts.\n- [ ] StricterThanWild count drops by ~43 (target ~31 residual).\n- [ ] Any residual bettertls::pathbuilding non-flips have follow-up beads filed.\n\n## Depends on\n\nPKIX-lwr9.2, PKIX-lwr9.3, PKIX-lwr9.4.\n\n## Filed by\n\nPKIX-lwr9 decomposition decision 2026-05-11 (Mark).",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: re-baseline limbo + update analysis MD",
+  "updated_at": "2026-05-11T22:00:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:30:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:30:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:30:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

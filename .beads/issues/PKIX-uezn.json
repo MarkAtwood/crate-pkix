@@ -1,0 +1,22 @@
+{
+  "close_reason": "Pass 2 found no new substantive issues. Both passes at convergence (P3+ only, low missed-bug probability).",
+  "closed_at": "2026-05-07T15:26:47Z",
+  "compaction_level": 0,
+  "content_hash": "b0e33abbdbd02b58a1b939765fb476092befc09cf1cd1546259e3fd2b0717dc2",
+  "created_at": "2026-05-07T15:25:44Z",
+  "created_by": "Mark Atwood",
+  "description": "Second pass of /review-myoss + /review-rusty after PKIX-xbf1 fixes. Looking for convergence.",
+  "ephemeral": 0,
+  "id": "PKIX-uezn",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 2 epic",
+  "updated_at": "2026-05-07T15:26:47Z"
+}

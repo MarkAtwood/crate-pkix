@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.25",
+  "title": "What is good: error type design across the workspace",
+  "description": "The workspace's error type discipline is genuinely well-done and worth defending:\n\n1. Every public error enum is #[non_exhaustive] with structured fields (not String messages). Callers can programmatically match on variants without parsing text.\n\n2. DerError is an opaque newtype wrapping der::Error \u2014 insulating callers from upstream semver churn while preserving Display diagnostics. This is a hard pattern to get right (most Rust crypto crates expose der::Error directly and break on version bumps).\n\n3. The Cow<'static, str> pattern for fixed-string error details (pkix-chain's ProfileViolation, OcspDelegation) preserves zero-allocation for the common case while supporting serde Deserialize (which needs Cow::Owned) without leaking memory.\n\n4. Cache-friendly result types: the workspace non-negotiable #6 is enforced with compile-time Send+Sync assertions in pkix-revocation, pkix-chain, and pkix-truststore. Error types derive Clone+PartialEq+Eq throughout. IoFailure in pkix-truststore cleanly solves the 'io::Error is not Clone' problem without losing kind information.\n\n5. Error::source() chains are consistently implemented, preserving the std::error::Error causal chain for every wrapping layer.\n\nLocations: pkix-path/src/lib.rs (DerError), pkix-revocation/src/lib.rs (Error, OutOfScopeReason), pkix-chain/src/lib.rs (Error with From impls), pkix-truststore/src/lib.rs (Error, IoFailure), pkix-ct/src/lib.rs (Error), pkix-identity/src/lib.rs (IdentityError).",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:05Z",
+  "updated_at": "2026-06-15T17:15:28Z",
+  "closed_at": "2026-06-15T17:15:28Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:05"
+    }
+  ]
+}

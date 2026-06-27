@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features -- tests_policy_fields exits 0 with all 7 min_rsa/rsa_key_bits tests passing. Direct helper tests (tests 1-3) exist as a separate test tier from validate_path-level tests.",
+  "assignee": "Mark Atwood",
+  "close_reason": "7 min_rsa_key_bits tests: 3 direct helper unit tests (2048/1024/EC) + 4 validate_path-level tests. All pass.",
+  "closed_at": "2026-05-06T04:59:33Z",
+  "compaction_level": 0,
+  "content_hash": "9be68ee139069346d1531c49bfcbf2c8f91e72693f60ed73dc26b11a875e24c6",
+  "created_at": "2026-05-06T03:45:50Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add unit tests for the `min_rsa_key_bits` policy field in `pkix-path`.\n\n**Algorithm:**\nTests go in `mod tests_policy_fields` in `pkix-path/src/lib.rs`.\n\nAlso add a direct unit test for the `rsa_public_key_bits` helper function (since it is a non-trivial DER parser).\n\n**Test 1: `rsa_key_bits_correct_for_2048_key`** (unit test of the helper directly)\n- Load `leaf-rsa2048-365d-san-eku.der`\n- Call `rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info)`\n- Oracle: OpenSSL confirms this key is 2048 bits: `openssl x509 -inform DER -in leaf-rsa2048-365d-san-eku.der -text -noout | grep 'Public-Key'` \u2192 `Public-Key: (2048 bit)`\n- Assert: `result == Some(2048)`\n\n**Test 2: `rsa_key_bits_correct_for_1024_key`** (unit test of the helper directly)\n- Load `leaf-rsa1024-365d-san-eku.der`\n- Call `rsa_public_key_bits`\n- Oracle: OpenSSL \u2192 `Public-Key: (1024 bit)`\n- Assert: `result == Some(1024)`\n\n**Test 3: `rsa_key_bits_none_for_ec_key`** (unit test of the helper directly)\n- Load `leaf-p256-365d-san-eku.der`\n- Call `rsa_public_key_bits`\n- Assert: `result == None` \u2014 non-RSA keys return None\n\n**Test 4: `min_rsa_key_bits_passes_when_key_meets_limit`** (validate_path level)\n- Chain: root-rsa2048 \u2192 int-rsa2048 \u2192 leaf-rsa2048-365d-san-eku (RSA-2048 leaf)\n- Policy: `min_rsa_key_bits = Some(2048)`\n- Assert: `result.is_ok()` \u2014 2048 >= 2048\n\n**Test 5: `min_rsa_key_bits_fails_when_key_too_small`** (validate_path level)\n- Chain: root-rsa2048 \u2192 int-rsa2048 \u2192 leaf-rsa1024-365d-san-eku (RSA-1024 leaf)\n- Policy: `min_rsa_key_bits = Some(2048)`\n- Oracle: 1024 < 2048 \u2192 KeyTooSmall. Leaf is at index 0.\n- Assert: `matches!(result, Err(Error::KeyTooSmall { index: 0 }))`\n\n**Test 6: `min_rsa_key_bits_none_is_unconstrained`** (validate_path level)\n- Chain: root-rsa2048 \u2192 int-rsa2048 \u2192 leaf-rsa1024-365d-san-eku (RSA-1024 leaf)\n- Policy: `min_rsa_key_bits = None`\n- Assert: `result.is_ok()` \u2014 None = unconstrained\n\n**Test 7: `min_rsa_key_bits_ec_key_passes_unconditionally`** (validate_path level)\n- Chain: root-p256 \u2192 int-p256 \u2192 leaf-p256-365d-san-eku (P-256 leaf)\n- Policy: `min_rsa_key_bits = Some(4096)` (very large, but key is EC)\n- Assert: `result.is_ok()` \u2014 EC keys are not affected by min_rsa_key_bits\n\n**Defensive programming rules:**\n- Tests 1\u20133 are direct helper tests \u2014 they do not use `validate_path`. This is the correct layered approach.\n- Oracle for bit counts: OpenSSL `openssl x509 -text` output, verified during fixture generation (not derived from code under test).\n- Tests 5 and 6 must use the same fixture to isolate the policy field as the variable.\n- Use `matches!` with specific index for error variant assertions.\n\n**Subagent instructions:**\n- Spawn one research subagent: confirm that `rsa_public_key_bits` is declared `fn rsa_public_key_bits` (not `pub fn`) and is accessible from within an inline test module in the same file.\n- Spawn one implementation subagent: write all 7 tests.\n- Spawn one validation subagent: `cargo test -p pkix-path --all-features -- tests_policy_fields 2>&1`. All 7 must pass.\n\n**Tests:**\n| Name | Condition | Oracle | Assertion |\n|---|---|---|---|\n| rsa_key_bits 2048 | helper unit test | OpenSSL: 2048 bit | `Some(2048)` |\n| rsa_key_bits 1024 | helper unit test | OpenSSL: 1024 bit | `Some(1024)` |\n| rsa_key_bits EC | helper unit test | not RSA | `None` |\n| min_bits passes | 2048 leaf, min=2048 | 2048 >= 2048 | `is_ok()` |\n| min_bits fails | 1024 leaf, min=2048 | 1024 < 2048 | `Err(KeyTooSmall { index: 0 })` |\n| min_bits None | 1024 leaf, None | default | `is_ok()` |\n| min_bits EC ignored | P-256 leaf, min=4096 | EC not RSA | `is_ok()` |",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Tests: min_rsa_key_bits enforcement",
+  "updated_at": "2026-05-06T04:59:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:45:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

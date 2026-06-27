@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:15:40Z",
+  "compaction_level": 0,
+  "content_hash": "0758ac55ecd02c8be758848e7eb50025268c701fd112bb6964657cde6390cc87",
+  "created_at": "2026-05-02T13:41:25Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk allocates a fixed [0u8; 8192] stack buffer and calls encode_to_slice (line 719-722). Certificates with large extensions (e.g. embedded CRL distribution points, large SAN lists, policy OID sequences) can exceed 8192 bytes. When that happens, encode_to_slice returns a DER error which is mapped to Error::Der \u2014 the caller has no way to distinguish 'buffer too small' from 'malformed certificate'. No test covers this path. The buffer size should be documented with a rationale, the error should be a distinct variant (e.g. CertTooLarge), and a test with a >8192-byte TBS should be added.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "8192-byte stack TBS buffer silently returns DER error on large certs",
+  "updated_at": "2026-05-02T14:15:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

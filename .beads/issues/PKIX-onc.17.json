@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Rewrote try_find_cert_ext doc to prominently label it fail-closed and clarify the distinction from find_cert_ext.",
+  "closed_at": "2026-05-05T04:52:40Z",
+  "compaction_level": 0,
+  "content_hash": "0faf1a7976c48db46e92402952233fc19a5d107e7512b90c49bee4d89df78b72",
+  "created_at": "2026-05-03T13:15:58Z",
+  "created_by": "Mark Atwood",
+  "description": "find_cert_ext and try_find_cert_ext differ only by the generic try_ prefix, which signals fallibility without explaining why two variants exist. The real distinction is fail-open (silently treat decode error as absent) vs fail-closed (propagate decode error). Suggested: rename try_find_cert_ext to find_cert_ext_strict, or make one function returning Result<Option<T>> and let find_cert_ext call .ok().flatten(). Either makes the semantic choice visible at the call site rather than requiring the reader to look up both implementations.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "try_find_cert_ext: name does not signal fail-open vs fail-closed",
+  "updated_at": "2026-05-05T04:52:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

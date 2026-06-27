@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:27:19Z",
+  "compaction_level": 0,
+  "content_hash": "ac66fc30a9b1fcd1a2f7c3e99dadeae4682d75a82f4f93b6121fb2199d3c8e63",
+  "created_at": "2026-05-02T23:20:48Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd two mutable state variables to the `chain_walk` function in pkix-path/src/lib.rs to track the running NameConstraints state across the chain traversal.\n\n## Algorithm\nPer RFC 5280 \u00a76.1.2:\n- `let mut permitted_subtrees: Option<Vec<GeneralSubtree>> = None;` \u2014 None = unconstrained\n- `let mut excluded_subtrees: Vec<GeneralSubtree> = Vec::new();`\n\nThese are declared before the main loop and updated per-certificate by the state-update logic (separate issue).\n\n## Acceptance criteria\n- Variables declared with correct types from x509_cert\n- No behavior change in this issue \u2014 just declare the variables (they will be used by subsequent issues)\n- Compiles with no unused-variable warnings (annotate with _ prefix temporarily if needed, or use #[allow])",
+  "ephemeral": 0,
+  "id": "PKIX-cg1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add NC state variables to chain_walk",
+  "updated_at": "2026-05-02T23:27:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-pjz",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

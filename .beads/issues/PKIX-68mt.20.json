@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "7e6ba2f06fb2a952518eeb3ae215a3cff5dc79dbd87dbf1586a1c5c9060844d3",
+  "created_at": "2026-05-14T19:18:47Z",
+  "created_by": "Mark Atwood",
+  "description": "IdentityError::MalformedInput is returned from at least the following distinct conditions:\n\nServerName::dns_name failures:\n  1. empty input\n  2. bare '.'\n  3. contains '*' (wildcard in target)\n  4. label too long (> 63)\n  5. total name too long (> 253)\n  6. hyphen at label start/end\n  7. non-LDH ASCII byte\n  8. embedded empty label ('foo..bar')\n  9. IDNA 2008 conversion failure\n\nServerName::ip_address failures:\n  10. empty\n  11. contains '%' (zone id)\n  12. IPv6 parse failure (any sub-cause)\n  13. IPv4 parse failure (any sub-cause, including leading-zero rejection vs out-of-range vs wrong octet count)\n  14. unmatched '[' bracket\n\nMailboxName::parse failures:\n  15. missing '@'\n  16. empty local or domain\n  17. double '@'\n  18. whitespace / NUL / quote / angle-bracket in local\n  19. ASCII local-part not atext\n  20. ASCII local-part has leading/trailing/consecutive dots\n  21. domain fails the same DNS validation as above\n\nCaller impact: a TLS service receiving 'bad input' from a user-supplied SNI string cannot tell from IdentityError::MalformedInput whether to:\n\n* log 'invalid hostname syntax' and 400 the request,\n* warn 'IDN conversion failed; is the user trying punycode?',\n* alert 'asterisk in supposedly-target name suggests config injection',\n* etc.\n\nFor prelaunch architectural completeness, IdentityError should subdivide. Suggested non-exhaustive variant shape:\n\n  MalformedDnsName { reason: DnsNameError }\n  MalformedIp { reason: IpAddressError }\n  MalformedMailbox { reason: MailboxError }\n\nwith structured reason enums (also #[non_exhaustive]) carrying the specific failure mode. This is the shape pyca/cryptography's exceptions take, and rustls-pki-types subdivides similarly.\n\nLower-effort alternative: add variants like InvalidWildcardInTarget, LabelTooLong, NotLdh, IdnaFailure, IpZoneIdUnsupported, MailboxLocalPartMalformed, MailboxDomainMalformed, while keeping the existing MalformedInput as a #[deprecated] alias-by-not-being-returned.\n\nSeverity P2: catchable error subdivisions can be added non-breakingly later because the enum is #[non_exhaustive], but only by adding *new* variants, never by removing MalformedInput. So shipping coarse and refining later is feasible \u2014 file as P2 'should fix before 1.0 to avoid double-coverage forever'.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "IdentityError::MalformedInput too coarse \u2014 collapses \u226510 distinct failure modes",
+  "updated_at": "2026-05-14T19:18:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:18:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T18:58:48Z",
+  "compaction_level": 0,
+  "content_hash": "18b374a562702bac72c0ab0ad4a9a6b6e6c98dc6133e1b546cbf719bcebf4093",
+  "created_at": "2026-05-12T00:18:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-amgn.8 demonstrates the catalog-paired-with-Rust-Lint pattern. This bead lands one concrete Lint impl, the startup invariant that catches drift between registered Lints and the catalog, and the divergences.md scaffolding.\n\n## What\n\n### One Lint impl\n\nPick a high-value, easy-to-implement zlint rule (e.g. `e_basic_constraints_not_critical` \u2014 basicConstraints MUST be critical when present in CA certs, RFC 5280 \u00a74.2.1.9 + CA/B Forum BR 7.1.2). Implement in pkix-lint-cabf/src/lints/basic_constraints_not_critical.rs:\n\n```rust\nuse pkix_lint::{Lint, Finding, Severity};\n\npub struct BasicConstraintsNotCriticalLint;\n\nimpl Lint for BasicConstraintsNotCriticalLint {\n    fn id(&self) -> &'static str { \"e_basic_constraints_not_critical\" }\n\n    fn check_cert(&self, cert: &Certificate) -> Vec<Finding> {\n        // walk cert.tbs.extensions for OID 2.5.29.19 (basicConstraints)\n        // if present and !is_critical and is_ca: produce Finding\n    }\n}\n```\n\nThe Lint's metadata methods (title, description, citation, etc.) delegate to crate::catalog::cabf_br_tls().get(\"e_basic_constraints_not_critical\") and return those values. Per PKIX-9vnx.6, this is the Lint-as-Control pattern.\n\n### Startup invariant\n\nIn pkix-lint-cabf/src/lib.rs:\n\n```rust\npub fn all_cabf_br_tls_lints() -> Vec<Box<dyn Lint>> {\n    vec![Box::new(BasicConstraintsNotCriticalLint), /* ... */]\n}\n\n#[cfg(test)]\nmod invariant_tests {\n    #[test]\n    fn every_registered_lint_has_catalog_entry() {\n        let catalog = crate::catalog::cabf_br_tls();\n        for lint in crate::all_cabf_br_tls_lints() {\n            assert!(catalog.get(lint.id()).is_some(),\n                \"registered Lint '{}' has no matching Control in vendored catalog\",\n                lint.id());\n        }\n    }\n}\n```\n\nThis catches the case where a Lint is added/renamed but the catalog wasn't refreshed.\n\n### divergences.md placeholder\n\npkix-lint-cabf/divergences.md:\n```\n# Divergences from zlint\n\nThis file tracks places where pkix-lint-cabf's interpretation of a CA/B Forum BR rule intentionally differs from zlint's implementation, and why.\n\nEach entry should record:\n- Catalog Control ID\n- Brief description of the divergence\n- Rationale (link to bd issue, ballot discussion, spec disagreement, etc.)\n- Date and reviewer\n\n## Current divergences\n\n(none yet \u2014 placeholder)\n```\n\n## Acceptance\n\n- [ ] One Lint impl pairing with a catalog Control ID, demonstrating the pattern.\n- [ ] Lint's check_cert produces a Finding for a known-bad cert; Ok for a known-good cert (unit tests).\n- [ ] Lint's metadata methods delegate to the vendored catalog.\n- [ ] every_registered_lint_has_catalog_entry test passes.\n- [ ] divergences.md placeholder committed.\n- [ ] cargo test -p pkix-lint-cabf clean.\n\n## Out of scope\n\n- Implementing all 100+ CABF lints. Pattern is established here; more lints land incrementally in follow-up bds.\n- cabf-br-smime / cabf-br-cs catalog pairings (future).\n\n## Depends on\n\nPKIX-amgn.8.5.\n\n## Filed by\n\nDecomposed from PKIX-amgn.8 per Mark's 2026-05-11 decisions.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Frozen 2026-05-12 (PKIX-ncab.2 cascade): parent PKIX-amgn.8 re-scoped because OSCAL is no longer prescribed as the catalog format. This issue is a snapshot of the OSCAL-target version of the work; it will be reworked, closed, or replaced when the replacement policy/config format is decided. Until then, do not claim autonomously.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "First Lint pairing in pkix-lint-cabf + startup invariant + divergences.md placeholder",
+  "updated_at": "2026-05-12T18:58:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:18:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T17:18:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

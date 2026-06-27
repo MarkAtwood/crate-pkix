@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:30:49Z",
+  "compaction_level": 0,
+  "content_hash": "15f77c92eaf159c8f45895b798c144c8fe96bd1cefd4b7b4a328c96307df7118",
+  "created_at": "2026-05-06T22:13:48Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-9to",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: HIGH \u2014 Three distinct issues: (1) memory leak in serde path with no eviction, (2) silent security gap in RevocationChecker default impl, (3) de_static_str is a permanent API footgun for service deployments. The P0 correctness bugs (CRL missing cert.issuer check, OCSP wrong error on hash mismatch, IssuerDnContains silent uppercase failure) are the most urgent.\nConfidence: 82% chance of no missed high-severity bug. Least confident flags: (1) The policy tree implementation in pkix-path/src/lib.rs for RFC 5280 \u00a76.1 \u2014 I read the code but did not trace against PKITS vectors; subtle anyPolicy/inhibit/mapping interactions in cert_depth arithmetic could hide an off-by-one. (2) The delta CRL merge logic in crl.rs \u2014 the RemoveFromCRL handling looks correct but I have no delta-CRL PKITS fixture to verify against. (3) The NC constraint accumulation logic for the empty-permitted-set case. Would raise confidence if: cargo test --all-features passes and PKITS test corpus runs clean; a fuzz run against check_revocation and check_revocation_against_anchor with mismatched issuers.\nIdiom rating: ACCEPTABLE \u2014 No unsafe code anywhere (all crates forbid unsafe). Type design is solid: enums are non-exhaustive where it matters (LintResult, Severity, Scope, SubjectKind, Error, DeviationAddError). Seven new idiom findings filed (PKIX-9to.22 through .29): two missing #[non_exhaustive] on public enums expected to grow (DeviationScope, DeviationAction), two missing derives on public types (NoRevocation: PartialEq/Eq/Hash; CertPool: Clone), one performance/allocation hot-path issue (IssuerDnContains double-alloc), one copy-paste private fn (de_static_str), and two refactoring items (ocsp.rs verify_responder_id duplication, crl.rs is_none idiom). No return-at-end-of-fn, no .unwrap() in library code, no Box<dyn Error> in APIs, no stringly-typed errors, no missing Display impls. The overall idiom quality is above average for a v0.1 crate.\nRust idiom confidence: 88% chance of no missed issue. Least confident flags: (1) pkix-path/src/lib.rs chain_walk() is 350+ lines \u2014 I read it but did not trace every policy-tree branch for hidden allocations or lifetime annotation issues. (2) The NcTypeMask newtype bitmask is an unusual pattern; I verified the BitOr impls are correct but did not check all call sites exhaustively. (3) pkix-path-builder/src/lib.rs dfs() recursive function \u2014 I checked the Clone discipline but not whether the budget arithmetic could underflow on edge cases. Uncertainty driven by: length of pkix-path/src/lib.rs (2500+ lines), I read ~2/3 of it.\nReview complete. 3 commits. All P0-P2 actionable issues fixed. P3/P4 opinion items deferred or confirmed as intentional design.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: today's PKIX work \u2014 lint, path, revocation, profiles",
+  "updated_at": "2026-05-06T22:30:49Z"
+}

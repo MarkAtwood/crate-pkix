@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:32Z",
+  "compaction_level": 0,
+  "content_hash": "fc2a1fa2dab8ebd37b60082f629dcfff7dbcdbbc39fe3c6f4402420932ef21f8",
+  "created_at": "2026-05-06T21:31:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs line 58: The serde bound is serde(bound(deserialize = \"'de: 'static\")), which constrains all deserializers to have a 'static lifetime. This is required because EvaluationReport fields transitively use de_cow_static, which constructs Cow::Owned from a String, making the data 'static. However, this bound is unusual and may surprise callers trying to deserialize from a non-'static source (e.g., a borrowed byte slice via serde_json::from_slice). The serde bound is not documented in the struct doc comment or # Errors section. Callers who see serde derives and try to use serde_json::from_slice will get a confusing compiler error about lifetime requirements. Add a doc comment noting the 'de: 'static bound and why it exists.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: EvaluationReport serde bound is 'de: 'static \u2014 required at deserialize call site, not documented",
+  "updated_at": "2026-05-06T21:36:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

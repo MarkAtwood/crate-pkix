@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T060707Z-154326",
+  "close_reason": "Chose Option 2: removed stale 'v0.2' version values from the README crate table; replaced with 'released' (status, not version) to match the column header semantic. Added a one-line note that per-crate versions live on crates.io / Cargo.toml. Also fixed the two Quick Start snippets (pkix-chain = \"0.2\") to \"0.4\" matching current pkix-chain version, since the issue acceptance reads 'No stale v0.2 references in the README outside CHANGELOG history'. No version-pegged surfaces remain in the README; future minor / patch releases no longer require README edits.",
+  "closed_at": "2026-05-11T06:11:35Z",
+  "compaction_level": 0,
+  "content_hash": "1e9f073f3e3ffda63cc0cc6cba17879b09c73af88e7e3536f9c96a4f05c011b1",
+  "created_at": "2026-05-11T05:15:12Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSurfaced during PKIX-agp7.2 sweep. The top-level README.md crate table (lines 24-30) shows 'v0.2' for every crate, but the coordinated 0.3 follow-up wave (CHANGELOG [unreleased]) ships pkix-path 0.3.0, pkix-revocation 0.3.2, pkix-chain 0.4.0, pkix-chain-simple 0.4.0, and pkix-path-builder 0.3.0.\n\nThis is a data-freshness issue, not a v0.x-gating policy issue, which is why it was left out of PKIX-agp7.2.\n\n## What\n\nTwo options:\n1. Update the Version column to reflect actual Cargo.toml versions.\n2. Remove the Version column entirely \u2014 version info already lives in crates.io and individual Cargo.toml files; the README table doesn't need to mirror it.\n\nPick 2 if 'drive to done done done' means no version-pegged status surfaces; pick 1 if the table is genuinely informative for new readers.\n\n## Acceptance\n\n- [ ] README.md crate table either has accurate per-crate versions or no Version column.\n- [ ] No stale 'v0.2' references in the README outside CHANGELOG history.",
+  "ephemeral": 0,
+  "id": "PKIX-a94w",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "README crate-version column shows stale v0.2 for crates already at 0.3+",
+  "updated_at": "2026-05-11T06:11:35Z"
+}

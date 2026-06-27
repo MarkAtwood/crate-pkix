@@ -1,0 +1,31 @@
+{
+  "close_reason": "Bitmask design documented with INVARIANT comment in code",
+  "closed_at": "2026-05-03T00:38:12Z",
+  "compaction_level": 0,
+  "content_hash": "666bc256911990b92fc99d1302bd6aee5e10720d0bd9dc006d5428fdf14650ff",
+  "created_at": "2026-05-03T00:13:20Z",
+  "created_by": "Mark Atwood",
+  "description": "Tracking which name types have EVER been constrained via a separate bitmask (nc_constrained_types) is the correct solution to the empty-intersection enforcement problem: if CA1 permits 'example.com' DNS names and CA2 permits 'otherdomain.com' DNS names, the intersection is empty, but the type IS constrained \u2014 so any DNS SAN must fail. A design that only inspects nc_permitted to determine 'is this type constrained?' would incorrectly admit DNS names when the intersection is empty. The bitmask prevents that. Defend this design against refactoring that derives constrained-ness from nc_permitted contents.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.21",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_constrained_types bitmask design correctly handles empty-intersection case",
+  "updated_at": "2026-05-03T00:38:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:13:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "9130d5c74286823755c9781ae3fb9cd2a9e85f65bf21727d16c7bc257eba557e",
+  "created_at": "2026-05-14T17:30:41Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T172958Z-6770",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T172958Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-ct since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 the cryptographic verification path is well-tested with strong independent oracles, but the log-list ingestion seam (PKIX-ppbr.1, PKIX-ppbr.2) has two correctness bugs that undermine the trust-anchor layer for the whole crate, and the public surface (PKIX-ppbr.6, PKIX-ppbr.8, PKIX-ppbr.9) carries pre-1.0 design-closure decisions that need to be made before launch.\nConfidence: ~25% chance of missed bug. Least confident flags: PKIX-ppbr.4 (re-encoder bit-exactness across real-world CT-logged certs \u2014 only verifiable by running a corpus test). Uncertainty driven by: could not trace SignatureVerifier impl in pkix-path to confirm RSA `parameters: None` and ECDSA DER vs raw signature handling; could not run a real-world precert corpus to validate the x509-cert re-encoder assumption beyond the single committed fixture and live-log capture; could not verify what behavior the Google log_list.json schema specifies for each `state` variant (pending/qualified/usable/readonly/retired/rejected) at the spec level \u2014 the bugs in PKIX-ppbr.1 and PKIX-ppbr.2 are filed against the documented intent visible in this crate, not against an external spec read I did. Would raise confidence if: (a) corpus test against ~1000 real CT-logged certs from CRT.sh confirms tbs_without_sct_list round-trips; (b) explicit read of Chrome log_list.json schema documentation confirms state-variant handling; (c) integration test traces SignatureVerifier through to the ECDSA/RSA backend confirming algorithm dispatch.\nAPI contract risk: HIGH \u2014 the public surface (SctList, CtLog, SignedCertificateTimestamp, MerkleAuditPath, SignedTreeHead) ships with all-public-fields, no #[non_exhaustive], no serde, no constructor validation, and an Option<u64> log-window type whose two interpretations conflict. Multiple ergonomic frictions (verify_embedded_scts Result<usize>, separate log_id arg on verify_sth, CtLogList missing remove/clear/extend) will force caller-side workarounds within the first 0.x cycle.\nAPI contract confidence: 15% chance of missed issue. Least confident flags: PKIX-ppbr.19 (entry_type contract \u2014 the 'add it to the SCT struct' fix may interact with wire-format identity guarantees I did not chase fully); PKIX-ppbr.28 (feature granularity \u2014 would need to enumerate every public item to confirm the split into log-list/verify/merkle is clean). Uncertainty driven by: could not run a downstream-consumer integration test to confirm which contract clauses ACTUALLY trip callers (the contract analysis is theoretical without a real second adopter); could not enumerate every potential CtLog field across all CT log-list schemas (Mozilla, Apple, Cloudflare may differ from Chrome's); did not exhaustively check whether pkix-ct's serde feature would interact badly with serde_json/base64 already pulled in by log-list-json (likely fine but unverified).\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-ct since 24701180",
+  "updated_at": "2026-05-14T17:51:27Z"
+}

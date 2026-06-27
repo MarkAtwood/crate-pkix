@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:46:51Z",
+  "compaction_level": 0,
+  "content_hash": "e574208b2dd887791ac22eab9b63987d13351987eb152aa25814ac23558b5779",
+  "created_at": "2026-05-07T20:12:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-path-builder/src/lib.rs:154-166\\` \\`cert_is_ca\\` uses \\`.ok()\\` on \\`BasicConstraints::from_der\\`, treating malformed BC as not-CA. The doc comment explicitly justifies this as \\\"fail-open for the builder\\\" because validate_path will catch structural problems later.\n\n## Why P2\n- The doc justification is partially correct (pkix-path's per-cert structural checks would reject a malformed BC if the cert is included as an intermediate), BUT:\n- The path builder still selects intermediate candidates whose BC is malformed \u2192 returned chain hits validate_path, which then runs signature verification and other checks before reaching the BC validation, wasting work.\n- More importantly: a cert with malformed BC that the builder treats as \\\"not-CA\\\" is **rejected as a candidate intermediate**. So the builder may return Err(NoPathFound) when a topologically valid path exists through the malformed-BC cert. That cert was probably the right candidate; rejecting it silently produces a misleading error (NoPathFound vs the truthful \\\"there is a path but one of the intermediates is malformed\\\").\n\n## Fix\nTwo reasonable options:\n1. Propagate the parse error to the caller as a new \\`Error::MalformedIntermediate\\` variant.\n2. Treat unparseable BC as a hard no, but log it via a tracing/diagnostic hook (currently no diagnostic surface in this crate).\n\nOption 1 is more honest. Option 2 needs design.\n\n## Scope reference\n\\`pkix-path-builder/src/lib.rs:154-166\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-0la6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: pkix-path-builder cert_is_ca silently treats malformed BasicConstraints as not-CA",
+  "updated_at": "2026-05-07T20:46:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

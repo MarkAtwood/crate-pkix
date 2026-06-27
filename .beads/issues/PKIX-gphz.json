@@ -1,0 +1,64 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b09dace8c4780164e7a1cb91769be9f02a33fe1676b06b649f22b2091781e53d",
+  "created_at": "2026-05-08T18:55:43Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nCurrently `pkix-path::DefaultVerifier` supports only two algorithms:\n* RSA-PKCS1v15 + SHA-256 (`1.2.840.113549.1.1.11`)\n* ECDSA P-256 + SHA-256 (`1.2.840.10045.4.3.2`)\n\nReal-world chains routinely use other algorithms. PKITS doesn't exercise this much because it's RFC-conformance focused, but a TLS chain in 2026 typically uses one of:\n\n* **RSA-PSS** (`1.2.840.113549.1.1.10`) \u2014 preferred in TLS 1.3, used by many modern CAs\n* **ECDSA P-384** (`1.2.840.10045.4.3.3`) \u2014 common in modern TLS, code signing, sigstore\n* **Ed25519** (`1.3.101.112`) \u2014 modern TLS, increasingly common\n\nWithout these, downstream consumers hitting these algorithms see `AlgorithmNotAllowed` (or worse, the OID dispatcher in `DefaultVerifier` returns `signature::Error::new()` with no useful info). The differential test harness will surface this loudly as `StricterThanWild` once we add a corpus that includes modern chains.\n\n## What\n\nFive new `SignatureVerifier` impl unit-structs in `pkix-path/src/lib.rs`, one per algorithm, each behind its own feature flag. `DefaultVerifier` (`lib.rs:3047`) gains OID dispatch entries for each. Each algorithm reuses the existing RustCrypto crate already in the dependency graph or pulls in a sibling crate (`p384`, `p521`, `ed25519-dalek` etc).\n\nPattern is established by the existing `EcdsaP256Verifier` (`lib.rs:1867`) and `RsaPkcs1v15Sha256Verifier` (`lib.rs:1909`) \u2014 copy and adapt per algorithm.\n\n## Recommended decomposition (file children when work starts)\n\n1. **RSA-PSS-SHA256 verifier** (P2) \u2014 most-impactful single algorithm. Note: PSS has algorithm parameters (saltLength, mgf1HashAlgorithm) that must be parsed from `AlgorithmIdentifier`. There are multiple 'valid' PSS encodings in the wild \u2014 this is itself a divergence class the harness should surface.\n2. **ECDSA P-384 + SHA-384 verifier** (P2) \u2014 `p384` crate exists in RustCrypto.\n3. **Ed25519 verifier** (P2) \u2014 `ed25519-dalek` or `ed25519` crate.\n4. **RSA-PKCS1v15 SHA-384 + SHA-512** (P3) \u2014 extends existing RSA verifier with two more OIDs.\n5. **ECDSA P-521 + SHA-512** (P3) \u2014 `p521` crate.\n\n## Acceptance\n\n- [ ] Each algorithm has its own `SignatureVerifier` impl, feature flag, and unit tests using independent oracles (RustCrypto test vectors, RFC 4231/8032 test vectors, NIST CAVS).\n- [ ] `DefaultVerifier` dispatches to all enabled verifiers via OID match.\n- [ ] No new test uses `pkix-path` itself as the oracle \u2014 every test verifies against a known-correct independently-computed signature.\n- [ ] `pkix-difftest run pkits ...` baseline unchanged (PKITS doesn't exercise these algos, so all chains stay in their current buckets).\n- [ ] A new sample chain (real-world cert with one of these algos) added to `pkix-difftest/tests/fixtures/` and exercised by the existing smoke tests.\n- [ ] No `unsafe`. No new top-level workspace deps that pull in C/C++.\n- [ ] `pkix-path` stays `no_std` \u2014 every new verifier opt-in via feature flag and the underlying crate is no_std-capable.\n\n## Out of scope\n\n- ML-DSA / Dilithium (covered by `pkix-composite` follow-up).\n- DSA (deprecated; not implementing).\n- ECDSA over non-NIST curves (secp256k1, brainpool).\n- RSA-PSS-SHA384, RSA-PSS-SHA512 (file as a follow-up if needed; PSS-SHA256 covers the bulk of real-world use).\n\n## Filed as\n\nv1.0 'bar' item per gap audit: `pkix-path` crypto coverage. Estimated ~200 lines of new code total + tests, spread across 5 children. Each child is roughly half a day of focused work.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path: signature algorithm coverage (RSA-PSS, P-384, Ed25519, P-521, RSA-SHA384/512)",
+  "updated_at": "2026-05-11T06:29:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T11:56:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T11:56:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T11:56:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T11:57:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T11:57:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T12:15:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

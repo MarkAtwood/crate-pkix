@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:20Z",
+  "compaction_level": 0,
+  "content_hash": "cf0cb3ca7eba854ebfccb3c99bc3caee1613dba019f703dbe309e89a1b6ca378",
+  "created_at": "2026-05-05T14:34:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Add CrlChecker::with_delta(base_der, delta_der, now, verifier) constructor. Validate BaseCRLNumber from delta matches base CRLNumber. Merge revoked entries: delta entries override base; removeFromCRL entries delete base entries. Return DeltaCrlMissingBase if delta supplied without valid base.",
+  "ephemeral": 0,
+  "id": "PKIX-58m.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement delta CRL merging (RFC 5280 \u00a75.2.4)",
+  "updated_at": "2026-05-05T15:25:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:34:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-58m",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:34:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-58m.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

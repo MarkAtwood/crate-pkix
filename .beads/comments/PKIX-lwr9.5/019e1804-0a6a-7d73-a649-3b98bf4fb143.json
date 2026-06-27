@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "created_at": "2026-05-11T17:09:39Z",
+  "id": "019e1804-0a6a-7d73-a649-3b98bf4fb143",
+  "issue_id": "PKIX-lwr9.5",
+  "text": "See parent PKIX-lwr9 comment of 2026-05-11. The 'rebaseline limbo' work in this bead would naturally include option (a) from the parent comment \u2014 route the limbo CertPath bundle through pkix_path_builder::build_path before classification (mirroring PKIX-t0w4's PKITS harness change). Doing so will flip most of the 47 StricterThanWild bettertls::pathbuilding cases to Agreement automatically and surface the genuine path-builder bugs (probably tc60-shaped). This bead may be the only one of PKIX-lwr9.{2,3,4,5} that needs to land."
+}

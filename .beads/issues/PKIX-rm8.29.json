@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.29",
+  "title": "pkix-path-builder::Error::NoValidPath carries last_error as String, not typed",
+  "description": "pkix_path_builder::Error::NoValidPath { tried: usize, last_error: String } carries the last validation error as a Display-rendered String rather than a typed pkix_path::Error. The variant doc explains this is because pkix_path::Error does not implement Hash (which Error derives). However this means callers who need to programmatically distinguish failure reasons (e.g. 'the only candidate chain had an expired intermediate' vs 'the only candidate chain had an unrecognized signature algorithm') must parse a free-form Display string or iterate build_path_candidates themselves.\n\nThe error is carried as String specifically to preserve Hash on the Error enum. pkix_path::Error does not impl Hash because it contains DerError (which uses Box<str>). The tradeoff was deliberate, but the contract consequence is that NoValidPath is the only Error variant in the entire workspace that discards typed error information for a derive convenience.\n\nWhat goes wrong if this stays as-is: Callers who receive NoValidPath cannot programmatically distinguish between different validation failures without dropping to the raw iterator API. The pkix-chain crate works around this (lines 618-631 in pkix-chain/src/lib.rs) by catching NoValidPath and re-running build_path (topology-only, no validation) to get a chain and re-validate it \u2014 specifically so the caller gets a typed pkix_path::Error rather than the stringified version. This workaround proves the typed error is needed by at least one consumer.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-path-builder/src/lib.rs lines 198-203 (NoValidPath variant)",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:15Z",
+  "updated_at": "2026-06-15T17:07:37Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:14"
+    }
+  ]
+}

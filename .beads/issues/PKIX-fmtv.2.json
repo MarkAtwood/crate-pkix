@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T18:38:22Z",
+  "compaction_level": 0,
+  "content_hash": "0abcd80a66f25725e9de85a453dd8ee380c50afb0eaf5ebbcec6eebee5a9695c",
+  "created_at": "2026-05-12T02:41:34Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (TrustDomain callback vs upfront-inputs) is largely moot: `SignatureVerifier` and `RevocationChecker` callbacks already exist and are exercised by `pkix_chain::verify_chain()` at `pkix-chain/src/lib.rs:156`. The mozilla::pkix-style trust-domain pattern is already shipped.\n\nWhat remains: **should `pkix-chain` add an `AiaFetcher` (or similar) callback for online intermediate retrieval per RFC 5280 \u00a74.2.2.1 (Authority Information Access)?**\n\nToday, `pkix-path-builder::build_first_valid_path` resolves intermediates from a bundle the caller already has. If the caller is missing an intermediate but the leaf has an `AIA` extension pointing at it (`accessMethod = id-ad-caIssuers`), the build fails. Closing the gap requires the verifier to call back into the caller (the caller has the I/O) for \"fetch this URL and give me the DER.\"\n\n**Options:**\n\n- **A) No AIA-fetch callback.** Callers responsible for assembling the full bundle. Matches current state. Simpler.\n- **B) Add `AiaFetcher` trait.** New trait alongside `SignatureVerifier` and `RevocationChecker`. `pkix-revocation-http` style: trait shape lets std/no_std/test-injection compose. Verifier calls `fetcher.fetch(uri)` when a needed intermediate is missing.\n- **C) Add as optional parameter to `verify_chain` (or new `verify_chain_with_aia`).** Backward-compatible.\n\n**Lower priority than the identity-binding gap.** Can ship after the main verify_* wrappers land.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide AIA-fetch callback for online intermediate retrieval",
+  "updated_at": "2026-05-12T18:38:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

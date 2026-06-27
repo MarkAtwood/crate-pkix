@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:12:57Z",
+  "compaction_level": 0,
+  "content_hash": "8fa03912e91ff441827e3bd9a4b93af495895663b2ae39fca97bd0d7c5351060",
+  "created_at": "2026-05-02T13:41:09Z",
+  "created_by": "Mark Atwood",
+  "description": "names_match (line 452) zips a_rdns and b_rdns in order and within each RDN calls any() to find a matching AVA. RFC 5280 \u00a74.1.2.4 and RFC 4518 require that two RDNs are equal if their sets of AVAs are equal regardless of encoding order. However the outer RDN sequence is compared position-by-position: a_rdns[0] is matched against b_rdns[0]. If two certs encode the same DN with RDNs in different order (legal DER SET OF encoding), names_match will return false and produce a spurious ChainBroken error. The RFC 5280 name-matching algorithm (section 7.1) requires order-independent RDN comparison.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.12",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "names_match treats RDN SET OF as ordered sequence",
+  "updated_at": "2026-05-02T14:12:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:41:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

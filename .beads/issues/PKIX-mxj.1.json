@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:00:40Z",
+  "compaction_level": 0,
+  "content_hash": "0efd21e6af9941bc733a411f1a78ee4e1026a4c9c228e33eb8a7f02bd95c32dc",
+  "created_at": "2026-05-07T03:48:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:630-632 \u2014 issuer_has_crl_sign() calls KeyUsage::from_der and on parse failure uses .unwrap_or(false), returning false. The caller (check_revocation line 215) then returns Err(CrlSignMissing). A malformed-but-critical KeyUsage extension should return CrlParseError (structural defect), not CrlSignMissing (missing bit). The behavior is fail-closed (rejects), but the wrong error variant reaches the caller, making the root cause undiagnosable. Fix: propagate the decode error as CrlParseError before the crl_sign() call.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "malformed KeyUsage on CRL issuer returns wrong error",
+  "updated_at": "2026-05-07T04:00:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:48:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

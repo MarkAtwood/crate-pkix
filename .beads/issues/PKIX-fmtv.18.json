@@ -1,0 +1,53 @@
+{
+  "close_reason": "All 7 children closed; all deps closed; corpus precondition met. OpenSSL differential coverage complete for sslserver/sslclient/smimesign/smimeencrypt/timestampsign/ocsphelper. Codesign coverage moved to PKIX-fmtv.24 (pyca composition; OpenSSL CLI has no codesign purpose). BLOCKED status was stale per 02:18 bd-spin comment.",
+  "closed_at": "2026-05-13T16:31:57Z",
+  "compaction_level": 0,
+  "content_hash": "921c834d8e64045add9f0b70cd32ca2fdf0c40e91e87415e53c6deefc8594230",
+  "created_at": "2026-05-12T02:42:48Z",
+  "created_by": "Mark Atwood",
+  "description": "Differential testing of `pkix-chain::verify_*` against `openssl verify` for the canonical purposes.\n\nFor each purpose:\n- **TLS server** \u2014 `openssl verify -purpose sslserver -verify_hostname <name>` vs `pkix_chain::verify_tls_server(..., name)`.\n- **TLS client** \u2014 `-purpose sslclient`.\n- **S/MIME signer** \u2014 `-purpose smimesign -verify_email <addr>`.\n- **Code signing** \u2014 `-purpose codesign`.\n- **OCSP responder** \u2014 `-purpose ocsphelper`.\n\nTest corpus per purpose:\n- Boundary cases: wildcard hostnames, IDN, mailbox case-folding, EKU restrictions, etc.\n- Sourced from `pkix-difftest` existing corpora (PKITS, x509-limbo where applicable) + curated `pkix-difftest/oracles/openssl/` cases.\n\nHarness: extend `pkix-difftest` to run both oracles per test case and report disagreements.\n\nAcceptance: per-purpose pass-rate documented in `pkix-difftest/baseline-verify-openssl.md`. Disagreements either resolved (one side is wrong, fix it) or documented (legitimate semantic divergence, e.g., OpenSSL legacy behavior we don't replicate).\n\n**Blocks on:** .15 (ergonomic wrappers \u2014 the test-side API).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 closing \u2014 BLOCKED status was stale]\n\nAll 7 children closed (.18.1 helper, .18.2 sslserver, .18.3 sslclient, .18.4 smime, .18.5 codesign superseded by PKIX-fmtv.24 pyca composition, .18.6 timestampsign, .18.7 ocsphelper). All 3 deps closed (.15, .22, .23).\n\nBLOCKED status was set 2026-05-13 02:18 by bd-spin when corpus precondition was unmet. .22 and .23 corpora shipped since; precondition is met. Status is stale.\n\nOpenSSL differential coverage for canonical purposes is complete except codesign (OpenSSL CLI has no -purpose codesign verb; coverage moved to PKIX-fmtv.24 via pyca composition). baseline-verify-openssl.md should document per-purpose pass-rates per the acceptance criterion.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Differential testing against OpenSSL for canonical purposes",
+  "updated_at": "2026-05-13T16:31:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:44:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.15",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-12T21:39:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.22",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-12T21:39:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.23",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

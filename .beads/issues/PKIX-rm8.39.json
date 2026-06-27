@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.39",
+  "title": "Inconsistent IoFailure boundary type between pkix-aia and pkix-truststore",
+  "description": "Both pkix-aia and pkix-truststore need to represent I/O errors in a Clone+Eq+Serialize-friendly shape (AGENTS.md non-negotiable #6 forbids embedding raw `std::io::Error`). Both crates independently implement the same pattern:\n\n- pkix-aia: `AiaError::IoFailure { kind: std::io::ErrorKind, message: String }` as an enum variant, with a private `io_error_kind_serde` module for round-tripping `ErrorKind` via its Debug label.\n- pkix-truststore: `pub struct IoFailure { pub kind: io::ErrorKind, pub message: String }` as a standalone public struct, with its own `io_error_kind_serde` module using the same Debug-label technique.\n\nThe two implementations are functionally identical but:\n1. pkix-aia inlines the fields as an enum variant; pkix-truststore extracts a named struct.\n2. Both ship separate copies of the `io_error_kind_serde` serialize/deserialize logic (identical label match tables for the same set of ErrorKind variants).\n3. A caller working with both AiaError and pkix_truststore::IoFailure cannot use one conversion for both.\n\nImpact: Code duplication across the io_error_kind_serde modules \u2014 currently ~70 lines each of identical match-arm tables. When a new Rust ErrorKind variant is added, both tables need updating independently. A shared boundary type or a shared serde helper module would eliminate the duplication.\n\nLocations: /home/mark/PROJECT/PKIX/pkix-aia/src/lib.rs lines 264-437 (io_error_kind_serde module), /home/mark/PROJECT/PKIX/pkix-truststore/src/lib.rs lines 221-336 (IoFailure struct + io_error_kind_serde module)",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:42Z",
+  "updated_at": "2026-06-15T17:13:51Z",
+  "closed_at": "2026-06-15T17:13:51Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:41"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion: tuple vs separate let bindings is style, not engineering",
+  "closed_at": "2026-05-03T13:28:58Z",
+  "compaction_level": 0,
+  "content_hash": "67776010d032f113ae11c30b7b2beb6a4385dccacf0a3bbc71b79a64db6b670e",
+  "created_at": "2026-05-03T13:15:34Z",
+  "created_by": "Mark Atwood",
+  "description": "Lines 1202-1211: 'let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints { None => (None, default), Some(nc) => (...) }' bundles two semantically independent initializations into one tuple match. A reader must mentally unpair both fields simultaneously to understand each. Separate bindings make the intent clear: 'let mut nc_permitted = anchor.name_constraints.as_ref().and_then(|nc| nc.permitted_subtrees.clone()); let mut nc_excluded = anchor.name_constraints.as_ref().and_then(|nc| nc.excluded_subtrees.clone()).unwrap_or_default();'",
+  "ephemeral": 0,
+  "id": "PKIX-onc.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC seeding: split tuple destructuring into separate let bindings",
+  "updated_at": "2026-05-03T13:28:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

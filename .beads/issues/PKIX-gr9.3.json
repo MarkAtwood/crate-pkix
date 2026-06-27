@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "fc15173478815d5cb5d783fd046b9158353a4dc046736393f376c4ce5b310854",
+  "created_at": "2026-05-06T17:07:13Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:193 and lib.rs:211 place #[must_use] on trait method declarations. In Rust, #[must_use] on a trait method does NOT automatically propagate to concrete implementations \u2014 the attribute is only enforced when the method is called through the trait (dyn RevocationChecker or generic T: RevocationChecker). Callers using a concrete CrlChecker or OcspChecker directly (without indirection through the trait) will NOT get the must_use lint. This creates a false sense of safety: the annotation suggests the result is always checked, but it may be silently dropped in non-generic contexts. Fix: document this limitation in the trait doc comment, OR (preferred) rely on the caller using must_use at the call site (e.g. verify_chain). The annotation is not wrong, but its limited scope should be noted.",
+  "ephemeral": 0,
+  "id": "PKIX-gr9.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "False positive: Rust #[must_use] on trait method DOES propagate to call sites through concrete impls. No action needed.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "#[must_use] on RevocationChecker trait methods is not inherited by overrides \u2014 misleading placement",
+  "updated_at": "2026-05-06T17:13:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T10:07:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gr9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

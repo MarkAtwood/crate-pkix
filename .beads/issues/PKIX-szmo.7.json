@@ -1,0 +1,67 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Triage complete for 4 of 5 scan modes (46 findings). PKIX-szmo.2 RFC scan remains open/blocked on API credits \u2014 not a blocker for triage of completed scans. 3 duplicates, 4 new fix beads filed (PKIX-6p6p/6cp5/cf0b/hk56), 39 dismissed. Report: reports/skoll-triage-summary.md.",
+  "closed_at": "2026-06-04T18:09:24Z",
+  "compaction_level": 0,
+  "content_hash": "0ae2c5ce90d59fc348cf95d9cf1e6058808e40fa6a15e3cfac4357bae6e13e00",
+  "created_at": "2026-06-04T17:28:33Z",
+  "created_by": "Mark Atwood",
+  "description": "After all 5 scan types complete (.2-.6), triage findings across all reports. Steps: (1) Collect all JSON outputs from /tmp/skoll-review-*.json. (2) Deduplicate findings that appear in multiple scan modes (e.g., a timing issue found by both security and consttime). (3) Cross-reference against existing beads \u2014 some findings may already be tracked (e.g., PKIX-7f92 crypto-security audit, PKIX-tit4 truststore review). (4) Dismiss false positives with documented rationale. (5) For real findings: assess severity (P0-P4), file individual fix beads with acceptance criteria, and wire dependencies. (6) Write a summary triage report at reports/skoll-triage-summary.md documenting what was found, what was dismissed, and what was filed. Consider running 'skoll multi all --no-synthesize' if the individual scans don't capture cross-cutting concerns.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Triage Skoll findings \u2014 deduplicate, assess, file fixes",
+  "updated_at": "2026-06-04T18:09:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-06-04T10:28:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-06-04T10:28:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-06-04T10:28:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-06-04T10:28:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:48:44Z",
+  "compaction_level": 0,
+  "content_hash": "f0189d75cf7878a6314f4d25c5adf8eb127703f115349332320c0c7803c2928e",
+  "created_at": "2026-05-02T14:39:08Z",
+  "created_by": "Mark Atwood",
+  "description": "PKITS_NOW = 1_577_836_800 (2020-01-01 UTC) is defined separately in pkix-path/tests/pkits_helper.rs and pkix-chain/tests/e2e.rs. If the PKITS cert validity window changes or a new test epoch is needed, both definitions must be updated in sync. One should reference the other.",
+  "ephemeral": 0,
+  "id": "PKIX-7os.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS_NOW constant duplicated between pkix-path and pkix-chain tests",
+  "updated_at": "2026-05-02T14:48:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:39:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7os",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

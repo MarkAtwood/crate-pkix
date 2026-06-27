@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed all 5 failing NC tests: URI host semantics (test 36), DN intersection with more-specific constraints (test 12), incompatible DN intersection (test 13), DN+RFC822 type-aware intersection (tests 28/29), emailAddress-in-subject check (test 29). Full workspace passes, clippy clean.",
+  "closed_at": "2026-05-03T00:02:14Z",
+  "compaction_level": 0,
+  "content_hash": "ce39bd9982eaa3620a774ce4f58d7bd562e89dfe94835472a33c48a67dab8799",
+  "created_at": "2026-05-02T23:39:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Five categories of NC matching bugs identified by \u00a74.13 PKITS tests:\n\n1. DN subtree permitted match: uses exact equality instead of RFC 5280 \u00a74.2.1.10 subtree (prefix) matching. Affects tests 1, 4, 5, 6, 11, 14, 27.\n\n2. DN excluded subtree check: not triggering when there are no permittedSubtrees (only excludedSubtrees). Affects tests 7, 8, 9, 15, 16.\n\n3. RFC 822 domain suffix: .domain syntax not matched. Affects tests 21, 23.\n\n4. DNS subdomain: exact match only, not suffix match. Affects test 30.\n\n5. URI host extraction: full URI string compared instead of extracting host for NC check. Affects test 34.\n\nAll affected tests are marked #[ignore] in pkits_4_13.rs with tracking reference PKIX-nc-matching.",
+  "ephemeral": 0,
+  "id": "PKIX-0vw",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Fix NameConstraints matching bugs found by \u00a74.13 PKITS tests",
+  "updated_at": "2026-05-03T00:02:14Z"
+}

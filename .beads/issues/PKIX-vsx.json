@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "all external ValidationPolicy struct literals updated to use new() or field assignment; #[non_exhaustive] added to struct",
+  "closed_at": "2026-05-03T13:59:40Z",
+  "compaction_level": 0,
+  "content_hash": "5aa7ca4320d504b34a46186d9cb153cc7281fa36d012120d3084308657c800b1",
+  "created_at": "2026-05-03T13:40:48Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy::new(now_unix) was added in PKIX-aoe. Before adding #[non_exhaustive] (deferred from PKIX-s54.1), update all external struct literals to use the constructor. Files: pkix-chain/tests/e2e.rs (4x), pkix-chain-simple/src/lib.rs (1x), pkix-path/tests/anchor_nc.rs (1x), pkix-path/tests/pkits_smoke.rs (1x), pkix-path/tests/pkits_helper.rs (1x), pkix-profiles/src/lib.rs (1x). Pattern: ValidationPolicy { current_time_unix: t, ..Default::default() } \u2192 ValidationPolicy::new(t). Then add #[non_exhaustive] to the struct. This is a pre-requisite for the v0.2 policy-field roadmap.",
+  "ephemeral": 0,
+  "id": "PKIX-vsx",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy: update struct literals to use new(), then add #[non_exhaustive]",
+  "updated_at": "2026-05-03T13:59:40Z"
+}

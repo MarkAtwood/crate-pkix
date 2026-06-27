@@ -1,0 +1,38 @@
+{
+  "close_reason": "All v0.1 PKITS sections pass: \u00a74.1/4.2 (0ux), \u00a74.3 (name chaining), \u00a74.6/4.7 (390). Ignored tests documented for v0.2.",
+  "closed_at": "2026-05-02T07:24:02Z",
+  "compaction_level": 0,
+  "content_hash": "e6595b5ce2efcbfbf7e77ebe47960c16daa265fe6de54243d096867b32998def",
+  "created_at": "2026-05-02T05:50:00Z",
+  "created_by": "Mark Atwood",
+  "description": "Set up the NIST PKITS (Public Key Interoperability Test Suite, NIST SP 800-89) as the primary integration test baseline for pkix-path.\n\nBLOCKED BY: Epic PKIX-lwr (path validator) and Epic PKIX-ehn (RustCrypto backends). Test infrastructure can be written earlier but tests will not pass until both are done.\n\nPKITS is the industry-standard test suite for RFC 5280 implementations. It ships as a ZIP containing ~500 DER-encoded certificates and CRLs covering every section of RFC 5280 path validation.\n\nSource: https://csrc.nist.gov/projects/pki-testing\nOracle: the PKITS document itself specifies expected pass/fail for each test. No code-under-test oracles.\n\nFixtures:\n  Commit all PKITS DER certificates and CRLs under pkix-path/tests/pkits/certs/ and pkix-path/tests/pkits/crls/. Record the SHA-256 of the PKITS ZIP in a README in that directory for reproducibility.\n\nTest infrastructure:\n  A pkits_chain!() macro or helper function that takes PKITS cert filenames (as used in the PKITS document), loads the DER, parses, constructs the chain in the right order, and runs validate_path against the PKITS trust anchor. Returns Result so expected-fail tests can assert on the error variant.\n\nv0.1 test sections (all must be green):\n  \u00a74.1  Signature Verification (4.1.1\u20134.1.6) \u2014 basic happy paths\n  \u00a74.2  Validity Period (4.2.1\u20134.2.8) \u2014 expired, not-yet-valid, edge cases\n  \u00a74.3  Verifying Data Signed by a CA (4.3.1\u20134.3.2) \u2014 BasicConstraints\n  \u00a74.6  Verifying Basic Constraints (4.6.1\u20134.6.20) \u2014 cA, pathLenConstraint\n  \u00a74.7  Key Usage (4.7.1\u20134.7.3) \u2014 keyCertSign\n\nSkipped sections (document as expected-skip, not expected-fail):\n  \u00a74.8  Certificate Policies \u2014 not implemented in v0.1\n  \u00a74.10 Name Constraints \u2014 not implemented in v0.1\n  \u00a74.11 Private Certificate Extensions \u2014 not applicable\n  \u00a74.13 Delta CRLs \u2014 not applicable for v0.1\n\nSub-issues to create:\n1. Obtain and commit PKITS DER fixtures\n2. PKITS test helper infrastructure (chain loader, trust anchor, assertion helpers)\n3. \u00a74.1 Signature Verification tests\n4. \u00a74.2 Validity Period tests\n5. \u00a74.3 + \u00a74.6 BasicConstraints tests\n6. \u00a74.7 Key Usage tests\n7. Document skipped sections in pkix-path rustdoc Limitations\n\nAcceptance: all v0.1 PKITS sections green, skipped sections documented.",
+  "ephemeral": 0,
+  "id": "PKIX-qkl",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: PKITS integration test suite",
+  "updated_at": "2026-05-02T07:24:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:50:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ehn",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:50:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:23:47Z",
+  "compaction_level": 0,
+  "content_hash": "286015fc88d0e9a10bd61c55fc71caa04439eb616e35c61bad505eb78264c30b",
+  "created_at": "2026-05-06T20:16:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:236-239 \u2014 In the dfs inner loop, spki_der_bytes is called once for the candidate (line 236), but the path-membership check then calls spki_der_bytes again for every cert already in the path (line 238). For a path of depth D, a single dfs frame performs D+1 SPKI DER encodings per pool candidate. Fix: encode the already-in-path SPKIs lazily and cache them, or compare the SubjectPublicKeyInfoOwned directly (it implements PartialEq) without DER roundtrip.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "spki_der_bytes in path-builder re-encodes candidate SPKI on every path comparison",
+  "updated_at": "2026-05-06T20:23:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:16:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8b171ea3f32b494386efda11f3e2212920291f51b2f1927ad103bef5079ac767",
+  "created_at": "2026-05-11T04:47:11Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-ng0x decomposition, child 2 of 5. Once an AC is parsed, the next\nlayer is identifying which public-key cert holder the AC refers to.\nRFC 5755 \u00a74.2.2 defines three Holder identification mechanisms, each\nneeding its own binding logic.\n\n## What\n\n1. Public API on `AttributeCertificate`:\n   - `fn holder_kind(&self) -> HolderKind` returning one of\n     `BaseCertificateId`, `EntityName`, `ObjectDigestInfo`.\n   - `fn binds_to(&self, pkc: &x509_cert::Certificate) -> Result<(), AcError>`\n     that returns Ok when the AC binds to the supplied PKC.\n2. Binding logic per Holder shape:\n   - **baseCertificateID**: AC.holder.baseCertificateID.{issuer, serial}\n     must equal the PKC.tbsCertificate.{issuer, serialNumber}. Issuer\n     comparison must follow RFC 4518 DN comparison (already a project\n     constraint) so cannot be byte-equal.\n   - **entityName**: AC.holder.entityName.GeneralNames must contain a\n     name that matches a GeneralName in the PKC subjectAltName or the\n     PKC subject DN. Document the exact match semantics chosen and back\n     them with RFC 5755 \u00a74.2.2 paragraph references.\n   - **objectDigestInfo**: hash the PKC public-key, full PKC, or other\n     \"object\" per the AC.holder.objectDigestInfo.digestedObjectType\n     and compare to the stored digest.\n3. Errors: distinct `AcError` variants per binding failure mode so\n   callers can distinguish \"wrong serial\" vs \"name mismatch\".\n\n## Tests\n\n- [ ] One fixture per Holder shape, with two test cases each:\n      matching PKC succeeds, mismatched PKC fails with the right\n      error variant.\n- [ ] Independent oracle for objectDigestInfo: hash computed via\n      openssl `dgst -sha256` against the input PKC pubkey DER,\n      compared byte-equal.\n- [ ] DN comparison must use the project canonical helper (not naive\n      byte-equality).\n\n## Depends on\n\nPKIX-ng0x.1 (AC ASN.1 parser must exist first).\n\n## Acceptance\n\n- [ ] Three binding variants tested.\n- [ ] DN comparison goes through the RFC 4518 helper.\n- [ ] objectDigestInfo digest matches openssl-computed oracle.",
+  "ephemeral": 0,
+  "id": "PKIX-ng0x.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-ac: RFC 5755 \u00a74.2.2 Holder identification + binding check",
+  "updated_at": "2026-05-11T04:47:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:47:10Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:48:01Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

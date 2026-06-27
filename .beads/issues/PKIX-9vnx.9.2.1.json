@@ -1,0 +1,32 @@
+{
+  "close_reason": "All acceptance criteria met. Items 1+2+5 (Lint impls, spec_section_id, per-lint tests) were satisfied by PKIX-9vnx.9.2.1.1 (closed 2026-05-13, shipped 8 RFC-conformance Lint impls in pkix-lint 0.9.0 across rfc5280, rfc6125, rfc8398, rfc8551 modules). Items 3+4 (BasicTlsProfile::lints() / BasicSmimeProfile::lints() returning the new lints) are now satisfied by commit 472d27b4 in PKIX-9vnx.9.2: BasicTlsProfile::impl LintProfile bundles 6 lints (Rfc6125TlsServerSanLint, Rfc5280EkuServerAuthLint, Rfc5280BasicConstraintsCaLeafLint, Rfc5280SanRequiredWhenSubjectEmptyLint, Rfc5280SignatureAlgorithmMatchLint, Rfc5280MaxSerialLengthLint); BasicSmimeProfile::impl LintProfile bundles 5 lints (Rfc8398SmimeSanLint, Rfc8551EkuEmailProtectionLint, Rfc8398SmimeMailboxEquivalenceLint, Rfc5280SignatureAlgorithmMatchLint, Rfc5280MaxSerialLengthLint). CHANGELOG entry covering both impls also landed in commit 472d27b4.",
+  "closed_at": "2026-05-13T19:10:51Z",
+  "compaction_level": 0,
+  "content_hash": "13b9994a3ff473edfb1c2c350b850a95b34f305603119674ef3b728adf67680c",
+  "created_at": "2026-05-13T00:10:31Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\npkix-lint currently ships exactly one RFC-conformance lint: `Rfc5280MaxSerialLengthLint`. Once PKIX-9vnx.9.2 implements LintProfile on BasicTlsProfile and BasicSmimeProfile in pkix-profiles, their `lints()` methods would return near-empty Vecs (just the serial-length lint). The resulting `check_basic_tls_shape()` and `check_basic_smime_shape()` would be near-no-op shape-checks -- they'd technically work but wouldn't catch much.\n\nThis bead tracks the missing RFC-conformance lints that need to land in pkix-lint to make the BasicTlsProfile / BasicSmimeProfile shape-checks substantive.\n\n## Candidate lints\n\n### For BasicTlsProfile (RFC 5280 + RFC 6125 baseline for TLS server certs)\n\n- RFC 6125 \u00a76.4.1: leaf MUST have subjectAltName extension with at least one dNSName or iPAddress\n- RFC 5280 \u00a74.2.1.12 + RFC 6125 \u00a76.4: leaf MUST assert id-kp-serverAuth in ExtendedKeyUsage\n- RFC 5280 \u00a74.2.1.6: SAN must be present when subject is empty SEQUENCE\n- RFC 5280 \u00a74.2.1.9: subscriber cert MUST NOT have BasicConstraints.cA=TRUE\n- RFC 5280 \u00a74.1: signatureAlgorithm in TBSCertificate matches signatureAlgorithm in outer Certificate\n\n### For BasicSmimeProfile (RFC 8551 \u00a73 baseline + RFC 5280/8398 for S/MIME)\n\n- RFC 8398: leaf MUST have subjectAltName extension with at least one rfc822Name or SmtpUTF8Mailbox otherName\n- RFC 5280 \u00a74.2.1.12 + RFC 8551 \u00a73.3: leaf MUST assert id-kp-emailProtection in ExtendedKeyUsage\n- RFC 8398 \u00a73: if rfc822Name and SmtpUTF8Mailbox both present for same mailbox, they MUST be equivalent\n- (others as discovered during impl)\n\n### Out of scope for this bead\n\n- CA/B Forum-specific lints (those live in pkix-lint-cabf; not RFC-conformance)\n- Lints that already exist in pkix-lint-cabf for WebPkiProfile / SmimeProfile / CodeSigningProfile (CABF-side shape checks reference pkix-lint-cabf, not pkix-lint)\n- Path-level lints (BasicConstraints chain depth, etc.) -- these are validation concerns, not shape-check concerns\n\n## Acceptance\n\n- [ ] At least one new RFC-conformance Lint impl per candidate above\n- [ ] Each Lint has spec_section_id citing its RFC + section\n- [ ] BasicTlsProfile::lints() returns these RFC-conformance lints\n- [ ] BasicSmimeProfile::lints() returns its RFC-conformance lints (subset overlapping with BasicTlsProfile + S/MIME-specific)\n- [ ] Per-lint tests covering pass + fail cases against known cert fixtures\n- [ ] CHANGELOG entry in pkix-lint\n\n## Cross-references\n\n- PKIX-9vnx.9.2 (parent: convenience aliases that need these lints to be substantive)\n- pkix-lint/src/rfc5280.rs (existing Rfc5280MaxSerialLengthLint -- the pattern to follow)\n- specs/rfc6125.txt (newly added 2026-05-12; needed for dNSName SAN binding)\n- specs/rfc8398.txt (newly added 2026-05-12; needed for rfc822Name SAN handling)\n- specs/rfc8551.txt (newly added 2026-05-12; needed for emailProtection EKU baseline)",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.9.2.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13] PKIX-9vnx.9.2.1.1 closed: 8-of-8 RFC-conformance Lint impls now ship in pkix-lint 0.9.0 (rfc5280, rfc6125, rfc8398, rfc8551 modules). That satisfies acceptance items 1, 2, and 5 ('one new Lint impl per candidate', 'each Lint has spec_section_id', 'per-lint tests'). Acceptance items 3 and 4 (BasicTlsProfile::lints() / BasicSmimeProfile::lints() returning the new lints) remain unmet \u2014 those changes live in pkix-profiles and are already in scope under the grandparent PKIX-9vnx.9.2 ('Preconditions: Profile types must implement pkix_lint::LintProfile'). Leaving this bead OPEN until profile-wiring lands; closing PKIX-9vnx.9.2.1.1 alone does not satisfy this bead's full acceptance.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add RFC-conformance lints to pkix-lint so BasicTlsProfile/BasicSmimeProfile shape-checks are substantive",
+  "updated_at": "2026-05-13T19:10:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T17:10:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.9.2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

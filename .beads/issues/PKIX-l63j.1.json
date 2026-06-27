@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T20:57:45Z",
+  "compaction_level": 0,
+  "content_hash": "a30da7ddc179f7c9b295b4d978f6672a3ab3aa7c74a45bbc001b8613498093a5",
+  "created_at": "2026-05-08T20:49:04Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSubset of PKIX-l63j epic. The lowest-risk, no-new-deps step toward RFC 4518 DN normalization.\n\nCurrently `pkix-path/src/lib.rs` `any_to_str_bytes` returns `None` for BMPString/UniversalString/TeletexString tags, falling back to raw DER byte equality in `ava_values_match`. Two certs that encode the same logical string with different DER tags (e.g. UTF8String 'Foo Co' vs BMPString 'Foo Co' as UCS-2) compare unequal even though they represent the same Unicode codepoints.\n\nInvestigation findings (PKIX-l63j parent task subagent):\n- `der` 0.7.10 already provides `der::asn1::BmpString` with a `chars()` iterator. No new deps needed.\n- `der` 0.7.10 does NOT recognise UniversalString (tag 0x1C is absent from `Tag::try_from`). Certs with UniversalString AVAs already fail `Certificate::from_der` upstream and never reach `ava_values_match`. UniversalString handling is therefore parser-rejected and need not be implemented in this child.\n- TeletexString is already partially handled (treated as ASCII / Latin-1 by existing `any_to_str_bytes` callers); RFC 4518 \u00a71.6 says T.61 transcoding is implementation-defined. Out of scope for this child; covered by separate child.\n- Zero existing PKITS or in-tree fixtures use BMPString DN AVAs. New synthetic fixtures must be generated via OpenSSL or pyca/cryptography.\n\n## What\n\n1. Refactor `NormalizedIter` from `Iterator<Item = u8>` to `Iterator<Item = char>`. ASCII-only inputs behave identically (case-fold via `char::to_ascii_lowercase`, whitespace collapse via `ch == ' '`).\n2. Replace `fn any_to_str_bytes(a: &der::Any) -> Option<&[u8]>` with `fn any_to_chars(a: &der::Any) -> Option<impl Iterator<Item = char>>` (or equivalent shape that fits the call site). Dispatch:\n   - `Utf8String`: `str::from_utf8(.value()).ok().map(str::chars)`\n   - `PrintableString`/`Ia5String`/`VisibleString`: ASCII subset; map bytes to char\n   - `BmpString`: decode via `der::asn1::BmpString` and call `chars()`. Reject odd-length content (malformed UCS-2) by returning `None` (fail-closed; existing pattern for malformed strings).\n3. Update `ava_values_match` and `normalized_eq` to consume `char` iterators.\n4. Update the existing 8 unit tests at `tests_normalized_iter` to construct `char` iterators (the public API doesn't change shape, the internal fn signatures do).\n5. Add new tests:\n   - BMPString-encoded 'Foo Co' compares equal to UTF8String 'Foo Co' (positive).\n   - BMPString-encoded 'foo co' compares equal to UTF8String 'Foo Co' under case folding (positive, ASCII case fold).\n   - BMPString-encoded 'Bar Co' compares unequal to UTF8String 'Foo Co' (negative).\n   - Synthetic test fixture: build two `Name` values via x509-cert constructors, one with PrintableString CN and one with BMPString CN, both 'TestCA'; assert `names_match` returns true.\n6. Update doc comments at `lib.rs:22-31` and `lib.rs:144-149` to reflect what's now supported (BMPString same-Unicode-codepoints) vs what remains a limitation (no NFKC, no full RFC 4518 prep, UniversalString parser-rejected).\n\n## Acceptance\n\n- [ ] BMPString-encoded same-Unicode CN matches UTF8String CN under existing case-fold + whitespace rules\n- [ ] All existing PKITS DN tests still pass (ASCII-only behaviour unchanged)\n- [ ] no_std preserved, no new dependencies\n- [ ] Limitation docs updated to reflect new state\n- [ ] Synthetic BMPString test fixture committed (in-process construction via x509-cert types, no openssl shell-out)\n\n## Out of scope (covered by sibling children of PKIX-l63j)\n\n- Unicode NFKC / case-fold for non-ASCII characters\n- Full RFC 4518 6-step prep pipeline\n- TeletexString policy decision\n- UniversalString (parser-rejected; document only)\n- Foreign-language DN test corpus expansion (separate child)",
+  "ephemeral": 0,
+  "id": "PKIX-l63j.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: BMPString transcoding + char-based NormalizedIter (no NFKC)",
+  "updated_at": "2026-05-08T20:57:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T13:49:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-14T03:12:40Z",
+  "id": "019e2478-da19-7bfc-8dc1-86ef0d56d38f",
+  "issue_id": "PKIX-a1yc",
+  "text": "Released by manual sweep on 2026-05-13 after bd-spin deadlock cleanup; partial commits (if any) are on origin \u2014 inspect git log before re-claiming"
+}

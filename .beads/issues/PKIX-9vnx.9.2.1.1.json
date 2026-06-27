@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:54:43Z",
+  "compaction_level": 0,
+  "content_hash": "077ba76b11e9da4c41aad135a7928113c4bdb3ac8ad84b41a44116572a988a72",
+  "created_at": "2026-05-13T02:29:57Z",
+  "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "description": "## What\n\nThree RFC-conformance lints deferred from PKIX-9vnx.9.2.1 (which shipped the first 5 of the 8 candidate lints in pkix-lint 0.7.0, 2026-05-12). These three need more substantive implementation work than the straightforward extension-presence / EKU-membership pattern used for the first batch.\n\n## Lints\n\n### 1. `rfc5280::Rfc5280SanRequiredWhenSubjectEmptyLint`\n\nRFC 5280 \u00a74.2.1.6:\n\n> If the subject field contains an empty sequence, then the issuing CA\n> MUST include a subjectAltName extension that is marked as critical.\n\nImplementation notes:\n- Need to detect \"empty subject\" \u2014 the Subject is a `Name ::= CHOICE { rdnSequence RDNSequence }` where `RDNSequence ::= SEQUENCE OF RelativeDistinguishedName`. Empty means the RDNSequence has zero entries.\n- When empty: SAN MUST be present AND marked critical.\n- When non-empty: SAN may be absent.\n\nx509-cert `tbs_certificate.subject` is a `Name` type; emptiness check is `cert.tbs_certificate.subject.0.is_empty()`.\n\nNegative-test fixture: would need a cert with empty subject + missing-or-non-critical SAN. Likely needs new fixture generation via pyca/cryptography. Out of scope: actually generating that fixture; the lint impl is shippable now, fixture can come later.\n\n### 2. `rfc5280::Rfc5280SignatureAlgorithmMatchLint`\n\nRFC 5280 \u00a74.1.1.2 + \u00a74.1.2.3:\n\n> This field [`signatureAlgorithm` in Certificate] MUST contain the same\n> algorithm identifier as the signature field in the sequence\n> tbsCertificate.\n\nImplementation notes:\n- Compare `cert.signature_algorithm` (the outer Certificate's algorithm) to `cert.tbs_certificate.signature` (the TBS's algorithm).\n- Both are `AlgorithmIdentifier` structs from x509-cert/spki. Need to compare both the OID and the optional parameters (handle the NULL vs absent ambiguity for RSA-with-* signatures: RFC 4055 \u00a72.1 says params SHOULD be NULL for RSA-PKCS1 sigs; some implementations omit them entirely; both are commonly accepted).\n- This is a relatively rare bug-class in well-behaved cert issuance but is a real RFC requirement, surfaces malformed certs.\n\nNegative-test fixture: need a cert where the outer and inner algorithm identifiers disagree. Not present in existing fixtures; likely needs custom DER-level synthesis (since pyca/openssl wouldn't normally produce such a cert). Fixture-generation is harder than the lint impl itself.\n\n### 3. `rfc8398::Rfc8398SmimeMailboxEquivalenceLint`\n\nRFC 8398 \u00a73 (last paragraph):\n\n> If both rfc822Name and SmtpUTF8Mailbox are present in the\n> subjectAltName extension, then the address values MUST be identical\n> with the following exception: any internationalized parts of the\n> email address (such as those rendered using A-labels) MUST be encoded\n> per the SmtpUTF8Mailbox specification.\n\nImplementation notes:\n- Iterate SAN; collect all rfc822Name entries and all id-on-SmtpUTF8Mailbox otherName entries.\n- For each pair: check equivalence under the rule above. The \"internationalized parts encoded per SmtpUTF8Mailbox\" clause means the local-part is UTF-8 in SmtpUTF8Mailbox and A-label-or-ASCII-only in rfc822Name; the domain may differ only by U-label/A-label encoding.\n- Requires the `idna` crate (workspace dep) to canonicalize A-labels and U-labels.\n\nNegative-test fixture: need a cert with both rfc822Name AND SmtpUTF8Mailbox SANs that disagree. Likely custom-generated via pyca/cryptography.\n\n## Why deferred\n\nThe first 5 lints from PKIX-9vnx.9.2.1 all follow the same pattern: \"extension X must be present, extension X must contain element Y\". Mechanical. The 3 deferred lints each require additional logic (empty-subject detection, AlgorithmIdentifier equivalence with parameter quirks, IDN-aware UTF-8 equivalence) that adds enough complexity that they want their own commits + fixtures.\n\nPKIX-9vnx.9.2.1 has been kept open (rather than closed) until these three lints land, satisfying its strict \"at least one new RFC-conformance Lint impl per candidate above\" acceptance criterion.\n\n## Out of scope\n\n- Fixture generation for any negative test. The lint impls can ship with positive tests only against existing fixtures; negative fixtures land when generated. File a follow-on fixture-generation bead if blocking.\n- New `IdentityError`-style error wrapping in pkix-chain \u2014 these lints feed `LintResult::Error` only.\n\n## Acceptance\n\n- [ ] All 3 lints land as `pub struct` + `impl Lint` in their respective `rfc5280` / `rfc8398` modules.\n- [ ] Each carries `spec_section_id` + `spec_url`.\n- [ ] At least one passing test per lint (positive case against existing fixtures).\n- [ ] Negative cases either tested against new fixtures OR documented as \"fixture-gen needed; positive tests only for now\".\n- [ ] CHANGELOG entry under `pkix-lint`.\n- [ ] PKIX-9vnx.9.2.1 closed once this child closes (its 8-candidate acceptance now met).\n\n## Cross-references\n\n- PKIX-9vnx.9.2.1 (parent \u2014 5 of 8 lints shipped)\n- PKIX-9vnx.9.2 (grandparent \u2014 convenience aliases that consume these lints)\n- pkix-lint/src/rfc5280.rs (existing pattern)\n- specs/rfc5280.txt \u00a74.2.1.6, \u00a74.1.1.2, \u00a74.1.2.3\n- specs/rfc8398.txt \u00a73 (last paragraph)\n",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.9.2.1.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add 3 deferred RFC-conformance lints (sig-alg match, SAN-when-subject-empty, rfc822/SmtpUTF8 equivalence)",
+  "updated_at": "2026-05-13T02:54:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T19:29:57Z",
+      "created_by": "bd-spin/bd-spin-20260513T014512Z-2345176",
+      "depends_on_id": "PKIX-9vnx.9.2.1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

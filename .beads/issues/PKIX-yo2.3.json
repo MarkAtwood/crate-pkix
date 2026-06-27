@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:43Z",
+  "compaction_level": 0,
+  "content_hash": "910e68e40f3f42d756f4afaaaf27d145e016378fef8bd032592c057b38c4d4f4",
+  "created_at": "2026-05-02T20:34:15Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-chain-simple/src/lib.rs, the check_algorithm function comment says 'returns Error::Path(SignatureInvalid) for that case' when referring to the RFC 5280 \u00a74.1.1.2 outer/inner OID consistency check. The actual error returned by check_oid_consistency (in validate_path) is Error::MalformedCertificate { index }, not Error::SignatureInvalid. A maintainer reading this comment will look for the wrong error variant when debugging OID-mismatch failures.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.3",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_algorithm comment wrong error type: says SignatureInvalid, actual is MalformedCertificate",
+  "updated_at": "2026-05-02T20:36:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

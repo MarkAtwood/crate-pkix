@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.22",
+  "title": "pkix-chain-simple Error missing serde feature",
+  "description": "pkix-chain-simple::Error derives `Clone, Debug, PartialEq, Eq` but has no `serde` Cargo feature and no `#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]`. Its sibling pkix-chain::Error (which serves the same role for the full-featured verifier) has serde support behind a feature flag.\n\nAGENTS.md non-negotiable #6 states that public result/error types 'SHOULD support serde::Serialize + Deserialize behind a serde feature flag.' pkix-chain-simple::Error wraps pkix_path::Error (which has serde) but the wrapper itself does not.\n\nImpact: callers using pkix-chain-simple who want to cache or serialize verification failures hit a wall when trying to serde-roundtrip pkix_chain_simple::Error. The Error wraps pkix_path::Error (which IS serde-able), but the outer enum is not.\n\nAlso missing: Send + Sync compile-time assertion. Every other substantive crate in the validation stack (pkix-path, pkix-revocation, pkix-chain, pkix-aia, pkix-truststore, pkix-lint) has a `const _: fn() = || { fn _assert_send_sync<T: Send + Sync>() {} ... }` block. pkix-chain-simple does not.\n\nLocations: /home/mark/PROJECT/PKIX/pkix-chain-simple/Cargo.toml (no serde feature), /home/mark/PROJECT/PKIX/pkix-chain-simple/src/lib.rs line 268-270 (Error derives)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:58Z",
+  "updated_at": "2026-06-15T17:03:44Z",
+  "closed_at": "2026-06-15T17:03:44Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:57"
+    }
+  ]
+}

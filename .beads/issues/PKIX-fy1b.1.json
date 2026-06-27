@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:47:51Z",
+  "compaction_level": 0,
+  "content_hash": "44a5f972c432e8381b196d03f5a04cf27b114bb2b2c65d55fefa2a48d11d55ad",
+  "created_at": "2026-05-07T04:36:00Z",
+  "created_by": "Mark Atwood",
+  "description": "In ocsp.rs:check_revocation() the step-0 issuer-name guard (lines 98-103) returns Err(Error::OcspCertIdMismatch) when the issuer subject doesn't match cert.issuer, which is correct. However the error code conflates two distinct failure modes: (a) the supplied issuer cert is wrong for this cert vs (b) the CertID hashes don't match. Callers cannot distinguish 'wrong issuer cert passed' from 'CertID hash mismatch' since both return OcspCertIdMismatch. This is a mild correctness concern (wrong diagnostic) but could mask misuse \u2014 the doc comment at step (0) says 'Defense-in-depth' but returning OcspCertIdMismatch for a non-CertID failure makes the error semantics misleading. Severity: P2 (API design / diagnostic).",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspResponderIdMismatch returned instead of OcspCertIdMismatch for issuer mismatch in check_revocation",
+  "updated_at": "2026-05-07T04:47:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

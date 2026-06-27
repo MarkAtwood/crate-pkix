@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:36:11Z",
+  "compaction_level": 0,
+  "content_hash": "fc5ef6216b35c219d3067f9c37af2ef2e178e439ac08a53fabdc3b44a89805d1",
+  "created_at": "2026-05-06T23:34:32Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs lines 1138, 1152: use String::new() instead of \"\".to_string() in test struct literal construction.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "refactor: replace \"\".to_string() with String::new() in test helpers",
+  "updated_at": "2026-05-06T23:36:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:34:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

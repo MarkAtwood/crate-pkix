@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T05:05:48Z",
+  "compaction_level": 0,
+  "content_hash": "c862df204559712354639d810d9269ba4f5006b5af05caf997cf7dc5c1d36bda",
+  "created_at": "2026-05-07T05:04:19Z",
+  "created_by": "Mark Atwood",
+  "description": "In pkix-revocation/src/lib.rs:126-128, the DeltaCrlBaseMismatch doc comment says: 'A delta CRL was supplied but no base CRL is available, or the delta\\'s BaseCRLNumber does not match the base CRL\\'s CRLNumber.' The last clause ('does not match the base CRL\\'s CRLNumber') is incorrect \u2014 that case returns CrlNumberMismatch (when delta_base_num > base_num at line 189). DeltaCrlBaseMismatch is returned for: (1) base CRL is itself a delta, (2) delta has no deltaCRLIndicator OID, (3) issuer DN mismatch, (4) unreachable invariant. The doc should describe those actual cases. No code change needed; doc fix only.",
+  "ephemeral": 0,
+  "id": "PKIX-7dop",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeltaCrlBaseMismatch doc: 'does not match' case is wrong variant",
+  "updated_at": "2026-05-07T05:05:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T22:04:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kimp",
+      "metadata": {},
+      "type": "discovered-from"
+    }
+  ]
+}

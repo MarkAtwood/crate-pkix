@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.12: variant removed entirely, doc moot",
+  "closed_at": "2026-06-15T18:30:21Z",
+  "compaction_level": 0,
+  "content_hash": "67acc8190d3c521dbfbbf19b3ff90c11e49ec68093b5c2190815cc592727b562",
+  "created_at": "2026-05-14T19:13:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: a user reads the published rustdoc for pkix-identity 0.x and sees:\n\n  /// Functionality scaffolded but not yet implemented. Currently still\n  /// returned by [`MailboxName::parse`] and [`verify_mailbox`].\n  /// Tracked by PKIX-fmtv.12.\n  NotYetImplemented,\n\n(pkix-identity/src/lib.rs:344-347)\n\nBut MailboxName::parse and verify_mailbox are both fully implemented as of 593d06bb and never return NotYetImplemented. The 'Currently still returned by' sentence is stale.\n\nConsequence: users will report 'docs say mailbox isn't implemented, but it works for me' confusion bugs, or worse, will skip the crate thinking it's incomplete. This is exactly the 'repeating class of issue reports from users who did nothing wrong' the maintainer-burden checklist warns about.\n\nFix: update the doc comment to reflect that NotYetImplemented is retained as a non-removed variant for future scaffold-then-fill workflows but is currently unused by any shipped entry point. (The module-level doc at lines 64-72 says this correctly; only the per-variant doc is stale.)",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rustdoc on IdentityError::NotYetImplemented misstates current state",
+  "updated_at": "2026-06-15T18:30:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

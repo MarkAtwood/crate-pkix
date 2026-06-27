@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:21Z",
+  "compaction_level": 0,
+  "content_hash": "972a91234561ea873b61cd4d1f9ed8147118af5849dbda900cb22ac79ffc3564",
+  "created_at": "2026-05-06T23:16:57Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 330-331: TryLater (3), InternalError (2), MalformedRequest (1), SigRequired (5), and Unauthorized (6) all return Err(OcspStatusUnknown). This is semantically incorrect: TryLater means 'retry later', not 'this cert is in an unknown revocation state'. InternalError/MalformedRequest are server-side failures. Callers who receive OcspStatusUnknown cannot distinguish between 'the server said try again' and 'the server actively reported the certificate status as unknown'. This affects retry logic and logging. The correct design is either (a) return a new OcspResponseError variant carrying the OcspResponseStatus, or (b) at minimum use OcspMalformed for the error-status codes and reserve OcspStatusUnknown for the cases where the server actually provided a status-unknown SingleResponse. Suggested fix: return Err(Error::OcspMalformed) for non-Successful response statuses (parallel to how parse/structural failures are reported), or add OcspResponderError(OcspResponseStatus) as a new Error variant.",
+  "ephemeral": 0,
+  "id": "PKIX-cb6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: OCSP non-Successful status codes mapped to OcspStatusUnknown",
+  "updated_at": "2026-05-06T23:47:21Z"
+}

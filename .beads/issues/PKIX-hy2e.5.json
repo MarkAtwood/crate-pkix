@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d949ccc8690295d235d550557cf753764facf7a54bb6fbd3cc08eeafa03ba861",
+  "created_at": "2026-05-14T12:40:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: lib.rs:1115-1130. Code intent: O(1) by-id lookup via HashMap. Actual code: HashMap<&'static str, Option<Box<dyn Lint>>>, then by_id.keys().copied().find(|k| *k == id.as_str()) for each id in the input slice. This is O(n) per lookup, O(n*m) overall (n = registered lints, m = requested ids). The HashMap itself is never used as a hashmap. The comment explains 'lifetime juggling \u2014 by_id keys are &static str but id is a runtime String, so we lift the lookup through the borrow' \u2014 but the fix is simply by_id.get(id.as_str()): &str implements Borrow<str> for HashMap<&'static str, _> lookup, so id.as_str() (&str) is a valid key against keys that are &'static str. The current code is over-careful and slow. Filter_to_ids on the typical OSCAL Catalog round-trip is fine at today's lint counts (~10-50), but becomes meaningful when pkix-policy-zlint lands and runs against ~700 zlint lints.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner::filter_to_ids does O(n) linear scan inside HashMap lookup, defeating the HashMap",
+  "updated_at": "2026-05-14T12:40:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Shipped option (c) in commit. Updated Display message on Error::NoCertificates to mention the absent BEGIN CERTIFICATE marker; updated the variant rustdoc to document the three-way ambiguity (truly empty / whitespace-only / non-PEM garbage) that from_pem cannot distinguish at the boundary check.",
+  "closed_at": "2026-05-14T08:11:56Z",
+  "compaction_level": 0,
+  "content_hash": "97bfa43e6369bf8577c94b08313414eeb88a8b648cb76c345a9e669b18b25ca0",
+  "created_at": "2026-05-14T04:58:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:324-329: the empty-input guard short-circuits on absence of '-----BEGIN CERTIFICATE-----' window and returns Error::NoCertificates.\n\nTrigger: caller passes arbitrary non-PEM bytes \u2014 a JPEG, a JSON config file someone mis-pointed at, an HTML 404 page from a misconfigured fetch.\n\nActual behavior: Error::NoCertificates. The rustdoc on from_pem promises this means 'input parsed cleanly but contained zero PEM blocks' \u2014 but the input was never parsed. Caller sees 'no certificates' and reasonably assumes the file is structurally valid PEM with no certs (e.g., a key-only PEM); in reality the file is garbage.\n\nThis is a P2 diagnostic bug rather than P0/P1 because:\n - Loud parse failure would be marginally more helpful but still won't tell the caller *what* the file actually is.\n - No security impact: the caller gets an error either way.\n\nFix options:\n a) Distinguish 'truly empty input' vs 'non-empty input with no BEGIN boundary' \u2014 return a new Error::NotPemFormat for the second case.\n b) Tighten the rustdoc to say 'no BEGIN CERTIFICATE marker was found' instead of 'input parsed cleanly but contained zero PEM blocks'.\n c) Accept that NoCertificates is a catch-all and add a hint in the Display message ('input contained no \"-----BEGIN CERTIFICATE-----\" marker').\n\nOption (c) is the lowest-cost real improvement: same wire form, better diagnostic, no API change.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_pem returns NoCertificates for non-PEM garbage, masking real input errors",
+  "updated_at": "2026-05-14T08:11:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:58:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

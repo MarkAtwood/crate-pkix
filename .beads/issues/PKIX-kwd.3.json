@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:13Z",
+  "compaction_level": 0,
+  "content_hash": "3230e92ac1ea8a5a65a0b5936b4426b0cc8d3794d48f3cd1ab0e296b1c760e2d",
+  "created_at": "2026-05-06T15:11:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs web_pki_policy(): The 398-day validity limit references TLS BR \u00a76.3.2 which was the current limit as of writing. CA/B Forum Ballot SC-081 (approved March 2024) reduces TLS certificate maximum validity to 47 days effective April 2027 via phased reduction (398\u2192200\u2192100\u219247 days). The current code is correct for deployed CAs today, but by April 2026 (when the first phase drops to 200 days) the 398-day limit in web_pki_policy will be too permissive. Either add a doc comment noting this is the pre-SC-081 limit, or make the validity parameterizable. Tracking this now prevents a silent security regression when SC-081 phases take effect.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "web_pki_policy 398-day limit will become stale with CA/B Forum SC-081",
+  "updated_at": "2026-05-06T15:35:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:11:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

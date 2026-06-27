@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:30:00Z",
+  "compaction_level": 0,
+  "content_hash": "bd049d9b46772e2843ccd467eade3946b8e9afe0fc2a3ac1109090e02fe57ae8",
+  "created_at": "2026-05-06T22:16:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs: check_revocation (lines 196-328) and check_revocation_against_anchor (lines 344-411) share virtually identical logic for CRL parsing, validity window check, IDP scope check, delta merge, and serial lookup. The only differences are how the issuer SPKI and name are sourced, and the cRLSign check (skipped for anchors). Suggested rewrite: extract a common inner function verify_and_check_serial(crl_der, issuer_spki, issuer_name, check_crl_sign: bool, ...) and call it from both public methods with the appropriate issuer source.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Refactoring the ~60-line shared logic requires a helper that takes (crl, crl_issuer_name, verifier, now_unix) \u2014 feasible but adds a private function with 4 parameters. Worth doing in a separate cleanup pass. Not blocking.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker: check_revocation and check_revocation_against_anchor share ~60 lines of duplicated logic",
+  "updated_at": "2026-05-06T22:30:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

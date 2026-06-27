@@ -1,0 +1,22 @@
+{
+  "close_reason": "Added # Limitations to names_match public rustdoc",
+  "closed_at": "2026-05-02T17:20:10Z",
+  "compaction_level": 0,
+  "content_hash": "a90b0518e15be397ae2985ff3e7b2de7b61ce125ddd4398d965f84ac4138e3e7",
+  "created_at": "2026-05-02T17:18:35Z",
+  "created_by": "Mark Atwood",
+  "description": "The public names_match() rustdoc does not mention that TeletexString and BMPString are not normalized \u2014 only a private helper (any_to_str_bytes) documents this. A caller reading only the public API will not discover that names_match() may return false for semantically equivalent names using legacy string types. Add to names_match() rustdoc or crate-level # Limitations: 'TeletexString and BMPString are not normalized in v0.1; name matching against these types falls back to raw DER byte comparison. Certificates from legacy PKIs using these types may fail validation.' Ref: RFC 5280 \u00a77.1.",
+  "ephemeral": 0,
+  "id": "PKIX-7n8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "names_match: document TeletexString/BMPString limitation in public rustdoc",
+  "updated_at": "2026-05-02T17:20:10Z"
+}

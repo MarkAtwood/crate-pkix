@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:57:32Z",
+  "compaction_level": 0,
+  "content_hash": "c3ef923c04155505d82fc5339eceb34955d357c3b2287a525d89e67f15674a59",
+  "created_at": "2026-05-13T05:44:53Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "PKIX-fmtv.18.6's diff against 'openssl verify -purpose timestampsign' surfaced a real divergence: OpenSSL strictly enforces RFC 3161 \u00a72.3, requiring the TSA cert's KeyUsage to contain ONLY 'digitalSignature' and/or 'nonRepudiation'. Other bits (keyEncipherment, keyAgreement, etc.) trigger 'unsuitable certificate purpose' rejection.\n\npkix-chain's verify_time_stamper does NOT check KU shape \u2014 only EKU presence, criticality, and sole-EKU. The fixture 'leaf-timestamping.der' (authored by pyca's gen.py for the smoke surface) carries digitalSignature+keyEncipherment in KU, validates under verify_time_stamper, and fails 'openssl verify -purpose timestampsign'.\n\nTwo parts to address:\n\n(1) **Strengthen verify_time_stamper or BasicTimeStampingProfile** to enforce RFC 3161 \u00a72.3: TSA cert KU MUST be limited to digitalSignature and/or nonRepudiation. Surface as Error::ProfileViolation. Pkix-path may not have a 'forbidden KU bit' check today; if not, the wrapper layer is the right place.\n\n(2) **Regenerate leaf-timestamping.der** to comply with RFC 3161 \u00a72.3 KU shape (drop keyEncipherment). Update gen.py to produce TSA fixtures with the correct KU. Once shipped, the pkix-difftest baseline-verify-openssl.md row 'happy_path_rfc3161_ku_violation' flips to Agree, the known_divergence flag is removed, and the bead is closed.\n\nAcceptance:\n- verify_time_stamper rejects leaf-timestamping.der under BasicTimeStampingProfile due to KU shape (after fixture-update or instead of). Test added under pkix-chain/tests/verify_time_stamper.rs.\n- baseline-verify-openssl.md timestamp section shows 4/4 agree, 0 known divergence.",
+  "ephemeral": 0,
+  "id": "PKIX-7cac",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_time_stamper should enforce RFC 3161 \u00a72.3 KeyUsage shape",
+  "updated_at": "2026-05-13T05:57:32Z"
+}

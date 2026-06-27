@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "031b32dec377fe1465cfd327bd98de7393a102089cfdfd5c6802a2c9c4bb9ebe",
+  "created_at": "2026-05-14T17:48:34Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/sct.rs:69-72\n\n```rust\n/// CT extensions byte string. Usually empty in deployed v1 SCTs (no\n/// extensions are currently defined by RFC 6962); preserved verbatim\n/// for forward compatibility and inclusion in the signed structure.\npub extensions: Vec<u8>,\n```\n\nThe doc says extensions are preserved verbatim for forward\ncompatibility. Two unstated contract questions:\n\n1. What is the upper bound on `extensions.len()`? RFC 6962 \u00a73.2\n   defines `CtExtensions: opaque<0..2^16-1>`, so 65535 bytes max.\n   The parser enforces this implicitly (the u16 length prefix\n   can't exceed 65535) but the doc doesn't mention the limit.\n\n2. What should a caller DO if extensions is non-empty? Today no\n   extensions are defined by RFC 6962, so any non-empty extensions\n   field is either future-spec or noise. The doc gives no guidance.\n   A caller writing a defensive check (\"reject non-empty\n   extensions\") has no contract to rely on.\n\n3. Are the bytes guaranteed to be a well-formed `CtExtensions`\n   wire encoding? RFC 6962 just says it's an opaque vector; the\n   contents are TBD for future versions. The parser does not\n   structurally validate.\n\nRecommendation: extend the doc:\n\n```rust\n/// CT extensions byte string. RFC 6962 \u00a73.2 defines no extensions\n/// for v1; in practice this field is empty on every deployed CT\n/// log's SCTs. RFC 9162 may define extensions for v2.\n///\n/// The wire-format upper bound is 65535 bytes (u16 length prefix);\n/// values exceeding that are rejected at parse time as\n/// `Error::TruncatedOrTrailing`.\n///\n/// The bytes are preserved verbatim for inclusion in the signed\n/// structure that the verifier reconstructs. The crate does not\n/// structurally validate the contents.\n///\n/// A caller wanting to reject non-empty extensions for forward-\n/// compatibility safety can check `sct.extensions.is_empty()`\n/// after parsing.\npub extensions: Vec<u8>,\n```\n\nPriority P4 / opinion: the existing comment is correct as far as\nit goes; this is bikeshed-adjacent. Filed for completeness because\nthe contract for \"what to do with extensions\" is part of the API\nsurface but the rustdoc punts on it.\n\nMarked `opinion` per \"labels for taste with no engineering basis\"\n\u2014 there's no specific bug, just under-specification.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.40",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SCT extensions field doc claims forward compatibility but parser preserves verbatim \u2014 caller has no guidance on validation",
+  "updated_at": "2026-05-14T17:48:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:48:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added RsaPkcs1v15Sha256Verifier behind #[cfg(feature=rsa)]; test passes with OpenSSL-generated RSA-2048 cert",
+  "closed_at": "2026-05-02T06:42:06Z",
+  "compaction_level": 0,
+  "content_hash": "e7d9c811f239befc84fc5fe2280fb5e94d49ae6d4e565f40ade03bd1183cf3e3",
+  "created_at": "2026-05-02T05:52:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement RSA-PKCS1v15 with SHA-256 as a concrete SignatureVerifier backend in pkix-path, behind the rsa feature flag.\n\nOID: sha256WithRSAEncryption = 1.2.840.113549.1.1.11\n\nImplementation:\n  - Extract RSA public key from SubjectPublicKeyInfoRef using rsa::RsaPublicKey::from_public_key_der() or spki::DecodePublicKey\n  - Construct rsa::pkcs1v15::VerifyingKey<sha2::Sha256>\n  - Verify signature bytes against message bytes (the DER TBSCertificate)\n  - Return Ok(()) on success, Err(signature::Error::new()) on failure (per corrected return type from PKIX-q13)\n\nAlso handle sha384WithRSAEncryption (1.2.840.113549.1.1.12) and sha512WithRSAEncryption (1.2.840.113549.1.1.13) for completeness \u2014 same code path with different SHA variant.\n\nTest vectors: use OpenSSL to generate RSA-signed certs and extract TBSCertificate + signature bytes. Never derive test vectors from the code under test. Commit as hex literals in the test module.\n  openssl req -newkey rsa:2048 -x509 -sha256 -days 3650 -nodes -out cert.pem\n  openssl x509 -in cert.pem -outform DER | xxd -p",
+  "ephemeral": 0,
+  "id": "PKIX-gmv",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: RSA-PKCS1v15-SHA-256 SignatureVerifier backend",
+  "updated_at": "2026-05-02T06:42:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:03:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q13",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

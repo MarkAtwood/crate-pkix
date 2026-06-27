@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:13:14Z",
+  "compaction_level": 0,
+  "content_hash": "561b1f4061b0d8c01e06cb569d77fa5bfc27eb77c951505b0ec4ecaa81d73301",
+  "created_at": "2026-05-07T16:13:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/tests/ contains: pkits_4_1_4_2.rs, pkits_4_3.rs, pkits_4_6_4_7.rs, pkits_4_13.rs, pkits_policy.rs, pkits_smoke.rs.\n\nPKITS \u00a74.13 tests NameConstraints. These test files should cover NC violation cases. However looking at the test structure, the tests use pkits_validate() which by default uses ValidationPolicy::new() with no special NC-enforcing configuration. The PKITS \u00a74.13 tests should include both valid-path (PASS) and invalid-path (FAIL) cases.\n\nWithout seeing the full content of pkits_4_13.rs, there may be adequate coverage. But anchor_nc.rs exists which covers trust anchor NC. The test coverage appears to be:\n- PKITS fixtures (binary, committed) \u2014 external oracle\n- anchor_nc.rs \u2014 tests for trust anchor NC seeding\n\nThe CRL checker and OCSP checker tests have good coverage of error paths. The chain_walk NC tests need verification.\n\nP2 \u2014 needs inspection to confirm whether PKITS \u00a74.13 negative cases are tested.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path tests: PKITS tests have no coverage for NC violations (only happy paths)",
+  "updated_at": "2026-05-07T16:13:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:13:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "acceptance_criteria": "cargo check -p pkix-path --all-features exits 0. Five new variants present in the Error enum. No existing tests broken (cargo test -p pkix-path --all-features exits 0).",
+  "assignee": "Mark Atwood",
+  "close_reason": "Five Error variants added: ValidityPeriodExceedsMax, AlgorithmNotAllowed, KeyTooSmall, MissingSan, MissingEku. Display and std::error::Error impls updated. cargo check and cargo test both exit 0.",
+  "closed_at": "2026-05-06T04:46:02Z",
+  "compaction_level": 0,
+  "content_hash": "9f3a222ca6c03bb5c8552978ca1fd13368d017c7b333d8fef7782f9c717207a4",
+  "created_at": "2026-05-06T03:41:38Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add five new variants to the `Error` enum in `pkix-path/src/lib.rs`.\n\n**Algorithm:**\n1. Open `pkix-path/src/lib.rs` and find the `Error` enum (currently 12 variants, `#[non_exhaustive]`).\n2. Add exactly these variants, in this order after the existing variants:\n   - `ValidityPeriodExceedsMax { index: usize }` \u2014 cert's (notAfter - notBefore) exceeds `max_validity_secs`\n   - `AlgorithmNotAllowed { index: usize }` \u2014 cert's signature algorithm OID is not in `allowed_signature_algs`\n   - `KeyTooSmall { index: usize }` \u2014 cert's RSA public key modulus is smaller than `min_rsa_key_bits`\n   - `MissingSan` \u2014 leaf cert has no SubjectAltName extension or SAN is empty (no `{ index }` needed; always index 0)\n   - `MissingEku` \u2014 leaf cert does not assert all required EKU OIDs (always index 0)\n3. Do NOT add `Display` impl \u2014 the existing `Error` has none, keep consistent.\n4. Rebuild (`cargo check -p pkix-path`) to confirm no compilation errors.\n\n**Defensive programming rules:**\n- Every error path returns `Err(TypedError::VariantName)` \u2014 no `unwrap()`, no `panic!()`\n- No key material in any log statement\n- No arithmetic in this bead \u2014 just enum variant definitions\n\n**Subagent instructions:**\n- Spawn one research subagent to read the current `Error` enum in `pkix-path/src/lib.rs` and confirm the exact current variants and line numbers before editing.\n- Spawn one validation subagent: after the edit, run `cargo check -p pkix-path --all-features 2>&1` and confirm exit code 0.\n\n**Tests:** None in this bead \u2014 the variants are exercised by later implementation beads.\n\n**No existing test should break** because the `Error` enum is `#[non_exhaustive]` \u2014 callers cannot exhaustively match it.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error variants: ValidityPeriodExceedsMax, AlgorithmNotAllowed, KeyTooSmall, MissingSan, MissingEku",
+  "updated_at": "2026-05-06T04:46:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:41:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "close_reason": "HttpOcspFetcher<F, V> impls pkix_revocation::RevocationChecker. check_revocation extracts HTTP/HTTPS AIA OCSP URLs, builds an OCSP request via build_ocsp_request (configurable hash_alg; default SHA-256), POSTs to each URL with Content-Type application/ocsp-request, delegates parsed response to pkix_revocation::OcspChecker. First successful path determinative; fetch + parse failures fall through; all-failed surfaces RevocationFetchFailed. with_hash_alg builder supports SHA-1 fallback. check_revocation_against_anchor stays at trait default (Ok(())) \u2014 same as OcspChecker. Tests use pyca/cryptography CA + leaves + matched good/revoked responses + closure-mock fetcher: 7 scenarios green including POST-shape regression guard and hash-alg override sanity check. Committed at 95ae103a.",
+  "closed_at": "2026-05-09T00:49:34Z",
+  "compaction_level": 0,
+  "content_hash": "f55d713903dec23680b3e85a2558f90df13bbb45b38c080c06f8b763e5a9807e",
+  "created_at": "2026-05-08T23:28:45Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nWire AIA URL extraction (PKIX-a1yc.3) + OCSP request building (PKIX-a1yc.4) + RevocationFetcher (PKIX-a1yc.1) + pkix-revocation::OcspChecker into a single RevocationChecker that POSTs OCSP queries to the responder URL extracted from the cert's AIA extension.\n\n## What\n\nReplace the placeholder `HttpOcspFetcher<F>` with a working impl:\n\n```rust\n#[cfg(feature = \"ocsp\")]\npub struct HttpOcspFetcher<F, V> {\n    fetcher: F,\n    verifier: V,\n    now_unix: u64,\n    hash_alg: OcspHashAlg, // configurable; default SHA-256\n}\n\n#[cfg(feature = \"ocsp\")]\nimpl<F: RevocationFetcher, V: SignatureVerifier + Clone> HttpOcspFetcher<F, V> {\n    pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self;\n    pub const fn with_hash_alg(self, alg: OcspHashAlg) -> Self;\n}\n\n#[cfg(feature = \"ocsp\")]\nimpl<F: RevocationFetcher, V: SignatureVerifier + Clone> RevocationChecker\n    for HttpOcspFetcher<F, V>\n{\n    fn check_revocation(&self, cert: &Certificate, issuer: &Certificate)\n        -> pkix_revocation::Result<()>;\n\n    fn check_revocation_against_anchor(...) -> ...;\n}\n```\n\n### check_revocation flow\n\n1. Extract AIA OCSP URLs from cert (via PKIX-a1yc.3 helper). If empty, return Ok(()) \u2014 no OCSP responder means no OCSP-based status; document.\n2. Build OCSP request DER bytes via PKIX-a1yc.4 helper using cert + issuer + hash_alg. On build error, surface it.\n3. For each URL in order:\n   a. `fetcher.fetch(POST, url, body=request_bytes, content_type=\"application/ocsp-request\")`. On error, continue to next URL.\n   b. Optional content-type sanity check on response (warn but accept if missing \u2014 many responders are loose).\n   c. `OcspChecker::new(response_bytes, now_unix, verifier.clone())` \u2192 if OCSPResponse status != successful or parse fails, continue to next URL.\n   d. `checker.check_revocation(cert, issuer)` \u2192 return result.\n4. If all URLs fail, surface a clear error.\n\n### check_revocation_against_anchor flow\n\nIdentical, with issuer = anchor.cert. Document and test that an OCSP response signed by the trust anchor itself is acceptable.\n\n## Acceptance\n\n- [ ] HttpOcspFetcher impls RevocationChecker (and against_anchor).\n- [ ] Empty AIA list returns Ok(()) (documented).\n- [ ] First successful POST+parse path taken.\n- [ ] Configurable hash algorithm (SHA-1 / SHA-256).\n- [ ] Tests with mock RevocationFetcher (canned response bytes) covering: cert revoked, cert good, cert unknown, fetcher all-fail, malformed response on first URL falls back to second.\n- [ ] No new pkix-revocation deps.\n\n## Out of scope\n\n- Caching (PKIX-a1yc.7).\n- Nonce verification.\n- Delegated OCSP responder cert chain validation (separate bead \u2014 for v0.x the OCSP signature must verify with the cert's issuer key directly OR with a delegated responder cert that x509-ocsp's BasicOcspResponse can pull in via certs[]; behaviour is whatever pkix-revocation::OcspChecker already does).\n- Stapled OCSP (TLS concern, out of scope for whole crate).\n\n## Effort\n\n~200 lines + tests.\n\n## Depends on\n\nPKIX-a1yc.1, PKIX-a1yc.3, PKIX-a1yc.4.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.6",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "HttpOcspFetcher<F, V>: RevocationChecker impl",
+  "updated_at": "2026-05-09T00:49:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:28:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

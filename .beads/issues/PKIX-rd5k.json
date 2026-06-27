@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:12Z",
+  "compaction_level": 0,
+  "content_hash": "9a150d286169ef5ab2f040e6e85a029f681a7650f8d40249aa63782bfff8d2e5",
+  "created_at": "2026-05-07T20:28:32Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n263 instances of `clippy::doc_markdown` warnings \u2014 doc comments that mention identifiers (struct names, field names, file basenames, OIDs as numbers) without backticks.\n\n## Examples\n\n```\npkix-lint/src/deviation.rs:1407\n    /// evidence_uri flows from Deviation through to DeviatedFinding.\n                                ^^^^^^^^^         ^^^^^^^^^^^^^^^\n\npkix-lint/tests/cabf_tls_br_tests.rs:23\n//!   int-p256.der                : P-256, CA:TRUE BasicConstraints, 10 years\n                                                   ^^^^^^^^^^^^^^^^\n\npkix-lint/tests/cabf_tls_br_tests.rs:10\n//!   2026-03-15T00:00:00Z = 1_773_532_800\n                             ^^^^^^^^^^^^^\n```\n\n## Distribution\n\nBy crate (counts of `item in documentation is missing backticks`):\n\n- pkix-lint: ~150 (deviation.rs, cabf_tls_br.rs, lib.rs, report.rs)\n- pkix-path: ~60\n- pkix-revocation: ~20\n- pkix-profiles: ~15\n- others: ~15\n\n## Fix\n\n`cargo clippy --workspace --all-features --all-targets --fix -- -W clippy::doc_markdown`\n\nThen review the diff to undo any false positives (e.g., a comment that legitimately mentions `BasicConstraints` as a concept rather than a Rust identifier).\n\n## Priority\n\nP4 \u2014 bulk doc cleanup. Rendered docs.rs output is fine; this just makes terminal `cargo doc` and IDE hover slightly nicer. Worth doing as a single cleanup commit.\n",
+  "ephemeral": 0,
+  "id": "PKIX-rd5k",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: 263 doc comments missing backticks around code identifiers (clippy::doc_markdown bulk fix)",
+  "updated_at": "2026-05-07T21:49:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

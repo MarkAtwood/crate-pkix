@@ -1,0 +1,31 @@
+{
+  "close_reason": "Duplicate of PKIX-841.20 (already tracked as OID const deduplication, deferred to v0.2).",
+  "closed_at": "2026-05-02T17:54:21Z",
+  "compaction_level": 0,
+  "content_hash": "d450a5f99fb696c827c7d6e51404c60b2c9b1787328352e63f5d494d2c379c82",
+  "created_at": "2026-05-02T17:52:34Z",
+  "created_by": "Mark Atwood",
+  "description": "EcdsaP256Verifier::verify_signature declares 'const OID: ObjectIdentifier = new_unwrap(\"1.2.840.10045.4.3.2\")' (line 727-728) and RsaPkcs1v15Sha256Verifier does the same for sha256WithRSAEncryption (line 765-766). Both strings are duplicated from the module-level OID_ECDSA_P256_SHA256 and OID_SHA256_WITH_RSA constants (lines 930-936). The module-level constants are gated on any(feature=\"p256\", feature=\"rsa\"), which is always true when either individual verifier is compiled, so the individual verifiers could reference the module-level constants directly. Duplication risks divergence if an OID string is ever updated. Fix: remove local const OID declarations and reference the module-level constants.",
+  "ephemeral": 0,
+  "id": "PKIX-22f.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OID local consts duplicate module-level OID_* constants",
+  "updated_at": "2026-05-02T17:54:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:52:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-22f",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

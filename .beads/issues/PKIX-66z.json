@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-66z",
+  "title": "pkix-policy-zlint: thin Lint-adapter over pkix-zlint-bridge findings",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:58:45Z",
+  "updated_at": "2026-06-15T17:58:45Z",
+  "closed_at": "2026-06-15T17:58:45Z"
+}

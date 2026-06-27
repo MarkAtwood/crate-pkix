@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:33:05Z",
+  "compaction_level": 0,
+  "content_hash": "4e29be0cf1a12d43528af6c1efb9b98b89a9f975d2ca679e3eea306f2772eea2",
+  "created_at": "2026-05-07T17:22:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs (Profile trait) \u2014 The Profile::policy() method returns ValidationPolicy but the trait method has no #[must_use] attribute, while the free-function aliases (web_pki_policy, smime_policy, etc.) in pkix-profiles do have #[must_use]. A caller who forgets to use the returned policy silently does no validation. Fix: add #[must_use] to the Profile::policy fn in the trait definition in pkix-path. This is primarily a pkix-path fix but detected during pkix-profiles review.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-profiles] Profile::policy() trait method lacks #[must_use]",
+  "updated_at": "2026-05-07T17:33:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

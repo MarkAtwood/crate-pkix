@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T03:56:50Z",
+  "id": "019e1f7a-eaff-7982-87c8-00dc9a0996f7",
+  "issue_id": "PKIX-2l0v",
+  "text": "Parent epic surfaced on `bd ready` autonomous frontier. Children:\n\n- PKIX-2l0v.1 (serde feature flag on ValidatedPath / Error variants / TrustAnchor / ValidationPolicy) \u2014 open + `human` label\n- PKIX-2l0v.2 (Send+Sync audit + assertions on load-bearing types) \u2014 closed\n- PKIX-2l0v.3 (verify_chain batch entry point design) \u2014 closed (decided in favour of `Verifier::verify_batch`, shipped under PKIX-gsd9 this session)\n\nOnly one open child, which is human-gated. Parent has no autonomous work of its own. Labeling `human` to keep the loop from re-picking. Drop the label when .1 closes.\n\n(Same workflow pattern as PKIX-fmtv / PKIX-fmtv.11 / PKIX-jy95 earlier this session.)\n"
+}

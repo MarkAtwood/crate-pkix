@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b7a67573e5f96928d24fa19e989fdb53647cc1403e10102eff6063cbf9ccb316",
+  "created_at": "2026-05-14T18:10:21Z",
+  "created_by": "Mark Atwood",
+  "description": "Every wrapper (verify_tls_server, verify_tls_client_*, verify_smime_*, verify_code_signer, verify_time_stamper, verify_ocsp_responder) calls verify_chain internally. verify_chain dispatches into Verifier::verify_one, which can return ANY Error variant including:\n\n- Error::Aia(AiaError)            \u2014 AIA fetch failed during slow-path reassembly\n- Error::PathBuild(pkix_path_builder::Error)  \u2014 path-builder ran out of candidates\n- Error::AiaDepthExceeded         \u2014 AIA recursion cap reached\n\nBut the wrapper rustdocs list only:\n\n- verify_tls_server (lines 743-750): Error::Path, Error::Revocation, Error::Identity\n- verify_tls_client_dns (lines 827-835): Error::Path, Error::Revocation, Error::Identity\n- verify_tls_client_mailbox (lines 904-912): Error::Path, Error::Revocation, Error::Identity\n- verify_smime_signer (lines 974-981): Error::Path, Error::Revocation, Error::Identity\n- verify_smime_recipient (lines 1007-1014): inherits via \"Identical mechanics\" cross-reference\n- verify_code_signer (lines 1061-1066): Error::Path, Error::Revocation\n- verify_time_stamper (lines 1127-1136): Error::Path, Error::Revocation, Error::ProfileViolation\n- verify_ocsp_responder (lines 1236-1249): Error::Path, Error::Revocation, Error::OcspDelegation\n\nThe wrappers ALL bake `&NoAiaFetcher` so they cannot in practice return Error::Aia(non-FetchingDisabled) \u2014 but the doc-level guarantee is missing. The caller seeing:\n\n    match verify_tls_server(...) {\n        Err(Error::Path(_)) => ...\n        Err(Error::Revocation(_)) => ...\n        Err(Error::Identity(_)) => ...\n        // exhaustive match impossible because Error is #[non_exhaustive]\n    }\n\n\u2026cannot tell from the rustdoc whether Error::Aia is reachable. They have to read the source to find out it's gated by &NoAiaFetcher being passed through, AND that NoAiaFetcher returns Error::Aia(AiaError::FetchingDisabled) on any orphaned chain.\n\nConcretely, today a caller invokes `verify_tls_server(&[leaf_only], ...)` with an intentionally-incomplete chain expecting a clean error. They get `Error::Aia(AiaError::FetchingDisabled)`. The wrapper's Errors section does not warn them this is possible.\n\nWHY IT MATTERS:\n\nThe slash-command checklist for underspecified contracts calls out:\n\n> Error behavior that is undocumented or inconsistent with the rest of the crate. A caller cannot write defensive code if they cannot tell from the signature or docs which errors are possible.\n\nThat is exactly what happened here. Three credible fixes:\n\n(a) **Document Aia/PathBuild/AiaDepthExceeded in every wrapper's Errors section** with the qualifier \"but only when the supplied chain has a break \u2014 the wrapper's hardcoded NoAiaFetcher makes this surface as Error::Aia(FetchingDisabled).\"\n\n(b) **Translate Error::Aia(FetchingDisabled) into a wrapper-friendly variant** at the wrapper boundary. E.g., have wrappers return Error::Path(pkix_path::Error::ChainBroken { index }) when the inner error is FetchingDisabled. Hides the AIA-implementation detail from wrappers that don't expose AIA to the caller.\n\n(c) **Catalog the full possible error set** in a crate-level rustdoc table mapping each wrapper to its possible error variants, then cross-reference. Replaces per-wrapper Errors sections with one source of truth.\n\nThis is closely related to PKIX-sqek.4 (wrappers can't opt into AIA): if (b) is chosen alongside the PKIX-sqek.4 fix (wrappers grow generic over AiaFetcher = NoAiaFetcher), the documented Errors sections gain Error::Aia variants conditionally, matching what the wrapper can actually return.\n\nFiled as P2 because the contract gap is a real footgun for defensive callers (especially those using match exhaustiveness), but downstream consumers can always pattern-match on Error::* and a fallback `_` arm \u2014 it doesn't cause incorrect validation, just confused error handling.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Wrappers omit Error::Aia / Error::PathBuild / Error::AiaDepthExceeded from their documented Errors lists",
+  "updated_at": "2026-05-14T18:10:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:10:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

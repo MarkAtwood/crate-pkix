@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-13T23:36:21Z",
+  "id": "019e23b2-cc41-7833-ae89-776b552dd4c2",
+  "issue_id": "PKIX-jbvb.5",
+  "text": "Decision (Mark, 2026-05-13): Option (A). Generate new self-signed tier certs in pkix-path/tests/fixtures/policy-checks/, modeled after zlint's smime_leg1_*_eff1.pem fixture shapes (policy OID + DN attrs).\n\nSub-question answers (agent decided per Mark's delegation):\n\n1. gen.py extension. Single fixture generator; no per-crate fragmentation.\n\n2. Provenance docs: inline rustdoc on each test, plus a brief comment block in the gen.py extension citing the zlint fixture each was modeled after. No separate SOURCES.md \u2014 keeps provenance close to point of use.\n\n3. Uniform across PKIX-jbvb.1, .2, .3. Same tier-cert shape, same approach for all three.\n\nClosing; PKIX-jbvb.{1,2,3} unblock for autonomous work."
+}

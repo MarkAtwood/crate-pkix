@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "aa7ebdf95f66edd6708bf9ae49b8640170600a2b2e9ddbf8c14b62392b76a16d",
+  "created_at": "2026-05-14T15:45:02Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/report.rs:59 derives Default on EvaluationReport, then defines new(...) at line 130 with five required parameters. The two construction paths coexist: callers can do EvaluationReport::default() to get a fully-empty report (every Cow is empty, chain_length=0, evaluated_at_unix=0), or use new() with explicit metadata.\n\nThis is the worst of both worlds \u2014 Default is meaningful only inside the crate (one test uses it via ..pass_finding()) and is misleading as public API (consumers think 'I can build an empty report and fill it' \u2014 but the resulting report misrepresents itself as an audit artifact). The OSCAL emitter happily serializes a default-constructed report into 'oscal-version: 1.1.2' garbage.\n\nSuggested rewrite: drop the Default derive on EvaluationReport. Move the test pattern that wants 'cheap report skeleton' to either an explicit test helper or to taking new(...) seriously and supplying the few required fields.\n\nIf you want the Default for ergonomic ..Self syntax inside tests, make it #[cfg(test)] or use the (private) field-update pattern directly.\n\nThis is taste-with-an-engineering-reason: the derived Default makes the API surface bigger and admits invalid OSCAL output. Cutting it is net subtractive.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "EvaluationReport mixes derived-Default with required EvaluationReport::new",
+  "updated_at": "2026-05-14T15:45:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

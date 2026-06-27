@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T23:39:15Z",
+  "id": "019e1e8f-1868-7378-a750-ffedf942dc41",
+  "issue_id": "PKIX-jy95.8",
+  "text": "ERROR HANDLING 2026-05-12 (parallel to PKIX-jy95.7 from .jy95.4 decision): pkix-pkilint-bridge implements the same BridgeError + PerCertError structural pattern as pkix-zlint-bridge. Bridge-level error variants are symmetric (BinaryNotFound, SubprocessFailed, SubprocessKilled, SubprocessTimeout, OutputParseError). PerCertError variants may differ in specifics -- pkilint's error vocabulary differs from zlint's -- but the structural shape (per-cert errors live inside batch results, don't fail the whole batch) is identical. Implementation-time: identify pkilint's actual per-cert error modes and discriminate accordingly."
+}

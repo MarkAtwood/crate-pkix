@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Consttime scan completed from earlier run. 6 findings (all INFO, all correctly dismissed \u2014 public data only). Report at /tmp/skoll-review-e5ECAd.md and /tmp/skoll-review-J5rqCR.json",
+  "closed_at": "2026-06-04T18:01:44Z",
+  "compaction_level": 0,
+  "content_hash": "fc8d9ac6df3313dec8ef0ca7a96593a4359b2208fd4316148901a25c0dc8f25e",
+  "created_at": "2026-06-04T17:28:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Run 'skoll consttime' from ~/PROJECT/PKIX. Relevant because pkix-path dispatches signature verification via SignatureVerifier trait (RSA, ECDSA P-256/P-384), and pkix-identity does mailbox/hostname matching that touches cryptographic identities. The scan checks for timing-dependent branches on secret data, early-return patterns in comparison functions, and variable-time operations. Note: pkix-lint's threat model is narrow (no secrets, no key material \u2014 per memory crypto-security-pkix-7f92-2026-05-14), so consttime findings there are likely N/A. Focus attention on pkix-path and pkix-revocation. Save output: 'skoll consttime --out ~/PROJECT/PKIX/reports/skoll-consttime.md'.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Skoll consttime scan \u2014 timing side-channel analysis",
+  "updated_at": "2026-06-04T18:01:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "documented known limitation; Cow<'static, str> migration deferred to v0.3",
+  "closed_at": "2026-05-07T16:37:07Z",
+  "compaction_level": 0,
+  "content_hash": "58acec0453d1da3c0a92ad59bccfdffb5152b04a3cc7fb23a4e03f559dbdbe80",
+  "created_at": "2026-05-07T16:10:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:139-146 \u2014 the de_static_str function leaks memory:\n  `Ok(Box::leak(s.into_boxed_str()))`\n\nThe doc comment documents this extensively, including a warning for long-running services. However:\n\n1. The serde bound on EvaluationReport and Finding requires 'de: 'static (documented), which means callers using serde_json::from_str (not from_slice) with a leaked string are the expected pattern. The test in report.rs does exactly Box::leak (line 305).\n\n2. For production use in a cert-policy daemon that continuously deserializes findings from a message queue, each unique LintResult detail string creates a permanent leak.\n\nThe doc comment says to file an issue to accelerate Cow<'static, str> migration. This is the filed issue.\n\nSeverity: P3 (not a correctness bug; will cause memory issues only in specific deployment patterns; documented).\n\nSuggested fix: Migrate LintResult::Warn/Error/Fatal detail field from &'static str to Cow<'static, str>. This is a breaking change, so needs a semver bump or a deprecation path.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "de_static_str memory leak in serde feature: unbounded growth in long-running services",
+  "updated_at": "2026-05-07T16:37:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:10:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

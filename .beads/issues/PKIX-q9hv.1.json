@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added final build_first_valid_path call after AIA loop so last iteration's fetches are consulted before AiaDepthExceeded.",
+  "closed_at": "2026-06-04T19:30:12Z",
+  "compaction_level": 0,
+  "content_hash": "64a562940fc14e636502df68e53ac6349c29826f20aea6739adcf79811d3cc53",
+  "created_at": "2026-05-14T14:36:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:597 `for _iteration in 0..AIA_MAX_DEPTH` runs build\u2192fetch in that order. After the final iteration (iter=4), the loop adds fetched certs to the pool then exits without ever calling `build_first_valid_path` on the augmented pool, so the last fetch round's results are never consulted. AIA_MAX_DEPTH=5 documents '5 fetch iterations' but effectively yields 'fetch up to 5 times, build only 5 times against fetch outputs 0..4'. Trigger: a 5-deep AIA chain where each intermediate's caIssuers must be fetched in sequence \u2014 the 5th fetch lands in the pool, then AiaDepthExceeded is returned instead of the successful path that one more build attempt would have produced. Fix: after the loop, call build_first_valid_path one final time with the fully-augmented pool, OR restructure the loop so build runs after each successful fetch round (which is what the iteration semantics imply). The bead-stated default of 5 in the rustdoc would then mean '5 hops resolved' rather than '4 hops resolved'.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AIA_MAX_DEPTH off-by-one: last fetch is wasted",
+  "updated_at": "2026-06-04T19:30:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:36:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

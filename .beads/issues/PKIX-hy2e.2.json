@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Changed cert_sha256_of return type from [u8; 32] to Option<[u8; 32]>, propagating None on DER encode failure. Eliminates false equality of SHA256(empty)=e3b0c4... across distinct un-encodable certs. Existing test run_cert_stamps_cert_sha256_on_findings exercises the Some(_) happy path; encode-failure path enforced at type level (downstream Finding.cert_sha256 was already Option<[u8;32]>). All 124 lib tests pass, clippy --all-features clean.",
+  "closed_at": "2026-05-14T13:07:19Z",
+  "compaction_level": 0,
+  "content_hash": "58d55ec0f1adea04bc97e8cf11360d827a60d1a0acc37cea2ccba60c4876520a",
+  "created_at": "2026-05-14T12:39:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: load a Certificate that successfully decodes from DER but fails to re-encode (e.g., a Certificate containing a field x509-cert can decode but cannot round-trip through Encode \u2014 this is rare but not theoretical, since x509-cert's encoders can fail on edge cases the decoders accept). cert_sha256_of (lib.rs:145-156) catches the encode error with .unwrap_or_default() and proceeds to hash an empty Vec, producing SHA256(empty) = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855. Actual bad behavior: every finding produced by run_cert on this cert is stamped with the same well-known empty-input hash, making evidence packs claim provenance for a cert whose content cannot be reproduced. Two distinct broken certs produce findings with the same cert_sha256. The comment says 'malformed Certificate would have failed to parse before reaching this function' \u2014 but the function takes &Certificate, which is constructed by the parser. x509-cert's roundtrip is documented to occasionally fail (DEFAULT-tagged fields, BMPString edge cases). Fix: change Vec<Finding> to surface the encode failure as a Fatal finding, or use a non-default sentinel (Option<[u8;32]>) so consumers can distinguish 'this cert failed to encode' from 'this cert had a meaningful all-zero hash.' Either way the silent fallback to SHA256(empty) is wrong.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_sha256_of swallows DER encode error, stamps all-zero hash on findings",
+  "updated_at": "2026-05-14T13:07:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:39:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

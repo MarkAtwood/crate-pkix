@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-vcn",
+  "title": "TrustAnchor NC: seed chain_walk from trust anchor NameConstraints extension",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:21Z",
+  "updated_at": "2026-06-15T17:57:21Z",
+  "closed_at": "2026-06-15T17:57:21Z"
+}

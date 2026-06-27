@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:13:48Z",
+  "compaction_level": 0,
+  "content_hash": "3ee4b88d9182399f9ba26224b7b7e631c987bb609b340112e44b0065f1034e1a",
+  "created_at": "2026-05-06T20:51:02Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/report.rs EvaluationReport struct at lines 44-86. The fields profile_id, profile_version, and rule_bundle_version are all &'static str. This is consistent with LintRunner::bundle_version (lib.rs:451) which is also &'static str. However, for a JSON-exportable evidence pack that the doc comment says is the 'exportable unit for the evidence pack workflow', requiring all metadata to be static string literals is overly restrictive. An operator generating reports with dynamic version strings (e.g., loaded from a config file or CI environment variable) cannot populate these fields without static strings. The Finding struct (lib.rs:370-401) uses the same &'static str approach for lint_id, citation, and rule_bundle_version. This is a systemic API design issue: the v0.3 note at lib.rs:64-66 mentions 'Dynamic messages are planned for v0.3 via Cow<'static, str>'. The same Cow migration would apply to EvaluationReport metadata fields. Fix: Either (a) change to String now (breaking change), or (b) change to Cow<'static, str> as planned for v0.3, or (c) add a parallel constructor that accepts String/Cow. Priority: P2 (API usability \u2014 limits non-compile-time metadata).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: EvaluationReport profile_id/version fields are &'static str only",
+  "updated_at": "2026-05-06T21:13:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

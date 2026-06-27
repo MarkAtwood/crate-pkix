@@ -1,0 +1,65 @@
+{
+  "compaction_level": 0,
+  "content_hash": "63485fdcac79e71f6bf1da458d69dca098cbe9abf22367312b6375ed48b21d56",
+  "created_at": "2026-05-13T16:46:09Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nImplement the **Organization-validated** S/MIME tier as a Profile type in `pkix-profiles-cabf`. Per CA/B Forum S/MIME BR \u00a77.6.1 and \u00a78: this tier proves the mailbox AND verified ownership of the organization domain. Distinct from Mailbox-validated (the current `SmimeProfile`) in subject DN field requirements, allowed SAN content, and asserted policy OID.\n\n## API shape\n\nPer the spec-taxonomy principle (PKIX-mzsk) and the wrapper-set decision (PKIX-fmtv.7, option C2: Profile is a generic parameter), file as a distinct Profile type:\n\n```rust\n/// Organization-validated S/MIME BR subscriber-certificate profile.\n///\n/// Reference, not authoritative. CA/B Forum S/MIME Baseline Requirements\n/// v1.0.14 (or whichever revision the cabf workspace has refreshed to).\n/// Section \u00a77.6.1 (Organization-validated profile) + \u00a78 (validation rules).\n///\n/// Asserts policy OID `2.23.140.1.5.2.1` (Organization-validated).\n///\n/// Required Subject DN fields per BR: organizationName, optionally\n/// jurisdictionCountry/State/Locality, organizationIdentifier.\n/// Subject SAN: rfc822Name (one or more); X.500 dirName when present\n/// must match Subject DN.\npub struct SmimeOrganizationValidated;\n\nimpl Profile for SmimeOrganizationValidated {\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // - required_leaf_eku: id-kp-emailProtection\n        // - require_rfc822_san: true\n        // - max_validity: per BR \u00a76.3.2 (same cap as other S/MIME tiers)\n        // - required_policy_oids: [2.23.140.1.5.2.1]  // Organization-validated\n        // - required_subject_dn_attributes: [organizationName]\n        // ... other tier-specific predicates\n    }\n    fn version(&self) -> &'static str { \"1.0.14\" }  // matches PKIX-d5rh dotted-version convention\n}\n\npub const fn smime_org_policy(now_unix: u64) -> ValidationPolicy {\n    SmimeOrganizationValidated.policy(now_unix)\n}\n```\n\n## Test fixtures\n\nPer Mark's 2026-05-11 decision (option d, recorded in PKIX-jbvb notes): pull from BOTH zlint testdata/ AND pkilint fixtures. Cross-validation between the two dominant ecosystem interpretations.\n\n- zlint: `~/GIT/zlint/v3/lints/cabf_smime/*/testdata/` (Apache-2.0, attributable, cite per-fixture)\n- pkilint: `~/GIT/pkilint/tests/integration_certificates/cabf/smime/` (Apache-2.0, attributable)\n\nFor Organization-validated specifically:\n- Positive cases: certs that zlint AND pkilint both classify as Organization-validated and accept\n- Negative cases: certs from other tiers (Mailbox, Sponsor, Individual) that should be rejected when `SmimeOrganizationValidated` is the active Profile\n\nRecord fixture provenance per-cert in `pkix-profiles-cabf/tests/fixtures/smime_org/SOURCES.md` or equivalent.\n\n## Acceptance\n\n- [ ] `pkix_profiles_cabf::SmimeOrganizationValidated` ships and impls `Profile`\n- [ ] `smime_org_policy(now_unix)` free function alias exists\n- [ ] Reference-not-authoritative rustdoc disclaimer header matches existing `pkix-profiles-cabf` types\n- [ ] Rustdoc cites CA/B Forum S/MIME BR v1.0.14 + \u00a77.6.1 + \u00a78 (or whichever section numbers actually contain the Organization-validated profile after PKIX-d5rh's citation refresh lands)\n- [ ] At least 2 positive + 2 negative test fixtures per the dual-oracle convention, with provenance recorded\n- [ ] Tests pass against both fixture sources\n- [ ] CHANGELOG entry in `pkix-profiles-cabf`\n- [ ] `pkix-profiles-cabf` rustdoc top-level updated to enumerate the new type alongside `SmimeProfile`\n\n## Out of scope\n\n- Renaming the current `SmimeProfile` to `SmimeMailboxValidated` for naming parity \u2014 could be a follow-up bead if the type-rename signal-to-noise is worth it; not blocking for this bead\n- Sponsor-validated (PKIX-jbvb.2)\n- Individual-validated (PKIX-jbvb.3)\n- Composing tiers into a \"any of these tiers\" enforcement (caller-side concern)\n\n## Blocks on\n\n- PKIX-mzsk (AGENTS.md amendment) \u2014 for principled justification\n- PKIX-d5rh (CABF citation refresh) \u2014 to align section numbers with current BR layout before this bead's rustdoc cites them\n\n## Cross-references\n\n- PKIX-jbvb (parent, S/MIME 4-tier umbrella)\n- PKIX-mzsk (spec-taxonomy principle in AGENTS.md)\n- PKIX-fmtv.7 (wrapper-set + Profile-as-generic-parameter decision)\n- PKIX-d5rh (citation refresh; section numbers depend on its outcome)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 do-beads loop] Escalating with parent PKIX-jbvb: ValidationPolicy lacks required_policy_oids / required_subject_dn_attributes fields, so per-tier policy() outputs would be byte-identical. See PKIX-jbvb notes for the full options analysis and recommendation (option B).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeOrganizationValidated profile + cross-validated fixtures",
+  "updated_at": "2026-05-13T18:15:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:47:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-d5rh",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:46:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:46:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:35:45Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-jbvb.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T17:16:41Z",
+      "created_by": "bd-spin/bd-spin-20260513T233709Z-3219518",
+      "depends_on_id": "PKIX-jbvb.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:47:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mzsk",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

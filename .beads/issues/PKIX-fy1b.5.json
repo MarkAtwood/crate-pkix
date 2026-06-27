@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: documented intentional behavior matching zlint byte-floor comparison; not a bug",
+  "closed_at": "2026-05-07T04:44:07Z",
+  "compaction_level": 0,
+  "content_hash": "09ae062e472fb5125fc4c8eac6dd33709a54ec26f33e0ab8be62119059dfe03a",
+  "created_at": "2026-05-07T04:36:36Z",
+  "created_by": "Mark Atwood",
+  "description": "In cabf_tls_br.rs line 255, the check is 'n_bytes >= 256', and the doc comment (lines 203-211) explicitly explains this accepts 2047-bit keys (256 bytes, high bit clear \u2192 no leading 0x00). The CA/B Forum TLS BR \u00a76.1.5 requires 'at least 2048 bits', not 2047. The doc notes this matches zlint behavior, but zlint has been criticized for this same floor. A 2047-bit modulus is cryptographically weaker and does not comply with the letter of the spec. This is a correctness/spec-compliance finding \u2014 the threshold should be > 256 bytes (strictly) to exclude 2047-bit keys, or the spec citation should be amended with a documented deviation.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RsaMinKeySizeLint: modulus length check accepts 2047-bit keys per doc comment \u2014 mismatch with spec",
+  "updated_at": "2026-05-07T04:44:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:36:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:43:49Z",
+  "compaction_level": 0,
+  "content_hash": "e09fdb8edd07a5249c74486134e8d28c263bc3412bbb9c252984552a1d33e58a",
+  "created_at": "2026-05-07T17:22:41Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:199-202 \u2014 The None arm of the match on path.last() uses debug_assert!(false, \"dfs called with empty path\") to signal an invariant violation, then returns Ok(false). The correct Rust idiom for invariant violations is unreachable!() (or debug_unreachable! from the unreachable crate for no_std-safe release builds). debug_assert!(false) silently continues after the assertion in release builds, meaning the caller gets a spurious Ok(false) rather than a panic. At minimum use unreachable!(\"...\") so debug builds panic loudly; in release builds this generates an optimization hint to the compiler that the branch is unreachable.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] debug_assert!(false,...) should be unreachable!()",
+  "updated_at": "2026-05-07T18:43:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "created_at": "2026-05-13T05:31:26Z",
+  "id": "019e1fd1-8814-76f6-9a3a-8ceb721a2d5b",
+  "issue_id": "PKIX-fmtv.18",
+  "text": "Decomposed into PKIX-fmtv.18.1 (shared helper) + .2/.3/.4/.5/.6/.7 (per-purpose diffs). Parent stays open as an umbrella; bd ready will surface the subbeads in turn. Releasing claim \u2014 will be closed when all children close and the umbrella baseline-verify-openssl.md is in place."
+}

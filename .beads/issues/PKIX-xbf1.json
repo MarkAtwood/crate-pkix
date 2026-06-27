@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:25:34Z",
+  "compaction_level": 0,
+  "content_hash": "3629ca473203f68f478b44a9170b2f89a7a2657700796d0688437651aad834df",
+  "created_at": "2026-05-07T15:18:51Z",
+  "created_by": "Mark Atwood",
+  "description": "Full-codebase /review-myoss pass 1. Scope: entire workspace (no specific epic qualifier). Section 0 anchor: does the code match what README, docs, and public API claim?",
+  "ephemeral": 0,
+  "id": "PKIX-xbf1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 1 epic",
+  "updated_at": "2026-05-07T15:25:34Z"
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3d2e5816df7cffa302feab0a9f7bb533c43174f1adce8b6842ca4ca7b06f5155",
+  "created_at": "2026-05-14T15:44:53Z",
+  "created_by": "Mark Atwood",
+  "description": "Three near-identical hex implementations live in the crate:\n\n1. pkix-lint/src/lib.rs:175-196 \u2014 cert_sha256_hex serializer/deserializer uses char::from_digit and u8::from_str_radix on string slices.\n2. pkix-lint/src/oscal/emit.rs:819-839 \u2014 hex() and hex_digit() free functions, pure index arithmetic.\n3. pkix-lint/src/oscal/parse.rs:866-892 \u2014 hex_decode() and nibble() free functions, bytes-indexed.\n\nPlus a fourth re-implementation in emit.rs's own test module (1581-1605) because hex_decode in parse.rs is private.\n\nThe lib.rs serde shape is unique (and broken \u2014 see PKIX-7f92.1) but the other three are byte-identical. Pulling them into a single private mod hex { fn encode/fn decode/fn nibble } would let the broken serde codec use the same primitives as the other two and avoid the panic bug entirely.\n\nSuggested rewrite: introduce pkix-lint/src/hex.rs (or a sub-mod of oscal) exposing pub(crate) fn encode(&[u8]) -> String and pub(crate) fn decode(&str) -> Option<Vec<u8>>, then port every call site. The serde codec in lib.rs becomes:\n\n  let bytes = hex::decode(&hex).ok_or_else(|| de::Error::custom('non-hex'))?;\n  if bytes.len() != 32 { return Err(de::Error::invalid_length(bytes.len(), &'32-byte sha256')) }\n  let mut out = [0u8; 32]; out.copy_from_slice(&bytes); Ok(Some(out))\n\nBoth shorter and panic-free.\n\nFiled as elegance not correctness because the broken serializer is filed separately. This is the refactor that closes both.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Hex encoding/decoding duplicated in three modules",
+  "updated_at": "2026-05-14T15:44:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:44:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

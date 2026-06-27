@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T04:16:37Z",
+  "id": "019e1f8d-09da-795c-8d1e-d575db63eb20",
+  "issue_id": "PKIX-hbzo.1.1",
+  "text": "Shipped 2026-05-12. Lint-domain oracle infrastructure under new `lint-oracles` cargo feature (off by default). Files added: lint_oracles/mod.rs (trait + types), lint_oracles/zlint.rs (ZlintOracle wrapping pkix-zlint-bridge), lint_oracles/pkix_lint_cabf.rs (PkixLintCabfOracle wrapping cabf_tls_br profile), tests/lint_oracles.rs (4 integration tests, 3 zlint-gated), CHANGELOG.md. Files modified: Cargo.toml (3 new optional deps), lib.rs (gated mod declaration). Tests: 72 lib tests with feature (59 baseline + 13 new), 4 integration. Empirical finding recorded in bd: PKITS Good CA Test1 leaf/intermediate trip zero actionable zlint findings (not CA/B Forum certs); test asserts shape end-to-end including empty-findings branch, no fabricated positives. cargo clippy --features lint-oracles -- -D warnings clean; rustdoc -D warnings clean; default-features clippy + rustdoc unchanged. Public surface: LintOracle, LintOracleResult, NormalizedFinding, OracleSource (incl Pkilint variant for forward-compat), ZlintOracle, PkixLintCabfOracle. Send+Sync compile-time assertion on NormalizedFinding/LintOracleResult/OracleSource via PKIX-2l0v.2 const-block pattern."
+}

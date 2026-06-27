@@ -1,0 +1,46 @@
+{
+  "close_reason": "Re-baseline (PKIX-lwr9.6, 2026-05-11) eliminated this entire bucket. Zero of the 22 'no path to a trusted anchor' cases this bead was framed around are present in the post-.6 StricterThanWild residuals. The failures were the harness bypassing pkix-path-builder entirely; PKIX-yn3e (AKI-based candidate selection, shipped 2026-05-08) already provides the cross-signed candidate selection this bead would have added. Closing as phantom problem per the empirical re-baseline.",
+  "closed_at": "2026-05-11T21:58:50Z",
+  "compaction_level": 0,
+  "content_hash": "b33f86e77ecb9200b78202551ecffe97d22bc043594e29e4081df6e2b701b040",
+  "created_at": "2026-05-11T16:29:50Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe largest single bucket in the bettertls::pathbuilding failures: ~22 cases where pkix-path emits 'no path to a trusted anchor' because pkix-path-builder selects the first candidate intermediate by issuer-DN match, fails verification against the leaf, and gives up. RFC 4158 \u00a73.2 specifies trying multiple candidates when one fails.\n\n## What\n\nIn pkix-path-builder, when multiple bundle certs match a given subject-DN as candidate issuers (e.g., a self-signed root and a cross-signed intermediate of the same logical CA both share the DN), the builder must try each one and accept the first that yields a valid chain via signature verification, not pick the first by some arbitrary order.\n\nImplementation sketch:\n\n- Bundle search: when looking for the issuer of cert C, collect ALL candidate certs whose Subject matches C.Issuer (after RFC 4518 string prep), not just the first.\n- For each candidate, attempt signature verification of C against the candidate's SPKI. If it verifies, the candidate is the issuer for this hop. If none verifies, the chain has no issuer for C and path building dead-ends.\n- AKI/SKI hint: when the AuthorityKeyIdentifier on C is present, prefer the candidate whose SubjectKeyIdentifier matches. RFC 4158 \u00a73.2 says AKI/SKI should narrow the search but not be the sole criterion (some chains lack AKI/SKI; matching SubjectDN is the fallback).\n\n## Acceptance\n\n- [ ] Cross-signed candidate selection lands in pkix-path-builder (NOT in pkix-path, which stays positional per AGENTS.md).\n- [ ] The ~22 'no path to a trusted anchor' bettertls cases flip to Pass.\n- [ ] AKI/SKI hinting is used when available, with SubjectDN-only as fallback (RFC 4158 \u00a73.2).\n- [ ] No regression on PKITS baseline.\n- [ ] No regression on the existing non-bettertls limbo cases.\n\n## Depends on\n\nPKIX-lwr9.1 (fixtures + test scaffolding).\n\n## Filed by\n\nPKIX-lwr9 decomposition decision 2026-05-11 (Mark).",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Inherited human label removed 2026-05-11 (Mark): the human label was inherited from PKIX-lwr9 at creation time, not a per-bead pending decision. These children are blocked by PKIX-lwr9.6 (limbo harness wiring) and will either become genuine builder bugs to fix or close as superseded once .6 re-baselines.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: cross-signed intermediate candidate selection",
+  "updated_at": "2026-05-11T21:58:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:29:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:30:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T12:45:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

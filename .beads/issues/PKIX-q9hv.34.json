@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "15f9b361a43c5042f192f1a02c986f8b5545c9e5cdad425864743093b41be11f",
+  "created_at": "2026-05-14T15:11:30Z",
+  "created_by": "Mark Atwood",
+  "description": "What the code does:\n\nEvery integration test file in pkix-chain/tests/ that reads fixtures from disk (8 files: hostname_corpus.rs, mailbox_corpus.rs, verify_code_signer.rs, verify_ocsp_responder.rs, verify_smime.rs, verify_time_stamper.rs, verify_tls_client.rs, verify_tls_server.rs) defines its own byte-identical copy of:\n\n    fn load_fixture(name: &str) -> Certificate {\n        let path = std::path::PathBuf::from(env!(\"CARGO_MANIFEST_DIR\"))\n            .join(\"tests/fixtures\")\n            .join(name);\n        let der = std::fs::read(&path).unwrap_or_else(|e| panic!(\"read {name}: {e}\"));\n        Certificate::from_der(&der).unwrap_or_else(|e| panic!(\"parse {name}: {e}\"))\n    }\n\nVerified byte-identical via md5sum across all 8 files (9470905cb8e1a8c686893f7c603f1c9a).\n\nAdditional duplication on the same root cause:\n- const NOW: u64 = 1_780_272_000 in 7 of the 8 disk-reading files\n- const BEFORE: u64 = 0 in 5 files\n- fn anchors() -> [TrustAnchor; 1] in 3 files (hostname_corpus.rs, mailbox_corpus.rs, verify_tls_client.rs)\n- A second variant fn load(der: &[u8]) -> Certificate duplicated between aia_chain_build.rs and aia_http_e2e.rs for the include_bytes! flavour\n\nWhat idiomatic Rust would do:\n\nCargo's integration-test convention is to share helpers via tests/common/mod.rs imported from each integration test file via mod common; use common::*;. The Rust book documents this pattern explicitly under 'Submodules in Integration Tests' precisely because integration tests are separate compilation units that cannot otherwise share code.\n\nWhy it matters:\n\nAny change to fixture loading \u2014 switching to pkix_truststore::from_der to keep the Tier-1 path through every cert ingestion in the workspace, adding a size cap, changing the fixtures directory layout for the PKIX-jbvb crate-split staging, improving error messages, or adapting to a future no-std fixture format \u2014 requires editing 8 files in lock-step. That is a maintenance hazard and a recurring source of merge-conflict friction between concurrent test additions. A reviewer reading the test directory should not have to grep 8 files to determine whether all callers of the helper are using the same shape.\n\nA serious Rust practitioner would wince at 8 byte-identical copies of the same 7-line helper. clippy does not flag this (cross-file duplication is outside its scope), but Rust convention treats it as obvious style debt.\n\nScope:\n\nTest-only \u2014 no production behaviour change, no API surface change. The fix is mechanical:\n\n1. Create pkix-chain/tests/common/mod.rs exposing pub fn load_fixture, pub fn load (byte-form), pub fn anchors, pub const NOW, pub const BEFORE.\n2. Add mod common; and use common::*; to each test file.\n3. Drop the local copies.\n\nThe workspace currently has no tests/common/mod.rs anywhere, so this is introducing a new convention. The downside is minor: one extra file per crate that adopts it. The upside is concentrated maintenance for any future fixture-loading refactor and a template downstream test files in pkix-revocation, pkix-truststore, and other crates can follow when they accrete similar duplication.\n\nNot in scope of this finding:\n\n- aia_chain_build.rs / aia_http_e2e.rs both use fn load(der: &[u8]) over include_bytes! \u2014 that variant exists for a good reason (small AIA fixtures embed cheaply) and consolidation into the common module should preserve both shapes side by side.\n- gen.py is Python and out of scope for any Rust idiom finding.\n\nReferences:\n- pkix-chain/tests/hostname_corpus.rs:20-26\n- pkix-chain/tests/mailbox_corpus.rs:30-36\n- pkix-chain/tests/verify_code_signer.rs:16-22\n- pkix-chain/tests/verify_ocsp_responder.rs:28-34\n- pkix-chain/tests/verify_smime.rs:23-29\n- pkix-chain/tests/verify_time_stamper.rs:20-26\n- pkix-chain/tests/verify_tls_client.rs:28-34\n- pkix-chain/tests/verify_tls_server.rs:22-28\n- pkix-chain/tests/aia_chain_build.rs:38-40 (byte-form sibling)\n- pkix-chain/tests/aia_http_e2e.rs:48-50 (byte-form sibling)",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.34",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-chain tests: load_fixture + NOW/BEFORE/anchors() duplicated across 8 test files; consolidate via tests/common/mod.rs",
+  "updated_at": "2026-05-14T15:11:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:11:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

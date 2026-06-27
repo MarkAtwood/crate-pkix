@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:11:18Z",
+  "id": "019e1d62-daa6-7bfe-8240-55ae16231430",
+  "issue_id": "PKIX-apmt",
+  "text": "Deferring 7 days for reconsideration (2026-05-12 -> 2026-05-19, Mark, interactive). Sub-decision A (workspace-prescribed wire format) deferred. Sub-decision B (zlint mirroring mechanism) resolved as (d) abandon zlint mirroring -- see PKIX-amgn.8 closure. With .8 closed, this epic no longer blocks any open work; the urgency was the .8 children. Trigger to re-evaluate: on or after 2026-05-19, or earlier if a concrete external consumer asks for an interop format (SARIF, OSCAL-as-canonical, JSON Schema'd workspace shape, etc.). Out-of-scope clarification recorded today: the question is about *prescribed canonical* format, not about whether pkix-lint/src/oscal/* stays available behind its feature flag (it stays, regardless of outcome)."
+}

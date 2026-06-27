@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-cr8.9",
+  "title": "RevocationFetchFailed.description unstructured",
+  "description": "Operators cannot telemetry per-URL failures because the description is an unstructured String. Old: PKIX-f1j4.11",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:53:27Z",
+  "updated_at": "2026-06-15T17:53:27Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-cr8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:53:27"
+    }
+  ]
+}

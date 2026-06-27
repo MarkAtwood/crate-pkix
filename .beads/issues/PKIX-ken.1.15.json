@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "git log -1 shows a commit with message 'feat(pkix-path): add ValidationPolicy profile-enforcement fields'. cargo test --workspace --all-features exits 0. cargo clippy --workspace --all-features exits 0. PKIX-ken.2 status is no longer blocked.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Workspace test, clippy, and pkix-profiles check all pass. Code committed in daad3cb.",
+  "closed_at": "2026-05-06T05:01:16Z",
+  "compaction_level": 0,
+  "content_hash": "205319fd23d4a7c4620273fd2972e5c738c3b88133c0c51e85ce6963f22b3b35",
+  "created_at": "2026-05-06T03:47:05Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Commit the complete implementation; verify PKIX-ken.2/3/4 (pkix-profiles policy functions) can now use the new ValidationPolicy fields.\n\n**Algorithm:**\n1. Confirm all preceding beads are closed (bd ready shows only this bead).\n2. Run the full workspace check one final time:\n   ```bash\n   cargo test --workspace --all-features 2>&1\n   cargo clippy --workspace --all-features -- -D warnings 2>&1\n   cargo fmt --all -- --check 2>&1\n   ```\n3. Stage and commit:\n   ```bash\n   git add -A\n   git commit -m 'feat(pkix-path): add ValidationPolicy profile-enforcement fields'\n   ```\n   Commit message must follow conventional commits. No AI attribution.\n4. Verify the five fields are accessible from pkix-profiles by writing a smoke check (NOT a permanent test \u2014 this is just a compilation check):\n   ```rust\n   // In pkix-profiles/src/lib.rs, update rfc5280_policy to set one field:\n   pub fn rfc5280_policy(now_unix: u64) -> ValidationPolicy {\n       let mut p = ValidationPolicy::new(now_unix);\n       // rfc5280_policy: no profile-specific constraints beyond RFC 5280 base rules.\n       p\n   }\n   ```\n   Confirm `cargo check -p pkix-profiles 2>&1` exits 0.\n5. Check that PKIX-ken.2 (web_pki_policy) is now unblocked: `bd show PKIX-ken.2` should show its deps satisfied.\n\n**Defensive programming rules:**\n- Do NOT push to remote unless explicitly instructed.\n- The commit is a clean atomic commit of the complete feature \u2014 not a series of WIP commits.\n- If cargo fmt --check fails: run `cargo fmt --all`, re-stage, then commit.\n\n**Subagent instructions:**\n- Single subagent: run all commands sequentially, report exit codes.\n- If any command fails: stop and report.\n\n**Tests:** The entire preceding test suite is the oracle.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "E2E: commit policy-field implementation; unblock PKIX-ken.2/3/4",
+  "updated_at": "2026-05-06T05:01:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:47:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.14",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

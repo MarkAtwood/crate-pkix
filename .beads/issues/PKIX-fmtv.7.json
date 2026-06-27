@@ -1,0 +1,31 @@
+{
+  "close_reason": "5-axis resolution (2026-05-12, attended session): (A) Ship all 7 wrappers: verify_tls_server, verify_tls_client, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper, verify_ocsp_responder. (B1) Explicit revocation arg per wrapper matching the verify_chain convention (caller passes &NoRevocation / &CrlChecker / &OcspChecker). (C2) Profile is a generic parameter (<P: Profile>); caller picks &BasicTlsProfile or &WebPkiProfile or custom. DefaultVerifier baked the same way verify_chain_default does it (single wrapper per use case; if a custom verifier is needed callers drop to verify_chain). (D1) Identity args are pre-parsed &ServerName<'_> / &MailboxName<'_>; caller calls ServerName::dns_name(s)? or MailboxName::parse(s)? before invocation. (E1) Naming follows verify_<use_case> family. Wrapper-name-vs-profile enforcement: documented in rustdoc ('caller must supply a profile that requires the appropriate EKU for this use case'); no type-level enforcement, no marker traits. verify_ocsp_responder additionally honors id-pkix-ocsp-nocheck per RFC 6960 \u00a74.2.2.2.1 to skip revocation of the responder cert when present. New error variant pkix_chain::Error::Identity(IdentityError) wraps pkix_identity::IdentityError; additive to the #[non_exhaustive] Error enum. Implementation downstream: PKIX-fmtv.11.2 (tls_server / tls_client), PKIX-fmtv.12.2 (smime_signer / smime_recipient), PKIX-fmtv.13 (code_signer / time_stamper / ocsp_responder), PKIX-fmtv.15 (the umbrella implementation bead).",
+  "closed_at": "2026-05-12T18:02:09Z",
+  "compaction_level": 0,
+  "content_hash": "de2e7d36c8acb2de6ad033eb3d655a176b56b22fd211541b33238ae6975f246b",
+  "created_at": "2026-05-12T02:41:57Z",
+  "created_by": "Mark Atwood",
+  "description": "Decide which single-call wrappers ship in `pkix-chain` for the 80% cases and what defaults each bakes.\n\n**Wrapper set:**\n\n- **Required:** `verify_tls_server(cert_bundle, trust, hostname, time) -> VerifyReport`\n- **Likely:** `verify_tls_client`, `verify_smime_signer`, `verify_code_signer`\n- **Maybe:** `verify_smime_recipient`, `verify_time_stamper`, `verify_ocsp_responder`\n\n**For each wrapper, what defaults are baked:**\n\n- **Revocation mode:** HardFail / SoftFail / Disabled default? (TLS server defaults vary by ecosystem: webpki=Disabled-by-default, Chrome=SoftFail, Firefox=SoftFail with CRLite.)\n- **Lint catalog:** none / RFC-baseline only / cabf-br (if applicable to use case)?\n- **Time source:** require explicit / default to `SystemTime::now()` (gates `std` feature)?\n- **Profile:** none / RFC baseline / CA/B Forum BR (where applicable)?\n\n**Naming convention:**\n\n- `verify_tls_server` matches Apple `SecPolicyCreateSSL`.\n- Could also be `verify_for_tls_server` (more explicit) or `verify_https` (TLS-server-specific synonym).\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide canonical ergonomic-wrapper set + defaults",
+  "updated_at": "2026-05-12T18:02:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

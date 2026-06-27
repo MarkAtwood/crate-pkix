@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T00:11:24Z",
+  "id": "019e1986-2a46-7b66-b0ce-b6e5e43512a4",
+  "issue_id": "PKIX-lwr9.4",
+  "text": "Decision recorded 2026-05-11 (Mark, interactive): ship BOTH option 1 (harness fix in pkix-difftest) and option 2 (new build_first_valid_path<V> helper in pkix-path-builder). The harness fix closes tc60 in the corpus; the helper closes the API ergonomics gap that surfaced the issue. Title is rescoped from 'fix tc60 intermediate selection at depth 3' (false framing \u2014 pkix-path-builder is correct) to umbrella over the two true fixes. Filing children .4.1 (harness) and .4.2 (helper)."
+}

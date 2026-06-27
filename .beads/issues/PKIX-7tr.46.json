@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:58Z",
+  "compaction_level": 0,
+  "content_hash": "6d7e0d1deddd140d3c98c3e9516892c078ec583a9040e1997113d50d2cbbab2e",
+  "created_at": "2026-05-02T13:45:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple defines a private RustCryptoVerifier(pkix_path::DefaultVerifier) newtype with impl Default and impl SignatureVerifier that simply delegates every method to the inner DefaultVerifier. This adds ~20 lines of code with no benefit. verify_simple() could pass &pkix_path::DefaultVerifier directly to pkix_path::validate_path. The wrapper was presumably added to avoid exposing DefaultVerifier in the local call site, but since DefaultVerifier is already a re-export of pkix_path and verify_simple takes no verifier parameter, there is no API surface concern. Delete RustCryptoVerifier and call validate_path(..., &pkix_path::DefaultVerifier) directly.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.46",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RustCryptoVerifier in pkix-chain-simple is unnecessary boilerplate",
+  "updated_at": "2026-05-02T14:19:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:45:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T10:26:42Z",
+  "compaction_level": 0,
+  "content_hash": "b2007a79d5f51e043971e5b376f9382b9cc0bbeaf3ac4c786a49cac2db6a1107",
+  "created_at": "2026-05-08T18:07:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-7nsf.7 uncovered that pyca/cryptography's `tests/x509/` corpus is **not** a chain corpus \u2014 it's overwhelmingly individual certificates used for parsing-test coverage. The actual hundreds-to-thousands-of-chains testsuite that pyca uses for path validation is **x509-limbo** (C2SP/x509-limbo), a separately-hosted JSON-manifest format with 9,773 testcases.\n\nThe original PKIX-7nsf description assumed pyca shipped its own chain corpus; that mental model didn't match reality. This follow-up bead operationalises the correct understanding: x509-limbo IS the pyca corpus we want.\n\n## Limbo schema\n\nEach testcase is a JSON object with:\n\n* `peer_certificate` (PEM string)\n* `untrusted_intermediates` (list of PEM strings)\n* `trusted_certs` (list of PEM strings \u2014 trust anchors)\n* `validation_time` (ISO8601 or null)\n* `validation_kind` (\"SERVER\" or \"CLIENT\")\n* `expected_result` (\"SUCCESS\" or \"FAILURE\")\n* `features` (list \u2014 e.g. \"has-crl\", \"has-policy-constraints\")\n* `crls` (list of PEM strings)\n* `signature_algorithms` (constraint list)\n* `expected_peer_name`, `expected_peer_names` (for SERVER mode)\n\nPer-testcase `validation_time` is THE big architectural change: the v1 harness uses `SystemTime::now()` everywhere; limbo testcases need per-chain validation time threaded through.\n\n## What\n\n1. **Harness extension**: add `validation_time_unix: Option<u64>` to `Chain` (or `CorpusItem`). Each oracle's `verify()` reads from there if set, else falls back to system clock.\n2. **`LimboCorpus` loader** (new module under `src/corpus/limbo.rs`): reads `limbo.json`, filters out testcases with features the harness can't run (`has-crl`, signature-algorithm constraints), yields one `CorpusItem` per remaining testcase.\n3. **Run + classify**: full corpus run, commit `baseline-limbo.md` and `baseline-limbo.json`. Hand-classify divergences as in PKIX-7nsf.6.\n\n## Acceptance\n\n- [ ] `Chain.validation_time_unix` (or equivalent) plumbed through all three oracles.\n- [ ] `LimboCorpus` impl with filter for unsupported features documented in code.\n- [ ] Baseline run committed.\n- [ ] Every `LooserThanWild` entry has follow-up bead or justification.\n\n## Notes\n\n- Clone x509-limbo into `~/GIT/x509-limbo` (~88MB). Per AGENTS.md source-of-truth rule.\n- limbo.json has 9773 testcases. Pyca subprocess startup (~30ms) means the full run takes ~15 min \u00d7 3 oracles. Consider parallelisation later (PKIX-klku CI integration).\n- Some limbo testcases pin to `signature_algorithms` lists; pkix-path's `ValidationPolicy` has `allowed_signature_algs` to mirror this.\n\n## Filed as\n\nFollow-up to PKIX-7nsf.7, surfacing during attempt to operationalise the parent bead's \"Tier 2: pyca corpus\" goal.",
+  "ephemeral": 0,
+  "id": "PKIX-g9vc",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: x509-limbo corpus integration (Tier 2 for real)",
+  "updated_at": "2026-05-11T10:26:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:29:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

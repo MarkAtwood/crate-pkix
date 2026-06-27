@@ -1,0 +1,31 @@
+{
+  "close_reason": "has_key_cert_sign is private; Option<bool> semantics are clear in a private context. Below threshold for change.",
+  "closed_at": "2026-05-02T17:47:40Z",
+  "compaction_level": 0,
+  "content_hash": "18bf0ca549f2384fe7cf43fa152fd31268c2d3ad0f4e6c05c1ef8d3348277970",
+  "created_at": "2026-05-02T17:32:06Z",
+  "created_by": "Mark Atwood",
+  "description": "has_key_cert_sign returns Option<bool> where None means 'extension absent' and Some(false) means 'extension present but bit not set'. The call site matches on Some(true) and collapses None and Some(false) into the same error. This is a tri-state encoded as Option<bool>, which is idiomatic Rust only when None truly means 'unknown/absent' and both Some variants are meaningfully distinct to the caller. Here they are not: the caller treats both non-Some(true) cases identically. A private enum (KeyCertSignStatus) or returning bool with 'absent = permitted' (flipping the logic) would be cleaner. As-is, a future maintainer adding a new call site must re-read the comment to understand the semantics.",
+  "ephemeral": 0,
+  "id": "PKIX-841.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "has_key_cert_sign returns Option<bool> \u2014 private but Option<bool> semantics are confusing",
+  "updated_at": "2026-05-02T17:47:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:32:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Inlined the one remaining rfc5280.rs format!() (serialNumber overflow detail) with let-bound 'cap = self.max_octets'. The other .43-flagged site (signatureAlgorithm mismatch) was already inlined in PKIX-7f92.3, and the .to_string()-on-literal smell was already removed in PKIX-7f92.5/.39. 307 tests pass; clippy clean.",
+  "closed_at": "2026-05-14T17:28:48Z",
+  "compaction_level": 0,
+  "content_hash": "6704ecb96502b4ed8bfa341bf8068388fd1bda80a43827b617ddb5ba2235fc8d",
+  "created_at": "2026-05-14T16:08:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/rfc5280.rs has two clippy::uninlined_format_args holdouts and one clippy::str_to_string smell:\\n\\n* Lines 182-185: `format!(\"certificate serialNumber is {} octets, exceeds cap of {} octets\", len, self.max_octets)` \u2014 should inline to `{len}` and `{cap}` with a local bind.\\n* Lines 596-600: `format!(\"outer signatureAlgorithm ({}) does not match \u2026 ({}); RFC 5280 \u00a74.1.1.2 requires both to be identical\", outer.oid, inner.oid)` \u2014 same.\\n* Line 161: `reason: \\\"max-octets must be at least 1\\\".to_string()` \u2014 the literal is a `&'static str`, so `.to_owned()` is the idiomatic conversion (matches the surrounding ParameterError shape which takes `String` via `.to_owned()` already on line 155).\\n\\nNo behavior change; mechanical fix via clippy --fix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.43",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "uninlined format args + redundant .to_string in pkix-lint/src/rfc5280.rs",
+  "updated_at": "2026-05-14T17:28:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:08:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

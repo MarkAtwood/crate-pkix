@@ -1,0 +1,38 @@
+{
+  "close_reason": "Superseded by audit 2026-05-11. pkix_chain::verify_chain() at pkix-chain/src/lib.rs:156-184 IS the orchestrator (path build via path-builder, RFC 5280 \u00a76.1 validate via validate_path, per-cert revocation loop). Existing API stays; new per-use wrappers compose on top via .11/.12/.13/.15.",
+  "closed_at": "2026-05-12T04:55:44Z",
+  "compaction_level": 0,
+  "content_hash": "0fd0c09b35cf2938c1c72963986a05343f47b5ced5544fd249c22d032a950f41",
+  "created_at": "2026-05-12T02:42:07Z",
+  "created_by": "Mark Atwood",
+  "description": "The `verify()` function itself. Orchestrates the pipeline.\n\n**Deliverable:** `pkix_chain::verify(cert_bundle, trust, policies, time) -> VerifyReport`.\n\nPipeline:\n\n1. **Path build** \u2014 call `pkix_path_builder::build_first_valid_path` (or accept positional chain).\n2. **Path validate** \u2014 call `pkix_path::validate_path` against the ordered chain.\n3. **Construct `PathContext`** \u2014 built path + time + trust anchors + (per `.2` decision) optional `TrustDomain`.\n4. **Run policy stack** \u2014 for each `&dyn VerificationPolicy`, call `.evaluate(&ctx)`; collect findings.\n5. **Rollup** \u2014 any unwaived `Severity::Error` finding \u2192 `Outcome::Invalid`; any HardFail-mode revocation `Indeterminate` \u2192 `Invalid`; else `Valid`.\n\nFailure modes to handle:\n- No path found (path builder returns None) \u2192 return early with `Invalid` + `FindingSource::PathValidation` finding.\n- Path validation fails \u2192 return early with the underlying error rendered as `Finding`.\n\nTests:\n- Empty policy stack \u2192 outcome = Valid (path was valid; nothing to fail).\n- Always-fail policy \u2192 outcome = Invalid.\n- Mixed pass/fail with one Error \u2192 Invalid; with only Warns \u2192 Valid.\n\n**Blocks on:** .1 (trait shape), .2 (TrustDomain shape), .5 (VerifyReport shape).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement verify() orchestrator (build + validate + policy stack + rollup)",
+  "updated_at": "2026-05-12T04:55:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:42:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:43:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

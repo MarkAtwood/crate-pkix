@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: pre-decode cert_cp once per cert before policy-d and policy-a/b blocks; anyPolicy qualifier lookup uses cert_cp instead of re-parsing.",
+  "closed_at": "2026-05-05T16:08:22Z",
+  "compaction_level": 0,
+  "content_hash": "8ed2b2e754596078b68229cf863ac458fc4fa7d9fa75b4b4826022283e25e139",
+  "created_at": "2026-05-05T15:46:34Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1827\u20131853\n\nWhen policy_mapping > 0 and a mapped issuer domain policy has no matching node in the tree, the code looks for a qualifying anyPolicy entry by calling find_cert_ext::<CertificatePolicies>(cert, OID_CERTIFICATE_POLICIES) inside the mapping loop:\n\n    let ap_q = pm.0.iter()\n        .find(|m| &m.issuer_domain_policy == idp)\n        .and_then(|_| {\n            if let Some(ref cp) = find_cert_ext::<CertificatePolicies>(cert, OID_CERTIFICATE_POLICIES) { ... }\n            else { None }\n        })\n        .unwrap_or_default();\n\nThis re-parses the CertificatePolicies extension (scanning the extensions list and decoding DER) on every unmapped policy entry in the PolicyMappings extension.  The cert's CertificatePolicies was already decoded moments earlier at line 1588 (assigned to cp_ext).  The ap_q lookup should use the already-decoded cp_ext value that is in scope in the outer 'if let Some(ref mut tree)' block rather than calling find_cert_ext again.\n\nImpact: O(M \u00d7 P) DER decode calls instead of O(1) where M = number of unmapped policies and P = number of CertificatePolicies entries; negligible for typical chains but unnecessary.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "policy-mapping anyPolicy qualifier lookup re-parses the cert's CertificatePolicies extension",
+  "updated_at": "2026-05-05T16:08:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T18:32:12Z",
+  "compaction_level": 0,
+  "content_hash": "7deb211e1c31208ffca2359db5feebe70aad8cd46ed2c0bc78b4dfbe6967a4cf",
+  "created_at": "2026-05-12T02:41:48Z",
+  "created_by": "Mark Atwood",
+  "description": "**Rescoped 2026-05-11 after code-state audit.**\n\nOriginal framing (decide the VerifyReport shape from scratch) is moot: `verify_chain()` already returns `Result<ValidatedPath, Error>`. `ValidatedPath` carries `anchor_index`, `depth`, and \u00a76.1.5 wrap-up outputs (leaf subject DN, issuer DN, serial, SPKI). The error type is a flat enum with one variant per RFC 5280 failure mode.\n\nWhat remains: **should new verify_* wrappers return a richer structured-findings type on top of the existing Result, or just propagate the underlying Result?**\n\n**Options:**\n\n- **A) Pass-through.** `verify_tls_server(...) -> Result<ValidatedPath, Error>`. Same shape as `verify_chain`. New error variants for `HostnameMismatch`, `MalformedSan`, etc. Simple, matches existing convention.\n- **B) Structured report.** `verify_tls_server(...) -> VerifyReport { outcome, findings, validated_path }` where `findings: Vec<Finding>` lists every check that ran (Pass / Warn / Error / Notice), even on success. Useful for compliance reporting / audit / lint integration.\n- **C) Hybrid.** Default return is `Result<ValidatedPath, Error>`. Optional verbose variant (`verify_tls_server_verbose(...) -> VerifyReport`) for callers who want structured findings.\n\n**A is the lowest-friction shape.** B earns its keep only if `.6` chooses to fold lint findings into the same pipeline AND callers want lint findings rolled up with verify outcomes. C is the easy compromise but doubles the API surface.\n\n**Lower priority than the identity-binding gap.** Can ship after the main verify_* wrappers land.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide structured-findings layer on top of Result<ValidatedPath, Error>",
+  "updated_at": "2026-05-12T18:32:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

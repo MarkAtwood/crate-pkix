@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "cb5431021bf22a2f2c80c2468988d230f4ec1efda5e57c6354757ff2ccc5780c",
+  "created_at": "2026-05-08T05:45:18Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.5(a)+(b) leaf finalisation + \u00a76.1.5(g) intersect-tree-with-user-initial-policy-set (lines 2669\u20132828) into `pub(crate) fn finalise_policy_tree_with_user_set(state: &mut WorkingState, policy: &ValidationPolicy) -> Result<()>`.\n\n## Risk\n\nHIGH. Largest single helper; final state-machine resolution.\n\n## \u00a76.1.5(a) decrement-skip optimisation (PKIX-als9 design \u00a77)\n\n> \"\u00a76.1.5(a) skips the RFC-mandated decrements of inhibit_any and policy_mapping with comment neither is read after \u00a76.1.5(a) (lines 2683\u20132685). Static-analysis claim, not tested invariant. If H11 extracted, comment must move with it; if any future code reads those after H11, the optimisation becomes a bug.\"\n\nThe comment must move WITH the code into H11 and be made even more explicit at the helper boundary.\n\n## PKITS coverage gap (design \u00a75)\n\n> \"8-way `initial_*` flag matrix in \u00a76.1.5(g) \u2014 partial coverage; H11 is where this would bite.\"\n\n## Dependencies\n\n- H10 (sequenced).\n\n## Acceptance\n\n- New helper.\n- Comment about \u00a76.1.5(a) decrement skip moved with the code, with explicit warning at helper boundary.\n- PKITS tests for `initial_explicit_policy`, `initial_policy_mapping_inhibit`, `initial_any_policy_inhibit` pass.\n- \u00a74.5, \u00a74.8\u2013\u00a74.12 all pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: H11 \u2014 extract finalise_policy_tree_with_user_set (~160 lines, \u00a76.1.5(a)+(b)+(g))",
+  "updated_at": "2026-05-08T05:45:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-07T22:46:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.14",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

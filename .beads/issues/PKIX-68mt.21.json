@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:36:11Z",
+  "compaction_level": 0,
+  "content_hash": "a22932bd6938771fed2a2120313e72851c6110e9d1cf032b5877fd4de9febcc8",
+  "created_at": "2026-05-14T19:19:12Z",
+  "created_by": "Mark Atwood",
+  "description": "ServerName<'a> and MailboxName<'a> are parameterized by 'a \u2014 the borrow of the input string. Internally they hold Cow<'a, str>, so the lifetime is only meaningful when the result happens to be Cow::Borrowed; the Cow::Owned cases (lowercased ASCII, A-label-converted U-label, IDN) carry an effectively-'static buffer hidden behind the 'a parameter.\n\nCaller impact (forcing-defensive-code):\n\n1. Any caller that stores a ServerName in a struct must thread 'a \u2014 even though the type may already own its data. This propagates the lifetime through Verifier configs, batch processors, cache structs.\n\n2. Returning a ServerName from a function that took owned input requires *constructing* a 'static-lifetime version. The only way to do that today is to leak the input string or stash it somewhere with the right scope. There is no:\n\n       ServerName::into_owned(self) -> ServerName<'static>\n\n   or:\n\n       ServerName::from_owned_dns_name(name: String) -> Result<Self, IdentityError>\n\n3. Callers writing trait objects need 'static bounds everywhere; ServerName<'_> can't satisfy them.\n\n4. The pkix-chain Verifier per AGENTS.md non-negotiable #6 must admit batch + caching patterns. Caches need 'static keys or values; ServerName<'a> can't be a cache key without the caller pre-allocating string buffers themselves.\n\nThis is the same shape that rustls-pki-types::ServerName solved by being 'static-only (owns its data; takes &str by value at parse, allocates if needed). webpki::SubjectNameRef takes the opposite stance (always-borrow) but adds a SubjectName owned variant.\n\nThe current shape \u2014 generic over 'a, but secretly may own \u2014 is the *worst* of both worlds: callers pay the lifetime tax even when nothing borrows.\n\nRecommend (one of):\n\na) Make the type 'static-only: store Box<str> / String / Box<[u8]>, drop the 'a parameter entirely. The borrowed-input fast path can return a ServerName built from the input string, allocating in any non-trivial case. This matches rustls-pki-types::ServerName.\n\nb) Keep 'a but add into_owned(self) -> ServerName<'static>, with the existing 'a constructors retained as the zero-alloc fast path.\n\nc) Add 'static-only sibling types ServerNameOwned, MailboxNameOwned with conversions.\n\nSeverity P1 because the 'a parameter is part of the published API surface; removing it later is a breaking change. This decision must be made before 1.0.\n\nRelated to PKIX-68mt.14 (Cow<'a, str> decision already filed as P3) but distinct \u2014 that filing is about the *internal* representation; this filing is about the *external* lifetime parameter and the missing into_owned() escape hatch.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ServerName / MailboxName lifetime 'a forces caller-thread of borrow forever; no into_owned() / 'static escape hatch",
+  "updated_at": "2026-06-15T18:36:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:19:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

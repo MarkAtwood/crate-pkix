@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:21:03Z",
+  "compaction_level": 0,
+  "content_hash": "90cfa4f3d6ba49611b91aefaf4df8c699c6224eb84541a1ec437bdac59e7f3eb",
+  "created_at": "2026-05-06T20:17:01Z",
+  "created_by": "Mark Atwood",
+  "description": "cabf_tls_br.rs:RsaMinKeySizeLint uses rsa_modulus_byte_len (byte-length comparison: n_bytes >= 256 = 2048 bits). A 2047-bit RSA key has a modulus with top bit clear, but due to DER sign-byte encoding the value may still decode to 256 bytes \u2014 the leading zero is present ONLY when the top bit would be set. So a 2047-bit key actually has 256 bytes of modulus magnitude (no leading zero), measuring as 2048 bits under the byte-length check. The doc comment acknowledges this: 'a 2047-bit modulus is 256 bytes with a leading zero'. But a 2047-bit key does NOT have a leading zero (it has 256 bytes with a clear top bit). Byte-length floor at 256 passes both 2048-bit and 2047-bit keys. The doc comment is self-contradictory. Whether this violates the TLS BR (which requires 2048-bit minimum) is a real question. The lint should use rsa_public_key_bits() from pkix-path which correctly calculates bit length via UintRef (stripping the sign byte) and multiplying by 8 \u2014 this also rounds up by at most 7 bits, so it has the same lenience but is less confusing. At minimum, the doc comment is wrong and misleading.",
+  "ephemeral": 0,
+  "id": "PKIX-512.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RsaMinKeySizeLint: 2047-bit key passes 2048-bit floor check",
+  "updated_at": "2026-05-06T20:21:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented build_ocsp_request producing OcspRequestBytes{body, content_type=application/ocsp-request}. SHA-1 and SHA-256 supported via OcspHashAlg enum (non-exhaustive). CertID built with x509-ocsp's Request::from_cert::<D>. Test oracle is openssl ocsp -no_nonce -reqout, byte-for-byte equal for both algorithms. Additional regression test confirms (cert, issuer) argument order matters. No nonce in v0.x (acceptance criterion explicitly defers). Committed at f1a03899.",
+  "closed_at": "2026-05-09T00:33:34Z",
+  "compaction_level": 0,
+  "content_hash": "a18cbf48be6e039a7489aa00ac9a2a5ada23a9d7cc2ab28a5788ac36a21efb3e",
+  "created_at": "2026-05-08T23:28:00Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nTo POST an OCSP query to a responder, pkix-revocation-http must build a DER-encoded OCSPRequest (RFC 6960 \u00a74.1.1). The cert + issuer are inputs; the request body and content-type are outputs the fetcher can POST.\n\nThe `x509-ocsp` 0.2 crate (already a dep of pkix-revocation when ocsp feature is on) provides `x509_ocsp::OcspRequest` and `OcspRequestBuilder`. We build on top.\n\n## What\n\nPublic helper:\n\n```rust\npub struct OcspRequestBytes {\n    pub body: Vec<u8>,           // DER-encoded OCSPRequest\n    pub content_type: &'static str, // \"application/ocsp-request\"\n}\n\npub fn build_ocsp_request(\n    cert: &Certificate,\n    issuer: &Certificate,\n    hash_alg: OcspHashAlg,\n) -> Result<OcspRequestBytes, BuildError>;\n```\n\nWhere:\n- `OcspHashAlg` is an enum: `Sha1`, `Sha256` (RFC 6960 mandates SHA-1 support; SHA-256 widely deployed).\n- The helper builds CertID (RFC 6960 \u00a74.1.1) with:\n  - `hashAlgorithm` \u2014 AlgorithmIdentifier wrapping the chosen hash OID.\n  - `issuerNameHash` \u2014 hash of the issuer's distinguishedName (DER of issuer.tbs_certificate.subject).\n  - `issuerKeyHash` \u2014 hash of the issuer's subject public key BIT STRING value (no algorithm prefix; just the public key bits per RFC 6960 \u00a74.1.1).\n  - `serialNumber` \u2014 cert.tbs_certificate.serial_number.\n\nSingle CertID per request (multiple CertIDs in one request is RFC-allowed but rarely implemented; out of scope for v0.x).\n\nOptional nonce extension is a separate concern \u2014 defer to a follow-up bead. For v0.x, no nonce.\n\n## Acceptance\n\n- [ ] Helper produces DER bytes that round-trip through x509-ocsp::OcspRequest::from_der().\n- [ ] Both SHA-1 and SHA-256 supported and tested.\n- [ ] CertID fields are byte-for-byte equal to what `openssl ocsp -reqout` produces against the same cert pair (independent oracle).\n- [ ] Test fixtures: 2-3 cert+issuer pairs with hand-computed expected request DER (or computed once via openssl + committed as hex literals).\n- [ ] No nonce in v0.x; documented as known limitation.\n\n## Out of scope\n\n- Nonce extension (RFC 6960 \u00a74.4.1).\n- Multiple-CertID requests.\n- Signed OCSP requests (RFC 6960 \u00a74.1.2.2 \u2014 almost never used).\n\n## Effort\n\n~150 lines + tests + 2-3 fixture pairs.",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP request DER encoding helper",
+  "updated_at": "2026-05-09T00:33:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:28:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

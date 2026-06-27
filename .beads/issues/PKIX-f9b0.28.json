@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:44:27Z",
+  "compaction_level": 0,
+  "content_hash": "caf7fde3c00c47858f50b7fe4767775c29e43f1bb3d4a5b4b54e72eb7ce1e8aa",
+  "created_at": "2026-05-07T17:23:04Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/integration.rs:247 \u2014 const N: usize = 30; is declared inside a function body after executable statements (the pool.add loop references it below, but the const appears mid-function). Clippy pedantic items_after_statements flags this. Move the const to the top of the function (or make it a module-level constant) so all items precede statements, following Rust style.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path-builder] const N defined after statements in test fn",
+  "updated_at": "2026-05-07T18:44:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

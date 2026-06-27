@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.36",
+  "title": "ValidatedPath.depth is misleading for single-cert chains",
+  "description": "In pkix-path/src/lib.rs line 1494, depth is computed as chain.len().saturating_sub(1). For a 1-cert chain (just the leaf, anchored directly), depth = 0. This is technically correct (zero intermediates), but the field name 'depth' and the pub doc do not specify whether it counts intermediates or total chain length. A caller wanting 'how many certs are in the validated chain' would need depth + 1. What goes wrong: ambiguity for callers who interpret depth as chain length rather than intermediate count. The ValidatedPath struct is published and serde-serializable (AGENTS.md non-negotiable #6), so the semantic of this field fossilizes. Recommend: clarify the rustdoc to explicitly state 'number of intermediate certificates between the leaf and the trust anchor; 0 when the leaf is issued directly by the anchor.' Location: /home/mark/PROJECT/PKIX/pkix-path/src/lib.rs, ValidatedPath struct definition.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:34Z",
+  "updated_at": "2026-06-15T17:03:05Z",
+  "closed_at": "2026-06-15T17:03:05Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:33"
+    }
+  ]
+}

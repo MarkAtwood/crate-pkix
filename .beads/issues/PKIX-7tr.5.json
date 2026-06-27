@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:13:45Z",
+  "compaction_level": 0,
+  "content_hash": "0a5367808fcdebc9648cca0c02f48410e9ed3c20ee1dedd1450488f5cc34cf17",
+  "created_at": "2026-05-02T13:40:42Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path / chain_walk perform no deduplication check on the chain slice. If chain contains the same Certificate at two positions (or two certificates with the same subject/SPKI), the walk proceeds without error. A chain where chain[0] == chain[1] will fail signature verification or name linkage, but the error message will be misleading (SignatureInvalid or ChainBroken rather than a 'malformed input' indication). No deduplication test exists. Should detect and reject duplicate certs to avoid misleading error attribution.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "duplicate certs in chain are silently processed twice",
+  "updated_at": "2026-05-02T14:13:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

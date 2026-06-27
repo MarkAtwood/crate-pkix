@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:46:49Z",
+  "compaction_level": 0,
+  "content_hash": "3db291a9a16be2f52b8ef76c8069bf79ba8e5a574525ddfef5bd47415958c3c2",
+  "created_at": "2026-05-07T20:13:41Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`README.md:133\\` and \\`pkix-path/README.md:97-98\\` claim:\n> Name constraints \u2014 RFC 5280 \u00a74.2.1.10 (DNS, RFC 822, URI, DirectoryName)\n\nBut \\`pkix-path/src/lib.rs\\`:\n- \\`name_type_bit\\` (L1576) tracks \\`IpAddress\\` (\\`NcTypeMask::IP_ADDRESS\\` at L1549).\n- \\`name_matches_subtree\\` (L1645\u20131647) dispatches IP address matching.\n- \\`matches_ip_address\\` (L1752) implements RFC 5280-style IP address NC matching for both IPv4 (8-byte mask+addr) and IPv6 (32-byte mask+addr).\n\n## Why P2\nSection 0 anchor \u2014 the README is a feature list that downstream consumers depend on for capability decisions. Under-reporting capability is less harmful than over-reporting, but a CA/auditor checking \\\"does this validator support IP NC?\\\" reading the README will conclude no, when the answer is yes. They will then choose a less-suitable validator on a false negative.\n\n## Fix\nUpdate both READMEs to list IpAddress in the supported NC name forms, e.g.:\n> Name constraints \u2014 RFC 5280 \u00a74.2.1.10 (DNS, RFC 822, URI, DirectoryName, IpAddress)\n\n## Scope reference\n\\`README.md:133\\`, \\`pkix-path/README.md:97-98\\`, supporting code at \\`pkix-path/src/lib.rs:1549,1576,1645-1647,1752\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-3atu",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: Workspace README under-reports IP address NameConstraints support",
+  "updated_at": "2026-05-07T20:46:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

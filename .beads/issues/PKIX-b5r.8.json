@@ -1,0 +1,31 @@
+{
+  "close_reason": "False alarm: the pre-deletion vpns_policies set correctly captures which policies are in the intersection before filtering; using it for the subsequent step-3 check is correct.",
+  "closed_at": "2026-05-05T16:10:13Z",
+  "compaction_level": 0,
+  "content_hash": "a1701129bd9f0dc9afd38c3daf0024ef4d9c86a9d2600189c00b79278f48d35c",
+  "created_at": "2026-05-05T15:46:07Z",
+  "created_by": "Mark Atwood",
+  "description": "**Bug**: In the \u00a76.1.5(g)(iii)(3) implementation at lib.rs:2141, the check for whether to materialize a new node uses `vpns_policies` (collected at line 2077-2080 BEFORE step (iii)(2) deletions). After step (iii)(2) deletes some vpns nodes, `vpns_policies` still contains their OIDs. So step (iii)(3) will NOT re-add those deleted policies (the check `!vpns_policies.contains(p_oid)` returns false for a policy that WAS in vpns_policies but whose node was deleted).\n\nRFC 5280 \u00a76.1.5(g)(iii)(3) says: 'If a node would be created whose valid_policy is already present in the valid_policy_node_set, that node need not be created.' The valid_policy_node_set is what REMAINS after step (iii)(2), not the original set.\n\n**Scenario**: Suppose initial_policy_set = {P1, P2} and after step (iii)(2), P1's vpns node was deleted (P1 not in initial_policy_set would be deleted, but if P1 IS in the set it stays). Actually re-reading: (iii)(2) deletes vpns nodes NOT in initial_policy_set. So if P1 is in initial_policy_set, its node stays. The dedup at (iii)(3) uses vpns_policies (before deletion) \u2014 for nodes that survived (iii)(2), they'll be in both the pre-deletion list and the tree, so (iii)(3) correctly skips them. For nodes deleted in (iii)(2), they're in vpns_policies but not in the tree, so (iii)(3) would skip re-creating them \u2014 but they SHOULD be re-created if they're in initial_policy_set... wait, if they were in vpns_policies and got deleted by (iii)(2) it means they were NOT in initial_policy_set. So (iii)(3) correctly doesn't re-add them.\n\n**Actually**: step (iii)(3) materializes nodes for initial_policy_set members NOT already in vpns_policies. The intent is: if initial_policy_set has P3 and P3 wasn't in the tree at all (not in vpns_policies), create it via the leaf anyPolicy node. If P3 WAS in vpns_policies (and survived (iii)(2) because it's in initial_policy_set), don't duplicate it.\n\nThe bug scenario is: P3 was in vpns_policies but was deleted by (iii)(2) because P3 is NOT in initial_policy_set. Then (iii)(3) checks initial_policy_set: if P3 is NOT in initial_policy_set, the loop doesn't iterate over P3 anyway (we iterate over initial_policy_set members). So this is actually correct.\n\n**Resolution**: After careful analysis, this is NOT a bug. The logic correctly handles the invariant: vpns_policies-before-deletion contains exactly the policies that (iii)(2) either kept (in initial_policy_set) or deleted (not in initial_policy_set). (iii)(3) only creates nodes for initial_policy_set members NOT yet in vpns_policies, which means 'not yet in the tree at all'. This is correct.\\n\\nDowngrading to P4 documentation: the code is correct but the variable name `vpns_policies` being collected before step (iii)(2) is confusing \u2014 a comment should explain why pre-deletion collection is semantically correct here.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "\u00a76.1.5(g)(iii) step 3 dedup uses wrong set",
+  "updated_at": "2026-05-05T16:10:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

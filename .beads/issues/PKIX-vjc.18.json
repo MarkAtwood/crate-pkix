@@ -1,0 +1,31 @@
+{
+  "close_reason": "Resolved by vjc.10 fix: OID_EMAIL_ADDRESS moved before the function doc comment",
+  "closed_at": "2026-05-03T00:38:35Z",
+  "compaction_level": 0,
+  "content_hash": "5109a5f814cbc2169070fdf5f248cb6fbfb0aaf50afe98749eaddac69ecbb2c7",
+  "created_at": "2026-05-03T00:12:49Z",
+  "created_by": "Mark Atwood",
+  "description": "The check_name_constraints function (line 1363) has its doc comment split: lines 1352-1358 form a doc comment, then OID_EMAIL_ADDRESS const definition (lines 1360-1361) interrupts it. Rustdoc attaches lines 1352-1358 to the CONST, not to the function. The function then has no doc comment rendered. This is confirmed by the structure: /// lines immediately before a const = that const's doc. A new contributor reading docs.rs will see no documentation for check_name_constraints.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.18",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "comment at line 1357 is a fragment split from function doc by OID_EMAIL_ADDRESS const",
+  "updated_at": "2026-05-03T00:38:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

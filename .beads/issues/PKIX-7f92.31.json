@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "57e1d41a9136437afabe3eda581fd50c717a3079cbffa46abec3db1c3220fd22",
+  "created_at": "2026-05-14T16:01:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:512, :534 \u2014 Both constructors return Result<Self, der::Error>:\n\n  pub fn issuer_dn_exact(name: &x509_cert::name::Name) -> Result<Self, der::Error>\n  pub fn serial_range(issuer: &x509_cert::name::Name, start: Vec<u8>, end: Vec<u8>) -> Result<Self, der::Error>\n\nder::Error is RustCrypto/formats' pre-1.0 (currently 0.7.x) error type whose semver-major is now pinned to pkix-lint's public API. When `der` cuts a major version \u2014 or restructures its Error type in a 0.x bump \u2014 both constructors' signatures break unconditionally, even for callers who do not care about der-level details.\n\nCALLER IMPACT: A caller writing:\n  match DeviationScope::issuer_dn_exact(&name) {\n      Ok(scope) => { ... }\n      Err(e) => log::error!(\"malformed name DN: {e}\"),\n  }\n\ndepends on the concrete der::Error type. If their crate also depends on der at a different major (because, e.g., a different transitive dep pulled der 1.0), the types stop unifying.\n\nREMEDIATION: Wrap der::Error in a pkix-lint-local opaque error type. Either:\n\n1. Add a new variant to DeviationAddError:\n     pub enum DeviationAddError {\n         ...\n         #[error(\"malformed DER in deviation scope: {0}\")]\n         MalformedScopeDer(String),\n     }\n   and map der::Error to String at the constructor boundary. Loses fine-grained error data but pkix-lint doesn't expose der-level details elsewhere either.\n\n2. Introduce DeviationScopeError as a dedicated error type:\n     #[non_exhaustive]\n     pub enum DeviationScopeError {\n         MalformedIssuerDn { detail: String },\n         InvalidSerialRange { detail: String },\n     }\n   and map der::Error inside the constructor.\n\nBoth options decouple pkix-lint's public surface from der's evolution.\n\nCombined with the &x509_cert::Name parameter leak (separate finding \u2014 same constructors), fixing both produces:\n\n  pub fn issuer_dn_exact(issuer_der: &[u8]) -> Result<Self, DeviationScopeError>\n  pub fn serial_range(issuer_der: &[u8], start: Vec<u8>, end: Vec<u8>) -> Result<Self, DeviationScopeError>\n\nwith zero direct exposure to either x509-cert or der in the DeviationScope public surface.\n\nPre-1.0 free fix.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "DeviationScope::issuer_dn_exact and ::serial_range return Result<_, der::Error>; pins der pre-1.0 major version into pkix-lint public API",
+  "updated_at": "2026-05-14T16:01:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:01:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

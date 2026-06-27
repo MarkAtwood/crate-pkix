@@ -1,0 +1,33 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path passes; cargo clippy -p pkix-path -- -D warnings clean; cargo fmt -- --check clean.",
+  "assignee": "Mark Atwood",
+  "close_reason": "TrustAnchor gains name_constraints field, #[non_exhaustive], try_find_cert_ext helper, TryFrom impls; from_cert populates via find_cert_ext",
+  "closed_at": "2026-05-03T13:08:58Z",
+  "compaction_level": 0,
+  "content_hash": "4717086f0a5a298c56887d2a4dd8559d674f11cb58efa884c0a860d3d2d184fa",
+  "created_at": "2026-05-03T13:04:27Z",
+  "created_by": "Mark Atwood",
+  "description": "Add `pub name_constraints: Option<NameConstraints>` to `TrustAnchor`, add `#[non_exhaustive]`, and update all constructors.\n\n**What:** Extend TrustAnchor so it can carry an optional NameConstraints value extracted from the trust anchor certificate's NC extension.\n\n**Algorithm:**\n1. Add `#[non_exhaustive]` attribute above the TrustAnchor struct definition (pkix-path/src/lib.rs ~line 237). Rationale: bundles the field addition as a single breaking change; prevents external struct-literal construction going forward.\n2. Add field `pub name_constraints: Option<x509_cert::ext::pkix::constraints::name::NameConstraints>` to TrustAnchor struct.\n3. Update `TrustAnchor::new(subject, spki)` signature to `new(subject, spki, name_constraints: Option<NameConstraints>) -> Self`. Update both internal call sites (~line 1624 and ~line 1987) to pass `None`.\n4. In `from_cert(cert: Certificate) -> Self`: call `find_cert_ext::<NameConstraints>(&cert, OID_NAME_CONSTRAINTS)` before moving cert fields out; populate the new field. This is fail-open (decode error \u2192 None) which is acceptable for the infallible constructor.\n5. In `From<&Certificate> for TrustAnchor`: same change as from_cert.\n6. Add a private helper `try_find_cert_ext<T: der::DecodeOwned>(cert: &Certificate, oid: der::asn1::ObjectIdentifier) -> Result<Option<T>>` that returns Ok(None) for absent, Ok(Some(T)) for present+valid, Err(Error::Der(e)) for present+invalid.\n7. Add `impl TryFrom<Certificate> for TrustAnchor { type Error = Error; fn try_from(cert: Certificate) -> Result<Self, Error> }` using try_find_cert_ext for fail-closed NC extraction.\n8. Add `impl TryFrom<&Certificate> for TrustAnchor { type Error = Error; fn try_from(cert: &Certificate) -> Result<Self, Error> }` similarly.\n9. Update both `impl` blocks (from_cert and From<&Certificate>) to call find_cert_ext and populate the field.\n\n**Defensive programming rules:**\n- try_find_cert_ext: if the NC extension is present but T::from_der returns Err, return Err(Error::Der(e)) \u2014 never silently treat it as absent in the TryFrom path.\n- from_cert (infallible path): use find_cert_ext which maps decode errors to None \u2014 document this in a comment.\n- No unwrap() in production code without a comment explaining why it cannot fail.\n\n**Tests:** verify that from_cert on a cert with no NC gives name_constraints=None; from_cert on cert with valid NC gives Some(...); TryFrom on cert with malformed NC bytes gives Err(Error::Der).",
+  "ephemeral": 0,
+  "id": "PKIX-aoe.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor: add name_constraints field and update constructors",
+  "updated_at": "2026-05-03T13:08:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:04:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

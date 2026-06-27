@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:03:42Z",
+  "id": "019e15d9-4819-7c8b-8fb3-d98852e187ed",
+  "issue_id": "PKIX-amgn.2",
+  "text": "Dependency ordering issue: step 5 of this bead's description says 'Move ... after PKIX-amgn.4 lands its refactor' but bd says amgn.4 is blocked-by amgn.2 (this bead). Needs untangling before work starts. Likely split: amgn.2a (empty skeleton crate with rustdoc header, no content), amgn.2b (move content from pkix-profiles), where amgn.2a blocks amgn.4 and amgn.4 blocks amgn.2b. Also: creating a new workspace crate touches workspace structure broadly \u2014 wanted explicit maintainer go-ahead before doing so even though parent epic PKIX-amgn endorses the split."
+}

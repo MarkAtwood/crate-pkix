@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:36:12Z",
+  "compaction_level": 0,
+  "content_hash": "593a121ee6862eaab252000202719684753bb7529b8b3c3bdf4a345e7f4bccb7",
+  "created_at": "2026-05-14T18:56:07Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:265-301: `InMemoryCache::get_crl` / `get_ocsp` call `is_live(entry.next_update, SystemTime::now())` to decide expiry. But `HttpCrlFetcher::now_unix` / `HttpOcspFetcher::now_unix` are caller-supplied UNIX-epoch seconds for the validation time. The two time sources are not synchronized.\n\nTrigger: any caller using a non-wall-clock validation time \u2014 e.g. backdated path validation (audit replay, attestation, offline / archived chain validation), forward-dated testing, or hostile-clock environments \u2014 will see incoherent behaviour. Concretely: (a) caller passes now_unix in the past so the validator should accept a cached CRL whose nextUpdate is in the past relative to wall-clock \u2014 InMemoryCache evicts it (returns None) and forces a refetch every call; or worse (b) caller passes now_unix in the future, the validator should reject a cached CRL whose nextUpdate is in the past relative to its now_unix \u2014 InMemoryCache returns the cached entry as live because nextUpdate > SystemTime::now() still holds. The validator then accepts it.\n\nBad behavior: case (b) is a security-relevant correctness bug \u2014 the cache serves entries the validator's own clock considers stale. CrlChecker::new will re-evaluate the CRL validity window against now_unix and reject it as CrlExpired, so the failure surfaces; but only by accident, because CrlChecker happens to redo the freshness check. If a future refactor of CrlChecker drops the redundant freshness check (reasonable optimization since the cache 'should' have filtered), the cache becomes a correctness gap.\n\nFix: thread now_unix into the cache layer. Either pass it through RevocationCache::get_*(key, now_unix) (breaks the trait \u2014 minor pre-1.0), or move the is_live check out of the trait and into the wrapper's miss/hit handling.\n\nNote: the rustdoc on RevocationCache::get_* says 'MUST return None for entries whose next_update is in the past' without naming a time source, so the trait itself is silent on this. The reference impl resolves it to SystemTime::now(); that resolution is the bug.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Cache freshness uses wall-clock SystemTime::now() while validator uses caller-supplied now_unix",
+  "updated_at": "2026-06-15T18:36:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:56:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "02436dca64ef84f50ba9d0383e355e82854aaefa251b11903b2b514aef534e42",
+  "created_at": "2026-05-14T16:09:25Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1300-1336 builds `HashMap<&'static str, Option<Box<dyn Lint>>>` keyed by lint id, then on each `id` in the input slice does:\\n\\n```rust\\nlet key = by_id\\n    .keys()\\n    .copied()\\n    .find(|k| *k == id.as_str())\\n    .ok_or_else(...)?;\\nif let Some(lint) = by_id.get_mut(key).and_then(|slot| slot.take()) { ... }\\n```\\n\\nThe `keys().find()` walk is O(n) per lookup, making the whole loop O(n\u00b2) \u2014 exactly what the HashMap was meant to avoid. The roundabout shape exists because the author thought there was a lifetime issue between the runtime `id: String` and the `&'static str` keys.\\n\\nThere is no lifetime issue: `HashMap<&'static str, V>: HashMap<K, V>` where `K: Borrow<str>`, so `by_id.remove(id.as_str())` works directly and returns `Option<Option<Box<dyn Lint>>>`. The `Option<Box<dyn Lint>>` wrapper for tombstoning is also unnecessary \u2014 `HashMap::remove` already consumes the entry exactly once, which is the same single-take semantic the tombstone provides.\\n\\nIdiomatic shape:\\n\\n```rust\\nlet mut by_id: HashMap<&'static str, Box<dyn Lint>> = self.lints.into_iter().map(|l| (l.id(), l)).collect();\\nlet mut filtered = Vec::with_capacity(ids.len());\\nfor id in ids {\\n    let lint = by_id.remove(id.as_str())\\n        .ok_or_else(|| ParseError::UnknownLintId { id: id.clone() })?;\\n    filtered.push(lint);\\n}\\n```\\n\\nThis is correctness-flavored (the O(n\u00b2) shape is wrong for the same reason the EvidenceIndex::build O(N\u00b2) was wrong in PKIX-7f92.11) and idiom-flavored (using HashMap correctly). Filed as P2 because typical lint counts are small (~50) so the practical penalty is microseconds, but the code reads as if the author lost a fight with the borrow checker \u2014 which is the canonical 'gave up on the borrow checker' smell from the ownership subsection.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.45",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner::filter_to_ids builds HashMap then iterates keys linearly \u2014 defeats the lookup index",
+  "updated_at": "2026-05-14T16:09:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:09:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

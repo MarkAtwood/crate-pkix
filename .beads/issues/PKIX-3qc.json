@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:48:48Z",
+  "compaction_level": 0,
+  "content_hash": "819044749869dfbbe539c24dd380fc44c2aa4098a7c1ef274e307daecb1e09da",
+  "created_at": "2026-05-06T21:46:25Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs - In check_revocation(), the cRLSign KeyUsage check (issuer_has_crl_sign) fires at line 218 for the base CRL issuer, but there is no equivalent check on the delta CRL issuer before verify_delta_crl_and_collect() verifies its signature. RFC 5280 \u00a76.3.3(f) requires cRLSign on any CRL issuer. In the current code both the base and delta are signed by the same issuer cert, so the base check transitively covers the delta \u2014 but this is not explicit and could become a silent gap if the code is ever refactored to support indirect CRLs (different delta issuer). At minimum this should be documented. Severity: currently safe due to same-issuer invariant, but the missing check is a correctness gap relative to the RFC text.",
+  "ephemeral": 0,
+  "id": "PKIX-3qc",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Delta CRL issuer cRLSign not checked before verifying delta signature",
+  "updated_at": "2026-05-06T21:48:48Z"
+}

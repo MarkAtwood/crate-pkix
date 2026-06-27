@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f492549ab491730d30a007411e2f831772c21e3c5201e6349fb07f46955cf5b8",
+  "created_at": "2026-05-14T14:23:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:68 marks Error #[non_exhaustive] (good). But the public data structs:\n- CtLog (log_list.rs:25) \u2014 likely to grow fields (mmd_seconds, log_type, dns API base, etc.)\n- SctList (sct.rs:137) \u2014 newtype Vec<SCT>, low risk but still\n- SignedCertificateTimestamp (sct.rs:56) \u2014 likely to grow if RFC 9162 v2 ever ships\n- MerkleAuditPath (verify.rs:592) \u2014 could grow (e.g., explicit subtree_size for partial proofs)\n- SignedTreeHead (verify.rs:568) \u2014 could grow\n\nNone of them carry #[non_exhaustive]. Adding any field becomes a breaking change to construction (pattern matching is unlikely on these but exhaustive construction is).\n\nPer AGENTS.md prelaunch framing ('Design for the eventual complete shape', 'Breaking changes are free'): pre-1.0 the marker is cheap and removes a class of future breaking changes. Post-1.0 adding fields without the marker is breaking.\n\nPre-1.0 the practical cost is callers must use struct update syntax or .new() \u2014 both healthy. Suggested fix: add #[non_exhaustive] to each public struct that's expected to grow, and add a constructor (CtLog::new() / SignedCertificateTimestamp::new()) that takes all current fields and returns Self. Same shape as the workspace's existing TrustAnchor / ValidationPolicy non-exhaustive types.\n\nReference: PKIX-tit4.29 (Error::MalformedAnchor struct variant) is the same kind of finding in pkix-truststore; same fix applies here at struct level.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Public data structs (CtLog, SctList, SignedCertificateTimestamp, MerkleAuditPath, SignedTreeHead) lack #[non_exhaustive]",
+  "updated_at": "2026-05-14T14:23:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:23:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

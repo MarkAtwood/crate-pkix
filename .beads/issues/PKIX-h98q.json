@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:20Z",
+  "compaction_level": 0,
+  "content_hash": "71214e22568c7e1492d69001213192bc6e4c10d662c6e1bb1a1a96e37d4ac607",
+  "created_at": "2026-05-07T20:27:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-path::Error::Der(der::Error)` at `pkix-path/src/lib.rs:143` exposes `der::Error` directly in the public API. PKIX-6sml flagged the same shape on `pkix-revocation::Error::CrlParseError`; this is the same pattern in pkix-path and should be tracked alongside it.\n\n## Location\n\n```\npkix-path/src/lib.rs:132-143\n\n/// ASN.1 / DER encoding or decoding error.\n///\n/// Returned when a structural encoding error is found in a certificate or\n/// when re-encoding `TBSCertificate` for signature verification fails.\n/// ...\n/// Callers that want a stable match target should check for `Error::Der(_)`\n/// without inspecting the inner value; the specific `der::Error` variants\n/// are not part of the stable API contract.\nDer(der::Error),\n```\n\n## Impact\n\nThe doc comment instructs callers not to inspect the inner value, but the type system does not enforce this. A semver-breaking change in the `der` crate (a major-zero crate currently at 0.7) cascades into a semver-breaking change in pkix-path. Pinning to `der = \"0.7\"` does not prevent the leak when der hits 0.8 / 1.0.\n\nThe `MalformedCertificate` variant (line 74) takes a different approach \u2014 it omits the inner `der::Error` deliberately to keep the surface stable. Doing the same for `Der` (e.g., `Der { source_message: &'static str }` or just collapsing to a unit variant with the diagnostic context dropped) would close this leak.\n\n## Fix options\n\n1. **Wrap**: introduce a private `DerError` newtype with a stable `Display`/`source` impl.\n2. **Drop the payload**: `Der` becomes a unit variant; `source()` returns `None`.\n3. **Defer**: leave for v0.3 / Rust 2024 edition, document the constraint more loudly.\n\nThis is the same trade-off PKIX-6sml describes for `CrlParseError`. Resolving them together would make sense.\n\n## Priority\n\nP3 \u2014 API hygiene. Pre-1.0 cost is low; post-1.0 it becomes a permanent semver constraint.\n",
+  "ephemeral": 0,
+  "id": "PKIX-h98q",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path::Error::Der(der::Error) leaks der::Error into stable API (mirrors PKIX-6sml)",
+  "updated_at": "2026-05-07T21:25:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

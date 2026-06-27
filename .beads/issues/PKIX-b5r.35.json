@@ -1,0 +1,31 @@
+{
+  "close_reason": "False alarm: anyPolicy expansion inhibit condition uses inhibit_any > 0 which is the correct RFC 5280 \u00a76.1.3(d)(2) check.",
+  "closed_at": "2026-05-05T16:10:42Z",
+  "compaction_level": 0,
+  "content_hash": "a9017cf45e5a01cd3aed062d77572cbfb07ccbdf7139fdf53df346ace48394d7",
+  "created_at": "2026-05-05T15:49:54Z",
+  "created_by": "Mark Atwood",
+  "description": "The anyPolicy expansion condition at lib.rs:1664 reads:\\n\\n    let may_expand = inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));\\n\\nRFC 5280 \u00a76.1.3(d)(2) says anyPolicy is processed 'if (1) the inhibitAnyPolicy state variable is greater than 0 or (2) the certificate being processed is self-issued and it is not the final certificate in the path.'\\n\\nThe condition i > 0 correctly identifies non-leaf certs (i==0 is the leaf). And is_self_issued_cert() is checked. So (inhibit_any > 0) OR (i>0 AND self-issued) \u2014 this matches the RFC exactly.\\n\\nHowever: the RFC says 'not the final certificate in the path' for the self-issued exception. The final certificate in the path is chain[0] (i==0, the leaf). So 'i > 0' correctly identifies non-final certs. This is correct.\\n\\nBUT: RFC 5280 \u00a76.1.4(d) (the counter update for anyPolicy) says the inhibit_any counter is decremented in the \u00a76.1.4 steps (intermediate cert processing), not \u00a76.1.3. Let me verify the ordering: the code processes inhibit_any decrement at line 1896 (inside the 'i > 0' block, after policy mappings). The anyPolicy expansion check at line 1664 uses the CURRENT value of inhibit_any (before the decrement for this cert). RFC 5280 \u00a76.1.3(d)(2) says to check inhibitAnyPolicy as currently set \u2014 which at that point is after all previous steps but before the \u00a76.1.4 decrement for the CURRENT cert. The current code does the expansion check at the RIGHT point (before the \u00a76.1.4 decrement).\\n\\nResolution: No bug. The inhibit_any check timing is correct. The (i > 0 && is_self_issued_cert) check is correct. Filing as P4 (document the timing analysis in a code comment near line 1663).",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.35",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS \u00a74.12 inhibitAnyPolicy: anyPolicy expansion condition off-by-one",
+  "updated_at": "2026-05-05T16:10:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:49:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

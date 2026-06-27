@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:01:56Z",
+  "compaction_level": 0,
+  "content_hash": "c2f0dd054957c69ac67f3ef0f8be75a2d0bfa07d1ad6c5b28ec71231154538eb",
+  "created_at": "2026-05-07T03:50:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:874-879 \u2014 validate_path_with_profile enforces 'Profile::policy() must set current_time_unix == now_unix' only via a debug_assert!, which is a no-op in release builds. A buggy Profile implementation that returns the wrong now_unix in the policy will silently cause validity checks to run against the wrong time. Fix: either (a) accept the Profile::policy() result and unconditionally overwrite policy.current_time_unix = now_unix after the call (trusting the caller's now_unix rather than the profile), or (b) replace the debug_assert with a hard check that returns Err in release builds.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Profile::policy contract enforced only by debug_assert",
+  "updated_at": "2026-05-07T04:01:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:50:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:57:38Z",
+  "compaction_level": 0,
+  "content_hash": "c59a199b3d1b8fd673113580f46f4d7b0ec18deaca5389deb05d3cf84d3557ad",
+  "created_at": "2026-05-07T17:22:20Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:3010,3015,3045,3050 \u2014 `use` items appear after `let` statements inside test functions (tests_ecdsa_p256 and tests_rsa modules). Clippy pedantic items_after_statements fires. Fix: move `use der::Encode as _` and `use spki::der::referenced::OwnedToRef as _` to the top of each test function, before the first let-binding.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] items_after_statements in unit test functions",
+  "updated_at": "2026-05-07T18:57:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

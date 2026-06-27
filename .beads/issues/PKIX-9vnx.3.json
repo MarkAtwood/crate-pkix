@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:19:21Z",
+  "compaction_level": 0,
+  "content_hash": "1fa14eccf1a7e5b8f888b2c428f7aa71bbf35312528a2b63e1b981113cad50b0",
+  "created_at": "2026-05-11T05:53:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint::EvaluationReport` is the canonical output of a lint run. Under Level 3 OSCAL alignment, it IS an OSCAL Assessment Results document, just typed in Rust.\n\n## What\n\nReshape `EvaluationReport` so its fields and structure correspond 1:1 to OSCAL Assessment Results:\n\n- `assessment-results.uuid` \u2014 generated UUID per run.\n- `assessment-results.metadata` \u2014 `title`, `last-modified` (= evaluated_at), `version`, `oscal-version`, `props` (carrying `rule-bundle-version`).\n- `assessment-results.import-ap` \u2014 reference to an Assessment Plan (caller-supplied or minimal stub).\n- `assessment-results.results[]` \u2014 typically one Result per run, containing:\n  - `uuid`, `title`, `description`, `start`, `end` (= evaluation start / end time).\n  - `findings[]` \u2014 see PKIX-9vnx.4.\n  - `observations[]` \u2014 see PKIX-9vnx.4 (Findings reference Observations).\n  - `risks[]` \u2014 see PKIX-9vnx.5 (DeviatedFindings become Risks with status=deviation-approved).\n  - `reviewed-controls` \u2014 references to the Controls (lints) that were evaluated.\n\nExisting fields like `profile_id` and `rule_bundle_version` map onto OSCAL's existing slots (`profile_id` \u2192 `reviewed-controls.control-objective-selections[].control-id` or similar; `rule_bundle_version` \u2192 `metadata.props[name=rule-bundle-version]`).\n\n## Acceptance\n\n- [ ] `EvaluationReport` Rust type has fields named per OSCAL conventions (or wraps an inner OSCAL Assessment Results struct).\n- [ ] Serde round-trips against the NIST OSCAL JSON Schema (or via oscal-cli validation in CI).\n- [ ] Existing tests that construct `EvaluationReport` updated.\n- [ ] CHANGELOG entry documenting the breaking change.\n\n## Depends on\n\nPKIX-9vnx.2 (OSCAL Rust binding must exist before we can field-align).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Reframed 2026-05-11 (Arch 2 \u2014 see PKIX-ztmr / PKIX-9vnx notes):\n\n- Title intent shifts from 'realign EvaluationReport TO OSCAL Assessment Results' to 'add OSCAL Assessment Results serializer for EvaluationReport.'\n- EvaluationReport's Rust shape does NOT need to mirror OSCAL field-for-field. Internal fields stay lean and lint-work-tailored.\n- Deliverable: `pkix_lint::oscal::emit::assessment_results(report: &EvaluationReport) -> serde_json::Value` (or equivalent), producing JSON that validates against oscal_assessment-results_schema.json v1.2.2.\n- Acceptance: serializer round-trips against NIST OSCAL schema (re-emit + reparse fidelity for the EvaluationReport projection).\n- No longer blocked by PKIX-9vnx.2 (closed).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Realign EvaluationReport to OSCAL Assessment Results",
+  "updated_at": "2026-05-11T17:19:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:53:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

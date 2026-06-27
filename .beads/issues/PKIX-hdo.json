@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "implemented check_extensions: leaf whitelist + CA guard, intermediate whitelist + BasicConstraints+KeyUsage required check",
+  "closed_at": "2026-05-02T06:40:07Z",
+  "compaction_level": 0,
+  "content_hash": "1eed5339d773dd0780fda143b4a34076faebb3db83cb9758af62ee43d444f4a2",
+  "created_at": "2026-05-02T05:54:00Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement check_extensions() in pkix-chain-simple/src/lib.rs (currently todo!() at line 335). This is the core of the simplicity gate.\n\nBLOCKED BY: PKIX-cfh API fixes (specifically the SignatureVerifier and TrustAnchor changes).\n\nLeaf cert path (is_leaf=true):\n  1. Walk cert.tbs_certificate.extensions (an Option<Extensions>, i.e., Option<Vec<Extension>>)\n  2. For each Extension: if ext.extn_id not in ALLOWED_LEAF_EXTENSIONS \u2192 Error::UnexpectedExtension { index }\n     (applies to BOTH critical and non-critical \u2014 the simplicity contract rejects everything unknown)\n  3. If BasicConstraints extension is present: parse it and check cA field.\n     If cA=TRUE \u2192 Error::LeafIsCA (the leaf is a CA cert, not an end-entity)\n     If cA=FALSE or absent \u2192 fine\n\nIntermediate path (is_leaf=false):\n  1. Walk extensions; any OID not in ALLOWED_INTERMEDIATE_EXTENSIONS \u2192 Error::UnexpectedExtension { index }\n  2. Check BasicConstraints is present and cA=TRUE:\n     Absent or cA=FALSE \u2192 Error::MissingRequiredExtension { index }\n  3. Check KeyUsage is present and keyCertSign bit is set:\n     Absent or bit not set \u2192 Error::MissingRequiredExtension { index }\n     (pkix-chain-simple always requires these; it does not honour enforce_key_usage=false)\n\nx509-cert extension access: cert.tbs_certificate.extensions returns Option<&Extensions>.\nUse x509_cert::ext::pkix::BasicConstraints and x509_cert::ext::pkix::KeyUsage decoded from the raw Extension.extn_value bytes.",
+  "ephemeral": 0,
+  "id": "PKIX-hdo",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: implement check_extensions",
+  "updated_at": "2026-05-02T06:40:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:54:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9f7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

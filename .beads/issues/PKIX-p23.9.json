@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:14Z",
+  "compaction_level": 0,
+  "content_hash": "8a2c1a755688c9f4b305f32ca89d41a0ce79d4bfbc4e11eb90ba6333c7e7a59f",
+  "created_at": "2026-05-06T21:31:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs: DeviationScope::IssuerDnContains requires the stored substring to be pre-lowercased (documented at lines 222-225). The existing test at line 919-923 tests that a completely nonexistent substring does not match, but there is no negative test that passing an uppercase substring silently fails to match. Given this is a documented API footgun (operators must remember to lowercase), there should be a test that:\n1. Confirms that IssuerDnContains(\"AGENCY X\".to_string()) does NOT match a cert whose issuer contains \"Agency X\" \u2014 proving the silent non-match behavior.\n2. Makes the footgun visible in the test suite so future reviewers understand why the lowercasing requirement exists.\n\nWithout this test, the behavior is only documented in prose, not verified in code.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: No test for IssuerDnContains with uppercase-stored substring (documents silent no-match)",
+  "updated_at": "2026-05-06T21:42:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

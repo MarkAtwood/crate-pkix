@@ -1,0 +1,61 @@
+{
+  "acceptance_criteria": "All 7 tests pass. u32::MAX pathLen test passes with no overflow. Saturating arithmetic confirmed in code review.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T07:05:26Z",
+  "compaction_level": 0,
+  "content_hash": "8c034ebf424eae69e2fdb6f55e95a6f981f2cc31f31096c6b9ea35c04ead0f10",
+  "created_at": "2026-05-02T06:14:19Z",
+  "created_by": "Mark Atwood",
+  "description": "Add the remaining per-cert checks to the walk loop from PKIX-vxf, plus the\npathLenConstraint state machine.\n\n## What (added inside the walk loop, after sig+name checks)\n\n### Per every cert (leaf and intermediates)\n  c. check_validity(cert[i], policy.current_time_unix)\n     -> Err(Error::ValidityPeriod { index: i })\n  d. check_critical_extensions(cert[i])\n     -> Err(Error::UnhandledCriticalExtension { index: i })\n\n### Per intermediate only (i > 0)\n  e. BasicConstraints cA=TRUE required\n     -> Err(Error::NotCA { index: i })\n  f. KeyUsage keyCertSign required (when policy.enforce_key_usage=true)\n     -> Err(Error::KeyUsageMissing { index: i })\n\n### pathLenConstraint state machine (RFC 5280 \u00a76.1.4(l)(m))\n  Initialize: max_path_length = policy.max_path_len\n  For each intermediate cert, if BasicConstraints.pathLenConstraint present:\n    let plen = cert.path_len_constraint as u64;  // widen from u32 first\n    if (plen as u8) < max_path_length (saturating) -> update max_path_length\n  After processing each intermediate, check remaining depth against max_path_length\n    -> Err(Error::PathTooLong)\n\n## Arithmetic safety requirements\n- NEVER do bare u8 decrement on max_path_length (underflow risk)\n- x509-cert represents pathLenConstraint as u32; u32::MAX must not overflow when\n  compared against u8 max_path_length. Use saturating_add/min/checked arithmetic.\n- Tested with pathLenConstraint = 0, 1, u32::MAX\n\n## Tests (externally-generated DER; openssl verify as oracle)\n- Expired leaf -> ValidityPeriod { index: 0 }\n- Not-yet-valid intermediate -> ValidityPeriod { index: 1 }\n- Unknown critical extension on leaf -> UnhandledCriticalExtension { index: 0 }\n- Intermediate without BasicConstraints cA=TRUE -> NotCA { index: 1 }\n- Intermediate without KeyUsage keyCertSign -> KeyUsageMissing { index: 1 }\n- pathLenConstraint=0 on intermediate, chain has one more intermediate -> PathTooLong\n- pathLenConstraint=u32::MAX on intermediate, no overflow\n\n## Depends on\nPKIX-vxf (walk loop skeleton), PKIX-047 (validity checker), PKIX-0q5 (BasicConstraints+pathLen extraction), PKIX-8ae (KeyUsage extraction), PKIX-ad6 (critical extension guard)",
+  "ephemeral": 0,
+  "id": "PKIX-gry",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: per-cert validity, critical extensions, and intermediate CA enforcement",
+  "updated_at": "2026-05-02T07:05:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:14:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-047",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0q5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8ae",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ad6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:14:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vxf",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

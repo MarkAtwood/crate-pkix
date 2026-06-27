@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d4da1f98ea6183586fd1a1244cb71f4acea92bb8f965b06c0b916af78154a139",
+  "created_at": "2026-05-14T18:30:26Z",
+  "created_by": "Mark Atwood",
+  "description": "The decision to ship build_first_valid_path as an iterator-driven retry loop on top of build_path_candidates is correct. A future contributor will look at this and suggest one of: (a) folding the retry into build_path itself (\"why have two helpers?\"); (b) building it into PathCandidates (\"why have a separate function?\"); (c) replacing it with a single full-pool validate_all-paths function. All three are wrong: (a) breaks build_path's backward-compat contract and forces a SignatureVerifier dep on every build_path caller; (b) puts policy/verifier into an iterator that should be pure topology, violates the separation of concerns the trait surface enforces; (c) loses the lazy-yield property that lets adversarial-pool callers stop early. The layered shape \u2014 pure topological iterator, single-shot first-yield wrapper, signature-verifying retry helper \u2014 is the right factoring and worth defending in PR review threads.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.16",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_first_valid_path is the right shape: iterator + per-candidate validate_path retry",
+  "updated_at": "2026-05-14T18:30:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

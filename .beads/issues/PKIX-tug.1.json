@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:42:06Z",
+  "compaction_level": 0,
+  "content_hash": "720e4cb28af01517fca581a6978f4943fb428e82d3a3a7db6b9721e58e6bd324",
+  "created_at": "2026-05-06T20:38:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs: DeviationRunResult::findings contains Pass and NotApplicable findings from the inner LintRunner, not just undeviated actionable findings. The doc comment does not call this out. Callers who check has_findings() expecting it to reflect only Warn/Error/Fatal may be surprised. Doc-only fix: clarify that findings mirrors the full LintRunner output (including Pass/NotApplicable) minus any findings that were moved to deviated.",
+  "ephemeral": 0,
+  "id": "PKIX-tug.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationRunResult doc omits that findings includes Pass/NotApplicable",
+  "updated_at": "2026-05-06T20:42:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:38:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tug",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

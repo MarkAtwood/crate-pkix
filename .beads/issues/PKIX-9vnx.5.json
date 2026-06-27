@@ -1,0 +1,40 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:29:23Z",
+  "compaction_level": 0,
+  "content_hash": "d8517d1bff5f92c67d20ea5b6b2a16726e630755d404d39e8c56a8d0b4949a3b",
+  "created_at": "2026-05-11T05:53:55Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint::Deviation` and `DeviationStore` carry the project's bespoke 'this rule does not apply here' override mechanism. OSCAL has the same concept built in: a Risk with `status=deviation-approved` referencing the affected Finding(s), with remediation guidance and approval audit trail.\n\n## What\n\nReplace the `Deviation` and `DeviationStore` types with OSCAL Risk objects:\n\n**OSCAL Risk fields:**\n- `uuid` \u2014 generated.\n- `title`, `description` \u2014 what the deviation is.\n- `statement` \u2014 the rationale text.\n- `status` \u2014 `open`, `investigating`, `remediating`, `deviation-requested`, `deviation-approved`, `closed`. For our case typically `deviation-approved` or `deviation-requested`.\n- `origins[]` \u2014 who approved (audit trail).\n- `threat-ids[]` \u2014 optional reference to standardised threat catalogs.\n- `characterizations[]` \u2014 facets of the risk.\n- `mitigating-factors[]` \u2014 why the deviation is acceptable.\n- `remediations[]` \u2014 planned actions if any.\n- `related-observations[]` \u2014 pointers to the Observations the deviation covers (i.e., the cert/chain/SAN-entry scope).\n- `subjects[]` \u2014 scope (issuer DN, subject DN, serial range, policy OID, etc.) lands here as OSCAL Subjects with appropriate `subject-uuid` / `type` fields.\n\n**Scope axes** (previously PKIX-8mzp's enum-variant proposals):\n- IssuerDnExact \u2192 OSCAL Subject with `type=identified-subject`, prop carrying issuer DN.\n- IssuerDnContains \u2192 same with `prop[name=dn-pattern]`.\n- SerialRange \u2192 `prop[name=serial-range]`.\n- SubjectDnContains, PolicyOid (PKIX-8mzp targets) \u2192 same pattern; new prop names.\n\nThe bespoke `DeviationScope` enum is retired. Subject-scoping is OSCAL-native: a Risk carries a `subjects` list with structured prop bags rather than a closed enum of scope kinds.\n\n**Persistence** (previously PKIX-dbhe's scope):\n- A 'Risk store' serializes as JSON arrays of OSCAL Risks.\n- File-backed persistence is OSCAL Risks in a file (potentially alongside an Assessment Plan or POA&M for full OSCAL context).\n\n## Acceptance\n\n- [ ] No `Deviation` or `DeviatedFinding` types remain; replaced by Risk-shaped types.\n- [ ] DeviationStore replaced by a Risk store with OSCAL-shaped persistence.\n- [ ] Scope axes (issuer DN, serial range, etc.) all expressible via Risk `subjects` + `props`.\n- [ ] PKIX-8mzp (DeviationScope::SubjectDnContains / PolicyOid) absorbed: the scope axes ARE expressible without growing a Rust enum.\n- [ ] PKIX-dbhe (persistence) absorbed: Risk store serialization IS persistence.\n- [ ] Serde round-trips against NIST OSCAL JSON Schema.\n\n## Reshape impact\n\n- PKIX-8mzp WONTFIX (closed with reason 'absorbed into PKIX-9vnx.5 \u2014 scope axes are OSCAL Subject props, not Rust enum variants').\n- PKIX-dbhe WONTFIX (closed with reason 'absorbed into PKIX-9vnx.5 \u2014 Risk store IS the persistence layer').\n\n## Depends on\n\nPKIX-9vnx.2 (binding), PKIX-9vnx.4 (Risks reference Observations, so Observations must exist first).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Reframed 2026-05-11 (Arch 2 \u2014 see PKIX-ztmr / PKIX-9vnx notes):\n\n- Title intent shifts from 'replace Deviation/DeviationStore WITH OSCAL Risk' to 'add OSCAL Risk serializer for Deviation; serialize DeviationStore as a JSON array of OSCAL Risks.'\n- `pkix_lint::Deviation` Rust struct STAYS as pkix-lint's internal representation. It does NOT become an OSCAL Risk struct.\n- Scope axes still don't grow Rust enum variants (per stance). Internal representation: open-ended `HashMap<String, String>` or `Vec<ScopeProp>` props bag \u2014 flexible enough that PKIX-8mzp's SubjectDnContains / PolicyOid land as new map keys, not new enum variants. Serializer emits them as OSCAL Subject props on the output Risk.\n- DeviationStore persistence: serialize/deserialize as a JSON array of OSCAL Risk objects. Internally still a `Vec<Deviation>` or similar.\n- No longer blocked by PKIX-9vnx.2 (closed). PKIX-8mzp and PKIX-dbhe stay reshaped under this; their notes already point here.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Realign Deviation/DeviationStore to OSCAL Risk + Risk store",
+  "updated_at": "2026-05-11T17:29:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:53:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

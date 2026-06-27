@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.73",
+  "title": "pkix-chain use-case wrappers hardwire NoAiaFetcher",
+  "description": "All eight use-case wrappers in pkix-chain (verify_tls_server through verify_ocsp_responder) hardwire NoAiaFetcher, meaning they never attempt AIA chain reassembly. The crate-level docs note: 'The use-case wrappers bake NoAiaFetcher internally; callers wanting AIA drop to verify_chain directly.'\n\nThis means any caller who wants automatic intermediate fetching via AIA AND the convenience of identity-binding / profile-enforcement wrappers must replicate the wrapper logic themselves. The Verifier struct is generic over A: AiaFetcher and supports AIA natively, but the wrappers bypass it.\n\nWhat goes wrong if this stays as-is: Same issue as the DefaultVerifier hardwiring \u2014 callers who need both AIA and the wrapper's post-validation logic (identity binding, timestamping EKU checks, OCSP delegation) must replicate non-trivial wrapper code. Combined with the DefaultVerifier hardwiring, a caller needing custom crypto AND AIA AND identity binding gets no help from the wrapper layer.\n\nLocations: All wrapper functions pass &NoAiaFetcher to verify_chain. E.g., line 800-801, 885-886, etc. in /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:28:32Z",
+  "updated_at": "2026-06-15T16:50:35Z",
+  "closed_at": "2026-06-15T16:50:35Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:28:31"
+    }
+  ]
+}

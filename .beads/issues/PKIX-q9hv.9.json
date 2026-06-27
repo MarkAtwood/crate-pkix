@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "13fe933e8c16423bfea679213375e81697dedd10e0c7c523e19111e9f112f11c",
+  "created_at": "2026-05-14T14:38:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:547-552: `build_with_aia` returns a chain that already passed pkix_path::validate_path (build_first_valid_path's contract per pkix-path-builder/src/lib.rs:1004-1006 \u2014 it yields the FIRST candidate that validate_path accepted). The slow path at line 549 then re-runs validate_path on the same chain to obtain the ValidatedPath. This re-runs every signature verification, every name-constraint check, every policy check redundantly. For a chain with 3 RSA-4096 intermediates, that's ~3 superfluous signature verifications per slow-path validation. Mitigation options: (1) have build_first_valid_path return both the chain AND the ValidatedPath it produced internally (changes pkix-path-builder API), or (2) augment build_with_aia to return the ValidatedPath alongside the chain, with an internal validate_path call that's the only one. Option (1) is the cleaner design because it eliminates the duplication at the source. Note: fast path is correct \u2014 single validate_path call.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Slow path validates the same chain twice (inside build_first_valid_path, then again)",
+  "updated_at": "2026-05-14T14:38:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:38:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

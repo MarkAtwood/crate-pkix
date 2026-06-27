@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "24d10ee94b639377ceec357b501cad1a5cb5daaa3d131e81c213f304c726c03b",
+  "created_at": "2026-05-14T19:43:04Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/signer_discovery.rs:87 vs :139:\n\n  pub fn discover_crl_signer<'a>(bundle: &'a [Certificate], crl: &CertificateList) -> Option<&'a Certificate>\n  pub(crate) fn reaches_self_signed(bundle: &[Certificate], signer: &Certificate) -> bool\n\nThe crate exports discover_crl_signer (re-exported through lib.rs line ~738) but withholds reaches_self_signed.\n\nWhat callers cannot do:\n\nA caller wanting to perform RFC 5280 \u00a76.3.3(f) gating themselves \u2014 perhaps because they want to use a CRL signer cert in a different context (an OCSP responder cert lookup, a downstream pkix-chain composition that needs the anchor proof for telemetry, a strict pre-flight check) \u2014 can:\n\n1. Call discover_crl_signer to find the candidate.\n2. Do something with the cert.\n\nBut they CANNOT:\n\n3. Independently verify the candidate chains back to a self-signed cert in the bundle, because reaches_self_signed is pub(crate). They have to rebuild that walk themselves OR call new_with_signer_discovery (which performs the gate as a side effect of constructing a CrlChecker, an object they may not need).\n\nThis creates a 'half-public API' shape: the discovery half is callable; the anchor-reachability half is not. The contract is internally consistent inside CrlChecker::new_with_signer_discovery but inconsistent for an external caller.\n\nTwo coherent designs, pick one:\n\n(A) HIGH-LEVEL ONLY: drop the pub from discover_crl_signer. Only expose new_with_signer_discovery (or a single facade function that returns Result<&Certificate, Error>). Callers cannot do step (1) above without going through the gate. This collapses two pub items into one and removes the half-public surface.\n\n(B) FULL-LOW-LEVEL: also export reaches_self_signed (and probably find_parent's logic via some seam). Callers who want to compose the pieces can. This commits more surface but is internally coherent.\n\nCurrent (mixed) state is the worst of both: exposes the discriminator step but withholds the gate step, forcing every external caller to either re-implement reaches_self_signed or use the high-level CrlChecker constructor.\n\nRecommendation: (A). discover_crl_signer's only real consumer inside this workspace is new_with_signer_discovery. Pre-launch is the right moment to demote it to pub(crate). If a future external use case appears, promoting it back is non-breaking; demoting later is breaking.\n\nIf (B) is chosen, also need to think about cert_authority_key_id / cert_subject_key_id (currently private helpers). The pub split is not at a natural seam.\n\nAcceptance: a decision recorded; if (A), demote discover_crl_signer to pub(crate) and remove its re-export from lib.rs.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "discover_crl_signer is pub but reaches_self_signed is pub(crate); callers cannot reproduce \u00a76.3.3(f) gate",
+  "updated_at": "2026-05-14T19:43:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:43:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

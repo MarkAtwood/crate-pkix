@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.24",
+  "title": "CertPool missing IntoIterator for owned CertPool",
+  "description": "In pkix-path-builder/src/lib.rs, CertPool implements IntoIterator for &CertPool (line 133) and Extend (line 127) but does not implement IntoIterator for the owned CertPool. This means callers cannot write 'for cert in pool { ... }' to consume the pool; they must borrow.\n\nWhat goes wrong: Callers wanting to take ownership of the certificates out of a pool (e.g., to feed them into a Vec<Certificate> without cloning) have no way to do so through the public API. They must call .iter() and clone each certificate.\n\nLocation: pkix-path-builder/src/lib.rs\n\nRecommendation: Add 'impl IntoIterator for CertPool' that consumes self and yields owned Certificate values via Vec::into_iter.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:03Z",
+  "updated_at": "2026-06-15T17:30:33Z",
+  "closed_at": "2026-06-15T17:30:33Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:02"
+    }
+  ]
+}

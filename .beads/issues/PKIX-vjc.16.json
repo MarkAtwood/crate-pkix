@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Pre-filter same-type entries before containment check, eliminating the duplicate same_nc_variant call per iteration.",
+  "closed_at": "2026-05-05T04:52:33Z",
+  "compaction_level": 0,
+  "content_hash": "7ce16a21e1764a69d10fba584e12fa96e4bbd0551a7520e8e29116b297fa8d71",
+  "created_at": "2026-05-03T00:12:36Z",
+  "created_by": "Mark Atwood",
+  "description": "The intersection loop (lines 1290-1327) checks the condition 'same_nc_variant(&c.base, &n.base) && name_matches_subtree(...)' in two separate .iter().any() closures (lines 1292+1296-1299 and 1307-1308+1312-1315) plus an extra dedup check (1318-1321). The logic is correct but the code reads as four separate scanning passes over the same two lists. A cleaner structure: build a helper fn intersect_subtrees(current, new) -> GeneralSubtrees that expresses the RFC algorithm as a single documented pass. The current in-line expansion is hard to audit for RFC 5280 compliance.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "intersection loop has duplicated same_nc_variant + name_matches_subtree call pairs",
+  "updated_at": "2026-05-05T04:52:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

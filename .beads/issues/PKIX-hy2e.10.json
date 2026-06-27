@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added Deviation.priority: i32 field (default 0). Updated DeviationStore::find_deviation and DeviationStore::find_deviation_for_chain to resolve by highest-priority-wins, with insertion order as the tie-breaker (matches the documented contract on both methods). The default priority of 0 preserves the prior 'first-match-wins-in-insertion-order' behavior for single-author stores; operators merging deviation files from multiple authors can now set explicit priorities to express specificity (site-local lab-scoped waivers get high priority, workspace-wide wildcard waivers stay at 0). Added Deviation::with_priority builder. The OSCAL Risk parser defaults priority to 0 on import; round-tripping priority through the OSCAL Risk extension model is a separate scope (left as a comment in parse.rs). Three regression tests: find_deviation_higher_priority_wins, find_deviation_priority_tie_breaks_by_insertion_order, find_deviation_negative_priority_loses_to_default. 268 lib tests + 7 doc tests + workspace tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:59:47Z",
+  "compaction_level": 0,
+  "content_hash": "8eb45f698bd19fe78ae7f96692d3cca2a90c0e6c7be707635cbd3dd102c37dab",
+  "created_at": "2026-05-14T12:40:55Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: deviation.rs:733-750. Doc says: 'In the case of multiple matching deviations, the first one added to the store wins. Deviations should be scoped to avoid unintentional overlap.' Scenario: operator merges two deviation files from two policy authors. Both target the same lint_id ('rfc5280.bc.ca_true_required' for an internal CA), one scoped 'any', one scoped 'issuer_dn_contains: internal-lab'. The 'any' deviation is added first (alphabetical merge by filename), so it wins for the lab CA cert too \u2014 but the lab-scoped deviation has a more specific justification and authorized_by. The lab-scoped deviation never fires. Maintenance consequence: when an auditor asks 'who authorized this waiver for cert X?', the answer is the 'any' deviation's authorized_by, not the lab-scoped deviation's. Wrong attribution in the audit trail. Fix: either (a) document and enforce a specific ordering rule (most-specific scope wins; or longest scope description wins; or explicit priority field on Deviation); (b) reject overlapping deviations at add time; (c) apply all matching deviations and surface the conflict to the operator. Option (a) with an explicit priority field is the most operator-friendly and matches how DACS/eBNF systems handle similar policy stacking. Pre-1.0 is the time to fix this \u2014 post-1.0 the on-disk OSCAL format gets harder to change.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationStore::find_deviation 'first match wins' is order-dependent without ordering contract",
+  "updated_at": "2026-05-14T13:59:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

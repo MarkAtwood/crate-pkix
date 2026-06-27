@@ -1,0 +1,31 @@
+{
+  "close_reason": "Duplicate of PKIX-rb6n which already tracks the empty-input panic guard removal upon x509-cert 0.3.x bump. The action (drop the BEGIN_BOUNDARY pre-scan + simplify NoCertificates handling) is the same; no separate work item needed.",
+  "closed_at": "2026-05-14T08:15:20Z",
+  "compaction_level": 0,
+  "content_hash": "40d0a4a20295ccf917eed13e894cf4a7a2ca8d6bcc7c6bcdbe67267ecb4ebaaa",
+  "created_at": "2026-05-14T04:59:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:324-329 scans the entire input via bytes.windows(BEGIN_BOUNDARY.len()).any(...) before calling load_pem_chain, which then performs its own scan internally.\n\nFor a 3 MB Debian bundle this is ~3 million byte comparisons before parsing begins. Cheap in absolute terms (~ a few milliseconds even on slow hardware) but it is a full pre-scan that will be obsoleted as soon as the workspace bumps to x509-cert 0.3.x (the bead PKIX-rb6n already tracks the workaround-removal).\n\nNot a real efficiency concern in the current shape because:\n  - The trust-store load is a once-at-startup operation, not a hot path.\n  - The pre-scan is necessary today to dodge the x509-cert 0.2.5 underflow panic.\n\nReason to file: when PKIX-rb6n closes (x509-cert 0.3.x bump), the entire empty-input guard becomes vestigial. The follow-up issue should track *removing* the guard, not just leaving it as belt-and-braces, so that the cost is dropped and the rustdoc claim (\"returns NoCertificates when the input parsed cleanly but contained zero PEM blocks\") becomes accurate again.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Empty-input guard duplicates load_pem_chain's whitespace-stripped emptiness check",
+  "updated_at": "2026-05-14T08:15:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:59:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

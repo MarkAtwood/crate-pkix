@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "229421d06b95bb91ff8022504f6e209968735cb587129f8b1f4082951ff0c322",
+  "created_at": "2026-05-14T18:01:25Z",
+  "created_by": "Mark Atwood",
+  "description": "build_with_aia (pkix-chain/src/lib.rs lines 595-691) loops up to AIA_MAX_DEPTH=5 times. Each iteration:\n\n1. Calls pkix_path_builder::build_first_valid_path \u2014 O(pool_size \u00d7 DFS_BUDGET) in the worst case.\n2. Walks the ENTIRE pool to find certs whose issuer is not resolvable (line 634):\n       for cert in pool.iter() {\n           if issuer_resolvable(cert, &pool, self.anchors) { continue; }\n           for uri in aia_extract::ca_issuers_http_uris(cert) { ... }\n       }\n3. issuer_resolvable itself iterates the pool + anchors for EACH cert (lines 1648-1659):\n       pool.iter().any(|c| pkix_path::names_match(...))\n           || anchors.iter().any(|a| pkix_path::names_match(...))\n\nCombined cost per iteration of the outer fetch loop: O(pool_size \u00d7 (pool_size + anchors)) name comparisons, where each names_match is itself O(DN bytes) under RFC 4518 string prep (cheap for short DNs, but not free).\n\nAcross iterations the pool only grows: as AIA-fetched certs are added, pool_size goes up. The same orphan checks run on certs that were orphans last round and still are this round.\n\nSCALING IMPACT: For typical PKIs the pool stays small (the caller-supplied chain + \u22645 fetched intermediates). pool_size \u00d7 (pool_size + anchors) is dominated by O(anchors), which is the trust-store size \u2014 100-200 anchors for a TLS root program. The inner string-prep cost on each anchor adds up: per iteration roughly 5 \u00d7 200 \u00d7 1\u00b5s = 1ms of pure name-comparison overhead, on a hot validation path.\n\nFor chains that succeed via the fast path (the common case) this overhead is zero \u2014 fast path bypasses build_with_aia entirely. The cost only fires when the chain is incomplete AND AIA fetching is needed, which is the slow path that already involves network I/O. So the per-validation impact is small relative to the I/O.\n\nBut verify_batch on incomplete chains pays this cost once per chain. For a batch of 1000 chains needing AIA, that's 1000 \u00d7 1ms = 1s of name-comparison overhead amortized across the batch. Not catastrophic but a real cost.\n\nFIX OPTIONS:\n- Cache a Set<DN_bytes> of 'resolvable subjects' built once per iteration. Lookups become O(1) (hashmap) instead of O(pool_size + anchors).\n- Skip the orphan re-walk for certs that were not orphans last iteration (track a 'definitely-resolvable' set across iterations; only newly-added certs need fresh classification).\n- Most importantly: in the common case where AIA succeeds in one round, the second iteration sees no new URIs and exits; this overhead is bounded by 2 \u00d7 the worst-case cost.\n\nRECOMMENDATION: defer. The cost is bounded by AIA_MAX_DEPTH and dominated by network I/O. Worth revisiting if profiling shows it in a hot path.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_with_aia walks entire pool every iteration to find orphans; O(iterations \u00d7 pool_size \u00d7 anchors)",
+  "updated_at": "2026-05-14T18:01:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:01:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

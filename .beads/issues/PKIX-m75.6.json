@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:57:20Z",
+  "compaction_level": 0,
+  "content_hash": "30aac6448b7f02432f7c8782e88baf12057eceb33c4f6b8c075ff2a111f955f7",
+  "created_at": "2026-05-06T20:48:22Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-revocation/src/ocsp.rs check_revocation() does not verify that the passed 'issuer' Certificate's subject DN matches cert.tbs_certificate.issuer. The CRL checker has a parallel check at crl.rs:202: 'names_match(&issuer.tbs_certificate.subject, &crl.tbs_cert_list.issuer)'. OCSP has no equivalent. The architectural defense is that validate_path already establishes the issuer-to-cert name linkage before check_revocation is called, so a correctly-used API is safe. However the defense-in-depth guarantee documented for CrlChecker (step 2b comment: 'guards against a caller passing a mismatched issuer certificate') is absent from OcspChecker. If a caller passes an incorrect issuer cert, the only catch is the CertID hash check at step 7a (which compares issuer.subject hash against the OCSP response's CertID.issuerNameHash). Fix: Add a check after step (6b): if !names_match(&issuer.tbs_certificate.subject, &cert.tbs_certificate.issuer) { return Err(Error::OcspSignatureInvalid); } Priority: P2 (API misuse gap; not exploitable in normal architectural flow).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: OcspChecker missing cert-issuer identity binding check",
+  "updated_at": "2026-05-06T20:57:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

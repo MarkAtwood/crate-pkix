@@ -1,0 +1,31 @@
+{
+  "close_reason": "Design decision recorded \u2014 NormalizedIter pre-trim is correct and worth defending.",
+  "closed_at": "2026-05-02T20:16:22Z",
+  "compaction_level": 0,
+  "content_hash": "01582179af9ffdeee3a0f2494a86e8f1c9f413c10a56861affc4fe22cd9f21c6",
+  "created_at": "2026-05-02T20:12:24Z",
+  "created_by": "Mark Atwood",
+  "description": "NormalizedIter::new() pre-trims leading/trailing spaces before iteration by slicing bytes[start..end]. This ensures trailing spaces never emit a trailing space byte \u2014 they're simply excluded from the slice before the iterator begins. A contributor might suggest 'just trim at the end' or 'use strip_prefix/strip_suffix'; the pre-trim approach is simpler and avoids double-pass. The regression tests for trailing space and internal-then-trailing space patterns are correct guard rails.",
+  "ephemeral": 0,
+  "id": "PKIX-guv.9",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter pre-trim design: correct and worth defending",
+  "updated_at": "2026-05-02T20:16:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:12:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

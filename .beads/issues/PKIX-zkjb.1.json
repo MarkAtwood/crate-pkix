@@ -1,0 +1,32 @@
+{
+  "close_reason": "Decision: option (i) pkix-aia. New workspace crate + pkix-aia-http adapter. Matches existing trust-domain seam pattern. Implementation children unblocked.",
+  "closed_at": "2026-05-13T16:18:25Z",
+  "compaction_level": 0,
+  "content_hash": "11504eb4a8877027d9fd7677c0b1ad42fe91e7d78bfbc44388de777465982a5c",
+  "created_at": "2026-05-13T16:16:00Z",
+  "created_by": "Mark Atwood",
+  "description": "## Decision\n\nPick where the `AiaFetcher` trait + `NoAiaFetcher` default + `AiaError` type live. Blocks PKIX-zkjb.2 (AiaError) and PKIX-zkjb.3 (trait def).\n\n## Options\n\n### (i) pkix-aia (new workspace crate)\n\nMatches the existing trust-domain seam pattern: SignatureVerifier in pkix-path, RevocationChecker in pkix-revocation, AiaFetcher in pkix-aia. Each thematic concern gets its own crate.\n\n- Pros: consistent naming, clean separation, std-vs-no_std boundary explicit, sibling adapter crate `pkix-aia-http` mirrors `pkix-revocation-http`.\n- Cons: adds a workspace member. The core crate is small (one trait, one default impl, one error type, maybe a helper to extract AIA URIs from a cert \u2014 though that already exists in pkix-revocation-http).\n\n### (ii) pkix-chain\n\nHosts the trait alongside its existing re-exports of SignatureVerifier and RevocationChecker. Centralizes the trust-domain seam in one place.\n\n- Pros: cohesion \u2014 pkix-chain is the orchestrator and owns the seam shape. Fewer crates. Easier for callers to discover all three callbacks together.\n- Cons: breaks the existing pattern. SignatureVerifier and RevocationChecker live in their thematic crates; pkix-chain only re-exports. Moving the trait definition itself there is inconsistent.\n\n### (iii) pkix-revocation\n\nReuses the existing crate, which already has the std-only HTTP adapter pattern (pkix-revocation-http) and the helper `extract_aia_http_urls`.\n\n- Pros: minimal crate churn. AIA fetching reuses pkix-revocation-http directly. The existing helper to extract AIA URIs is right there.\n- Cons: semantic misfit. AIA is \"online intermediate retrieval\"; revocation is \"is this cert revoked.\" Putting AiaFetcher in pkix-revocation conflates two RFC 5280 concerns. Bad signposting for callers.\n\n## Recommendation\n\n**Option (i): pkix-aia.** Matches existing pattern, cleanest separation of concerns, std-vs-no_std boundary explicit. Cost: one new workspace crate (small). Benefit: consistent naming and structure across the trust-domain seam.\n\n(ii) is defensible if you want to minimize crate count. (iii) is a semantic misfit and probably wrong.\n\n## Implementation consequences after decision\n\n- (i): file new `pkix-aia` core crate (no_std-friendly, sync) + `pkix-aia-http` adapter crate. The AIA-URI helper migrates from pkix-revocation-http to pkix-aia (or stays in pkix-revocation-http with re-export \u2014 minor).\n- (ii): trait definition lives in pkix-chain alongside `verify_chain`. NoAiaFetcher in pkix-chain. HTTP adapter still needs its own std-only crate (pkix-aia-http or fold into pkix-chain-http if that ever exists).\n- (iii): trait in pkix-revocation. HttpFetcher impl in pkix-revocation-http. The helper is already there. Naming becomes awkward (`pkix_revocation::AiaFetcher` reads oddly).\n\n## Out of scope for this decision\n\n- HTTP adapter crate name (will follow from the choice).\n- Default-impl behavior (already locked: NoAiaFetcher returns AiaError::FetchingDisabled).\n- Batch fetch method shape (already locked: batch_fetch with default-impl loop).",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 decision: option (i) pkix-aia]\n\nMark picked (i): new `pkix-aia` core workspace crate (no_std-friendly, sync), with `pkix-aia-http` as the std-only adapter crate for HTTP fetching.\n\nReasoning (per bead recommendation):\n- Matches existing trust-domain seam pattern (SignatureVerifier in pkix-path, RevocationChecker in pkix-revocation)\n- Cleanest separation of concerns; std-vs-no_std boundary explicit\n- Sibling adapter crate `pkix-aia-http` mirrors `pkix-revocation-http` naming\n\nRejected:\n- (ii) pkix-chain: would break the thematic-per-crate pattern\n- (iii) pkix-revocation: semantic misfit \u2014 AIA is intermediate retrieval, not revocation status\n\n## Implementation consequences locked in\n\n- Two new workspace crates: `pkix-aia` (core, no_std-friendly, sync) and `pkix-aia-http` (std-only adapter)\n- `AiaFetcher` trait, `NoAiaFetcher` default impl, and `AiaError` type all live in `pkix-aia`\n- The AIA-URI extraction helper `extract_aia_http_urls` currently in `pkix-revocation-http` should migrate to `pkix-aia` (or stay in pkix-revocation-http with a re-export from pkix-aia \u2014 implementation detail, defer to .5/.6 work)\n- pkix-chain re-exports AiaFetcher alongside its existing re-exports of SignatureVerifier and RevocationChecker (so callers see the full trust-domain seam from pkix-chain)\n- `pkix-aia-http::HttpFetcher` is the std-only sync impl; async variant via reqwest::blocking::Client or ureq\n\nhuman label removed; bead closes as decided.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide AiaFetcher trait location: pkix-aia (new crate) vs pkix-chain vs pkix-revocation",
+  "updated_at": "2026-05-13T16:18:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:15:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

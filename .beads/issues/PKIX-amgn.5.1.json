@@ -1,0 +1,32 @@
+{
+  "close_reason": "Superseded by PKIX-amgn.5: dropped #![no_std] from pkix-lint-cabf/src/lib.rs as part of the cabf_tls_br module migration; added pkix-lint + pkix-profiles-cabf + x509-cert + der to [dependencies] in pkix-lint-cabf/Cargo.toml; replaced stale 'Stub crate' rustdoc section with current Modules description. Acceptance criteria of .5.1 (no_std removed, deps added, cargo check clean) all met by .5's commit c70821b4. The 'design question' (std vs no_std) was resolved per .5.1's own recommendation: std posture, matches pkix-lint, no current no_std consumer use case.",
+  "closed_at": "2026-05-12T01:38:48Z",
+  "compaction_level": 0,
+  "content_hash": "8b531d09400d517fc3f0109c3713928641b6bccb47a0aaa2dcc5cea87e8b37ac",
+  "created_at": "2026-05-11T22:50:34Z",
+  "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "description": "## Why\n\nThe current `pkix-lint-cabf` stub declares `#![no_std]` at `pkix-lint-cabf/src/lib.rs:46`, but the `cabf_tls_br.rs` content scheduled to move into it (PKIX-amgn.5.2) currently uses `std::sync::OnceLock` and `std::error::Error`. The crate must pick a posture before the move.\n\n## What\n\n1. Decide std vs no_std. Recommendation: drop `#![no_std]` \u2014 pkix-lint itself is std (it has the oscal feature which requires serde_json + std), and the moved code uses std primitives. There is no consumer use case for a no_std CA/B Forum lint bundle today.\n2. Update `pkix-lint-cabf/src/lib.rs`: remove `#![no_std]` attribute. Keep `#![forbid(unsafe_code)]`, `#![deny(rust_2018_idioms, unreachable_pub)]`, `#![warn(missing_docs)]`.\n3. Add to `pkix-lint-cabf/Cargo.toml`:\n   - `pkix-lint = { workspace = true }` (or path-relative if workspace inheritance not yet wired)\n   - `pkix-profiles-cabf = { workspace = true }`\n   - `x509-cert = { workspace = true }`\n   - `der = { workspace = true }`\n4. Update the rustdoc on `pkix-lint-cabf/src/lib.rs` to drop the \"Stub crate\" status note in preparation for substantive content (PKIX-amgn.5.2).\n\n## Acceptance\n\n- [ ] `#![no_std]` removed from `pkix-lint-cabf/src/lib.rs`.\n- [ ] Cargo deps added; `cargo check -p pkix-lint-cabf` clean.\n- [ ] No source code moves yet (.2 does that); no behaviour change to other crates.\n\n## Out of scope\n\n- The actual cabf_tls_br.rs move (PKIX-amgn.5.2).\n\n## Design question (human approval)\n\nStd posture: confirm flip to std. Recommendation is std for the reasons above; if there is a use case for no_std CABF lints in PKIX-amgn.5.x's broader timeframe, file a separate bead.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.5.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Escalating to human (2026-05-11): bead explicitly designates a \"Design question (human approval)\" gate on the std-vs-no_std decision. The bead's own recommendation is to drop #![no_std]:\n\n- pkix-lint itself is std (oscal feature requires serde_json + std).\n- The cabf_tls_br.rs content scheduled to move into pkix-lint-cabf in PKIX-amgn.5.2 uses std::sync::OnceLock and std::error::Error.\n- No consumer use case for a no_std CA/B Forum lint bundle is on file.\n\nI concur with the recommendation. Three lower-risk alternatives I considered and rejected:\n\n1. Keep no_std and gate cabf_tls_br.rs body behind a \"std\" feature. Rejected: the entire reason to have pkix-lint-cabf is to ship the CABF rule encodings; gating them behind a feature flag is \"stub by another name\" and forces consumers to think about an axis (no_std CABF) that nobody is asking for.\n\n2. Migrate the std::sync::OnceLock callsites to once_cell::sync::Lazy + add once_cell as a workspace dep. Rejected: adds a new workspace dep purely to preserve a no_std posture no consumer needs. Inverted cost/benefit.\n\n3. Move cabf_tls_br.rs into pkix-lint-cabf as #[cfg(feature=\"std\")] gated and leave the lib.rs as no_std. Rejected: dead-on-arrival shape \u2014 pkix-lint-cabf with the std feature off has no public content whatsoever, since the bundle IS the std-only material.\n\nAwaiting human confirmation. Once confirmed, the bead is straightforward \u2014 remove #![no_std], add the four workspace deps, update lib.rs rustdoc, cargo check.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide pkix-lint-cabf no_std posture and update crate skeleton",
+  "updated_at": "2026-05-12T01:38:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T15:50:33Z",
+      "created_by": "bd-spin/bd-spin-20260511T212242Z-1478141",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "documented in from_cert rustdoc; TryFrom is the strict path",
+  "closed_at": "2026-05-03T13:26:12Z",
+  "compaction_level": 0,
+  "content_hash": "11c62e916361a76983bec6077f90f8039de0fcfe5c6d5efe6fbf30f9c7c6756d",
+  "created_at": "2026-05-03T13:18:13Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: trust anchor cert has NameConstraints extension marked critical=true, but its DER value fails to parse (e.g., encoding corruption, unsupported encoding form, or future extension format). from_cert calls find_cert_ext which silently returns None on parse error, so name_constraints = None. chain_walk proceeds with no NC constraints applied. Bad behavior: a critical extension that the implementation cannot process is silently ignored instead of causing rejection. RFC 5280 \u00a74.2 requires: 'A certificate-using system MUST reject the certificate if it encounters a critical extension it does not recognize or a critical extension that it cannot process.' OID_NAME_CONSTRAINTS is in HANDLED_CRITICAL_OIDS (so check_critical_extensions passes), but the parse error in find_cert_ext means the extension content is not actually processed \u2014 the implementation cannot enforce it, yet does not reject. Note: PKIX-onc.4 covers the documentation angle; this is the RFC 5280 correctness violation. The TryFrom<Certificate> path is fail-closed and correct; from_cert is the unsafe path.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.21",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_cert fail-open silently drops critical NC: RFC 5280 \u00a74.2 violation",
+  "updated_at": "2026-05-03T13:26:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:18:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

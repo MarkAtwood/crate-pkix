@@ -1,0 +1,38 @@
+{
+  "closed_at": "2026-05-11T15:27:27Z",
+  "compaction_level": 0,
+  "content_hash": "c147eea490fe38e0a7daa19891d75f71825884ef1c29ca44b5c67b47a17923c5",
+  "created_at": "2026-05-11T05:53:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nImplementing Level 3 OSCAL alignment requires Rust types corresponding to OSCAL Catalog / Profile / Assessment Results / Finding / Observation / Risk. Three options, one needs picking:\n\n## Options\n\n1. **Existing OSCAL Rust crate.** Evaluate `oscal-rs` (and any siblings on crates.io). Pros: someone else maintains the schema sync. Cons: dependency on a non-RustCrypto crate's quality, MSRV, no_std-ness; if abandoned or stale, we inherit the problem.\n2. **Hand-rolled subset.** We write the Rust types for only the OSCAL fields we actually emit / consume. Pros: tight control, no external dep, MSRV-friendly. Cons: we manually track NIST schema evolution; for OSCAL v1.1 \u2192 v1.2 we'd need to update; some risk of schema drift.\n3. **Generated from JSON Schema.** Use a code-generator (`schemars`-style or custom) to produce Rust types from NIST's official OSCAL JSON Schema. Pros: schema drift is mechanical; we commit the generated output but regenerate when NIST releases a new version. Cons: generated code is verbose; tooling complexity.\n\n## What\n\nSurvey the options:\n\n1. Audit `oscal-rs` and any other existing crates: last release date, MSRV, no_std support, feature coverage relative to PKIX-9vnx.1's needs.\n2. Estimate hand-rolled subset size given .1's coverage list. Rough line count.\n3. Investigate JSON-schema-to-Rust generators relevant to OSCAL's schema shape.\n4. Recommend one path.\n\n## Acceptance\n\n- [ ] Survey results documented (could be in the same OSCAL.md as .1, or its own section).\n- [ ] One option chosen with rationale.\n- [ ] If 'existing crate' is chosen, the crate is named + version pinned.\n- [ ] If 'hand-rolled' is chosen, the module layout is sketched.\n- [ ] If 'generated' is chosen, the generation toolchain is identified.\n- [ ] If the chosen path is hand-rolled or generated: where does the OSCAL Rust binding live? A new workspace crate `pkix-oscal` (with no PKIX-specific content) so it's reusable, or inline in `pkix-lint`? Recommendation: separate crate for isolation.\n\n## Depends on\n\nPKIX-9vnx.1 (need the coverage list to size the binding decision).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Closed 2026-05-11 (Mark): Architecture 2 (interpreter, not binding) chosen. The binding-choice question dissolves:\n\n- No `pkix-oscal` Rust crate.\n- No roscal_lib dependency (the only candidate on crates.io, single-maintainer, last release Feb 2024, not viable).\n- No schema-generated binding.\n\nUnder Arch 2, pkix-lint emits/parses OSCAL JSON via thin serializer/parser modules using `serde_json::Value` (or per-callsite struct helpers as needed). The OSCAL.md mapping table now describes serializer output, not Rust struct shape.\n\nSee PKIX-ztmr notes for full Arch 2 rationale. PKIX-9vnx.3-.7 reframe accordingly.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL Rust binding choice: existing crate, hand-rolled subset, or generated from JSON Schema",
+  "updated_at": "2026-05-11T15:27:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:53:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:54:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

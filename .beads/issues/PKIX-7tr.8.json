@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:02:53Z",
+  "compaction_level": 0,
+  "content_hash": "7a55498342511f11e44efbe9e034a47af9dbdfed66ea152a2b4bda0fa6d09d90",
+  "created_at": "2026-05-02T13:40:53Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs line 110: reason as u8 where CrlReason is #[repr(u32)]. All defined CrlReason values (0-10, per RFC 5280 \u00a75.3.1) fit in a u8, so the cast is lossless for any value that parses successfully. Unknown reason codes >10 would be rejected by the DER parser as an unrecognized enum variant before reaching this code, so no truncation occurs in practice. However, the cast is semantically unsound: if x509-cert ever adds a reason code >255, or if a future caller uses a raw discriminant, the cast silently truncates. The idiomatic fix is to use u32 for reason_code in Error::Revoked and avoid the cast entirely.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.8",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "extract_reason_code casts CrlReason (repr u32) to u8",
+  "updated_at": "2026-05-02T14:02:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

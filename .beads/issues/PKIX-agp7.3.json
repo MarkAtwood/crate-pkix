@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Bead description sweep complete. 7 descriptions rewritten (PKIX-baac, PKIX-a1yc, PKIX-l63j, PKIX-taa.9, PKIX-ng0x, PKIX-p8vz, PKIX-8h87). 4 title+status changes (PKIX-r2y revived from deferred, PKIX-zyb revived from deferred, PKIX-klku unblocked, PKIX-5bab unblocked \u2014 '(deferred)' stripped from latter two titles). PKIX-t0w4 reframed for pkix-path-builder reality. Final verification grep returns only meta references (the epic itself, this bead, t0w4 quoting the old AGENTS.md line). Bead-side sweep complete.",
+  "closed_at": "2026-05-11T05:20:29Z",
+  "compaction_level": 0,
+  "content_hash": "2b86f2ecf40f20be5e3740979495c58b8f6f85d48e03c88476a0a30128665b22",
+  "created_at": "2026-05-11T05:07:12Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nBeads have the same Category-A / B / C mix as source files. Walk open beads, strip Category-A language from descriptions. Walk deferred-status beads, revive the ones deferred for Category-A reasons.\n\n## What\n\n### Bead description sweep\n\nFor every open or in-progress bead (\u224836 of them as of 2026-05-11):\n1. Read the description.\n2. Identify Category-A language ('out of scope for v0.1', 'tracked for v0.2', 'planned for v0.3', 'deferred to v0.x').\n3. Rewrite to describe current state without version gating, OR strip if the sentence reduces to nothing useful.\n4. Keep '## Out of scope' sections that are Category B (legitimate work-partition, e.g. 'consumer's job', 'handled by pkix-X', 'separate RFC').\n5. Keep '## Out of scope' sections that are Category C (\"this bead does NOT cover Y because Y is its own bead\") \u2014 these are work-partition, not version-gate.\n\n### Deferred-status revival\n\nPer 2026-05-11 `bd list --status=deferred`, 11 beads are deferred. Category-A revival candidates:\n\n- **PKIX-r2y** \u2014 'v0.2: max_rdn_size policy limit in ValidationPolicy' \u2014 REVIVE.\n- **PKIX-zyb** \u2014 'v0.2: Unicode NFKC normalization in names_match' \u2014 REVIVE.\n\nLeave deferred (legit non-version-gate reasons):\n- PKIX-taa.10 (DoS vector \u2014 operational risk decision)\n- PKIX-2j0.2/5/6/8 (perf cleanups)\n- PKIX-gr9.3 (#[must_use] inheritance)\n- PKIX-taa.7 (wrong test assertions)\n- PKIX-taa.8 (duplicate tests)\n- PKIX-taa.9 (depth counting discrepancy)\n\nVerify each by reading the bead description before final decision; reclassify if grep was wrong.\n\n### Title 'deferred' check\n\nTwo blocked-status beads have '(deferred)' in title:\n- **PKIX-klku** \u2014 'diff harness: CI integration (deferred)'\n- **PKIX-5bab** \u2014 'diff harness: Tier-3 CT log scrape corpus (deferred)'\n\nRead each. If 'deferred' = Category A (version-gate), strip the qualifier and check if the bead becomes workable. If 'deferred' = Category B/C (legitimate sequencing, blocked on another concrete piece of work), leave alone.\n\n### PKIX-t0w4 reframe\n\nWith the v0.1 path-building gate dropped and `pkix-path-builder` crate already existing:\n- Original Option 1 (in-harness AKI/SKI walk) becomes 'tactical, throwaway'.\n- Original Option 2 ('stand up pkix-path-builder') becomes 'use existing pkix-path-builder'.\n- Original Option 3 ('accept noise') stays available but lower priority now that path-building IS in scope.\n\nUpdate PKIX-t0w4's description to reflect the new options without forcing a decision in this bead \u2014 surface for human review separately if Mark wants to choose now.\n\n## Acceptance\n\n- [ ] Every open/in-progress bead's description scanned. Category-A language removed or reframed.\n- [ ] PKIX-r2y, PKIX-zyb revived to open status with rewritten descriptions (no v0.2 framing).\n- [ ] PKIX-klku, PKIX-5bab triaged: either qualifier stripped + un-deferred, or leave with reason recorded.\n- [ ] PKIX-t0w4 description reframed for pkix-path-builder reality.\n- [ ] Final `bd search 'v0.2'` and `bd search 'v0.3'` return zero results that are Category A.\n\n## Out of scope (Category B usage, correctly!)\n\n- Code/docs sweep \u2014 that's PKIX-agp7.2.\n- AGENTS.md / CHANGELOG \u2014 that's PKIX-agp7.1.\n- Closed beads \u2014 historical record, leave alone.\n\n## Depends on\n\nPKIX-agp7.1 (anchor first; .2 and .3 are independent and can run in parallel after .1).",
+  "ephemeral": 0,
+  "id": "PKIX-agp7.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Sweep Category-A version-gating from bead descriptions; un-defer Category-A deferred beads",
+  "updated_at": "2026-05-11T05:20:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:07:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-agp7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:07:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-agp7.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

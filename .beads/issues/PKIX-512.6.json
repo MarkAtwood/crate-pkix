@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:24:59Z",
+  "compaction_level": 0,
+  "content_hash": "c429a454763888e5b0a7f4fa18e36988a7ca1e1055d3ffd5eb2de5e1f674bf9a",
+  "created_at": "2026-05-06T20:17:20Z",
+  "created_by": "Mark Atwood",
+  "description": "report.rs:findings_at_or_above uses a hardcoded matches! pattern rather than Severity's derived Ord. For Severity::Fatal threshold, only LintResult::Fatal findings are returned (via the catch-all (Fatal, _) arm). Warn and Error findings are NOT returned because (Warn, Fatal) and (Error, Fatal) don't match any pattern. This means findings_at_or_above(Fatal) silently excludes Error-level findings, which is surprising and inconsistent with the method's 'at or above' contract. Severity derives PartialOrd+Ord (Info < Warn < Error < Fatal), so the correct implementation is: collect findings where the LintResult variant's corresponding severity >= min_severity. The simplest fix replaces the matches! with a severity_of_result() helper plus a >= comparison, which also future-proofs against new LintResult variants.",
+  "ephemeral": 0,
+  "id": "PKIX-512.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "EvaluationReport::findings_at_or_above incorrect for Severity::Fatal threshold",
+  "updated_at": "2026-05-06T20:24:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

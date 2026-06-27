@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:24Z",
+  "compaction_level": 0,
+  "content_hash": "021f64d41d098d4507cc7286b5af31d821733fb288ab477310daf6f1df8c6269",
+  "created_at": "2026-05-06T23:17:27Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs check_revocation lines 220-243: the CRL signature is verified at step 3b (line 220) before the validity window is checked at step 4 (line 233). Cryptographic signature verification is significantly more expensive than a timestamp comparison. For a stale CRL (the common case in a misconfigured deployment) the code performs a full RSA or EC signature verification before discovering the CRL is expired. Reordering the steps to check the validity window first (before signature verification) would fail fast on the cheap check. The same ordering issue exists in check_revocation_against_anchor (lines 364-382) and in verify_delta_crl_and_collect (lines 494-522). Suggested fix: move the thisUpdate/nextUpdate check to before the signature verification call in all three locations.",
+  "ephemeral": 0,
+  "id": "PKIX-pb5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: CRL signature verified before validity window check",
+  "updated_at": "2026-05-06T23:47:24Z"
+}

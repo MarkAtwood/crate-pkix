@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e58dfd6a57b2d925037519f3da5b412e82204fc2d19ec005dac2fdd21f02337e",
+  "created_at": "2026-05-14T17:44:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:64, 152-156\n\n```rust\nuse pkix_path::SignatureVerifier;\n\npub struct SctVerifier<V: SignatureVerifier> {\n    logs: CtLogList,\n    verifier: V,\n}\n```\n\nThe public surface of `pkix-ct` includes a generic bound on a trait\ndefined in `pkix-path`. When `pkix-path` cuts a major version that\nchanges `SignatureVerifier`'s method signature, error type, or\nassociated types, every signature in `pkix-ct` that mentions\n`SctVerifier<V: SignatureVerifier>` is implicitly broken too \u2014\n`pkix-ct`'s own SemVer compatibility is tied to `pkix-path`'s.\n\nWorkspace internal coupling is the maintainer's choice but it has\ncaller consequences: a downstream crate depending on `pkix-ct 0.x`\nimplicitly accepts the same major version constraint on `pkix-path`,\neven if they never call `pkix-path` directly.\n\nThis pattern is fine within a tightly-coupled workspace where all\ncrates ship lockstep, but the Cargo.toml does not document the\nexpected coupling. Three improvements:\n\n1. Add a `# Version coupling` section to the `SctVerifier` doc\n   comment stating that `pkix-ct`'s SemVer follows `pkix-path`'s\n   trait changes, and listing the pin: \"pkix-ct 0.x.y requires\n   pkix-path 0.x.y\".\n\n2. In Cargo.toml, use a tilde-version requirement on `pkix-path`:\n   `pkix-path = { version = \"~0.x\", ... }`. (workspace inheritance\n   currently obscures this; the workspace's [dependencies] section\n   gets to set the version.)\n\n3. (Optional) Re-export `pkix_path::SignatureVerifier` from\n   `pkix-ct`'s public surface so callers can write\n   `pkix_ct::SignatureVerifier` instead of pulling in `pkix-path`\n   separately. This matches what's already done in `pkix-chain`'s\n   role as umbrella crate.\n\nPriority P2: the coupling exists either way; this is about making it\nvisible to callers so they can plan around it.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctVerifier<V> re-export couples pkix-ct major version to pkix-path major version",
+  "updated_at": "2026-05-14T17:44:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:44:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

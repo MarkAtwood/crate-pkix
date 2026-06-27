@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Review converged: P0=0 P1=0 P2=0. One P4 opinion only. Tests green. Stopping condition met.",
+  "closed_at": "2026-05-02T18:07:14Z",
+  "compaction_level": 0,
+  "content_hash": "df4b687d75e87bd99ffff7dfd40ccefd5b6d8044e3c570b9ab66bd73237818c6",
+  "created_at": "2026-05-02T18:03:36Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-bmo",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: LOW \u2014 recent changes are pure improvements: derives, From impl, simplified match/iter. No new public surface that could lock in bad API choices. No security surface changes.\nIdiom rating: CLEAN \u2014 recent changes are all idiomatic improvements. The diff introduces From<&Certificate>, adds standard derives, simplifies match/iterator patterns. No ownership anti-patterns, no new unwrap, no gratuitous clones. The pre-existing from_cert named constructor (instead of From<Certificate>) is not in this diff's scope.\nConfidence: 5% chance of missed bug. Least confident flags: none \u2014 I have no real complaints. Uncertainty driven by: can't run the test suite from here to confirm no regressions from the Copy/Hash derives. Would raise confidence if: cargo test --workspace passes green.\nRust idiom confidence: 3% chance of missed issue. Least confident flags: none. Uncertainty driven by: Extensions::IntoIterator semantics (assumes &Extensions impl IntoIterator, which compiles but I can't confirm without running the type checker).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: pyc RFC 4518 DN normalization \u2014 post-fixes pass",
+  "updated_at": "2026-05-02T18:07:14Z"
+}

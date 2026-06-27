@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:46:51Z",
+  "compaction_level": 0,
+  "content_hash": "a0ac796d58976aa343d5b1706bd70fb27e981445e52363a7ac0328cbf700ca7e",
+  "created_at": "2026-05-07T20:12:42Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-revocation/src/crl.rs:713\\`:\n\\`\\`\\`rust\nfn cert_is_ca_cert(cert: &Certificate) -> bool {\n    cert.tbs_certificate.extensions.as_deref().unwrap_or(&[])\n        .iter()\n        .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)\n        .and_then(|e| BasicConstraints::from_der(e.extn_value.as_bytes()).ok())\n        .is_some_and(|bc| bc.ca)\n}\n\\`\\`\\`\n\nThe \\`.ok()\\` discards a \\`der::Error\\`. A cert with a present-but-malformed BasicConstraints is silently treated as not-a-CA.\n\n## Why P2\n- \\`cert_is_ca_cert\\` drives the IDP scope check in \\`check_revocation\\` (lines 273\u2013286). If a cert is actually a CA but has a malformed BC, this routine returns \\`false\\`, so a CRL with \\`only_contains_ca_certs=true\\` will be silently skipped (return \\`Ok(())\\` at line 281\u2013284) \u2014 the CRL is treated as not covering that cert when in reality it should.\n- The corresponding pkix-path code (\\`try_find_cert_ext\\`) is fail-closed for security-critical extension decoding. This crate inconsistently fail-opens.\n- Documented elsewhere as risk: \\`MalformedCertificate\\` is the typical error variant for this case.\n\n## Fix\nChange \\`cert_is_ca_cert\\` to return \\`crate::Result<bool>\\` and return \\`Err(Error::CrlParseError(...))\\` (or a new variant) on malformed BC. Both call sites in \\`check_revocation\\` (line 273) and \\`check_revocation_against_anchor\\` (line 401) need the propagation.\n\nAlternatively, follow pkix-path's policy: malformed extension \u2192 MalformedCertificate-equivalent error, propagate up through the revocation path.\n\n## Scope reference\n\\`pkix-revocation/src/crl.rs:713-724\\`, callers at lines 273, 401.",
+  "ephemeral": 0,
+  "id": "PKIX-d667",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: cert_is_ca_cert in pkix-revocation/crl.rs silently fail-opens on malformed BasicConstraints",
+  "updated_at": "2026-05-07T20:46:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

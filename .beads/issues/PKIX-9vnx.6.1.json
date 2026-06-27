@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Shipped: 4 OSCAL-Control metadata methods on Lint trait (title, description, rfc_section_id, rfc_url) all default-provided. 6 CABF TLS BR lints override title + rfc_section_id. 7 new tests. All feature combos pass. Commit d649a894.",
+  "closed_at": "2026-05-11T22:05:08Z",
+  "compaction_level": 0,
+  "content_hash": "7b8494de117e1e208e65cef39aec24a35ae56f012efb161fed8f5b9bc835e6d3",
+  "created_at": "2026-05-11T18:00:27Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nPKIX-9vnx.6 decomposition step 1. The Lint trait today has 5 required metadata accessors (id, citation, severity, scope, applies_to) but no OSCAL-Control-grade fields (title, description, RFC section, citation URL). This bead adds them as default methods so the existing 6 CABF lint impls keep compiling.\n\n## What\n\nExtend the `Lint` trait in `pkix-lint/src/lib.rs` with these default methods (Option (a) \u2014 discrete methods per PKIX-9vnx.6 notes):\n\n- `fn title(&self) -> &str` \u2014 default: returns `self.id()`.\n- `fn description(&self) -> Option<&str>` \u2014 default: `None`.\n- `fn rfc_section_id(&self) -> Option<&str>` \u2014 default: `None`. Example value: `\"rfc5280-4.2.1.9\"` (OSCAL Control-id-shaped).\n- `fn rfc_url(&self) -> Option<&str>` \u2014 default: `None`. Example: `\"https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9\"`.\n\nOverride these in the 6 existing CABF lints (`cabf_tls_br.rs`) to declare the TLS BR section ID + URL where applicable. The CABF lints' citation strings like `\"TLS BR \u00a76.3.2 (SC-081)\"` stay; the new methods are additive.\n\n## Acceptance\n\n- [ ] Lint trait has the 4 new default methods.\n- [ ] Each method has rustdoc with OSCAL Control-field mapping.\n- [ ] Existing 6 CABF lints override at least `rfc_section_id` and `rfc_url` (where a stable URL exists for the TLS BR section).\n- [ ] Tests verify metadata returns for each existing lint.\n- [ ] Full pkix-lint suite passes default + --features oscal + --all-features.\n- [ ] Clippy clean.\n\n## Out of scope\n\n- OSCAL Catalog JSON serialization \u2014 that's .6.2.\n- Round-trip via JSON Catalog \u2014 that's .6.3.\n- Parameter mechanism \u2014 that's .6.4.",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.6.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Lint trait OSCAL-Control metadata methods (foundational)",
+  "updated_at": "2026-05-11T22:05:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T11:00:27Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

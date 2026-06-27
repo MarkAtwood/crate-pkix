@@ -1,0 +1,31 @@
+{
+  "close_reason": "Bikeshedding \u2014 '## [1.0.0] \u2014 TBD' was deliberately rolled out across all 12 1.0-scope crates in commit 362979de (PKIX-wlsr.7.2). The pattern is a workspace convention with the date filled at publish time. Retracting the finding.",
+  "closed_at": "2026-05-14T19:00:08Z",
+  "compaction_level": 0,
+  "content_hash": "a52f0fb00c9921eeabd1b17e07bbc62fc6eaaa3dcf83b7582b87948f314488b5",
+  "created_at": "2026-05-14T18:59:48Z",
+  "created_by": "Mark Atwood",
+  "description": "CHANGELOG.md:11: '## [1.0.0] \u2014 TBD'. The section then enumerates every feature, including the async traits and cache, as 'Added' in 1.0.0. This pattern (consolidate all pre-1.0 work into the eventual 1.0.0 section) is reasonable for a workspace doing a 1.0 cut, but readers landing on the changelog before 1.0.0 ships see a future-dated release with 'Added' items that are TODAY in the code.\n\nThe current shape conflates two things: (a) what's in HEAD, and (b) what 1.0.0 will contain when it eventually ships. Pre-1.0 readers conventionally want (a); post-1.0 readers want (b). The crate's [Unreleased] section being empty while [1.0.0]\u2014TBD has everything inverts the convention.\n\nEither (a) keep [Unreleased] as the bucket for pending changes and move them to 1.0.0 at release-cut, or (b) document the convention so consumers seeing this don't get confused. Workspace-wide consistency matters here \u2014 looking at the workspace CHANGELOG.md should clarify the pattern.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.22",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CHANGELOG [1.0.0] section uses 'TBD' as version date but lists every feature as added",
+  "updated_at": "2026-05-14T19:00:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

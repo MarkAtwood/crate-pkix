@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done in commit. from_der_iter now uses .map().collect::<Result<_, _>>(). Behaviour-equivalent, 8 tests in tests/malformed_nc.rs + existing fixture tests cover the path.",
+  "closed_at": "2026-05-14T07:58:46Z",
+  "compaction_level": 0,
+  "content_hash": "4cebcda5baa39725eccc1d159543c94b199886effaca4024a9c9b50958272db1",
+  "created_at": "2026-05-14T05:16:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:376\u2013380 \u2014 `from_der_iter` builds its output Vec with:\n\n    let mut anchors = Vec::new();\n    for (i, bytes) in iter.into_iter().enumerate() {\n        let cert = Certificate::from_der(bytes.as_ref()).map_err(|_| Error::MalformedAnchor(i))?;\n        anchors.push(TrustAnchor::from_cert(cert));\n    }\n\nThis is the exact pattern the rusty review prompt enumerates: `for` loops that accumulate into a `Vec` via `.push()` instead of `.map()` + `.collect()`. The idiomatic equivalent:\n\n    let anchors: Vec<TrustAnchor> = iter\n        .into_iter()\n        .enumerate()\n        .map(|(i, bytes)| {\n            Certificate::from_der(bytes.as_ref())\n                .map_err(|_| Error::MalformedAnchor(i))\n                .map(TrustAnchor::from_cert)\n        })\n        .collect::<Result<_, _>>()?;\n\nWhat goes wrong if it stays:\n1. `.collect::<Result<Vec<_>, _>>()` preallocates the Vec using the iterator's `size_hint()`; the explicit `Vec::new()` does not, so well-behaved upstream iterators (slices, Vecs, ExactSizeIterator) miss a free preallocation. `from_der_iter` is the canonical adapter entry point that will be hit by every system-store / PKCS#11 / KMS adapter \u2014 preallocation matters at scale.\n2. Intent is less clear: the `for`+`?` form mixes 'transform every item' with 'propagate first error' as imperative steps; collect-into-Result expresses both as one operation.\n3. Inconsistency with the rest of the crate (`Ok(certs.into_iter().map(TrustAnchor::from_cert).collect())` at line 334 in `from_pem` uses the collect form already).",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_der_iter accumulates via for-loop with .push() where .collect::<Result<Vec<_>, _>>() is canonical",
+  "updated_at": "2026-05-14T07:58:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:16:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

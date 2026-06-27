@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8a46a7c9d7cf45d3903dfe00db1bd3b0e749bfb98bfdbfb10e5f6d5ad29a0f96",
+  "created_at": "2026-05-14T12:41:33Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: lib.rs:1330-1343. run_chain calls run_cert for each chain position, and run_cert recomputes cert_sha256_of(cert) for each call. The test at lib.rs:1901-1927 pins this behavior: three identical certs at indices 0/1/2 \u2192 three hashings. For typical chains (no repetition) this is fine. For cross-signed/bridge CA scenarios where the same intermediate appears at two positions in different chains, this is wasteful. For 'fan-out' validation patterns where one leaf is checked against N candidate paths through different intermediates, the leaf is re-hashed for every path. Fix: have run_chain pre-compute one sha256 per unique cert via Vec<[u8;32]> built before the loop, and pass it into run_cert via a new method run_cert_with_hash. Or: cache by &Certificate identity in a per-call HashMap. Filed P3 because the cost is single-digit microseconds per cert (DER re-encode dominates over SHA-256) and the duplicate-cert case is rare. Worth tracking for when pkix-difftest starts running massive corpora.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "run_chain re-hashes the same DER bytes per cert position \u2014 same cert N times = N hashes",
+  "updated_at": "2026-05-14T12:41:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:41:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

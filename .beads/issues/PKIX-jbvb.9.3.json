@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bc4c886e64b7bb3d9e1ba0ed2331e1a30b325d70ad1845b9398a8644a3a4f455",
+  "created_at": "2026-05-14T02:39:59Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nMultipurpose-generation sibling to `SmimeOrganizationValidated` (the\nOrg Strict tier, pending PKIX-jbvb.1). Per CA/B Forum S/MIME BR\n\u00a77.1.6.1: Multipurpose certs assert policy OID `2.23.140.1.5.2.2` and\npermit additional EKU values beyond `emailProtection`.\n\n## API shape\n\n```rust\npub struct SmimeOrganizationValidatedMultipurpose;\n\nimpl Profile for SmimeOrganizationValidatedMultipurpose {\n    fn id(&self) -> &'static str { \"cabf.smime.organization.multipurpose\" }\n    fn version(&self) -> &'static str { \"1.0.14\" }\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // Baseline same as SmimeOrganizationValidated (Strict), with:\n        // - required_leaf_policy_oids: [2.23.140.1.5.2.2]\n        // - EKU permissiveness per \u00a77.1.2.3(f) Multipurpose row\n    }\n}\n\npub const fn smime_org_multipurpose_policy(now_unix: u64) -> ValidationPolicy { ... }\n```\n\n## Subject DN rule\n\nPer \u00a77.1.4.2.4 (Organization-validated) Multipurpose column: same as\nStrict \u2014 `AllOf(organizationName, organizationIdentifier)`. Tier-\ndistinguishing attributes (givenName/surname/pseudonym) SHALL NOT.\n\n## OID constant\n\nAdd `CABF_SMIME_ORGANIZATION_VALIDATED_MULTIPURPOSE_POLICY` =\n`ObjectIdentifier::new_unwrap(\"2.23.140.1.5.2.2\")`.\n\n## Test fixture\n\nGenerate `smime-org-multipurpose-self-signed-365d.der` via extension to\n`gen-smime-tier-fixtures.py`. Subject DN: C, O, organizationIdentifier, CN.\n\n## Acceptance\n\n- Type, alias, OID constant ship.\n- Tests: positive (the new fixture) + negative (Org Strict cert\n  fails this Profile by policy-OID mismatch, and vice versa).\n- CHANGELOG + divergences.md updated.\n- Same clippy/fmt/test bars as PKIX-jbvb.9.2.\n\n## Blocks on\n\n- **PKIX-jbvb.1** \u2014 Org Strict (`SmimeOrganizationValidated`) must\n  ship first; this is the structural template (DN rules + OID\n  constants for Org tier). Same blocked-on pattern as\n  PKIX-jbvb.9.2 \u2192 .9.1.\n\n## Cross-references\n\n- PKIX-jbvb.9 (epic)\n- PKIX-jbvb.1 (Org Strict \u2014 required-first template, blocks this)\n- specs/cabforum-smime-BR.md \u00a77.1.6.1, \u00a77.1.2.3(f), \u00a77.1.4.2.4\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeOrganizationValidatedMultipurpose profile + fixtures",
+  "updated_at": "2026-05-14T02:39:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:39:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T19:39:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

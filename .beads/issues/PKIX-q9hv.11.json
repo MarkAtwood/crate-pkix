@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b7c4cf8fc469779bafe9a1bae5e12bf578270595b1e6d06a1d4391fb7a6be1a1",
+  "created_at": "2026-05-14T14:39:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1338-1404: The NoCheckShim approach is the right pattern. RFC 6960 \u00a74.2.2.2.1 nocheck bypass is a per-cert, per-call concern that the RevocationChecker trait shouldn't know about (otherwise every implementer would have to carry the responsibility). Wrapping the caller's checker in a shim that short-circuits for one identified cert is clean. The LeafIdent(issuer DN, serial) identifier follows RFC 5280 \u00a74.1.2.2's uniqueness contract directly. A future contributor might suggest adding a 'bypass set' parameter to RevocationChecker::check_revocation \u2014 defend the shim: the bypass is a wrapper-layer concern (only verify_ocsp_responder knows when it applies), pushing it into the trait would make every other RevocationChecker carry useless ceremony.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.11",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "NoCheckShim for OCSP responder id-pkix-ocsp-nocheck \u2014 preserve",
+  "updated_at": "2026-05-14T14:39:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:39:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T18:16:46Z",
+  "compaction_level": 0,
+  "content_hash": "9b037eb39fd4d62857012a5312e3b3dd7036726a7c48eed53ad3f1c25a3497b2",
+  "created_at": "2026-05-11T17:46:56Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## What\n\nRunning `cargo test -p pkix-path --no-default-features` fails to compile\nthe integration test crates (pkits_4_5, pkits_4_6_4_7, anchor_nc,\npkits_policy, \u2026) because they unconditionally import `DefaultVerifier`,\nwhich is only re-exported when at least one algorithm feature is on\n(`rsa` or `p256`).\n\n## Reproduce\n\n```\ncargo test -p pkix-path --no-default-features\n```\n\nErrors with:\n\n```\nerror[E0432]: unresolved import `pkix_path::DefaultVerifier`\n```\n\nacross multiple integration tests.\n\n## Notes\n\n- This is **pre-existing**, not caused by PKIX-0x9z. Confirmed by\n  `git stash` + retry on prior HEAD.\n- The library and lib tests compile cleanly under `--no-default-features`\n  (`cargo test -p pkix-path --no-default-features --lib` is green).\n- Likely fix: gate the integration tests behind `#[cfg(any(feature = \"rsa\",\n  feature = \"p256\"))]` or add a `DefaultVerifier` stub for the no-default\n  build. Out of scope for PKIX-0x9z.\n\n## Out of scope for current bead\n\nSurfaced while validating PKIX-0x9z. Left untouched to honour the\n\"strictly in scope\" rule.",
+  "ephemeral": 0,
+  "id": "PKIX-yg2r",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: integration tests require default features (RSA/p256) \u2014 --no-default-features compile fails",
+  "updated_at": "2026-05-11T18:16:46Z"
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "32160b15b294c43c96c04437a73d813a06b8dfb5e2ae0fb9e84a09d30e63916a",
+  "created_at": "2026-05-14T19:36:47Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/signer_discovery.rs:138 doc says: 'cycle detection uses subject-DN equality to avoid quadratic memory.'\n\nActual implementation (lines 143-174) uses NO DN-equality cycle detection. It uses a step counter (`max_steps = bundle.len() + 1`) and returns false when exceeded. A walk through an A\u2192B\u2192A cycle would take N+1 steps and then bail \u2014 correct (fail-closed) but not via DN equality.\n\nThe 'avoid quadratic memory' phrase suggests the alternative considered was a visited-set, which would be O(N) memory not O(N\u00b2). The doc is wrong on two counts: no DN-equality check exists, and the rejected alternative would be O(N) memory not quadratic.\n\nFix: rewrite the doc comment to describe the actual mechanism \u2014 'A bounded step counter caps the walk at bundle.len() + 1 iterations; longer chains (or cycles) fail closed by returning false.' Drop the inaccurate cycle-detection-via-DN-equality claim.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.3",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "reaches_self_signed doc claims DN-equality cycle detection; code uses step-bound",
+  "updated_at": "2026-05-14T19:36:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:36:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

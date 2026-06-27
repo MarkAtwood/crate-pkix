@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8c8fc1894b79eae8037bec50d59e0b0c9ab199285f94a663b11fce3a55c2bce9",
+  "created_at": "2026-06-15T19:45:47Z",
+  "created_by": "Mark Atwood",
+  "description": "Harden the HTTP CRL/OCSP fetcher for production deployment. The cache clock bug (PKIX-f1j4.1) is fixed. Remaining: cache eviction, stale-OCSP overwrite, lock poisoning, async footguns, API hygiene. Existing epic PKIX-cr8 tracks 10 items.\n\nMust-fix for production:\n- Cache eviction policy (bounded memory)\n- OCSP stale-over-fresh fix\n- Lock poisoning policy (propagate or document)\n- Async check_revocation_against_anchor default-skip footgun\n- now_unix stale-time for long-lived fetchers\n\nAcceptance: pkix-revocation-http passes a multi-hour soak test with rotating CRLs and OCSP responders without memory growth or stale-response bugs.",
+  "ephemeral": 0,
+  "id": "PKIX-77k9.3",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-revocation-http production hardening",
+  "updated_at": "2026-06-15T19:45:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:45:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-77k9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

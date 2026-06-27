@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:19:31Z",
+  "compaction_level": 0,
+  "content_hash": "6a67d56d0e0c0c35fcf40e9252fa6d9fc3c75f977293d09d50d249a766f322a1",
+  "created_at": "2026-05-06T21:17:48Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "pkix-lint/src/report.rs:58: EvaluationReport has serde(bound(deserialize = \"'de: 'static\")) but should use serde(bound(deserialize = \"\")) like Finding, LintResult, and DeviatedFinding.\n\nThe de_cow_static helper (line 38) returns Cow::Owned(String) \u2014 it does NOT borrow from the deserializer's lifetime 'de. Therefore no 'de: 'static constraint is needed. The other types in the same crate that use de_static_str all correctly use bound(deserialize = \"\").\n\nPractical impact: low \u2014 serde_json::from_str uses HRTB internally so the test passes. But a custom Deserializer<'de> where 'de is a short-lived borrow would be rejected at the trait-bound level even though de_cow_static would succeed. The inconsistency with the other three types also suggests this is a latent mistake.\n\nFix: change serde(bound(deserialize = \"'de: 'static\")) to serde(bound(deserialize = \"\")) on EvaluationReport.\nNot a bug: the 'de: 'static bound IS required because Vec<Finding> in EvaluationReport generates Finding: Deserialize<'de> requirement, and Finding contains &'static str fields via de_static_str helpers. Empty bound causes a lifetime error. Bound is correct.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2-RUSTY2: EvaluationReport serde bound wrong: 'de: 'static should be empty",
+  "updated_at": "2026-05-06T21:19:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:17:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

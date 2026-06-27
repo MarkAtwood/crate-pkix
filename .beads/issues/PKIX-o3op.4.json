@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "88d3f2a54e8d098618cb50e5fd288fd6e45ef92bfbfd6bd7059dde60c0887622",
+  "created_at": "2026-05-14T19:27:41Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: stdlib stabilizes a new ErrorKind variant (this has happened repeatedly \u2014 see the io_error_more tracking issue, stabilized in tranches across 1.83 and surrounding releases).\n\nMaintenance consequence: each stabilization either silently loses information through pkix-aia's serde label helper (current behavior \u2014 see PKIX-o3op.1), or pkix-aia must ship a patch that adds the new variant to two parallel match arms (label_for and kind_for at pkix-aia/src/lib.rs:289-344). The same patch must update the cases table in tests at lines 356-377. Three places, no compile-time check that they stay in sync.\n\nIf the design is preserved (hand-maintained table), at minimum the maintenance contract should be made explicit: a comment saying 'this table must be updated whenever stdlib stabilizes a new ErrorKind variant; the build will not catch omissions' would help. Currently the contract is implicit and the existing comments overstate the helper's coverage (see PKIX-o3op.2 and PKIX-o3op.3).\n\nThe forward-compat fallback at line 312 ('_ => \"Other\"' for the deserialize side via kind_for) is only half the contract. The serialize side has no such fallback \u2014 silently emitting 'Other' for an unknown variant is the bug, not the cushion.\n\nResolving PKIX-o3op.1 by option (b) (format!(\"{kind:?}\") in serialize) eliminates this maintenance tax entirely. Resolving it by option (a) (extending the table) accepts the recurring tax.\n\nThis is the architectural decision worth recording: do future-stdlib labels round-trip by construction, or by ongoing maintenance?",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "label_for table is a recurring maintenance tax across stdlib releases",
+  "updated_at": "2026-05-14T19:27:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:27:41Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

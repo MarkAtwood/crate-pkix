@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:00:07Z",
+  "compaction_level": 0,
+  "content_hash": "c984c06095b224adca8b4325d10eca1a6073e128a03c7cce1d5bddd74dc57d5b",
+  "created_at": "2026-05-06T20:51:48Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: CrlChecker::check_revocation (pkix-revocation/src/crl.rs:187-374) and CrlChecker::check_revocation_against_anchor (lines 391-519) share nearly identical implementations for steps (4) CRL validity window check, (5) IssuingDistributionPoint scope, (6) delta CRL merge, and (7) serial number search. The two methods differ only in whether the issuer identity comes from a &Certificate or a &TrustAnchor (step 3 cRLSign check and the SPKI source). This duplication means that a bug fix or behavior change in one path must be manually replicated in the other. Fix: extract a private helper function 'do_revocation_check(crl, delta_entries, cert, now_unix)' that handles steps 4-7, shared by both check_revocation and check_revocation_against_anchor. The issuer-specific steps (2-3b for cert, 2-3 for anchor) remain in each method. This removes ~100 lines of duplicated code and a maintenance hazard.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: CrlChecker check_revocation and _against_anchor have duplicated logic",
+  "updated_at": "2026-05-06T21:00:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.51",
+  "title": "pkix-ct::Error missing serde derives unlike rest of workspace",
+  "description": "pkix_ct::Error derives Clone, Debug, PartialEq, Eq, Hash but does not carry serde derives (even behind a feature flag), unlike the Error types in pkix-path, pkix-revocation, pkix-chain, pkix-path-builder, pkix-truststore, pkix-aia, and pkix-identity which all carry '#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]'. AGENTS.md non-negotiable #6 states: 'result/error types MUST derive Clone + Debug + PartialEq + Eq and MUST be Send + Sync. They SHOULD support serde::Serialize + Deserialize behind a serde feature flag.'\n\npkix-ct's Cargo.toml also has no serde feature at all. This is inconsistent with the workspace convention and blocks caching/transport of CT verification errors.\n\nWhat goes wrong if this stays as-is: Callers who want to serialize/cache CT verification results cannot do so without wrapping the error type. This breaks the uniform cache-friendliness contract the rest of the workspace maintains.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-ct/src/lib.rs line 67 (Error enum)",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:18Z",
+  "updated_at": "2026-06-15T16:30:57Z",
+  "closed_at": "2026-06-15T16:30:57Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:18"
+    }
+  ]
+}

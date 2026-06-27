@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.48",
+  "title": "Genuinely well-done: fail-closed extension handling throughout",
+  "description": "The codebase consistently applies fail-closed semantics for malformed certificate extensions across all crates. Every extension parse (BasicConstraints, KeyUsage, EKU, CertificatePolicies, NameConstraints, IssuingDistributionPoint, CRLReasons, OCSP EKU, etc.) that influences a security decision uses try_find_cert_ext or equivalent fail-closed parsing: a malformed extension returns an error rather than being silently treated as absent. This is the correct design for a PKI validator \u2014 treating a malformed critical extension as absent is a fail-open that could bypass security constraints. The pattern is applied uniformly in pkix-path (chain_walk), pkix-revocation (CRL scope, CRL signer KeyUsage, OCSP delegate EKU), pkix-path-builder (BasicConstraints CA check), and pkix-chain-simple (extension whitelist). The only intentional exception is the path-builder's skip-not-fail for malformed BasicConstraints on pool candidates, which is documented and justified (one bad cert in a CMS bag must not poison verification). This consistency is worth defending against future 'simplification' suggestions.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:12Z",
+  "updated_at": "2026-06-15T17:15:45Z",
+  "closed_at": "2026-06-15T17:15:45Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:11"
+    }
+  ]
+}

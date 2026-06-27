@@ -1,0 +1,43 @@
+{
+  "compaction_level": 0,
+  "content_hash": "900ccf24989e794cafd1dffff62bee4b8aa41587695a9af3963fbe4b10023a65",
+  "created_at": "2026-05-08T05:45:13Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract project leaf SAN/EKU/rfc822 checks (e2/e3/e4, ~57 lines, lines 2336\u20132392) into `pub(crate) fn enforce_leaf_profile(...)`.\n\n## Risk\n\nLow-medium. Multi-check, no state mutation, but exercised by project profile rules (not just PKITS).\n\n## Dependencies\n\n- H4 (verify_cert_signature) \u2014 shares conceptual locality.\n- H5 (check_issuer_linkage) \u2014 shares conceptual locality.\n\nThe deps are about helper-pattern consistency rather than code-level coupling. H6 reads cert and policy fields only.\n\n## Acceptance\n\n- New helper in pkix-path/src/lib.rs.\n- chain_walk calls helper for the leaf cert (i == 0 branch).\n- All PKITS tests pass.\n- Project profile tests pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: H6 \u2014 extract enforce_leaf_profile (~57 lines, project leaf SAN/EKU/rfc822)",
+  "updated_at": "2026-05-08T05:45:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-07T22:46:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T22:46:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

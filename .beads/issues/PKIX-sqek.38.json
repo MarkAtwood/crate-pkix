@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "14409229970dacf9251092f612fab2e3bdcc80b0129e22c9b4137f2d9f0f9294",
+  "created_at": "2026-05-14T18:18:12Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:122 imports `use std::borrow::Cow;` at the module top.\n\nHowever, two field declarations in the `Error` enum write the fully-qualified path:\n\n- Line 181: `reason: std::borrow::Cow<'static, str>,`\n- Line 208: `reason: std::borrow::Cow<'static, str>,`\n\nMeanwhile every other use in the file uses the imported short name (`Cow::Borrowed(...)` at lines 1264, 1341, 1356, 1372, 1498, 1504, 1509, 1517, 1525, 1530, 1580, 1596, 1711, 1714).\n\nThe `use` statement is doing its job for every constructor site but is silently bypassed for two type-annotation sites. The fix is mechanical: replace the two FQ paths with bare `Cow<'static, str>`.\n\nWhat goes wrong if it stays: cosmetic inconsistency. A reader sees `std::borrow::Cow` in two field types and may think the module-top `use` is dead. Not a correctness issue but a code-smell signal that the file evolved without one final consistency pass.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.38",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "std::borrow::Cow fully-qualified at rustdoc field types is redundant with use std::borrow::Cow",
+  "updated_at": "2026-05-14T18:18:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:18:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

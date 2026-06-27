@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T06:52:33Z",
+  "compaction_level": 0,
+  "content_hash": "c8471faf4f5f69812440227791fe09614ce5ab8875559d59745a1876d52ad292",
+  "created_at": "2026-05-02T05:52:24Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement a DefaultVerifier struct in pkix-path that dispatches to the available algorithm backends by OID. This is the concrete SignatureVerifier used by pkix-chain-simple and serves as the recommended starting point for users who want RustCrypto defaults.\n\nBLOCKED BY: PKIX-gmv (RSA backend) and PKIX-evy (P-256 backend).\n\nDesign:\n  pub struct DefaultVerifier; (zero-sized, no state)\n  \n  impl SignatureVerifier for DefaultVerifier {\n    fn verify_signature(...) -> Result<(), signature::Error> {\n      match algorithm.oid {\n        OID_SHA256_WITH_RSA => rsa_pkcs1v15_sha256::verify(...),\n        OID_ECDSA_SHA256    => ecdsa_p256_sha256::verify(...),\n        _                   => Err(signature::Error::new()),  // unsupported algorithm\n      }\n    }\n  }\n\nFeature gating: DefaultVerifier is pub only when at least one backend feature is active. Use #[cfg(any(feature = rsa, feature = p256))] or a derived rustcrypto feature.\n\nThis struct is what pkix-chain-simple's internal RustCryptoVerifier should delegate to (eliminating the todo!() in its verify_signature). It can also be exported from pkix-chain for users who want the high-level API with default backends.",
+  "ephemeral": 0,
+  "id": "PKIX-8wg",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: DefaultVerifier OID dispatch wrapper",
+  "updated_at": "2026-05-02T06:52:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:52:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-evy",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:52:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gmv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

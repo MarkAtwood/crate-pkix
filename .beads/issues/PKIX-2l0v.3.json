@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T23:42:18Z",
+  "compaction_level": 0,
+  "content_hash": "a69c2383cf6a5b0fbdb4ae30e9109fb04341430de312acac8133e9da5ee77eac",
+  "created_at": "2026-05-12T19:16:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\n`pkix_chain::verify_chain(&[Certificate], &[TrustAnchor], now, &Verifier, &RevChecker) -> Result<ValidatedPath, Error>` is per-chain shaped. Setup cost is light (no fork+exec; trust anchor parsing happens once if anchors are reused). Question: does the workspace need a batch entry point like `verify_chains(&[&[Certificate]], &[TrustAnchor], ...) -> Vec<Result<ValidatedPath, Error>>`?\n\n## Options\n\n- **A) No batch entry point.** Callers loop over verify_chain themselves. Setup is light; the loop is fine. Matches current state.\n\n- **B) Add verify_chains batch entry point.** Amortizes any shared state (caching the SignatureVerifier's algorithm dispatch table, caching trust anchor parsing, etc.). Marginal performance gain but explicit batch shape signals support.\n\n- **C) Add a Verifier struct that holds prepared state.** Bigger API change: `let v = Verifier::new(anchors, &sig_verifier, &rev_checker); v.verify_one(chain) / v.verify_batch(&[chain])`. This is closer to mozilla::pkix's TrustDomain shape. Better caching story (anchor pre-processing happens once). Bigger surface change.\n\n## Considerations\n\n- AGENTS.md non-negotiable #6 explicitly singles out adapter crates with subprocess overhead as needing batch (1000x asymptotic cost penalty without it). verify_chain has no subprocess; the asymptotic argument is much weaker.\n- Real-world batch use cases (CT log scan, enterprise audit) tend to want adapter-style processing anyway: zlint findings, OCSP checks, etc. \u2014 those are where batch matters more.\n- Callers can wrap verify_chain in a Rayon parallel iterator today without any workspace API change. That's basically a batch entry point at the caller layer.\n\n## Tentative position\n\nA (no batch entry point) is probably right unless someone surfaces a concrete cost benefit. Setup is light; caller-side wrapping is trivial. The asymptotic case in #6 was specifically about subprocess overhead in adapter crates. verify_chain isn't that.\n\n## Out of scope\n\n- Implementing options B or C\n- Designing a Verifier struct shape\n\n## Decision-gate\n\nHuman label. Surface when there's a concrete consumer or measurement driving the question \u2014 until then, A by default.",
+  "ephemeral": 0,
+  "id": "PKIX-2l0v.3",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide whether verify_chain needs a batch entry point",
+  "updated_at": "2026-05-12T23:42:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:16:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2l0v",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

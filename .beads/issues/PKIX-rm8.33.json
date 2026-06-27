@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.33",
+  "title": "verify_tls_server and siblings panic on empty chain despite documented error return",
+  "description": "In pkix-chain/src/lib.rs, verify_tls_server (line 802), verify_smime_signer (line 1033), verify_smime_recipient (line 1066), verify_time_stamper (lines 1187-1188), and verify_ocsp_responder (line 1301) all access chain[0] unconditionally after verify_chain returns Ok. verify_chain delegates to validate_path which rejects empty chains with NoTrustedPath. So chain[0] is safe at runtime. But: (1) the safety depends on pkix_path::check_inputs rejecting empty chains BEFORE returning Ok \u2014 if that invariant is ever violated (e.g. a future refactor that changes error ordering), these wrappers panic with an index-out-of-bounds. (2) The contract is not locally visible \u2014 a reader of verify_tls_server sees chain[0] without a guard and has to trace through verify_chain -> Verifier::verify_one -> pkix_path::validate_path -> check_inputs to confirm safety. What goes wrong: if pkix_path ever changes to allow empty chains (unlikely but structurally possible), all use-case wrappers in pkix-chain panic. A debug_assert!(!chain.is_empty()) at each call site or a shared early guard would make the invariant locally visible and fail-fast in debug builds.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:24Z",
+  "updated_at": "2026-06-15T16:27:04Z",
+  "closed_at": "2026-06-15T16:27:04Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:23"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.1",
+  "title": "CRL: delta entries cloned on every check",
+  "description": "Location: pkix-revocation/src/crl.rs, verify_delta_crl_and_collect() (line ~1078)\n\nEvery call to check_revocation / check_revocation_against_anchor clones the entire delta CRL revoked-certificates Vec via:\n  Ok(delta_crl.tbs_cert_list.revoked_certificates.clone().unwrap_or_default())\n\nThe code already notes this (line 1070-1077 comment) and calls it 'deferred as a low-priority perf cleanup'. The delta CRL is already pre-parsed and stored as &self.delta_crl; verify_delta_crl_and_collect could return a borrowed &[RevokedCert] slice reference instead of cloning the Vec. Both call sites (check_revocation line 648 and check_revocation_against_anchor line 842) would use the slice in-scope before dropping it.\n\nWhat goes wrong: on a CRL with thousands of revoked entries, each check_revocation call allocates and copies every RevokedCert. For batch validation (verify_batch) this multiplies to O(certs_in_batch * revoked_entries) allocations.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:23:41Z",
+  "updated_at": "2026-06-15T16:30:29Z",
+  "closed_at": "2026-06-15T16:30:29Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:23:41"
+    }
+  ]
+}

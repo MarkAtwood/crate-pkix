@@ -1,0 +1,45 @@
+{
+  "close_reason": "HttpCrlFetcher<F, V> impls pkix_revocation::RevocationChecker. check_revocation extracts HTTP/HTTPS CDP URLs, fetches each via the user-supplied RevocationFetcher, delegates parsed CRL bytes to pkix_revocation::CrlChecker. First successful parse path is determinative; fetch + parse failures fall through; all-failed surfaces as Error::RevocationFetchFailed. Added that new variant to pkix_revocation::Error (std-gated, additive on non_exhaustive enum, pkix-revocation 0.3.1 -> 0.3.2). check_revocation_against_anchor stays at trait default Ok(()) matching CrlChecker. Tests use pyca/cryptography fixtures + closure-mock fetcher: 7 scenarios green. Committed at 4ef429be.",
+  "closed_at": "2026-05-09T00:46:17Z",
+  "compaction_level": 0,
+  "content_hash": "959507a7ea25fe5b04b1e90060eab3ad6e9dc2e37aa2242caab05bfcccd487f6",
+  "created_at": "2026-05-08T23:28:24Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nWire CDP URL extraction (PKIX-a1yc.2) + RevocationFetcher (PKIX-a1yc.1) + pkix-revocation::CrlChecker into a single RevocationChecker that fetches CRLs from each cert's CDP and delegates revocation checks.\n\n## What\n\nReplace the placeholder `HttpCrlFetcher<F>` with a working impl:\n\n```rust\n#[cfg(feature = \"crl\")]\npub struct HttpCrlFetcher<F, V> {\n    fetcher: F,\n    verifier: V,\n    now_unix: u64,\n    // Optional: max CRL size, etc. \u2014 deferred to caching child PKIX-a1yc.7\n}\n\n#[cfg(feature = \"crl\")]\nimpl<F: RevocationFetcher, V: SignatureVerifier + Clone> HttpCrlFetcher<F, V> {\n    pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self;\n}\n\n#[cfg(feature = \"crl\")]\nimpl<F: RevocationFetcher, V: SignatureVerifier + Clone> RevocationChecker\n    for HttpCrlFetcher<F, V>\n{\n    fn check_revocation(&self, cert: &Certificate, issuer: &Certificate)\n        -> pkix_revocation::Result<()>;\n\n    fn check_revocation_against_anchor(\n        &self,\n        cert: &Certificate,\n        anchor: &TrustAnchor,\n    ) -> pkix_revocation::Result<()>;\n}\n```\n\n### check_revocation flow\n\n1. Extract CDP URLs from cert (via PKIX-a1yc.2 helper). If empty, return Ok(()) \u2014 no CDPs means no CRL-based revocation status (document this; a stricter policy can be a follow-up).\n2. For each URL in order:\n   a. `fetcher.fetch(GET, url)` \u2192 bytes (or move on to next URL on FetchError; collect last error to return if all fail).\n   b. `CrlChecker::new(bytes, now_unix, verifier.clone())` \u2014 if parse error, treat as fetch failure for this URL and continue.\n   c. `checker.check_revocation(cert, issuer)` \u2014 return result immediately. If revocation status determined (Ok or Err::Revoked), surface that; do not try other URLs.\n3. If all URLs failed without yielding a checker, return a new error variant `Error::FetchError(url, source)` or similar (needs to be surfaced through pkix-revocation::Error \u2014 coordinate with PKIX-a1yc.1).\n\n### check_revocation_against_anchor flow\n\nIdentical, but issuer is `&anchor.cert` (the TrustAnchor's cert reference). The anchor cert is the issuer for an EE that the trust anchor signed directly.\n\n## Acceptance\n\n- [ ] HttpCrlFetcher impls RevocationChecker (and check_revocation_against_anchor).\n- [ ] Empty CDP list returns Ok(()) (documented).\n- [ ] First successful fetch+parse path is taken; subsequent URLs not fetched.\n- [ ] All URLs failing surfaces a clear error variant.\n- [ ] Tests with mock RevocationFetcher (canned bytes) covering: revoked cert, good cert, fetcher all-fail, parse error on first URL falls back to second.\n- [ ] No new pkix-revocation deps; only x509-cert + der + the parent revocation crate.\n\n## Out of scope\n\n- Caching (PKIX-a1yc.7).\n- IDP scope matching \u2014 that's already in pkix-revocation::CrlChecker; we just feed it bytes.\n- Nondeterministic URL ordering (we walk in extension-defined order).\n\n## Effort\n\n~180 lines + tests.\n\n## Depends on\n\nPKIX-a1yc.1 (trait widening), PKIX-a1yc.2 (CDP extractor).",
+  "ephemeral": 0,
+  "id": "PKIX-a1yc.5",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "HttpCrlFetcher<F, V>: RevocationChecker impl",
+  "updated_at": "2026-05-09T00:46:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T16:28:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T16:30:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T16:30:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-a1yc.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2374121cf27f89a34ba3231586797e3d279eaaa535bda88b8b2261f46d0bdebd",
+  "created_at": "2026-05-02T17:09:56Z",
+  "created_by": "Mark Atwood",
+  "defer_until": "2026-08-01T00:00:00Z",
+  "description": "Add max_rdn_size: usize field to ValidationPolicy (default 32). In names_match(), before the O(n^2) SET comparison, check that each RDN has <= max_rdn_size AVAs; if exceeded, treat as non-matching. Motivation: theoretical O(n^2) DoS via crafted certs with huge AVA sets. Real-world safe default: 32 AVAs per RDN is far more than any legitimate CA uses. See SECURITY threat model: Algorithmic Complexity (Medium risk).",
+  "ephemeral": 0,
+  "id": "PKIX-r2y",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "max_rdn_size policy limit in ValidationPolicy",
+  "updated_at": "2026-05-11T05:18:01Z"
+}

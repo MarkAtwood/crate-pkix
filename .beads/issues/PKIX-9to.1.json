@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:25:13Z",
+  "compaction_level": 0,
+  "content_hash": "ac98eab8665aa77e25a78e176afe2847bb27709df7a56159d19727adc4704aca",
+  "created_at": "2026-05-06T22:14:25Z",
+  "created_by": "Mark Atwood",
+  "description": "check_revocation at ocsp.rs:158: when issuerNameHash or issuerKeyHash mismatches, returns Err(OcspStatusUnknown). A hash mismatch means the response is for a different cert/issuer, not that the responder returned unknown status. The correct error is OcspSignatureInvalid or a new OcspCertIdMismatch. In hard-fail mode the caller still rejects, but error messages and matching code treating OcspStatusUnknown as 'try another responder' will silently swallow a wrong-responder attack.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP CertID hash mismatch returns OcspStatusUnknown (misleading error)",
+  "updated_at": "2026-05-06T22:25:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:14:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

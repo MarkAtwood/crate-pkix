@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T13:56:13Z",
+  "compaction_level": 0,
+  "content_hash": "b4624b61ad81ce66be98f9ba0038a5b83b921a711d34b6dab8e4bc5039b8eb9e",
+  "created_at": "2026-05-02T13:40:29Z",
+  "created_by": "Mark Atwood",
+  "description": "RFC 5280 \u00a74.2.1.9: pathLen counts non-self-issued intermediates that MAY FOLLOW the cert. chain_walk at line 764 checks i-1 > path_len, where i is the reversed position. chain[0] is the leaf (EE), not an intermediate. For chain[2] (top intermediate), i-1=1 intermediate follows it (chain[1]). This count is correct. However the code conflates chain position with intermediate count: if chain contains only one intermediate (chain=[leaf, int]) then at i=1, i-1=0 which is correct. The arithmetic holds only because chain[0] is always the EE. This needs an explicit comment or the invariant breaks silently if the indexing assumption is ever changed. File to require a correctness proof comment anchored to RFC 5280 \u00a74.2.1.9.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pathLenConstraint semantics wrong for non-self-issued intermediates",
+  "updated_at": "2026-05-02T13:56:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:40:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

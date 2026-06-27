@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T19:01:07Z",
+  "compaction_level": 0,
+  "content_hash": "b70ba4a38642f66bcfd29b076f279ac755bffe97da7b91c7f88c29aa9b90f5ce",
+  "created_at": "2026-05-06T18:56:04Z",
+  "created_by": "Mark Atwood",
+  "description": "CrlChecker does not override check_revocation_against_anchor; anchor-issued certs silently skip CRL check. Implement the override using anchor subject + SPKI directly.",
+  "ephemeral": 0,
+  "id": "PKIX-oxs",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Fix CRL anchor: implement check_revocation_against_anchor on CrlChecker",
+  "updated_at": "2026-05-06T19:01:07Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:42Z",
+  "compaction_level": 0,
+  "content_hash": "956ae1bf20887c1688bd9fce904433b69cf2eeb292bc071fba1773d8f70347de",
+  "created_at": "2026-05-06T22:17:40Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:237: cycle detection compares SubjectPublicKeyInfo values rather than subject DNs. This is correct: in cross-certified or bridge CA topologies, two certs with the same subject DN but different keys represent different signing authorities and are valid distinct nodes in the path graph. DN-based cycle detection would prune valid paths through bridge CAs. A contributor might suggest using subject DN (simpler, no full SPKI comparison) \u2014 that would be wrong and must be resisted.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.20",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SPKI-based cycle detection in path builder is correct; DN-based would be wrong",
+  "updated_at": "2026-05-06T22:29:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:17:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

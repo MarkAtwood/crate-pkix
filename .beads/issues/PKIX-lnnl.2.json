@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a662c4612fbc2c6e023297f1cb44c8c16d4e31bdb2930df912e8e7317034700b",
+  "created_at": "2026-05-14T19:36:36Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: caller invokes `new_with_signer_discovery` with a bundle in which the discovered signer carries an AKI keyIdentifier but the bundle is missing the cert whose SKI matches; the bundle DOES contain a same-DN different-key cert (the key-rollover bridge scenario in reverse).\n\ndiscover_crl_signer (pkix-revocation/src/signer_discovery.rs:100-105) explicitly returns None on AKI-present-but-no-SKI-match, with rationale: 'A bundle that has the right DN but the wrong key would otherwise hijack discovery \u2014 exactly the case AKI is designed to prevent.'\n\nfind_parent (pkix-revocation/src/signer_discovery.rs:186-205) does the OPPOSITE on the same input shape: it loops over bundle looking for AKI/SKI match, and on no-match silently continues to the issuer-DN fallback (line 201-204). This means reaches_self_signed can succeed by walking through same-DN-different-key bridges that AKI was supposed to prevent.\n\nBad behavior: structural anchor-reachability check accepts a chain that AKI semantics say should be rejected. Today this is mitigated by the doc-level 'no signature verification; bundle pre-validation is caller's responsibility' stance \u2014 but the inconsistency is a footgun: discover_crl_signer's behavior and find_parent's behavior disagree on the same primitive.\n\nFix options:\n1. Mirror discover_crl_signer's strict semantics in find_parent: AKI present and no SKI match \u2192 return None (no DN fallback). Aligns the two functions on the same anti-hijack rule.\n2. Mirror find_parent's lenient semantics in discover_crl_signer: drop the early return. Loses the \u00a74.5 PKITS discriminator property; not viable.\n\n(1) is the correct fix. Add a unit test that constructs a bundle with [bridge_with_AKI, same_DN_cert_no_matching_SKI] and asserts reaches_self_signed returns false.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "find_parent silently falls through AKI\u2192DN; discover_crl_signer does not",
+  "updated_at": "2026-05-14T19:36:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:36:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

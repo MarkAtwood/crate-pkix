@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:03:29Z",
+  "compaction_level": 0,
+  "content_hash": "6f8914f3d601ed868c7e1afa49e2c1da1e885bfd038231de1778c406602dbcc6",
+  "created_at": "2026-05-06T16:51:44Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path-builder/src/lib.rs:193-200\\n\\nThe DFS cycle detection in build_path compares candidate subject DNs against all currently-in-path certs (lines 193-200). Two distinct certificates from the same CA (e.g., different keys during rollover) will have the same subject DN, causing the second to be skipped as a 'cycle.'\\n\\nIn a bridge CA topology where multiple certs share a subject DN (e.g., cross-certificates from different PKIs that happen to use the same issuer name), the path builder will fail to find valid paths that require traversing any CA whose DN already appears in the path.\\n\\nNote: This is a v0.1 scope issue documented in AGENTS.md: 'Cross-certificates and bridge CA topologies are handled here, not in pkix-path.' The current cycle detection incorrectly handles this case by subject-DN dedup only.\\n\\nFix for v0.2: Change cycle detection to compare certificate identity (e.g., DER fingerprint, or issuer+serial) rather than subject DN alone. Subject DN dedup is only safe if each CA has a unique DN, which is not guaranteed across bridge CAs.\\n\\nFor v0.1: add a doc comment or Limitations section to build_path documenting that cycle detection is subject-DN-based and may fail to find valid paths in key-rollover or bridge-CA topologies.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: cycle detection by DN allows false positive on cross-cert topologies",
+  "updated_at": "2026-05-06T17:03:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

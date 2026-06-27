@@ -1,0 +1,31 @@
+{
+  "close_reason": "incorrect: SEC0 verified that nc_constrained_types should NOT include bits from excluded entries; mid-chain code confirms this; bug was fixed in PKIX-onc.20",
+  "closed_at": "2026-05-03T13:27:56Z",
+  "compaction_level": 0,
+  "content_hash": "ae5d9763077ad0c0e9d96dcbbb97a1dc2a41318d2876514ebd907896d66a39d8",
+  "created_at": "2026-05-03T13:16:04Z",
+  "created_by": "Mark Atwood",
+  "description": "nc_constrained_types is initialized by ORing bits from both the anchor's permitted_subtrees and excluded_subtrees entries, not left at 0. This is critically correct. If it started at 0, an anchor constraining DNS via permittedSubtrees could have its permitted set emptied by a conflicting intermediate CA; check_name_constraints would then consult nc_constrained_types, find DNS bit unset, and silently accept all DNS names \u2014 the opposite of the intended behavior. The excluded case also requires seeding: a name type appearing only in anchor excludedSubtrees (no permitted entry) still needs its bit set so the excluded check fires correctly. A future contributor might suggest starting at 0 and only setting bits during chain-walk NC updates, reasoning that 'anchor NC is not a CA cert.' That is wrong: RFC 5280 \u00a76.1.2(e)/(f) explicitly seeds the initial permitted and excluded state from the trust anchor.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.18",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_constrained_types seeded from anchor NC collections, not initialized to 0",
+  "updated_at": "2026-05-03T13:27:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:16:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

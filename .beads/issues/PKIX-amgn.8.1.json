@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T00:23:31Z",
+  "compaction_level": 0,
+  "content_hash": "d7cec23795f1e3a9cd1457c99219fc3b8dd2adf9761cf42498ddfa7d28461d4f",
+  "created_at": "2026-05-12T00:16:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-amgn.8 vendor-zlint pattern requires the zlint source (for testdata corpus access useful to PKIX-hbzo.1) and the runnable binary (for 'zlint -listLintsJSON' invocation by the refresh tool). Mark chose BOTH paths 2026-05-11.\n\n## What\n\n1. Shallow clone github.com/zmap/zlint into ~/GIT/zlint:\n   ```\n   git clone --depth 1 https://github.com/zmap/zlint ~/GIT/zlint\n   ```\n2. Install the binary:\n   ```\n   go install github.com/zmap/zlint/v3/cmd/zlint@latest\n   ```\n   The binary lands in $GOPATH/bin (or $HOME/go/bin). Confirm it's on PATH.\n3. Verify both:\n   - `ls ~/GIT/zlint/v3/lints/ | head` shows the lint Go source files.\n   - `zlint -listLintsJSON | head -50` emits structured lint metadata.\n   - `ls ~/GIT/zlint/v3/testdata/` shows the per-lint cert fixture corpus.\n\n## Acceptance\n\n- [ ] ~/GIT/zlint exists with depth-1 clone of master.\n- [ ] zlint binary on PATH (`which zlint` succeeds).\n- [ ] `zlint -listLintsJSON` runs and produces JSON output.\n- [ ] testdata/ directory accessible (deferred consumer: PKIX-hbzo.1).\n\n## Out of scope\n\n- Pinning zlint to a specific commit (per amgn.8 decision: track master, refresh at maintainer's discretion).\n- Writing the JSON-transform refresh tool (PKIX-amgn.8.3).\n\n## Filed by\n\nDecomposed from PKIX-amgn.8 per Mark's 2026-05-11 decisions.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Local zlint setup: shallow clone to ~/GIT/zlint + go install binary",
+  "updated_at": "2026-05-12T00:23:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:16:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

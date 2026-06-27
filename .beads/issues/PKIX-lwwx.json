@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced serial_lex_ge / serial_lex_le with a single serial_cmp returning core::cmp::Ordering. Call site uses .is_ge() / .is_le(). Tests reorganized into serial_cmp_{greater,less,equal,leading_zeros_stripped} preserving every original assertion (independent oracle; hand-verifiable byte sequences). Net +1 test.",
+  "closed_at": "2026-05-07T23:26:52Z",
+  "compaction_level": 0,
+  "content_hash": "cbc57fca009d7ba807e6bc96ab45adc7b1204ba95fd164a0cd657df220781cd5",
+  "created_at": "2026-05-07T23:04:53Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-lint/src/deviation.rs:411-433 \u2014 serial_lex_ge, serial_lex_le, strip_leading_zeros.\n\n## Finding\nThe two helpers do near-identical work:\n\n```\nfn serial_lex_ge(a: &[u8], b: &[u8]) -> bool {\n    let a = strip_leading_zeros(a);\n    let b = strip_leading_zeros(b);\n    if a.len() != b.len() { return a.len() > b.len(); }\n    a >= b\n}\n\nfn serial_lex_le(a: &[u8], b: &[u8]) -> bool {\n    let a = strip_leading_zeros(a);\n    let b = strip_leading_zeros(b);\n    if a.len() != b.len() { return a.len() < b.len(); }\n    a <= b\n}\n```\n\nThis is the textbook DRY-violation pattern. The idiomatic Rust shape is a single Ordering-returning function:\n\n```\nfn serial_cmp(a: &[u8], b: &[u8]) -> core::cmp::Ordering {\n    let a = strip_leading_zeros(a);\n    let b = strip_leading_zeros(b);\n    a.len().cmp(&b.len()).then_with(|| a.cmp(b))\n}\n```\n\nCall sites then use `.is_ge()` / `.is_le()` on the Ordering value:\n```\nlet serial_ge_start = serial_cmp(serial, start).is_ge();\nlet serial_le_end = serial_cmp(serial, end).is_le();\n```\n\nThis:\n- Removes the duplicated strip_leading_zeros + length comparison.\n- Is the standard idiom for byte-slice numeric comparison.\n- Centralises the DER positive-integer ordering rule (length-first, then bytewise) in one place.\n\n## Severity\nP4 (opinion / DRY). Both functions are tiny and correct; this is purely a code-cleanliness improvement.\n\n## Tests\nThe tests at deviation.rs:1066-1090 (serial_lex_ge_basic, serial_lex_le_basic, serial_lex_leading_zeros_stripped) would need to be updated to either:\n1. Test serial_cmp directly returning Ordering, or\n2. Be renamed and rewritten as boolean-returning thin wrappers around serial_cmp, preserved for source compatibility within the crate.\n\nEither rewriting strategy must keep the same test coverage; no test discipline issue.",
+  "ephemeral": 0,
+  "id": "PKIX-lwwx",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: serial_lex_ge / serial_lex_le could be unified as a single Ordering-returning helper",
+  "updated_at": "2026-05-07T23:26:52Z"
+}

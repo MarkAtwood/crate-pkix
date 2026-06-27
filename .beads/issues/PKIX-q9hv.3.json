@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T15:21:51Z",
+  "compaction_level": 0,
+  "content_hash": "2f6b3ac33f68898fd347c766055f8d0789192105a18ba406ce2c4bf4214fa539",
+  "created_at": "2026-05-14T14:36:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1291-1308 `verify_responder_is_delegated_by` only checks that responder.issuer DN equals issuer.subject DN. RFC 6960 \u00a74.2.2.2: 'This certificate MUST be issued directly by the CA that is identified in the request.' Two CAs in the same hierarchy with colliding DNs (legitimate cross-signing, or hostile look-alike) can both pass the DN check while only one of them actually signed the responder cert. The cryptographic check (responder cert signed by issuer.spki) only fires when `issuer` is also in `chain` \u2014 but the verify_ocsp_responder signature takes `issuer` separately from `chain`, so a caller can pass a DN-matching but different CA cert. Spec-correct delegation pinning requires either (a) verifying responder.signature with issuer.spki directly, or (b) checking responder.AuthorityKeyIdentifier (AKI) matches issuer.SubjectKeyIdentifier (SKI) when present, in addition to DN equality. The docstring at line 1284-1290 acknowledges this gap ('The cryptographic signature check ... is already covered by verify_chain when issuer appears in the chain') but doesn't enforce that `issuer` IS in the chain. Trigger: caller validates OCSP responder against a 'sibling' CA cert with the same DN but a different key. Wrapper passes; the supposed-issuer never actually signed the responder. Fix: either verify chain.iter().any(|c| c == issuer) and document that contract, or call the signature verifier directly to bind issuer.spki \u2194 responder.signature.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Crypto-security framing (from /review-crypto-security pass, 2026-05-14): re-affirms P0. DN-only delegation match in `verify_responder_is_delegated_by` is a trust-misattribution primitive. Concrete attack: in a cross-signed-CA topology (common in real PKIs \u2014 Let's Encrypt's R3 was cross-signed by IdenTrust and ISRG Root X1, both with DN `/C=US/O=...`-shaped names; intermediate CA renames during root rollover produce DN collisions), two distinct CAs can share an issuer DN. An attacker who controls one of the cross-signing CAs (or compromises one's key) can mint a responder cert with id-kp-OCSPSigning that DN-matches the legitimate issuer but is signed by the attacker's CA. `verify_chain` validates the responder against trust anchors via the signature side, but `verify_responder_is_delegated_by` then accepts the responder as 'delegated by' the caller-supplied legitimate issuer purely on DN match \u2014 giving the caller a confident 'this responder speaks for issuer X' answer when in fact it speaks for issuer-DN-twin Y. Going wrong: integrity of revocation status \u2014 the attacker's responder can claim a revoked cert is good, or vice versa. Mitigation: in addition to the DN check, verify either (a) AuthorityKeyIdentifier on the responder matches SubjectKeyIdentifier on the supplied issuer, or (b) the responder's signature verifies under the supplied issuer's SubjectPublicKeyInfo (re-runs the signature check that `verify_chain` already did, but pins it to the caller-named issuer rather than 'whichever issuer DN-matched in the chain').",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "verify_ocsp_responder issuer-DN match insufficient \u2014 also verify AKI/SKI",
+  "updated_at": "2026-05-14T15:21:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:36:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c89c8015922a3b705e2cc500fa70f38aecac3cb41bd5b593bb3eab653860b81f",
+  "created_at": "2026-05-14T14:27:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:10-14: 'pkix-ct ships no built-in log list. Consumers populate the list from a source they trust.' This matches the workspace-wide stance in AGENTS.md: 'no baked-in trust data, no baked-in trust source.'\n\nA future contributor might suggest 'ship a compiled-in Mozilla CCADB CT log list / Chrome list / Apple list for convenience.' Workspace policy is explicit that this is rejected \u2014 trust data is deployment configuration, not library content. pkix-ct enforces it via API: the only ways to populate CtLogList are caller-supplied DER bytes or caller-supplied JSON from a source they trust.\n\nThe Google log_list.json parser is opt-in via the log-list-json feature flag. Even with the parser enabled, no JSON is bundled \u2014 the caller must read it from somewhere they trust. This matches pkix-truststore's 'no baked-in roots' stance.\n\nDefend this: refuse to ship a CCADB-bundled or Chrome-bundled log list, no matter how convenient it seems for getting-started examples.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.22",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "No baked-in CT log list \u2014 pkix-ct ships zero trust data and refuses to",
+  "updated_at": "2026-05-14T14:27:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:27:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

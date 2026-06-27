@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "run_cert_at_issuance() added; audit vs operational modes documented in run_cert; 2 new tests",
+  "closed_at": "2026-05-06T19:32:20Z",
+  "compaction_level": 0,
+  "content_hash": "a4cd7f6ea0849989aa6f5b168eee6d086c27c877ab6a811583811c4789f74ef4",
+  "created_at": "2026-05-06T19:20:41Z",
+  "created_by": "Mark Atwood",
+  "description": "Operators have two distinct use cases:\n- Audit mode: 'was this cert compliant when it was issued?' (pass issuance time as now_unix)\n- Operational mode: 'is this cert compliant under current rules?' (pass current time as now_unix)\n\nThe API already supports this via now_unix parameter in check_cert. What is missing:\n1. Explicit documentation explaining both modes and how to select them\n2. A named constant or helper: LintRunner::run_cert_at_issuance(cert, kind, issued_at) that extracts notBefore from the cert and uses it as now_unix\n3. Lint authors must document whether their lint is issuance-time sensitive (SC-081 validity caps) or evaluation-time sensitive (algorithm retirement)\n4. Consider adding a LintMode enum { Issuance, Operational } to make the intent explicit in the LintRunner call signature",
+  "ephemeral": 0,
+  "id": "PKIX-rrh",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: time-of-issuance vs time-of-evaluation mode \u2014 API and docs",
+  "updated_at": "2026-05-06T19:32:20Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Positive finding: per-cert request body construction once per check",
+  "closed_at": "2026-06-15T18:47:56Z",
+  "compaction_level": 0,
+  "content_hash": "a6b768bf4d09148d484aa95f7aef9c6e730653f0386bdcd9da2958fd90a98e99",
+  "created_at": "2026-05-14T19:01:24Z",
+  "created_by": "Mark Atwood",
+  "description": "src/ocsp.rs:48-61 + src/cache.rs:736-741 + src/async_ocsp.rs:35-41: `build_ocsp_request(cert, issuer, hash_alg)` is called once per check_revocation, BEFORE the URL loop. The body is reused across every URL attempt.\n\nWhat a future contributor will incorrectly suggest:\n\n1. 'Move build_ocsp_request inside the URL loop so we can vary the hash_alg per responder.' \u2014 Adds complexity for an unused capability. RFC 6960 \u00a74.3 says responders MUST implement SHA-1; SHA-256 is widely supported. There's no real workflow where one cert hits multiple responders with different per-responder hash algs.\n\n2. 'Each URL might want a different nonce extension; rebuild per URL.' \u2014 Nonces aren't in scope yet (PKIX-a1yc explicitly defers them). When they're added, the per-URL rebuild question can be revisited then; doing it speculatively now adds complexity.\n\nDefending this decision: building once gets us O(1) DER encoding per check_revocation. The CertID computation requires SHA hashing of issuer SPKI + DN, which is non-trivial CPU work for SHA-1/SHA-256. Doing it once is the right default.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.26",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Per-cert request-body construction in build_ocsp_request happens once per check_revocation, not per URL",
+  "updated_at": "2026-06-15T18:47:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:01:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

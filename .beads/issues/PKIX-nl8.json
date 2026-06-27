@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-nl8",
+  "title": "Review round 1: RFC 4518 DN normalization (PKIX-pyc)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:42Z",
+  "updated_at": "2026-06-15T17:57:42Z",
+  "closed_at": "2026-06-15T17:57:42Z"
+}

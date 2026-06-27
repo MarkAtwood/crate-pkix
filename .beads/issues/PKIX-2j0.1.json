@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:22Z",
+  "compaction_level": 0,
+  "content_hash": "e135b62e70ae8ecc35e6e32b88aa373fbf0814f68680230c8cb58664c11e0cd5",
+  "created_at": "2026-05-06T16:49:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:196\n\nThe default method `check_revocation_against_anchor` returns `crate::Result<()>` but has no `#[must_use]` annotation. The provided default always returns `Ok(())` silently. While this is called via the trait object dispatch path (not directly by callers of the default), Rust convention requires `#[must_use]` on Result-returning trait methods so that an implementor who accidentally omits the override and calls the default in their own code cannot silently drop the result.\n\nMore importantly: the trait method `check_revocation` also lacks `#[must_use]`. Both should be annotated.\n\nFix:\n```rust\n#[must_use = \"revocation check result must not be silently discarded\"]\nfn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()>;\n\n#[must_use = \"revocation check result must not be silently discarded\"]\nfn check_revocation_against_anchor(...) -> crate::Result<()> { Ok(()) }\n```\n\nclippy lint: `must_use_candidate` would flag these.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add #[must_use] to RevocationChecker::check_revocation_against_anchor default",
+  "updated_at": "2026-05-06T16:58:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:49:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

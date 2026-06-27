@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "95f5b7983951c5749912d1019c55673d494e59e9d111a9d7aa7a468c8c4b1f7a",
+  "created_at": "2026-05-14T18:58:19Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:592, 617, 774, 791 (and matching sync sites in crl.rs:85 / ocsp.rs:88): `CrlChecker::new(cached.bytes.as_slice(), self.inner.now_unix, self.inner.verifier.clone())`. The V: SignatureVerifier + Clone bound is propagated through the wrapper.\n\nFor verifiers that are zero-cost copies (DefaultVerifier, unit structs), this is free. For verifiers that carry state (a verifier wrapping a hardware key handle, or an Arc<dyn Verifier>), the clone is a refcount bump per check_revocation call. Not a real bottleneck.\n\nBut the design choice forces V: Clone on every consumer. A verifier that is naturally not Clone (e.g. holds an &mut to a hardware token) can't be used. Mitigations: (a) take &V in CrlChecker::new (changes pkix-revocation API; pre-1.0 fine), (b) accept Arc<dyn SignatureVerifier> as the canonical shape (breaks generic monomorphization, also fine), or (c) leave as-is and add a docstring note that Clone is required.\n\nOut-of-scope for this crate to change pkix-revocation's CrlChecker::new signature; in-scope to note the implication and decide whether to push the change up to pkix-revocation as part of the 1.0 wave.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Every cache check on hit clones the verifier \u2014 V: Clone bound forces unnecessary allocation for verifiers carrying state",
+  "updated_at": "2026-05-14T18:58:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:58:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

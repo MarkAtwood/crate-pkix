@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added metadata.oscal-version validation to lint_ids_from_catalog and resolve_profile (recursive on profile imports); deviation_store_from_risks intentionally exempt since it consumes a bare Risk array with no metadata - documented in its rustdoc. New ParseError variants MissingOscalVersion and UnsupportedOscalVersion. Shared pub(crate) check_oscal_version helper in parse.rs takes the metadata-container object directly. OSCAL_VERSION constant consolidated from emit.rs + catalog.rs into oscal/mod.rs alongside new SUPPORTED_OSCAL_VERSIONS allowlist (currently singleton ['1.1.2'], structured to grow). 6 new tests cover missing/unsupported/accepted at both Catalog and Profile boundaries, plus recursive validation through profile imports. 286 pkix-lint tests pass; workspace builds clean. Commit 0e1a706f.",
+  "closed_at": "2026-05-14T16:50:59Z",
+  "compaction_level": 0,
+  "content_hash": "45fe6aaaa28b41ae70ea74ca5af7fbbc97ede503a3a542e2361d37564b125747",
+  "created_at": "2026-05-14T16:02:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/parse.rs (entire file) \u2014 The two public parsers `deviation_store_from_risks` and `lint_ids_from_catalog` (and the helper `resolve_profile` in oscal/profile.rs) do not inspect the input's metadata.oscal-version field.\n\nThe OSCAL_VERSION constant (\"1.1.2\") is defined in two places \u2014 oscal/emit.rs:80 and oscal/catalog.rs:81 \u2014 and used only on the emit side. The parse side accepts JSON conforming to ANY oscal-version, parses against the 1.1.2 schema shape, and produces a DeviationStore / Vec<String> that may silently lose, mis-interpret, or panic on fields that have different semantics in different schema versions.\n\nCALLER IMPACT: An operator producing OSCAL via a tool that targets OSCAL 1.0.4 (older) or 1.2.0 (newer) gets one of:\n- Silent data loss (fields the parser doesn't understand in the wrong-version layout are ignored).\n- Wrong data ingest (fields with renamed paths produce ParseError::MissingField or ParseError::WrongType for the wrong-version input).\n- Worst case: silent acceptance of data with subtly different semantics, producing a DeviationStore that is structurally valid but semantically wrong.\n\nA round-trip emit-then-parse always works because the emitter writes 1.1.2. A round-trip parse-then-emit silently re-stamps the data as 1.1.2 regardless of the input's claimed version.\n\nREMEDIATION: Add a version check at parse entry. Two design options:\n\n1. Strict accept-1.1.2-only:\n   pub enum ParseError {\n       ...\n       #[error(\"unsupported OSCAL version: found {found:?}, expected 1.1.2\")]\n       UnsupportedOscalVersion { found: String },\n   }\n   At the start of each parse function:\n       let version = value\n           .get(\"metadata\").and_then(|m| m.get(\"oscal-version\"))\n           .and_then(|v| v.as_str())\n           .ok_or(ParseError::MissingOscalVersion)?;\n       if version != crate::oscal::OSCAL_VERSION {\n           return Err(ParseError::UnsupportedOscalVersion {\n               found: version.to_string(),\n           });\n       }\n\n2. Allowlist with explicit compat range:\n   const SUPPORTED_OSCAL_VERSIONS: &[&str] = &[\"1.1.2\"];  // expand as needed\n   if !SUPPORTED_OSCAL_VERSIONS.contains(&version) {\n       return Err(ParseError::UnsupportedOscalVersion { found: ... });\n   }\n\nDocument the supported-version set in the oscal/mod.rs module rustdoc so callers know what to target.\n\nRELATED: oscal/emit.rs:80 and oscal/catalog.rs:81 duplicate the OSCAL_VERSION constant. The duplication is a separate-but-related concern \u2014 see related finding (PKIX-7f92.17 already flags parallel-but-separate uuid_v8 namespaces; same pattern of duplication). Consolidate the version constant into oscal/mod.rs as `pub(crate) const OSCAL_VERSION: &str = \"1.1.2\";` (or `pub` if callers should be able to inspect it programmatically) and reference it from both emit and parse.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL parser does not validate metadata.oscal-version; silently accepts inputs claiming any schema version (1.0.4, 1.2.0) as if they were 1.1.2",
+  "updated_at": "2026-05-14T16:50:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:02:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "False alarm. PKITS \u00a74.10 all 23 tests pass. has_any at cert_depth is correct \u2014 \u00a76.1.4(b) runs after step(d) which places anyPolicy at cert_depth; checking that level is right.",
+  "closed_at": "2026-05-06T16:14:14Z",
+  "compaction_level": 0,
+  "content_hash": "c706a12a60ee1ffa1a073afc46353b9108c703e5b78f9fba2b202c00ddfc3302",
+  "created_at": "2026-05-06T16:12:28Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-path/src/lib.rs in PolicyMappings step(d) has_any check. When a mapping's issuerDomainPolicy is not already in the tree at cert_depth and the code looks for anyPolicy at cert_depth (has_any check), it should check cert_depth-1 (the parent level) per RFC 5280 \u00a76.1.4(b)(1)(ii). Verify line in the find_cert_ext call for anyPolicy in the mappings fallback, then check against RFC text and PKITS \u00a74.10 results.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: \u00a76.1.4(b) PolicyMappings anyPolicy fallback uses cert_depth not cert_depth-1",
+  "updated_at": "2026-05-06T16:14:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:12:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

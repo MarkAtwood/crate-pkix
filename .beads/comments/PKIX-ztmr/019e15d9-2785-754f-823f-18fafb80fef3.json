@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:03:34Z",
+  "id": "019e15d9-2785-754f-823f-18fafb80fef3",
+  "issue_id": "PKIX-ztmr",
+  "text": "Stance is recorded in AGENTS.md non-negotiable #5; bead's purpose (capturing the decision and Rust-ecosystem rationale) is fulfilled. Recommend closing as 'stance recorded, see AGENTS.md #5 and OSCAL.md'. Leaving open for maintainer to confirm close vs keep-open-as-anchor. Not actionable by do-beads loop \u2014 pure stance/decision bead."
+}

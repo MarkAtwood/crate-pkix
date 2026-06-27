@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:19:30Z",
+  "compaction_level": 0,
+  "content_hash": "f8d2a02a873626118ee1c2e0c654d9f765b96f97994deacc8e4e4e3b46141ab6",
+  "created_at": "2026-05-06T21:16:58Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Round-1 fix (PKIX-m75.16) added #[must_use] to DeviationStore::active_at, active_for_lint, and expired_at in pkix-lint/src/deviation.rs (lines 551, 559, 573). All three return 'impl Iterator', which is already marked #[must_use] by the standard library. Clippy's 'double_must_use' lint fires on all three, and the pre-push checklist runs 'cargo clippy -- -D warnings', so this is a compile-blocking defect.\n\nFix: remove the bare #[must_use] attributes from those three methods. The Iterator return type already guarantees the warning; the explicit attribute is redundant noise that breaks -D warnings.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2-RUSTY2: double_must_use on DeviationStore iterator methods",
+  "updated_at": "2026-05-06T21:19:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:16:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

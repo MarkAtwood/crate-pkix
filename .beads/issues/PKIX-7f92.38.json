@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented option (1) from the bead: added 'pkix-lint.deviation-priority' optional OSCAL prop encoding, emitted conditionally on priority != 0 (legacy OSCAL byte-compat), parsed back via new parse_optional_i32 helper. Added ParseError::InvalidI32 variant for malformed values. Three regression tests lock the behavior: round-trip with mixed positive/negative/zero priorities, legacy-shape (missing prop) decodes to 0, and non-numeric prop value surfaces InvalidI32 rather than panic/silent-default. Updated oscal/mod.rs contract claim to reflect now-complete round-trip coverage. Commit 93cd9539.",
+  "closed_at": "2026-05-14T16:42:37Z",
+  "compaction_level": 0,
+  "content_hash": "9381f737d4ef0b1f11260d1b78da6b1114ea629d3e22c7840624eb46b9bf5438",
+  "created_at": "2026-05-14T16:03:41Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/parse.rs:547 (deviation_store_from_risks) + pkix-lint/src/oscal/mod.rs:~23 (round-trip claim) \u2014 There is a documented contract that is violated.\n\nCONTRACT CLAIM (oscal/mod.rs, module-level rustdoc):\nThe module documentation states that risks_from_store -> deviation_store_from_risks forms a closed round-trip loop yielding an Eq-equal DeviationStore. This claim is referenced from the round-trip integration tests and the public emit/parse API design.\n\nREALITY (oscal/parse.rs:547 implementation):\nparse_risk (called by deviation_store_from_risks per entry) hardcodes priority: 0 on the constructed Deviation regardless of what the input Risk had. There is no parse-side encoding for Deviation::priority \u2014 the field was added in commit 4dd25cdb (feat(pkix-lint): Deviation.priority for explicit resolution ordering) and the parse side was not updated to round-trip it.\n\nPROOF: A DeviationStore containing any Deviation with priority != 0 fails Eq comparison against (emit \u2218 parse) of itself.\n\nCALLER IMPACT:\n- A caller relying on the round-trip claim to round-trip policy state through OSCAL gets silent data loss on priority. This is exactly the failure mode the round-trip integration test should catch \u2014 but the test (if it exists for priority) is either missing or broken.\n- The lint-resolution ordering (which uses Deviation::priority \u2014 see find_deviation tie-breaking) is silently flattened across an OSCAL export/import cycle. A caller's deliberate priority hierarchy disappears after round-trip.\n\nREMEDIATION OPTIONS:\n\n1. ADD AN OSCAL PROP ENCODING FOR priority:\n   In risks_from_store, emit a \"pkix-lint.deviation-priority\" prop carrying the priority as a string. In deviation_store_from_risks, parse it back. Default to 0 if absent (so old OSCAL files round-trip with priority=0, matching pre-priority behavior).\n\n2. DOCUMENT THE LOSSY ROUND-TRIP TRUTH:\n   Update oscal/mod.rs to state: \"Round-trip preserves all Deviation fields EXCEPT priority, which is reset to 0 on parse. See PKIX-7f92.37.\"\n\nOption 1 is correct; Option 2 is a workaround.\n\nThe current state \u2014 documented contract is violated by implementation \u2014 is the strongest API-contract failure mode. The doc says X, the code does Y. A caller's defensive code based on X breaks.\n\nPre-1.0: Option 1 is non-breaking-additive (new OSCAL prop, defaulted) and is the canonical fix.\n\nRELATED: PKIX-hy2e.10 (in source comments at oscal/parse.rs:~643) is referenced. Cross-reference here.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.38",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL emit-parse round-trip claim is WRONG: deviation_store_from_risks always sets priority=0, contradicting oscal/mod.rs's 'Eq-equal store' contract for any non-zero-priority deviation",
+  "updated_at": "2026-05-14T16:42:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:03:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

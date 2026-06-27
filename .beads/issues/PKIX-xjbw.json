@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:41:50Z",
+  "compaction_level": 0,
+  "content_hash": "c288617cdc338fa4ec4b7084c87efbb76a94566efe1f55fb153a5654c8563287",
+  "created_at": "2026-05-07T20:14:22Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-revocation/src/crl.rs:74-82\\` and \\`pkix-revocation/src/ocsp.rs:38-43\\` document this directly:\n> Both the base CRL and the delta CRL (if present) are re-parsed from DER on every \\`check_revocation\\` call.\n> The OCSP response is re-parsed from DER on every \\`check_revocation\\` call.\n\nBoth note tracking for v0.3.\n\n## Why P3\n- Documented limitation, not a defect.\n- For a chain of N=5 certs against the same CRL, this is 5x redundant parse work.\n- Practically not large for typical CRLs (KB-MB) but would matter for very large enterprise CRLs.\n\n## Fix\nCache the parsed structure inside \\`CrlChecker\\` / \\`OcspChecker\\`. Two implementation options:\n1. Parse eagerly in \\`new\\` / \\`with_delta\\`, store the parsed value; signature is verified on first \\`check_revocation\\` and cached.\n2. Use \\`OnceCell\\`-style lazy parse on first call.\n\nOption 1 is simpler and surfaces parse errors at construction (better UX). Both eliminate the redundant work.\n\n## Scope reference\n\\`pkix-revocation/src/crl.rs:79-82\\` (limitation note), \\`208\\` (\\`check_revocation\\` body), \\`357\\` (\\`check_revocation_against_anchor\\`); \\`pkix-revocation/src/ocsp.rs:38-43,93,219\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-xjbw",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-revocation re-parses CRL/OCSP DER on every check_revocation call",
+  "updated_at": "2026-05-07T21:41:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

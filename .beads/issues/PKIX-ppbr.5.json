@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bf54a6e6bcc1c8888fb36944ff02ab71c52f14a15649f9a6a3f319fd2fd6c9e7",
+  "created_at": "2026-05-14T17:34:11Z",
+  "created_by": "Mark Atwood",
+  "description": "verify.rs:191-192 and :284-285 both document the window as `[log.usable_from_ms, log.retired_at_ms]` (square brackets on both sides). The actual implementation in `log_window_contains` (verify.rs:845-857) uses `timestamp_ms < lo` (inclusive lower) and `timestamp_ms >= hi` (exclusive upper), making the real window `[lo, hi)` \u2014 half-open.\n\nWhat would make it clear: update both rustdoc bullet points to `[log.usable_from_ms, log.retired_at_ms)` and the `log_window_contains` doc comment (already correct at line 841) is the canonical statement. Or, less preferably, change the implementation to match the docs.\n\nAudience: someone reading rustdoc to decide whether an SCT timestamped exactly at `retired_at_ms` is supposed to verify. Today, the docs say yes; the code says no. Programmers reading the source will be told contradictory things.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "doc comments on verify_sct_for_cert/verify_sct_for_precert say [lo, hi] but log_window_contains is [lo, hi)",
+  "updated_at": "2026-05-14T17:34:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:34:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

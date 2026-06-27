@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:15Z",
+  "compaction_level": 0,
+  "content_hash": "74ebf671b71e31863d6e5b956f638354041aadefb33684a8b49605e491f8df58",
+  "created_at": "2026-05-06T15:12:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs web_pki_missing_san_rejected() (line 325): This test name implies SAN rejection is verified, but the actual test code (lines 345-351) uses webpki-self-signed-365d.der which HAS a SAN, and asserts that it PASSES (not that it's rejected). The comment on lines 332-343 acknowledges the workaround: 'this test validates that web_pki_policy returns require_subject_alt_name=true' \u2014 which is just a field-value assertion, not the rejection test the name implies. The rejection path for MissingSan error is tested in pkix-path/src/lib.rs tests_policy_fields::require_san_fails_when_san_absent (which uses leaf-p256-365d-no-san.der). The misnamed test in pkix-profiles could mislead reviewers into thinking the rejection case is covered here when it's only partially covered. Either rename the test to 'web_pki_policy_san_field_is_true' or add a fixture without SAN and test actual rejection.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "web_pki_policy missing_san test misleadingly named and doesn't test rejection",
+  "updated_at": "2026-05-06T15:35:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:12:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

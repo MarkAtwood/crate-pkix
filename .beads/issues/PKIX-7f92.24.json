@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented Option 1 from the bead: dropped derive(PartialOrd, Ord) on Severity and added pub const fn rank(self) -> u8 with documented per-variant ranks (Info=10, Notice=20, Warn=30, Error=40, Fatal=50) spaced for future mid-scale insertions. Updated the single in-source comparison (findings_at_or_above) to use .rank(). Replaced the existing severity_ordering pin test with two new pins: rank values and rank-ordering alignment. Workspace tests + clippy clean. Commit landing.",
+  "closed_at": "2026-05-14T17:03:09Z",
+  "compaction_level": 0,
+  "content_hash": "1ae2293901d5b2c3c2af5486b21d6c83f8fc71e2f251160d84d8cbe5d0fe3155",
+  "created_at": "2026-05-14T16:00:10Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:275 \u2014 Severity is #[non_exhaustive] and derives PartialOrd + Ord. The derive uses position-in-source ordering, so:\n\n  pub enum Severity { Info, Notice, Warn, Error, Fatal }\n\nmeans severity >= Severity::Warn evaluates to {Warn, Error, Fatal}.\n\nIn v0.8, the maintainer inserted Notice between Info and Warn. The ordering CHANGED \u2014 Notice was promoted from \"did not previously exist\" to \"below Warn\". Any downstream code that wrote `if finding.severity >= Severity::Warn { fail() }` was unaffected this time only because Notice is BELOW Warn. The next mid-list insertion (e.g. an Emergency variant between Error and Fatal, or a Trace below Info) WILL silently change the meaning of existing >= comparisons.\n\n#[non_exhaustive] does not help here. It prevents struct-literal construction and exhaustive match, but says nothing about derived Ord. Callers comparing severity values are an unprotected forever-commitment.\n\nCONCRETE CALLER IMPACT: A caller writing if finding.severity >= Severity::Warn { log_error() } today has the contract \"log Warn, Error, Fatal.\" If pkix-lint v0.10 adds Emergency between Error and Fatal, callers who do not recompile (and many will not \u2014 they pin to ^0.x) silently START treating Emergency as below Warn. If those callers recompile, the comparison is unchanged but the type now contains an Emergency variant they don't handle.\n\nREMEDIATION (pick one):\n1. Drop derive(PartialOrd, Ord); expose `pub const fn rank(self) -> u8` returning documented per-variant integer ranks. Callers compare ranks, not Severity values. Adding a variant only requires picking a new rank \u2014 existing ranks stay stable.\n2. Keep the derive but commit in rustdoc that variants will ONLY be appended (never inserted) and add a compile-time variant-order test that locks Info=0, Notice=1, Warn=2, Error=3, Fatal=4. This forecloses ever fitting a new variant into the existing rank order.\n\nOption 1 is the standard \"derive(Ord) on a public enum is a stability trap\" remediation across the Rust ecosystem.\n\nPre-1.0 is the cheapest time to fix. Once 1.0 ships, all comparison semantics are locked.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Severity derives PartialOrd/Ord with positional variants; v0.8 Notice insertion already broke comparison semantics",
+  "updated_at": "2026-05-14T17:03:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:00:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

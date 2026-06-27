@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:00:06Z",
+  "compaction_level": 0,
+  "content_hash": "43db44c970b01ec0822d63f694e837b02790d68cd7ad303d6589066c48a9d672",
+  "created_at": "2026-05-06T20:47:56Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: LintRunner (pkix-lint/src/lib.rs:446) does not implement Debug. The struct holds Vec<Box<dyn Lint>> which cannot be Debug-derived automatically (Box<dyn Lint> requires Lint: Debug). However, a manual Debug impl showing the lint IDs (the stable string from Lint::id()) would be straightforward and valuable for diagnostics. Without Debug, LintRunner cannot appear in #[derive(Debug)] structs that contain it, and cannot be printed with {:?} in logs or test failures. Fix: add 'Debug' to the Lint trait bound (fn fmt showing id() list) or add a manual impl Debug for LintRunner that formats as 'LintRunner { lints: [\"id1\", \"id2\", ...], bundle_version: \"...\"}'. The Lint trait already has Send + Sync bounds, adding Debug to the trait bound is a breaking change for existing Lint implementors.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: LintRunner missing Debug impl",
+  "updated_at": "2026-05-06T21:00:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:47:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

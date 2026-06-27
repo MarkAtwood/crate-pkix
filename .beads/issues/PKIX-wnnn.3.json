@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "892bbee3e87ea3219c3590db462cdee97b6545f7dd548ca1367d6db69b07703c",
+  "created_at": "2026-05-14T18:28:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:1060 inside #[cfg(test)] mod tests \u2014 `extern crate std;` triggers clippy's unused-extern-crates lint with -D warnings. cargo clippy -p pkix-path-builder --all-features --tests -- -D warnings fails the workspace pre-push check (AGENTS.md). The crate's #![cfg_attr(not(feature = \"std\"), no_std)] means under default-feature builds std is already accessible; the extern crate declaration is redundant. Fix: delete the line, or replace with use std::{...}; in the test bodies (current tests already write std::format!, std::fs::read, etc. with absolute paths so the extern is genuinely unused).",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cargo clippy --tests fails: unused extern crate std",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:28:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

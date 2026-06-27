@@ -1,0 +1,30 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "compaction_level": 0,
+  "content_hash": "394b848e9d6ebbebeac6cb711ae77aed1ed3f5caa870eafe91902162e43ed28c",
+  "created_at": "2026-05-08T18:56:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nRSA-PSS (PKCS#1 v2.1) is the preferred RSA signature mode in TLS 1.3 and is used by Let's Encrypt and many other modern CAs. `pkix-path` currently rejects PSS-signed certs as `AlgorithmNotAllowed` (or `signature::Error::new()` with no detail).\n\nOID: `1.2.840.113549.1.1.10` (rsassa-pss). Note this OID does NOT identify the hash; instead the AlgorithmIdentifier carries parameters (`RSASSA-PSS-params`) specifying `hashAlgorithm`, `maskGenAlgorithm`, `saltLength`, `trailerField`.\n\n## What\n\nIn `pkix-path/src/lib.rs`:\n\n1. New unit struct `RsaPssSha256Verifier` behind `feature = \"rsa-pss\"` (or extend the existing `rsa` feature to cover both v1.5 and PSS). Mirror the structure of `RsaPkcs1v15Sha256Verifier` at `lib.rs:1909`.\n2. **Parameter parsing**: decode the `RSASSA-PSS-params` SEQUENCE from `AlgorithmIdentifierRef::parameters`. Fields: `hashAlgorithm` (default sha1), `maskGenAlgorithm` (default mgf1+sha1), `saltLength` (default 20), `trailerField` (default 1). Honor the v1 implementation choice: only accept SHA-256 + MGF1+SHA-256 + saltLength==32 (or matching digest output length). Reject other parameter combos as `AlgorithmNotAllowed` initially; widen later.\n3. **OID dispatch**: add a branch in `DefaultVerifier` (`lib.rs:3047`) for OID `1.2.840.113549.1.1.10` that constructs the verifier and calls it. The parameter-parsing happens inside the verifier so `DefaultVerifier` stays a thin OID dispatcher.\n4. **Wire to the rsa crate**: `rsa::pss::Pss` for verification.\n\n## Acceptance\n\n- [ ] `RsaPssSha256Verifier` impls `SignatureVerifier`.\n- [ ] Unit test verifies a known-good PSS signature from external test vectors (NIST CAVS, RustCrypto's rsa crate test vectors). Independent oracle, NOT `pkix-path` itself.\n- [ ] Unit test rejects a tampered signature.\n- [ ] Unit test rejects PSS with unsupported parameters (e.g. SHA-1 hash, non-matching salt length).\n- [ ] At least one real-world PSS-signed chain added under `pkix-difftest/tests/fixtures/` (e.g. extract from a current Let's Encrypt cert) and confirmed to validate.\n- [ ] `DefaultVerifier` dispatches to it.\n\n## Edge cases to handle defensively\n\n- **Multiple 'valid' PSS encodings in the wild** \u2014 some CAs emit explicit defaults, some omit them. The differential harness will surface the divergence class. Document which encodings we accept in the rustdoc.\n- **AlgorithmIdentifier OID consistency** between outer signatureAlgorithm and inner TBSCertificate.signature: existing `check_oid_consistency` (`lib.rs:1015`) compares OIDs only, NOT parameters. PSS chains may have different parameter encodings in the two locations even when they represent the same algorithm. Existing comment at `lib.rs:1006-1014` already explains this is intentional; PSS doesn't change that calculus.\n\n## Filed as\n\nPKIX-gphz child #1. Highest-impact single algorithm.",
+  "ephemeral": 0,
+  "id": "PKIX-gphz.1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "crypto: RSA-PSS-SHA256 SignatureVerifier",
+  "updated_at": "2026-05-14T03:12:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T11:56:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-gphz",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

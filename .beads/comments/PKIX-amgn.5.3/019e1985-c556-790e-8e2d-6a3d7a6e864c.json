@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T00:10:58Z",
+  "id": "019e1985-c556-790e-8e2d-6a3d7a6e864c",
+  "issue_id": "PKIX-amgn.5.3",
+  "text": "Decision recorded 2026-05-11 (Mark, interactive): option (ii) \u2014 rewrite the six framework fixture tests in pkix-lint/src/oscal/{catalog,profile}.rs to use Rfc5280MaxSerialLengthLint plus an inline synthetic MinimalLint where the test needs >1 distinct lint type. Framework tests stay with the framework crate. Recommendation accepted. Proceed after PKIX-amgn.5.2 ships."
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:59:51Z",
+  "compaction_level": 0,
+  "content_hash": "c8434de2f738665bd5f621611756bbe5d432d9b5989d910be5dc71712859d4fd",
+  "created_at": "2026-05-07T03:50:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/tests/integration.rs:247-253 \u2014 The adversarial pool test directly mutates ca.tbs_certificate.issuer and ca.tbs_certificate.subject_public_key_info.subject_public_key to create synthetic clones. These mutations produce Rust-object-level modifications that bypass DER consistency \u2014 the tbs_certificate fields are inconsistent with the outer certificate's DER signature. This is acceptable in a path-BUILDER test (build_path only does name matching, not signature verification), but the comment should explicitly note that these certs are structurally invalid for validate_path purposes, and the test should NOT pass them to validate_path. The test already avoids calling validate_path with these mutated certs, but the comment should be explicit.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder test mutates cert fields directly (bypasses DER)",
+  "updated_at": "2026-05-07T03:59:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:50:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

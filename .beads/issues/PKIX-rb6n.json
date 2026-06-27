@@ -1,0 +1,21 @@
+{
+  "compaction_level": 0,
+  "content_hash": "4dcccbe2af9b01b2396272978c5bb91fd4d8da8df0df2f0b428daee9bec9191a",
+  "created_at": "2026-05-11T04:41:44Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-wzmg's second acceptance criterion: when x509-cert 0.3.x ships a stable\nrelease (currently in 0.3.0-rc.4 prerelease), the workspace can bump to it and\nthe empty-input panic guard in pkix-truststore can be removed.\n\nUpstream fix: RustCrypto/formats#1965 (commit 6e6ed032, merged 2025-07-26).\nShipped in: x509-cert 0.3.0-rc.2 and later. Not in any 0.2.x stable.\n\n## What\n\nWhen the workspace bumps to x509-cert 0.3.x stable:\n\n1. Remove the `if !bytes.windows(...).any(...)` early-return guard in\n   pkix-truststore/src/lib.rs::from_pem.\n2. Remove the BEGIN_BOUNDARY const if it has no other users.\n3. Keep the post-call `certs.is_empty()` check, since that handles input\n   that has BEGIN markers but no parseable certs (e.g. only PRIVATE KEY\n   blocks); empty-input-after-strip handling is separate.\n4. Verify all 25 pkix-truststore tests still pass, especially:\n   - empty_pem_file_is_no_certificates\n   - whitespace_only_pem_is_no_certificates\n   - unknown_pem_label_errors\n\n## Acceptance\n\n- [ ] Workspace pinned to x509-cert >= 0.3.x stable\n- [ ] Guard removed from pkix-truststore/src/lib.rs::from_pem\n- [ ] Comment on the guard removed with it\n- [ ] Tests pass",
+  "ephemeral": 0,
+  "id": "PKIX-rb6n",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked blocked 2026-05-10: gated on x509-cert 0.3.x stable release. The fix is in 0.3.0-rc.4 prerelease but not in any stable release. Unblock when x509-cert publishes a 0.3.x non-prerelease.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-truststore: drop empty-input panic guard when x509-cert reaches 0.3.x stable",
+  "updated_at": "2026-05-11T04:48:42Z"
+}

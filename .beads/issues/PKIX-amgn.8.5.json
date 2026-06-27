@@ -1,0 +1,39 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T18:58:40Z",
+  "compaction_level": 0,
+  "content_hash": "c43f661fcc981ea2a2e00e929078b762626225c0569ac574e487b4caffee22d1",
+  "created_at": "2026-05-12T00:17:59Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPer PKIX-amgn.8 decisions (2026-05-11): pkix-lint-cabf parses vendored OSCAL Catalog JSON via serde_json into a lean Rust struct (NOT 1:1 OSCAL mirror), tailored to what Lint impls actually look up. Consistent with Arch 2 / PKIX-9vnx.10 Risk parser pattern.\n\n## What\n\nIn pkix-lint-cabf/src/catalog.rs (new module):\n\n```rust\n#[derive(Debug, Clone, serde::Deserialize)]\npub struct VendoredCatalog {\n    /// Indexed lookup by Control ID.\n    controls: BTreeMap<String, Control>,\n    /// Catalog title from OSCAL metadata.\n    title: String,\n    /// zlint SHA this catalog was derived from.\n    zlint_sha: String,\n}\n\n#[derive(Debug, Clone, serde::Deserialize)]\npub struct Control {\n    pub id: String,\n    pub title: String,\n    pub statement: String,            // from parts[name=statement].prose\n    pub citation: String,             // from links[rel=cites]\n    pub br_section: Option<String>,   // from props[name=br-section]\n    pub source_classification: String, // from props[name=source-classification]\n    pub effective_date: Option<String>, // from props[name=effective-date], RFC 3339\n}\n\nimpl VendoredCatalog {\n    pub fn parse(json: &str) -> Result<Self, CatalogParseError>;\n    pub fn get(&self, control_id: &str) -> Option<&Control>;\n    pub fn iter(&self) -> impl Iterator<Item = (&String, &Control)>;\n    pub fn zlint_sha(&self) -> &str;\n}\n```\n\nThe Deserialize impl walks OSCAL Catalog shape (catalog -> groups[]/controls[] -> control{id, title, parts[], links[], props[]}) into the lean indexed form. May be hand-written or use a serde adapter \u2014 implementation choice.\n\n### Bake-in pattern\n\n```rust\nconst CABF_BR_TLS_JSON: &str = include_str!(\"../catalogs/cabf-br-tls-derived-from-zlint-<sha7>.oscal.json\");\n\npub fn cabf_br_tls() -> &'static VendoredCatalog {\n    static CATALOG: OnceLock<VendoredCatalog> = OnceLock::new();\n    CATALOG.get_or_init(|| VendoredCatalog::parse(CABF_BR_TLS_JSON).expect(\"vendored catalog must parse\"))\n}\n```\n\nThe catalog filename embedding the zlint SHA means each refresh requires updating the include_str! path. That's a feature, not a bug \u2014 explicit version coupling.\n\n### Error type\n\nCatalogParseError covers: malformed JSON, missing required fields (statement, citation, source-classification), unknown OSCAL version, etc. Use thiserror.\n\n## Acceptance\n\n- [ ] catalog.rs module with VendoredCatalog + Control + CatalogParseError.\n- [ ] include_str! + OnceLock pattern for cabf_br_tls() works.\n- [ ] Unit test: parse a sample OSCAL Catalog JSON fixture (small, hand-crafted), verify get() returns expected Controls.\n- [ ] Unit test: malformed JSON returns CatalogParseError, not panic.\n- [ ] cabf_br_tls() called at runtime parses the vendored catalog without error (smoke test against the catalog from PKIX-amgn.8.4).\n\n## Out of scope\n\n- Lint impls (PKIX-amgn.8.6 demonstrates the pattern).\n- Startup-invariant check (lint-id-must-match-catalog) \u2014 folded into .8.6 or follow-up.\n\n## Depends on\n\nPKIX-amgn.8.4 (the vendored catalog file must exist to include_str! against; can stub for unit tests but smoke needs the real file).\n\n## Filed by\n\nDecomposed from PKIX-amgn.8 per Mark's 2026-05-11 decisions.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Frozen 2026-05-12 (PKIX-ncab.2 cascade): parent PKIX-amgn.8 re-scoped because OSCAL is no longer prescribed as the catalog format. This issue is a snapshot of the OSCAL-target version of the work; it will be reworked, closed, or replaced when the replacement policy/config format is decided. Until then, do not claim autonomously.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint-cabf runtime catalog parser: lean Rust struct + BTreeMap index",
+  "updated_at": "2026-05-12T18:58:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:17:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T17:18:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

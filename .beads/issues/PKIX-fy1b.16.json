@@ -1,0 +1,31 @@
+{
+  "close_reason": "false positive: byKey path is tested (ocsp_responder_id_bykey_correct_accepted); gap in byKey OcspResponderIdMismatch arm is documented in the test comment at line 303",
+  "closed_at": "2026-05-07T04:43:55Z",
+  "compaction_level": 0,
+  "content_hash": "9d8ba69691c0b2d373eceb003c154ffd2d9fce2b1dfbabc67396ba41d8b08797",
+  "created_at": "2026-05-07T04:38:01Z",
+  "created_by": "Mark Atwood",
+  "description": "The most recent commit (1c1b267) documents a coverage gap for byKey OcspResponderIdMismatch. The verify_responder_id_impl function (ocsp.rs line 464) handles byKey (line 475-480) using SHA-1 of the SPKI raw bytes, but the OCSP test fixtures in tests/ocsp_checker_tests.rs only test byName responses. There is no test that exercises the byKey branch \u2014 not even a stub with a mismatched hash. The byKey SHA-1 computation (line 477: sha1::Sha1::digest(spki_raw)) has not been independently validated against a reference. This is a test coverage gap on security-critical identity verification logic.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.16",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OCSP byKey ResponderId coverage gap documented but no test verifies byKey path is reachable",
+  "updated_at": "2026-05-07T04:43:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:38:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

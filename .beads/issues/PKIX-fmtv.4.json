@@ -1,0 +1,31 @@
+{
+  "close_reason": "Resolved by inspection 2026-05-11. RevocationChecker::check_revocation(cert, issuer) is per-cert by design; verify_chain at pkix-chain/src/lib.rs:172-181 calls it in a loop. Granularity is per-cert and already in production.",
+  "closed_at": "2026-05-12T04:55:55Z",
+  "compaction_level": 0,
+  "content_hash": "2c5cd86fc4fc92f6c854e1e772648792b11abde5b038665eeed101de4e4d76ff",
+  "created_at": "2026-05-12T02:41:43Z",
+  "created_by": "Mark Atwood",
+  "description": "**Options:**\n\n- **A) Per-path single mode.** Caller passes `RevocationMode::HardFail | SoftFail | Disabled`; applies uniformly to every cert in chain. Simpler.\n- **B) Per-cert mode.** Caller can request hard-fail EE OCSP but soft-fail intermediate CRL (common operational pattern). More expressive.\n- **C) Per-source mode.** OCSP vs CRL different. Most granular; rarely needed in practice.\n\nOperational reality: B is what production deployments actually want. CT log monitors and CAs themselves typically: hard-fail EE OCSP, soft-fail intermediate CRL, disable revocation for root anchors. A forces caller to pick the most lenient mode (which weakens EE checking) or the strictest (which causes intermediate CRL-fetch outages to fail handshakes).\n\nWorth checking: does `pkix-revocation::RevocationChecker` trait already support per-cert mode? If yes, picking B is free.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide RevocationMode granularity (per-path vs per-cert)",
+  "updated_at": "2026-05-12T04:55:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

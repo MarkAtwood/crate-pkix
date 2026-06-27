@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "97f99f5f9a7a76c8b17a72470a2c7169a10d1152a554b3e255dbf4ef8fc9ea2a",
+  "created_at": "2026-05-06T16:50:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:910-914\n\n`prune_policy_tree` allocates a `Vec<ObjectIdentifier>` on every iteration of the pruning loop:\n\n```rust\nlet child_policies: Vec<der::asn1::ObjectIdentifier> = tree\n    .iter()\n    .filter(|n| n.depth == d)\n    .map(|n| n.valid_policy)\n    .collect();\n```\n\nThis Vec is only used in the `retain` closure that follows. Since `ObjectIdentifier` is `Copy`, the collect into a Vec could be replaced with a closure that re-iterates the tree inline \u2014 avoiding the allocation entirely:\n\n```rust\ntree.retain(|n| {\n    if n.depth != prune_depth {\n        return true;\n    }\n    // Re-scan children inline \u2014 tree is not mutated here.\n    tree.iter().any(|child| {\n        child.depth == d && n.expected_policy_set.contains(&child.valid_policy)\n    })\n});\n```\n\nHowever, note that `retain` takes `&mut self`, so borrowing `tree` inside the closure is a borrow conflict. The `collect()` pattern works around this. An alternative that avoids the allocation is to snapshot indices or use a bitset.\n\nA P3 note: the correct fix is to either accept the current collect() (it's correct and the policy tree is small), or restructure the loop to avoid the dual borrow. Document the reason for the collect() if kept.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "The Vec collect-and-retain pattern is the canonical Rust workaround for the double-borrow problem. No improvement possible without unsafe. Deferred.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "prune_policy_tree: extract child_policies into reusable iterator instead of collecting to Vec",
+  "updated_at": "2026-05-06T17:03:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:50:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

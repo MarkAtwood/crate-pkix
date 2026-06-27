@@ -1,0 +1,54 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T01:34:24Z",
+  "compaction_level": 0,
+  "content_hash": "e6f1d8aa5e17bea1c86bd077e884ea5b26f6169a7cec13609038c8eeb0a611a8",
+  "created_at": "2026-05-11T05:45:36Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAfter PKIX-amgn.3 lands `pkix-lint-cabf`, the original `pkix-lint` crate keeps only:\n\n1. `Lint` trait, `LintRunner`, `Finding`, `EvaluationReport`, `DeviationStore`, `DeviatedFinding` (framework).\n2. RFC-conformance lints (RFC 5280 \u00a74.2.1.* violations, RFC 6960 OCSP response anomalies, RFC 4518 DN-encoding issues, etc.).\n\nCA/B Forum-specific lint bundles move to `pkix-lint-cabf`. Breaking change for downstream consumers using `cabf.br.tls` rule bundle directly.\n\n## What\n\n### Stays in pkix-lint\n\n- Framework types listed above.\n- Standards-body lints: anything keyed off RFC / ITU-T / NIST text.\n\nSuggested initial standards-body lint set (curate from what's already there):\n\n- `rfc5280.crit-ext-must-be-recognized` (RFC 5280 \u00a76.1 critical-extension handling)\n- `rfc5280.basic-constraints-on-ca` (\u00a74.2.1.9)\n- `rfc5280.keyusage-keycertsign-on-ca` (\u00a74.2.1.3)\n- `rfc5280.serial-number-positive` (\u00a74.1.2.2 \u2014 non-zero, \u2264 20 octets, positive)\n- `rfc5280.validity-encoding` (\u00a74.1.2.5 \u2014 UTCTime vs GeneralizedTime boundary)\n- `rfc4518.dn-string-prep` (advisory: warns when DN encodings won't normalize cleanly)\n- `rfc6960.ocsp-producedAt-vs-thisUpdate` (advisory: sanity check)\n- (More as the existing lint corpus is triaged.)\n\n### Moves to pkix-lint-cabf\n\n- Anything keyed off a CA/B Forum ballot (SC-081, SC-072, etc.).\n- `cabf.br.tls` / `cabf.br.smime` rule bundle identifiers.\n- Bundle-version constants pinned to BR revision numbers.\n\n### Existing test fixtures\n\n`EvaluationReport::new(\"cabf.br.tls\", \"SC-081\", \"v0.2.0\", ...)` examples in rustdoc and tests \u2014 replace the bundle-name string with a generic example like `\"rfc5280.core\"` or `\"example.lint-bundle\"` for the framework crate's docs. CA/B Forum-specific examples move to `pkix-lint-cabf` rustdoc.\n\n## Acceptance\n\n- [ ] No `cabf.*` rule identifiers in pkix-lint source.\n- [ ] At least 4-6 RFC-conformance lints retained or extracted as the canonical 'standards-body lint bundle.'\n- [ ] cargo check + tests clean across workspace.\n- [ ] Crate version bumped (breaking change).\n- [ ] CHANGELOG entry documenting the migration.\n\n## Depends on\n\nPKIX-amgn.1, PKIX-amgn.3 (target crate for moved content).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "OSCAL alignment retrofit (2026-05-11, per PKIX-ztmr stance): the refactored pkix-lint MUST ship the OSCAL-shaped types from PKIX-9vnx (EvaluationReport \u2192 Assessment Results, Finding \u2192 Finding + Observation, Deviation \u2192 Risk, Lint \u2192 Control). NOT bespoke-then-realign-later. The RFC-conformance lint bundle becomes the project's reference OSCAL Catalog (per PKIX-9vnx.6). This bead now depends on PKIX-9vnx.6 (Lint-as-Control mapping). Without that prerequisite, the refactor would deliver bespoke types that need to be re-broken later \u2014 bad sequencing.\nScope reshape 2026-05-11: this bead's substantive content is now reframed under the zlint-derived OSCAL Catalog approach (PKIX-amgn.8).\n\nOriginal framing: 'author cabf.br.tls / cabf.br.smime lint bundles by hand-reading the CA/B Forum BR PDFs and translating each rule.'\n\nReframed under PKIX-amgn.8: vendor zlint's catalog as OSCAL Catalog JSON; pkix-lint-cabf interprets it at runtime; this bead implements the Rust check_cert() bodies referencing the catalog's Control IDs.\n\nThis bead's acceptance criteria stand: pkix-lint keeps RFC-conformance lints; CA/B Forum content lives in pkix-lint-cabf. The HOW changed; the WHAT didn't.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Refactor pkix-lint: strip CA/B Forum lint bundles, keep framework + RFC-conformance lints",
+  "updated_at": "2026-05-12T01:34:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:56:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T22:45:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:59:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

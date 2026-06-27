@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:43:47Z",
+  "compaction_level": 0,
+  "content_hash": "eaab81e056c824b1ea1e8c26c484cc5dff5b138dd0382a698a358f5c252a7df4",
+  "created_at": "2026-05-07T17:22:06Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1326,1334,2192,2364,2378,2473,2501,2559 \u2014 twelve for-loops use .iter() on slices/vecs where the bare reference suffices. Clippy pedantic explicit_iter_loop fires. Fix: replace `for x in v.iter()` with `for x in &v` (or `for x in v` if Vec). Pure style, no functional impact.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] explicit_iter_loop: .iter() in for loops",
+  "updated_at": "2026-05-07T18:43:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

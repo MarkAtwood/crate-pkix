@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Ran cargo fmt --all to clean the tree. Also fixed 4 clippy::empty_line_after_doc_comments regressions caused by my .21 #[must_use] removal (left blank lines between doc and fn signature). cargo fmt --check is now clean exit 0; clippy --workspace -D warnings passes.",
+  "closed_at": "2026-05-07T22:39:28Z",
+  "compaction_level": 0,
+  "content_hash": "6b994fb797f00d91e593798e1e817d881838ae09a04459196a82ce802fb88e40",
+  "created_at": "2026-05-07T22:01:35Z",
+  "created_by": "Mark Atwood",
+  "description": "rustfmt 1.8.0-stable (current stable as of 2026-03-02) reports 99 diffs across 14 files in the workspace. Per AGENTS.md pre-push checklist, `cargo fmt --all` is mandatory before committing.\n\nAffected files (with diff counts):\n  pkix-lint/src/cabf_tls_br.rs: 7\n  pkix-lint/src/deviation.rs: 25\n  pkix-lint/src/lib.rs: 9\n  pkix-lint/src/report.rs: 2\n  pkix-lint/tests/cabf_tls_br_tests.rs: 9\n  pkix-path/src/lib.rs: 15\n  pkix-path/tests/pkits_4_6_4_7.rs: 1\n  pkix-path-builder/tests/integration.rs: 2\n  pkix-profiles/src/lib.rs: 8\n  pkix-revocation/src/crl.rs: 4\n  pkix-revocation/src/ocsp.rs: 4\n  pkix-revocation/tests/crl_checker_tests.rs: 4\n  pkix-revocation/tests/ocsp_checker_tests.rs: 9\n  (total: 99)\n\nReproduction:\n  cargo fmt --all -- --check    # exits non-zero, prints all diffs\n\nThe diffs are mostly pure-syntax (`const X: T = | ObjectIdentifier::new_unwrap(...)` collapsed onto one line, etc.) \u2014 they were likely fmt-clean against an older rustfmt and a more recent rustfmt has tightened heuristics. Two response options:\n\nA. Run `cargo fmt --all` and commit the changes. Lowest-friction \u2014 re-aligns the tree with the current stable rustfmt.\n\nB. Pin rustfmt via a `rust-toolchain.toml` so the project's intended formatting is reproducible across developer machines.\n\nPass-1 attribution: P4 commit 01908663 includes 'clippy bulk fixes' and was the most recent commit; it should have left the tree fmt-clean. It did not.\n\nSeverity: P2 because the project's own AGENTS.md mandates fmt --check passing pre-push, so this is a violation of project policy. Not P1 because no semantic correctness is affected.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: cargo fmt --check fails on 99 ranges across 14 files; CI policy is broken",
+  "updated_at": "2026-05-07T22:39:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:01:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

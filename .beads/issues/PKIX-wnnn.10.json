@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "10abf66e697af4a9e55bf7ab4c1c8b1ca2055ca4f339279bec8b1b61bfb5421d",
+  "created_at": "2026-05-14T18:29:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:328-347: rank_candidates allocates Vec<(u8, usize)> with capacity == pool.len(), then sorts. Called once per frame; per Frame.ranked = Some(ranked). For typical PKI (small pools, shallow chains) this is one or two small allocations per build_path call. For a build_first_valid_path loop that iterates many candidates in a large pool, the allocation cost compounds: every backtrack to a frame re-uses the cached ranked Vec (fine), but every NEW frame allocates. Not in a hot path that anyone has measured. Flag for the case where the pool grows to thousands of certs (federal bridge PKI scenarios). Alternative shape: a two-pass scan that yields candidates lazily by tier. Probably not worth the complexity unless profiling shows it.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "rank_candidates allocates Vec per frame even for one-candidate matches; consider iterator-based ranking for hot DFS path",
+  "updated_at": "2026-05-14T18:29:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

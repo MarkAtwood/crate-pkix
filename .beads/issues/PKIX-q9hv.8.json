@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "98b6bf06e169cc4cc423ebb1854ed217dd835dc9de152a29d170fc93bc3ab7a5",
+  "created_at": "2026-05-14T14:38:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:209-213 (Error::Aia rustdoc): 'Carries the underlying pkix_aia::AiaError from the last fetch attempt; earlier failures are dropped because the chain builder iterates URIs in caller-supplied order and only the final blocker determines the outcome.' This is misleading. Looking at build_with_aia (lines 620-668): the iteration order is (1) by orphan cert in pool.iter(), (2) by URI from ca_issuers_http_uris (which is in AIA-extension order on each cert), (3) skipping URIs already in tried_uris. The 'final' URI's error has no special significance \u2014 it's just whichever URI happened to be processed last in iteration N's batch. If iteration 0 fetches 3 URIs and iteration 1 fetches 2, the 'last AIA error' surfaced may be from iter 1 even though iter 0 had the actual relevant fetches. Reword to: 'Carries the most-recent AiaError surfaced during fetch iterations. The order in which URIs were attempted is implementation-defined (currently: iteration-major, then orphan-cert-major within each iteration, then AIA-extension order within each cert).'",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AIA last_aia_error rustdoc misrepresents URI ordering",
+  "updated_at": "2026-05-14T14:38:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:38:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

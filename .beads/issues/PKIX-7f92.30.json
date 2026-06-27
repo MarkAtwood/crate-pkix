@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Migrated DeviationScope::issuer_dn_exact and ::serial_range from &x509_cert::name::Name to impl Into<Vec<u8>>; both return Self directly (no Result, no encode step). OSCAL parse side drops the parse-and-re-encode round-trip \u2014 keeps decode_name as a typed-error guard but flows the raw DER bytes through to the constructor. All call sites updated (tests in deviation.rs, oscal::emit, oscal::parse). x509-cert is no longer named in either constructor's signature; the remaining der::Error leak in oscal::parse::ParseError is tracked separately under PKIX-7f92.31. No external callers exist; migration is workspace-local. 286 pkix-lint tests pass; workspace builds clean. Commit cac8a353.",
+  "closed_at": "2026-05-14T16:55:26Z",
+  "compaction_level": 0,
+  "content_hash": "84c284a94932495f3d6003c1e041e1bbfe633110fa0a715be8fbb5d34605be60",
+  "created_at": "2026-05-14T16:01:40Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:512 and :534 \u2014 Both DeviationScope constructors take &x509_cert::name::Name:\n\n  pub fn issuer_dn_exact(name: &x509_cert::name::Name) -> Result<Self, der::Error>\n  pub fn serial_range(issuer: &x509_cert::name::Name, start: Vec<u8>, end: Vec<u8>) -> Result<Self, der::Error>\n\nInternally, both constructors immediately encode the Name to DER bytes via name.to_der() for storage in the props bag. The typed parameter is gratuitous \u2014 pkix-lint stores and compares raw DER bytes (see prop_issuer_dn_der / serial_cmp).\n\nCALLER IMPACT: pinning x509-cert's pre-1.0 major version (currently 0.3.x, with active development toward 1.0) directly into pkix-lint's public API. When x509-cert cuts 1.0 \u2014 or just changes Name's internal shape in a 0.x.y bump \u2014 these two constructors break.\n\nA caller that has DER bytes (the common case in pkix-lint's intended workflow \u2014 deviations are policy entries authored by operators from observed cert data, not from in-flight Certificate structs) is forced to:\n  let name: Name = Name::from_der(&issuer_der)?;\n  let scope = DeviationScope::issuer_dn_exact(&name)?;  // encodes back to DER\n\nThat is an unnecessary parse-and-re-encode round-trip.\n\nREMEDIATION: Change the parameter type to &[u8] (DER bytes):\n\n  pub fn issuer_dn_exact(issuer_der: &[u8]) -> Result<Self, DeviationScopeError>\n  pub fn serial_range(issuer_der: &[u8], start: Vec<u8>, end: Vec<u8>) -> Result<Self, DeviationScopeError>\n\nDocument the DER encoding contract: \"issuer_der is the DER encoding of the issuer Name (the value of TBSCertificate.issuer or Certificate.tbs_certificate.issuer.to_der()). The bytes are stored verbatim and compared byte-equal during matching.\"\n\nCallers with a Name in hand call `name.to_der().unwrap()` at the call site \u2014 that's where they have x509-cert as a dep anyway.\n\nThis decouples pkix-lint's deviation-store API entirely from x509-cert's evolution. Combined with the der::Error wrapping fix (separate finding), DeviationScope's public surface stops depending on either upstream crate.\n\nALTERNATIVE: keep &Name but document the version-pin commitment in rustdoc. This is cheaper to implement but pins x509-cert forever.\n\nPre-1.0 free for the &[u8] migration.\n\nNote: deviation.rs:494 (issuer_dn_contains) takes String / &str, which is fine. The two constructors flagged here are the only x509-cert leak in the DeviationScope public surface.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationScope::issuer_dn_exact and ::serial_range take &x509_cert::name::Name; pins x509-cert pre-1.0 major version gratuitously (constructor immediately re-encodes to DER)",
+  "updated_at": "2026-05-14T16:55:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:01:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

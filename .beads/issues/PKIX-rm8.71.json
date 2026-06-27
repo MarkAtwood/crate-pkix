@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.71",
+  "title": "pkix-path::Error::CrlSignMissing is ambiguously named vs pkix-revocation::Error::CrlSignMissing",
+  "description": "Both pkix_path::Error and pkix_revocation::Error have a variant named CrlSignMissing, but they mean different things:\n\n- pkix_path::Error::CrlSignMissing { index } \u2014 an intermediate CA cert's KeyUsage extension lacks cRLSign. Fired during path validation when ValidationPolicy::require_crl_sign_on_cas is true.\n- pkix_revocation::Error::CrlSignMissing \u2014 a CRL issuer certificate does not have the cRLSign bit set in KeyUsage (RFC 5280 section 6.3.3(f)). Fired during CRL verification.\n\nBoth are semantically related (missing cRLSign) but operate in different contexts and different crates. A caller working with pkix-chain who matches on Error::Path(pkix_path::Error::CrlSignMissing { .. }) vs Error::Revocation(pkix_revocation::Error::CrlSignMissing) must carefully track which crate the variant came from.\n\nWhat goes wrong if this stays as-is: Potential confusion in diagnostics and log messages where the qualified path is stripped. The Display strings differ ('cRLSign missing at chain index N' vs 'CRL issuer KeyUsage does not include cRLSign'), so this is not silent. But the shared name is a mild readability trap.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-path/src/lib.rs lines 327-330 (CrlSignMissing in pkix_path::Error)\n- /home/mark/PROJECT/PKIX/pkix-revocation/src/lib.rs lines 373-374 (CrlSignMissing in pkix_revocation::Error)",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:28:07Z",
+  "updated_at": "2026-06-15T17:30:50Z",
+  "closed_at": "2026-06-15T17:30:50Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:28:06"
+    }
+  ]
+}

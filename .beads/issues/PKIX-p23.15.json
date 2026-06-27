@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:12Z",
+  "compaction_level": 0,
+  "content_hash": "7a798c59056b1482c57977f32d31271bbfa9dc2c7f2f1e0e76a2f2aa85ca6123",
+  "created_at": "2026-05-06T21:33:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:243-249, 335-341, 431-437, 484-491; pkix-revocation/src/ocsp.rs:213-221, 348-355\n\nmatch &field { Some(v) => { if check { return Err(E); } }, None => return Err(E) }\n\nShould be: let v = field.as_ref().ok_or(Error::X)?; if check { return Err(Error::X); }\n\nIdiomatic Rust: ok_or()? replaces match-on-None-returns-Err pattern. Appears 6 times across two files.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "M6: match Option ok_or pattern in CRL/OCSP checkers (appears 6 times)",
+  "updated_at": "2026-05-06T21:42:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:33:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

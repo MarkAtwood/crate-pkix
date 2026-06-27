@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:09:22Z",
+  "compaction_level": 0,
+  "content_hash": "2208c8e093cea704d829e4c08e67b3b156589fc92cc597b59bb496e912b062c7",
+  "created_at": "2026-05-02T13:43:00Z",
+  "created_by": "Mark Atwood",
+  "description": "NormalizedIter::new strips trailing spaces via rposition, so the input slice passed to the iterator never ends with a space. However the pending_space logic (lines 545-554) emits a space and then skips forward \u2014 if pending_space is true and pos reaches the end of the trimmed slice, it returns None rather than the pending space. This means a string ending with multiple spaces (e.g. 'foo  ') after trimming becomes 'foo' (trailing spaces stripped), which is correct. But consider an input whose trimmed content ends with a run of internal spaces followed by a non-space that was consumed on the previous call. The pending_space branch at line 549 skips all spaces and then checks if pos < len: if the trimmed content happens to end in a space after the last non-space character was already emitted, the emit is skipped. This is correct. However the code has no test for strings that are entirely spaces (' ') \u2014 new() sets start==end==0 producing an empty slice, and the iterator should yield nothing. Verify with a test.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.39",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter emits trailing space for input ending with internal space sequence",
+  "updated_at": "2026-05-02T14:09:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:43:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

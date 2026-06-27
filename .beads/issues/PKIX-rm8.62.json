@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.62",
+  "title": "pkix-chain uses pkix_path_builder types without re-exporting",
+  "description": "In pkix-chain/src/lib.rs, the public Error enum exposes Error::PathBuild(pkix_path_builder::Error) (line 233) and Error::AiaDepthExceeded mentions the AIA_MAX_DEPTH constant. The pkix_path_builder::Error type is part of pkix-chain's public API surface (callers match on Error::PathBuild), but pkix_path_builder is not re-exported from pkix-chain.\n\nWhat goes wrong: A caller who wants to match on the inner pkix_path_builder::Error must add pkix-path-builder as a direct dependency, and must pin a compatible version. If pkix-chain bumps its pkix-path-builder dependency to a new semver-breaking version, the caller's direct dep version may conflict. The re-export standard says: if crate A's public API uses types from crate B, A should re-export B.\n\nLocation: pkix-chain/src/lib.rs:233\n\nRecommendation: Add 'pub use pkix_path_builder;' (or at minimum 'pub use pkix_path_builder::Error as PathBuildError;') to pkix-chain's public API.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:55Z",
+  "updated_at": "2026-06-15T17:19:00Z",
+  "closed_at": "2026-06-15T17:19:00Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:54"
+    }
+  ]
+}

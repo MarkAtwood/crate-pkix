@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added cert_is_ca and cert_path_len_constraint using x509-cert BasicConstraints; path_len_constraint was already Option<u8> in x509-cert 0.2",
+  "closed_at": "2026-05-02T06:36:28Z",
+  "compaction_level": 0,
+  "content_hash": "b72f5cd6cd9c2a599fd229adc2c55b8a4e918075f4c6abc8291bd92a519be5c4",
+  "created_at": "2026-05-02T05:51:10Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement helpers to extract BasicConstraints from a Certificate for use in the \u00a76.1 state machine.\n\nRFC 5280 \u00a74.2.1.9: BasicConstraints is CRITICAL on CA certs. Fields: cA BOOLEAN DEFAULT FALSE, pathLenConstraint INTEGER OPTIONAL.\n\nFunctions needed:\n  cert_is_ca(cert: &Certificate) -> Option<bool>\n    Returns Some(true/false) if BasicConstraints extension is present, None if absent.\n    Absence means cA=FALSE per RFC 5280.\n  \n  cert_path_len_constraint(cert: &Certificate) -> Option<u8>\n    Returns the pathLenConstraint if present in BasicConstraints, None otherwise.\n\nUsage in \u00a76.1 state machine:\n  - Every certificate in chain[1..] (intermediates) must have cA=TRUE. Absence or cA=FALSE \u2192 Error::NotCA { index }\n  - pathLenConstraint on cert[i] means at most that many more intermediate certs are allowed above cert[i]. State machine variable max_path_length tracks this.\n  - RFC 5280 \u00a76.1.4(l): if isCA and pathLenConstraint present and current path depth > pathLenConstraint \u2192 Error::PathTooLong (or a dedicated variant)\n\nImplementation note: x509-cert may have BasicConstraints decoded already in x509_cert::ext::pkix::BasicConstraints. Prefer that over manual DER parsing.\n\nTest vectors: use PKITS \u00a74.6 BasicConstraints test certificates.",
+  "ephemeral": 0,
+  "id": "PKIX-0q5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: BasicConstraints and pathLenConstraint extraction",
+  "updated_at": "2026-05-02T06:36:28Z"
+}

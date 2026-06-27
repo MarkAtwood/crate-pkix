@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:41:49Z",
+  "compaction_level": 0,
+  "content_hash": "49ee9694c6eb578e21e260c4149012043e79b8d63d3f4031823ebec48869e0e5",
+  "created_at": "2026-05-07T20:27:49Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n20 functions in the workspace could be `const fn` per `clippy::missing_const_for_fn`. The MSRV is 1.73, which supports `const fn` for all the constructs flagged.\n\n## Notable cases (by impact)\n\n| Location | Function | Effect of const-ifying |\n|---|---|---|\n| pkix-path/src/lib.rs:409 | `TrustAnchor::new` | Allows trust anchors at compile time, e.g. for embedded test fixtures |\n| pkix-path/src/lib.rs:1556 | `NcTypeMask::intersects` | Internal \u2014 small perf, mostly idiom |\n| pkix-path/src/lib.rs:1576 | `name_type_bit` | Internal helper |\n| pkix-revocation/src/lib.rs:190 | `crl_reason_name` | Pure ASCII match \u2014 natural fit |\n| pkix-profiles/src/lib.rs:367 | `sc081_validity_cap` | Useful \u2014 callers may want it in const context |\n| pkix-lint/src/lib.rs:329-350 | `LintResult::is_pass`, `is_finding`, `is_fatal`, `detail` | Useful \u2014 callers may want compile-time evaluation |\n| pkix-lint/src/deviation.rs:710,716,722 | `DeviationRunner::new`, `lint_runner`, `deviation_store` | Idiom |\n| pkix-lint/src/deviation.rs:520 | `effective_severity` | Internal |\n| pkix-lint/src/report.rs:106 | `severity_of` | Internal |\n| pkix-ac/src/lib.rs:121 | `validate_attribute_cert` (stub) | Stub \u2014 likely will need state once impl'd |\n| pkix-ct/src/lib.rs:105 | `verify_scts` (stub) | Stub |\n\n## Why it matters\n\n`TrustAnchor::new` being const would let downstream crates declare:\n\n```rust\nconst ROOT: TrustAnchor = TrustAnchor::new(...);\n```\n\nUseful for `no_std` embedded targets where trust anchors are baked into the firmware.\n\n`LintResult::is_pass` etc. are `match`-on-enum predicates \u2014 the canonical \"should be const fn\" shape.\n\n## Fix\n\nMechanical. Be careful about the stub ones (`validate_attribute_cert`, `verify_scts`) \u2014 they will likely need to be non-const once implemented, so adding `const` now would be a breaking change later. Skip those.\n\n## Priority\n\nP3 \u2014 public-API const-correctness for `TrustAnchor::new` and `LintResult::is_*` is genuinely useful. Internal ones are P4.\n",
+  "ephemeral": 0,
+  "id": "PKIX-nu1h",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: 20 functions could be const fn; TrustAnchor::new and LintResult::is_* are notable wins",
+  "updated_at": "2026-05-07T21:41:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:27:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

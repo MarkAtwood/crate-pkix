@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:21:13Z",
+  "compaction_level": 0,
+  "content_hash": "58a0e07aa90a60ffd4a71b41b9983e7e0f1bfd6d947d80b64904895b5ee8b775",
+  "created_at": "2026-05-07T04:14:36Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/tests/cabf_tls_br_tests.rs:176-296 \u2014 The 100-day and 47-day phase tests were added and do use real DER fixtures (leaf-p256-110d-post-sc081-100d.der, leaf-p256-50d-post-sc081-100d.der, leaf-p256-50d-post-sc081-47d.der, leaf-p256-45d-post-sc081-47d.der). The fixture-only tests (validity_max_error_110d_in_100d_phase, validity_max_pass_50d_in_100d_phase, etc.) are present and not #[ignore]'d, which is good. However the tests validity_max_cap_function_100d_phase and validity_max_cap_function_47d_phase test sc081_validity_cap() directly via pkix_profiles::sc081_validity_cap \u2014 this function is under test. These are unit tests on the oracle function itself, not independent verification. They pass vacuously if sc081_validity_cap is wrong in a self-consistent way. The cap function tests should be documented as 'oracle: CA/B Forum text, independent of lint code' or cross-checked against an external epoch calculation, not just confirm that sc081_validity_cap(T) == sc081_validity_cap(T).",
+  "ephemeral": 0,
+  "id": "PKIX-i0g9.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SC-081 100d/47d fixture tests still #[ignore]-free but use cap function, not DER fixtures",
+  "updated_at": "2026-05-07T04:21:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:14:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-i0g9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

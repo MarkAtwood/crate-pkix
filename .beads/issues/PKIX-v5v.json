@@ -1,0 +1,22 @@
+{
+  "close_reason": "Covered by PKIX-2xm",
+  "closed_at": "2026-05-02T17:20:10Z",
+  "compaction_level": 0,
+  "content_hash": "79a1fb166c3090ca6104a999e7120615d8dd09feed7092083e76035d2c9f1450",
+  "created_at": "2026-05-02T17:18:36Z",
+  "created_by": "Mark Atwood",
+  "description": "The any_to_str_bytes rustdoc says TeletexString is unsupported and deferred to v0.2, but does not explain the engineering reason: T61/TeletexString uses a Latin-1 superset encoding that requires dedicated Unicode transcoding per RFC 4518 \u00a72.6; it cannot be treated as raw ASCII. A future maintainer might think they can 'add T61 support by stripping to ASCII' \u2014 which would silently produce wrong results on accented characters. Clarify the doc to say: 'TeletexString (T.61 encoding) and BMPString (UTF-16BE) require multi-byte Unicode transcoding per RFC 4518 \u00a72.6 before normalization. This is a deliberate scope boundary, not a simple decoder addition.'",
+  "ephemeral": 0,
+  "id": "PKIX-v5v",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: explain why TeletexString is excluded (not just that it is)",
+  "updated_at": "2026-05-02T17:20:10Z"
+}

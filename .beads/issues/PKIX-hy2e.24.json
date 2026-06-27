@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "95932d2b2dfeb6d616fcf56c22d15c474f526c920f18db59c5bc03ffe988a83a",
+  "created_at": "2026-05-14T12:48:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:647:\n\n    /// Globally unique, stable identifier for this lint.\n    fn id(&self) -> &'static str;\n\nThe 'static lifetime forces every Lint impl to back its id with a\nstring literal or a Box::leak'd String. This is fine for the\n20-ish hand-authored lints in this crate and pkix-lint-cabf.\n\nIt is NOT fine for the published goal of the workspace:\npkix-policy-zlint (PKIX-jy95) is supposed to adapt zlint's ~400\nrules, each with an upstream-derived id. Those ids come from zlint's\nNDJSON output at runtime. The current trait signature requires that\nadapter to either:\n\n  (a) Match zlint ids against a compile-time-baked HashMap<String,\n      &'static str>, which means re-publishing pkix-policy-zlint\n      every time zlint adds a rule.\n  (b) Use Box::leak to permanently allocate every observed id.\n      Memory grows unbounded for a long-running process if zlint's\n      catalog evolves at runtime (it doesn't normally, but the API\n      forces this trade).\n  (c) Implement the trait on a Box<dyn Lint>-of-string-id wrapper,\n      defeating the trait's purpose.\n\nThe same applies to:\n\n  - title()  -> &str   \u2014 same lifetime story (less critical: tied to &self)\n  - citation()  -> &'static str \u2014 same as id()\n  - spec_section_id()  -> Option<&str>  \u2014 tied to &self, OK\n  - spec_url()  -> Option<&str> \u2014 tied to &self, OK\n\n# What the caller cannot do\n\nA caller cannot write:\n\n    struct ZlintBridgeLint {\n        id: String,\n        citation: String,\n        ...\n    }\n    impl Lint for ZlintBridgeLint {\n        fn id(&self) -> &'static str { &self.id }  // ERROR: lifetime mismatch\n    }\n\nThey have to either leak or restructure. Every other trait method\n(title, description, spec_section_id, spec_url) takes &self\ncorrectly. Why is id() different?\n\n# Suggested fix\n\nEither change id() to `&self -> &str` (tied to &self lifetime \u2014 same\nas title/description) or to `-> Cow<'static, str>`. Note:\n\n  - Cow<'static, str> works for both static-string lints (zero-cost)\n    and runtime-constructed lints (Cow::Owned).\n  - Returning `&str` tied to &self is even cleaner; the only reason\n    to require 'static is if the runner stores ids in `Finding`\n    without copying. That copy is cheap and `Finding.lint_id` is\n    already Cow<'static, str>.\n\n# Provenance\n\nThe contract was set in 0.0.0 and locked through every minor since.\nThe recent migration of `LintResult` detail to `Cow<'static, str>`\n(PKIX-ua6q, 0.3.0) was the analogue move for the *result* side; the\nsame move is overdue for the *id* side.\n\n# Forward fit\n\nWhen pkix-policy-zlint goes to PR, this trait restricts what the\nadapter can do. Pre-1.0 framing: fix it before 1.0 ships. Breaking\nchange but free pre-1.0.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: Lint::id() -> &'static str forbids runtime-built lint IDs",
+  "updated_at": "2026-05-14T12:48:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:48:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

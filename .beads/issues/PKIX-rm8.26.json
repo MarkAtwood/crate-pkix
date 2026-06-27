@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.26",
+  "title": "pkix-ac Error missing serde and Send+Sync assertion",
+  "description": "pkix-ac::Error derives `Clone, Debug, PartialEq, Eq` but has no `serde` Cargo feature and no `#[cfg_attr(feature = \"serde\", derive(...))]`. It also lacks the Send + Sync compile-time assertion present in all substantive sibling crates (pkix-path, pkix-revocation, pkix-chain, pkix-aia, pkix-truststore, pkix-lint, pkix-zlint-bridge).\n\npkix-ac has a `std` feature that propagates to pkix-path/std, indicating it is not a bare stub \u2014 it has enough structure to warrant the same error-type discipline as its siblings.\n\nAGENTS.md non-negotiable #6: 'Public result/error types ... MUST derive Clone + Debug + PartialEq + Eq and MUST be Send + Sync. They SHOULD support serde::Serialize + Deserialize behind a serde feature flag.'\n\npkix-ac satisfies the MUST but not the SHOULD (serde) and lacks the MUST (Send+Sync) compile-time assertion that every other crate uses to pin the guarantee.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-ac/src/lib.rs line 78-80, /home/mark/PROJECT/PKIX/pkix-ac/Cargo.toml",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:07Z",
+  "updated_at": "2026-06-15T17:03:50Z",
+  "closed_at": "2026-06-15T17:03:50Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:06"
+    }
+  ]
+}

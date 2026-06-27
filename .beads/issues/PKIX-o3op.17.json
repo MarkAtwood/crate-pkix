@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6863990b2a81d9042b6bb3e440f280e77e2bac1f64123470be79ba70c4446280",
+  "created_at": "2026-05-14T19:29:57Z",
+  "created_by": "Mark Atwood",
+  "description": "Why this choice is correct: NoAiaFetcher at pkix-aia/src/lib.rs:639-640 is '#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)] pub struct NoAiaFetcher;'. The zero-sized unit struct is intentional. It compiles to nothing. It satisfies 'A: AiaFetcher + Default' bounds. The Copy derive is intentional even though Clone covers most uses \u2014 Copy admits pass-by-value through generic APIs that take ownership without ownership friction, which is how it will be threaded through pkix-chain::Verifier (PKIX-zkjb.9).\n\nThe companion test 'no_aia_fetcher_is_zero_sized' at line 993 pins this as a compile-time invariant. A future field addition (even PhantomData with a bound) would break the test.\n\nA future contributor might suggest 'remove Copy, Clone is sufficient'. Reject: Copy is the ergonomic difference that makes pass-by-value through generic Verifier construction painless. The ZST means there is literally nothing to clone or move; Copy reflects that fact at the type-system level.\n\nA future contributor might also suggest 'replace this with () or PhantomData and have impl AiaFetcher for ()'. Reject: a named type carries documentation and is greppable. () impls cannot carry rustdoc. NoAiaFetcher is the API; the ZST is the implementation.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.17",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Decision: NoAiaFetcher is ZST with Copy + Default + zero allocation",
+  "updated_at": "2026-05-14T19:29:57Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

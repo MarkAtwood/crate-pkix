@@ -1,0 +1,22 @@
+{
+  "close_reason": "Epic complete: all three profile functions implemented (web_pki_policy, smime_policy, code_signing_policy). ValidationPolicy extended with 5 enforcement fields. Full workspace tests green.",
+  "closed_at": "2026-05-06T05:08:03Z",
+  "compaction_level": 0,
+  "content_hash": "5747ede214c31d2dfbd8d005aca6ac2aaac719321a261177c4d1eebc5885bd88",
+  "created_at": "2026-05-06T03:26:06Z",
+  "created_by": "Mark Atwood",
+  "description": "The three CA/B Forum profile functions in pkix-profiles \u2014 web_pki_policy, smime_policy, code_signing_policy \u2014 all panic with unimplemented!(). Only rfc5280_policy is real (it just calls ValidationPolicy::new()).\n\nCompleting these requires two phases:\n\nPhase 1: Extend ValidationPolicy in pkix-path to carry the additional constraints the profiles need (max validity period, allowed signature algorithm OIDs, minimum RSA key size, required extensions). These fields are not present today.\n\nPhase 2: Implement each profile function to return a ValidationPolicy with those fields populated per the relevant CA/B Forum Baseline Requirements document.\n\nAcceptance criteria:\n- web_pki_policy, smime_policy, and code_signing_policy return real ValidationPolicy values (no panic)\n- The constraints they set are enforced by validate_path / chain_walk\n- Tests verify that certificates violating each profile's constraints are rejected\n- cargo test --workspace passes\n- cargo clippy --workspace -- -D warnings passes\n- RUSTDOCFLAGS='--cfg docsrs -D warnings' cargo +nightly doc --no-deps --all-features --workspace passes\n- cargo +1.73 check --workspace passes",
+  "ephemeral": 0,
+  "id": "PKIX-ken",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: implement pkix-profiles (CA/B Forum policy functions)",
+  "updated_at": "2026-05-06T05:08:03Z"
+}

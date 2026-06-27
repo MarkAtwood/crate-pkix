@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bd6fbd38e2991ed5b72bb25217548d3292bb77aafebfb7d2d9ff6ba80d3e909d",
+  "created_at": "2026-05-14T19:27:27Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-aia/src/lib.rs:266-270 comment says: 'The Debug representation for ErrorKind is the variant name (e.g. \"NotFound\", \"PermissionDenied\"). It is stable across stdlib releases \u2014 variant names do not change \u2014 and it lines up with the labels we accept in deserialize.'\n\nThe implementation immediately below this comment does NOT use the Debug impl. It calls label_for(*kind), which is a hand-written match table at lines 289-314. The comment misrepresents the mechanism.\n\nA reader reading the comment believes the helper is forward-compatible by construction (it just emits whatever Debug says). The actual implementation is forward-compatible only up to the labels enumerated in the table \u2014 see P0 PKIX-o3op.1 for the consequence.\n\nEither the comment should be revised to match the implementation ('We maintain a stable label table that mirrors the Debug spelling for the recognized variants. New stdlib variants fall through to \"Other\".'), or the implementation should be revised to match the comment (use format!(\"{kind:?}\") in serialize \u2014 which would also fix the P0 finding).",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.2",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Rustdoc comment claims label_for uses Debug-impl; implementation uses match table",
+  "updated_at": "2026-05-14T19:27:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:27:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

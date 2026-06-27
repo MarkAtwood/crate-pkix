@@ -1,0 +1,53 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "pkits_helper.rs with pkits_cert/pkits_trust_anchor/pkits_validate; pkits_smoke.rs with 3 tests passing (4.1.1 valid, not-yet-valid, 4.1.2 root-only)",
+  "closed_at": "2026-05-02T07:18:19Z",
+  "compaction_level": 0,
+  "content_hash": "96091620be3bbee75f90cfc21c9df398e9dcd2f3d28018c30ea219ae23d6cf69",
+  "created_at": "2026-05-02T05:52:46Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement the test helper infrastructure in pkix-path/tests/ that all PKITS test cases will use.\n\nBLOCKED BY: PKIX-6vd (fixtures must be committed first), PKIX-h6z (validate_path must work), PKIX-8wg (DefaultVerifier must exist).\n\nHelpers needed:\n\npkits_cert(name: &str) -> Certificate\n  Loads pkix-path/tests/pkits/certs/{name}.crt as DER and parses it.\n  Panics with a clear message if the file is missing.\n\npkits_trust_anchor() -> TrustAnchor\n  Loads TrustAnchorRootCertificate.crt and wraps it as a TrustAnchor.\n\npkits_validate(cert_names: &[&str], now_unix: u64) -> pkix_path::Result<ValidatedPath>\n  Convenience: loads named certs in order (leaf first), builds the chain, calls validate_path with DefaultVerifier and the PKITS trust anchor.\n  now_unix should be set to a fixed test time within the PKITS cert validity windows (check the actual cert dates from the fixtures).\n\nassert_pkits_valid!(cert_names: [...])\nassert_pkits_invalid!(cert_names: [...], Error::SomeVariant { .. })\n  Test macros for readability.\n\nThe PKITS document numbers tests as e.g. '4.1.1' with cert names like 'ValidCertificatePathTest1EE', 'GoodCACert', etc. The helper should make it easy to write:\n  assert_pkits_valid!(['ValidCertificatePathTest1EE', 'GoodCACert']);",
+  "ephemeral": 0,
+  "id": "PKIX-6cq",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS: test helper infrastructure",
+  "updated_at": "2026-05-02T07:18:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:52:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-6vd",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:52:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8wg",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:52:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-h6z",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:03:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o76",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

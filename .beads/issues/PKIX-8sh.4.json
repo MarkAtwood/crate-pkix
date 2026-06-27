@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:47:50Z",
+  "compaction_level": 0,
+  "content_hash": "6295ebd069e958b2cad4209d8b582b4d35a4de60db5e625a86f88e7af3d97902",
+  "created_at": "2026-05-02T18:30:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs line 133: SingleResponse matching is by cert_id.serial_number only. Serial numbers are unique per CA but not globally. An OCSP response produced by CA-A for serial=42 will satisfy a check for CA-B's cert with serial=42 if the signature check passes (e.g., if the same key signs both CAs' OCSP responses, or if the caller supplies the wrong response). The CertID.issuerNameHash and CertID.issuerKeyHash fields are not verified. This is documented in the struct doc comment, but the security consequence is real: a compromised or colluding CA can replay an OCSP 'good' response from its own cert pool to cover a cert revoked by another CA. The issuer hash fields must be verified against the issuer cert's subject name and SPKI.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspChecker serial-only CertID matching allows cross-CA OCSP response replay",
+  "updated_at": "2026-05-02T22:47:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:30:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

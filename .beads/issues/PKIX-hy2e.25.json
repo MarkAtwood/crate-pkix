@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ea1c2b9ca5837e899cc9dce62cad3133d21acb688f0d50bee6dc68fa067a3e4d",
+  "created_at": "2026-05-14T12:48:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1469:\n\n    pub fn check_shape(\n        cert: &Certificate,\n        kind: SubjectKind,\n        now_unix: u64,\n        profile: &dyn LintProfile,\n    ) -> Result<(), Vec<Finding>>\n\nThe shape is:\n  - Ok(())  \u2014 no Error/Fatal findings\n  - Err(findings) \u2014 has at least one Error/Fatal; returns ALL findings\n\nThe documented contract (line 1447-1450) acknowledges this:\n'Findings on Warn-only certs are silently discarded by check_shape\n(the Ok variant carries no findings). Callers that need access to\nWarn-level findings even on pass should call LintRunner::run_cert\ndirectly via profile.lint_runner().'\n\nThis is exactly the defensive-code-forcing shape AGENTS.md warns\nagainst. Three problems:\n\n1. *Inconsistent information density across branches.* Err carries\n   the full Vec<Finding>; Ok throws it away. The caller who wants\n   to log every Warn finding for compliance reporting has to call\n   the function and *also* call run_cert separately, evaluating the\n   same lints twice. That's an API gotcha, not a convenience.\n\n2. *Caller cannot tell why ok happened.* Was it because no lint\n   fired, because every lint was NotApplicable, because the lint set\n   was empty? Same Ok(()) for all three cases. Downstream report\n   generators want to distinguish 'we ran 47 lints, 47 passed' from\n   'we ran 47 lints, 47 returned NotApplicable because the cert\n   wasn't a TLS leaf'.\n\n3. *Implicit re-evaluation cost.* The recommended workaround (call\n   `profile.lint_runner().run_cert(...)` to get warnings even on\n   pass) re-runs the entire lint set. For a check_shape on a high-\n   volume cert intake, that doubles the cost.\n\n# The right contract shape\n\nEither:\n\n  (a) Return Vec<Finding> directly. Callers filter by\n      f.result.is_finding() and decide what they want. This is\n      idiomatic and matches LintRunner::run_cert (which returns\n      Vec<Finding>). 'check_shape' becomes a thin wrapper that\n      just calls run_cert and returns its result.\n\n  (b) Return Result<Vec<Finding>, Vec<Finding>> \u2014 the Vec carries\n      *all* findings in both branches; the Ok/Err distinction is\n      purely the actionability question 'did anything fail?'\n\n  (c) Return a typed verdict struct:\n        ShapeResult {\n            verdict: enum { Pass, Failed },\n            findings: Vec<Finding>,\n        }\n      with #[non_exhaustive] for forward-compat. This is the most\n      explicit and matches OSCAL Assessment Results modeling.\n\nThe current shape forces every defensive-minded caller (e.g. one\nthat ships an audit log) to write the boilerplate:\n\n    let findings = profile.lint_runner().run_cert(cert, kind, 0, now_unix);\n    let any_error = findings.iter().any(|f| matches!(\n        f.result, LintResult::Error(_) | LintResult::Fatal(_)));\n    if any_error { ... }\n\nThat's exactly what check_shape() does internally. There's no point\nin the helper if every caller has to recreate it for warnings.\n\n# Forward fit\n\nThis API was added in commit 5c0d67de (this diff). Removing the\ndiscard is non-breaking pre-1.0. Cheap fix: change the signature to\nResult<Vec<Finding>, Vec<Finding>> and adjust the body to return\nfindings in both branches.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: check_shape() silently discards Warn findings on Ok path",
+  "updated_at": "2026-05-14T12:48:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:48:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

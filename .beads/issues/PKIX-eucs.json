@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:04Z",
+  "compaction_level": 0,
+  "content_hash": "df0b966094f41b748d4d535ff72f313b3be80411a49325556b3940c49f6fa3f2",
+  "created_at": "2026-05-07T20:28:23Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\nTwo functions returning `Result` are missing `# Errors` doc sections. Clippy: `clippy::missing_errors_doc`.\n\n## Locations\n\n```\npkix-path/tests/pkits_helper.rs:64\n\npub fn pkits_validate(cert_names: &[&str], now_unix: u64) -> pkix_path::Result<ValidatedPath> {\n```\n\nThis is a test helper and not part of any public API, so adding a `# Errors` section is opinion-territory. The lint fires because `pub` extends across the crate boundary in a binary `[[test]]` target.\n\n```\npkix-ac/src/lib.rs:121\n\npub fn validate_attribute_cert(\n    _ac: &AttributeCertificate,\n    _aa_anchors: &[pkix_path::TrustAnchor],\n    ...\n) -> Result<()> {\n    Err(Error::NoTrustedSct)\n}\n```\n\nThis one is genuine public API of the `pkix-ac` stub. It needs a `# Errors` section explaining all error variants returned.\n\n## Priority\n\nP4 \u2014 the pkix-ac stub has a real doc gap (and is `pub`, advertised, etc.). The test helper case is a non-issue.\n",
+  "ephemeral": 0,
+  "id": "PKIX-eucs",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: pkix-ac validate_attribute_cert pub fn missing # Errors doc section",
+  "updated_at": "2026-05-07T21:49:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

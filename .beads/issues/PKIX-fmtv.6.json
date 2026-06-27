@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T18:33:53Z",
+  "compaction_level": 0,
+  "content_hash": "bcf18149d6191ddd98a475dd1447ec84bf806e6d932400eaa295afbc8176a3a7",
+  "created_at": "2026-05-12T02:41:53Z",
+  "created_by": "Mark Atwood",
+  "description": "`pkix-lint` exists as a standalone advisory lint engine. Should it integrate into `verify()` as another policy, or run in parallel?\n\n**Options:**\n\n- **A) `policies::lint_catalog(&catalog)` is a `VerificationPolicy` adapter.** Lint findings appear in the same `VerifyReport.findings` vec alongside path/revocation/profile findings. One pipeline, one report. The survey recommended this.\n- **B) Parallel pipeline.** `verify()` returns chain outcome; caller invokes `pkix-lint::LintRunner` separately for advisory findings. Two reports, more wiring. Preserves stronger separation: \"trust decision\" vs \"advisory findings.\"\n\nA is the lower-friction shape for users who want a single call. B is the purist shape that keeps `verify()` purely about trust verdict.\n\nConcrete impact: if A, then `verify()` is the one-stop shop and lint findings can influence the outcome rollup (via severity); if B, then `pkix-lint` findings never affect verdict.\n\nDecision-gate. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide lint integration model (VerificationPolicy adapter vs parallel)",
+  "updated_at": "2026-05-12T18:33:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:41:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added full doc comment to try_find_cert_ext with fail-closed label and return value semantics.",
+  "closed_at": "2026-05-05T04:52:41Z",
+  "compaction_level": 0,
+  "content_hash": "85849bdc330574a326957f1828f96a546631fb5cd0f515f947ff59375841e268",
+  "created_at": "2026-05-03T13:15:36Z",
+  "created_by": "Mark Atwood",
+  "description": "try_find_cert_ext (line 620 of pkix-path/src/lib.rs) is a private function with no doc comment. Its error contract \u2014 Ok(None) when the extension is absent, Err when it is present but DER-malformed \u2014 is non-obvious and is the exact behavior that distinguishes it from find_cert_ext. A new contributor reading TryFrom<Certificate> will have to read the implementation to understand why the ? propagates. Add a /// doc comment explaining the three-case contract: absent \u2192 Ok(None), present+valid \u2192 Ok(Some(T)), present+malformed \u2192 Err(der::Error).",
+  "ephemeral": 0,
+  "id": "PKIX-onc.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "try_find_cert_ext: missing doc comment",
+  "updated_at": "2026-05-05T04:52:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

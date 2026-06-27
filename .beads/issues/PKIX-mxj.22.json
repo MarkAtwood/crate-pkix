@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:57:58Z",
+  "compaction_level": 0,
+  "content_hash": "8032848dd20d3a38bd200b3038007f60ffce64b6c45f24ccb751c1316cdec640",
+  "created_at": "2026-05-07T03:55:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:589-595 \u2014 The debug_assert! in LintRunner::new detects duplicate lint IDs by sorting a Vec of IDs and then checking windows(2). The idiomatic approach is: ids.sort_unstable(); ids.dedup(); ids.len() == lints.len(). The windows(2) pattern is less obvious and requires the reader to reconstruct that w[0] != w[1] for all adjacent pairs is equivalent to all-unique after sorting. Minor readability issue only.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "LintRunner::new dedup check uses sort+windows instead of dedup",
+  "updated_at": "2026-05-07T03:57:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:55:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

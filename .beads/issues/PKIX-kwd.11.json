@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:36Z",
+  "compaction_level": 0,
+  "content_hash": "75d8052c7faa25cf25947f8b23a8bd46f1a8318343337e5707da6282f5753352",
+  "created_at": "2026-05-06T15:13:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/Cargo.toml: x509-cert appears in [dependencies] but the only usage in pkix-profiles/src/lib.rs is inside #[cfg(test)] (line 189: 'use x509_cert::Certificate'). This means x509-cert is pulled in as a compile-time dependency for non-test builds, unnecessarily increasing the dependency footprint for users who only need the profile policy functions. It should be moved to [dev-dependencies]. This is a real dependency hygiene issue \u2014 users of pkix-profiles in no-test contexts carry the x509-cert transitive dep graph without needing it.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: x509-cert is a runtime dep but only used in tests",
+  "updated_at": "2026-05-06T15:24:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:13:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

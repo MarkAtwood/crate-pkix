@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "77b5303148f26f23f2035c00ce414cb2be6d9e6e5e13e5624b2244916e0b60ed",
+  "created_at": "2026-05-14T18:36:33Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/Cargo.toml ships the new optional `serde` feature (PKIX-zkjb.7), gating `serde::Serialize + Deserialize` derives on the public `Error` enum:\n\n```rust\n#[derive(Clone, Debug, PartialEq, Eq, Hash)]\n#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n#[non_exhaustive]\npub enum Error { \u2026 NoValidPath { tried, last_error } \u2026 }\n```\n\nThe Rust-level stability contract from `#[non_exhaustive]` is that adding a new variant later is a non-breaking change for callers \u2014 they were already required to write a `_` catchall. This is well-established.\n\nThe serde wire-format contract is **not the same**:\n\n- **Adding a new variant** (Rust-non-breaking): with serde's default externally-tagged enum format, a producer on `pkix-path-builder = 0.4` that emits `{\\\"NewVariant\\\": \u2026}` is **rejected** by an old consumer on `0.3.x`. Unknown-variant deserialization fails. Forward-incompat unless callers add `#[serde(other)]` on a catchall variant in their own wrapping types.\n- **Removing a field from NoValidPath**: hard break unless `#[serde(default)]` is added on the field before removal. The current variant has neither field marked `default`.\n- **Renaming a field**: hard break unless `#[serde(alias)]` is kept.\n- **Adding a field to NoValidPath**: forward-compat OK by serde's default (unknown fields ignored) \u2014 but see PKIX-wnnn.19 for the Rust-level issue.\n\nCallers carrying `Error` in their own serde-deserializable result types (per the `pkix-chain/serde` cascade in PKIX-zkjb.7) will be surprised when version evolution that the Rust API contract calls \"non-breaking\" turns out to be wire-breaking.\n\nThe serde feature's Cargo.toml comment (`Mirrors pkix-path's convention: typed inner errors so consumers can programmatically distinguish \"no chain built\" from \"candidate chain rejected by validate_path\"`) does not acknowledge this asymmetry. The rustdoc on `Error` and on the `serde` feature gate does not either.\n\nRequired doc: when the `serde` feature is enabled, the on-wire encoding of `Error` is **not** covered by the same stability contract as the Rust type. Callers wanting forward-compat across `pkix-path-builder` versions must use a catchall variant in their wrapping type or pin to a specific version.\n\nAlternative: ship `Error` with `#[serde(deny_unknown_fields)]` to make every change explicit, OR ship with a documented `#[serde(rename_all = \\\"snake_case\\\")]` and a `kind`/`message` tag-content layout that's friendlier to evolution. These are design decisions worth making before 1.0.\n\nNote: this is forward-looking \u2014 the CHANGELOG places the serde feature in [Unreleased], so the format is not yet shipped in a tagged release. Doc the contract before it ships, not after.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "serde feature on Error: Rust-level #[non_exhaustive] does NOT extend to serde wire format \u2014 doc must say so",
+  "updated_at": "2026-05-14T18:36:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:36:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

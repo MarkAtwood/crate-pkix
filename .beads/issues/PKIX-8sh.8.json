@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:38:55Z",
+  "compaction_level": 0,
+  "content_hash": "ec53173c00093a34428a6e18cff22783bf7e6d87588097c798521b08c36c6e18",
+  "created_at": "2026-05-02T18:31:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs line 73: write!(f, \"certificate {serial} is revoked (reason {code:?})\") uses {:?} Debug format for CrlReason. Confirmed: x509_cert::ext::pkix::crl::CrlReason does NOT implement Display. The Debug output produces Rust variant names like 'KeyCompromise', which is marginally readable but not user-friendly. Options: (a) contribute Display impl to x509-cert upstream (preferred, fits the RustCrypto contribution workflow); (b) write a local helper fn crl_reason_name(r: CrlReason) -> &'static str mapping variants; (c) leave as-is with a comment. This is caller-visible in error messages.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlReason in Revoked Display uses Debug format instead of Display",
+  "updated_at": "2026-05-02T22:38:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

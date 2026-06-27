@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "EvaluationReport struct; rule_bundle_version on Finding; serde feature; with_bundle_version constructor; JSON round-trip test; 52 tests pass",
+  "closed_at": "2026-05-06T19:57:54Z",
+  "compaction_level": 0,
+  "content_hash": "e40e1d42de0c4a55def637e51f42112fa6d7acb1837e001ba1717b45dbad0a95",
+  "created_at": "2026-05-06T19:50:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Add EvaluationReport wrapping Vec<Finding> + Vec<DeviatedFinding> + evaluation metadata (evaluated_at_unix, cert DER SHA-256, chain_depth, profile_id, profile_version, rule_bundle_version). Add serde Serialize behind a feature flag. This is the evidence pack: one exportable struct an operator can attach to a CA help-desk ticket. Also add rule_bundle_version: &'static str to Finding (threaded from a LintRunner-level bundle version string).",
+  "ephemeral": 0,
+  "id": "PKIX-gj6",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: EvaluationReport struct and JSON evidence pack export",
+  "updated_at": "2026-05-06T19:57:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T12:50:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-3c5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

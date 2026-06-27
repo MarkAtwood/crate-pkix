@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added names_match with RFC 4518 ASCII normalization via NormalizedIter; full Unicode deferred to v0.2",
+  "closed_at": "2026-05-02T06:36:29Z",
+  "compaction_level": 0,
+  "content_hash": "e1f2ecc6f40afa6736707c9df7f3bccc4539df7040b8109dedf13de615b6e6d8",
+  "created_at": "2026-05-02T05:50:50Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement names_match(a: &Name, b: &Name) -> bool in pkix-path using proper RFC 4518 distinguished name comparison. This is a foundational helper used by both the chain linkage check (cert[i].issuer == cert[i+1].subject) and trust anchor matching.\n\nWhy not byte equality: RFC 5280 \u00a77.1 explicitly requires case-insensitive matching and whitespace normalization for PrintableString/UTF8String/etc. Byte equality would reject chains where issuer and subject differ only in case or extra spaces \u2014 common in real CA software.\n\nRFC 4518 string prep rules that must be implemented:\n- Map: case fold, normalize whitespace (leading/trailing stripped, internal runs collapsed to single space)\n- Normalize: Unicode NFKD normalization\n- Prohibit: no prohibited characters check needed for DN comparison\n- Match attribute-by-attribute: same number of RDNs, same OIDs, normalized values equal\n- Multi-valued RDNs: set equality (order-independent within an RDN)\n\nImplementation notes:\n- x509-cert represents Name as a sequence of RelativeDistinguishedName, each a SET of AttributeTypeAndValue\n- AttributeTypeAndValue.value is an Any; need to decode as DirectoryString (PrintableString | UTF8String | BMPString | TeletexString | UniversalString | IA5String)\n- For no_std: use core::str for string ops; no Unicode normalization library available without alloc. Acceptable approximation for v0.1: implement case-fold and whitespace normalization; document that full NFKD is deferred.\n- Must handle at minimum: UTF8String, PrintableString, IA5String (sufficient for PKITS)\n\nTest vectors: construct Name pairs using OpenSSL or x509-cert builder; include cases that differ only in case, whitespace, encoding type.",
+  "ephemeral": 0,
+  "id": "PKIX-drv",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: Name comparison per RFC 4518 DN string prep",
+  "updated_at": "2026-05-02T06:36:29Z"
+}

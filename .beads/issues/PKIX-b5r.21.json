@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Not a bug: with_delta() parameters base_der/delta_der are correctly named in both signature and documentation. No inversion.",
+  "closed_at": "2026-05-05T16:09:35Z",
+  "compaction_level": 0,
+  "content_hash": "5e54bbe75bf19a31beb6711fc4470b3d5cbc31832230f6d3dee826280e3d2ddd",
+  "created_at": "2026-05-05T15:47:33Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:107\u2013112\n\nThe signature is:\n\n    pub fn with_delta(\n        base_der: impl Into<Vec<u8>>,\n        delta_der: impl Into<Vec<u8>>,\n        now_unix: u64,\n        verifier: V,\n    ) -> crate::Result<Self>\n\nBoth parameters have the same type (impl Into<Vec<u8>>).  A caller can trivially swap them.  Line 124 then checks:\n\n    if base_crl_number(&base_crl).is_some() {\n        return Err(Error::DeltaCrlBaseMismatch);\n    }\n\nThis check is backwards in its error semantics: it returns DeltaCrlBaseMismatch if the BASE CRL has a deltaCRLIndicator extension, which would actually mean the caller passed a delta as the first argument.  The error message ('delta CRL BaseCRLNumber does not match the base CRL CRLNumber') is misleading for this case.\n\nThe swap hazard is real because both args are opaque byte buffers with the same type.  Idiomatic mitigation options:\n1. Use a named builder struct: CrlCheckerBuilder::base(bytes).delta(bytes).build(now, verifier)\n2. Introduce newtypes BaseCrl(Vec<u8>) and DeltaCrl(Vec<u8>) to make swapping a compile error\n3. At minimum, name the error variant CrlIsNotBase or similar when the base-is-actually-a-delta check fires\n\nOption 1 or 2 is the correct fix; option 3 is a band-aid.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "with_delta(): base_der/delta_der parameter names inverted in impl vs docs",
+  "updated_at": "2026-05-05T16:09:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

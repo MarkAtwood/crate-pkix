@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features exits 0. The max_validity_secs logic is present immediately after check_validity in chain_walk. saturating_sub is used for the duration calculation.",
+  "assignee": "Mark Atwood",
+  "close_reason": "max_validity_secs enforced in chain_walk after check_validity, using saturating_sub. cargo test and clippy both exit 0.",
+  "closed_at": "2026-05-06T04:50:03Z",
+  "compaction_level": 0,
+  "content_hash": "5d2927d212faabd529bd2ea1c57e31d90e8347e2d43caf3f40239c806e7ba9db",
+  "created_at": "2026-05-06T03:42:18Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Enforce `policy.max_validity_secs` in `chain_walk`: reject any certificate whose (notAfter - notBefore) exceeds the limit.\n\n**Algorithm:**\n1. Read `chain_walk` in `pkix-path/src/lib.rs`. The existing validity-period check is `check_validity(cert, policy.current_time_unix, i)?` \u2014 locate its exact line.\n2. Immediately after that line, insert a new block for the validity-period-length check:\n   ```rust\n   // (c2) Max validity period length check.\n   if let Some(max_secs) = policy.max_validity_secs {\n       let not_before = cert.tbs_certificate.validity.not_before.to_unix_duration().as_secs();\n       let not_after  = cert.tbs_certificate.validity.not_after.to_unix_duration().as_secs();\n       if not_after.saturating_sub(not_before) > max_secs {\n           return Err(Error::ValidityPeriodExceedsMax { index: i });\n       }\n   }\n   ```\n3. The `Time::to_unix_duration()` method returns `core::time::Duration`; calling `.as_secs()` gives `u64`. This is `no_std`-safe.\n4. `saturating_sub` is used so a certificate where notAfter < notBefore (malformed) produces 0, not overflow \u2014 it will trivially pass the `> max_secs` check (a duration of 0 seconds is never too long).\n5. This check applies to EVERY cert in the chain (no `i == 0` guard) because the epic description says so.\n6. Run `cargo test -p pkix-path --all-features 2>&1` to confirm no regressions.\n\n**Defensive programming rules:**\n- Use `saturating_sub` not `-` to avoid wrapping on malformed certs.\n- Early-return with `Err(Error::ValidityPeriodExceedsMax { index: i })` \u2014 no `unwrap()`.\n- No key material in any log statement.\n\n**Subagent instructions:**\n- Spawn one research subagent: read the `check_validity` call site in `chain_walk` and report its exact line number.\n- Spawn one implementation subagent: apply the change.\n- Spawn one validation subagent: run `cargo test -p pkix-path --all-features 2>&1` after the change. Confirm exit 0.\n\n**Tests:** Covered by the dedicated test bead PKIX-ken.1.6.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Enforce max_validity_secs in chain_walk",
+  "updated_at": "2026-05-06T04:50:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:42:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

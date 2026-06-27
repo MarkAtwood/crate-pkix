@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:27:28Z",
+  "compaction_level": 0,
+  "content_hash": "3c485e7ce9fc4cb8bad90b4df481b26ba646d59fda3b3026dfc9492d7beebd62",
+  "created_at": "2026-05-06T20:15:22Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:260 \u2014 fn der_peel_tlv<'a>(input: &'a [u8], ...) -> Option<(&'a [u8], &'a [u8])> carries an explicit 'a lifetime that the compiler can infer from the single input reference. Clippy -D warnings already flags this as an error. Fix: remove <'a> and the explicit lifetime annotations.",
+  "ephemeral": 0,
+  "id": "PKIX-95m.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "clippy: needless_lifetimes on der_peel_tlv in cabf_tls_br.rs",
+  "updated_at": "2026-05-06T20:27:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:15:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-95m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

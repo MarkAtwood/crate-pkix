@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:58:16Z",
+  "compaction_level": 0,
+  "content_hash": "728b1dad58fa002ea46eee4206010c0569eff542897a3428dfb70c7e0cc1e1fa",
+  "created_at": "2026-05-07T03:55:46Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:425 \u2014 eku.0.iter().any(|oid| oid == &ID_KP_SERVER_AUTH) is the manual equivalent of eku.0.iter().any(|oid| oid == &ID_KP_SERVER_AUTH). Since x509_cert's ObjectIdentifier implements PartialEq, the idiomatic form is eku.0.contains(&ID_KP_SERVER_AUTH). The same pattern occurs in chain_walk in pkix-path/src/lib.rs. Minor clippy-style finding.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "EkuServerAuthLint uses iter().any(|oid| oid == &CONST) instead of contains",
+  "updated_at": "2026-05-07T03:58:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:55:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

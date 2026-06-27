@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:42:11Z",
+  "compaction_level": 0,
+  "content_hash": "0174712db9ead520a63d93ec10609fab108786f9c63fbaeefed966c2f2ab1b66",
+  "created_at": "2026-05-06T21:30:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs lines 317-331: The DFS_BUDGET (10,000 visits) is shared across all iterative-deepening rounds (1..=10 depth). Each call to dfs() at depth 1 explores the same nodes as depth 2, then depth 3, etc. For a pool of N candidate CA certs, the first round visits O(N) nodes, the second O(N\u00b2), etc. The shared budget means that for a legitimate pool of even 20-30 CA certs, the budget may be exhausted before the correct depth is reached, returning BudgetExceeded even though a valid path exists.\n\nExample: 30 CA certs all with matching subject names. Round 1: 30 visits. Round 2: 30 + 30*30 = 930 visits. Round 3: 930 + 30*30*30 = ~27,930 visits total \u2014 BudgetExceeded on round 3 for a pool of 30 certs, even though valid paths at depth 1 may exist.\n\nThe correct fix is either: (a) reset budget per round, (b) use a per-round budget, or (c) document the effective pool size limit. The DFS_BUDGET=10,000 comment says \"10,000 visits is sufficient for legitimate chains\" but provides no analysis of pool size limits. A pool of 30 intermediate CAs with identical subject DNs (not uncommon in large enterprise PKI with many issuing CAs under the same root) could exhaust the budget.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: build_path budget shared across iterative-deepening rounds \u2014 BudgetExceeded may fire on legitimate chains",
+  "updated_at": "2026-05-06T21:42:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:30:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

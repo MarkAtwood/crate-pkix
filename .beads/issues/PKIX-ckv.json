@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:48:48Z",
+  "compaction_level": 0,
+  "content_hash": "af3f9ea0efafe59ef08a3ca6e3390f76d90a9d56642921434d25ff09956b10d6",
+  "created_at": "2026-05-06T21:46:32Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:123 and pkix-lint/src/deviation.rs:72 - de_static_str leaks a heap allocation on every deserialization call. This is intentional but the memory growth is unbounded: deserializing N distinct strings leaks N allocations forever. The lib.rs comment says 'small allocation + leak' which is correct per-call but misleading about aggregate behavior. This is a documented design choice that is acceptable for the stated use-case (loading saved reports), but: (1) there is no warning about the memory growth in the doc comments, and (2) the pattern creates a trivial memory exhaustion vector if an adversary can cause repeated deserialization of distinct strings (e.g., from untrusted JSON). This is a P3/documentation gap with a security dimension.",
+  "ephemeral": 0,
+  "id": "PKIX-ckv",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Box::leak in de_static_str is undocumented memory leak",
+  "updated_at": "2026-05-06T21:48:48Z"
+}

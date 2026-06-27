@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:31:40Z",
+  "compaction_level": 0,
+  "content_hash": "b00fa64939a55d936c55275a187f85b57a2e642a775a250a51695ed32d4b6ca4",
+  "created_at": "2026-05-06T23:19:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Correctness, Rust-idiom, and design review of all work done today. Covers pkix-lint (deviation, lib, report, cabf_tls_br), pkix-path, pkix-profiles, pkix-revocation, pkix-path-builder.",
+  "ephemeral": 0,
+  "id": "PKIX-tog",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review pass 1: today's work",
+  "updated_at": "2026-05-06T23:31:40Z"
+}

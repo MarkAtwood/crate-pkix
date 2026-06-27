@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6f99ed1cdfe24f166aa8547888c969a4e9d2c65af547f3eb7edd85eee45787ce",
+  "created_at": "2026-05-14T19:13:58Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-identity/src/lib.rs:706-708 explicitly documents that IPv4-in-IPv6 forms like '::ffff:192.0.2.1' are not supported, with the rationale 'a future extension can add this without API change'.\n\nImpact: real-world TLS configs sometimes use IPv4-mapped forms in operator-facing config; if a target string comes from such config and the cert SAN holds the canonical 16-byte form, the match will fail with MalformedInput rather than NoMatchingSan. Not a security bug (fails closed) but a UX cliff.\n\nThere is no integration test or rustdoc-level note in ServerName::ip_address advertising this limitation publicly. The crate's Limitations section in the module doc doesn't mention it.\n\nAction: either\n(a) add a public Limitations bullet ('IPv4-mapped IPv6 like ::ffff:1.2.3.4 not parsed; pass the IPv4 string instead') so users see it in rustdoc, or\n(b) implement the parse path (small \u2014 detect 'final group with dots', parse as IPv4, slot into bytes 12-15). pyca/cryptography handles this.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "IPv4-mapped/embedded IPv6 (::ffff:1.2.3.4) not parseable; documented limitation but no test",
+  "updated_at": "2026-05-14T19:13:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:28:46Z",
+  "compaction_level": 0,
+  "content_hash": "4adb3ce2ffc21ff5cc2de8744f70cf297af7c786b05d7995e0c3c76616526315",
+  "created_at": "2026-05-06T23:20:20Z",
+  "created_by": "Mark Atwood",
+  "description": "Delta bytes are decoded into CertificateList twice: once in the outer guard block to extract the issuer, then again inside verify_delta_crl_and_collect. Two full DER parses plus two allocations per call. Fix: refactor verify_delta_crl_and_collect to accept an already-parsed &CertificateList. File: pkix-revocation/src/crl.rs lines 281, 488.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.13",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crl: delta CRL DER parsed twice per check_revocation call",
+  "updated_at": "2026-05-06T23:28:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

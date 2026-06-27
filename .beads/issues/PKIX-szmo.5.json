@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Bugs scan completed from earlier run. 6 findings (2 Medium, 4 Low). Report at /tmp/skoll-review-3QZpPZ.md and /tmp/skoll-review-UlBUUl.json",
+  "closed_at": "2026-06-04T18:01:46Z",
+  "compaction_level": 0,
+  "content_hash": "966857cae35b5e919e31100a84ce6bb0590a3c7079a33a8e09c961e2f5b6a3c6",
+  "created_at": "2026-06-04T17:28:22Z",
+  "created_by": "Mark Atwood",
+  "description": "Run 'skoll bugs' from ~/PROJECT/PKIX. Targets logic errors, off-by-one in chain indexing, edge cases in name constraint matching, incorrect DER length handling, validity period boundary conditions, and correctness issues in path validation state machine. The workspace already has extensive differential testing (PKITS, x509-limbo, CT scrape corpora) so many classes of bugs are already caught \u2014 the value-add from Skoll is fresh-eyes pattern matching on code Claude hasn't seen in the differential testing context. Save output: 'skoll bugs --out ~/PROJECT/PKIX/reports/skoll-bugs.md'.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Skoll bugs scan \u2014 logic errors and edge cases",
+  "updated_at": "2026-06-04T18:01:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-06-04T10:28:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:52:10Z",
+  "compaction_level": 0,
+  "content_hash": "3d0916d729d0ea33c7824a991e4a6fb52f21c6b240dbc1ea13a4246cb56c9675",
+  "created_at": "2026-05-06T23:15:02Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-3yj.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: profile.policy() contract has no enforced postcondition that current_time_unix == now_unix",
+  "updated_at": "2026-05-06T23:52:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:15:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-3yj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:03:25Z",
+  "compaction_level": 0,
+  "content_hash": "cdde7dead84d03bcfdbf5905027b244cd69e1fd8ae6cfa7c6a68de0483ca4380",
+  "created_at": "2026-05-07T03:50:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:618 \u2014 LintRunner::with_bundle_version(lints, version: &'static str) forces callers to use compile-time literals. A caller that reads the bundle version from a config file or database cannot use this API without Box::leak. Finding::rule_bundle_version is also &'static str for the same reason. Fix: change bundle_version in LintRunner to Cow<'static, str> (mirroring Finding::lint_id and citation), update with_bundle_version to accept impl Into<Cow<'static, str>>, and change Finding::rule_bundle_version to Cow<'static, str>. This is a minor breaking change but removes the &'static str constraint without losing the zero-copy path for literal strings.",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "LintRunner::with_bundle_version requires &'static str, blocks runtime config",
+  "updated_at": "2026-05-07T04:03:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:50:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T02:09:04Z",
+  "id": "019e1f18-4172-7c03-9417-7238dc874600",
+  "issue_id": "PKIX-fmtv.13",
+  "text": "Closing the umbrella. Of the three .13 wrappers:\n\n- \u2705 verify_code_signer \u2014 PKIX-fmtv.13.1 shipped 2026-05-12.\n- \u2705 verify_time_stamper \u2014 PKIX-fmtv.13.2 shipped 2026-05-12 (with critical-and-sole EKU enforcement per RFC 3161 \u00a72.3, new Error::ProfileViolation variant).\n- \u23f3 verify_ocsp_responder \u2014 PKIX-fmtv.13.3 human-labeled with three substantive design questions filed (issuer param shape, self-signed CA-direct case, id-pkix-ocsp-nocheck shim).\n\nThe umbrella scope is fulfilled to the extent it can be without human design input on the OCSP responder wrapper.\n"
+}

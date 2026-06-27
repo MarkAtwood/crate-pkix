@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "94045f41837061977098062e90795e93e51cb698f2dabebbb2305ce809603ed5",
+  "created_at": "2026-05-14T19:29:36Z",
+  "created_by": "Mark Atwood",
+  "description": "Why this choice is correct: AiaError::IoFailure (pkix-aia/src/lib.rs:198-204) carries 'kind: std::io::ErrorKind' plus 'message: String' rather than embedding std::io::Error directly. The decomposition is a deliberate response to AGENTS.md non-negotiable #6: result types MUST derive Clone + Debug + PartialEq + Eq + Send + Sync, and SHOULD support serde behind a feature flag. std::io::Error provides NONE of: Clone, PartialEq, Eq, Serialize. Embedding it would block the entire cache-friendliness invariant.\n\nThe rustdoc at lines 188-195 captures the rationale clearly. The os_error() numeric code is dropped \u2014 this is a real information loss, but the alternative (embed std::io::Error, lose Clone+Eq+Serialize) is worse for the workspace's prevalidation/cache-replay use case.\n\nA future contributor might suggest 'just embed std::io::Error with #[serde(skip)] and conditional Clone'. Reject: the partial workarounds make the invariant fragile and surprise downstream tooling that depends on the full set of derives. Decomposition is the right call.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.14",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Decision: AiaError carries decomposed { kind, message } not std::io::Error",
+  "updated_at": "2026-05-14T19:29:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

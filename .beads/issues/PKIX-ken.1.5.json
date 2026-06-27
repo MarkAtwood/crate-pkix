@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features exits 0. cargo clippy exits 0. rsa_public_key_bits() uses der::SliceReader and der::asn1::UintRef only. No pkcs1 or rsa crate import in the helper. cargo tree -p pkix-path shows pkcs1 only as a transitive dep (not direct). min_rsa_key_bits check in chain_walk returns Error::KeyTooSmall when modulus is too small.",
+  "assignee": "Mark Atwood",
+  "close_reason": "rsa_public_key_bits() helper added using der::SliceReader+UintRef (no new dep). min_rsa_key_bits check in chain_walk. cargo test and clippy pass.",
+  "closed_at": "2026-05-06T04:50:09Z",
+  "compaction_level": 0,
+  "content_hash": "76038328d74f9283427fc723d9fdc6e28fe71abf15120af3abf4fdf52bb68ac9",
+  "created_at": "2026-05-06T03:43:26Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Enforce `policy.min_rsa_key_bits` in `chain_walk`: reject any certificate carrying an RSA public key whose modulus is smaller than the specified bit count. Non-RSA keys are silently skipped.\n\n**No new dependency.** The `der` crate (already a required direct dependency of `pkix-path`) provides `SliceReader`, `UintRef`, and the `sequence()` reader method. Do NOT use the `rsa` crate (optional, feature-gated) or the `pkcs1` crate (not a direct dep). Do NOT hand-roll a TLV byte parser.\n\n**Algorithm:**\n\n### Step 1: Define the RSA algorithm OID constant\nNear the existing OID constants (around line 630):\n```rust\n/// rsaEncryption OID: 1.2.840.113549.1.1.1 (RFC 3279 \u00a72.3.1)\nconst OID_RSA_ENCRYPTION: der::asn1::ObjectIdentifier =\n    der::asn1::ObjectIdentifier::new_unwrap(\"1.2.840.113549.1.1.1\");\n```\n\n### Step 2: Implement the helper function\nAdd a private function immediately before `chain_walk`:\n```rust\n/// Decodes the RSA modulus from an SPKI and returns its bit length.\n///\n/// Returns `None` if the key algorithm is not RSA, or if the SPKI cannot be\n/// decoded (treated as non-RSA rather than an error, since algorithm-specific\n/// decode failures are already caught by signature verification).\n///\n/// Uses `der::SliceReader` and `der::asn1::UintRef` from the existing `der`\n/// dependency \u2014 no additional crate required.\n///\n/// RSAPublicKey ::= SEQUENCE { modulus INTEGER, publicExponent INTEGER }\n/// (RFC 3279 \u00a72.3.1; PKCS#1 \u00a73.1)\nfn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {\n    use der::{Decode, Reader};\n    use der::asn1::UintRef;\n\n    if spki.algorithm.oid != OID_RSA_ENCRYPTION {\n        return None; // Non-RSA key: check does not apply.\n    }\n    // BitString::as_bytes() returns None only when unused_bits != 0.\n    // RSA SPKI subject_public_key is always octet-aligned (unused_bits = 0).\n    let raw = spki.subject_public_key.as_bytes()?;\n\n    // raw is a DER-encoded RSAPublicKey SEQUENCE.\n    let mut reader = der::SliceReader::new(raw).ok()?;\n    let modulus_byte_len: usize = reader.sequence(|r| {\n        // Decode modulus as UintRef \u2014 this handles the DER unsigned-INTEGER\n        // sign-byte convention automatically: UintRef::as_bytes() strips the\n        // leading 0x00 sign byte when present, returning only magnitude bytes.\n        let modulus: UintRef<'_> = r.decode()?;\n        Ok(modulus.as_bytes().len())\n    }).ok()?;\n\n    // For a correctly encoded RSA key, the first magnitude byte has its high\n    // bit set (RSA moduli are always of their declared size with no leading\n    // zeros after the sign byte is stripped). Therefore byte_len * 8 is exact.\n    // A modulus with a leading zero after stripping the sign byte would be\n    // misencoded \u2014 the conservative over-count of up to 7 bits is acceptable\n    // because: (a) such keys are malformed, (b) the check is a minimum floor\n    // not an exact-size requirement, so treating 2041-bit key as 2048 is safe.\n    Some(modulus_byte_len.saturating_mul(8) as u32)\n}\n```\n\n### Step 3: Insert the check in chain_walk\nAfter the `allowed_signature_algs` check (Wave 1B bead), insert:\n```rust\n// (a1) RSA minimum key size check.\nif let Some(min_bits) = policy.min_rsa_key_bits {\n    if let Some(actual_bits) = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info) {\n        if actual_bits < min_bits {\n            return Err(Error::KeyTooSmall { index: i });\n        }\n    }\n    // Non-RSA keys: rsa_public_key_bits returns None \u2192 check silently skipped.\n}\n```\n\n### Step 4: Verify no new dependency added\nRun `cargo tree -p pkix-path --no-dedupe 2>&1 | grep pkcs1` \u2014 must be empty (pkcs1 must not appear as a direct dep).\n\n**Defensive programming rules:**\n- `der::SliceReader::new` and `reader.sequence()` return `der::Result` \u2014 map failures to `None` with `.ok()?` (a decode failure means the SPKI is malformed; this is caught separately by signature verification, so returning `None` here is safe).\n- `saturating_mul(8)` prevents overflow on a hypothetical absurdly large modulus byte count.\n- No `unwrap()` anywhere in the helper or the check block.\n- `BitString::as_bytes()` returning `None` (unused_bits != 0) \u2192 `None` propagated; valid RSA keys are never non-octet-aligned.\n- Non-RSA keys: `None` returned before any byte parsing \u2014 fast path.\n\n**Subagent instructions:**\n- Spawn one research subagent: (a) confirm `der::SliceReader` and `reader.sequence()` exist in der 0.7 by reading `~/.cargo/registry/src/.../der-0.7.*/src/reader.rs`; (b) confirm `UintRef::as_bytes()` strips the sign byte by reading `der-0.7.*/src/asn1/integer/uint.rs` around the `new()` and `as_bytes()` methods.\n- Spawn one implementation subagent: add the OID constant, implement the helper, add the check in chain_walk.\n- Spawn one validation subagent: run `cargo test -p pkix-path --all-features 2>&1` and `cargo clippy -p pkix-path --all-features -- -D warnings 2>&1`. Both must exit 0. Also run `cargo tree -p pkix-path | grep pkcs1` and confirm it is empty.\n\n**Tests:** Covered by PKIX-ken.1.11.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Enforce min_rsa_key_bits in chain_walk (der::SliceReader + UintRef, no new dep)",
+  "updated_at": "2026-05-06T04:50:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:43:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

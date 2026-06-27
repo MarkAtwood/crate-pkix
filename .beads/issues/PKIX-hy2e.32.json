@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0a3bf61a9b6a5a6393ab0262315e85f35a36761dcf2af1fa8db5f9fb294c2995",
+  "created_at": "2026-05-14T12:51:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/emit.rs:99:\n\n    pub fn assessment_results(report: &EvaluationReport) -> Value;\n\n    pub fn risks_from_store(store: &DeviationStore) -> Vec<Value>;\n\n    pub fn deviation_store_from_risks(value: &Value) -> Result<DeviationStore, ParseError>;\n\n    pub fn resolve_profile(profile: &Value, sources: &HashMap<String, Value>)\n        -> Result<ResolvedProfile, ParseError>;\n\nThe OSCAL public surface is entirely `serde_json::Value` in / out. This\nis intentional \u2014 the OSCAL spec is JSON, and there's no point in\nconstructing typed mirrors for the entire OSCAL Assessment-Results\nschema. But it locks pkix-lint's OSCAL API to serde_json's major\nversion forever.\n\nIf serde_json cuts 2.0 (e.g., Value gains a new variant or changes\nNumber representation), pkix-lint must cut a major bump too, even\nwhen the OSCAL semantics haven't changed.\n\n# What the caller cannot do\n\nA caller using `pkix-lint = { version = \\\"0.x\\\", features = [\\\"oscal\\\"] }`\nwill receive whatever serde_json version pkix-lint's workspace pin\nselects. They cannot pin pkix-lint and float serde_json independently\nbecause the types appear in pkix-lint's public function signatures.\n\n# Mitigations\n\n1. Document the version-coupling on the oscal module (similar to\n   PKIX-hy2e.23 for pkix-path re-exports).\n\n2. Wrap serde_json::Value in a newtype that delegates serialization\n   \u2014 but that's lots of code for marginal benefit.\n\n3. Pin serde_json as a workspace-level `1.0.*` and treat any future\n   serde_json 2.0 as a coordinated workspace event. This is the\n   pragmatic choice \u2014 serde_json's 1.x line has been stable since\n   2018 with no concrete major-bump signal.\n\n# Why P3\n\nserde_json is the de facto stable point in the Rust ecosystem. The\nrisk is real but the probability is low. Document it explicitly so\nthe contract is honest, and don't pretend the version-decoupling\nexists when it doesn't.\n\n# Suggested fix\n\nAdd a # Stability section to the oscal module rustdoc:\n\n    /// # serde_json version coupling\n    ///\n    /// The public OSCAL API uses serde_json::Value directly. A major\n    /// version bump in serde_json (currently 1.x) would force a major\n    /// bump in pkix-lint. We do not wrap Value behind a newtype to\n    /// avoid carrying duplicate JSON modeling code; if serde_json 2.0\n    /// happens, this crate will cut its own 2.0 as a coordinated\n    /// workspace release.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: oscal::emit::assessment_results returns serde_json::Value, ties caller to serde_json major",
+  "updated_at": "2026-05-14T12:51:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:51:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

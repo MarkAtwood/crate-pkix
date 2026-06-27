@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:59:35Z",
+  "compaction_level": 0,
+  "content_hash": "c4217f06b040a8c05910596b848390a8a3ee52d1baa6fb5cbb3d1a3e88867a67",
+  "created_at": "2026-05-07T04:41:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs DeviationScope::matches IssuerDnContains arm (lines 317-319):\n\n    let mut issuer_lower = cert.tbs_certificate.issuer.to_string();\n    issuer_lower.make_ascii_lowercase();\n    issuer_lower.contains(substring.as_str())\n\ncert.tbs_certificate.issuer.to_string() allocates a new String on every call to matches(). For a chain evaluation with N certs and D deviations active, this is N * D allocations of the same issuer DN string.\n\nThe standard Rust idiom for repeated-comparisons-with-one-side-invariant is to pre-compute and cache the issuer string. Since DeviationScope::matches takes &Certificate (not a pre-formatted string), the allocation happens inside the loop.\n\nFix options:\n1. Add a DeviationScope::matches_with_issuer_str(&self, issuer_lower: &str) variant that accepts a pre-lowercased issuer string, so the caller can compute it once per cert and reuse across multiple DeviationScope checks.\n2. Change find_deviation to accept a pre-formatted issuer string alongside the cert.\n\nEither option eliminates the repeated to_string() allocation in the common IssuerDnContains path.\n\nCategory: R5 (String allocation in hot path where &str would suffice)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.23",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: IssuerDnContains matching allocates String on every call via to_string()",
+  "updated_at": "2026-05-07T04:59:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:41:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

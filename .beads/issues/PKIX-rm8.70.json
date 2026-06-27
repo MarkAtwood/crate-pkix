@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.70",
+  "title": "RevocationChecker default skip on anchor-issued cert is a silent security gap",
+  "description": "RevocationChecker::check_revocation_against_anchor has a default implementation that returns Ok(()) \u2014 silently skipping revocation for the anchor-issued certificate. The trait doc, crate-level doc, and verify_chain doc all warn about this. The NoRevocation type inherits this default (intentionally). CrlChecker and OcspChecker both override it.\n\nHowever, any custom RevocationChecker impl that forgets to override this method silently skips revocation on the most security-critical certificate in the chain (the one directly trusted by the anchor). There is no compile-time warning, no runtime diagnostic. The trait design relies on implementors reading the docs and remembering to override a default method.\n\nWhat goes wrong if this stays as-is: A custom RevocationChecker that implements only the required check_revocation method \u2014 which is the natural thing to do when implementing a trait with one required method \u2014 leaves the anchor-issued cert unchecked. The chain validates successfully, the cert passes revocation for every other position, but the anchor-issued cert's revocation status is silently skipped. In a real deployment this could mean accepting a revoked intermediate CA.\n\nThe documentation is thorough (the warning appears in four separate places), but documentation-as-the-only-safety-net for a silent security gap is a weak contract. Possible mitigations: (a) make both methods required (breaking, forces every impl to consciously decide), (b) add a #[must_use] or similar annotation (not applicable to trait methods), (c) emit a runtime diagnostic on first invocation of the default impl (observable behavior change, may not be acceptable).\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-revocation/src/lib.rs lines 697-703 (default impl)\n- /home/mark/PROJECT/PKIX/pkix-revocation/src/lib.rs lines 25-29 (crate-level Security warning)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:27:54Z",
+  "updated_at": "2026-06-15T16:30:46Z",
+  "closed_at": "2026-06-15T16:30:46Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:27:54"
+    }
+  ]
+}

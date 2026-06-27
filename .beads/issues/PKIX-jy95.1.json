@@ -1,0 +1,31 @@
+{
+  "close_reason": "completed",
+  "closed_at": "2026-05-12T21:47:46Z",
+  "compaction_level": 0,
+  "content_hash": "e8acf5d4adec4fc49f672c7970bf192679ce97a5b721acce039ff5d53ea07f5a",
+  "created_at": "2026-05-12T19:39:46Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nHow does pkix-policy-zlint expose zlint's findings as workspace `Lint` impls?\n\n## Options\n\n- **A) One workspace `Lint` per zlint check.** ~700 `Lint` instances. Each cabf-br-tls / cabf-br-smime / cabf-cs check becomes a separate Rust `Lint` struct. Pro: 1:1 mapping with zlint's catalog; consumer can include/exclude individual checks; severity / rationale per-check; matches workspace's existing per-Lint pattern. Con: 700 instances to register; `LintRunner::new()` startup cost; many small types.\n\n- **B) Umbrella `Lint` per profile family.** Three or four `Lint` impls (CabfTlsBrLint, CabfSmimeBrLint, CabfCsBrLint, optionally an all-CABF umbrella). Each invokes zlint internally with its profile-family filter; emits a single rolled-up finding or a `Vec<Finding>` inside one `Lint`. Pro: small surface, low startup cost. Con: consumer can't easily include/exclude individual zlint checks; loses 1:1 catalog correspondence.\n\n- **C) Hybrid: umbrella by default, individual Lints opt-in.** Ship the umbrella (B) as the primary entry point; provide a builder / factory that materializes the per-check (A) instances on demand for callers who need per-check control. Best ergonomics, most surface, most complexity.\n\n## Considerations\n\n- Workspace's existing pattern: each `Lint` is one rule. Matches (A).\n- zlint's catalog evolves; new checks land regularly. (A) means refresh-time pressure on Lint impl registration. (B) absorbs new checks transparently.\n- Cache-friendliness (non-negotiable #6): `Finding` is per-check; a Vec<Finding> from one umbrella `Lint` is fine but loses some grain.\n- pkix-policy-pkilint (sibling) faces the same question and probably wants the same shape.\n\n## Decision-gate\n\nProbably blocks pkix-policy-zlint implementation start. Surface when PKIX-jy95.1 (when it's filed as a child) begins.\n\n## Cross-references\n\n- PKIX-jy95 (parent epic, comment thread captures the broader context)\n- PKIX-hbzo.1 (zlint+pkilint as differential oracles; granularity question echoes here)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.1",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide lint granularity for pkix-policy-zlint: one Lint per zlint check or umbrella Lint per profile family",
+  "updated_at": "2026-05-12T21:47:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T12:39:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

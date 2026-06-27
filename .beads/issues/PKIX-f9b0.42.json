@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:12Z",
+  "compaction_level": 0,
+  "content_hash": "880ed4c2701ceab694606532d366c1d0e0db8598087db2c883cb6335a95f5e1f",
+  "created_at": "2026-05-07T17:24:03Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:48 \u2014 pub fn new() -> Self on CtLogList has no #[must_use] attribute. clippy::must_use_candidate (pedantic) flags this. Constructors should be annotated so callers cannot silently discard the value. Fix: add #[must_use] above pub fn new() -> Self.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.42",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-ct] CtLogList::new() missing #[must_use]",
+  "updated_at": "2026-05-07T17:28:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:24:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

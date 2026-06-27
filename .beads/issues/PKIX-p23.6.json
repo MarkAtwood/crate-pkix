@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:29Z",
+  "compaction_level": 0,
+  "content_hash": "e418b55cc12dc5736f315d1f23243d07e4648871a1ce0fbcc835b67666c43c3c",
+  "created_at": "2026-05-06T21:30:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs lines 877-885: check_inputs detects \"duplicate certificates\" by comparing SubjectPublicKeyInfo equality. The intent (line 879 comment) is to detect a cert appearing twice in the chain. However, the comparison is value-based on the SPKI fields, not identity-based on the certificate itself. Two legitimately different certificates that happen to share the same public key (e.g., a cross-signed cert from two different CAs, both carrying the same subject public key) will trigger DuplicateCertificate even though neither cert is a duplicate.\n\nMore critically for correctness: the comment at line 185-188 in the DuplicateCertificate error doc says \"two distinct certificates that share the same public key... indicates a likely error in chain construction.\" This framing is incorrect. In a cross-certification topology, it is entirely valid for two different CA certificates to share a key (one CA, two different issuers). Rejecting such chains is a correctness bug.\n\nAdditionally, the check fires before chain_walk, so a valid cross-signed chain would be rejected with DuplicateCertificate before signature verification even attempts it, giving no opportunity for the signature path to succeed.\n\nThe DFS path builder cycle detection (pkix-path-builder/src/lib.rs line 238) also uses SPKI identity for cycle detection \u2014 this is correct there because within the same chain the same signing key appearing twice is a cycle. But in validate_path, the same assumption means a legitimately cross-signed chain is rejected.\n\nSuggested fix: compare full certificate identity (e.g., require both SPKI AND issuer+serial match) rather than SPKI alone. Or limit the check to exact certificate equality (same DER bytes), not SPKI value equality.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: DuplicateCertificate check uses SPKI equality \u2014 false-positive on key reuse across chain",
+  "updated_at": "2026-05-06T21:36:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:30:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

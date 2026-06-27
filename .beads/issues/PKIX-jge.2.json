@@ -1,0 +1,38 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "DeviationRunner + DeviationRunResult; findings partitioned; deviated always visible; 4 tests",
+  "closed_at": "2026-05-06T19:29:31Z",
+  "compaction_level": 0,
+  "content_hash": "91838246f6e818e012a1700052adf1e98122dbaadf6e04c777eac802a067c1c9",
+  "created_at": "2026-05-06T19:26:01Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-jge.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: DeviationRunner wraps LintRunner with active deviations",
+  "updated_at": "2026-05-06T19:29:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T12:26:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jge",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-06T12:26:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jge.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

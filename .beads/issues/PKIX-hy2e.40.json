@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "2fa7a8ab29f06c1642d681d9e25db7150813773c6dc1484929921d454207c774",
+  "created_at": "2026-05-14T13:03:43Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: a caller passes a serde_json::Value whose pkix-lint.issuer-dn-der, pkix-lint.serial-start, or pkix-lint.serial-end prop is an arbitrarily long hex string. hex_decode (oscal/parse.rs:824-838) computes Vec::with_capacity(s.len() / 2) and decodes byte-by-byte until the input is exhausted.\n\nActual bad behavior: a 1 GiB hex string triggers a 512 MiB Vec allocation before any structural validation rejects the value. Section C explicitly calls out 'variable-length fields have explicit upper bounds enforced before allocation. (Memory-DoS via this field claims to be 4 GiB long.)'\n\nEngineering reality: the input has already been parsed by serde_json before our parser sees it, so serde_json::from_str / from_value already paid the cost of materializing the string. The incremental allocation here is at most equal to half the JSON parser's own peak memory. This is why the finding is P3 rather than P2 \u2014 the real DoS vector is upstream of pkix-lint.\n\nBut the explicit-upper-bound rule still applies: a defense-in-depth fix is cheap and matches the Section C discipline. Reasonable bounds:\n- PROP_ISSUER_DN_DER: a DER Name has a practical max of a few KiB; 64 KiB is a generous cap.\n- PROP_SERIAL_START / PROP_SERIAL_END: RFC 5280 \u00a74.1.2.2 caps the encoded INTEGER at 20 octets, hex-encoded is 40 chars; 128 chars is generous.\n\nFix: add early-return checks (s.len() > MAX_HEX_LEN_FOR_PROP) returning ParseError::MalformedHex (or a new ParseError::HexTooLong) before the Vec::with_capacity call.\n\nSection: C (untrusted input at protocol boundaries \u2014 variable-length field memory bound)",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.40",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "hex_decode in OSCAL parser allocates without explicit upper bound on caller-controlled length",
+  "updated_at": "2026-05-14T13:03:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T06:03:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

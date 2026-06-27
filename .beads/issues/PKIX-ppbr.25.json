@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a63a93e7faf54ecff63d5f1c0da8f93cb3b66a2cb8d1056b0ac59fa15a3c5bf1",
+  "created_at": "2026-05-14T17:44:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:152-156, 384-425\n\n`SctVerifier<V>` does not document `Send + Sync` requirements on\n`V: SignatureVerifier`. The struct itself is `Send + Sync` iff\n`V: Send + Sync` (auto-derived).\n\nNon-negotiable #6 says cache-friendly types must be `Send + Sync`.\nThe doc comment in non-negotiable #6 explicitly states this requirement\nfor \"public result/error types\" but the constraint extends to the\nverifier types callers will share across threads.\n\nTypical caller deployment:\n\n- Trust state (log list + verifier) is constructed at startup\n- Wrapped in `Arc<SctVerifier<DefaultVerifier>>`\n- Shared across N async tasks, each receiving a connection,\n  parsing SCTs, and calling `verify_*` concurrently\n\nThis works today because `DefaultVerifier` is `Copy + Send + Sync`,\n`CtLogList` is `Send + Sync` (BTreeMap of plain data), and the\nverify methods take `&self`. But the contract is not stated in any\ndoc comment. A caller reviewing whether they can wrap in `Arc` has\nto inspect the trait bounds and auto-trait propagation themselves.\n\nRecommendation: add a contract clause to `SctVerifier`'s doc\ncomment:\n\n> `SctVerifier<V>` is `Send + Sync` whenever `V: SignatureVerifier`\n> is, and the verify methods take `&self`, so the same verifier may\n> be shared across threads behind `Arc` without locking.\n\nSame clause belongs on `CtLogList`. Add a `static_assertions`-style\ntest that fails compilation if these are ever changed:\n\n```rust\nfn _assert_send_sync()\nwhere\n    SctVerifier<DefaultVerifier>: Send + Sync,\n    CtLogList: Send + Sync,\n{}\n```\n\nPriority P3 because the property holds today; this is making the\nimplicit explicit, which prevents accidental regression.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_embedded_scts Send/Sync contract unstated \u2014 common pattern is shared SctVerifier across worker threads",
+  "updated_at": "2026-05-14T17:44:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:44:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

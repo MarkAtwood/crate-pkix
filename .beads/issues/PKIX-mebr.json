@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T18:28:01Z",
+  "compaction_level": 0,
+  "content_hash": "a1829e0718572a8cf3e0e4ea9d6f5a107221c15a31128e8e38539fcb62f91be3",
+  "created_at": "2026-05-08T18:24:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-7nsf.7 closed with the discovery that pyca's actual chain corpus is x509-limbo (separate repo, 9,773 testcases). The proper LimboCorpus integration is filed as PKIX-g9vc (P3, ~1-2h of work, requires per-testcase validation_time threading through all oracles).\n\nIn the meantime, downstream developers and reviewers should have a way to actually run the harness on the full x509-limbo corpus to *see* what it does end-to-end. The pieces already exist \u2014 PEM-tree corpus loader handles directory trees of chain.pem files. Bridging that to limbo.json is a small Python converter, no harness changes needed.\n\n## What\n\n1. `pkix-difftest/python/limbo-to-pem-tree.py`: stdlib-only Python script that reads `limbo.json` and writes one `chain.pem` (leaf + intermediates + first trust anchor) per testcase into a directory tree, plus a sibling `meta.json` capturing per-testcase metadata (`expected_result`, `validation_kind`, `validation_time`, features) for later cross-reference.\n2. Filter testcases with features the harness cannot run (`has-crl`).\n3. `pkix-difftest/README.md` Demo section explaining the workflow:\n   - clone x509-limbo\n   - run converter\n   - run `pkix-difftest run pem-tree ...`\n4. Document limitations clearly (validation_time ignored, expected_result not threaded through, has-crl skipped).\n\n## Acceptance\n\n- [ ] Converter runs on a fresh clone of C2SP/x509-limbo and writes a non-empty directory tree.\n- [ ] Harness runs to completion on the converted tree (errors-per-chain are visible in the report, not silent).\n- [ ] README Demo section explains the workflow and limitations.\n- [ ] Script uses Python stdlib only (no cryptography or other 3rd-party deps \u2014 the venv is for pyca_oracle.py only).\n\n## Out of scope\n\n- Per-testcase validation_time (PKIX-g9vc).\n- Expected-result threading (would require extending the PEM-tree loader's `Corpus` impl, which is harness work).\n- `has-policy-constraints`, `pedantic-*` feature filtering \u2014 too granular for a demo path.\n\n## Filed as\n\nUser-requested follow-up to PKIX-7nsf.7 ('have a path somewhere to use the entire test corpus as a demo'). Smaller-scope alternative to PKIX-g9vc that uses only existing harness pieces.",
+  "ephemeral": 0,
+  "id": "PKIX-mebr",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: demo path \u2014 limbo-to-pem-tree converter for ad-hoc full-corpus runs",
+  "updated_at": "2026-05-08T18:28:01Z"
+}

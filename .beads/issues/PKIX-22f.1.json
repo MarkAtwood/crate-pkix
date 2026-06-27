@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: doc says 'ASCII byte slices' \u2192 'byte slices'; clarified that case-folding only applies to ASCII letters, non-ASCII passed through unchanged per RFC 4518 \u00a72 v0.1 scope.",
+  "closed_at": "2026-05-02T17:54:11Z",
+  "compaction_level": 0,
+  "content_hash": "d6245decd4abde1a5df7f31b13ed6defedb8d9eb7f677c43ea26366a81283261",
+  "created_at": "2026-05-02T17:52:16Z",
+  "created_by": "Mark Atwood",
+  "description": "normalized_eq (line 637) is documented as 'Compare two ASCII byte slices' but the function receives raw Utf8String bytes from any_to_str_bytes \u2014 and Utf8String can contain multi-byte UTF-8 (e.g. '\u00c5ngstr\u00f6m'). The doc is false: the function accepts non-ASCII input but silently handles it incorrectly (to_ascii_lowercase() is a no-op for bytes >=128, so UTF-8 multi-byte chars are compared literally). The mismatch between the doc claim and actual input domain will mislead maintainers. Fix: update the doc comment to say 'handles ASCII bytes only; non-ASCII bytes are passed through unchanged' and cross-reference the v0.1 limitation note in names_match.",
+  "ephemeral": 0,
+  "id": "PKIX-22f.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "normalized_eq doc says ASCII but accepts UTF-8 bytes",
+  "updated_at": "2026-05-02T17:54:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:52:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-22f",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

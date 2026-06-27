@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:46:52Z",
+  "compaction_level": 0,
+  "content_hash": "46d08e04dfd9520f59fa3749093eb9a532c37d3a61a263a7d72a9f882ed9762c",
+  "created_at": "2026-05-07T20:13:27Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\nThe four \\\"planned\\\" crates (\\`pkix-revocation-http\\`, \\`pkix-ct\\`, \\`pkix-composite\\`, \\`pkix-ac\\`) carry version 0.1.1 in their Cargo.toml but the actual public functions are stubs marked \\`#[deprecated = \\\"... not yet implemented; this function always returns ...\\\"]\\`. Examples:\n- \\`pkix-ct/src/lib.rs:104\\` \\`pub fn verify_scts\\` returns \\`Err(NoTrustedSct)\\` unconditionally\n- \\`pkix-ac/src/lib.rs:120\\` \\`pub fn validate_attribute_cert\\` returns hardcoded \\`Err\\`\n- \\`pkix-composite/src/lib.rs:64\\` \\`CompositeVerifier::new\\` is itself \\`#[deprecated]\\`\n- \\`pkix-revocation-http\\` has no impl at all of its advertised \\`HttpCrlFetcher\\` / \\`HttpOcspFetcher\\`.\n\nThe other crates in the workspace are at v0.2.0; the v0.1.1 number on stubs implies an earlier already-published version.\n\n## Why P2\n- Section 0 anchor \u2014 the workspace README marks them as \\\"planned\\\" but the version number suggests \\\"published, just slightly older.\\\" If anyone has \\`pkix-ct = \\\"0.1\\\"\\` in Cargo.toml, they get a stub that returns Err on every call and warns on every use.\n- A v0.1.1 release with \\`#[deprecated]\\` on its only public function is an unusual semver shape. Better practice: either publish as 0.0.x (clearly pre-release) or do not publish at all until the implementation lands.\n- Either Mark cut these crates to reserve names on crates.io (legitimate but should be documented), or the version was bumped without justification.\n\n## Fix\nPick one and document the rationale:\n1. Drop these crates from the workspace until ready (delete dirs, remove from members list).\n2. Bump version to 0.0.0 (or 0.0.1) to signal \\\"unreleased / placeholder\\\".\n3. If 0.1.1 is intentional name-reservation, add a clear note in each crate-level lib.rs and README explaining the version mechanics.\n\nSide note: \\`pkix-revocation-http\\` lib.rs imports types from \\`pkix-revocation\\` but does not depend on its \\`crl\\`/\\`ocsp\\` features for the delegation. Once implementation begins this Cargo.toml will need feature-flag wiring.\n\n## Scope reference\n\\`pkix-revocation-http/Cargo.toml:5\\`, \\`pkix-ct/Cargo.toml:5\\`, \\`pkix-composite/Cargo.toml:5\\`, \\`pkix-ac/Cargo.toml:5\\`. Workspace \\`Cargo.toml:30,33,34,35\\` references.",
+  "ephemeral": 0,
+  "id": "PKIX-gdvf",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: stub crates published as v0.1.1 with #[deprecated] - confusing semver state",
+  "updated_at": "2026-05-07T20:46:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

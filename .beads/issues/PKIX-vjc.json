@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-05T04:52:38Z",
+  "compaction_level": 0,
+  "content_hash": "9c0f4cc39f9ec40a9bb9971d0ebdf5bb2499b5deb04954064ec1dd2482ab1853",
+  "created_at": "2026-05-03T00:10:06Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-vjc",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Maintainer risk: HIGH \u2014 stale documentation says NC is not implemented (security misrepresentation), DN excluded subtrees are silently not enforced for 8 PKITS cases, and anchor-supplied initial NC state is never applied per RFC 5280 \u00a76.1.1.\nConfidence: 25% chance of missed bug. Least confident flags: PKIX-vjc.3 (DN excluded subtree direction \u2014 the actual test failure cause needs verification by running the test with debug output; I inferred the direction from PKITS expected results but could be wrong about which direction is correct). PKIX-vjc.5 (test 30 ignore comment may be stale \u2014 the arithmetic looks like it should pass; may be failing for unrelated reason). Uncertainty driven by: cannot run the tests in this review pass, and x509_cert::ext::pkix::constraints::name::GeneralSubtrees API (push/extend methods, as_slice) assumed from usage patterns not verified. Would raise confidence if: I could run cargo test and get the actual failure output for tests 7, 30.\nIdiom rating: ACCEPTABLE \u2014 no unsafe, no unwrap outside tests, non_exhaustive on Error, #[forbid(unsafe_code)]. The main idiom issues are &Option<T> instead of Option<&T> (PKIX-vjc.23), an avoidable clone (PKIX-vjc.24), and a bool parameter where an enum would read better (PKIX-vjc.25). None are show-stoppers.\nRust idiom confidence: 15% chance of missed issue. Least confident flags: PKIX-vjc.24 (the clone may be unavoidable given x509_cert GeneralName ownership structure \u2014 haven't checked if GeneralName::DirectoryName can take a &Name reference). Uncertainty driven by: did not inspect x509_cert::ext::pkix::name::GeneralName definition to confirm whether a borrow-based construction is possible.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Review: NameConstraints RFC 5280 \u00a74.2.1.10 implementation",
+  "updated_at": "2026-05-05T04:52:38Z"
+}

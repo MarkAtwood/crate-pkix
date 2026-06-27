@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:30:28Z",
+  "compaction_level": 0,
+  "content_hash": "61313253666aab64fcbe9d321918e3c3f508c4fdd1c5294112034b2117914d31",
+  "created_at": "2026-05-06T15:19:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs line 592-599: ValidatedPath derives Clone, Copy, Debug, PartialEq, Eq, Hash and is #[non_exhaustive].\n\n#[non_exhaustive] prevents external struct-literal construction \u2014 correct. However deriving Copy on a #[non_exhaustive] struct creates a subtle API tension:\n- #[non_exhaustive] signals 'this type may grow new fields', which is the reason struct literal syntax is forbidden.\n- Deriving Copy says 'this type is small enough to copy by value everywhere'.\n- If a future field is added that is not Copy (e.g., a Vec<PolicyOid> representing the validated policy set), Copy would have to be removed \u2014 a silent breaking change for code that relies on ValidatedPath being Copy (e.g., passing by value without clone()).\n\nThe API should document this tension or explicitly commit to keeping ValidatedPath Copy-forever.\n\nAdditionally, ValidatedPath::depth is computed as chain.len().saturating_sub(1) (line 685). This is the chain length minus 1, NOT the number of non-self-issued intermediates (which is what RFC 5280 calls 'path length'). The doc says 'Depth of the validated chain (number of intermediates, excluding trust anchor)' which is correct for the simple linear case, but could be surprising for chains with self-issued intermediates counted differently by max_path_len.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.22",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidatedPath derives Copy but ValidatedPath::depth can silently become stale",
+  "updated_at": "2026-05-06T15:30:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:19:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

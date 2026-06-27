@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b7e561e661e87ebbadbad8b90782adc1d85e9bb9969c89fce53750416c3ecc5f",
+  "created_at": "2026-05-11T04:47:56Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-ng0x decomposition, child 5 of 5. RFC 5755 \u00a76 specifies the AC\nCRL profile. ACs revoke separately from PKCs. The existing\n`pkix-revocation::CrlChecker` is PKC-shaped and likely needs an\nAC-aware variant (or a parameterised version).\n\n## What\n\n1. Survey pkix-revocation to find the natural extension point \u2014 either\n   add an AC mode to CrlChecker or add a parallel AcCrlChecker.\n2. Implement AC CRL fetching/parsing using the existing pkix-revocation\n   infrastructure where possible.\n3. The AC CRL is itself an X.509 CRL but with specific extensions per\n   RFC 5755 \u00a76 (NoRevocationAvailable indicator, AC-CRL distinguished\n   from PKC-CRL).\n4. Integrate into `validate_attribute_cert` as an optional revocation\n   check, defaulting to `NoRevocation` so existing callers do not\n   silently gain a network dep.\n\n## Tests\n\n- [ ] AC CRL parse round-trip against an external oracle.\n- [ ] Revoked AC detection on a test vector.\n- [ ] NoRevocationAvailable extension causes a documented verdict\n      (likely \"indeterminate\", caller policy decides).\n\n## Depends on\n\nPKIX-ng0x.3 (validation pipeline must exist).\nCoordinates with pkix-revocation crate but does not block on\nfundamental pkix-revocation changes.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ng0x.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-ac: RFC 5755 \u00a76 AC CRL revocation",
+  "updated_at": "2026-05-11T04:47:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:47:55Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:48:05Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision C (delete). pkix-lint-cabf-refresh crate removed from workspace. Substantive transform never started; entire raison d'\u00eatre was OSCAL Catalog JSON output. Recoverable from git if a format decision later resurrects this work. Applied under PKIX-ncab.10.",
+  "closed_at": "2026-05-12T16:33:53Z",
+  "compaction_level": 0,
+  "content_hash": "ba09bcf456a4be100f5afd5df776ef42dfa222e879a8ee1de6af4089d7c3be45",
+  "created_at": "2026-05-12T02:20:38Z",
+  "created_by": "Mark Atwood",
+  "description": "`pkix-lint-cabf-refresh` is a maintainer-only dev binary (`publish=false`, version `0.0.0`) whose entire purpose is \"transform zlint NDJSON \u2192 OSCAL Catalog JSON, vendored into pkix-lint-cabf.\"\n\nWithout OSCAL centrality, decide:\n\n- **A) Keep with new purpose** (format TBD; the metadata extraction is still useful).\n- **B) Freeze** at 0.0.0; revisit when policy-data format is decided.\n- **C) Delete the crate**; restart fresh when a format is chosen.\n\nCascade: .2 (PKIX-amgn.8 fate) and .10 (apply .4 decision) depend on this.\n\nDecision-gate bead. Human label inherited from parent.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide fate of pkix-lint-cabf-refresh crate",
+  "updated_at": "2026-05-12T16:33:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:20:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

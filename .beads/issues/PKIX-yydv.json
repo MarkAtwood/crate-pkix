@@ -1,0 +1,88 @@
+{
+  "close_reason": "All 14 child findings closed: 9 in this pass (mqet, di36, 343f, nygs, 7i5a, q1nf, wxgh, h8bf, glva) plus 3 P4 idiom fixes (v87s, xarw, lwwx) and 2 closed earlier as duplicates/won't-fix (40gc, 5zf2). Pass-3 review identified no correctness or security issues; remaining work (PKIX-qwzx.11 dual-semantics, PKIX-als9 chain_walk decomposition) is in separate beads requiring explicit human direction.",
+  "closed_at": "2026-05-07T23:27:11Z",
+  "compaction_level": 0,
+  "content_hash": "eee01b631eb4f42595a3efdd3c212daa58070730dc5ab80739d134ccf4adb5b9",
+  "created_at": "2026-05-07T22:48:39Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 3 of /review-myoss after pass-2 fixes commit e586bc49 closed 28/30 of PKIX-qwzx. Anchor: e586bc49 + the two intentionally-deferred issues (PKIX-qwzx.11 dual-Ok semantics, PKIX-qwzx.22 chain_walk too_many_lines).\n\nVerification of pass-2 commit claims:\n- cargo build --workspace --all-features: clean \u2713\n- cargo clippy --workspace --all-features --all-targets -- -D warnings: clean \u2713\n- cargo fmt --check: clean \u2713\n- cargo test --workspace --all-features: 74 result lines, 0 failures \u2713\n- RUSTDOCFLAGS=\"--cfg docsrs -D warnings\" cargo +nightly doc --no-deps --workspace --all-features: clean \u2713\n- No tests modified, deleted, skipped, or weakened: confirmed by inspection of all _tests.rs and PKITS diffs \u2713\n- 28/30 of PKIX-qwzx closed in beads: confirmed \u2713\n\nFindings filed under this epic represent net-new issues introduced by, or surfaced after, the pass-2 fixes. None re-flag the two explicitly-deferred PKIX-qwzx.11 / .22.\n\nConvergence check:\n- All findings are P3 or labeled 'opinion'. None block merge.\n- Section 7 calibration: confidence in audit completeness is high \u2014 all 24 changed files and the workspace-wide build/clippy/fmt/test/doc loop were validated.\n- We have converged. Recommend stopping the review loop.",
+  "ephemeral": 0,
+  "id": "PKIX-yydv",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "## Pass 3b (review-rusty) \u2014 Findings filed\n\nAnchor: e586bc49 (same as pass 3 myoss).\n\nFiled 9 net-new idiom findings under PKIX-yydv. Direct child issues all linked via 'blocks:PKIX-yydv':\n\n### P3 (4)\n- PKIX-h8bf \u2014 stale 'structural clone' comment in verify_delta_crl_and_collect after parse-once cache\n- PKIX-di36 \u2014 pkix-ct::Error misses Hash derive that pass-2 reconciliation should have added\n- PKIX-q1nf \u2014 cert_is_ca duplicated between pkix-path-builder and pkix-revocation/crl\n- PKIX-mqet \u2014 pass-2 const-fn cleanup incomplete (CtLogList::new and DeviationStore::new)\n\n### P4 / opinion (5)\n- PKIX-40gc \u2014 chain_walk reverse-loop style preference\n- PKIX-5zf2 \u2014 chain_walk option_if_let_else nursery hit (decision: keep match)\n- PKIX-lwwx \u2014 serial_lex_ge / serial_lex_le unification\n- PKIX-v87s \u2014 parse_issuing_dp match-on-Option vs map().transpose()\n- PKIX-xarw \u2014 hash_certid_input repeated trait-import use statements\n\n### Section 7 \u2014 Confidence calibration\n- Probability of a missed P0/P1/P2 idiom finding: very low. clippy --workspace --all-features --all-targets -- -D warnings is clean. Pedantic + nursery + cargo + style + perf + complexity together produce only 9 warnings, of which:\n  - 4 in pkix-path lib (1 doc_link_code, 2 too_many_lines already filed in PKIX-qwzx.22, 1 option_if_let_else now filed as PKIX-5zf2)\n  - 2 in pkix-path test helpers (must_use_candidate \u2014 low value on test-only fns)\n  - 3 redundant aggregation/duplicate lines\n- Probability of a missed P3 idiom finding: low-to-moderate. The four filed P3 findings all surfaced from cross-cutting checks (parse-once cache implications, pass-2 derive consistency claim, function-level DRY across crates, const-fn consistency). Additional minor P3s may exist in the deviation/lint module given its size (1500+ lines), but the spot-checks done here found no further structural issues.\n- Probability of a missed P4 idiom finding: moderate. P4 idiom findings are by definition opinion calls, and several were deliberately not filed because they would be churn without engineering value (e.g., `impl<'a> IntoIterator` style, single-element vec! allocations in profile constructors, per-arm match cosmetics elsewhere in chain_walk).\n- No new P0/P1/P2 findings emerged. None of the 9 P3/P4 findings block merge.\n\n### Convergence assessment (rusty pass)\nPer /review-rusty convergence criteria:\n- All findings are at priority 3+ or labeled 'opinion'. \u2713\n- Section 7 calibration: low probability of missed P0/P1/P2 issue. \u2713\n- The rusty pass has converged.\n\n### Convergence assessment (review loop overall)\nCombined with the converged myoss pass 3 (5 P3 findings, all opinion-grade):\n- 14 total findings under PKIX-yydv, all P3 or P4.\n- No P0/P1/P2 findings remain.\n- Both the myoss and rusty passes converged with low-confidence-of-missed-bug calibration.\n- The full review loop has converged. Recommendation: stop the review loop and triage these 14 findings against v0.2 release scope vs v0.3 deferral.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss pass 3 (post-pass-2 anchor e586bc49)",
+  "updated_at": "2026-05-07T23:27:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T16:04:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-40gc",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:05:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-5zf2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:03:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-di36",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:02:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-h8bf",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:04:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwwx",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:04:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mqet",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:03:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q1nf",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:05:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-v87s",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-07T16:04:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-xarw",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

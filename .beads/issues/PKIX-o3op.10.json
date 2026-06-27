@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6f1653830c406a7c751e2ca22823e64e021e12e4379da09ee3ada961cf88b5ea",
+  "created_at": "2026-05-14T19:28:47Z",
+  "created_by": "Mark Atwood",
+  "description": "What is unclear and for whom: pkix-aia/src/lib.rs:350-386 declares a test that loops over a cases table of (ErrorKind, &str) pairs and asserts label_for and kind_for invert each other on each pair. The cases table at lines 356-377 is hand-written and lists exactly the 20 variants the helper code at lines 289-344 enumerates.\n\nA new contributor reading this test will conclude: 'this tests the round-trip is bidirectional for every recognized variant.' That is the test's stated purpose ('the table is the oracle' \u2014 line 355).\n\nBut the test cannot catch the bug where a NEW stdlib ErrorKind variant exists outside this table. Adding ErrorKind::HostUnreachable to label_for but forgetting to update the test cases would still pass; removing kind_for's NotFound arm but also removing the cases entry for NotFound would still pass. The 'oracle' is the same hand-written table the code uses.\n\nThis is not a coverage problem of the test itself \u2014 the test is correct for what it claims. The problem is the test's name and comment suggest more than it delivers, and a reader updating the helper might believe 'this test will tell me if I forget to update the helper.' It will not.\n\nWhat would make it clear: rename the test to label_table_is_self_consistent or label_round_trip_for_listed_variants, and add a comment 'this test only exercises variants enumerated in the cases table; coverage for new stdlib variants is the maintainer's manual responsibility \u2014 see PKIX-o3op.4.'\n\nCoupled to PKIX-o3op.4 (the maintainer-burden finding).",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.10",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Test label_round_trip_covers_recognized_variants is tautological as written",
+  "updated_at": "2026-05-14T19:28:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:28:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

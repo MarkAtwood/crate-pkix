@@ -1,0 +1,39 @@
+{
+  "close_reason": "wontfix",
+  "closed_at": "2026-05-12T18:58:31Z",
+  "compaction_level": 0,
+  "content_hash": "86bb0959a8918ecbc6ec98abc6e6db0f2b4b4a0453b9bfa534436c3b82f21a4c",
+  "created_at": "2026-05-12T00:17:36Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nPKIX-amgn.8.3 ships the transform tool. This bead runs it once against current zlint master, commits the output, and lands the crate-root NOTICE file.\n\n## What\n\n1. Refresh checkouts:\n   ```\n   git -C ~/GIT/zlint pull --depth=1 origin master\n   ZLINT_SHA=$(git -C ~/GIT/zlint rev-parse --short HEAD)\n   ```\n2. Generate catalog:\n   ```\n   zlint -listLintsJSON > /tmp/zlint-lints.json\n   cargo run -p pkix-lint-cabf-refresh -- \\\\\n     --zlint-output /tmp/zlint-lints.json \\\\\n     --zlint-sha \"$ZLINT_SHA\" \\\\\n     --output-dir pkix-lint-cabf/catalogs/\n   ```\n3. Commit `pkix-lint-cabf/catalogs/cabf-br-tls-derived-from-zlint-<sha7>.oscal.json`.\n4. Write `pkix-lint-cabf/NOTICE` at crate root:\n   - Full Apache-2.0 license text (or pointer + URL)\n   - Per-vendored-asset section listing: filename, upstream URL, upstream SHA, license, copyright holder\n   - Initial entry: cabf-br-tls catalog, github.com/zmap/zlint, <sha>, Apache-2.0, zmap contributors\n5. Schema validation: if the tool didn't validate at generation time, validate now via oscal-cli (download/install if needed) and document outcome.\n6. Update pkix-lint-cabf README to note the vendored catalogs and refresh workflow.\n\n## Acceptance\n\n- [ ] pkix-lint-cabf/catalogs/cabf-br-tls-derived-from-zlint-<sha7>.oscal.json committed.\n- [ ] pkix-lint-cabf/NOTICE exists with full attribution.\n- [ ] pkix-lint-cabf README documents the refresh workflow (one paragraph + code snippet).\n- [ ] OSCAL Catalog schema validation passes (or schema-validation gap bd filed and linked).\n\n## Out of scope\n\n- cabf-br-smime, cabf-br-cs catalogs (future bds; same pattern).\n- Runtime parser in pkix-lint-cabf (PKIX-amgn.8.5).\n- First Rust Lint pairing example (PKIX-amgn.8.6).\n\n## Depends on\n\nPKIX-amgn.8.3.\n\n## Filed by\n\nDecomposed from PKIX-amgn.8 per Mark's 2026-05-11 decisions.",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.8.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Frozen 2026-05-12 (PKIX-ncab.2 cascade): parent PKIX-amgn.8 re-scoped because OSCAL is no longer prescribed as the catalog format. This issue is a snapshot of the OSCAL-target version of the work; it will be reworked, closed, or replaced when the replacement policy/config format is decided. Until then, do not claim autonomously.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Vendor first cabf-br-tls catalog: run refresh tool, commit output, write NOTICE",
+  "updated_at": "2026-05-12T18:58:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T17:17:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T17:17:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6a26ed55eeddb6961dfe0db0181940b212330da3911de07496a57e12a4a89c22",
+  "created_at": "2026-05-14T14:51:21Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:200-214 \u2014 `Error::Aia(pkix_aia::AiaError)` carries a single\nAiaError. The rustdoc says:\n\n    Carries the underlying [`pkix_aia::AiaError`] from the last fetch\n    attempt; earlier failures are dropped because the chain builder\n    iterates URIs in caller-supplied order and only the final blocker\n    determines the outcome.\n\n(PKIX-q9hv.8 already notes the rustdoc is inaccurate about the\nordering reasoning \u2014 separate issue.) The contract issue here is\ndifferent: callers debugging \\\"why did AIA chain reassembly fail\\\"\nsee exactly ONE error, and have no way to learn:\n\n- how many URIs were tried\n- which URI produced which error\n- whether failures were homogeneous (all timeout) or heterogeneous\n  (some 404, some malformed)\n\nTo debug, a caller MUST wrap their `AiaFetcher` impl in a\nlogging/recording shim that captures all per-URI results outside\nthe wrapper's error channel. That's the same pattern as the\nSignatureVerifier shim used in tests, but undocumented as a\ndebugging requirement.\n\nThree reasonable directions:\n\na) Document the limitation prominently in the rustdoc for\n   `Error::Aia` with a worked example of the logging-shim pattern.\n   Cheapest fix; doesn't change the API.\n\nb) Change `Error::Aia` to carry a richer payload:\n       Aia { errors: Vec<(String, AiaError)> }\n   Records every URI + its error so callers see the full picture.\n   More allocation; useful for debug.\n\nc) Add a third path: surface `Error::Aia` with the last error AND\n   provide a `Verifier::with_aia_observer(...)` callback the verifier\n   invokes per-URI for logging. Closure-based, no error-type change.\n\n(a) is cheap and may be enough. (b) is the most caller-honest. (c) is\nthe most flexible but adds API surface.\n\nThis is distinct from PKIX-q9hv.8 (which is about rustdoc accuracy on\nURI ordering). The contract gap here is the lossy aggregation,\nindependent of order.\n\nCaller impact: anyone debugging AIA failures in production. With\nn URIs and 1 error message, mean-time-to-diagnose scales with n.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::Aia carries only the last fetch error; earlier failures silently dropped",
+  "updated_at": "2026-05-14T14:51:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:51:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "P4 cosmetic, no immediate action",
+  "closed_at": "2026-05-02T14:51:04Z",
+  "compaction_level": 0,
+  "content_hash": "401cd760b22553078f73ece1d77a166610d81a92d7ea9d28739e86e0de2fa7bf",
+  "created_at": "2026-05-02T14:50:40Z",
+  "created_by": "Mark Atwood",
+  "description": "doc_auto_cfg was renamed to doc_cfg in Rust 1.92.0. The migration is correct (doc_cfg now includes auto behavior), but should be verified once crate is published to docs.rs to confirm feature flags appear correctly in generated docs.",
+  "ephemeral": 0,
+  "id": "PKIX-8f7.1",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "doc_auto_cfg \u2192 doc_cfg migration should be verified on docs.rs",
+  "updated_at": "2026-05-02T14:51:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T07:50:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8f7",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "23310ba9897f6c5b84b76d75d99adc5614030e17c47c1e71d3b3749ec0da59e2",
+  "created_at": "2026-05-14T19:42:21Z",
+  "created_by": "Mark Atwood",
+  "description": "At pkix-revocation/src/signer_discovery.rs:87-113:\n\n  pub fn discover_crl_signer<'a>(...) -> Option<&'a Certificate> {\n      // (1) AKI/SKI walk: linear scan, first match wins.\n      if let Some(aki_key_id) = crl_authority_key_id(crl) {\n          for cert in bundle { if matches { return Some(cert); } }\n      }\n      // (2) DN fallback: linear scan, first match wins.\n      bundle.iter().find(|cert| names_match(...))\n  }\n\nWhat the contract says: 'Returns None if no candidate is found.'\n\nWhat the contract does NOT say:\n\n1. When multiple bundle entries have the same SKI (legal \u2014 two cross-signed siblings can share a key and thus an SKI), the FIRST occurrence is returned. The rustdoc does not specify this. A caller cannot rely on which one comes back.\n\n2. When the AKI is absent and multiple bundle entries have the same subject DN as the CRL issuer (which is exactly the \u00a74.5 self-issued key-rollover case \u2014 old-bridge cert and new-key cert share the subject DN), the FIRST DN match is returned. Again, undocumented.\n\n3. The function is named `discover_crl_signer` singular, implying a unique answer exists. In reality the function returns 'whichever candidate the bundle happens to put first.' For PKITS \u00a74.5 with AKI present, this is fine \u2014 AKI/SKI is a near-unique discriminator. Without AKI, two valid candidates may exist; the caller has no contract telling them how the ambiguity resolves.\n\nConcrete consequences for callers:\n\n- A caller who constructs the bundle from a HashMap iteration order will get NON-DETERMINISTIC results across runs. Hash randomization in Rust's std HashMap means today's bundle order is not tomorrow's. The function silently picks differently.\n\n- A caller building a pkix-chain wrapper that wants to try ALL candidate signers (e.g., if signature verification fails on the first, try the next) has no way to ask discover_crl_signer for the next one.\n\n- The cycle-detection rationale in reaches_self_signed silently relies on AKI/SKI uniqueness, which is exactly what discover_crl_signer does NOT guarantee in mode (2).\n\nOptions:\nA. Document the first-match contract explicitly: 'When multiple bundle entries match, returns the first in iteration order. Callers needing all candidates must filter the bundle themselves.'\nB. Change the signature to `fn discover_crl_signers(...) -> impl Iterator<Item = &Certificate>` so callers can iterate candidates. Breaking change for new_with_signer_discovery internally (just take .next()).\nC. Add a sibling `discover_all_crl_signers` returning Vec<&Certificate>, keep the singular for the common case.\n\nMaintainability tax of status quo: every time anyone refactors discover_crl_signer, they could silently change the iteration order (e.g., switching from `for` to `iter().find()` could be a no-op today but matter once an inner search is reorganized). With no documented contract, they cannot tell a regression from a deliberate change.\n\nPicks (B) or (A) for pre-1.0; (A) is the cheapest.\n\nAcceptance: rustdoc on discover_crl_signer states 'returns the first match in bundle iteration order; behavior is well-defined for bundles with one candidate per SKI but undefined-which-of-N when multiple entries share the discriminator.' If (B) chosen, file follow-up for the iterator API.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "discover_crl_signer: bundle iteration order is observable but undocumented",
+  "updated_at": "2026-05-14T19:42:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:42:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

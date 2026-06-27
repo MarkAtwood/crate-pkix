@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added smime-self-signed-365d.der and codesign-self-signed-365d.der fixtures to gen.py, added smime_conforming_cert_passes and code_signing_conforming_cert_passes e2e tests in pkix-profiles",
+  "closed_at": "2026-05-06T16:20:22Z",
+  "compaction_level": 0,
+  "content_hash": "ee693281ec93f5b5425c27ab4460dc19c15af870267950c748011e9acca15a6a",
+  "created_at": "2026-05-06T16:12:56Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-profiles/src/lib.rs test module. web_pki_policy has a full passing test but smime_policy and code_signing_policy only test field values and rejection cases. Add fixtures with emailProtection EKU (smime) and codeSigning EKU (code_signing) and confirm validate_path accepts them.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: No end-to-end passing test for smime_policy or code_signing_policy",
+  "updated_at": "2026-05-06T16:20:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:12:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

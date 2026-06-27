@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "a2a355ab978cd6d9ca6e0a384b648112f8b68b0ff6f31c77a800c73e297cef85",
+  "created_at": "2026-05-14T14:56:41Z",
+  "created_by": "Mark Atwood",
+  "description": "Four call sites in this PR re-implement the same extension-lookup-by-OID pattern over cert.tbs_certificate.extensions, with slight stylistic drift between copies:\n\n  - aia_extract.rs:67-75 find_extension_value() \u2014 Option<&[u8]>, '.as_deref().unwrap_or(&[]).iter().find(|e| &e.extn_id == oid).map(|e| e.extn_value.as_bytes())'\n  - lib.rs:1321-1324 has_ocsp_no_check() \u2014 bool, '.as_ref().is_some_and(|exts| exts.iter().any(|e| e.extn_id == OID_OCSP_NO_CHECK))'\n  - lib.rs:1422-1434 enforce_timestamping_eku_critical_and_sole() \u2014 '.as_ref().ok_or(...)?' followed by '.iter().find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE).ok_or(...)?'\n  - lib.rs:1498-1505 enforce_timestamping_ku_shape() \u2014 '.as_ref()' then '.iter().find(|e| e.extn_id == OID_KEY_USAGE)' via let-else\n\nEach call site uses a slightly different shape: '== OID' vs. '&extn_id == oid', '.find()' vs. '.any()', '.as_deref()' vs. '.as_ref()', '.ok_or(...)?' vs. let-else. The stylistic drift is a tell that no canonical helper exists.\n\nWhat goes wrong as it stands: every new call site picks its own shape, the patterns slowly diverge, and a behavioural change (e.g. 'extension critical-flag check should also be available') requires updating four places. Idiomatic Rust convention is one private helper:\n\n    fn find_ext<'a>(cert: &'a Certificate, oid: &ObjectIdentifier) -> Option<&'a Extension> {\n        cert.tbs_certificate.extensions.as_deref()?.iter().find(|e| &e.extn_id == oid)\n    }\n\nthen every site reads e.g. 'find_ext(cert, &ID_CE_EXT_KEY_USAGE)' and dispatches on the Option. has_ocsp_no_check becomes a one-liner '.is_some()'; the TSA enforcers carry an .ok_or onto the helper result; aia_extract.rs's find_extension_value disappears entirely.\n\nThis is internal-tidying, not correctness, hence P2. The reason to flag it pre-1.0: once stable the pattern hardens, and a follow-up that needs to also check 'extension critical flag' (e.g. for an extension that MUST be marked critical) will have to thread the new check through four sites rather than one. Adjacent to PKIX-q9hv.27 (OID constants); a single fix sweep can resolve both.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Extension-search-by-OID logic duplicated 4 times; lacks a single helper",
+  "updated_at": "2026-05-14T14:56:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:56:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

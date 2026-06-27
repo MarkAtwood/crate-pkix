@@ -1,0 +1,46 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T18:13:43Z",
+  "compaction_level": 0,
+  "content_hash": "63c1391e7e3bd84c385fabf27551e551173804b53b53872bc912a8306636aa94",
+  "created_at": "2026-05-08T15:19:56Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nCloses the documentation gap in PKIX-7nsf's acceptance criteria:\n- 'Documentation: `tools/difftest/README.md` explains how to add a new oracle, add a new corpus, and re-run a baseline.'\n- 'At least one real divergence found, classified, and recorded in a project-level `INTEROP.md` with rationale (\"we side with X because Y\").'\n\n## What\n\n1. **`pkix-difftest/README.md`**:\n   - 30-second pitch: what the harness does, why, when to use it.\n   - Quickstart: `./python/setup-venv.sh && cargo run -p pkix-difftest -- run pkits <path>`.\n   - How to add a new oracle: trait surface (`fn verify(chain: &Chain) -> io::Result<Verdict>`), where to plug it in.\n   - How to add a new corpus: `Corpus` trait, glob conventions, ordering normalisation.\n   - How to re-run a baseline: command, where artefacts land, how to interpret the report.\n   - Limitations: see-also links to deferred CT-scrape and CI-integration beads.\n\n2. **Project-level `INTEROP.md`** (top of repo, not under pkix-difftest/):\n   - Heading: 'Real-world interoperability divergences'.\n   - One section per concrete divergence found in the PKITS or pyca baseline (PKIX-7nsf.6 and .7).\n   - Each section: chain name + URL, what pkix-path verdict, what each oracle's verdict, our reasoning ('we side with X because Y, where X is one of {pkix-path, openssl, pyca, RFC literal text}').\n   - Link from the top README.md to INTEROP.md.\n\n## Acceptance\n\n- [ ] `pkix-difftest/README.md` exists and covers all four how-tos.\n- [ ] `INTEROP.md` exists at repo root and has at least one concrete divergence written up.\n- [ ] Top-level `README.md` links to `INTEROP.md`.\n- [ ] No claims in either doc that aren't backed by a baseline-{pkits,pyca}.json entry.\n\n## Notes\n\n- This is the **last** in-scope child of PKIX-7nsf. Filing follow-up beads from divergences found here is expected and welcomed (each follow-up is a real-bug or wontfix-with-rationale bead).\n- INTEROP.md's purpose is durable: future PRs that change verdict behaviour must update INTEROP.md if they affect a documented divergence.",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: README + INTEROP.md initial draft",
+  "updated_at": "2026-05-08T18:13:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:19:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:04:03Z",
+  "compaction_level": 0,
+  "content_hash": "1c9fc37827715b716a3ad307ce77cc429c3a9d7af19f6d9fd48b651233dccd9c",
+  "created_at": "2026-05-06T20:51:24Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/report.rs:244 contains a json_round_trip test gated on #[cfg(feature = \"serde\")]. The test is never executed by 'cargo test -p pkix-lint' (the default CI run), only by 'cargo test -p pkix-lint --features serde'. If the serde feature is not included in the standard CI matrix, the serialization of EvaluationReport can regress silently. Fix: add a CI matrix entry that runs 'cargo test -p pkix-lint --features serde' (or add it to a workspace-level test target). Alternatively, consider whether the json_round_trip test should be a separate integration test file that's only compiled when the serde feature is enabled, making the gating explicit and discoverable. Same concern applies to any serde-gated code in deviation.rs and lib.rs.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: serde JSON test not run without --features serde",
+  "updated_at": "2026-05-06T21:04:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:51:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

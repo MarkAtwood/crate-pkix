@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added pub fn cert_is_ca(cert) -> Result<bool, DerError> to pkix-path; pkix-path-builder::cert_is_ca and pkix-revocation::crl::cert_is_ca_cert both became thin wrappers that map the opaque DerError to their crate-specific Error variant. OID_BASIC_CONSTRAINTS const removed from both downstream crates (now resolved via pkix-path).",
+  "closed_at": "2026-05-07T23:26:19Z",
+  "compaction_level": 0,
+  "content_hash": "81bf7a2886f3f12335cfe50e141097a54283c619a71395b6287f9352338f1a5e",
+  "created_at": "2026-05-07T23:03:38Z",
+  "created_by": "Mark Atwood",
+  "description": "## Locations\n- pkix-path-builder/src/lib.rs:182-200 \u2014 fn cert_is_ca(cert: &Certificate) -> Result<bool>\n- pkix-revocation/src/crl.rs:738-754 \u2014 fn cert_is_ca_cert(cert: &Certificate) -> crate::Result<bool>\n\n## Finding\nBoth crates implement essentially the same logic \u2014 'does this Certificate have a BasicConstraints extension with cA=TRUE?' \u2014 with structurally identical code:\n\n1. Look up the BasicConstraints extension by raw OID (2.5.29.19) in tbs_certificate.extensions.\n2. If absent, Ok(false).\n3. If present, BasicConstraints::from_der(...). On parse failure, typed error, propagate; on success, return bc.ca.\n\nThe only differences:\n- Function name (cert_is_ca vs cert_is_ca_cert)\n- Error variant returned on malformed BC (Error::MalformedIntermediate vs Error::MalformedCertificate)\n- Ownership of the OID constant (each crate defines its own OID_BASIC_CONSTRAINTS)\n\n## Why this matters\n- Maintenance hazard: any change to BasicConstraints handling (e.g., x509-cert API change, additional defense-in-depth) must be made in two places. The pass-2 fix landed both parsers ('fail-closed alternative' wording in both) but left them as parallel implementations.\n- Code review surface: future contributors will not know which to update or whether they should converge.\n- Test isolation: each crate maintains its own test coverage for what is the same logic.\n\n## Severity\nP3 (idiom / DRY). Not a correctness issue today (both implementations agree), but the parallel maintenance burden is exactly the kind of latent inconsistency that surfaces only when one side is updated.\n\n## Fix options\n1. Add a public helper to pkix-path \u2014 e.g., pub fn cert_is_ca(cert: &Certificate) -> Result<bool, DerError> that returns the opaque DerError on malformed BC. Both pkix-path-builder and pkix-revocation/crl call it and .map_err to their own error variant. pkix-path already exposes names_match as a similar utility, so this is consistent.\n2. Inline both with a shared comment pointing to the canonical RFC 5280 \u00a74.2.1.9 reference. Cheaper in churn but does not solve the DRY.\n\nOption 1 is the idiomatic Rust answer and fits the existing 'pkix-path is the foundation' architecture from AGENTS.md.\n\n## Out of scope\nNot a v0.2 blocker \u2014 the two implementations agree today. File for v0.3 cleanup.",
+  "ephemeral": 0,
+  "id": "PKIX-q1nf",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: cert_is_ca duplicated between pkix-path-builder and pkix-revocation/crl",
+  "updated_at": "2026-05-07T23:26:19Z"
+}

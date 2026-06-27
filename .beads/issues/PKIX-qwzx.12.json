@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Applied Option A: replaced 'is a RevocationChecker' / 'A RevocationChecker that ...' with 'Will implement RevocationChecker once fetching is wired up' on HttpCrlFetcher, HttpOcspFetcher, and the crate-level Design section. No type-system claim now mismatches reality. Docs build with -D warnings.",
+  "closed_at": "2026-05-07T22:26:36Z",
+  "compaction_level": 0,
+  "content_hash": "6b28819eef32729cc0b710629c669ce1611ed270c1873d083a3f39e0527d54ed",
+  "created_at": "2026-05-07T22:02:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation-http/src/lib.rs:81-86:\n  /// A [`pkix_revocation::RevocationChecker`] that fetches CRLs on demand.\n  ...\n  pub struct HttpCrlFetcher<F> { ... }\n\nThe doc claim 'is a RevocationChecker' is false in the type system: HttpCrlFetcher<F> does NOT implement RevocationChecker \u2014 there is no `impl RevocationChecker for HttpCrlFetcher` block. Same for HttpOcspFetcher (line 111).\n\nThis is technically a stub crate at v0.0.0, and the # Limitations section says 'Not yet implemented (PKIX-58m)'. So it is not production-misleading. But the type-system claim and the prose claim disagree.\n\nFix options:\n\nA. (preferred) Replace the type-system claim with one that matches reality:\n   /// Will implement [`pkix_revocation::RevocationChecker`] once fetching is wired up.\n\nB. Add a stub impl that returns Err(...) from every method, similar to how pkix-composite has a stub impl SignatureVerifier that returns SignatureError::new() (lib.rs:74-86). This is more consistent with the rest of the workspace.\n\nSeverity: P3 / opinion \u2014 fact-check on stub-crate documentation.\n\nPass-1 attribution: not flagged. Pass 1 bumped these to v0.0.0 (PKIX-gdvf) but didn't reconcile the doc/type-system gap.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.12",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-revocation-http stubs claim 'is a RevocationChecker' in docs but do not impl the trait",
+  "updated_at": "2026-05-07T22:26:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:02:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

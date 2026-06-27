@@ -1,0 +1,31 @@
+{
+  "close_reason": "False alarm: the final check correctly handles initial_explicit_policy via the counter initialization at chain_walk start (explicit_policy = 0 if initial_explicit_policy=true).",
+  "closed_at": "2026-05-05T16:10:32Z",
+  "compaction_level": 0,
+  "content_hash": "bad796d89765da59e1dab254d3ccc6f7d27a05fa5637ec74dd68889e9b3f45e7",
+  "created_at": "2026-05-05T15:48:53Z",
+  "created_by": "Mark Atwood",
+  "description": "The \u00a76.1.5(g) final check at lib.rs:2173-2175 correctly evaluates: 'if explicit_policy == 0 AND policy_tree is None \u2192 PolicyViolation'. This correctly implements RFC 5280 \u00a76.1.5(g): 'path processing has succeeded if either (1) the explicit_policy variable is greater than 0 or (2) the valid_policy_tree is not NULL.'\\n\\nHowever, re-reading the initialization at line 1528-1531: when `initial_explicit_policy = false`, explicit_policy is initialized to `n + 1` (where n = chain.len()). The decrement at line 1894 is only applied to non-self-issued intermediates. The decrement at line 1730 is applied to the non-self-issued leaf.\\n\\nFor a chain of length 2 (leaf + 1 intermediate), n=2, explicit_policy starts at 3. After processing the intermediate (non-self-issued): explicit_policy = 2. After processing the leaf (non-self-issued): explicit_policy = 1. Final check: explicit_policy (1) > 0, so success.\\n\\nWith initial_explicit_policy = true: explicit_policy = 0. After the leaf decrement: saturating_sub(1) = 0. Final check: explicit_policy == 0, check policy_tree.\\n\\nThis appears correct. But there's a subtle edge case: for a chain of length 1 (single cert, self-signed, acting as both chain and anchor), n=1. explicit_policy = 2. The loop processes i=0 (the cert). Since i==0, the leaf finalisation block runs. Is the cert self-issued? If yes, no decrement. explicit_policy stays 2. Final check: 2 > 0 \u2192 success. This is correct.\\n\\nFor initial_explicit_policy = true with a 1-cert self-signed chain: explicit_policy = 0. Leaf is self-issued, no decrement. Final check: 0 == 0. Check policy_tree: if the cert has a CertificatePolicies extension, the tree may have nodes. If no CP extension, tree is None \u2192 PolicyViolation. This matches RFC 5280 expectation.\\n\\n**Resolution**: The final check IS correct. No bug found here. The edge cases all trace correctly. Document this analysis in the code with a comment at line 2171 explaining why checking explicit_policy after all decrements correctly implements \u00a76.1.5(g).\\n\\nLocation: pkix-path/src/lib.rs:2171-2177\\n\\nFiling as P4 (documentation clarification only).",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.30",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "\u00a76.1.5(g): final check must also consult initial_explicit_policy",
+  "updated_at": "2026-05-05T16:10:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:48:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

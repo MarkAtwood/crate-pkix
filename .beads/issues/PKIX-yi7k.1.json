@@ -1,0 +1,31 @@
+{
+  "close_reason": "Keep lenient (Option A). pkix-revocation::CrlChecker::new_with_signer_discovery's anchor-reachability gate stays structural-only \u2014 the reaches_self_signed walk treats any self-issued cert (subject == issuer) as a terminator without verifying the self-signature or matching against a TrustAnchor slice. Strict semantics (full chain verification, anchor DN matching) are deferred to higher-layer composers (pkix-chain), consistent with AGENTS.md non-negotiable #2 (one-way dependency: chain -> revocation -> path) and the framework-not-policy stance. This matches the Option A path that PKIX-cqwt explicitly chose. A future stricter mode can be added as an additional constructor variant if a consumer surfaces.",
+  "closed_at": "2026-05-11T19:44:30Z",
+  "compaction_level": 0,
+  "content_hash": "877973ce23d993d47e29164f7abd4a2afc82be340b93cda38d91c98fd924893f",
+  "created_at": "2026-05-11T17:51:14Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "Follow-up to PKIX-cqwt.\n\nThe CrlChecker::new_with_signer_discovery anchor-reachability gate (reaches_self_signed in signer_discovery.rs) treats any *self-issued* cert (subject == issuer) as an anchor terminator. This includes:\n\n1. Real self-signed root CAs.\n2. Self-issued key-rollover bridge certs (PKITS \u00a74.5 case: BasicSelfIssuedOldKeyNewWithOldCACert is self-issued but signed by a different key from the bridge subject's own).\n\nOption A (chosen) explicitly defers full signature verification of the signer's chain to higher-layer composers (pkix-chain). The current structural-only walk accepts both cases as 'reached an anchor.'\n\nThis is the intended behavior under Option A but worth surfacing as a separate bead because:\n- A future caller might assume reaches_self_signed === 'this cert verifies back to a TA' (it does not).\n- If we ever want stricter semantics in pkix-revocation, we would either (a) require the caller to also pass a TrustAnchor slice and check that the terminating self-issued cert's subject matches an anchor DN, or (b) actually verify the self-signature.\n\nAcceptance:\n- Decide stance: keep lenient (close as won't-fix) OR tighten by passing trust anchors into new_with_signer_discovery.\n- If tightening, add a TrustAnchor parameter and check the terminating cert's subject DN matches an anchor.\n\nRefs:\n- pkix-revocation/src/signer_discovery.rs::reaches_self_signed\n- PKIX-cqwt notes ratifying Option A\n- AGENTS.md non-negotiable #2",
+  "ephemeral": 0,
+  "id": "PKIX-yi7k.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: stricter signer-chain anchor check in discovery",
+  "updated_at": "2026-05-11T19:44:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T10:51:14Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-yi7k",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

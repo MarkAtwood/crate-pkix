@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:18:47Z",
+  "compaction_level": 0,
+  "content_hash": "a1e020d83fe0e4ae77ebd49d17a95594b83478505835f67c8936fdfb51909f34",
+  "created_at": "2026-05-07T04:14:44Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:72-77 \u2014 The OcspResponderIdMismatch variant has a doc comment (lines 72-77), so this finding is partially addressed. However the doc comment says 'byName DN or byKey SHA-1 hash' but does not mention that the SHA-1 used here is specifically SHA-1 of the SPKI subjectPublicKey raw bytes (not of the full SubjectPublicKeyInfo DER), which is the non-obvious part. Compare ocsp.rs:477 where spki_raw = subject_public_key.raw_bytes(). A reader of lib.rs alone cannot reconstruct the correct hash input. Suggest adding: 'byKey: SHA-1 of the issuer SPKI subjectPublicKey bit string (raw bytes, tag/length/unused-bits stripped)' to the variant doc.",
+  "ephemeral": 0,
+  "id": "PKIX-i0g9.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OcspResponderIdMismatch variant missing doc comment",
+  "updated_at": "2026-05-07T04:18:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:14:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-i0g9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

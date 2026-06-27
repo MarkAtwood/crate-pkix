@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:15:36Z",
+  "compaction_level": 0,
+  "content_hash": "a2b7d6aaa72ea88988f36ab3562cc2907581547a9d6ccf1a04680c2181af5527",
+  "created_at": "2026-05-07T16:15:35Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:306-310:\n  `// cRLSign was already verified above for the base CRL issuer.`\n  `// The delta CRL uses the same issuer (confirmed by name-match above),`\n  `// so the cRLSign bit check is not repeated here.`\n\nThe base CRL's issuer certificate is checked for cRLSign via check_crl_sign() at line 227. But the DELTA CRL's issuer is only name-matched to the base CRL issuer and the cert's issuer \u2014 it is NOT re-checked for cRLSign in verify_delta_crl_and_collect (lines 500-549).\n\nRFC 5280 \u00a76.3.3(f) requires: 'Verify that the current CRL is a complete CRL for the subject certificate, has the same issuer as the subject certificate, or is issued by a CA who has authority to revoke certs issued by the same issuer.' The cRLSign check applies to ALL CRLs, not just the base.\n\nHowever: the code's reasoning is that since delta_crl.issuer name-matches the same issuer cert that was already cRLSign-verified for the base CRL, the delta CRL is signed by the same CA and the cRLSign check implicitly passes. This is correct IF the name match uniquely identifies the issuer certificate (no same-named CAs with different keys). Given that we also verify the delta CRL's SIGNATURE against the issuer's SPKI (line 534-542 in verify_delta_crl_and_collect), this is sufficient: if the signature verifies against the same issuer SPKI that passed cRLSign, the delta is authenticated.\n\nThe reasoning is sound. Not a security bug.\n\nBut noting: the cRLSign check should probably be stated explicitly in verify_delta_crl_and_collect's docstring rather than relying on caller reasoning.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation CrlChecker: delta CRL cRLSign check is NOT performed (security gap)",
+  "updated_at": "2026-05-07T16:15:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:15:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

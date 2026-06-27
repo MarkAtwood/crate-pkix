@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:55Z",
+  "compaction_level": 0,
+  "content_hash": "1dff8a710f8d4a563822a272cd74bfbdbe4b804fba2be70c806ef948de871f5d",
+  "created_at": "2026-05-05T15:49:40Z",
+  "created_by": "Mark Atwood",
+  "description": "RFC 5280 \u00a74.2 requires that a critical extension which cannot be processed MUST cause path validation to fail. Both BasicConstraints and NameConstraints are frequently critical.\\n\\ncert_basic_constraints() at lib.rs:855 calls find_cert_ext (fail-open: decode errors silently become None). cert_name_constraints() at lib.rs:871 calls try_find_cert_ext (fail-closed: decode errors become MalformedCertificate).\\n\\nThe asymmetry is intentional (BasicConstraints is fail-open, NameConstraints is fail-closed per commit dcdc963), but the comment at lib.rs:109 in the find_cert_ext doc only says 'Use this for extensions where a parse failure is tolerable'. BasicConstraints with cA=TRUE that fails to decode would silently become 'no BasicConstraints', causing the cert to fail the 'bc.ca must be true' check at line 1755 anyway (bc is None, is_some_and returns false, NotCA error). So the fail-open is safe for BasicConstraints: a malformed BasicConstraints that can't be decoded produces the same result as an absent one \u2014 the cert is rejected as NotCA. This is acceptable.\\n\\nHowever, this reasoning is NOT documented in the code. A future maintainer who changes the behavior of 'None from find_cert_ext' (e.g., adding a 'treat absent BC as cA=false for non-self-issued' optimization) could introduce a security regression.\\n\\nLocation: pkix-path/src/lib.rs:855-857 (cert_basic_constraints)\\n\\nRecommendation: Add a comment explaining WHY fail-open is safe for BasicConstraints: 'fail-open is safe here because None produces the same security outcome as cA=false \u2014 the NotCA check at line 1755 will reject the cert either way. If the extension is critical and malformed, RFC 5280 requires rejection; our code achieves this as a side effect of treating None as cA=false (NotCA error). cert_name_constraints uses fail-closed because NC malformation must be explicitly flagged per RFC 5280 \u00a74.2.'",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.34",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_basic_constraints uses fail-open while cert_name_constraints uses fail-closed \u2014 asymmetry needs doc",
+  "updated_at": "2026-05-05T16:06:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:49:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

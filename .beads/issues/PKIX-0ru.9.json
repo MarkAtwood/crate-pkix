@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: added Limitation bullet to CrlChecker doc (crl.rs) and OcspChecker doc (ocsp.rs) noting check_revocation_against_anchor is not overridden",
+  "closed_at": "2026-05-06T16:22:49Z",
+  "compaction_level": 0,
+  "content_hash": "5b1dc3907a840de7180c77167f4ee4150fe8a657500e78d9720415579ac54910",
+  "created_at": "2026-05-06T16:13:08Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/src/crl.rs line 44, pkix-revocation/src/ocsp.rs line 22. The RevocationChecker trait doc warns that CrlChecker/OcspChecker do not override check_revocation_against_anchor, but the struct-level doc # Limitations sections do not mention this. Add a bullet to each struct's Limitations.",
+  "ephemeral": 0,
+  "id": "PKIX-0ru.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: CrlChecker/OcspChecker struct doc missing Limitation: check_revocation_against_anchor not overridden",
+  "updated_at": "2026-05-06T16:22:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:13:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0ru",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

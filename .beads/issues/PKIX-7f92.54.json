@@ -1,0 +1,31 @@
+{
+  "closed_at": "2026-05-14T16:18:14Z",
+  "compaction_level": 0,
+  "content_hash": "273cd79cd84145a3318ba3cd8003465c39954fdd9ca96f56d988eb5f3c4b8471",
+  "created_at": "2026-05-14T16:16:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/parse.rs::parse_risk and pkix-lint/src/oscal/parse.rs::parse_subject read multiple variable-length string fields from attacker-supplied JSON via `Value::as_str().to_string()` with no upper-length cap enforced before allocation:\n\n- `obj.get(\"description\").and_then(Value::as_str).ok_or(...)?.to_string()` (parse.rs:576-580) \u2014 `justification`\n- `required_nonempty_prop` for `pkix-lint.deviation-id`, `pkix-lint.target-lint`, `pkix-lint.action`, `pkix-lint.authorized-by` (parse.rs:589-608) \u2014 each becomes a heap-allocated String\n\nA malicious OSCAL Risk JSON with a 100MB `description` (justification) string allocates 100MB on parse, plus another copy through DeviationStore::add, plus another copy on every subsequent OSCAL emit of the same store. `hex_decode` (parse.rs:834-848) similarly allocates without a length cap, although DER bytes are typically bounded by certificate size anyway.\n\nSection C (untrusted input \u2014 memory-DoS via variable-length fields). What goes wrong: availability. `deviation_store_from_risks` is the inverse of `risks_from_store` and is the documented entry point for ingesting deviation policy from operator-provided JSON. That JSON crosses a trust boundary in any deployment where the deviation file is fetched from a network source or shared filesystem.\n\nserde_json's default 128-level recursion limit prevents stack-overflow attacks but does not bound individual string lengths.\n\nP3 defense-in-depth, not P1:\n- Operators typically curate their own deviation JSON, not adversaries\n- Even if adversarial, the attack vector is \"crash the audit pipeline\" not \"forge a deviation\"\n\nFix shape:\n- Document the expected upper bound on each field (deviation IDs <= 64 chars, justifications <= 4KB) and reject longer values with a typed ParseError variant before allocation\n- Or document explicitly that callers MUST cap input size (e.g., via `serde_json::Deserializer::from_reader` with a length-limited reader) before invoking `deviation_store_from_risks`\n\nSection C requires bounded variable-length fields at protocol boundaries; pkix-lint's OSCAL parse path is such a boundary.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.54",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Duplicate of PKIX-hy2e.40 (open, P3) filed in the prior crypto-security pass on pkix-lint. hy2e.40 captures the hex_decode-specific case; this issue named description/justification/authorized-by which are not in hy2e.40 \u2014 but the underlying defense-in-depth principle (Section C explicit upper bounds on variable-length fields) is the same and the fix shape is identical (early-return checks before allocation). The hex_decode case is the most exploitable; description/justification are operator-supplied so secondary. Closing as substantive duplicate. If the maintainer wants the description/justification subset broken out separately, can reopen under a tighter title.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OSCAL Risk parse path accepts unbounded string lengths for description/justification/authorized-by/prop values",
+  "updated_at": "2026-05-14T16:18:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:16:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

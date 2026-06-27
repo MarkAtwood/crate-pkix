@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:51Z",
+  "compaction_level": 0,
+  "content_hash": "430296bac363de610f9ae70f12e8cb4cd906f389cf47c60720cd9e9e411de59d",
+  "created_at": "2026-05-02T22:20:18Z",
+  "created_by": "Mark Atwood",
+  "description": "The any_to_str_bytes doc explains TeletexString is intentionally not normalized due to vendor incompatibility. This creates a class of support issues when users hit TeletexString mismatches: 'Can you normalize it like BMPString?' The doc defends the position, but maintainers will see this question repeatedly. Consider adding a FAQ/LIMITATIONS section to rustdoc explaining this is not a bug and why, to deflect support questions earlier.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TeletexString byte-exact comparison will generate repeating support questions",
+  "updated_at": "2026-05-02T22:35:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

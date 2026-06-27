@@ -1,0 +1,32 @@
+{
+  "close_reason": "PKITS 100% except documented divergences. limbo 25/26 residuals accepted as divergences; PKIX-lwr9.4 (real path-builder bug) is a 1.0 blocker. All baseline docs reviewed at publish. No new corpora at 1.0.",
+  "closed_at": "2026-05-13T17:08:04Z",
+  "compaction_level": 0,
+  "content_hash": "bc81ef36d154ce0e6f3ab1be6ceaf127cdd795c62c53a01d7406554248a3161a",
+  "created_at": "2026-05-13T16:58:00Z",
+  "created_by": "Mark Atwood",
+  "description": "## Test acceptance criteria for 1.0\n\nWhat pass-rate against the differential test corpora is the workspace willing to declare as 1.0?\n\nThe workspace has two Tier-1 corpora and a Tier-2 corpus per AGENTS.md:\n\n- **PKITS (NIST)** \u2014 Tier 1. Current state: documented in `pkix-difftest/baseline-pkits-analysis.md`.\n- **x509-limbo** \u2014 Tier 2. Current state: documented in `pkix-difftest/baseline-limbo-analysis.md`.\n\nPlus per-purpose differential coverage:\n- OpenSSL diff (PKIX-fmtv.18, closed) \u2014 TLS server/client, S/MIME sign/encrypt, time-stamping, OCSP responder\n- pyca/cryptography diff (PKIX-fmtv.19, closed) \u2014 TLS server/client only (pyca's API surface)\n- Codesign diff (PKIX-fmtv.24, open) \u2014 via pyca composition + standalone EKU check\n\n## Decisions\n\n### PKITS pass rate target\n\nCurrently the workspace passes most of PKITS. The remaining failures (if any) are documented as \"workspace stricter than spec\" (intentional) or \"spec ambiguity\" (defensible) or \"real bugs\" (must-fix).\n\n**Open: what pass rate (e.g., \"100%\" / \"100% except documented exceptions\" / \"specific count\") is the 1.0 bar?**\n\nRecommendation: **100% except cases documented in baseline-pkits-analysis.md as \"workspace-stricter-than-spec\" or \"spec-ambiguous-and-we-disagree-with-PKITS-on-purpose\".** Any \"real bug\" entries in the baseline are 1.0 blockers.\n\n### limbo pass rate target\n\nPer session conversation, currently 26 residuals. Most are \"workspace correctly stricter\" or \"harness limitations.\" One genuine path-builder bug (PKIX-lwr9.4 tc60).\n\n**Open: 1.0 accepts the residuals as documented divergences? Or must PKIX-lwr9.4 close first?**\n\nRecommendation: **PKIX-lwr9.4 closes as part of 1.0 cascade (it's a real path-builder bug).** Other 26 residuals stay as documented divergences.\n\n### Differential test baseline documents\n\nEach baseline file (`baseline-pkits-analysis.md`, `baseline-limbo-analysis.md`, `baseline-verify-openssl.md`, `baseline-verify-pyca.md`) needs to be up-to-date at 1.0 publish.\n\n**Acceptance: all baseline files reviewed and reflect current state at 1.0.**\n\n## Out of scope\n\n- Adding new corpora at 1.0 (post-1.0 work)\n- Per-RFC test vector coverage expansion (incremental)\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- PKIX-lwr9.4 (bettertls tc60 path-builder bug; 1.0 blocker per recommendation)\n- pkix-difftest baselines (must be reviewed for 1.0 publish)\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 RESOLVED: principled-default test acceptance]\n\n**PKITS pass rate target at 1.0: 100% except cases documented in baseline-pkits-analysis.md as 'workspace-stricter-than-spec' or 'spec-ambiguous-and-we-disagree-with-PKITS-on-purpose'.**\n\nAny 'real bug' entries in the baseline file are 1.0 blockers. Workspace-deliberate-stricter entries are documented and accepted.\n\n**limbo pass rate target at 1.0: Current 26 residuals accepted as documented divergences, EXCEPT PKIX-lwr9.4 (bettertls::pathbuilding::tc60 path-builder bug).**\n\nPKIX-lwr9.4 is a genuine path-builder bug per baseline-limbo-analysis.md. It must close before 1.0 publish. The other 25 residuals are 'workspace correctly stricter' or 'harness limitations' \u2014 documented and accepted.\n\n**Differential test baseline documents at 1.0: ALL REVIEWED for accuracy.**\n\n- baseline-pkits-analysis.md\n- baseline-limbo-analysis.md\n- baseline-verify-openssl.md\n- baseline-verify-pyca.md\n\nEach is current as of 1.0 publish date. PKIX-wlsr.6 Limitations audit cross-checks per-crate rustdoc against baseline statements.\n\n**No additional corpora added for 1.0.** New corpora (bettertls expansion, additional limbo cases, etc.) are post-1.0 work. The 1.0 promise is 'verified against the corpora we have, gaps documented.'",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Test acceptance criteria: PKITS / limbo / diff baseline pass-rates for 1.0",
+  "updated_at": "2026-05-13T17:08:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:57:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

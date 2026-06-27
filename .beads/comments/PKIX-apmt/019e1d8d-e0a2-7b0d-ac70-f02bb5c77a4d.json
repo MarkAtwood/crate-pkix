@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:58:18Z",
+  "id": "019e1d8d-e0a2-7b0d-ac70-f02bb5c77a4d",
+  "issue_id": "PKIX-apmt",
+  "text": "RESOLVED 2026-05-12 (Mark, interactive). The question DISSOLVES under the three-mode policy-class model now ratified in AGENTS.md non-negotiable #5. There is no single workspace-prescribed wire format because the three policy classes have different format ownership: (1) standards-body specs are Rust code (no format question); (2) industry-forum / vendor policies are consumed by sibling policy-adapter crates (pkix-policy-zlint, pkix-policy-pkilint, etc.), each consuming the upstream tool's natural format -- the format is the upstream's choice, not the workspace's; (3) site-local policy is the deployer's choice in whatever shape suits them. The OSCAL emit/parse already shipped in pkix-lint/src/oscal/* becomes one optional adapter for sites wanting OSCAL interop, NOT the canonical workspace format. The original framing of this epic ('decide wire format or commit to Rust-only') was a false dichotomy that assumed the workspace had to make one workspace-wide choice; the three-mode model resolves it by recognizing that the choice is per-mode, not workspace-wide. AGENTS.md non-negotiable #5 updated accordingly. Cross-reference: PKIX-amgn.8 (re-WONTFIX in same session under the no-transcription stance; pkix-policy-zlint becomes the principled path for comprehensive CA/B Forum coverage)."
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3a08f58efe43f72a4dc9c69b8ba1fef94916f0c67d62b3a11471aa875240d24a",
+  "created_at": "2026-05-14T18:13:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:367-383 (verify_chain's \"Revocation coverage\" section) and lines 527-536 (Verifier::verify_one's \"Revocation coverage\" section) contain near-identical text describing the same behaviour:\n\nverify_chain (lines 367-383):\n    /// # Revocation coverage\n    ///\n    /// Every certificate in `chain` is revocation-checked:\n    ///\n    /// - `chain[i]` where `chain[i+1]` exists: checked via\n    ///   [`RevocationChecker::check_revocation`] with `chain[i+1]` as the issuer.\n    /// - The last cert in `chain` (issued directly by the trust anchor): checked via\n    ///   [`RevocationChecker::check_revocation_against_anchor`].\n    ///\n    /// The **default implementation** ...\n\nverify_one (lines 527-536):\n    /// # Revocation coverage\n    ///\n    /// Identical to [`verify_chain`]:\n    ///\n    /// - `chain[i]` where `chain[i + 1]` exists: checked via\n    ///   [`RevocationChecker::check_revocation`] with `chain[i + 1]` as\n    ///   the issuer.\n    /// - The last cert in the validated chain (issued directly by the\n    ///   trust anchor): checked via\n    ///   [`RevocationChecker::check_revocation_against_anchor`].\n\nverify_one points back at verify_chain (\"Identical to [`verify_chain`]\") AND restates the contract anyway. The two versions differ in minor ways:\n\n- verify_chain says \"in `chain`\" (the input argument); verify_one says \"in the validated chain\" (post-AIA-augmentation).\n- verify_chain's version includes a paragraph about default implementations and CrlChecker/OcspChecker overrides; verify_one's does not.\n- Whitespace: `chain[i+1]` vs `chain[i + 1]`.\n\nWHY IT MATTERS:\n\nThe slash-command checklist for docs as contract calls out:\n\n> Doc comments that describe what the function does at the implementation level rather than what callers should rely on.\n\nPlus the duplication itself is a maintenance hazard: a future refactor that changes revocation handling on the slow path (PKIX-sqek.1's AIA-augmented chain reassembly) updates one docstring and not the other; the contract diverges silently. Callers reading verify_chain see one rule, callers reading verify_one see another.\n\nOPTIONS:\n\n(a) **Single source of truth.** Have verify_one's rustdoc say only \"Revocation coverage is identical to [`verify_chain`]; see that function for details.\" Delete the bullet list. One place to update if the contract changes.\n\n(b) **Make verify_chain a thin wrapper that points at verify_one** (which is the actual implementation per line 397). The crate-level rustdoc at lines 65-66 already says \"The free function [`verify_chain`] is a thin wrapper around [`Verifier::verify_one`]; both are zero-cost over the other.\" Have verify_chain's rustdoc point at verify_one for the substantive contract; remove the duplication on the wrapper.\n\n(c) **Status quo.** Accept the duplication. Acceptable if you want each function's rustdoc to be self-contained for inline browsing.\n\nFiled as P4 with opinion label per the slash-command instructions: this is a readability/maintenance preference, not an engineering risk that surfaces today. The \"future divergence\" scenario is real but speculative. Bikeshedding territory.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.33",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Verifier::verify_one docstring duplicates verify_chain's Revocation coverage section; future divergence risk",
+  "updated_at": "2026-05-14T18:13:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:13:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "evidence_uri: Option<String> on Deviation; flows to DeviatedFinding; 2 tests",
+  "closed_at": "2026-05-06T19:52:24Z",
+  "compaction_level": 0,
+  "content_hash": "d39e6f216aaaae4d4f7cda84fd0cfbd0bf5f9a2156c04d1587a4c3142175ddcb",
+  "created_at": "2026-05-06T19:50:15Z",
+  "created_by": "Mark Atwood",
+  "description": "Add optional evidence_uri: Option<String> to Deviation. This field carries a URI pointing to the backing waiver document (e.g. file:///var/lib/agency-x-pki/waivers/2025-11-03.pdf or https://...). It is optional and backward compatible. When present, it appears in DeviatedFinding output so operators can click through to the justification document.",
+  "ephemeral": 0,
+  "id": "PKIX-3c5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: add evidence_uri to Deviation struct",
+  "updated_at": "2026-05-06T19:52:24Z"
+}

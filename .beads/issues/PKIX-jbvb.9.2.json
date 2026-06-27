@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "91cbabb87f694be1352dda355ab06fa795f60c10c8a078941e66f8b36525474c",
+  "created_at": "2026-05-14T02:39:44Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nMultipurpose-generation sibling to `SmimeMailboxValidated` (the renamed\n`SmimeProfile`, post PKIX-jbvb.9.1). Per CA/B Forum S/MIME BR \u00a77.1.2.3(f)\nEKU rules and \u00a77.1.6.1 reserved OIDs: Multipurpose certs assert policy\nOID `2.23.140.1.5.1.2` and permit `emailProtection` plus additional EKU\nvalues (for document-signing crossover).\n\n## API shape\n\n```rust\n/// CA/Browser Forum S/MIME Baseline Requirements \u2014 Mailbox-validated\n/// profile (Multipurpose generation).\n///\n/// Reference, not authoritative. See crate-level rustdoc.\n///\n/// Asserts policy OID `2.23.140.1.5.1.2` (\u00a77.1.6.1 / Appendix A).\n/// Permits additional EKU values beyond `emailProtection` per \u00a77.1.2.3(f)\n/// Multipurpose row.\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]\npub struct SmimeMailboxValidatedMultipurpose;\n\nimpl Profile for SmimeMailboxValidatedMultipurpose {\n    fn id(&self) -> &'static str { \"cabf.smime.mailbox.multipurpose\" }\n    fn version(&self) -> &'static str { \"1.0.14\" }\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // Baseline of SmimeMailboxValidated, with:\n        // - required_leaf_policy_oids: [2.23.140.1.5.1.2]\n        // - EKU: still requires emailProtection, but does not constrain\n        //   the EKU set to emailProtection-only (Strict has the stricter\n        //   constraint; Multipurpose does not).\n        // - same 825d cap, same SAN rules, same algs, same RSA min\n    }\n}\n\npub const fn smime_mailbox_multipurpose_policy(now_unix: u64) -> ValidationPolicy { ... }\n```\n\n## Subject DN rule\n\nPer \u00a77.1.4.2.3 (Mailbox-validated table) Multipurpose column: same as\nStrict \u2014 minimal DN, organizationName SHALL NOT, all tier-distinguishing\nattributes SHALL NOT.\n\n`required_leaf_subject_dn_attrs` stays `None` (no DN-attribute rule for\nthis tier). Same as `SmimeMailboxValidated`.\n\n## OID constant\n\nAdd `CABF_SMIME_MAILBOX_VALIDATED_MULTIPURPOSE_POLICY` =\n`ObjectIdentifier::new_unwrap(\"2.23.140.1.5.1.2\")`.\n\n## Test fixture\n\nModeled after zlint's `smime_mp1_mv_eff1.pem` if it exists; otherwise\ngenerate `smime-mailbox-multipurpose-self-signed-365d.der` via\nextension to `gen-smime-tier-fixtures.py`. Same self-signed-anchor\npattern as the other tier fixtures.\n\n## Acceptance\n\n- `SmimeMailboxValidatedMultipurpose` ships and impls `Profile`.\n- `smime_mailbox_multipurpose_policy(now_unix)` free function alias.\n- Reference-not-authoritative rustdoc disclaimer matches other types.\n- `id()` returns `\"cabf.smime.mailbox.multipurpose\"`.\n- `required_leaf_policy_oids` set to `[2.23.140.1.5.1.2]`.\n- Test fixture cross-validates pass with this profile, fail with the\n  Strict sibling (`SmimeMailboxValidated`).\n- CHANGELOG entry under `[Unreleased]`.\n- `divergences.md` updated.\n- `cargo test -p pkix-profiles-cabf --all-features` passes.\n- `cargo clippy ... -D warnings` clean.\n\n## Blocks on\n\n- **PKIX-jbvb.9.1** \u2014 Mailbox Strict rename must land first so this\n  ships under the correct sibling name.\n\n## Cross-references\n\n- PKIX-jbvb.9 (epic)\n- PKIX-jbvb.9.1 (Strict rename, blocks this)\n- PKIX-jbvb.7 (Sponsor/Individual Strict \u2014 naming pattern template)\n- specs/cabforum-smime-BR.md \u00a77.1.6.1, \u00a77.1.2.3(f), \u00a77.1.4.2.3\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeMailboxValidatedMultipurpose profile + fixtures",
+  "updated_at": "2026-05-14T02:39:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:39:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T19:39:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

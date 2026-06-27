@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6869cc1a5f70f705f674cd40f7c1e8bc1ea994dcf2b7575d6642b7d6c3b7e105",
+  "created_at": "2026-05-14T16:01:26Z",
+  "created_by": "Mark Atwood",
+  "description": "The six public functions exported under the oscal feature take or return serde_json::Value directly:\n\n  pkix-lint/src/oscal/emit.rs:99    pub fn assessment_results(report: &EvaluationReport) -> Value\n  pkix-lint/src/oscal/emit.rs:442   pub fn risks_from_store(store: &DeviationStore) -> Vec<Value>\n  pkix-lint/src/oscal/parse.rs:547  pub fn deviation_store_from_risks(value: &Value) -> Result<DeviationStore, ParseError>\n  pkix-lint/src/oscal/parse.rs:889  pub fn lint_ids_from_catalog(value: &Value) -> Result<Vec<String>, ParseError>\n  pkix-lint/src/oscal/catalog.rs:101 pub fn catalog_from_lints(lints, catalog_id, catalog_version) -> Value\n  pkix-lint/src/oscal/profile.rs:203 pub fn resolve_profile(profile: &Value, sources: &HashMap<String, Value>) -> Result<ResolvedProfile, ParseError>\n\nThis pins serde_json's major version (currently 1.x, stable for years but not zero-risk) into pkix-lint's public oscal-feature API. A hypothetical serde_json 2.0 forces every pkix-lint consumer using the oscal feature to coordinate the upgrade. The coupling is gratuitous \u2014 pkix-lint does not expose a JSON-DOM-shaped API for any reason intrinsic to its model.\n\nCALLER IMPACT:\n\nToday, a caller writing:\n  let assessment = pkix_lint::oscal::emit::assessment_results(&report);\n  serde_json::to_string_pretty(&assessment)?\n\ndepends on `assessment: serde_json::Value`. If pkix-lint and the caller end up with different serde_json majors due to MSRV, dep-tree resolution, or a transitive bump, the type stops unifying and compilation breaks.\n\nA caller wanting to use jiff_json (hypothetical) or sonic_rs as their JSON layer cannot \u2014 they must serialize the pkix-lint Value first and reparse, which defeats the point.\n\nARCHITECTURAL ANGLE: Per AGENTS.md non-negotiable #6, pkix-lint's public surface must \"remain possible to cache\" and \"be Send+Sync.\" serde_json::Value satisfies both today, but the wider problem \u2014 pkix-lint's API stability depends on a third-party crate's API stability \u2014 is exactly what the framework-not-policy non-negotiable #5 wants to avoid.\n\nREMEDIATION OPTIONS:\n\n1. Return String / &str / Vec<u8> from emit functions; accept &str / &[u8] in parse functions. Internal serde_json work happens entirely inside pkix-lint. Callers depend on whatever JSON layer they want.\n   - Slight perf cost on the emit side (re-serialize) but the OSCAL output is already serialized for almost every caller use case (writing to disk, transmitting, etc.).\n   - Standard pattern for crates that want to control their own dependency surface.\n\n2. Wrap serde_json::Value in opaque newtypes:\n   pub struct OscalAssessmentResults(serde_json::Value);\n   pub struct OscalCatalog(serde_json::Value);\n   pub struct OscalProfile(serde_json::Value);\n   pub struct OscalRisks(serde_json::Value);\n   with .as_value() / .to_string() / .from_str() methods. Callers pass these around; pkix-lint absorbs any serde_json major bump internally by changing only the .as_value() method.\n   - Preserves the zero-copy \"build JSON DOM then serialize once\" pattern.\n   - Pre-1.0 free if added now.\n\n3. Document the serde_json major-version pin commitment explicitly and accept it. This is the cheapest option but ties pkix-lint to serde_json forever \u2014 a real cost the maintainer should make deliberately, not by default.\n\nOption 2 (opaque newtype) is the highest-flexibility / lowest-friction choice. It costs ~30 lines per type and produces no caller-visible behavioral change.\n\nCASCADE: This finding is structurally identical to PKIX-7f92.7 (rfc_section_id/rfc_url) but at the module-API scale rather than the trait-method scale. Same fix pattern (typed wrapper, deprecation alias if needed).",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "serde_json::Value leaks through 6 public OSCAL APIs (assessment_results, risks_from_store, deviation_store_from_risks, lint_ids_from_catalog, catalog_from_lints, resolve_profile); serde_json major-version pinned into pkix-lint public surface",
+  "updated_at": "2026-05-14T16:56:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:01:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6f027ee6561188299a9be27d0756ae712aa453446a8ae90df378fa7272e0749b",
+  "created_at": "2026-05-14T08:02:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Follow-up to PKIX-tit4.4 (option (c) doc-correction shipped). The remaining question is whether the workspace's IoFailure { kind, message } shape (PKIX-2l0v.1 D3) is the right wire form long-term, or whether one of two stronger options should be taken pre-1.0:\n\n(a) Replace format!(\"{:?}\", kind) with a hand-maintained u8/string match table. New std::io::ErrorKind variants become a maintenance task on each stdlib bump; no silent lossy round-trip in practice (consumers without the entry emit/decode a sentinel that survives without losing fidelity).\n\n(b) Drop the typed kind field entirely. IoFailure becomes { message: String }. Callers needing programmatic kind branching can grep the message or upgrade their oracle.\n\n(c) [shipped via PKIX-tit4.4] Keep Debug-of-ErrorKind, but disclose the brittleness honestly in rustdoc. Currently in tree.\n\nWorkspace-level: PKIX-2l0v.1 D3 picked the { kind, message } shape; pkix-aia and pkix-truststore both follow it. Reversing to (b) is a workspace-wide breaking change. Decision wants human input because: pre-1.0 framing argues for design closure but D3 IS the design closure, and (a)/(b) reverse it. Recommendation if no human pushback within 24h: stay at (c). Cross-references PKIX-tit4.5 (which raises the question of whether IoFailure should be lifted to pkix-path); a (b) decision here would moot tit4.5 partially.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.28",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "IoFailure wire form: decide between Debug-of-ErrorKind (current), hand-maintained u8 table, or drop kind entirely",
+  "updated_at": "2026-05-14T08:02:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T01:02:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

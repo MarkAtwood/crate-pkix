@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:59Z",
+  "compaction_level": 0,
+  "content_hash": "097b4d7915b6ea3b153895d61426f39c76087f810b357e65b965120c6ed1c463",
+  "created_at": "2026-05-06T22:16:49Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:271-327: rsa_modulus_byte_len, der_peel_tlv, der_tlv_value_len, parse_der_length implement manual DER parsing to measure the RSA modulus. pkix-path/src/lib.rs:1813: rsa_public_key_bits is a private function doing essentially the same job using UintRef from the der crate. The lint uses raw byte counting (n_bytes >= 256) while pkix-path uses magnitude bytes (produces 2048 for a 2048-bit key). Having two implementations is a maintenance burden: any fix to the comparison logic must be applied in two places. Suggested: expose rsa_public_key_bits as pub(crate) or as a pub function in a pkix-crypto-util crate, then use it from both sites.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "rsa_public_key_bits in pkix-path is private and returns bits; cabf_tls_br needs bytes and different semantics. Could expose as pub, but adds public surface. Deferred.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cabf_tls_br.rs duplicates RSA modulus parsing; pkix-path already has rsa_public_key_bits",
+  "updated_at": "2026-05-06T22:29:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

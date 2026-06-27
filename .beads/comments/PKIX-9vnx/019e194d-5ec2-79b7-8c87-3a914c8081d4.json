@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T23:09:21Z",
+  "id": "019e194d-5ec2-79b7-8c87-3a914c8081d4",
+  "issue_id": "PKIX-9vnx",
+  "text": "do-beads autonomous loop hygiene 2026-05-11: all autonomous descendants of this epic are closed. Architectural decisions ratified (Arch 2 / PKIX-ztmr, AGENTS.md non-negotiable #5). Serializers shipped (.3 Assessment Results emit, .4 Finding+Observation emit, .5 Risk emit, .10 Risk parse round-trip, .11 DeviationScope props-bag refactor). Lint-as-Control shipped (.6 via .6.1/.6.2/.6.3/.6.4). Profile composition via OSCAL Profile semantics shipped (.7). AGENTS.md updated (.8). Sole remaining open descendant: PKIX-9vnx.9.2 (transitively, via PKIX-9vnx.9 -> PKIX-9vnx.9.2), human-labeled pending workspace-dep design call (adding pkix-lint as a dep of pkix-profiles + pkix-profiles-cabf). Umbrella has no autonomous frontier; relabeling human so the do-beads loop stops surfacing it every session. Re-evaluate when PKIX-9vnx.9.2 resolves."
+}

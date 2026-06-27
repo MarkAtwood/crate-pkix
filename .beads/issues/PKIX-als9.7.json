@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T032340Z-4081086",
+  "close_reason": "Extracted check_issuer_linkage helper (RFC 5280 \u00a76.1.3(a)(2)). working_issuer_is_san_identity assignment remains in chain_walk per design \u00a77 critical preservation requirement (verified at line 3252). All 262 tests pass.",
+  "closed_at": "2026-05-11T04:12:46Z",
+  "compaction_level": 0,
+  "content_hash": "420c7f1c54194067780592046a635135aba269e74f22c1c7a1a3b12fbdc06503",
+  "created_at": "2026-05-08T05:43:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.3(a)(2) DN linkage / SAN-identity exception check (lines 2154\u20132166) into `pub(crate) fn check_issuer_linkage(cert: &Certificate, working_issuer_name: &Name, working_issuer_is_san_identity: bool, index: usize) -> Result<()>`.\n\n## Risk\n\nLow \u2014 but with a critical preservation requirement.\n\n## CRITICAL note (PKIX-als9 design \u00a77)\n\nThe assignment `working_issuer_is_san_identity = cert_has_san_identity(cert)` (line 2666) MUST stay in chain_walk, NOT move into the helper. PKITS does NOT test SAN-identity propagation across multiple intermediates. If the assignment moves, the \u00a74.2.1.6 SAN-identity exception breaks silently for chains where the issuer (not the leaf) uses SAN.\n\n## Acceptance\n\n- New helper.\n- chain_walk calls helper at the existing call point.\n- Code review confirms `working_issuer_is_san_identity` assignment remains in chain_walk loop body.\n- Tests + clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "als9: H5 \u2014 extract check_issuer_linkage (~7 lines, \u00a76.1.3(a)(2) DN linkage)",
+  "updated_at": "2026-05-11T04:12:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:43:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

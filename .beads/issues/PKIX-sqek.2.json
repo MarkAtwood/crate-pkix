@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:30Z",
+  "compaction_level": 0,
+  "content_hash": "7eec46872f38a41b0b188703c34c89f34ede585bd4d44cea16e39a1af54d4ef9",
+  "created_at": "2026-05-14T17:58:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-aia/src/lib.rs documents AiaError::MalformedCertificate(String) as: 'Fetched bytes did not parse as a DER-encoded X.509 certificate. The inner `String` is an adapter-side diagnostic suitable for logging.' (lines 153-160). The variant's intent is to carry a parse-error description like 'expected SEQUENCE got SET' (per its own test at line 712).\n\nIn pkix-chain/src/lib.rs line 671-672, the chain-build slow path constructs:\n\n    last_aia_error = Some(pkix_aia::AiaError::MalformedCertificate(uri.clone()));\n\n\u2026stuffing the URI into the diagnostic field instead of the parse error from <Certificate as der::Decode>::from_der(&der). The der::Error is discarded.\n\nThis is then encoded into the public test contract in tests/aia_chain_build.rs::aia_fetch_returns_garbage_surfaces_malformed_certificate (lines 286-288):\n\n    pkix_chain::Error::Aia(AiaError::MalformedCertificate(uri)) => {\n        assert_eq!(uri, \"http://example.test/intermediate.der\");\n    }\n\n\u2026locking in the misuse.\n\nCONSEQUENCES:\n1. The variant's documented contract is violated. Adapters that return MalformedCertificate themselves (the pkix-aia docs even point at 'adapter-side diagnostic') will produce a value that means something different from what pkix-chain produces. A caller cannot disambiguate.\n2. The actual root-cause der::Error is silently dropped. Debugging 'why did this CA's intermediate fail to parse' becomes impossible from the error alone \u2014 the user only knows WHICH URI failed (which they already provided), not WHY the bytes were bad.\n3. The Display impl produces 'AIA-fetched bytes did not parse as a certificate: http://example.test/intermediate.der' which is nonsensical \u2014 the URI isn't the diagnostic.\n\nFIX: Either (a) extend AiaError with a new variant like Aia(MalformedFetchedCertificate {uri, parse_error_display}); or (b) fix pkix-chain to put the actual der::Error.to_string() in the inner String and surface the URI separately (e.g. via the Error::Aia wrapper carrying a URI alongside the inner AiaError); or (c) document the field reuse and accept the per-adapter ambiguity. The current state \u2014 adapter docs say 'parse diagnostic', chain-build uses it as 'URI' \u2014 is incoherent.\n\nThe pkix-aia test at line 712 ('expected SEQUENCE got SET') and the pkix-chain test at line 287 ('http://example.test/intermediate.der') asserting DIFFERENT semantics on the same variant inner is the smoking gun.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AiaError::MalformedCertificate variant repurposed to carry URI instead of parse diagnostic",
+  "updated_at": "2026-06-04T19:32:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:58:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

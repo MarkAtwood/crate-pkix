@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:24:59Z",
+  "compaction_level": 0,
+  "content_hash": "62efde0628ccbb3e64eadc0275c6f9ac82c8832e43ef54d54c76ba38f760a650",
+  "created_at": "2026-05-11T07:16:39Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nIn pkix-difftest/src/corpus/pkits.rs, when loading a PKITS testcase, also load the CRLs referenced by the cert chain and populate Chain.crls.\n\n## What\n\n- PKITS testcase loader currently extracts the chain certs.\n- PKITS test vectors (vectors.json or vector.json depending on PKITS version) include a 'crls' list per testcase. Loader must:\n  - Read the CRL filenames from the testcase metadata.\n  - Load each as DER from pkix-difftest/.../pkix-path/tests/pkits/crls/<name>.crl.\n  - Set chain.crls = vec_of_der.\n- If the PKITS test corpus doesn't list CRLs per testcase, infer them from the chain (one CRL per CA cert's DN match). Fall back to walking pkits/crls/ if needed.\n\n## Acceptance\n\n- [ ] PKITS loader populates Chain.crls when CRLs are referenced by the testcase.\n- [ ] Existing testcases without CRLs still load with chain.crls.is_empty().\n- [ ] At least one PKITS \u00a74.4 testcase ends up with chain.crls non-empty.\n\n## Depends on\n\nPKIX-emf1.1.\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS corpus loader: thread CRL bytes through Chain",
+  "updated_at": "2026-05-11T07:24:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:38Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T00:17:04Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

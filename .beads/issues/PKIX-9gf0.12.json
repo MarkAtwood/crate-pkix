@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:10:51Z",
+  "compaction_level": 0,
+  "content_hash": "7df886d615eb1f945fbacc85c1ffe1ae800da5ab3839e2cf0d808042726a8e29",
+  "created_at": "2026-05-07T16:10:50Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:206-209 \u2014 the DFS base case checks only names_match to terminate at a trust anchor:\n  `for anchor in anchors { if pkix_path::names_match(&anchor.subject, &current_issuer) { return Ok(true); } }`\n\nThis means build_path can return a 'found' path where the last cert's issuer happens to match a trust anchor name, but the signature was NOT verified. This is intentional: the doc says 'Signatures are not verified here; that is the responsibility of the caller via validate_path.'\n\nHowever, there is a subtle security issue: if the pool contains a cert issued by a rogue CA whose name matches a trust anchor, build_path will include it in the candidate path. The caller passes it to validate_path, which will then fail signature verification. This is not a security bug because validate_path is the authoritative checker.\n\nBUT: build_path could also return a path terminating at the wrong anchor if there are two anchors with the same name (key rollover). It picks the first name-matching anchor without checking which one actually signed the chain. validate_path tries each anchor, so it will still work correctly.\n\nNo security bug. The doc contract is clear. Not filing.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder dfs: anchor name-match without signature verification may accept wrong path",
+  "updated_at": "2026-05-07T16:10:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:10:50Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

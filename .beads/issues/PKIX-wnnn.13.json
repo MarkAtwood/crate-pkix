@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "095352acba1469c8689840dc91b5e2571f620390b39babd986b8c35a563905e4",
+  "created_at": "2026-05-14T18:30:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/tests/bettertls.rs:78-87 \u2014 Observed::to_json formats string fields via Rust's Debug ({:?}) which differs from JSON encoding in edge cases: Rust escapes non-ASCII as \\u{XXXX} (curly braces), JSON requires \\uXXXX (no braces); tabs are \\t in both but other control chars diverge. The baseline-pkix-path.json file is labeled as JSON but is parsed by load_baseline (line 234-280) with a hand-rolled brace-matching scanner that does not verify JSON syntax. The round-trip works because the SAME Debug-rendering is used to write and to read (each line's stored value is compared byte-for-byte). It will not work if anyone opens the file in a JSON tool and re-writes it (e.g., `jq . file > file` to format). The mislabeling is documented (line 240-243 calls out the hand-rolled scan rationale) but worth fixing to use proper JSON escaping. Suggested fix: a tiny json_escape helper, or accept the labeling mismatch and rename the file to .baseline-pkix-path.txt \u2014 at least then nobody passes it through jq. Minor; the test works as-is. Calling it out so future debugging doesn't waste time wondering why jq corrupts the baseline.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Observed::to_json uses Debug-quoting via {:?}, breaks if reasons contain unicode escapes or control chars",
+  "updated_at": "2026-05-14T18:30:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

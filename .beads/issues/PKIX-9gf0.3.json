@@ -1,0 +1,30 @@
+{
+  "closed_at": "2026-05-07T16:09:09Z",
+  "compaction_level": 0,
+  "content_hash": "74c5cbe0a58aeffeadc0fef6e89957991e045e6ce5649e59e51122481c894876",
+  "created_at": "2026-05-07T16:09:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2562-2571 \u2014 the \u00a76.1.5(b) post-loop block only clamps explicit_policy from the leaf's PolicyConstraints:\n  `if let Some(req) = pc.require_explicit_policy { explicit_policy = explicit_policy.min(req); }`\n\nRFC 5280 \u00a76.1.5(b) says: 'If a policy constraints extension is included in the certificate and requireExplicitPolicy is present and has a value of 0, set the explicit-policy state variable to 0.' This only cites explicit_policy \u2014 NOT inhibit_policy_mapping.\n\nHowever, \u00a76.1.5 also includes: '(c) Assign the intersection of the valid_policy_tree ...' but does NOT say to clamp inhibit_any or policy_mapping from the leaf cert's PolicyConstraints. This is correct as written.\n\nBUT: the code also does NOT decrement inhibit_any and policy_mapping in \u00a76.1.5(a) for the leaf even though RFC \u00a76.1.5(a) says to do so for non-self-issued certificates. The code at line 2555-2558 only decrements explicit_policy. Looking at the comment: 'Per \u00a76.1.5(a): RFC also decrements inhibit_any and policy_mapping here, but neither is read after \u00a76.1.5(a) in our implementation.' \u2014 this is intentional and documented as a known omission since neither is tested afterward. Not a bug.\n\nWithdrawing.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RFC 5280 \u00a76.1.5(b): leaf PolicyConstraints not applied to policy_mapping counter",
+  "updated_at": "2026-05-07T16:09:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:09:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

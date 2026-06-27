@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "cargo check passes; pkix_chain::DefaultVerifier resolves; verify_chain_default is callable without a verifier argument; clippy -D warnings passes.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T07:01:46Z",
+  "compaction_level": 0,
+  "content_hash": "7db66fa5da67428e3687c1be91b64a3b75451f6fbd268cda8cca94d8664d1bf0",
+  "created_at": "2026-05-02T06:02:15Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Make pkix-chain::verify_chain usable without requiring callers to construct a SignatureVerifier by providing a default RustCrypto-backed verify_chain_default() function and re-exporting DefaultVerifier from pkix-chain.\n\nBLOCKED BY: PKIX-8wg (DefaultVerifier must exist in pkix-path), PKIX-m49 (pkix_chain::Error must exist).\n\n**Algorithm:**\n1. In pkix-chain/src/lib.rs, add re-export: pub use pkix_path::DefaultVerifier;\n2. Add a convenience function:\n   pub fn verify_chain_default<R>(\n       chain: &[Certificate],\n       anchors: &[TrustAnchor],\n       policy: &ValidationPolicy,\n       revocation: &R,\n   ) -> Result<ValidatedPath>\n   where R: RevocationChecker\n   {\n       verify_chain(chain, anchors, policy, &DefaultVerifier, revocation)\n   }\n   This function is gated: only available when pkix-path's default/rustcrypto features are active.\n3. Update pkix-chain crate docs to show verify_chain_default in the quick-start example.\n4. No other changes \u2014 verify_chain itself stays generic.\n\n**Defensive programming rules:**\n- verify_chain_default must not add any new error paths beyond what verify_chain already has.\n- No unwrap() anywhere.\n- The DefaultVerifier re-export must be feature-gated consistently with its definition in pkix-path.\n\n**Subagent instructions:**\nSingle subagent. Read pkix-path/src/lib.rs to confirm DefaultVerifier's feature gate before writing the re-export and wrapper. Then implement.\n\n**Tests:**\n- test_verify_chain_default_compiles: confirm that calling verify_chain_default with a real chain, real anchors, real policy, and NoRevocation compiles without requiring a verifier argument. Oracle: compile success. NOTE: since validate_path is todo!() until PKIX-h6z, this test will panic at runtime; mark with #[ignore] until h6z is closed.\n- test_default_verifier_reexport: import pkix_chain::DefaultVerifier; confirm it is the same type as pkix_path::DefaultVerifier (they are the same type). Oracle: type identity.",
+  "ephemeral": 0,
+  "id": "PKIX-jws",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: wire DefaultVerifier into verify_chain and re-export",
+  "updated_at": "2026-05-02T07:01:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:02:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8wg",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:02:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m49",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

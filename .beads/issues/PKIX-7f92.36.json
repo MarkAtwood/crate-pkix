@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "cc8e0b34ccb6a991020bc23f1959b03ea8f08961d340908d2628725945a47322",
+  "created_at": "2026-05-14T16:03:05Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1394 \u2014 apply_parameter_overrides doc describes the atomic clone-and-swap contract (already flagged as PKIX-7f92.19) but does not document two edge cases that callers writing wrapper code need to know:\n\n1. EMPTY-INPUT BEHAVIOR:\n   What does apply_parameter_overrides(&mut self, &[]) do?\n   The implementation returns Ok(()) (no-op), but the doc doesn't say so.\n   A caller writing if !overrides.is_empty() { runner.apply_parameter_overrides(overrides)?; } would do that defensively just in case.\n\n2. DUPLICATE param_id BEHAVIOR:\n   If overrides contains [(\"lint-foo\", \"val1\"), (\"lint-foo\", \"val2\")] for the same lint+param combo, what happens?\n   The implementation applies them in supplied order (so \"val2\" wins). But the doc doesn't say this. A caller wanting deterministic deduplication has to read the source.\n\n3. SAME lint_id, DIFFERENT param_id, MIXED VALID/INVALID:\n   The doc's atomicity claim covers the all-fail case clearly. But what about [(\"lint-a\", \"valid\"), (\"lint-a\", \"invalid\")]? The all-fail rule applies \u2014 but does the function detect ALL errors before failing, or short-circuit on the first?\n   The implementation short-circuits (see the apply loop). The doc does not say.\n\nCALLER IMPACT: A caller building override resolution from OSCAL Profile imports (the natural use case) ends up with overrides that may contain duplicates from multiple imports or programmatic deduplication. They need to know whether to pre-dedupe themselves or rely on apply_parameter_overrides's semantics.\n\nREMEDIATION: Add a clear contract section:\n\n  /// # Behavior\n  ///\n  /// - Empty `overrides` is a successful no-op (`Ok(())`).\n  /// - Duplicate `(param_id, value)` entries for the same lint+param are applied\n  ///   in supplied order \u2014 the last value wins.\n  /// - On the first invalid override, the entire call returns `Err(...)` and\n  ///   the runner state is unchanged (atomic clone-and-swap).\n  /// - Validation is not exhaustive: only the first failing override is\n  ///   reported. Callers wanting all errors must pre-validate via a Profile-\n  ///   side validator.\n\nPre-1.0 free.\n\nSuggested label suffix: underspecified.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.36",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner::apply_parameter_overrides empty-input and duplicate-param_id behavior undocumented; callers cannot tell whether empty is no-op or whether duplicates apply in supplied order, reverse order, or error",
+  "updated_at": "2026-05-14T16:03:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:03:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced make_ascii_lowercase with str::to_lowercase (Unicode-aware default case mapping per Unicode 15.1) on both sides of the issuer-DN-substring matcher: DeviationStore::add (store-side normalization) and DeviationScope::matches (cert-side normalization). Non-ASCII characters (accented Latin like '\u00fc', CJK kana, etc.) now fold consistently. Updated the issuer_dn_contains rustdoc to remove the misleading ASCII-only warning and document the new Unicode behavior. Two regression tests: case_folding_is_unicode_aware_for_store_normalization (verifies stored substring after M\u00dcLLER->m\u00fcller via add) and case_folding_is_unicode_aware_via_to_lowercase (independent oracle confirming std::str::to_lowercase behavior matches the documented Unicode default casing rule; this is the oracle that would catch a Rust-std semantic change). The per-match allocation cost is acknowledged in the rustdoc with a caller-side caching recommendation. 256 lib tests + 7 doc tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:39:07Z",
+  "compaction_level": 0,
+  "content_hash": "7fe0d0b21829b1ec5005fcc245ab51be52fe8459a1feb0d593ae16e98873b78c",
+  "created_at": "2026-05-14T12:40:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: deviation.rs:445-459 + 684-692. DeviationStore::add normalizes the substring with make_ascii_lowercase, and DeviationScope::matches normalizes the cert issuer DN string the same way. Doc on issuer_dn_contains warns 'case folding uses make_ascii_lowercase(), which only folds ASCII. Non-ASCII DN components (accented letters, CJK, etc.) are left unchanged. For non-ASCII issuer DNs, use issuer_dn_exact.' Scenario: operator writes a deviation scoped 'agency m\u00fcller ca' (lowercase) against a cert whose issuer DN to_string() produces 'CN=Agency M\u00fcller CA, ...'. The cert side make_ascii_lowercase produces 'cn=agency M\u00fcller ca' (\u00fc unchanged). 'm\u00fcller' substring match against 'M\u00fcller' fails because the '\u00fc' inside 'M\u00fcller' wasn't folded. Maintenance consequence: silent no-match. The deviation appears to be installed (DeviationStore::add succeeds) and active (effective dates match), but never fires. Operator escalates to maintainer asking why the waiver isn't being applied. This shows up first with EU government CAs (Bundesdruckerei, Caisse des D\u00e9p\u00f4ts, etc.) and is invisible in test corpora that are mostly ASCII. Fix: use unicode_case_mapping or a proper Unicode lowercase implementation. The 'use issuer_dn_exact' workaround is documented but no part of the code points users to it when their match silently fails.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "issuer_dn_contains uses ASCII-only case folding, silently produces wrong matches for non-ASCII DNs",
+  "updated_at": "2026-05-14T13:39:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

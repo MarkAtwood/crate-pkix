@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9de87d53ae6837d05218627b7e1ef8c19078f20e6802cf42559ca31533877755",
+  "created_at": "2026-05-11T04:45:01Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-xj81 decomposition, pattern 4 of 6. Pool admits two same-length valid\npaths from EE to anchor. Document the deterministic tiebreak contract and\ntest it.\n\n## What\n\nPool topology:\n\n```\nStressRoot \u2500\u2500 signs \u2500\u2500 IntermediateA \u2500\u2500 signs \u2500\u2500 PathChoiceEE\nStressRoot \u2500\u2500 signs \u2500\u2500 IntermediateB \u2500\u2500 signs \u2500\u2500 PathChoiceEE\n```\n\n(Same EE, dual issuers \u2014 only possible if EE is signed by two issuers, i.e.\ntwo separate EE certs with the same DN + SPKI, each signed by a different\nintermediate. So the fixture actually has PathChoiceEE-A and PathChoiceEE-B\nthat share subject DN + SPKI; the build is from any one of them.)\n\nActual fixture:\n\n```\nStressRoot \u2500\u2500 signs \u2500\u2500 IntermediateA (SKI=keyA)\nStressRoot \u2500\u2500 signs \u2500\u2500 IntermediateB (SKI=keyB)\nIntermediateA \u2500\u2500 signs \u2500\u2500 PathChoiceEE_A (AKI=keyA, same SPKI as B)\nIntermediateB \u2500\u2500 signs \u2500\u2500 PathChoiceEE_B (AKI=keyB, same SPKI as A)\n```\n\n(Two EE certs with the same subject DN and SPKI but signed by different\nintermediates; AKI distinguishes them. PKIX-yn3e behaviour means the AKI\nhint determines which intermediate is tried first.)\n\nBuild steps:\n\n1. Generator issues five DER fixtures.\n2. Test (`tests/path_disambiguation.rs`):\n   - For PathChoiceEE_A with AKI=keyA: `build_path` must return a chain\n     containing IntermediateA, not IntermediateB. Verify via SKI bytes.\n   - For PathChoiceEE_B with AKI=keyB: `build_path` must return IntermediateB.\n   - When AKI is absent (third EE variant, but no AKI), document the\n     observed tiebreak (pool-insertion order today) in the test as a\n     pinned contract.\n\n## Acceptance\n\n- [ ] Five+ DER fixtures committed.\n- [ ] Generation reproducible via `generate.sh`.\n- [ ] Three integration tests pinning the tiebreak behaviour.\n\n## Depends on\n\nPKIX-xj81.1.",
+  "ephemeral": 0,
+  "id": "PKIX-xj81.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: multiple-valid-paths disambiguation fixture+test",
+  "updated_at": "2026-05-11T04:45:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:45:00Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:45:30Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-xj81.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

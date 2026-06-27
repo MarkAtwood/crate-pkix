@@ -1,0 +1,21 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:15:05Z",
+  "compaction_level": 0,
+  "content_hash": "b1aeadd089d26016a10fd104fe0c9989b672f8bcfc62bc7851facc7dc216b66e",
+  "created_at": "2026-05-06T17:08:44Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-t4s",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss-pass2: commits ddb474d6..66eb8531",
+  "updated_at": "2026-05-06T17:15:05Z"
+}

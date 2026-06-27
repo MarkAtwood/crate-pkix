@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T19:15:42Z",
+  "compaction_level": 0,
+  "content_hash": "ae977dc8aa6cfe3bc0fcc8fb488ee8297332005bea831116b0038fb02dd42f16",
+  "created_at": "2026-06-15T19:06:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-identity/src/lib.rs: `ServerName` and `MailboxName` gained `FromStr` impls (lines 310-315, 470-476) but have no `Display` impl. This violates the Rust convention that `FromStr` and `Display` are a matched pair \u2014 if you can parse a string into a type, you should be able to format the type back to a string. Without `Display`, callers cannot log or display these types without reaching into the internal structure via accessors. The types are public and cache-friendly (they derive `Serialize`), so they will appear in diagnostic contexts.\n\nSuggested fix: implement `Display` for both. `ServerName` should print the DNS name or IP literal; `MailboxName` should print `local@domain`.",
+  "ephemeral": 0,
+  "id": "PKIX-q5t0.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ServerName and MailboxName implement FromStr but not Display",
+  "updated_at": "2026-06-15T19:15:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:06:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q5t0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

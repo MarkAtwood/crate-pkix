@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.53",
+  "title": "docs.rs metadata inconsistent: pkix-chain-simple missing all-features",
+  "description": "pkix-chain-simple's Cargo.toml package.metadata.docs.rs section has only rustdoc-args but is missing all-features = true:\n\n  [package.metadata.docs.rs]\n  rustdoc-args = [\"--cfg\", \"docsrs\"]\n\nEvery other crate in the workspace that has a package.metadata.docs.rs section includes both:\n\n  [package.metadata.docs.rs]\n  all-features = true\n  rustdoc-args = [\"--cfg\", \"docsrs\"]\n\npkix-chain-simple has no optional features currently (default = []), so the omission has no practical effect today. But if features are added later, the docs.rs build will not enable them, causing feature-gated items to be missing from the published docs. The inconsistency with every other crate in the workspace creates a maintenance trap.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-chain-simple/Cargo.toml line 24",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:24Z",
+  "updated_at": "2026-06-15T17:03:27Z",
+  "closed_at": "2026-06-15T17:03:27Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:24"
+    }
+  ]
+}

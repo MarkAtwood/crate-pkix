@@ -1,0 +1,30 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ed827a221d271b2191b8bce54d26e74b4da0c627d81a0e2aac1418de50cc6773",
+  "created_at": "2026-05-06T16:51:54Z",
+  "created_by": "Mark Atwood",
+  "description": "File: pkix-revocation/tests/pkits_crl.rs:391-408, 505-520, 530-545\\n\\nThree tests (pkits_4_14_3, pkits_4_14_8, pkits_4_14_9) are marked #[ignore] because CDP/IDP name matching is not implemented. However, inside each ignored test body, there is:\\n    assert!(result.is_err(), ...)\\nThis assertion will NEVER run (the test is ignored). If the feature is eventually implemented and the #[ignore] is removed, the assertion will execute \u2014 but the test is also currently documenting the DESIRED behavior, which is correct.\\n\\nThe real issue: the tests do not verify the CURRENT behavior (that the checker returns Ok() for non-revoked certs when CDP/IDP matching is unimplemented). A developer removing #[ignore] would get a test that passes if the assertion holds, but would have no way to know if the current Ok() behavior is tested elsewhere.\\n\\nThis is a minor test quality issue: the ignored tests document intended future behavior correctly, but there are no active tests that verify the current behavior for these specific test vectors (that the checker does NOT incorrectly revoke them).\\n\\nFix: Add active (non-ignored) companion tests for each vector that verify the current behavior (checker returns Ok() because CDP/IDP matching is unimplemented). This is separate from the ignored tests that represent the desired behavior once the feature is implemented.",
+  "ephemeral": 0,
+  "id": "PKIX-taa.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Adding companion tests for each PKITS 4.14 vector is correct but out of scope for this review loop. Track as v0.2 test coverage work.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "deferred",
+  "timeout_ns": 0,
+  "title": "pkits_4_14_3 and 4_14_8/4_14_9 ignored tests pass wrong assertion",
+  "updated_at": "2026-05-06T17:02:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-taa",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

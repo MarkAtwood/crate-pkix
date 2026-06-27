@@ -1,0 +1,40 @@
+{
+  "acceptance_criteria": "RustCryptoVerifier contains no todo!(); cargo check --package pkix-chain-simple passes; clippy -D warnings passes.",
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T07:01:46Z",
+  "compaction_level": 0,
+  "content_hash": "3a825d1575f2cfa0cd2c10604b468d59d4607e6648e8c0b00175e75d36270651",
+  "created_at": "2026-05-02T06:02:31Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Replace the todo!() in pkix-chain-simple's internal RustCryptoVerifier::verify_signature with a delegation to pkix_path::DefaultVerifier, eliminating the duplicate implementation.\n\nBLOCKED BY: PKIX-8wg (DefaultVerifier must exist), PKIX-q13 (verify_signature return type must be Result<(), signature::Error> before this compiles correctly).\n\n**Algorithm:**\n1. In pkix-chain-simple/src/lib.rs, change RustCryptoVerifier from a zero-sized stub to a newtype wrapper:\n   struct RustCryptoVerifier(pkix_path::DefaultVerifier);\n2. Implement Default for RustCryptoVerifier:\n   impl Default for RustCryptoVerifier {\n       fn default() -> Self { Self(pkix_path::DefaultVerifier) }\n   }\n3. Implement SignatureVerifier for RustCryptoVerifier by delegating:\n   fn verify_signature(&self, algorithm, issuer_spki, message, signature) -> Result<(), signature::Error> {\n       self.0.verify_signature(algorithm, issuer_spki, message, signature)\n   }\n4. In verify_simple(), update construction: &RustCryptoVerifier::default() or &RustCryptoVerifier(pkix_path::DefaultVerifier).\n5. Remove the todo!() entirely.\n\n**Defensive programming rules:**\n- This bead contains zero new logic \u2014 it is purely delegation. If any error path requires new logic, something is wrong with the approach; stop and surface to human.\n- No unwrap() anywhere.\n\n**Subagent instructions:**\nSingle subagent. Read both pkix-chain-simple/src/lib.rs and pkix-path/src/lib.rs (post-PKIX-8wg) before writing. Confirm DefaultVerifier's exact type signature. Then implement. This bead should take under 30 minutes.\n\n**Tests:**\n- test_rust_crypto_verifier_delegates: (compile-time only until PKIX-h6z) confirm RustCryptoVerifier::verify_signature compiles and calls DefaultVerifier. Oracle: compiler.\n- Note: runtime tests belong in PKIX-mee (integration tests for verify_simple).",
+  "ephemeral": 0,
+  "id": "PKIX-s19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: wire RustCryptoVerifier to DefaultVerifier",
+  "updated_at": "2026-05-02T07:01:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T23:02:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8wg",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T23:02:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q13",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

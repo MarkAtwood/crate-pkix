@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:26:36Z",
+  "compaction_level": 0,
+  "content_hash": "b06335c271392c292890c3520b295b6957b1ac558c903168a521568f8bfda10c",
+  "created_at": "2026-05-02T23:21:02Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd 5 private matching functions in pkix-path/src/lib.rs that test whether a GeneralName (from a subject's SAN or DN) satisfies a GeneralSubtree constraint.\n\n## Algorithm\n\n### name_matches_subtree(name, subtree) -> bool\nDispatch to variant-specific matcher. Return false for mismatched variants.\n\n### matches_directory_name(subject_dn, constraint_dn) -> bool\nCall existing name_matches() (or ava_values_match chain). Exact match only (RFC 5280 \u00a77.1 normalisation).\n\n### matches_dns_name(subject: &str, constraint: &str) -> bool\n- If constraint has leading dot: subject must end with constraint (label-aware suffix)\n  e.g. \".example.com\" matches \"foo.example.com\" but NOT \"example.com\" itself\n- If no leading dot: exact match only\n- Case-insensitive ASCII comparison\n\n### matches_rfc822_name(subject: &str, constraint: &str) -> bool\n- If constraint contains '@': exact match\n- If constraint starts with '.': local@domain must have domain suffix matching constraint\n- Otherwise: domain part of subject must equal constraint (case-insensitive)\n\n### matches_uri(subject_uri: &str, constraint: &str) -> bool\n- Extract host from URI (between :// and first / or end)\n- Apply DNS matching rules to host vs constraint\n\n### matches_ip_address(subject_bytes: &[u8], constraint_bytes: &[u8]) -> bool\n- constraint_bytes must be 8 bytes (IPv4) or 32 bytes (IPv6) \u2014 addr+mask pairs\n- Split into addr and mask halves\n- Each byte: (subject[i] & mask[i]) == (constraint_addr[i] & mask[i])\n- Return false if lengths don't match expected sizes\n\n## Defensive programming\n- Return false (not error) for constraint variants not yet handled (URI, IP) if out of scope\n- DNS: reject empty labels, label must not start/end with hyphen (RFC 952)\n- All string comparisons: lowercase before comparing\n\n## Acceptance criteria\n- DNS: \".example.com\" matches \"sub.example.com\", rejects \"example.com\" and \"notexample.com\"\n- DNS: \"example.com\" matches only \"example.com\"\n- RFC822: \"@example.com\" in constraint matches only that address; \".example.com\" matches any @*.example.com\n- IP: 192.168.0.0/255.255.0.0 matches 192.168.5.10, rejects 10.0.0.1\n- No panics on empty or malformed input",
+  "ephemeral": 0,
+  "id": "PKIX-mew",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement GeneralName matching functions",
+  "updated_at": "2026-05-02T23:26:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f0m",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

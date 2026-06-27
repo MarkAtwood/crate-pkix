@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:27:18Z",
+  "compaction_level": 0,
+  "content_hash": "100783ab9a0c8f7ab11dc2b3b05a482c7c394d8be87553e913e0cdd3263c59f3",
+  "created_at": "2026-05-11T07:16:09Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nIn pkix-difftest/src/oracles/openssl.rs, when Chain.crls is non-empty, write each DER CRL into the tempdir as a PEM file and add -CRLfile + -crl_check (or -crl_check_all) to the openssl verify command line.\n\n## What\n\n- When chain.crls.is_empty(): existing behavior.\n- Otherwise:\n  - Write each DER CRL as crl_N.pem in the tempdir (use the same approach as cert tempdir-writing).\n  - For multi-CRL: openssl verify accepts -CRLfile once but reads concatenated PEM, so concat all into a single crls.pem.\n  - Add -CRLfile crls.pem and -crl_check_all (verifies entire chain) to the command.\n\n## Notes\n\n- OpenSSL 3.x: -crl_check checks the leaf only; -crl_check_all checks all certs in the chain. Most PKITS revocation testcases revoke the EE \u2014 -crl_check_all matches RFC 5280 \u00a76.3 (revocation per-cert in chain). Decision: use -crl_check_all for full-chain coverage.\n\n## Acceptance\n\n- [ ] OpenSSL oracle plumbs Chain.crls into a tempdir crls.pem.\n- [ ] -CRLfile and -crl_check_all are added to the command.\n- [ ] One test verifying a PKITS revoked-leaf chain returns Fail with reason mentioning 'revoked' or 'CRL'.\n\n## Depends on\n\nPKIX-emf1.1.\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Wire OpenSSL oracle to use -CRLfile + -crl_check when Chain.crls is non-empty",
+  "updated_at": "2026-05-11T07:27:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:09Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T00:17:03Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

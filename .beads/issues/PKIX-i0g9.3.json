@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:18:35Z",
+  "compaction_level": 0,
+  "content_hash": "649351327615720a3bba66eb9a5a1393330f2efade40e30f3bc9ed80ee143b91",
+  "created_at": "2026-05-07T04:14:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:500 and pkix-lint/src/report.rs:54 \u2014 The serde bound 'de: 'static was added to Finding and EvaluationReport. This means any code that tries to deserialize a Finding or EvaluationReport with a non-static deserializer lifetime (e.g., serde_json::from_slice on a &[u8] local variable, or any in-place parsing) will fail to compile. The bound is overly strict: de_cow_static only requires String::deserialize which works with any 'de lifetime. Only the LintResult fields using de_static_str require 'de: 'static. The bound should be applied per-field (it already is, via deserialize_with) rather than at the struct level. The test in report.rs works around this by leaking the JSON to 'static (line 298), which is a code smell confirming the constraint is too broad.",
+  "ephemeral": 0,
+  "id": "PKIX-i0g9.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "serde bound 'de: 'static on Finding prevents non-static deserialization",
+  "updated_at": "2026-05-07T04:18:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:14:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-i0g9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

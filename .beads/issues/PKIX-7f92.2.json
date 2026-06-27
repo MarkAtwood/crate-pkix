@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Empirically verified x509-cert 0.2.5 SerialNumber::as_bytes() returns the FULL encoded INTEGER content (including leading 0x00 sign byte for positive high-bit-set values) \u2014 der::asn1::Int's strip_leading_ones handles 0xFF only, not 0x00. The bead's hypothesis (undermeasure by 1 octet) was incorrect: the lint already measures encoded-content length, matching zlint/pkilint. Documentation contradicted itself; this commit fixes that and adds a hand-crafted-DER negative-path test (serial_length_lint_rejects_21_octet_high_bit_set_serial) that constructs a 21-octet INTEGER content serial via SerialNumber::from_der and verifies the lint flags it. The struct rustdoc now explicitly names the RFC 5280 \u00a74.1.2.2 ambiguity (encoded-content vs unsigned-value reading) and locks in the encoded-content choice. Commit 116945fc.",
+  "closed_at": "2026-05-14T16:34:48Z",
+  "compaction_level": 0,
+  "content_hash": "d4503b83e6be2fb8f7fb3cc95942876541370015eb2bd3287038f256fd18d527",
+  "created_at": "2026-05-14T15:42:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/rfc5280.rs:174-193: the lint measures cert.tbs_certificate.serial_number.as_bytes().len() and compares to max_octets=20. The rustdoc claims as_bytes returns the canonical big-endian unsigned bytes with leading 0x00 sign padding already stripped.\n\nRFC 5280 \u00a74.1.2.2 says 'Conforming CAs MUST NOT use serialNumber values longer than 20 octets'. This is widely understood to apply to the encoded INTEGER content (i.e. what an ASN.1 INTEGER decoder reads), which for DER includes the 0x00 sign-byte when the high bit of the leading data byte is set.\n\nExample mismatch: a CA issues a 20-byte unsigned serial 0x80,..,0x?? (high bit set). The DER INTEGER content is 21 bytes (0x00 sign byte + 20 data bytes). The RFC measure says noncompliant (>20). x509-cert's as_bytes() strips the sign byte and returns 20 bytes \u2014 the lint reports compliant.\n\nThis is a known shape \u2014 pkilint and zlint both measure encoded INTEGER content length, not the stripped unsigned representation. Verify by writing a probe: a fixture cert with a 20-byte high-bit-set unsigned serial. Filed as a probe-or-fix bead because settling this requires either (a) a new fixture, or (b) confirming x509-cert SerialNumber semantics in their source.\n\nIf the fix is required: switch to measuring the encoded INTEGER content length (e.g. cert.tbs_certificate.serial_number.to_der().len() minus the tag+length overhead). The lint's tests would need a high-bit-set serial fixture to lock the behavior in.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc5280MaxSerialLengthLint may report length 1 octet short of RFC measure",
+  "updated_at": "2026-05-14T16:34:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:42:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:32Z",
+  "compaction_level": 0,
+  "content_hash": "eae83e75a7a9719242e5c6cc73270bc31bc157c6d56248c930716582b97cc599",
+  "created_at": "2026-05-05T15:48:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2130\u20132138\n\nThe code:\n\n    let has_leaf_any = tree.iter().any(|nd| {\n        nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY\n    });\n    if has_leaf_any {\n        let ap_qual = tree\n            .iter()\n            .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)\n            .map(|nd| nd.qualifier_set.clone())\n            .unwrap_or_default();\n\nThe tree is walked twice with the same predicate: once with .any() to check existence, then with .find() to get the node.  This is idiomatic in cases where the predicate is expensive or the data is not an iterator \u2014 but here it is a simple flat Vec scan.\n\nCollapse into one pass:\n\n    let ap_qual = tree\n        .iter()\n        .find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY)\n        .map(|nd| nd.qualifier_set.clone())\n        .unwrap_or_default();\n    let has_leaf_any = !ap_qual.is_empty() || tree.iter().any(...);\n\nActually the cleanest form is:\n\n    if let Some(ap_node) = tree.iter().find(|nd| nd.depth == leaf_depth && nd.valid_policy == OID_ANY_POLICY) {\n        let ap_qual = ap_node.qualifier_set.clone();\n        // ... rest of the block\n    }\n\nThis eliminates the double scan and makes has_leaf_any a structural consequence of finding the node.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.29",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_has_leaf_any searches tree twice for the same node",
+  "updated_at": "2026-05-05T16:06:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:48:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

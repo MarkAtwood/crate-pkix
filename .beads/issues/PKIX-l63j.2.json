@@ -1,0 +1,36 @@
+{
+  "compaction_level": 0,
+  "content_hash": "bd524ba39cd5c6f05d7b8456c62f37b1cd6760a56c594130766b6da1f1667972",
+  "created_at": "2026-05-08T20:49:15Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nSubset of PKIX-l63j epic. Builds on PKIX-l63j.1 (BMPString transcoding) to extend DN normalization to canonical-equivalence: precomposed vs decomposed Unicode forms, case-fold non-Latin scripts, full RFC 4518 \u00a71 prep.\n\n## What\n\n1. Add `unicode-normalization` crate dep (no_std-capable) for NFKC.\n2. Use Unicode `char::to_lowercase()` (already in core) for case folding non-ASCII.\n3. Implement RFC 4518 \u00a71 6-step prep: transcode (covered by PKIX-l63j.1), map (case-fold + control-strip), normalize (NFKC), prohibit, bidi check, insignificant-character (whitespace collapse already done).\n4. Tests: precomposed 'caf\u00e9' (U+00E9) compares equal to decomposed 'caf\u00e9' (U+0065 U+0301).\n\n## Acceptance\n\n- See parent PKIX-l63j acceptance.\n\n## Depends on\n\nPKIX-l63j.1.",
+  "ephemeral": 0,
+  "id": "PKIX-l63j.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-path: RFC 4518 NFKC + Unicode case fold for non-ASCII DN AVAs",
+  "updated_at": "2026-05-08T20:49:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T13:49:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T13:49:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-l63j.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

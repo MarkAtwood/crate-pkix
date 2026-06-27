@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:49:34Z",
+  "compaction_level": 0,
+  "content_hash": "f64ca29dbd280fa14fa0bba6415a512ecae8fc124e4f71d0e2e6a2e89b05e866",
+  "created_at": "2026-05-02T17:29:17Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor stores owned Name and SubjectPublicKeyInfoOwned rather than borrowing from a certificate. This is correct because anchors live independently of any certificate \u2014 a platform trust store stores (name, SPKI) pairs, not full certificate DER. Borrowing from Certificate would force callers to keep Certificate alive for the trust anchor lifetime. ValidatedPath being #[non_exhaustive] is also correct: it currently has anchor_index and depth, and future additions (e.g. validated_policies, name_constraints_result) will be common. Making it non_exhaustive now avoids a breaking change later. A contributor might suggest making ValidatedPath::new() available for testing \u2014 that would defeat the purpose of non_exhaustive. The current design is correct.",
+  "ephemeral": 0,
+  "id": "PKIX-841.19",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor stores owned data; ValidatedPath is non_exhaustive \u2014 both correct",
+  "updated_at": "2026-05-02T17:49:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:29:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

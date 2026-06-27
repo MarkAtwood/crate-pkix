@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T23:08:16Z",
+  "compaction_level": 0,
+  "content_hash": "d0f3e1167632f017f17b84c2559a4fdbd45659fe17a6edd56b8bb05dd7d507f8",
+  "created_at": "2026-05-13T16:20:13Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nThread `AiaFetcher` through `pkix-chain` as the third trust-domain callback alongside `SignatureVerifier` and `RevocationChecker`. Re-export `pkix_aia::AiaFetcher` and `pkix_aia::NoAiaFetcher` from pkix-chain so callers see the full seam in one crate.\n\n## API shape\n\n`Verifier` struct (from PKIX-gsd9) gains a third generic parameter:\n\n```rust\npub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    policy: &'a ValidationPolicy,\n    verifier: &'a V,\n    revocation: &'a R,\n    aia: &'a A,\n}\n\nimpl<'a, V, R, A> Verifier<'a, V, R, A> { /* verify_one, verify_batch */ }\n```\n\n`verify_chain` free function gets an extra parameter (or a builder, depending on PKIX-gsd9 final shape):\n\n```rust\npub fn verify_chain(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    policy:     &ValidationPolicy,\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n    aia:        &impl AiaFetcher,    // NEW\n) -> Result<ValidatedPath, Error>;\n```\n\nA `verify_chain_default()` convenience uses `NoAiaFetcher` to preserve the existing \"no online lookups\" default behavior.\n\n## Chain-build flow with AiaFetcher\n\nBefore path-build (pkix-path-builder), inspect the caller-supplied chain:\n\n1. If chain is complete (root reachable from leaf via in-chain issuers), no AIA fetch needed.\n2. If chain is missing an intermediate: extract AIA URIs from the cert whose issuer is missing (use `extract_aia_http_urls` helper, possibly migrated to pkix-aia).\n3. Call `aia.batch_fetch(&uris)` \u2014 try all URIs, pick first that returns a valid Certificate matching the needed issuer DN + SKI.\n4. Add fetched cert to the candidate pool; pass to path-builder.\n5. If all AIA fetches fail: return chain-build error wrapping the AiaError.\n\nLoop: a fetched intermediate may itself have a missing issuer. Cap recursion depth (e.g. 5) to prevent unbounded fetching.\n\n## Error type\n\n`pkix_chain::Error` gains new variants:\n\n```rust\npub enum Error {\n    // ... existing variants ...\n    AiaFetchFailed { uri: String, error: AiaError },\n    AiaChainBuildFailed { reason: String },\n}\n```\n\n## Acceptance\n\n- [ ] `Verifier` gains third generic `A: AiaFetcher`\n- [ ] `verify_chain` signature includes `&impl AiaFetcher` parameter\n- [ ] `verify_chain_default` uses `NoAiaFetcher`\n- [ ] Chain with missing intermediate validates when AiaFetcher provides it\n- [ ] Chain with missing intermediate fails cleanly when AiaFetcher returns FetchingDisabled (no panic, no infinite loop)\n- [ ] Recursion cap (default 5 levels of AIA fetches) enforced\n- [ ] Existing tests still pass (use NoAiaFetcher where they previously had no AIA callback)\n- [ ] CHANGELOG entry on pkix-chain noting the API addition\n- [ ] AGENTS.md `pkix-chain` description updated to mention AiaFetcher as the third trust-domain callback\n\n## Out of scope\n\n- Caching the AIA fetcher results (caller wraps with caching layer)\n- LDAP fetcher (pkix-aia-ldap could be a separate adapter crate; file as a follow-up if demand surfaces)\n- Pre-fetching all AIA URIs even for complete chains\n\n## Cross-references\n\n- PKIX-zkjb (parent)\n- PKIX-zkjb.3 (trait def)\n- PKIX-zkjb.4 (NoAiaFetcher default)\n- PKIX-gsd9 (Verifier struct shape, recently shipped)\n",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Integrate AiaFetcher into pkix-chain Verifier and verify_chain entry points",
+  "updated_at": "2026-05-13T23:08:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:20:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:36:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

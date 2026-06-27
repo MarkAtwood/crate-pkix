@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c33d11899a4563729d93f5ab98187b8dc43dd0a5020aed03cc5b8ca9410fd0a6",
+  "created_at": "2026-05-14T18:00:41Z",
+  "created_by": "Mark Atwood",
+  "description": "verify_responder_is_delegated_by (pkix-chain/src/lib.rs lines 1328-1379) hardcodes DefaultVerifier for the RFC 6960 \u00a74.2.2.2 cryptographic delegation check:\n\n    DefaultVerifier\n        .verify_signature(\n            responder.signature_algorithm.owned_to_ref(),\n            issuer.tbs_certificate.subject_public_key_info.owned_to_ref(),\n            &tbs_der,\n            responder.signature.raw_bytes(),\n        )\n\nThe rest of verify_ocsp_responder also currently hardcodes DefaultVerifier (line 1286). That itself is documented as a limitation ('callers that need a custom verifier should drop down to verify_chain'). The hardcoding becomes a real problem when the chain successfully validates under verify_chain with a custom verifier (e.g. an Ed25519- or P-521-capable backend not in DefaultVerifier) but the delegation check inside verify_ocsp_responder cannot \u2014 because it's stuck on DefaultVerifier.\n\nSCENARIO that triggers the cost:\n- Issuer CA cert uses Ed25519 (real, common in modern PKIs, RFC 8410).\n- DefaultVerifier covers RSA-PKCS1v15-SHA-{256,384,512} and ECDSA-P-256-SHA-256.\n- Caller validates the chain with a custom verifier that covers Ed25519 and feeds it to verify_chain. The chain validates.\n- Caller wants 'and also verify this responder is delegated by issuer'. They call verify_ocsp_responder(...). The wrapper validates the chain again (now with DefaultVerifier \u2014 already a problem since the chain may fail under DefaultVerifier and the caller gets Error::Path which makes no sense given their chain was fine under the custom verifier they already proved). Then the delegation check tries Ed25519 under DefaultVerifier \u2192 no dispatch \u2192 returns Error::OcspDelegation { reason: 'signature does not verify...' } even though the responder IS legitimately delegated.\n\nThe user gets a misleading error: 'this responder isn't delegated by issuer' when in fact 'this implementation can't tell because it doesn't support Ed25519.'\n\nMAINTENANCE CONSEQUENCE: every algorithm coverage gap in DefaultVerifier becomes a silent over-rejection in verify_ocsp_responder. The user's recourse \u2014 per the docstring at line 1326 \u2014 is to 'drop down to verify_chain and replicate the delegation check' \u2014 but the helper has no public surface, so they'd have to recreate verify_responder_is_delegated_by from scratch.\n\nTwo compounding issues with PKIX-sqek.4: both stem from the wrappers committing to DefaultVerifier without allowing the caller to pick a SignatureVerifier.\n\nFIX: take a SignatureVerifier as a wrapper argument (same shape as Verifier::new). Pre-1.0 this is free; post-1.0 it requires an additive sibling wrapper.\n\nThis applies to ALL eight use-case wrappers, but verify_ocsp_responder is the worst case because the misleading error (Error::OcspDelegation) blames the responder rather than admitting the limitation.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_ocsp_responder hardcodes DefaultVerifier for the delegation signature binding, ignoring caller's verifier",
+  "updated_at": "2026-05-14T18:00:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:00:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

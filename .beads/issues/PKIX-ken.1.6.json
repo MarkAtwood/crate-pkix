@@ -1,0 +1,47 @@
+{
+  "acceptance_criteria": "cargo test -p pkix-path --all-features exits 0. require_subject_alt_name check is present in chain_walk, guarded by i == 0. Returns Error::MissingSan when SAN is absent or empty and policy requires it. Reuses the existing san variable without a second decode call.",
+  "assignee": "Mark Atwood",
+  "close_reason": "require_subject_alt_name enforced in chain_walk before if i > 0, guarded by i == 0, reuses existing san variable. Tests pass.",
+  "closed_at": "2026-05-06T04:50:12Z",
+  "compaction_level": 0,
+  "content_hash": "22531c4b9ba515aa428fcc94a33dfcea1ef6389f45892e5df62662e57779d95a",
+  "created_at": "2026-05-06T03:43:45Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Enforce `policy.require_subject_alt_name` in `chain_walk`: when `true`, the leaf certificate (index 0) must have a non-empty SubjectAltName extension.\n\n**Algorithm:**\n1. Read `chain_walk` and locate line 1734: `let san = cert_subject_alt_names(cert);` \u2014 this already decodes the SAN for the current cert (used by NameConstraints).\n2. Note: the loop runs from high `i` (root-adjacent) to `i == 0` (leaf). The leaf-specific section is around lines 1752\u20131768.\n3. Find the end of the per-cert checks and before the `if i > 0 { ... }` CA-only block. Insert a leaf-only SAN check immediately before `if i > 0`:\n   ```rust\n   // (e2) Require non-empty SubjectAltName on leaf cert.\n   if i == 0 && policy.require_subject_alt_name {\n       // `san` is already decoded above (let san = cert_subject_alt_names(cert)).\n       // It is None if the extension is absent, or Some(vec) where vec may be empty.\n       let san_is_nonempty = san.as_ref().map(|names| !names.is_empty()).unwrap_or(false);\n       if !san_is_nonempty {\n           return Err(Error::MissingSan);\n       }\n   }\n   ```\n4. Understand what `cert_subject_alt_names` returns: read the function signature. It likely returns `Option<Vec<GeneralName>>` or similar. If the function returns a different type, adapt the `.is_empty()` check accordingly.\n5. Run `cargo test -p pkix-path --all-features 2>&1` to confirm no regressions.\n\n**Defensive programming rules:**\n- Guard with `i == 0` \u2014 intermediate CA certs are NOT checked for SAN.\n- `MissingSan` is returned (not `MissingSan { index: 0 }`) \u2014 the variant has no fields.\n- The `san` variable is already decoded at line 1734; do not call `cert_subject_alt_names` a second time.\n- No `unwrap()`.\n\n**Subagent instructions:**\n- Spawn one research subagent: read the `cert_subject_alt_names` function signature and return type, and the exact lines around 1734 in chain_walk to determine the `san` variable type.\n- Spawn one implementation subagent: apply the change.\n- Spawn one validation subagent: run `cargo test -p pkix-path --all-features 2>&1`. Confirm exit 0.\n\n**Tests:** Covered by the dedicated test bead PKIX-ken.1.9.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Enforce require_subject_alt_name in chain_walk (leaf cert only)",
+  "updated_at": "2026-05-06T04:50:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:43:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T20:47:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-05T20:47:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

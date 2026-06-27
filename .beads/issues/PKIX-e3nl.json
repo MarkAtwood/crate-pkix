@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260514T024333Z-3287470",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T02:45:45Z",
+  "compaction_level": 0,
+  "content_hash": "6f188e28b016571ef6e748d9da18617624bf2d4d0ea4d605cbc05ad928241aeb",
+  "created_at": "2026-05-14T02:11:43Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nCodify the architectural principle decided 2026-05-13 (Mark) as a new\nnon-negotiable in `AGENTS.md`, sibling to non-negotiable #5\n(framework-not-policy three-mode architecture).\n\n## The principle\n\nThe workspace's fast in-process `Profile`/`Lint` types ship the current\nrules from the latest BR snapshot. Historical-regime replay and\ncaller-pinned spec versions go out-of-process to `pkix-policy-zlint`.\n\nWorth a separate non-negotiable because it cuts on a different axis from\nnon-negotiable #5:\n\n- **Non-negotiable #5** governs **who owns the policy specification**:\n  standards-body (workspace authors) / industry-forum (sibling adapter\n  crate) / site-local (consumer).\n- **This new non-negotiable** governs **when the policy is evaluated**:\n  current regime (workspace) / historical or version-pinned (external\n  validator).\n\nA rule that the spec ITSELF writes as time-keyed (SC-081 phased validity\ncap, `sc081_validity_cap(not_before_unix)`) stays in-process because the\ntime-keying is part of the current rule's definition \u2014 it's transcribing\nwhat the spec literally says, not maintaining a delta history.\n\n## Draft text\n\nAdd as a new non-negotiable (#6 or appropriately numbered) under\n\"Non-negotiable constraints\" in `AGENTS.md`:\n\n```\n6. **Current-regime only; historical and version-pinned postures go out-of-process.**\n\n   Workspace `Profile` and `Lint` types snapshot the current rules from\n   the latest BR text. They evaluate \"is this cert conforming under\n   today's rules?\" \u2014 including rules the spec itself writes as\n   time-keyed (SC-081 phased validity cap, future similar). The\n   time-keying is part of the current rule's definition, not historical\n   replay.\n\n   The workspace does NOT ship validators that evaluate against:\n   - rules in force at a past time, with predicates that have since\n     been changed or removed (historical-regime replay), or\n   - a caller-pinned spec version (version-frozen replay).\n\n   For either posture, use `pkix-policy-zlint` with a version-pinned\n   lint set. zlint owns the historian role for vendor policy.\n\n   `ValidationPolicy::new(now_unix)` selects the moment at which\n   validity-period checks are evaluated, NOT the moment whose rules are\n   in force. This is documented on the API (see PKIX-* bead for the\n   rustdoc clarification).\n```\n\n(Cross-reference the sibling beads in the parenthetical once they are\nfiled.)\n\n## Why this matters\n\nWithout codification, future agents and future-Mark will repeatedly\nrelitigate \"should pkix-profiles-cabf take a version parameter?\" /\n\"should the workspace ship historical replay?\" The 2026-05-13 chat\narrived at the answer; this bead writes it down so subsequent sessions\ninherit the decision.\n\nIt also clarifies an existing ambiguity in `ValidationPolicy::new(now_unix)`:\ncallers may intuit that passing an older `now_unix` gives them \"rules in\nforce at that older time.\" It doesn't. Documenting the semantic on the\nAPI surfaces the trap before users walk into it.\n\n## Acceptance\n\n- AGENTS.md amended with the non-negotiable text above (final numbering\n  per where it slots in).\n- `CHANGELOG.md` workspace-root entry under `[unreleased]` documenting\n  the amendment.\n- Commit message: `docs(AGENTS.md): codify temporal-posture\n  non-negotiable (current-regime in-process; historical out-of-process)`.\n\n## Cross-references\n\n- AGENTS.md non-negotiable #5 (sibling architectural principle; framework/policy axis)\n- AGENTS.md \"Project phase and decision framing\" (prelaunch framing)\n- PKIX-mzsk (spec-taxonomy principle; sibling principle on the\n  taxonomy-depth axis)\n- PKIX-jy95 (`pkix-policy-zlint` \u2014 where historical-regime replay lives)\n- 2026-05-13 chat record (decision rationale; framing originated when\n  Mark proposed \"if its not currentnow, it has to run thru long path\n  that ends with the external validator\")\n\n## Not in scope\n\n- Implementing the phased-rule helper catalog (filed as sibling bead).\n- The `now_unix` rustdoc clarification (filed as sibling bead).\n- The PKIX-jbvb.8 multi-generation Profile types question (different\n  axis: taxonomy depth, not temporal posture).\n",
+  "ephemeral": 0,
+  "id": "PKIX-e3nl",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AGENTS.md: codify temporal-posture non-negotiable (current-regime only; historical/version-pinned out-of-process)",
+  "updated_at": "2026-05-14T02:45:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:12:59Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kgnk",
+      "metadata": {},
+      "type": "relates-to"
+    }
+  ]
+}

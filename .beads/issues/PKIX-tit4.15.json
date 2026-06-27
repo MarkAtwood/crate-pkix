@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:24Z",
+  "compaction_level": 0,
+  "content_hash": "3169e56822064338644091ca85b1a7e806afbca5cc1e67a7ba72d0641216e9fa",
+  "created_at": "2026-05-14T05:06:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore is silent in rustdoc about panic safety. No function says\n'this function does not panic on any input.' This is unusual for a Tier-1\nparsing library that explicitly defends against an upstream panic in its\nown code (see lib.rs:316-329).\n\nCurrent state:\n\n  - lib.rs:316-323 carries a hand-written guard ('input contains no BEGIN\n    boundary -> NoCertificates') specifically to avoid triggering a\n    subtract-with-overflow panic in x509-cert 0.2.x's load_pem_chain.\n    The comment references RustCrypto/formats#1965 and notes the\n    workaround can be removed when the workspace bumps to x509-cert\n    0.3.x. PKIX-tit4.6 already discusses this from a duplication angle.\n  - There is no statement that all other inputs are panic-free.\n  - The crate's `#![forbid(unsafe_code)]` at lib.rs:2 means no UB, but\n    safe Rust can still panic (subtract-with-overflow under debug\n    builds, allocation failure, etc.).\n\nWhat goes wrong for a caller in production:\n\n  - A high-assurance caller (e.g., a TLS server fronting a payments API)\n    that must not unwind into uncontrolled crash needs to know whether\n    to wrap trust-store loading in catch_unwind. With no documented\n    contract, the safe default is to wrap, which adds latency and obscures\n    real errors.\n  - A library caller composing pkix-truststore into a service-level\n    'fail-on-startup' loader cannot tell whether a malformed CA bundle\n    will produce a useful Error or a panic that bypasses Result::Err\n    handlers.\n  - A fuzzer-driven harness needs to know whether to treat panics as\n    bugs or as expected behavior on malformed input. Without a contract,\n    fuzz triage is ambiguous.\n\nFix: add a top-level rustdoc section to lib.rs:\n\n  //! # Panic safety\n  //!\n  //! All loaders in this crate are panic-free on any input: malformed\n  //! PEM, malformed DER, truncated input, oversized input, and adversarial\n  //! input return `Err(Error::...)` rather than panicking. Allocation\n  //! failure follows the standard library policy (`Vec::push` may abort\n  //! the process under the global allocator's policy; we do not catch\n  //! this).\n  //!\n  //! Internally we guard against one known panic in\n  //! `x509-cert::load_pem_chain` (subtract-with-overflow on empty input\n  //! after whitespace strip); see RustCrypto/formats#1965. The guard is\n  //! removed when the workspace bumps to `x509-cert 0.3.x`.\n\nThis is a contract the maintainer is already keeping (the test suite at\nfixtures.rs and serde_round_trip.rs covers every named negative case\nwithout a single `#[should_panic]`). The doc only needs to say it.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.15",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Panic-safety contract is undocumented; crate already carries one defensive workaround against an upstream panic",
+  "updated_at": "2026-05-14T08:14:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:06:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

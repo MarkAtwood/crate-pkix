@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T02:44:28Z",
+  "compaction_level": 0,
+  "content_hash": "83dff16f29137e4f13a96bd0f789007a8488afa8c19bd8f810479c288a19ca4f",
+  "created_at": "2026-05-12T21:53:39Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAdd a new Notice variant to pkix-lint::Severity, slotted between Info and Warn:\n\n```rust\n#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]\n#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]\n#[non_exhaustive]\npub enum Severity {\n    /// Advisory / best-practice -- does not constitute a violation.\n    Info,\n    /// Minor observation (zlint-style notice) -- not a violation but worth surfacing.\n    ///\n    /// Aligns with syslog severity 5 (Notice) and zlint catalog 'notice' verdict.\n    Notice,\n    /// Violation of a SHOULD or RECOMMENDED requirement.\n    Warn,\n    /// Violation of a MUST or REQUIRED requirement.\n    Error,\n    /// Violation so severe that further evaluation is meaningless.\n    Fatal,\n}\n```\n\n## Why\n\nPKIX-jy95.2 decided to preserve zlint's notice-level vocabulary as a distinct workspace severity. Notice slots between Info and Warn matching both zlint (where Notice(4) sits between Pass(3) and Warn(5)) and syslog RFC 5424 (where Informational > Notice > Warning by severity ranking).\n\n## Implementation\n\n- pkix-lint/src/lib.rs line ~238: insert Notice as second enum variant\n- Verify no exhaustive match clauses in pkix-lint or pkix-lint-cabf break (the non_exhaustive marker means callers MUST already include a wildcard, but in-tree code might match exhaustively for clarity -- if so, add Notice arms)\n- Update Severity rustdoc to mention syslog + zlint alignment\n- Run cargo test pkix-lint pkix-lint-cabf\n- CHANGELOG entry: 'Severity: add Notice variant between Info and Warn (zlint + syslog alignment).'\n- Bumps pkix-lint to a new minor version per semver (adding a variant to a non_exhaustive enum is non-breaking)\n\n## Acceptance\n\n- [ ] pkix-lint Severity has Notice variant\n- [ ] Severity PartialOrd derives the correct ordering (verified by test: `Severity::Info < Severity::Notice < Severity::Warn`)\n- [ ] All existing pkix-lint + pkix-lint-cabf tests pass\n- [ ] No exhaustive matches on Severity in workspace code break\n- [ ] CHANGELOG + minor version bump\n\n## Out of scope\n\n- Mapping zlint severities into Notice (that happens in pkix-zlint-bridge per PKIX-jy95.7)\n- Renaming Info or merging Info/Notice (decision was to keep both)\n\n## Cross-references\n\n- PKIX-jy95.2 (decision that filed this task)\n- PKIX-jy95.7 (pkix-zlint-bridge -- will emit Notice for zlint notice-level findings)\n- pkix-lint/src/lib.rs line 238 (current Severity enum)",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.2.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Extend pkix-lint::Severity enum with Notice variant (between Info and Warn)",
+  "updated_at": "2026-05-13T02:44:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T14:53:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95.2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

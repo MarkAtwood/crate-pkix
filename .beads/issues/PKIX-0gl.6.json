@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:52Z",
+  "compaction_level": 0,
+  "content_hash": "3ce99c4a47d6014fed0ce33db3ce802ca9473cbb25fcf490f0dd219f8c97a1f6",
+  "created_at": "2026-05-02T22:20:37Z",
+  "created_by": "Mark Atwood",
+  "description": "Lines 693\u2013712 spend 20+ lines describing v0.2 normalization strategy (NFKC, UTF-16BE decode, CheckBidi). This is useful context but dominates the v0.1 API comment. A v0.2 implementer will read v0.2 code, not v0.1 rustdoc. Consider: (1) move v0.2 strategy to v0.2 crate's lib.rs comments when v0.2 launches, or (2) create a separate RFC-4518-normalization.md guide at the repo root explaining the full preparation pipeline. Keep v0.1 rustdoc focused on 'what we handle now and what falls back.'",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.6",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: v0.2 implementation details should move to v0.2 code or separate RFC-guide doc",
+  "updated_at": "2026-05-02T22:35:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T22:20:25Z",
+  "compaction_level": 0,
+  "content_hash": "a98dc531e15b7c5b069d8699bc5ac4e6ac80c9927d85909721b3bb5ef336f424",
+  "created_at": "2026-05-13T21:11:24Z",
+  "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "description": "## What\n\nSeven of the twelve 1.0-scope crates currently have no `CHANGELOG.md` at all. PKIX-wlsr.7 implicitly assumes each crate has a CHANGELOG with an `[Unreleased]` section to roll up; that assumption fails for these seven crates. They need CHANGELOGs authored from scratch first.\n\nThe workspace-level `/home/mark/PROJECT/PKIX/CHANGELOG.md` (1726 lines) carries unified per-crate release notes already. The work is to extract each crate's history from the workspace CHANGELOG into its own per-crate `CHANGELOG.md`, formatted to match the convention used by the existing five (pkix-chain, pkix-identity, pkix-profiles-cabf, pkix-lint-cabf, pkix-aia).\n\n## Affected crates\n\n- `pkix-path` (foundation crate; substantial history; current 0.3.0)\n- `pkix-revocation` (current 0.3.2)\n- `pkix-path-builder` (current 0.3.1)\n- `pkix-truststore` (current 0.0.0)\n- `pkix-profiles` (current 0.3.0)\n- `pkix-lint` (current 0.9.0)\n- `pkix-revocation-http` (current 0.0.0)\n\n## Acceptance\n\n- [ ] Each of the seven crates has a `CHANGELOG.md` matching the Keep a Changelog convention used by the existing five\n- [ ] Each CHANGELOG covers the crate's history accurately (cross-referenced against the workspace CHANGELOG + git log + bead memories)\n- [ ] An `[Unreleased]` section captures any not-yet-released-from-this-crate content (ready for .7.2 to roll up into 1.0.0)\n- [ ] No content is fabricated \u2014 anything that cannot be traced to a real event in git log / bead history / workspace CHANGELOG is omitted\n\n## Cross-references\n\n- PKIX-wlsr.7 (parent)\n- /home/mark/PROJECT/PKIX/CHANGELOG.md (workspace-level unified CHANGELOG \u2014 primary source for extraction)\n- Per-crate convention reference: pkix-chain/CHANGELOG.md, pkix-identity/CHANGELOG.md, pkix-aia/CHANGELOG.md\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.7.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Author missing CHANGELOG.md for 7 1.0-scope crates (pkix-path, pkix-revocation, pkix-path-builder, pkix-truststore, pkix-profiles, pkix-lint, pkix-revocation-http)",
+  "updated_at": "2026-05-13T22:20:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T14:11:24Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

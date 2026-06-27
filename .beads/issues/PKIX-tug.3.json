@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:42:07Z",
+  "compaction_level": 0,
+  "content_hash": "7061abd859c3abd2e7dce07323ef21eaf27eac2ce0c3fb0fc85c530b9f6c9fa9",
+  "created_at": "2026-05-06T20:38:25Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs: Several identifiers in doc comments (KeyUsage, SubjectPublicKeyInfo, NameConstraints, rustcrypto, etc.) are not wrapped in backticks. These fire under clippy::pedantic (doc_markdown lint) but not under the default -D warnings set. Fix if the project adds -W clippy::pedantic to CI.",
+  "ephemeral": 0,
+  "id": "PKIX-tug.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "doc_markdown pedantic: identifiers not backtick-quoted in pkix-path doc comments",
+  "updated_at": "2026-05-06T20:42:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:38:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tug",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

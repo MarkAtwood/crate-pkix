@@ -1,0 +1,31 @@
+{
+  "close_reason": "Already addressed: doc lists all 4 validated fields",
+  "closed_at": "2026-06-15T19:15:42Z",
+  "compaction_level": 0,
+  "content_hash": "4c23fbeb4ec6dd67a637e40ca77576a7ef4e4be796d5d1ae4d42c16a4c0aad24",
+  "created_at": "2026-06-15T19:08:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs line 74: The doc comment on `DeviationAddError::EmptyField` says 'A required string field (`justification` or `authorized_by`) was empty.' but `Deviation::new()` now also validates `id` and `target_lint` for emptiness (lines 267-271). The doc should list all four fields, or use a generic phrasing like 'A required string field was empty. The contained String names the field.'",
+  "ephemeral": 0,
+  "id": "PKIX-q5t0.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@wolfssl.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationAddError::EmptyField doc lists only 2 of 4 validated fields",
+  "updated_at": "2026-06-15T19:15:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-15T12:08:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q5t0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

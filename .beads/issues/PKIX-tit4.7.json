@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done. Error::Pem(DerError) and Error::Der(DerError) rustdoc now both explain the workspace's DerError naming rationale and cross-reference each other.",
+  "closed_at": "2026-05-14T08:17:55Z",
+  "compaction_level": 0,
+  "content_hash": "c3fab466382e7db494ba24280e7ae34d6d51139243fe695a0e02935a585cb936",
+  "created_at": "2026-05-14T04:59:30Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:219-222: the Error::Pem variant carries a DerError. This is because der::Error has an ErrorKind::Pem variant and the upstream load_pem_chain only returns der::Error.\n\nThe naming is consistent with pkix-revocation::CrlParseError(DerError), so renaming would diverge from the workspace pattern. But a future reader of the type definition sees:\n\n  Error::Pem(DerError)  // wait, why is a PEM error a DerError?\n\nThe workspace-wide answer is \"DerError is the opaque-newtype shape, used wherever any der::Error escapes a Tier-1 API surface, including PEM framing failures\". That answer is in the rustdoc on DerError but not on Error::Pem itself.\n\nSuggested rewrite (rustdoc only, no API change): add a single-sentence cross-reference on Error::Pem and Error::Der pointing at DerError::new's explanation of why this is one opaque type covering both PEM-framing and DER-body failures.\n\nThis is taste-with-engineering-basis: avoiding the \"why does X wrap Y?\" stall during a future code review of a similar new variant.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::Pem(DerError) is semantically odd: a 'PEM' error wrapping a DerError type name",
+  "updated_at": "2026-05-14T08:17:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:59:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

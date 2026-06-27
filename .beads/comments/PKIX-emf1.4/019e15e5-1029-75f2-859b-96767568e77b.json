@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "created_at": "2026-05-11T07:16:34Z",
+  "id": "019e15e5-1029-75f2-859b-96767568e77b",
+  "issue_id": "PKIX-emf1.4",
+  "text": "Filed during PKIX-emf1 decomposition. The parent bead's premise about pyca PolicyBuilder + CRL is incorrect \u2014 verified against cryptography 48.0.0 in the project's venv. Maintainer should pick option (1), (2), or (3) and possibly amend the parent bead's description to reflect actual pyca capabilities."
+}

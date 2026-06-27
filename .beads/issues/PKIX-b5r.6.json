@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: renamed NcTypeMask::contains() to intersects() at definition and all 5 call sites.",
+  "closed_at": "2026-05-05T16:08:08Z",
+  "compaction_level": 0,
+  "content_hash": "ab6d35ccbdbad3aaa68bec0f8987f8b7d3706fe596142731268d89bff1948a58",
+  "created_at": "2026-05-05T15:45:52Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1151\u20131153\n\nThe method is:\n\n    fn contains(self, other: NcTypeMask) -> bool { self.0 & other.0 != 0 }\n\n'contains' conventionally means 'all bits of other are set in self' (i.e. self & other == other, a subset test).  What this actually computes is 'at least one bit of other is set in self' \u2014 that is the standard meaning of intersects() from the bitflags crate and from std's Flags trait.\n\nUsing the wrong name will mislead a reviewer:\n- nc_constrained_types.contains(NC_TYPE_RFC822) reads as 'RFC822 is fully contained in the mask' \u2014 which is accidentally correct for single-bit masks but breaks down the moment someone passes a multi-bit mask.\n- The bitflags crate convention (intersects vs contains) is well-established in the Rust ecosystem.\n\nFix: rename to intersects() and update all call sites (seven occurrences).",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.6",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NcTypeMask::contains() should be named intersects()",
+  "updated_at": "2026-05-05T16:08:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:45:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

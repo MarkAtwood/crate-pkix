@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "dcee96b91fcf880a10233630c67a3dc51340c95811534dee77fa108a67c89800",
+  "created_at": "2026-05-14T15:44:31Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs DeviationStore::find_deviation and find_deviation_for_chain iterate self.deviations linearly on every call. The runner calls find_deviation per Finding, so a chain with N findings against a store of M deviations is O(N*M) per chain.\n\nIn the typical operator setup (M < 50 deviations, N < 100 findings per chain), this is fine. At the workspace-batch shape (replaying many chains against the same store), the cost is M * total_findings.\n\nCheap optimization: build a HashMap<target_lint, Vec<&Deviation>> at first lookup (lazy_init) so find_deviation does O(1) lint-id lookup plus O(matching_deviations) scope-match. Most lint ids have zero or one matching deviation in the store; the speedup is roughly M-fold for the common case.\n\nNot P0 \u2014 workspace tests stay under threshold. Worth filing so future batch-mode work has a starting point. Also see AGENTS.md non-negotiable #6 'callbacks not closed structs' \u2014 DeviationStore is the closed struct, but its lookup shape is the bottleneck if it ever becomes one.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "DeviationStore lookups are linear; cache-friendly index recommended at scale",
+  "updated_at": "2026-05-14T15:44:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:44:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

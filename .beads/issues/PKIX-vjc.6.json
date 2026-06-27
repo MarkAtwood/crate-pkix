@@ -1,0 +1,31 @@
+{
+  "close_reason": "Covered by vjc.17 fix; chain_walk docstring now lists all steps including NC check (e) and NC state update (i)",
+  "closed_at": "2026-05-03T00:37:50Z",
+  "compaction_level": 0,
+  "content_hash": "e6f3ffe0a71fd2e9b63e84e33132227953f70e6f432bcdf264f91729b98bf9bd",
+  "created_at": "2026-05-03T00:11:00Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk docstring (lines 1172-1176) describes steps a-g but omits step (e) NameConstraints check and step (h) NC state update. A contributor reading only the docstring will not know NC checks exist in the loop, making it easy to accidentally reorder or remove the check_name_constraints call. Update docstring to list all steps including NC.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC state update happens only for i>0 but check happens for all i including leaf",
+  "updated_at": "2026-05-03T00:37:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:11:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

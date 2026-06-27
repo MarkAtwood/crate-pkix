@@ -1,0 +1,37 @@
+{
+  "closed_at": "2026-05-03T12:57:46Z",
+  "compaction_level": 0,
+  "content_hash": "fa821378627820ddd719b4678e60ceaf0e179d278f3f6d78a894ae596e9e5a2f",
+  "created_at": "2026-05-03T02:40:58Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk initializes nc_permitted=None and nc_excluded=empty regardless of the trust anchor cert's own NameConstraints extension. RFC 5280 \u00a76.1.2 allows trust anchors to provide initial-permitted-subtrees and initial-excluded-subtrees. A trust anchor that has a NameConstraints extension meant to limit what its subordinate CAs can issue is silently ignored. The comment at line 1194 references 'PKIX-fr4' which does not exist in beads. \u2192 Any trust-anchor-imposed NC constraints have no effect.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Trust anchor NC extension ignored; chain_walk starts with unconstrained state",
+  "updated_at": "2026-05-03T12:57:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:40:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-03T05:57:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-aoe",
+      "metadata": {},
+      "type": "supersedes"
+    }
+  ]
+}

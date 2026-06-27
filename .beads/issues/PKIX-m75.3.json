@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:00:06Z",
+  "compaction_level": 0,
+  "content_hash": "546233f1f16bc1569279c8be528ea5d53f20c4433720dd4e21e22993992f6d39",
+  "created_at": "2026-05-06T20:48:08Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: DeviationScope::IssuerDnContains stores a String substring. In DeviationScope::matches (pkix-lint/src/deviation.rs:274-278), every call does substring.to_lowercase() on each invocation, allocating a new String every time matches() is called. For a deviation store consulted once per certificate per lint, this is O(findings * deviations) allocations. Fix: normalize the substring to lowercase at construction time (in DeviationStore::add or in an IssuerDnContains constructor). The stored string should already be lowercased. The comparison becomes: issuer_str.to_lowercase().contains(self.0.as_str()) where self.0 is already lowercase. This eliminates the per-call allocation of the lowercased substring. The to_string() + to_lowercase() on the issuer side is still needed since the cert's issuer is not pre-lowercased, but the substring side is caller-controlled.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: IssuerDnContains repeats to_lowercase on hot path",
+  "updated_at": "2026-05-06T21:00:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6354aeb41a988fdca16a118e6e50834deb741543e8131028d0a8659cc84154ca",
+  "created_at": "2026-05-14T19:13:27Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: a CA issues a non-conformant cert with an otherName(SmtpUTF8Mailbox) SAN carrying an ASCII mailbox like 'user@example.com' (RFC 8398 \u00a74 says they MUST NOT, but it happens). A caller verifies an ASCII MailboxName(\"user@example.com\") target against this cert.\n\nExpected per pkix-identity/src/lib.rs:455-460:\n  /// An internationalized [`MailboxName`] (non-ASCII local-part) can only\n  /// match an `otherName(SmtpUTF8Mailbox)` SAN entry \u2014 `rfc822Name` is\n  /// IA5String and cannot carry non-ASCII bytes. An ASCII [`MailboxName`]\n  /// matches `rfc822Name` only. RFC 8398 \u00a74 requires CAs to use\n  /// `SmtpUTF8Mailbox` exclusively for non-ASCII mailboxes, so the two\n  /// SAN forms encode disjoint identity spaces.\n\nActual: san_entry_matches_mailbox (lib.rs:482-495) gates the Rfc822Name branch on `!target.is_internationalized` but does NOT gate the OtherName(SmtpUTF8Mailbox) branch. ASCII targets reach the SmtpUTF8 branch and can match.\n\nThis is a doc/code disagreement. Either is defensible standalone (strict = doc; liberal = code), but they must agree before 1.0 because both define publicly observable behavior:\n\n- If doc wins (recommended for security conservatism): add `if target.is_internationalized` guard on the SmtpUTF8 branch. Disjoint identity spaces means an ASCII target failing to match an SmtpUTF8Mailbox SAN forces the CA to issue conformant rfc822Name entries.\n- If code wins (liberal): rewrite the rustdoc to say 'an ASCII MailboxName may match either rfc822Name or SmtpUTF8Mailbox' and document why (interop with non-conformant CAs).\n\nThis is a 1.0 surface decision \u2014 the choice fossilizes. Pick one and document the rationale.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "ASCII MailboxName matches SmtpUTF8Mailbox SAN, contradicting rustdoc",
+  "updated_at": "2026-05-14T19:13:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:27:33Z",
+  "compaction_level": 0,
+  "content_hash": "f315e0c0d17393e3e3cbdbb313631bcd07ab8d86407488c89e095b160239433d",
+  "created_at": "2026-05-07T16:09:54Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:304-311 \u2014 the default impl of check_revocation_against_anchor returns Ok(()), meaning any custom RevocationChecker that does NOT override this method silently skips revocation checking for the certificate directly issued by the trust anchor.\n\nThe documentation is explicit about this, including a 'Failing to override' warning in the module doc comment. However there is NO compile-time signal, no runtime diagnostic, and no way to detect the skip from the caller.\n\nIn pkix_chain::verify_chain (lib.rs:164-168), this is correctly called. The call passes through without error even when the checker doesn't cover that cert.\n\nThis is a design API issue: the default-to-skip behavior creates a security hole for any implementor who does not read the documentation carefully. The comment in lib.rs says 'Failing to override it will silently leave the anchor-issued certificate unchecked with no compile error or runtime warning.'\n\nSuggested mitigation (P2): Add a doc comment on the default impl that prints 'NOTE: the default implementation performs NO revocation check' as a warning that must be explicitly acknowledged. Consider providing a wrapper type that panics in debug builds if the default is used with non-NoRevocation semantics.\n\nThis is a real API safety concern but not a correctness bug in the existing code, since NoRevocation intentionally skips.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_revocation_against_anchor default Ok(()) silently skips anchor-issued cert",
+  "updated_at": "2026-05-07T16:27:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:09:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

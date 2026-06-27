@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "documented; monolithic structure is intentional for RFC 5280 state machine",
+  "closed_at": "2026-05-07T16:42:10Z",
+  "compaction_level": 0,
+  "content_hash": "5d384e68302b5ceb95cfbc54d5cf363e605398d8edc053a7db401a05b801c3e3",
+  "created_at": "2026-05-07T16:19:48Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1906 (chain_walk function)\n\nClippy pedantic flags chain_walk as 'this function has too many lines (484/100)'. Functions this long are difficult to review, test at the unit level, and understand in isolation.\n\nThe function currently implements in one pass:\n  - Signature algorithm allowlist check\n  - Signature verification  \n  - Name linkage\n  - Validity period (two variants)\n  - RSA key size\n  - Critical extension guard\n  - Certificate policy tree (d)(1),(d)(2),(d)(3)\n  - Policy violation check (f)\n  - Name constraints check (e,e2,e3,e4)\n  - BasicConstraints + pathLen (f,h)\n  - KeyUsage (g)\n  - PolicyMappings (policy-a, policy-b)\n  - PolicyConstraints (policy-c)\n  - InhibitAnyPolicy (policy-d)\n  - NameConstraints state update (i)\n  - Post-loop policy checks (\u00a76.1.5)\n\nMost of these sub-checks are already delegated to helper functions. Extracting the policy-tree processing (init_policy_tree, per-cert update, prune, post-loop checks) into a separate function, and the NameConstraints state accumulation into another, would reduce chain_walk to a readable orchestration loop of ~100-150 lines.\n\nThis is a maintenance issue: the current structure makes it easy to introduce a subtle ordering bug between policy-tree and NC updates.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.42",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-path: chain_walk is 484 lines \u2014 violates function-length guideline",
+  "updated_at": "2026-05-07T16:42:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

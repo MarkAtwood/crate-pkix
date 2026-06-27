@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T19:10:39Z",
+  "compaction_level": 0,
+  "content_hash": "e59bf07dee1e23b225c623b9a57f58b72ce2478959d4f466defd985fc973a14c",
+  "created_at": "2026-05-11T09:29:10Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nPKIX-baac.5 shipped Merkle inclusion proof and STH signature verification (RFC 6962 \u00a72.1.1 / \u00a73.5) with synthetic-but-algorithm-correct fixtures: a Python oracle builds a tiny Merkle tree of 7 leaves, signs a synthetic STH committing to its root, and a separate independent verify-side algorithm (RFC 9162 \u00a72.1.3.2) cross-checks every proof. openssl additionally independently validates the STH signature against the SPKI and signed-input bytes.\n\nThe bead's acceptance criterion 2 ('One real-world inclusion proof verifies against a real STH') is met in algorithm-shape but not in literal real-world bytes. A captured live-log triple from e.g. Google Argon2024 or Cloudflare Nimbus 2024 would provide extra defense in depth against any subtle wire-format divergence between pkix-ct's interpretation and what real CT logs emit.\n\n## What\n\n1. Pick a currently-usable RFC 6962 log (Argon2024 or Nimbus 2024 are fine choices).\n2. Fetch one cert's SCT (from a CT-enforcing TLS site's cert), its inclusion proof via the log's get-proof-by-hash endpoint, and a contemporary STH via get-sth.\n3. Commit the captured triple (cert.der, sct.bin, audit-path.bin, sth.bin, log-spki.der) as offline fixtures under pkix-ct/tests/fixtures/.\n4. Add an integration test that wires them together: parse the cert, derive the leaf hash for the precert form, verify the inclusion proof against the STH's root_hash, and verify the STH signature against the log's published SPKI.\n\n## Out of scope\n\n- Live network calls during tests. The capture is one-off; the test runs fully offline.\n- Automated capture in CI. If the captured STH ages out, the test will still verify (since pkix-ct doesn't enforce STH freshness), but maintainers may want to refresh periodically.\n\n## Filed as\n\nFollow-up to PKIX-baac.5. Algorithm correctness is established by PKIX-baac.5's synthetic-oracle work; this bead just adds a concrete real-world byte-equality data point.",
+  "ephemeral": 0,
+  "id": "PKIX-baac.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Closed 2026-05-11 (do-beads autonomous loop).\n\nDelivered:\n- pkix-ct/tests/fixtures/live-log/capture_live_log.py \u2014 one-off network-capture script that finds a currently-running CT log from the Google v3 log list, captures a precert SCT from a CT-enforcing TLS site (default: cloudflare.com), computes the RFC 6962 \u00a73.4 MerkleTreeLeaf and its leaf hash, fetches the matching inclusion proof and a contemporary STH, and writes everything as offline fixtures.\n- Captured triple from Cloudflare Nimbus2026 (currently-usable log shard) at tree_size=4188754631, leaf_index=4172671010 (audit-path length 30). meta.json records full provenance.\n- pkix-ct/tests/live_log.rs \u2014 integration test that runs verify_sct_for_precert + verify_sth + verify_inclusion end-to-end against the captured triple. All 3 pkix-ct entry points pass.\n\nIndependent oracles cross-validate the fixture:\n1. Cloudflare's get-proof-by-hash endpoint accepted the leaf hash my script computed \u2014 the log itself confirms the \u00a73.4 byte form is correct.\n2. A pure-Python RFC 9162 \u00a72.1.3.2 verifier inside the capture script re-verifies the inclusion proof against the STH root.\n3. openssl dgst -verify independently confirms the STH ECDSA-SHA256 signature against the log SPKI.\n\nFollow-up filed: PKIX-yzb6 (ship a public MerkleTreeLeaf builder helper so future capture scripts and CT consumers don't have to re-implement \u00a73.4).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: capture a live-log SCT+inclusion+STH triple as offline fixture",
+  "updated_at": "2026-05-11T19:10:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T02:29:10Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T18:57:23Z",
+  "compaction_level": 0,
+  "content_hash": "081b62ceae346d032f463cabf8031a948aafcd1a28927f767391bf4b35175d4b",
+  "created_at": "2026-05-07T17:22:14Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:346 \u2014 `verify_signature` on `SignatureVerifier` returns Result with no `# Errors` section. lib.rs:877 \u2014 `validate_path_with_profile` same. Clippy pedantic missing_errors_doc fires for both. Fix: add `# Errors` sections.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-path] missing # Errors doc on SignatureVerifier + validate_path_with_profile",
+  "updated_at": "2026-05-07T18:57:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

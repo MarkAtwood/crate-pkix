@@ -1,0 +1,15 @@
+{
+  "auto_compact_enabled": "false",
+  "compact_batch_size": "50",
+  "compact_parallel_workers": "5",
+  "compact_tier1_days": "30",
+  "compact_tier1_dep_levels": "2",
+  "compact_tier2_commits": "100",
+  "compact_tier2_days": "90",
+  "compact_tier2_dep_levels": "5",
+  "compaction_enabled": "false",
+  "dolt_host": "127.0.0.1",
+  "dolt_mode": "server",
+  "dolt_port": "3308",
+  "issue_prefix": "PKIX"
+}

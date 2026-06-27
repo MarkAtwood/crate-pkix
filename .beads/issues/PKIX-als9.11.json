@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "9fe134101a0f47e3299c51955abfae69dc6b8981bf2457fb8e67f7cf1457cbc0",
+  "created_at": "2026-05-08T05:45:14Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nExtract \u00a76.1.4(k) BC cA / NotCA + \u00a76.1.4(n) keyCertSign + \u00a76.1.4(m) pathLenConstraint into `pub(crate) fn check_intermediate_basic_constraints(cert: &Certificate, max_path_len: &mut Option<u8>, i_non_self_issued: usize, index: usize) -> Result<()>`.\n\nSource ranges:\n- \u00a76.1.4(k) lines 2398\u20132412\n- \u00a76.1.4(n) lines 2414\u20132425\n- \u00a76.1.4(m) lines 2427\u20132438\n\n## Risk\n\nMedium. Touches `max_path_len` and self-issued path-length counting.\n\n## Self-issued exemption (PKIX-als9 design \u00a75)\n\n\u00a76.1.4(m) `pathLenConstraint` counts only non-self-issued certs. PKITS \u00a74.5 was the largest unmonitored regression class; fixtures imported in PKIX-77cl. H7 must preserve self-issued exemption \u2014 \u00a74.5.1 / \u00a74.5.3 in pkix-path tests will catch regressions.\n\n## Acceptance\n\n- New helper.\n- chain_walk calls helper for intermediates.\n- All PKITS tests pass, including \u00a74.5.1, \u00a74.5.3, \u00a74.5.4, \u00a74.5.6, \u00a74.5.8.\n- \u00a74.6 (basic constraints) and \u00a74.7 (key usage) tests pass.\n- clippy clean.\n- No behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-als9.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "als9: H7 \u2014 extract check_intermediate_basic_constraints (~33 lines, \u00a76.1.4(k)+(m)+(n))",
+  "updated_at": "2026-05-08T05:45:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T22:45:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-als9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

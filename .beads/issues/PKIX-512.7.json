@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:28:59Z",
+  "compaction_level": 0,
+  "content_hash": "482922372b130bdae3d43a1cf206e89f679b564abf08b1a6e64d765277e64bcd",
+  "created_at": "2026-05-06T20:17:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/tests/cabf_tls_br_tests.rs: There is no test that calls ValidityMaxLint via run_cert with current time (operational mode) for a cert whose notBefore was pre-SC-081 but whose validity exceeds the post-SC-081 cap. This is the failure mode of PKIX-512.1 (SC-081 cap evaluated at wrong time). Without a test demonstrating the correct behavior, the bug cannot be regression-tested. Add: one test with now=post-SC-081, cert.notBefore=pre-SC-081, cert.validity=300d \u2192 should PASS (cap=398d at issuance); one test with now=post-SC-081, cert.notBefore=post-SC-081, cert.validity=300d \u2192 should FAIL (cap=200d at issuance).",
+  "ephemeral": 0,
+  "id": "PKIX-512.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "No test for ValidityMaxLint in audit-mode vs operational-mode",
+  "updated_at": "2026-05-06T20:28:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

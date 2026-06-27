@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "78f632108581b88a37beaf80c16a323d337254538c81e608873c5894014bd82e",
+  "created_at": "2026-05-14T19:14:41Z",
+  "created_by": "Mark Atwood",
+  "description": "normalize_dns_name at pkix-identity/src/lib.rs:569 and matches_smtp_utf8_mailbox at line 532 call idna::domain_to_ascii. The idna crate's default for that function is UTS#46 'transitional=false' processing (the modern non-transitional form most browsers have settled on).\n\nReal-world consequence: some inputs (e.g., German '\u00df' = sharp s) produce different A-labels under transitional vs non-transitional. A target normalized one way and a SAN normalized the other will not match. The choice is intentional but not documented.\n\nAction: add a paragraph to the module-level Limitations section (lib.rs:74-95) naming the IDNA processing mode used and citing the idna crate version. Future contributors who consider switching to idna::Idna::new(...).to_ascii(...) for custom strictness will see the trade-off.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.11",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "idna::domain_to_ascii processing mode (UTS#46 vs IDNA2008-strict) not documented",
+  "updated_at": "2026-05-14T19:14:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

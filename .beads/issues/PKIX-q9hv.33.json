@@ -1,0 +1,30 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "85db444a1c7c2311c12f5ca9421de538e63aea017b0f7263a32daac204687240",
+  "created_at": "2026-05-14T15:04:09Z",
+  "created_by": "Mark Atwood",
+  "description": "`build_with_aia` (pkix-chain/src/lib.rs:650) decodes AIA-fetched bytes with `<Certificate as der::Decode>::from_der(&der)` directly, trusting whatever size the `AiaFetcher` returned. The `pkix-aia-http::HttpFetcher` adapter currently caps body size (default 64 KiB per pkix-aia rustdoc; configurable via `with_max_response_size`) and surfaces `AiaError::ResponseTooLarge` if the cap is exceeded, so today the `from_der` input is bounded.\n\nDefense-in-depth gap: the cap lives in an adapter crate and is per-fetcher configuration. A future `AiaFetcher` implementation \u2014 caller-supplied (e.g. a cache wrapper) or a different transport (gRPC, in-memory) \u2014 may forget the cap. `pkix-chain` would then call `from_der` on an arbitrarily large `Vec<u8>`. While `x509-cert`'s DER parser is itself bounded by ASN.1 length encoding, attempting to parse a 1 GiB attacker-supplied blob still allocates working buffers in proportion to claimed-length fields and runs the structural parser over the data \u2014 a documented amplification source.\n\nMitigation: enforce a sanity cap inside `build_with_aia` before decoding. The RFC-realistic ceiling for a single X.509 cert is well under 32 KiB (typical: 1-4 KiB; pathological with many SANs: under 16 KiB). 64 KiB matches `pkix-aia-http`'s default and gives 16\u00d7 headroom. Cap of `MAX_AIA_DER_LEN = 64 * 1024` as a private const, check `der.len() <= MAX_AIA_DER_LEN` and treat oversize as `AiaError::MalformedCertificate(uri)` (or a new `AiaError::ResponseTooLargeAtChain`).\n\nGoing wrong: availability through memory pressure if any adapter forgets caps. Not a confidentiality / integrity issue.\n\nCrypto-security framing: P2 defense-in-depth. With the current `pkix-aia-http` cap in place this is a hypothetical; the cap-in-chain is insurance against an adapter regression. The current code is safe **today** but the safety depends on an invariant in another crate.\n\nRelated: PKIX-q9hv.14 ('build_with_aia trusts batch_fetch return length without assertion') \u2014 that finding is about result-array length; this one is about per-result byte length. Both share the pattern of trusting the adapter without an in-crate sanity check.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.33",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "(SEC) AIA-fetched DER is decoded without a defense-in-depth size cap in pkix-chain",
+  "updated_at": "2026-05-14T15:04:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:04:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "FALSE ALARM: matches_dns_name without leading dot matches subdomains (test 30 passes)",
+  "closed_at": "2026-05-03T00:34:03Z",
+  "compaction_level": 0,
+  "content_hash": "b9e3599f1dc54b3e89ee8a097183d8cbf32b469f98aabd32c7f7083b3fe8081a",
+  "created_at": "2026-05-03T00:10:52Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_dns_name lines 973-980: when constraint has no leading period, the comment says 'matches exact host AND any subdomain'. But RFC 5280 \u00a74.2.1.10 text says: 'DNS name constraint without a leading period matches the host and any subdomain'. However PKITS 4.13.30 is ignored with the note 'DNS subdomain match not implemented; exact match only'. But lines 976-980 DO attempt subdomain matching. The real failure of test 30 (subject=testserver.testcertificates.gov, constraint=testcertificates.gov) should pass: subject.len() > constraint.len() + 1 (30 > 20 + 1 = 21, YES), subject.as_bytes()[30-20-1=9] should be '.'. Let me verify: 'testserver.testcertificates.gov'[9] = '.'. So subject[9..] = '.testcertificates.gov'. eq_ignore_ascii_case('testcertificates.gov'). This checks subject[11..] not subject[9..]. Actually subject[subject.len()-constraint.len()..] = subject[11..] = 'testcertificates.gov'. That DOES equal constraint. The subdomain condition: subject.as_bytes()[subject.len()-constraint.len()-1] = subject.as_bytes()[10] = '.' \u2014 yes. So this SHOULD match. Test 30 may be failing for a different reason (possibly the check is on a SAN vs subject). This needs deeper investigation but the bug comment on test 30 appears to be stale/wrong \u2014 the matching logic looks correct for straight subdomain. Worth investigating why test 30 actually fails.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.5",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "matches_dns_name: no-leading-dot does NOT match subdomains per RFC 5280",
+  "updated_at": "2026-05-03T00:34:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:10:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

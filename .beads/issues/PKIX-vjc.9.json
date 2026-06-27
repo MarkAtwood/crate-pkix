@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added INVARIANT comment documenting the nc_constrained_types never-cleared semantics",
+  "closed_at": "2026-05-03T00:38:03Z",
+  "compaction_level": 0,
+  "content_hash": "28cac924776762500020e618e8d214ab3e8a0df4904c735a243572a4dbc97619",
+  "created_at": "2026-05-03T00:11:31Z",
+  "created_by": "Mark Atwood",
+  "description": "nc_constrained_types is set with |= (ORed, never cleared). If a CA adds a permittedSubtrees entry for DNS, then the intersection narrows it to empty (two conflicting DNS constraints from two CAs), the type stays constrained but nc_permitted may contain no DNS entries. The enforcement in check_names checks type_constrained() \u2014 which is true \u2014 and then requires at least one match in nc_permitted. With zero DNS entries in nc_permitted, every DNS SAN fails. This is the CORRECT RFC 5280 behavior (conflicting permitted subtrees should block all names of that type). The bitmask design is intentional. However this is a subtle invariant: the correctness relies on nc_constrained_types never losing bits, and nc_permitted correctly encoding the empty set for that type by containing zero entries of that type. This invariant is not documented. A future contributor who 'cleans up' nc_constrained_types based on nc_permitted content will silently break the empty-intersection case. Document explicitly.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_constrained_types bitmask: once a type is constrained it can never be unconstrained",
+  "updated_at": "2026-05-03T00:38:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:11:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

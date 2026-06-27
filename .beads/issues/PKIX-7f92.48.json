@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "93bea52581b2e8387c9de261f26b1fc4f0a7bdbe16877bd310707d180dc54ba2",
+  "created_at": "2026-05-14T16:10:07Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:738-744 implements hex_encode as:\\n\\n```rust\\nfn hex_encode(bytes: &[u8]) -> String {\\n    let mut s = String::with_capacity(bytes.len() * 2);\\n    for b in bytes {\\n        s.push_str(&format!(\"{b:02x}\"));\\n    }\\n    s\\n}\\n```\\n\\nEach `push_str(&format!(...))` allocates a fresh 2-byte String, formats into it, copies the bytes into `s`, and drops the temporary. That is one alloc + one copy per input byte on top of the `String::with_capacity` pre-allocation that was supposed to be the optimisation.\\n\\nThe sister implementation in pkix-lint/src/oscal/emit.rs:822-837 already does it the cheap way:\\n\\n```rust\\nfn hex(bytes: &[u8]) -> String {\\n    let mut s = String::with_capacity(bytes.len() * 2);\\n    for b in bytes {\\n        s.push(hex_digit(b >> 4));\\n        s.push(hex_digit(b & 0x0f));\\n    }\\n    s\\n}\\n```\\n\\nNo per-byte allocations. Either:\\n* Replace deviation.rs hex_encode with the emit.rs hex shape, OR\\n* Use `write!(&mut s, \"{b:02x}\").unwrap()` which avoids the intermediate String allocation (`write!` writes directly into the target).\\n\\nThis is the canonical 'Vec::with_capacity then immediately allocate inside the loop' anti-pattern from the clippy subsection of the prompt. Note: PKIX-7f92.14 already calls out that the three hex routines should be consolidated; that finding is the structural fix. This finding is the local-correctness fix for the deviation.rs site even before consolidation.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.48",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "hex_encode in deviation.rs uses .push_str(&format!(\"{b:02x}\")) \u2014 per-byte allocation; emit.rs hex() shows the cheaper form",
+  "updated_at": "2026-05-14T16:10:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:10:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

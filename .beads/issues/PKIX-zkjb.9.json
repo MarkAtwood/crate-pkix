@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "1.0 API freeze landed. Verifier<'a, V, R, A: AiaFetcher = NoAiaFetcher> with aia: &'a A field; Verifier::new takes 5 args, Verifier::new_no_aia convenience constructor wires &NoAiaFetcher; verify_chain takes 6 args, verify_chain_default keeps 4-arg shape (wires NoAiaFetcher internally); all 8 use-case wrappers bake &NoAiaFetcher in their internal verify_chain call (signatures unchanged). Re-exports added for AiaError/AiaFetcher/NoAiaFetcher. Doctests + e2e tests updated. NO actual AIA fetching invoked; NoAiaFetcher preserves pre-1.0 'caller supplies the complete chain' semantics. The 1.0 surface is now locked so PKIX-zkjb.7 can wire real fetching post-1.0 non-breakingly. 107 workspace test suites pass; cargo clippy -D warnings clean; strict rustdoc clean; fmt clean. Committed ec9bb744. PKIX-zkjb's full 1.0-blocker cascade (.2/.3/.4/.9) now CLOSED.",
+  "closed_at": "2026-05-13T21:07:24Z",
+  "compaction_level": 0,
+  "content_hash": "964d99d810495074e68dd65d63bc752524a9a0aeea52fc906a413fd97cb8e8c1",
+  "created_at": "2026-05-13T17:05:16Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nAdd the `A: AiaFetcher` 3rd generic to the `Verifier` struct in `pkix-chain`, defaulting to `NoAiaFetcher`. **1.0 API freeze.** Pure type-level change \u2014 no behavior change in chain-build; `NoAiaFetcher` returns `FetchingDisabled` so the chain-build path matches current behavior (chains needing AIA-fetched intermediates fail validation).\n\nThe point: lock the public API now so adding real AIA fetching post-1.0 is non-breaking.\n\n## API shape\n\nCurrent `Verifier` (from PKIX-gsd9):\n\n```rust\npub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker> {\n    anchors: &'a [TrustAnchor],\n    policy: &'a ValidationPolicy,\n    verifier: &'a V,\n    revocation: &'a R,\n}\n```\n\nAfter this bead:\n\n```rust\npub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    policy: &'a ValidationPolicy,\n    verifier: &'a V,\n    revocation: &'a R,\n    aia: &'a A,\n}\n```\n\nConstructor evolves to take `aia` parameter. Existing 2-generic call sites that constructed `Verifier { ... }` directly need to pass `&NoAiaFetcher` (or use a convenience constructor `Verifier::new_no_aia(...)`).\n\n`verify_chain` free function similarly gets an `aia: &impl AiaFetcher` parameter; `verify_chain_default` uses `NoAiaFetcher`.\n\n## What this bead does NOT do\n\n- Does NOT implement chain-build to actually call `aia.fetch()`. The Verifier holds the AiaFetcher reference but doesn't use it; chain-build flow remains \"caller-supplied chain must be complete or validation fails.\" That work is PKIX-zkjb.7 (post-1.0).\n- Does NOT ship pkix-aia-http. That's PKIX-zkjb.5 (post-1.0).\n- Does NOT ship a differential test for actual AIA fetching. That's PKIX-zkjb.8 (post-1.0).\n\nThis is **API freeze only**. The 3-generic shape becomes the 1.0 commitment; the real fetching behavior lands post-1.0 without API breakage.\n\n## Implementation notes\n\n- `Verifier::new()` constructor signature changes \u2014 breaking for anyone constructing `Verifier` today. Pre-1.0 is the right time for this.\n- Consider exposing `Verifier::with_aia(aia: &A)` builder method so default construction picks `NoAiaFetcher` without explicit reference.\n- Document in rustdoc: \"AiaFetcher behavior lands in a future point release; at 1.0 the trait exists and is reserved in the Verifier signature.\"\n\n## Acceptance\n\n- [ ] Verifier struct has `A: AiaFetcher = NoAiaFetcher` 3rd generic\n- [ ] `aia: &'a A` field added\n- [ ] Constructor signature updated (with convenience method for NoAiaFetcher default)\n- [ ] `verify_chain` free function takes optional `&impl AiaFetcher` parameter (or default-Aia variant)\n- [ ] `verify_chain_default` uses NoAiaFetcher\n- [ ] Existing tests pass after updating to pass `&NoAiaFetcher` (or whatever the default convenience exposes)\n- [ ] No actual AIA fetching invoked anywhere in chain-build flow\n- [ ] CHANGELOG entry: \"API freeze for future AiaFetcher integration. NoAiaFetcher default preserves existing 'caller supplies full chain' behavior.\"\n\n## Blocks\n\n- PKIX-wlsr (1.0 release) \u2014 this bead must close before 1.0 publish\n- PKIX-zkjb.7 (post-1.0 chain-build wiring) \u2014 depends on this bead's API existing\n\n## Blocks on\n\n- PKIX-zkjb.3 (AiaFetcher trait must exist before Verifier can reference it)\n- PKIX-zkjb.4 (NoAiaFetcher default must exist before Verifier default-type can reference it)\n\n## Cross-references\n\n- PKIX-zkjb (AiaFetcher umbrella)\n- PKIX-wlsr.3 decided 2026-05-13: \"3-generic now with placeholder NoAiaFetcher\"\n- PKIX-gsd9 (Verifier struct introduction)\n",
+  "ephemeral": 0,
+  "id": "PKIX-zkjb.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Verifier struct: add 3rd generic for AiaFetcher with NoAiaFetcher default (1.0 API freeze)",
+  "updated_at": "2026-05-13T21:07:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T10:05:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T10:05:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T10:05:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-zkjb.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

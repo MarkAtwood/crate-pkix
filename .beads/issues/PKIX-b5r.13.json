@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: changed while d > 0 + inner break to while d > 1, eliminating dead code and clarifying intent.",
+  "closed_at": "2026-05-05T16:08:27Z",
+  "compaction_level": 0,
+  "content_hash": "4e5528e1dad9b2e28446e4a34cc47078ef4d825d5685513c3983e285dce4a295",
+  "created_at": "2026-05-05T15:46:45Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:748\u2013776\n\nThe function is:\n\n    fn prune_policy_tree(tree: &mut Vec<PolicyNode>, cert_depth: usize) {\n        let mut d = cert_depth;\n        while d > 0 {\n            d -= 1;\n            if d == 0 { break; }  // depth-0 root is always kept\n            ...\n        }\n    }\n\nThe while loop condition is 'd > 0', so after 'd -= 1' the only way to reach the 'if d == 0 { break }' is when d was 1 before the decrement.  This is equivalent to 'while d > 1' as the outer condition:\n\n    while d > 1 {\n        d -= 1;\n        ...\n    }\n\nThe extra 'break' inside the loop at d==0 is never reached \u2014 the while guard 'd > 0' after 'd -= 1' would exit on the next iteration anyway.  A future reader must trace through both the while condition AND the inner break to understand what the loop does.  The loop structure obscures the invariant that d is always >= 1 when the body executes.  Simplify to 'while d > 1 { d -= 1; ... }' and remove the dead break.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "prune_policy_tree: d=0 guard makes the while condition unreachable",
+  "updated_at": "2026-05-05T16:08:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

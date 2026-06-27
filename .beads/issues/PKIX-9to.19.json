@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:41Z",
+  "compaction_level": 0,
+  "content_hash": "4cd016e89c33004d9ed2d51072c6c77761d6152ba3ac22b2d86aebd704977c36",
+  "created_at": "2026-05-06T22:17:38Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs:sc081_validity_cap and pkix-lint/src/cabf_tls_br.rs:ValidityMaxLint correctly use the certificate's notBefore as the input to the phase lookup, not the relying-party's current time. SC-081 requires the cap in force at issuance to govern the cert for its lifetime. Using now_unix would retroactively invalidate pre-SC-081 certs after the phase boundary. The WebPkiProfile doc explains this clearly. A contributor might suggest adding max_validity_secs = Some(398*86400) to the policy; that must be resisted because it uses RP current time and would break pre-SC-081 certs after 2026-03-15.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.19",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SC-081 validity cap uses notBefore not relying-party time \u2014 semantically correct",
+  "updated_at": "2026-05-06T22:29:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:17:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

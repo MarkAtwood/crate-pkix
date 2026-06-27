@@ -1,0 +1,31 @@
+{
+  "close_reason": "fixed by PKIX-onc.9 fix (clone\u2192move in TryFrom)",
+  "closed_at": "2026-05-03T13:25:50Z",
+  "compaction_level": 0,
+  "content_hash": "dc86aedb7ab479f80881237a3ebdbaeb09b7d5b5373974cba39a31e4026e7c8c",
+  "created_at": "2026-05-03T13:15:25Z",
+  "created_by": "Mark Atwood",
+  "description": "TryFrom<Certificate> for TrustAnchor takes cert by value but calls .clone() on subject and subject_public_key_info (lines 302-303). Since the impl consumes cert, these should be direct field moves: subject: cert.tbs_certificate.subject, subject_public_key_info: cert.tbs_certificate.subject_public_key_info. The clone is a copy-paste artefact from From<&Certificate>. Only try_find_cert_ext needs &cert so it must precede the struct literal, or be called via cert.tbs_certificate.extensions reference before consuming the fields.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TryFrom<Certificate>: needless .clone() on owned fields",
+  "updated_at": "2026-05-03T13:25:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

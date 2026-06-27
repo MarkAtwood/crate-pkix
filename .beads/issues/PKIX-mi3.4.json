@@ -1,0 +1,38 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:18Z",
+  "compaction_level": 0,
+  "content_hash": "4c606b4b5a82108c3664f524bd2cb512bec7cd69097ef655125b7be6e5e3ec4f",
+  "created_at": "2026-05-05T14:33:35Z",
+  "created_by": "Mark Atwood",
+  "description": "In chain_walk for i>0: step (a) reject anyPolicy as issuer/subject domain in PolicyMappings. Step (b) remap expected_policy_set when policy_mapping>0, delete nodes when policy_mapping==0. Step (h) decrement explicit_policy/policy_mapping/inhibit_any for non-self-issued certs. Steps (i,j) clamp counters from PolicyConstraints and InhibitAnyPolicy extensions.",
+  "ephemeral": 0,
+  "id": "PKIX-mi3.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement RFC 5280 \u00a76.1.4(a-b,h-j): PolicyMappings + counter updates",
+  "updated_at": "2026-05-05T15:25:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3.3",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

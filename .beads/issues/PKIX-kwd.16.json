@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:37Z",
+  "compaction_level": 0,
+  "content_hash": "96e3c3f3a90a79c08c664ecd9e430a4b9cc60bd1216644e6f8e9403057297bbf",
+  "created_at": "2026-05-06T15:18:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs lines 169-215: The Display impl for Error uses the type name explicitly in every match arm:\n  Error::SignatureInvalid { index } => ...\n  Error::ValidityPeriod { index } => ...\n  ... (all 15 variants)\n\nClippy (nursery/pedantic) flags this as 'unnecessary structure name repetition \u2014 use the applicable keyword: Self'. Changing Error:: to Self:: in match arms inside impl Error blocks is the idiomatic Rust style for 2018+ edition code. It also means a type rename does not require updating every arm.\n\nThis affects pkix-path/src/lib.rs Display impl (line 169), std::error::Error impl (line 218), and the From<der::Error> impl (line 244).\n\nSame pattern exists in pkix-path-builder/src/lib.rs Error::Display (line 93).",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::Display uses Error:: prefix instead of Self:: in match arms",
+  "updated_at": "2026-05-06T15:24:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:18:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

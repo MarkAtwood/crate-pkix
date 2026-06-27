@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-03T02:46:40Z",
+  "compaction_level": 0,
+  "content_hash": "676c4a23a1ddc399673eacb737b4e3baac9bf785ce69bc1aff3f28a507256221",
+  "created_at": "2026-05-03T02:41:23Z",
+  "created_by": "Mark Atwood",
+  "description": "Both functions have identical structure: scan extensions, find by OID, call T::from_der().ok(). The pattern will be copy-pasted again when the next extension type (e.g. NameConstraints for the trust anchor, CRLDistributionPoints) is added. Suggested rewrite: fn find_ext<T: der::Decode>(cert: &Certificate, oid: ObjectIdentifier) -> Option<T> { cert.tbs_certificate.extensions.as_deref().unwrap_or(&[]).iter().find(|e| e.extn_id == oid).and_then(|e| T::from_der(e.extn_value.as_bytes()).ok()) }",
+  "ephemeral": 0,
+  "id": "PKIX-27p.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_name_constraints and cert_subject_alt_names duplicate find-ext-by-OID-and-decode",
+  "updated_at": "2026-05-03T02:46:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

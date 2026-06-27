@@ -1,0 +1,22 @@
+{
+  "close_reason": "Added comment documenting duplicate-OID invariant in names_match",
+  "closed_at": "2026-05-02T17:20:08Z",
+  "compaction_level": 0,
+  "content_hash": "69b8784bbd24116c5abd7db9aa81d4909f2745d00534892e54e71c23540208d8",
+  "created_at": "2026-05-02T17:15:20Z",
+  "created_by": "Mark Atwood",
+  "description": "The names_match function relies on RFC 5280 SET semantics to forbid duplicate OIDs within an RDN, but this constraint is not documented anywhere. A maintainer unfamiliar with X.509 could refactor the matching logic to use pair-tracking without realizing it would break on edge case certificates with same OID repeated. Document this invariant in the names_match rustdoc or add an assertion/validation check.",
+  "ephemeral": 0,
+  "id": "PKIX-doy",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "SET matching: document duplicate OID invariant in names_match",
+  "updated_at": "2026-05-02T17:20:08Z"
+}

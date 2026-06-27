@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.56",
+  "title": "pkix-revocation crl feature gates on std, blocking no_std CRL checking",
+  "description": "In pkix-revocation's Cargo.toml, the 'crl' feature requires 'std': 'crl = [\"std\"]'. The OCSP feature similarly: 'ocsp = [\"std\", ...]'. This means CRL and OCSP checking are unavailable in no_std environments. The crate-level docs state 'The core trait and NoRevocation are no_std. Feature-gated checkers that perform network I/O are std-only' \u2014 but CrlChecker performs no network I/O (the docs say 'Offline CRL validation \u2014 no network; you provide the DER-encoded CRL bytes'). An offline CRL check that takes caller-supplied DER bytes should be feasible in no_std+alloc, yet the feature gate forces std.\n\nWhat goes wrong if this stays as-is: Embedded/no_std callers who can supply CRL DER bytes offline are locked out of CRL revocation checking. They are forced to use NoRevocation even when they have the CRL data available. This is a contract gap: the API promises 'offline, caller-supplied bytes' but the feature gate requires 'std'.\n\nThe likely reason for the std gate is that der::Error or x509-cert types used in the CRL path need std. Whether those deps actually need std or could be feature-gated to alloc-only is an implementation question.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-revocation/Cargo.toml line 22 ('crl = [\"std\"]')",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:33Z",
+  "updated_at": "2026-06-15T17:07:36Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:32"
+    }
+  ]
+}

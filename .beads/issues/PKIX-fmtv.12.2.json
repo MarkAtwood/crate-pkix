@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T01:55:33Z",
+  "compaction_level": 0,
+  "content_hash": "1d1b189225408cb37c3e87e32b4a10c68aeb8d293577d556e2b206f2eb9e31ce",
+  "created_at": "2026-05-12T05:17:53Z",
+  "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "description": "Ship the S/MIME ergonomic wrappers in pkix-chain that compose existing chain validation with the new pkix-identity mailbox binding.\n\n## Blocks on\n\n- **PKIX-fmtv.7** (human-labeled): decides the v0.x wrapper set \u2014 specifically whether BOTH signer and recipient wrappers ship, or only signer, or both gated behind separate feature flags.\n- **PKIX-fmtv.12.1**: pkix-identity `verify_mailbox` body must be implemented first so the wrappers have something to call.\n\n## Deliverable\n\nAdd to pkix-chain public API:\n\n```rust\npub fn verify_smime_signer(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    mailbox:    &MailboxName<'_>,    // re-exported from pkix-identity\n    policy:     &ValidationPolicy,   // typically BasicSmimeProfile.policy(now)\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n\npub fn verify_smime_recipient(\n    chain:      &[Certificate],\n    anchors:    &[TrustAnchor],\n    mailbox:    &MailboxName<'_>,\n    policy:     &ValidationPolicy,\n    verifier:   &impl SignatureVerifier,\n    revocation: &impl RevocationChecker,\n) -> Result<ValidatedPath, VerifyError>;\n```\n\nBodies:\n1. `verify_chain(chain, anchors, policy, verifier, revocation)?` (existing).\n2. `pkix_identity::verify_mailbox(&chain[0], mailbox)?` (new).\n3. `Ok(ValidatedPath)`.\n\nThe signer/recipient distinction is encoded in the caller-supplied `ValidationPolicy` (keyUsage: `digitalSignature` for signer vs `keyEncipherment` for recipient \u2014 set via `BasicSmimeProfile` or downstream profiles in `pkix-profiles-cabf`). The wrappers themselves are byte-identical except for the function name; the distinction is purely API-ergonomic so callers communicate intent at the call site.\n\n## VerifyError changes\n\nAdd variants `MailboxMismatch(IdentityError)` and `MalformedMailbox(IdentityError)` or similar, wrapping `pkix_identity::IdentityError`. Exact shape depends on PKIX-fmtv.7's decision.\n\n## Tests\n\n- Positive: cert with matching SAN + valid chain \u2192 `Ok(ValidatedPath)`.\n- Identity-mismatch: cert with non-matching SAN + valid chain \u2192 `VerifyError::MailboxMismatch`.\n- Chain-invalid: cert with matching SAN + broken chain \u2192 `VerifyError::PathInvalid` (existing).\n- Path-validation runs first: cert with matching SAN + expired chain \u2192 path error, not identity error (assertion on error ordering).\n\n## Out of scope\n\n- Body of `pkix_identity::verify_mailbox` \u2014 that is PKIX-fmtv.12.1.\n- Wrapper-set decision \u2014 that is PKIX-fmtv.7.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.12.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain: verify_smime_signer / verify_smime_recipient wrappers (composes verify_chain + pkix_identity::verify_mailbox)",
+  "updated_at": "2026-05-13T01:55:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:17:53Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.12",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T22:17:59Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.12.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T22:17:58Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.7",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

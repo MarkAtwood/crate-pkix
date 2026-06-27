@@ -1,0 +1,31 @@
+{
+  "close_reason": "chain_walk docstring updated to list steps e and i (NC check and NC state update)",
+  "closed_at": "2026-05-03T00:37:54Z",
+  "compaction_level": 0,
+  "content_hash": "8865b729ba00105e08fb10401e815f89b8942845d0f4a6c591e6bc30e50fac3a",
+  "created_at": "2026-05-03T00:12:43Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk docstring (lines 1172-1176) lists steps a-g but the implementation also performs (e) check_name_constraints and (h) NC state update. The docstring still uses the old step letters that predate NC. A contributor debugging NC behavior from the docstring will not find it. Update docstring to add: '(e) Check cert names against accumulated NameConstraints state. (h) For intermediate CAs: update NC state (intersection for permitted, union for excluded).' And renumber existing steps accordingly.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk docstring does not list NC check (step e) or NC state update (step h)",
+  "updated_at": "2026-05-03T00:37:54Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:12:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

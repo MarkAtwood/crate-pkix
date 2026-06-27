@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:22Z",
+  "compaction_level": 0,
+  "content_hash": "f873376e2bc2088bf05d9acea1f450f5705913c3b7cf03e83e2dbc7c4361a4a7",
+  "created_at": "2026-05-14T18:59:03Z",
+  "created_by": "Mark Atwood",
+  "description": "src/ocsp.rs:36, src/async_ocsp.rs:22, src/cache.rs:785: `const OCSP_REQUEST_CT: &str = \"application/ocsp-request\";` (or inline string literal) is declared in three places. The constant is also exposed via OcspRequestBytes::content_type \u2014 that field literally exists for callers to use this value without redeclaring it.\n\nRewrite: in the three call sites (sync ocsp.rs, async ocsp.rs, cache.rs cached fetcher), use `req_bytes.content_type` from the OcspRequestBytes already in scope:\n\n    let req = FetchRequest::post(url, &req_bytes.body, req_bytes.content_type);\n\nDrops three near-identical OCSP_REQUEST_CT consts. The OcspRequestBytes::content_type field is documented as 'Always application/ocsp-request' \u2014 using it via the struct centralises the value at its definition site (ocsp_request.rs:115).",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FetchMethod::Post body+content_type duplicated in OCSP_REQUEST_CT constant across modules",
+  "updated_at": "2026-06-15T18:51:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

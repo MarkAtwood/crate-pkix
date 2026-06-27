@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "names_match was already pub; no change needed. Pre-existing extern crate alloc ordering bug fixed as side-effect.",
+  "closed_at": "2026-05-05T14:41:07Z",
+  "compaction_level": 0,
+  "content_hash": "d2fd41beb675e0b3410974825e06f023412db3b1b9c64d582273c6c36cb8d0d6",
+  "created_at": "2026-05-05T14:33:07Z",
+  "created_by": "Mark Atwood",
+  "description": "names_match is currently private (no pub). pkix-path-builder needs it to filter candidates by DN during path building. Add pub to names_match in pkix-path/src/lib.rs.",
+  "ephemeral": 0,
+  "id": "PKIX-y2j.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Export names_match from pkix-path public API",
+  "updated_at": "2026-05-05T14:41:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-y2j",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

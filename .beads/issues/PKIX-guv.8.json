@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:16:48Z",
+  "compaction_level": 0,
+  "content_hash": "310b5a4f21c6ac4f7a8ab3cc690415d3a629be4452c35f139b8ae30c579544dd",
+  "created_at": "2026-05-02T20:12:09Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs chain_walk: 'if bc.as_ref().map(|b| b.ca) != Some(true)' \u2014 idiomatic at MSRV 1.73: 'if !bc.as_ref().is_some_and(|b| b.ca)'. The as_ref() is necessary since bc is used again in the pathLenConstraint check below. Rewrite: 'if !bc.as_ref().is_some_and(|b| b.ca) { return Err(Error::NotCA { index: i }); }'",
+  "ephemeral": 0,
+  "id": "PKIX-guv.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "bc.as_ref().map(...) != Some(true) should use is_some_and (MSRV 1.73)",
+  "updated_at": "2026-05-02T20:16:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:12:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-guv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

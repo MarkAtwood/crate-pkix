@@ -1,0 +1,31 @@
+{
+  "close_reason": "u8 is a deliberate type choice matching the RFC 5280 \u00a76.1 loop counter semantics. 255 intermediates is far beyond any real PKI depth. No change needed.",
+  "closed_at": "2026-05-02T17:47:56Z",
+  "compaction_level": 0,
+  "content_hash": "a10098539e674f98a7cfdb6087c877bb78aeff47aba4d26f467f2c3592c81535",
+  "created_at": "2026-05-02T17:27:31Z",
+  "created_by": "Mark Atwood",
+  "description": "max_path_len is typed as u8, capping at 255. RFC 5280 pathLenConstraint is an INTEGER with no upper bound specified in the ASN.1. If a cert carries pathLenConstraint=300 (legal per ASN.1), the code compares u8 path_len (which can't hold 300 \u2014 the decode itself may fail at the x509-cert layer, or truncate). Also, the policy max_path_len is cast as 'policy.max_path_len as usize' in the check, meaning a policy value of 255 allows 255 intermediates which is effectively unlimited. Using u8 for a security parameter that should be small is fine in practice, but it should be u8 with a comment explaining why (practical max is <<255) so a future contributor doesn't change it to usize 'for correctness' and accidentally allow unlimited path depth.",
+  "ephemeral": 0,
+  "id": "PKIX-841.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "max_path_len u8 type allows silent cap at 255 intermediates",
+  "updated_at": "2026-05-02T17:47:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:27:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

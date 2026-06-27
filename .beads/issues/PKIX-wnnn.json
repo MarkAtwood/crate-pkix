@@ -1,0 +1,31 @@
+{
+  "assignee": "Mark Atwood",
+  "compaction_level": 0,
+  "content_hash": "d7a71589218a43130c7793080dc3514d04664c9844b6f2748abcfa2e18cfcf10",
+  "created_at": "2026-05-14T18:26:11Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {
+    "dispatcher": "bd-review-loop",
+    "dispatcher_run": "bd-review-loop-20260514T182540Z-85585",
+    "final_failures": 1,
+    "final_iter": 1,
+    "final_verdict": "question_tool_invoked",
+    "log_dir": "/home/mark/.local/state/bd-review-loop/PKIX/20260514T182540Z",
+    "model": "anthropic/claude-opus-4-7",
+    "scope": "pkix-path-builder since 24701180",
+    "variant": "max"
+  },
+  "no_history": 0,
+  "notes": "Maintainer risk: MEDIUM \u2014 three P0 issues are workspace-pre-push-check failures (clippy --tests, cargo doc --all-features); none would change shipped behaviour, but all three would block AGENTS.md's published pre-push gate. Plus a documented contradiction between the # Limitations rustdoc and the 0.3.1 CHANGELOG about whether tc60 is resolved. None of the P0/P1 findings indicate a wrong-on-the-spec bug. The trait surface and Error shape are forward-compatible (#[non_exhaustive]). Risk is doc-fidelity and CI-discipline, not behavioural correctness.\nConfidence: 5% chance of missed bug. Least confident flags: PKIX-wnnn.7 (pkix-chain NoValidPath as non-recoverable) \u2014 the adversarial cross-cert AIA scenario I describe is constructible but I have not built one to confirm; the finding is a doc/operational gap, not a correctness claim against demonstrated input. Uncertainty driven by: no probe was run against an actual cross-signed federal-bridge fixture (skipped per /review-myoss read-only rule); the 25 bettertls fixtures committed in this diff don't exercise that case. Would raise confidence if: a fixture from a real federal-bridge cross-cert pool was added, or a unit test in pkix-chain explicitly exercises the NoValidPath then AIA fetches the right cross-cert path.\nAPI contract risk: LOW \u2014 eight api-contract findings filed (PKIX-wnnn.19 through .26). The one P1 (struct-variant exhaustiveness on Error::NoValidPath) is a permanent shape commitment that becomes locked-in once 1.0 ships, but is a one-attribute fix today; the P2s are doc-only (serde format stability, last_error format stability, time-complexity contract); the P3s are minor doc inaccuracies. No findings under api-contract,versioning / leakage / defensive \u2014 that ground was either covered by the prior review (PKIX-wnnn.5 closes off the leakage angle on String) or genuinely empty in this diff. The new public surface (build_first_valid_path, Error::NoValidPath, serde feature on Error) is acceptable to depend on as-is provided the P1 is addressed before 1.0.\nAPI contract confidence: 10% chance of missed issue. Least confident flags: (a) PKIX-wnnn.20 (serde wire format) \u2014 I reasoned from serde's default external-tag behaviour without comparing pkix-path's existing serde-on-Error practice; if pkix-path already documents the same trade-off elsewhere in the workspace and pkix-path-builder consciously mirrors it, my finding is partially redundant; (b) PKIX-wnnn.19 (struct-variant exhaustiveness) is sound on the Rust language spec but I did not run cargo-semver-checks against a hypothetical \"add field to NoValidPath\" delta to confirm it flags as breaking. Uncertainty driven by: (1) no probe of cargo-semver-checks output, (2) no cross-read of pkix-path / pkix-revocation / pkix-chain Error types to see if the workspace has an established pattern for struct-variant evolution that this diff implicitly conforms to, (3) cargo doc was not run, so the intra-doc link rendering in PKIX-wnnn.24 is inferred from rustdoc reference-syntax rules rather than observed in the generated HTML. Would raise confidence if: (a) cargo-semver-checks output on a synthetic future-state branch confirms PKIX-wnnn.19's breaking-change classification, (b) a brief sibling-crate read confirms whether pkix-path's serde Error pattern matches or differs.\nbd-review-loop: iter=1 verdict=question_tool_invoked failures=1 history=; ",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "in_progress",
+  "timeout_ns": 0,
+  "title": "Review: pkix-path-builder since 24701180",
+  "updated_at": "2026-05-14T18:42:25Z"
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Profile trait added to pkix-path + 4 impls in pkix-profiles; workspace clean",
+  "closed_at": "2026-05-06T18:54:50Z",
+  "compaction_level": 0,
+  "content_hash": "75d96b2871892a19b9da8dfcdbd97712c7b602924b9a7285739cc0f1ccaf5cd8",
+  "created_at": "2026-05-06T18:43:54Z",
+  "created_by": "Mark Atwood",
+  "description": "Currently pkix-profiles exposes only free functions (web_pki_policy, smime_policy, etc.) returning ValidationPolicy. There is no trait abstraction for 'a profile', so external crates (fpki, dod, etsi) have no convention to implement against, no stable ID, no citation metadata, and no way to participate in a registry or be composed.\n\nAdd a Profile trait to pkix-profiles, something like:\n\n  pub trait Profile {\n      fn id(&self) -> &str;           // e.g. \"cabf.br\", \"fpki.common\", \"dod.cp\"\n      fn version(&self) -> &str;\n      fn policy(&self, now_unix: u64) -> ValidationPolicy;\n      fn policy_oids(&self) -> &[ObjectIdentifier]; // OIDs this profile claims authority over\n  }\n\nThe existing free functions (web_pki_policy etc.) should remain as convenience wrappers but also be exposed as implementors of Profile so callers can use either style.\n\nThis is the foundation that makes pkix-fpki, pkix-dod, pkix-etsi possible as peer crates rather than forks.",
+  "ephemeral": 0,
+  "id": "PKIX-8c6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: add Profile trait for regime-pluralism",
+  "updated_at": "2026-05-06T18:54:50Z"
+}

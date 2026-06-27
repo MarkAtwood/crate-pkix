@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.9",
+  "title": "verify_tls_server and siblings panic on empty chain",
+  "description": "All use-case wrapper functions in pkix-chain (verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper) index chain[0] unconditionally after verify_chain returns Ok. If chain is empty, verify_chain returns Err(Error::Path(Error::NoTrustedPath)) and the index is never reached. However, the precondition 'chain must not be empty' is not documented on the wrapper functions \u2014 only on verify_chain itself. If the validate_path contract were ever relaxed to accept empty chains (e.g. a trust-anchor-only validation path), the unchecked chain[0] index would panic.\n\nverify_ocsp_responder is the one exception: it checks chain.is_empty() explicitly at line 1292.\n\nWhat goes wrong if this stays as-is: Currently safe only because validate_path rejects empty chains. But the contract relies on an undocumented coupling between verify_chain's empty-chain rejection and the wrappers' unchecked chain[0] access. If validate_path's empty-chain guard were ever removed or relaxed, eight functions would panic.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 802 (verify_tls_server: chain[0])\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 888 (verify_tls_client_dns: chain[0])\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 965 (verify_tls_client_mailbox: chain[0])\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 1033 (verify_smime_signer: chain[0])\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs line 1066 (verify_smime_recipient: chain[0])\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 1187-1188 (verify_time_stamper: chain[0])\n\nSuggested fix: Either (a) document the 'chain must not be empty' precondition on each wrapper, or (b) add the same explicit is_empty() guard verify_ocsp_responder already uses.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:23Z",
+  "updated_at": "2026-06-15T17:13:12Z",
+  "closed_at": "2026-06-15T17:13:12Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:22"
+    }
+  ]
+}

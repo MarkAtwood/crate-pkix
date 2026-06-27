@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:47:19Z",
+  "compaction_level": 0,
+  "content_hash": "5627b90b5b7e727f2980e5e65f6508cf4e5240e664854b104035be214452cebc",
+  "created_at": "2026-05-06T23:16:38Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs lines 186-188 (and 290-292): when `now > nextUpdate` (stale response) or `nextUpdate` is absent, the code returns `Err(OcspStatusUnknown)`. This is semantically wrong: a stale OCSP response is not equivalent to the responder saying 'I don't know this certificate'. The CRL checker correctly distinguishes these: CrlExpired is a separate error. OcspStatusUnknown implies a live responder actively returned unknown status, which is a hard-fail signal meaning 'stop trusting this cert'. A stale response should signal 'I cannot confirm freshness' (equivalent to CrlExpired) \u2014 a different action for callers (e.g., fetch a fresh response) vs. 'the responder says unknown' (revoke or hard-fail). As written, an expired OCSP response and a live 'unknown' status are indistinguishable to callers, preventing retry logic or better diagnostics. Suggested fix: add an `OcspExpired` error variant (mirroring `CrlExpired`) and return it from the staleness checks; reserve `OcspStatusUnknown` strictly for `CertStatus::Unknown` and the serial-not-found case.",
+  "ephemeral": 0,
+  "id": "PKIX-ibo",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P0: OCSP expired nextUpdate returns OcspStatusUnknown, not a distinct error",
+  "updated_at": "2026-05-06T23:47:19Z"
+}

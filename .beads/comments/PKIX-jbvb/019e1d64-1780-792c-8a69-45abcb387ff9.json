@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:12:39Z",
+  "id": "019e1d64-1780-792c-8a69-45abcb387ff9",
+  "issue_id": "PKIX-jbvb",
+  "text": "Removed spurious dependency on PKIX-amgn.8 (2026-05-12). The edge existed because both lived under the PKIX-amgn realignment umbrella, but PKIX-jbvb is about S/MIME BR sub-profile *types* in pkix-profiles-cabf (Organization-/Sponsor-/Individual-validated tiers) which are pure Profile-trait impls -- they do not consume zlint-derived catalog metadata. With PKIX-amgn.8 closing WONTFIX, the edge would have wrongly perpetually blocked .jbvb. Other blockers (.amgn.2 / .4 / .6) all closed; this issue is now reachable."
+}

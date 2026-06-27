@@ -1,0 +1,31 @@
+{
+  "close_reason": "Doc-only fixes: updated stale/ambiguous rustdoc and CHANGELOG entries",
+  "closed_at": "2026-06-04T19:51:02Z",
+  "compaction_level": 0,
+  "content_hash": "c7d42a7736f3c809165f61b65ca5ca049145915a35c66456a938a70c2cbb589d",
+  "created_at": "2026-05-14T19:27:57Z",
+  "created_by": "Mark Atwood",
+  "description": "Scenario: two AIA HTTP adapter implementations diverge. Adapter A follows 3xx redirects internally and emits HttpStatus only for the final non-2xx response. Adapter B does not follow redirects and emits HttpStatus(301) for a redirect that adapter A would have followed.\n\nMaintenance consequence: callers pattern-matching on AiaError::HttpStatus get adapter-dependent behavior with no contract to point at. The variant rustdoc at pkix-aia/src/lib.rs:124-134 says 'the remote endpoint responded with a non-success HTTP status. Carries the numeric status code (e.g. 404, 503).' It does not say whether HttpStatus(200) is constructible (logically wrong but type-allowed), whether 3xx is acceptable, or what happens with redirect chains.\n\nReal-world relevance: CA/Browser Forum BR and Apple root program prohibit AIA URIs that redirect. An adapter conforming to either would surface HttpStatus(301/302) as the failure; an adapter following the more permissive RFC 5280 reading would surface HttpStatus(404) of the redirect target. These produce different cached results for the same upstream behavior, and a downstream policy layer matching on HttpStatus can't tell.\n\nFix: tighten the rustdoc on HttpStatus. State explicitly: the status code is the FINAL response status after the adapter's redirect policy has been applied; whether redirects are followed is adapter configuration. Adapters MUST NOT emit HttpStatus(2xx). Add a debug_assert in the doc that adapters should not emit success codes through this variant.\n\nPre-1.0 the variant could also be narrowed to non-2xx by construction via a newtype, but that is a bigger change.\n\nNot a code defect today (no adapters exist yet \u2014 pkix-aia-http is separate). Filing because the contract solidifies before the first adapter ships.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AiaError::HttpStatus(u16) public contract ambiguous on 3xx/redirects/2xx",
+  "updated_at": "2026-06-04T19:51:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:27:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

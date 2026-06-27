@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:36Z",
+  "compaction_level": 0,
+  "content_hash": "9ea18dd5f704bf144398b8f958613e7caf9059ef54ca3a1a72b29007dbb1e78d",
+  "created_at": "2026-05-07T17:24:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation-http/src/lib.rs:40 \u2014 The trait method fn fetch returns Result<Vec<u8>, FetchError> but has no # Errors section in its rustdoc. clippy::missing_errors_doc (pedantic) flags this. Fix: add a # Errors section to the fetch method doc listing the FetchError variants: Transport, HttpStatus, TooLarge.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.45",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation-http] RevocationFetcher::fetch missing # Errors doc section",
+  "updated_at": "2026-05-07T17:28:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:24:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

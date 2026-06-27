@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "e203d4b6f04b5b973dfdf68970291420551cd47ce9784f52fed93ea8cb748efa",
+  "created_at": "2026-05-14T15:45:43Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:1235-1262 LintRunner::check_unique_ids panics on duplicate lint ids in BOTH debug AND release. The CHANGELOG records that the previous behavior was debug-only gating; PKIX-hy2e.7 fixed that.\n\nDefense: duplicate lint ids interact catastrophically with the deviation mechanism. A deviation keyed on lint-id 'X' would silently apply to every finding with that id, halving the visible work without flagging anything. An operator who saw 'all green' would have no signal that compliance was actually only half-checked.\n\nA panic at runner construction time is the correct response \u2014 it's the equivalent of an assert!() that the duplicate-id-free invariant holds. The cost is O(n log n) over a typically tiny n (dozens of lints), measured in microseconds. The alternative (returning Result, or quietly deduping) is wrong: Result forces every caller into error handling for a precondition that never legitimately fails, and silent dedup hides the bug.\n\nWhat a contributor might suggest changing: 'panicking in release is harsh, return an error or warn-log instead'. Counter-argument: the panic message tells the operator exactly what to fix (deduplicate the lint set). The operator who built a runner with duplicate ids has a code-side bug in their lint composition; deferring it to runtime via Result just makes the error happen further from the cause.\n\nLock this in.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.20",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "LintRunner panics on duplicate lint ids in both debug and release (PKIX-hy2e.7)",
+  "updated_at": "2026-05-14T15:45:43Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

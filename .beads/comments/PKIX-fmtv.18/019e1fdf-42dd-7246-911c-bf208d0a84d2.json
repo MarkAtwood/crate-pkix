@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "created_at": "2026-05-13T05:46:26Z",
+  "id": "019e1fdf-42dd-7246-911c-bf208d0a84d2",
+  "issue_id": "PKIX-fmtv.18",
+  "text": "Umbrella blocked on PKIX-fmtv.18.5 human decision (OpenSSL CLI has no 'codesign' purpose; that bead is escalated). All other subbeads (.18.1-.18.4, .18.6, .18.7) shipped. baseline-verify-openssl.md exists with per-purpose pass-rates for every wrapper:\n\n- TLS server: 23/23 agree (PKIX-fmtv.18.2)\n- TLS client: 7/7 agree (PKIX-fmtv.18.3)\n- S/MIME signer: 19/19 agree (PKIX-fmtv.18.4)\n- S/MIME recipient: 19/19 agree (PKIX-fmtv.18.4)\n- Code signing: no OpenSSL oracle exists (.18.5 escalated)\n- Time stamping: 3/4 agree, 1 known Rust-looser divergence on RFC 3161 \u00a72.3 KU shape; follow-up PKIX-7cac filed\n- OCSP responder: 3/3 chain-only cases agree (.18.7)\n\nTotal: 74 substantive cross-oracle verdicts produced, 73 agree (98.6% across the corpora that have an OpenSSL oracle). One documented intentional divergence (.18.6) and one no-oracle gap (.18.5).\n\nWhen the human resolves .18.5 (rescope to no-oracle-documented and close, or pick a different oracle), this umbrella can close."
+}

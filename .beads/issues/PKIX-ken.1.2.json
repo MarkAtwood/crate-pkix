@@ -1,0 +1,33 @@
+{
+  "acceptance_criteria": "cargo check -p pkix-path --all-features exits 0. Five new public fields present on ValidationPolicy with correct types. Default for each new field: None/false. cargo test -p pkix-path --all-features exits 0 (no existing tests broken).",
+  "assignee": "Mark Atwood",
+  "close_reason": "Five ValidationPolicy fields added: max_validity_secs, allowed_signature_algs, min_rsa_key_bits, require_subject_alt_name, required_leaf_eku. Default impl updated. Rustdoc Limitations section added. cargo check and cargo test both exit 0.",
+  "closed_at": "2026-05-06T04:46:04Z",
+  "compaction_level": 0,
+  "content_hash": "d2bc9436bd1380975281c2455db290854775f99296a5c0ace3816c5d78e17bfe",
+  "created_at": "2026-05-06T03:42:01Z",
+  "created_by": "Mark Atwood",
+  "description": "**What:** Add five new public fields to `ValidationPolicy` in `pkix-path/src/lib.rs` and update `Default` and `new()`.\n\n**Algorithm:**\n1. Find the `ValidationPolicy` struct definition (currently 7 fields, `#[non_exhaustive]`, derives `Clone, Debug, PartialEq, Eq`).\n2. Append these five fields to the struct body (after `initial_policy_set`):\n   ```rust\n   /// If `Some(n)`, reject any certificate whose (notAfter - notBefore) exceeds `n` seconds.\n   /// `None` means unconstrained. Applied to every cert in the chain.\n   pub max_validity_secs: Option<u64>,\n\n   /// If `Some(list)`, reject any certificate whose `tbs_certificate.signature.oid` is not in `list`.\n   /// `None` means any algorithm is accepted.\n   /// Applied to every cert in the chain. Check fires before signature verification.\n   pub allowed_signature_algs: Option<alloc::vec::Vec<der::asn1::ObjectIdentifier>>,\n\n   /// If `Some(bits)`, reject any certificate carrying an RSA public key whose modulus is\n   /// fewer than `bits` bits. Non-RSA keys are not affected. `None` means unconstrained.\n   pub min_rsa_key_bits: Option<u32>,\n\n   /// If `true`, the leaf certificate (index 0) must have a non-empty SubjectAltName extension.\n   /// Applies only to the leaf; intermediate CA certs are not checked.\n   pub require_subject_alt_name: bool,\n\n   /// If `Some(oids)`, the leaf certificate must explicitly assert every OID in `oids`\n   /// via its ExtendedKeyUsage extension. `anyExtendedKeyUsage` (2.5.29.37.0) does not\n   /// satisfy a specific OID check. `None` means no EKU requirement.\n   pub required_leaf_eku: Option<alloc::vec::Vec<der::asn1::ObjectIdentifier>>,\n   ```\n3. Update `impl Default for ValidationPolicy` to add:\n   ```rust\n   max_validity_secs: None,\n   allowed_signature_algs: None,\n   min_rsa_key_bits: None,\n   require_subject_alt_name: false,\n   required_leaf_eku: None,\n   ```\n4. `ValidationPolicy::new()` calls `Default::default()` for all fields except `current_time_unix` \u2014 no change needed there.\n5. Update the rustdoc comment on `ValidationPolicy` to add a `# Limitations` section noting that path-building (RFC 4158) and revocation are out of scope for v0.1.\n6. Run `cargo check -p pkix-path --all-features 2>&1` to confirm no errors.\n\n**Defensive programming rules:**\n- All new fields are `Option<_>` or `bool` with a safe/permissive default \u2014 callers who do not set the field get unconstrained behavior (backward compatible).\n- No key material, no arithmetic, no validation logic in this bead.\n- `alloc::vec::Vec` is the correct type (already used for `initial_policy_set`; same pattern).\n\n**Subagent instructions:**\n- Spawn one research subagent: read `pkix-path/src/lib.rs` around the `ValidationPolicy` struct and its `Default` impl to get exact line numbers before editing.\n- Spawn one validation subagent: after the edit, run `cargo check -p pkix-path --all-features 2>&1` AND `cargo test -p pkix-path --all-features 2>&1`. Confirm both exit 0.\n\n**Tests:** None in this bead \u2014 fields are structural only. Checked by later enforcement beads.\n\nAll existing callers use `::new()` or `Default + struct update` and cannot use exhaustive struct literals from outside the crate (`#[non_exhaustive]`), so this is a non-breaking addition.",
+  "ephemeral": 0,
+  "id": "PKIX-ken.1.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ValidationPolicy: add max_validity_secs, allowed_signature_algs, min_rsa_key_bits, require_subject_alt_name, required_leaf_eku fields",
+  "updated_at": "2026-05-06T04:46:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T20:42:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ken.1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

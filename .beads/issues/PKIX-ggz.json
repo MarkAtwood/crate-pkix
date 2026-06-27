@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-ggz",
+  "title": "Review loop: last 24h work (NameConstraints + policy + path-builder + delta CRL)",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:57:22Z",
+  "updated_at": "2026-06-15T17:57:22Z",
+  "closed_at": "2026-06-15T17:57:22Z"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:11Z",
+  "compaction_level": 0,
+  "content_hash": "79cbb47c593799eea5be68104909ed4a9503f903c4a6421c98daf3e3df802b60",
+  "created_at": "2026-05-07T20:28:19Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n5 instances of `match Option { Some(x) => ..., None => ... }` or `if let Some(x) = ... else { ... }` patterns that clippy flags as `clippy::option_if_let_else`. Cleaner with `Option::map_or` / `map_or_else`.\n\n## Locations\n\n- pkix-path/src/lib.rs:1201 (`map_or_else` \u2014 closures over `Result`)\n- pkix-path/src/lib.rs:1969 (the `nc_permitted/nc_excluded` initialization \u2014 interesting: cloning happens in the `Some` arm only)\n- pkix-path/src/lib.rs:1991 (`nc_constrained_types`)\n- pkix-lint/src/cabf_tls_br.rs:256 (`rsa_modulus_byte_len` check)\n- pkix-lint/src/cabf_tls_br.rs:489 (`BasicConstraints` decode)\n\n## Caveat\n\nThe pkix-path:1969 case is non-trivial \u2014 the `Some(nc) => ...` arm clones, and the comment says `// Clone necessary: nc_permitted and nc_excluded are mutated during the walk.`. Rewriting as `map_or_else(|| ..., |nc| ...)` works but the closure form is arguably less readable. Worth checking case-by-case.\n\n## Priority\n\nP4 \u2014 opinion. The cabf_tls_br.rs cases are clear wins; the pkix-path NC-init case is a judgment call.\n",
+  "ephemeral": 0,
+  "id": "PKIX-g9v6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: 5 if-let-else patterns could use Option::map_or / map_or_else",
+  "updated_at": "2026-05-07T21:49:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

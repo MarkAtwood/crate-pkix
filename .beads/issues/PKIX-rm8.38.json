@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.38",
+  "title": "cert_aki_key_id and cert_ski_key_id allocate Vec<u8> unnecessarily",
+  "description": "In pkix-path-builder/src/lib.rs:276-307, cert_aki_key_id and cert_ski_key_id return Option<Vec<u8>>, allocating a new Vec for the extension bytes on every call. The only consumer (rank_candidates at line 341) immediately compares the bytes with as_deref() and drops the Vec.\n\nWhat goes wrong: Each candidate evaluation allocates 1-2 small Vecs (typically 20 bytes each) that are immediately dropped after a byte comparison. For pools with many candidates, this is O(pool_size) needless allocations per rank_candidates call.\n\nThe equivalent functions in pkix-revocation/src/signer_discovery.rs (lines 219-258) return Option<OctetString>, which borrows from the parsed Certificate and avoids allocation entirely.\n\nLocations:\n- pkix-path-builder/src/lib.rs:276 (cert_aki_key_id returns Vec<u8>)\n- pkix-path-builder/src/lib.rs:298 (cert_ski_key_id returns Vec<u8>)\n\nRecommendation: Return Option<&[u8]> (borrowing from the Certificate's parsed extensions) instead of Option<Vec<u8>>, matching the signer_discovery approach. The parsed x509_cert::ext::pkix::AuthorityKeyIdentifier / SubjectKeyIdentifier types hold OctetString values that can be borrowed.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:37Z",
+  "updated_at": "2026-06-15T17:31:03Z",
+  "closed_at": "2026-06-15T17:31:03Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:36"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:48:30Z",
+  "compaction_level": 0,
+  "content_hash": "9ab2489574e67b0aa9c316e1ae73080545117825bfd710e859a4f7c7209fd7c8",
+  "created_at": "2026-05-11T05:29:52Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nRFC 5280 \u00a76.1 path validation requires `keyCertSign` on CA certs in the chain but says nothing about `cRLSign`. pkix-path follows \u00a76.1 literally and does NOT check cRLSign in chain_walk.\n\nPKITS \u00a74.7.4 (Invalid keyUsage Critical cRLSign False Test4) and \u00a74.7.5 (Invalid keyUsage Not Critical cRLSign False Test5) expect chains to fail when an intermediate CA cert lacks cRLSign. PKITS conflates cert validation with revocation infrastructure: a CA cert without cRLSign cannot revoke certs it issued, so PKITS treats such chains as invalid even at path-validation time.\n\nCurrently both tests are `#[ignore]`'d at `pkix-path/tests/pkits_4_6_4_7.rs:406, 421` with the reason 'cRLSign enforcement not implemented in path validation (RFC 5280 \u00a76.1 only requires keyCertSign)'.\n\n## Decision needed\n\nTwo reasonable positions:\n\n1. **Add a `ValidationPolicy` bit `require_crl_sign_on_cas: bool`** (default false). When true, chain_walk enforces cRLSign on every intermediate. Restores PKITS conformance for \u00a74.7.4/.5 callers who want it without forcing it on every consumer.\n2. **Keep current behavior, document as intentional divergence in INTEROP.md.** pkix-path sides with the RFC literal reading; PKITS conflates two concerns; callers wanting cRLSign enforcement run a separate lint via pkix-lint.\n\nEither is defensible. Default recommendation: option 1 (configurable, off by default) because it's additive.\n\n## Acceptance (option 1 if chosen)\n\n- [ ] `ValidationPolicy::require_crl_sign_on_cas` field, default false.\n- [ ] chain_walk enforces when set.\n- [ ] PKITS \u00a74.7.4 and \u00a74.7.5 #[ignore] reasons updated to reference this bead and the policy flag.\n- [ ] Existing tests pass unchanged with default policy.\n- [ ] INTEROP.md updated.\n\n## Filed as\n\nTracker for the cRLSign #[ignore] reasons in pkix-path/tests/pkits_4_6_4_7.rs:406, 421. Surfaced by PKIX-agp7.2 sweep audit.",
+  "ephemeral": 0,
+  "id": "PKIX-0x9z",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Ratified 2026-05-11 (Mark): Option 1 \u2014 add `ValidationPolicy::require_crl_sign_on_cas: bool`, default `false`. Additive; no consumer break. PKITS \u00a74.7.4 / \u00a74.7.5 #[ignore] reasons updated to reference this flag.\n\nRejected: Option 2 (keep RFC-literal, document divergence in INTEROP.md).\n\nAcceptance criteria unchanged. INTEROP.md should still mention the flag exists and what it does. Ready for autonomous claim.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: cRLSign enforcement policy for path validation (PKITS \u00a74.7.4/.5)",
+  "updated_at": "2026-05-11T17:48:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T23:30:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yi7k",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

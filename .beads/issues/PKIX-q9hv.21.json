@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "414ef9a6b667d9d265ac549fa6473346042e8d98c73dc532fceacb6b6eee219a",
+  "created_at": "2026-05-14T14:50:21Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:140 \u2014 `pub const AIA_MAX_DEPTH: usize = 5;` is exposed in\nthe public surface, but `Verifier` provides no way to override it.\nA caller wanting one of:\n\n- a *lower* cap (defense-in-depth: \\\"I trust at most 1 hop of AIA\n  fetching against my well-known PKI\\\")\n- a *higher* cap for an unusual deep-cross-sign environment\n- runtime-configurable cap based on caller policy\n\ncannot configure it through any pkix-chain API. The only escape hatch\nis to skip `verify_one` entirely and call\n`pkix_path_builder::build_first_valid_path` directly with their own\nAIA loop \u2014 which loses all the wrapper logic.\n\nThis is the worst of both worlds: the constant is `pub` (so it's a\nforever-stable item in the API surface and changing its value is a\nsoft breaking change for callers comparing depths) AND immutable for\ncallers wanting to deviate.\n\nThree reasonable fixes:\n\na) Add an override on `Verifier`:\n\n       impl Verifier { pub fn with_aia_max_depth(mut self, depth: usize) -> Self }\n\n   `AIA_MAX_DEPTH` stays as the documented default. Callers opt into\n   a different value if they want.\n\nb) Promote it to a configurable field on `ValidationPolicy` (since\n   that's already where time / max_path_len / etc. live). Keeps the\n   pkix-chain API stable; callers tune via the existing policy\n   surface.\n\nc) De-pub the constant (drop the `pub`) and keep it as an internal\n   implementation detail. Callers who care about the value learn it\n   from the `Error::AiaDepthExceeded` Display string. Simplest;\n   removes the contract entirely.\n\n(b) is most consistent with the rest of the workspace. (a) is the\nsmallest change to the current shape. (c) is the punt.\n\nPKIX-q9hv.1 separately notes the off-by-one bug in how the cap is\napplied; fixing that bug first is sensible \u2014 but the override question\nstands either way.\n\nCaller impact: anyone with non-default trust-domain depth requirements.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AIA_MAX_DEPTH is pub const with no Verifier-level override",
+  "updated_at": "2026-05-14T14:50:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:50:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

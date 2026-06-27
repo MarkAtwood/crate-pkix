@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1e63f517df3178a083c3fe774723f5952fbc698d09e3d28d68ec6a915b1bdb04",
+  "created_at": "2026-05-14T14:23:56Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:56 \u2014 #[derive(Clone, Debug, Default)] on CtLogList. CtLog itself derives PartialEq + Eq + Hash. The inner BTreeMap<[u8;32], CtLog> supports PartialEq + Eq (Hash is not auto-derived for BTreeMap, but that's fine).\n\nPer workspace non-negotiable #6 ('Cache-friendly result types ... MUST derive Clone + Debug + PartialEq + Eq ... and SHOULD support serde::Serialize + Deserialize behind a serde feature flag for cross-process / persistent caches'): CtLogList is configuration that callers will want to compare ('did the log list change since I cached this verdict?'), serialize (for cross-process caches), and dedup. Currently:\n- No PartialEq \u2192 cannot test equality.\n- No Eq \u2192 cannot use as HashMap key.\n- No serde \u2192 cannot persist to disk in caller-side caches without bespoke conversion.\n\nCtLog already derives PartialEq/Eq/Hash. The CtLogList wrapper needlessly drops them. Suggested fix: add PartialEq + Eq to the derive list. Add an optional serde Serialize/Deserialize behind a feature flag (probably 'serde' as a cross-cutting feature, matching the pattern in pkix-path).\n\nConcrete user scenario: a caller writes a CT validation cache keyed by (cert_id, log_list_fingerprint). Today they have to hash the underlying BTreeMap manually or compute a fingerprint by iterating CtLogList::iter(). Trivial fix unblocks a documented design intent.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CtLogList drops PartialEq/Eq derives, blocking caller-side dedup and prevalidation caches",
+  "updated_at": "2026-05-14T14:23:56Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:23:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

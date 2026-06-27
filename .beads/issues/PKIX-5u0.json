@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "spki_key_matches helper + regression test added; build and all tests clean",
+  "closed_at": "2026-05-02T21:48:58Z",
+  "compaction_level": 0,
+  "content_hash": "447fde926628c91b0e46c7b1c34cb175d4dcb70b836fe4ad1b08ce2af46cf2c9",
+  "created_at": "2026-05-02T21:39:24Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path (pkix-path/src/lib.rs) uses anchor.subject_public_key_info \\!= last_cert.tbs_certificate.subject_public_key_info to reject a name-matching anchor whose SPKI differs from the chain's last cert SPKI (name-collision guard). This relies on SubjectPublicKeyInfoOwned::PartialEq producing the correct result. If the spki crate implements PartialEq via decoded field comparison and the two SPKIs encode the same key with different parameter representations (e.g., RSA AlgorithmIdentifier with explicit NULL params vs. absent params), the comparison returns unequal even though the keys are identical \u2014 causing a valid self-signed root cert to be incorrectly rejected as an anchor. Conversely if PartialEq is byte-exact DER comparison, two equivalent-key SPKIs with different encodings also compare unequal (same direction, also wrong for acceptance). Action: read spki crate source, verify what PartialEq compares, add a regression test using two certs with same key but different parameter encoding if the behavior is ambiguous.",
+  "ephemeral": 0,
+  "id": "PKIX-5u0",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "is_self_issued SPKI guard uses PartialEq \u2014 robustness to equivalent DER unverified",
+  "updated_at": "2026-05-02T21:48:58Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:31Z",
+  "compaction_level": 0,
+  "content_hash": "df632c3d187840f8c135f6093f4c664d61fccc902fb292187ac60d9f6269519f",
+  "created_at": "2026-05-14T17:33:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: caller imports a CT log whose state is currently 'pending'/'qualified'/'readonly'/'rejected' (not 'usable'). `from_google_log_list_json` (log_list.rs:204-208) maps state-other-than-'usable' to `usable_from_ms = None`. `log_window_contains` (verify.rs:845-857) treats `None` as 'unbounded lower bound' and returns true.\n\nActual bad behavior: an SCT signed by a log that has never reached the 'usable' state (or has been rejected by the browser-trust program) verifies successfully. This contradicts the doc comment on `CtLog::usable_from_ms` (log_list.rs:46): \"`None` means the log has never reached the `usable` state.\" The semantics the doc promises \u2014 refuse SCTs from never-usable logs \u2014 is the opposite of what the code does.\n\nTwo reasonable fixes:\n1. Treat `usable_from_ms = None` as 'never usable' in `log_window_contains`: `if log.usable_from_ms.is_none() { return false; }`. Matches the doc; requires Google-JSON parser to set `usable_from_ms` to the timestamp of state entry even for non-usable states (or keep None semantics aligned).\n2. Change `from_google_log_list_json` to skip importing logs whose state is not 'usable' or 'readonly', so the situation cannot arise.\n\nEither fix is acceptable but the current state \u2014 silent contradiction between doc and behavior in a security-sensitive path \u2014 must not ship. CT log list ingestion is the trust-anchor seam for SCT verification; getting it wrong undermines the whole crate.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "log_window_contains contradicts CtLog::usable_from_ms doc \u2014 None passes window check instead of failing",
+  "updated_at": "2026-06-04T19:32:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:33:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

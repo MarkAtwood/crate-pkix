@@ -1,0 +1,32 @@
+{
+  "close_reason": "All 6 skeletons hold at 0.x. Default cascade from PKIX-wlsr.1 narrow scope. pkix-ac, pkix-ct, pkix-composite, pkix-dane, pkix-truststore-system, pkix-truststore-pkcs11 all ship at independent 0.x post-1.0. pkix-aia is separately scoped to 1.0 via Verifier decision in .3.",
+  "closed_at": "2026-05-13T17:07:28Z",
+  "compaction_level": 0,
+  "content_hash": "2cd8b92887f1481e12e6157f8219b66addbd0d2e21bc12f6c13351f6c3658542",
+  "created_at": "2026-05-13T16:57:57Z",
+  "created_by": "Mark Atwood",
+  "description": "## Skeleton/stub crate disposition for 1.0\n\nFor each currently-skeleton-or-stub crate, decide: **ship at 1.0** (full implementation required), **hold at 0.x** (released independently post-1.0), or **drop** (remove from workspace entirely).\n\nUnder (A) narrow scope (default per .1), all default to \"hold at 0.x\". This bead exists to record the explicit decisions and surface any \"ship at 1.0\" exceptions.\n\n## Per-crate decisions\n\n### pkix-ac (RFC 5755 Attribute Certificates)\n\nCurrent state: skeleton. PKIX-ng0x has 4 children (parser, holder, validity, extraction). No working code yet.\n\nDefault: hold at 0.x.\n\nArgument for ship: completeness; attribute certs are part of the PKIX ecosystem.\nArgument for hold: skeleton with multi-week implementation cost; AC use cases are niche (most callers don't need them).\n\n### pkix-ct (RFC 6962/9162 Certificate Transparency)\n\nCurrent state: skeleton. PKIX-baac tracked. SCT verification not implemented.\n\nDefault: hold at 0.x.\n\nArgument for ship: TLS server callers often verify SCTs.\nArgument for hold: skeleton; SCT verification requires log-source-of-truth integration (CT log list maintenance, signed tree heads, inclusion proofs), all of which are independent concerns deserving their own iteration cycle.\n\n### pkix-composite (PQC composite signatures)\n\nCurrent state: skeleton.\n\nDefault: hold at 0.x.\n\nArgument for ship: PQC is timely.\nArgument for hold: standards still moving (LAMPS drafts referenced in specs/), skeleton, no real-world traffic yet.\n\n### pkix-dane / pkix-dane-resolver\n\nCurrent state: planned but not implemented. PKIX-j32w epic.\n\nDefault: hold at 0.x.\n\nArgument for ship: DANE composition with PKIX is interesting for SMTP and HTTPS.\nArgument for hold: not yet shipped; ecosystem adoption is limited; would benefit from 0.x iteration.\n\n### pkix-truststore-system\n\nCurrent state: stub. PKIX-8h87 deferred.\n\nDefault: hold at 0.x.\n\nArgument for ship: many callers want OS-native trust.\nArgument for hold: stub; per-OS implementation work (macOS Keychain, Windows CertStore, etc.) is platform-specific FFI that benefits from per-platform iteration; not blocked on workspace core stability.\n\n### pkix-truststore-pkcs11\n\nCurrent state: stub. PKIX-p8vz deferred.\n\nDefault: hold at 0.x.\n\nArgument for ship: HSM users want this.\nArgument for hold: stub; PKCS#11 FFI is a separate skill domain; 0.x iteration appropriate.\n\n## Recommendation\n\n**All six hold at 0.x.** Default of (A) narrow scope per .1 applies uniformly. None of these are part of \"RFC 5280 X.509 for Rust\" core; all are genuinely adjacent and benefit from independent release cadence.\n\nIf any \"ship at 1.0\" exception is selected, that re-opens the scope question in .1 and triggers an implementation cascade for that crate.\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- PKIX-wlsr.1 (.1 scope decision; if narrow, this bead defaults to all-hold)\n- PKIX-ng0x (pkix-ac implementation epic)\n- PKIX-baac (pkix-ct implementation tracker)\n- PKIX-j32w (DANE implementation epic)\n- PKIX-8h87, PKIX-p8vz (trust store adapter stubs)\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 RESOLVED: all 6 skeleton crates hold at 0.x]\n\nPer PKIX-wlsr.1 narrow scope decision, all six skeleton/stub crates hold at independent 0.x cadence post-1.0:\n\n- **pkix-ac** (RFC 5755 attribute certs) \u2014 skeleton; PKIX-ng0x cascade continues at 0.x\n- **pkix-ct** (RFC 6962/9162 CT/SCT) \u2014 skeleton; PKIX-baac at 0.x; CT log integration is a separate concern deserving its own iteration cycle\n- **pkix-composite** (PQC composite sigs) \u2014 skeleton; LAMPS drafts still moving; ship at 0.x to track upstream\n- **pkix-dane / pkix-dane-resolver** \u2014 PKIX-j32w planned but not implemented; 0.x sibling crate cadence\n- **pkix-truststore-system** \u2014 stub (PKIX-8h87 deferred); per-OS FFI is platform-specific work; 0.x\n- **pkix-truststore-pkcs11** \u2014 stub (PKIX-p8vz deferred); PKCS#11 FFI is a separate skill domain; 0.x\n\nNo 'ship at 1.0' exceptions. None of these are part of 'RFC 5280 X.509 for Rust' core; all are genuinely adjacent and benefit from independent release cadence.\n\npkix-aia is NOT covered by this disposition \u2014 Mark elevated it to 1.0 scope via PKIX-wlsr.3 (Verifier 3-generic decision). pkix-aia ships at 1.0 with trait + NoAiaFetcher + AiaError only; pkix-aia-http stays at 0.x.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Per-skeleton-crate disposition for 1.0: ship / hold-at-0.x / drop",
+  "updated_at": "2026-05-13T17:07:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:57:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

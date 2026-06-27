@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "created_at": "2026-05-13T19:26:29Z",
+  "id": "019e22ce-0ba5-7614-ac6d-c9e4c1e1a0d7",
+  "issue_id": "PKIX-wlsr",
+  "text": "[2026-05-13 do-beads convergence] All 5 human-decision children resolved (.1-.5). Two execution children: .6 closed, .7 blocked on PKIX-zkjb.{2,3,4,9} (the 1.0-blocker AiaFetcher cascade). The entire PKIX-zkjb subtree is transitively gated on human-labeled beads \u2014 zkjb.2/3/4/5/7/9 are all open but the dep graph between siblings is inverted (e.g., zkjb.2 'depends on' zkjb.3 with type=blocks, but logically the error type must come before the trait that returns it). zkjb.4 + zkjb.8 carry human label directly; zkjb.umbrella carries human label and documents the recommended six-command bd dep rewiring in its notes. Until that escalation is acted on, neither PKIX-wlsr.7 nor the 1.0 release as a whole is autonomously workable. Labeling PKIX-wlsr human per the convergence pattern (memory do-beads-loop-convergence-2026-05-11-autonomous) so the bd ready frontier stops cycling on this umbrella each session. Unlabel naturally after PKIX-zkjb subtree closes."
+}

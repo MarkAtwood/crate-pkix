@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Consolidated fix with PKIX-7f92.39 (same parameter, both bounds). Added private MAX_OCTETS_RANGE = 1..=21 and shared validate_max_octets helper. set_parameter and with_max_octets both route through the validator: set_parameter returns ParameterError::InvalidValue; with_max_octets panics (precedent: LintRunner::new's panic-on-duplicate-id). Range is 1..=21 to accommodate both RFC readings the workspace documents (encoded-content=20, unsigned-value=21); anything outside is rejected. Five regression tests cover both paths and both directions. 300 tests pass; workspace builds clean.",
+  "closed_at": "2026-05-14T17:18:21Z",
+  "compaction_level": 0,
+  "content_hash": "a3b30778b06ce709d9ef37590ac63f7d8d2c93a3d792b20b79c6a7f7fb50a4ca",
+  "created_at": "2026-05-14T15:43:27Z",
+  "created_by": "Mark Atwood",
+  "description": "rfc5280.rs:148-170: set_parameter('max-octets', '...') rejects 0 but accepts any other usize, including 21, 1000, usize::MAX. The rustdoc says 'Setting max-octets above 20 is permitted but advertises a deliberate deviation from RFC 5280 baseline' \u2014 but there is no surfaced signal (no log, no Notice finding, no separate metadata field) that distinguishes a deviation from a baseline run.\n\nFailure mode: an operator copy-pastes an OSCAL Profile that sets max-octets=64 (or worse, max-octets=usize::MAX as a 'temporary' workaround) and ships a runner that silently passes every cert under the RFC 5280 \u00a74.1.2.2 check. The finding output is indistinguishable from a clean baseline run. Months later someone re-reads the Profile and discovers the regression.\n\nMaintainer consequence: this is the kind of silent-misconfig bug that produces 'pkix-lint said clean, why was the cert noncompliant' tickets. Two cheap fixes: (a) emit a Notice-severity finding tied to the same lint ID when max_octets > 20 (operator sees the deviation in normal output); (b) reject set_parameter values > 20 with InvalidValue, forcing operators to wire a separate explicit 'permit-rfc-deviation' lint when they really want this. (b) is the safer default for a Tier-1 RFC-conformance lint.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Rfc5280MaxSerialLengthLint set_parameter accepts values >20 silently weakening RFC baseline",
+  "updated_at": "2026-05-14T17:18:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:43:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

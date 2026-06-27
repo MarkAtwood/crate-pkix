@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T22:24:12Z",
+  "compaction_level": 0,
+  "content_hash": "6de4b82072223b189f2cb2e2690eca564f24cb584c3eab1df7473f973173b82f",
+  "created_at": "2026-05-13T21:11:38Z",
+  "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "description": "## What\n\nFor each of the 12 crates in narrow 1.0 scope, consolidate the current `[Unreleased]` content into a new `## 1.0.0 \u2014 <TBD>` section at the top. The literal asks from PKIX-wlsr.7:\n\n- `## 1.0.0 - YYYY-MM-DD` heading (use TBD or a placeholder; Mark fills the real date at publish time)\n- Summary line: 'First stable release.'\n- `### Breaking` enumeration when applicable\n- `### Added` enumeration since last 0.x\n- `### Fixed` enumeration since last 0.x\n- Link to relevant beads where useful (don't over-link)\n\n## Affected crates\n\nAll 12 in the narrow 1.0 scope:\npkix-path, pkix-revocation, pkix-chain, pkix-path-builder, pkix-truststore, pkix-identity, pkix-profiles, pkix-profiles-cabf, pkix-lint, pkix-lint-cabf, pkix-revocation-http, pkix-aia\n\n## Blocks\n\n- PKIX-wlsr.7.1 must close first (the 7 missing CHANGELOGs need to exist before they can be rolled up)\n\n## Heading-style decision needed\n\nThe existing five CHANGELOGs use inconsistent breaking-change heading styles:\n- `### Changed (breaking)` (pkix-chain)\n- `### Removed (breaking)` (pkix-lint-cabf)\n- No breaking heading at all despite a behavior change (pkix-profiles-cabf max_path_len removal)\n\nThe roll-up should pick one convention and apply it consistently across all 12 crates. Recommendation: `### Breaking` as the umbrella heading (matches the bead's own naming).\n\n## Acceptance\n\n- [ ] Each 1.0-scope crate's CHANGELOG.md has a `## 1.0.0 \u2014 <TBD>` heading at top\n- [ ] Each entry has a 'First stable release.' summary line\n- [ ] `### Breaking` / `### Added` / `### Fixed` sub-sections used consistently across all 12\n- [ ] `[Unreleased]` section preserved as an empty heading for future work (post-1.0 next changes)\n- [ ] Bead links accurate; no fabricated bead IDs\n\n## Cross-references\n\n- PKIX-wlsr.7 (parent)\n- PKIX-wlsr.7.1 (blocks)",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.7.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Roll up [Unreleased] -> ## 1.0.0 entry in all 12 1.0-scope crate CHANGELOGs",
+  "updated_at": "2026-05-13T22:24:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T14:11:37Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T14:11:55Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

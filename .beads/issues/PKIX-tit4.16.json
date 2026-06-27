@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "31af4f6259adac41690b6ee60e295244f27ce9b4911816a7cee0e2fcccae3665",
+  "created_at": "2026-05-14T05:07:15Z",
+  "created_by": "Mark Atwood",
+  "description": "The crate ships a flat set of free functions:\n\n  pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>, Error>\n  pub fn from_der(bytes: &[u8]) -> Result<TrustAnchor, Error>\n  pub fn from_der_iter<I, B>(iter: I) -> Result<Vec<TrustAnchor>, Error>\n  pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>, Error>\n  pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor, Error>\n\nThere is no `TrustStoreLoader` / `Loader` / `LoaderOptions` struct. There\nis no builder. The free functions have no extensibility seam.\n\nFuture additions that already have placeholder beads or known need:\n\n  - Strict NameConstraints loading (PKIX-tit4.1: use TrustAnchor::try_from\n    instead of from_cert so malformed NC fails closed). A 'strict' mode\n    flag would naturally live on a loader struct.\n  - Per-anchor filter callback (Mozilla's 'serverAuth only' bit, root\n    program ingestion rules \u2014 README explicitly lists per-anchor trust\n    policy as an explicit non-goal for now, but the README says 'revisit\n    when a concrete consumer asks for it'). When revisited, the API\n    needs an extensibility seam.\n  - Warning channel (PKIX-tit4.1 option c: 'surface a per-anchor warning'\n    for soft failures). A `&mut Vec<Warning>` parameter or a configurable\n    callback both want a loader-shaped home.\n  - Caller-supplied 'now' for time-of-load validity-period filtering (a\n    deployment may want to drop anchors that have already expired at\n    load time rather than at validation time).\n  - Memory-mapped or chunked loading for very large bundles (lib.rs:391\n    already calls out 'tens of MB' as the rough threshold).\n\nWith the current API, each of these is either:\n\n  a) A new function name (`from_pem_strict`, `from_pem_with_filter`,\n     `from_pem_with_warnings`, \u2026). The surface grows linearly with\n     options and the combinations explode.\n  b) An overloaded signature change. Each is a breaking change to the\n     public function (pre-1.0 free; post-1.0 a major bump).\n\nBoth are worse than admitting a `LoaderOptions` struct now while there are\nno consumers to migrate.\n\nPre-1.0 framing (from AGENTS.md 'Design for the eventual complete shape'):\nthis is exactly the moment to decide whether the eventual shape is\n'function-per-source \u00d7 option-permutation' or 'small loader struct + per-\nsource method.' The latter scales; the former does not.\n\nCounter-argument: if 'no options will ever need to be added' is the\nmaintainer's call, the current shape is fine. The README's 'Per-anchor\ntrust policy is out of scope; revisit when a concrete consumer asks for\nit' suggests options WILL be added eventually, which makes the current\nshape a pre-1.0 forward-compat trap.\n\nThis is flagged 'opinion' because reasonable maintainers prefer free\nfunctions for simple bytes-in/anchors-out plumbing. But the architectural\nquestion deserves an explicit decision rather than 'we never thought to\nask.'",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.16",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Free-function API forecloses on extensibility seams; future options must use new names",
+  "updated_at": "2026-05-14T05:07:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:07:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

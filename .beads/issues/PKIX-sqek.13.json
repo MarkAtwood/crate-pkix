@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "41407845891c9cc05eac1e15ea456b782dc96b6714f80ba8ca0d7f7c72022081",
+  "created_at": "2026-05-14T18:02:10Z",
+  "created_by": "Mark Atwood",
+  "description": "Error::ProfileViolation::reason and Error::OcspDelegation::reason both carry the same lengthy rustdoc explaining why the field is Cow<'static, str> rather than &'static str (lines 175-180 and 204-208). The rationale is verbatim duplicated:\n\n    `Cow<'static, str>` rather than `&'static str` so the serde\n    deserialize path can yield an owned `String` without leaking\n    memory. Producers always supply `Cow::Borrowed` from a\n    `&'static str` literal; the `Cow::Owned` variant arises only\n    on the deserialize path.\n\nThis is the type-level invariant of 'all our static-string error reasons are Cow'. If a future variant adds another such field, the rationale will be duplicated a third time, or worse, will drift.\n\nSUGGESTED REWRITE: hoist the rationale to a module-level doc comment on Error itself (near line 147 where Error is declared), then have each variant's reason field point at it:\n\n    /// Fixed-string description of which invariant was violated.\n    /// See the [] type docs for why this is .\n    reason: Cow<'static, str>,\n\nThe 4-line rationale lives in one place; new variants get a one-line pointer comment.\n\nThis is a readability finding: a contributor reading just Error::ProfileViolation has the rationale right there, but a contributor reading both variants gets the same paragraph twice and may suspect the second copy is subtly different. It is not.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cow<'static, str> rationale comment for ProfileViolation.reason duplicated across two variants; should hoist to one place",
+  "updated_at": "2026-05-14T18:02:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:02:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

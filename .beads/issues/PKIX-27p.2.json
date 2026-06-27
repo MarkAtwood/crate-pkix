@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-03T02:46:34Z",
+  "compaction_level": 0,
+  "content_hash": "bbde0844706fcbde56eca847e46134e65384fad089ae23b3c1946968181050a7",
+  "created_at": "2026-05-03T02:41:02Z",
+  "created_by": "Mark Atwood",
+  "description": "Adding a new GeneralName variant to name_matches_subtree/same_nc_variant requires also adding NC_TYPE_* constant AND updating name_type_bit. Nothing enforces this. A contributor who adds DNS-over-IPv6 or RegisteredID support to the matching functions and forgets name_type_bit would leave that name type permanently unconstrained even when permittedSubtrees contains entries for it. Silent NC bypass for the new type. \u2192 Add a static assertion or centralize the type\u2192bit mapping so the compiler catches incompleteness.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_constrained_types bitmask has no compile-time completeness guarantee",
+  "updated_at": "2026-05-03T02:46:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

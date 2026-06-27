@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:39Z",
+  "compaction_level": 0,
+  "content_hash": "ed718846defe7efffd8f8ae48c0ca765e35237f21bbbe72d16222dc6afdcff15",
+  "created_at": "2026-05-06T20:54:24Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/lib.rs LintRunner::run_chain() at lines 591-604. The doc comment says 'Returns a flat Vec<Finding> with cert_index set for each' but does not explain that LintResult::Fatal stops lint evaluation ONLY for the current certificate (intra-cert) and does NOT cause run_chain() to skip subsequent certificates in the chain. For example, if cert[0] (leaf) returns Fatal, run_chain() still evaluates all lints against cert[1], cert[2], etc. This is intentional per the LintResult::Fatal doc ('The runner stops evaluating remaining lints for the current item' \u2014 emphasis: current item). However, a caller who expects Fatal to mean 'abort the entire chain evaluation' would be surprised. Fix: Add to run_chain() doc: 'Note: Fatal results stop further lint evaluation for the current certificate only. Subsequent certificates in the chain are evaluated normally. If you need to abort chain evaluation on Fatal, inspect the findings from run_cert() per-cert before proceeding.' Priority: P3 (documentation gap).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: LintRunner::run_chain doc omits that Fatal does not stop cross-cert evaluation",
+  "updated_at": "2026-05-06T20:58:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:54:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

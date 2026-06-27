@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T17:15:04Z",
+  "compaction_level": 0,
+  "content_hash": "ee2e935593b84b7d34ad8ad135510a415371632200337f53f2635342b9959e7f",
+  "created_at": "2026-05-06T16:50:08Z",
+  "created_by": "Mark Atwood",
+  "description": "Systematic review pass covering correctness, security, contract violations, error handling, test coverage, and code quality for the commit window 4b382332..ac780bbe. Covers pkix-path, pkix-profiles, pkix-revocation, pkix-revocation-http, and pkix-path-builder.",
+  "ephemeral": 0,
+  "id": "PKIX-taa",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-myoss: commits 4b382332..ac780bbe",
+  "updated_at": "2026-05-06T17:15:04Z"
+}

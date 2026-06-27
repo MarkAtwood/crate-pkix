@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b01e3f8d21be77e0a724e199ab27cf8a54dc74ee2bf4389827b57b100920e1cb",
+  "created_at": "2026-05-14T02:38:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nShip Multipurpose generation Profile types as siblings to the Strict\ntier types decided in PKIX-jbvb.6 / implemented in PKIX-jbvb.7.\n\nDecision recorded in PKIX-jbvb.8 (Mark 2026-05-13): yes, ship them,\nchained after the Strict surface is complete.\n\n## Eventual surface\n\nEight `pkix-profiles-cabf` S/MIME Profile types total (one per BR cell\nthat is not Legacy-banned):\n\n| Validation tier | Strict (`.3`) | Multipurpose (`.2`) |\n|---|---|---|\n| Mailbox | `SmimeMailboxValidated` (renamed from `SmimeProfile` \u2014 PKIX-jbvb.9.0) | `SmimeMailboxValidatedMultipurpose` (PKIX-jbvb.9.1) |\n| Organization | `SmimeOrganizationValidated` (PKIX-jbvb.1) | `SmimeOrganizationValidatedMultipurpose` (PKIX-jbvb.9.2) |\n| Sponsor | `SmimeSponsorValidated` \u2713 (PKIX-jbvb.7) | `SmimeSponsorValidatedMultipurpose` (PKIX-jbvb.9.3) |\n| Individual | `SmimeIndividualValidated` \u2713 (PKIX-jbvb.7) | `SmimeIndividualValidatedMultipurpose` (PKIX-jbvb.9.4) |\n\nEach Multipurpose sibling differs from its Strict counterpart in:\n\n- Policy OID (`.2` vs `.3` suffix)\n- EKU permissiveness \u2014 Strict requires `id-kp-emailProtection` ONLY;\n  Multipurpose allows additional EKU values (document-signing crossover)\n- A few extension permissiveness differences per \u00a77.1.2.3(f) tables\n\nSame DN rules per tier. Same 825-day validity cap. Same baseline.\n\n## Children\n\n- **PKIX-jbvb.9.0** \u2014 Rename `SmimeProfile` \u2192 `SmimeMailboxValidated`\n  for naming consistency with the rest of the tier surface. Pre-1.0\n  breaking change. Prerequisite for Mailbox Multipurpose.\n- **PKIX-jbvb.9.1** \u2014 `SmimeMailboxValidatedMultipurpose`. Blocks on .9.0.\n- **PKIX-jbvb.9.2** \u2014 `SmimeOrganizationValidatedMultipurpose`. Blocks\n  on PKIX-jbvb.1 (Org Strict, which is the template).\n- **PKIX-jbvb.9.3** \u2014 `SmimeSponsorValidatedMultipurpose`. Strict\n  sibling exists (PKIX-jbvb.7); not blocked.\n- **PKIX-jbvb.9.4** \u2014 `SmimeIndividualValidatedMultipurpose`. Strict\n  sibling exists (PKIX-jbvb.7); not blocked.\n\n## Out of scope\n\n- New `pkix-chain` wrappers. `verify_smime_signer` is already\n  Profile-parameterized; no per-tier wrapper multiplication.\n- \"Try multiple tier Profiles\" auto-discovery wrapper for callers\n  receiving signed email of unknown tier. File separately if user\n  demand surfaces \u2014 it exists independently of Multipurpose addition\n  (Sponsor vs Individual is already a runtime tier-discovery question).\n- Composite \"Strict OR Multipurpose\" single Profile via either-of\n  `required_leaf_policy_oids`. The current `required_leaf_policy_oids`\n  semantic per PKIX-jbvb.4 is allOf \u2014 would require a separate\n  predicate axis to express anyOf-OID semantics. Out of scope here.\n\n## Cross-references\n\n- PKIX-jbvb (parent S/MIME sub-profile-families umbrella)\n- PKIX-jbvb.6 (Strict-vs-Legacy decision, Strict selected as the modern target)\n- PKIX-jbvb.7 (Sponsor + Individual Strict implementation; the template)\n- PKIX-jbvb.8 (decision bead \u2014 closed yes, plan tracked here)\n- PKIX-mzsk (spec-taxonomy principle \u2014 BR-named cells in scope)\n- PKIX-e3nl (temporal-posture non-negotiable \u2014 neutral, Multipurpose is parallel current-tier)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: S/MIME Multipurpose generation Profile types (4-tier sibling surface)",
+  "updated_at": "2026-05-14T02:38:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:38:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

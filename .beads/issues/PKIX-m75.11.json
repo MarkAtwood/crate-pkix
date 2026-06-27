@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:33Z",
+  "compaction_level": 0,
+  "content_hash": "32ac4aec282e6473e84d2e2207f33f79482f43ae289624c37024158ca1f92a63",
+  "created_at": "2026-05-06T20:49:04Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/deviation.rs DeviationRunner::run_path() at lines 641-662 uses chain[0] (the leaf cert) for scope matching on ALL path-level deviation lookups. The doc comment at line 643 says 'For path-scope lints, scope matching uses the leaf certificate (chain[0])'. This is correct for scope types like IssuerDnContains and SerialRange where the leaf is the natural subject. However, a path-scope lint might fire due to an intermediate CA's properties (e.g., a custom lint about chain depth relative to an intermediate CA's DN). An operator who creates a deviation with DeviationScope::IssuerDnExact(intermediate_ca_dn) would expect it to match when the intermediate's DN is in scope \u2014 but the match is done against the LEAF cert's issuer, not the intermediate's subject. This creates an undocumented restriction: path-scope deviations must always be scoped to the LEAF cert's identity, not to any intermediate. The doc comment does say 'For path-scope lints, scope matching uses the leaf certificate' but doesn't warn operators that IssuerDnExact/SerialRange scoped to an intermediate will always fail. Fix: Add a # Limitations section to DeviationRunner::run_path() doc comment explicitly warning that DeviationScope::IssuerDnExact and SerialRange must reference the LEAF cert's issuer DN, not intermediate CAs.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: DeviationRunner.run_path uses leaf cert for all path-lint scope matching",
+  "updated_at": "2026-05-06T20:58:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:49:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

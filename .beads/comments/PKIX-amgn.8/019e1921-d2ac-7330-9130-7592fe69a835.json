@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "created_at": "2026-05-11T22:21:48Z",
+  "id": "019e1921-d2ac-7330-9130-7592fe69a835",
+  "issue_id": "PKIX-amgn.8",
+  "text": "Escalating to human (do-beads loop, 2026-05-11): this bead requires several decisions and external-tool installations that need explicit human authorization. Open questions: (1) Install zlint? It's a Go binary requiring 'go install github.com/zmap/zlint/v3/cmd/zlint@latest' OR a shallow clone of github.com/zmap/zlint into ~/GIT \u2014 neither is currently present locally. (2) Where does the refresh tool live? The bead says 'pkix-difftest/python/ OR a Rust binary in a dev-only sub-crate; final shape TBD'. (3) Runtime parser shape \u2014 'lean Rust types or serde_json::Value walked at lookup time' (the bead leaves this open). (4) Catalog vendoring filename convention pinned to zlint version \u2014 picking the version is a policy choice (latest? a stable tag? what stability promise?). (5) Apache-2.0 attribution placement \u2014 what's the workspace convention for vendoring upstream open-source content? Recommendation: handle this bead as a focused human-collaborated session rather than autonomous spin. The autonomous frontier has self-contained alternatives (e.g., PKIX-lwr9.4 single-tc60 path-builder fix) that don't hit these decisions."
+}

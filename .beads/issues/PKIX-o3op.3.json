@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3a34b811dc4c27c8dd133e844df1c16ff6e8ac93260519efa7e9c4662e61ba70",
+  "created_at": "2026-05-14T19:27:33Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-aia/src/lib.rs:250-256 says: 'this helper covers the variants stable since Rust 1.45 plus the expansions in 1.74 (InvalidFilename, ArgumentListTooLong, etc.). Variants added in newer stdlib releases that the helper does not yet recognize serialize as \"Other\".'\n\nThe label_for match table at lines 289-314 contains NEITHER InvalidFilename NOR ArgumentListTooLong. They are the example variants the comment cites as covered, and they are not in the table.\n\nA reader takes this comment as authoritative and assumes 1.74-era IoFailure values will round-trip through serde with their kind preserved. They will not \u2014 see P0 PKIX-o3op.1.\n\nFix coupled to PKIX-o3op.1: whichever approach resolves the P0, update this comment to match.\n\nThis is filed separately from the P0 because it is the documentation-correctness face of the bug; the P0 captures the behavioral consequence.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.3",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Rustdoc claims '1.74 expansions' coverage that label_for does not have",
+  "updated_at": "2026-05-14T19:27:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:27:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

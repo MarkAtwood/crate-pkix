@@ -1,0 +1,50 @@
+{
+  "compaction_level": 0,
+  "content_hash": "fd0e4dc7f722a4c43d02622a5494bdf107d725dcf997447871a9246095cde5a9",
+  "created_at": "2026-05-11T16:56:48Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-lint-cabf` ships CA/B Forum lint bundles as \"reference / not authoritative\" interpretations \u2014 CA/B Forum publishes only PDFs, so any machine-readable encoding is somebody's interpretation. The dominant ecosystem interpretations are:\n\n- **zlint** (Go, Apache-2.0) \u2014 maintained by Let's Encrypt + community. The de facto reference everyone in the CA world cross-checks against. Source: <https://github.com/zmap/zlint>.\n- **pkilint** (Python, Apache-2.0) \u2014 maintained by DigiCert. Strong on S/MIME BR and ETSI / EU Trust List concerns. Source: <https://github.com/digicert/pkilint>.\n\nIf `pkix-lint-cabf`'s interpretations silently diverge from both zlint and pkilint, that's a defect surface. Differential cross-checking earns the \"useful even if not authoritative\" label.\n\n## What\n\nAdd zlint and pkilint as differential oracles to `pkix-difftest`, scoped to the CA/B Forum lint domain (NOT general path validation \u2014 that stays on OpenSSL + pyca).\n\nArchitecture (parallels the existing oracle layout at `pkix-difftest/python/pyca_oracle.py`):\n\n1. **zlint sidecar.** Either:\n   - **Subprocess**: spawn `zlint -format json <cert.der>` per cert, parse the JSON output. Requires zlint binary in PATH or vendored under `pkix-difftest/bin/`.\n   - **Python wrapper**: install `zlint` via `pip install zlint` (the Python bindings package), call from a sidecar script analogous to `pyca_oracle.py`.\n\n   First option is simpler. Second is more portable but adds a Python dep.\n\n2. **pkilint sidecar.** New `pkix-difftest/python/pkilint_oracle.py` that uses `pkilint.cabf_serverauth` (TLS BR) and `pkilint.cabf_smime` (S/MIME BR) APIs.\n\n3. **Verdict reconciliation.** Each oracle emits a list of finding IDs. `pkix-difftest` classifies per cert:\n   - **Agreement**: all three (pkix-lint-cabf, zlint, pkilint) emit the same finding set (or all clean).\n   - **PkixStricter**: pkix-lint-cabf emits findings the others don't.\n   - **PkixLaxer**: zlint or pkilint emits findings pkix-lint-cabf doesn't.\n   - **Disagree**: oracles diverge among themselves (zlint says X, pkilint says Y); pkix verdict is documented but not flagged as wrong.\n\n4. **Test corpus.** Reuse the bettertls / x509-limbo corpora plus dedicated CA/B Forum BR test vectors. May need to source these from zlint's own test fixtures (which are Apache-2.0 and citable).\n\n5. **Baseline + CI.** Generate `pkix-difftest/baseline-cabf-lint.{json,md}` on every push. Treat divergence increases as warnings, not failures (since both oracles can also be wrong).\n\n## Acceptance\n\n- [ ] zlint oracle integration (subprocess or Python wrapper).\n- [ ] pkilint oracle integration.\n- [ ] Verdict reconciliation logic.\n- [ ] CA/B Forum BR test corpus (sourced from zlint fixtures or curated).\n- [ ] Baseline output committed under `pkix-difftest/baseline-cabf-lint.{json,md}`.\n- [ ] CI run on every push.\n- [ ] Analysis MD documenting where pkix-lint-cabf diverges from zlint / pkilint and why (intentional vs unintentional).\n\n## Out of scope\n\n- Replacing zlint or pkilint. They keep doing their thing. We just cross-check against them.\n- Wholesale adoption of zlint's lint catalog as `pkix-lint-cabf`'s catalog \u2014 that's a separate proposal (see related-to PKIX-XXXX if/when filed).\n- Using zlint / pkilint as path-validation oracles (their domain is lint, not chain walking).\n\n## Depends on\n\n- `PKIX-amgn.5` (substantive `pkix-lint-cabf` content exists to cross-check). Without that, there's nothing to compare.\n\n## Related to\n\n- `PKIX-hbzo` (`pkix-difftest` completeness umbrella).\n- `PKIX-8qz1` (per-rule split \u2014 fast Rust executes, OSCAL describes; cross-validation confirms the executable side matches consensus).\n\n## Filed by\n\nSurfaced in conversation 2026-05-11 after noting CA/B Forum publishes only PDFs; zlint and pkilint are the de facto machine-readable interpretations, so they're the natural cross-validation oracles.\n",
+  "ephemeral": 0,
+  "id": "PKIX-hbzo.1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "blocked",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: zlint + pkilint as cross-validation oracles for pkix-lint-cabf",
+  "updated_at": "2026-05-13T04:01:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:56:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8qz1",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:56:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T12:46:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.8",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:56:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hbzo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

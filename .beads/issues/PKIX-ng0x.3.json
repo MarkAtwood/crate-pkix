@@ -1,0 +1,43 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f091ab118fb1efe1bc78f8c8ae7befc4ac94c63f43bf235ea623c57957bd07bd",
+  "created_at": "2026-05-11T04:47:35Z",
+  "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+  "description": "## Why\n\nPKIX-ng0x decomposition, child 3 of 5. The AC has its own validity\nwindow (separate from the issuing AA cert) and is signed by an\nAttribute Authority whose own X.509 cert chain must validate against\nan AA-specific trust set.\n\n## What\n\n1. **Validity check** (RFC 5755 \u00a74.2.4): `AttCertValidityPeriod` is\n   two `GeneralizedTime` fields. Verify `notBeforeTime <= now <=\n   notAfterTime` where `now` is supplied by the caller (consistent\n   with pkix-path style \u2014 no implicit SystemTime).\n2. **AA chain validation** (RFC 5755 \u00a75): the AC.signature is verified\n   by the AA cert. The AA cert is itself an X.509 PKC and its chain\n   must validate via `pkix_path::validate_path`. Caller supplies the\n   AA cert (or a candidate AA cert pool plus AA trust anchors).\n3. Composition: `validate_attribute_cert(ac, holder_pkc, aa_chain,\n   aa_anchors, &policy, &verifier)` walks:\n   - parse `ac` (PKIX-ng0x.1)\n   - bind to `holder_pkc` (PKIX-ng0x.2)\n   - check `ac.validity` against `policy.now()`\n   - call `pkix_path::validate_path(aa_chain, aa_anchors, ...)` to\n     validate the AA chain\n   - verify `ac.signature` against `aa_chain[0]`s SPKI using the\n     supplied `verifier`\n   - return Ok(parsed_ac) on success, structured AcError on failure\n\n## Tests\n\n- [ ] Validity period: notBefore-in-future, notAfter-in-past, and\n      within-window cases all map to correct verdicts.\n- [ ] AA chain validation: invalid AA chain (expired, untrusted)\n      causes structured failure.\n- [ ] Signature failure: tampered AC.signature byte causes specific\n      AcError variant, not a generic \"validation failed\".\n- [ ] Composition: cross-check that the AA chain validation goes\n      through pkix-path (does not re-implement chain walking).\n\n## Depends on\n\nPKIX-ng0x.1 (parser) and PKIX-ng0x.2 (binding).",
+  "ephemeral": 0,
+  "id": "PKIX-ng0x.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-ac: AttCertValidityPeriod + AA chain validation",
+  "updated_at": "2026-05-11T04:47:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T21:47:35Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T21:48:02Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T21:48:03Z",
+      "created_by": "bd-spin/bd-spin-20260511T043138Z-4160815",
+      "depends_on_id": "PKIX-ng0x.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

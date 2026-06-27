@@ -1,0 +1,31 @@
+{
+  "close_reason": "opinion; work captured in doc comment",
+  "closed_at": "2026-05-02T22:35:52Z",
+  "compaction_level": 0,
+  "content_hash": "63a7f72c7eda17318644ac4163199c6c4ac8bced48538ea8c9c0644454f469c2",
+  "created_at": "2026-05-02T22:20:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Lines 701\u2013709 read as internal debate ('byte-exact comparison is intentional and permanent') rather than API documentation. The vendor divergence analysis and RFC citations are valuable for reviewers but distract rustdoc readers. Extract the TeletexString justification to a DECISION.md entry: 'TeletexString normalization rejected \u2014 no standard T.61\u2192Unicode mapping; RFC 5280 marks it OPTIONAL; vendor implementations (OpenSSL, NSS, GnuTLS) diverge. Byte-exact fallback is permanent, not deferred.' Simplify rustdoc to: 'TeletexString: byte-exact comparison (no standardized mapping; see DECISION.md).'",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.5",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "any_to_str_bytes: internal rationale (TeletexString justification) belongs in DECISION.md, not rustdoc",
+  "updated_at": "2026-05-02T22:35:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:20:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

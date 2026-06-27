@@ -1,0 +1,38 @@
+{
+  "close_reason": "Memory epic-structure-post-2026-05-11-6-typed rewritten per PKIX-ncab.1 decision (rename + retain). PKIX-9vnx is now described as 'OSCAL emit/parse; historical alignment epic superseded by PKIX-ncab; shipped emit/parse code remains in tree as one supported output format'. PKIX-ztmr noted as superseded by 2026-05-11 demotion but retained as decision-history. PKIX-ncab added as the cleanup epic that supersedes PKIX-9vnx's framing without invalidating its shipped artifacts.",
+  "closed_at": "2026-05-12T16:45:04Z",
+  "compaction_level": 0,
+  "content_hash": "9679367295ea03ccad5b84586d9db3fc3f4a424382ef1d5822409b8676c31e3e",
+  "created_at": "2026-05-12T02:21:31Z",
+  "created_by": "Mark Atwood",
+  "description": "The memory `epic-structure-post-2026-05-11-6-typed` currently glosses PKIX-9vnx as \"(OSCAL alignment)\". Revise per the .1 decision:\n\n- If .1 chose A (close-as-superseded): drop PKIX-9vnx from the active-epics list and add a brief note that it's closed historical.\n- If .1 chose B (rename): update the gloss to match the new title.\n- If .1 chose C (keep title + supersession note): keep the \"(OSCAL alignment)\" gloss but add a parenthetical \"(now historical)\".\n\nSingle `bd forget epic-structure-post-2026-05-11-6-typed` + `bd remember --key epic-structure-post-2026-05-11-6-typed \"<updated text>\"` operation.\n\nBlocks on: .1.\n",
+  "ephemeral": 0,
+  "id": "PKIX-ncab.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Update memory epic-structure-post-2026-05-11-6-typed per .1 decision",
+  "updated_at": "2026-05-12T16:45:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T19:21:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T19:22:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ncab.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

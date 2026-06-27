@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6f76e97672038eb3b46c42694a3306706ffa7c22006be26dc7240da8ab9040ed",
+  "created_at": "2026-05-14T19:38:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:1287 clones base_dn for every NameRelativeToCRLIssuer DPN resolved. Called once per IDP DPN (rare; one per CRL) and once per CDP entry (up to a handful per cert) inside check_idp_dp_scope (lines 1366-1397).\n\nFor typical certs with 1-5 CDP entries this is a handful of DN clones, each maybe 100-500 bytes. Net cost: microseconds. Below threshold.\n\nDocumented here as 'considered and rejected as not worth optimizing today.' If profiling later shows this is hot, the fix is to push the relative-RDN appending into the comparison logic itself (compare 'cert_issuer_DN + cdp_rdn' against 'crl_issuer_DN + idp_rdn' without materializing the appended forms).",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "dpn_to_general_names clones the base DN per CDP/IDP resolution",
+  "updated_at": "2026-05-14T19:38:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:38:19Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

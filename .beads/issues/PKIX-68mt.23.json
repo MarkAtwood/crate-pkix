@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3b6874ca7cc6f3e4c10bed27d10a59613352e1ab6a3c4eb0d8833c091a2387ea",
+  "created_at": "2026-05-14T19:19:49Z",
+  "created_by": "Mark Atwood",
+  "description": "The verify_* functions return Result<(), IdentityError>. On Ok, the caller learns 'a SAN entry matched' but not *which* one (e.g., 'matched wildcard *.foo.com', 'matched IP 192.0.2.1', 'matched rfc822Name vs SmtpUTF8Mailbox').\n\nCaller impact:\n\n* TLS server-name validators that log 'cert vended for example.com via *.example.com wildcard' have to walk the SAN themselves *after* a successful match.\n* Audit / compliance reports needing to record the matched SAN entry pay 2x SAN parse cost.\n* Wildcard-vs-exact telemetry (security teams want to know how often wildcard matches occur in their fleet) requires a second pass.\n\nThe signature `Result<(), IdentityError>` is the simplest shape but it's a one-way commitment. Once shipped, the maintainer cannot change the Ok variant to carry data without breaking every existing caller.\n\nLower-friction alternatives \u2014 all chosen before 1.0 because the Ok shape is immutable post-ship:\n\n1. Return Result<MatchInfo, IdentityError> where MatchInfo is #[non_exhaustive] and carries which-entry-matched info. This is the most correct shape.\n\n2. Provide a second function verify_dns_name_with_info that returns the rich variant; keep the simple one as a wrapper. Doubles surface area.\n\n3. Pass a &mut Option<MatchInfo> out-param. Ugly; not idiomatic.\n\n4. Add a 'last match' accessor on ServerName. Stateful; thread-hostile.\n\n5. Document the loss explicitly. Punts the problem to callers forever.\n\nBest option: (1). The shape:\n\n  pub struct DnsMatch<'a> {\n      pub matched_san: &'a str,\n      pub via_wildcard: bool,\n  }\n  pub fn verify_dns_name(...) -> Result<DnsMatch<'_>, IdentityError>;\n\n(non_exhaustive, lifetime tied to cert).\n\nFor verify_mailbox similarly: which SAN form matched (Rfc822Name vs SmtpUTF8Mailbox).\n\nSeverity P2 (was P1, downgraded): callers can subset with `let _ = verify_dns_name(..)?;` if they don't want the info, so this is largely additive. The bar for changing the signature later is high though \u2014 file this as a 1.0-blocker design decision.",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_dns_name / verify_mailbox discard which SAN entry matched \u2014 diagnostic info lost forever",
+  "updated_at": "2026-05-14T19:19:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:19:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

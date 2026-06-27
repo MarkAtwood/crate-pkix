@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Refactored sites 1 and 3 from match-on-Option to map_or/map_or_else. Site 2 left as-is per the issue's caveat (the explicit None arm is the readability anchor and the rewrite would be a wash). Builds clean.",
+  "closed_at": "2026-05-07T22:35:41Z",
+  "compaction_level": 0,
+  "content_hash": "dac9520d9f5ad936ce928658c4c2d1cc6101415af7bc011d101e1e86d9ce27e4",
+  "created_at": "2026-05-07T22:16:25Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nClippy nursery `option_if_let_else` flags three patterns in `pkix-path/src/lib.rs`\nwhere a long `match Some(x) / None` block could be expressed via\n`Option::map_or`/`Option::map_or_else`:\n\n1. **`pkix-path/src/lib.rs:1248-1258`** \u2014 `try_find_cert_ext`:\n   ```rust\n   match cert.tbs_certificate.extensions.as_deref().unwrap_or(&[])\n       .iter().find(|e| e.extn_id == oid) {\n       None => Ok(None),\n       Some(e) => T::from_der(e.extn_value.as_bytes()).map(Some),\n   }\n   ```\n   Could be `.map_or_else(|| Ok(None), |e| T::from_der(e.extn_value.as_bytes()).map(Some))`.\n\n2. **`pkix-path/src/lib.rs:2018-2028`** \u2014 initial NC seeding from anchor:\n   ```rust\n   let (mut nc_permitted, mut nc_excluded) = match &anchor.name_constraints {\n       None => (None, GeneralSubtrees::default()),\n       Some(nc) => (nc.permitted_subtrees.clone(), nc.excluded_subtrees.clone().unwrap_or_default()),\n   };\n   ```\n\n3. **`pkix-path/src/lib.rs:2040-2049`** \u2014 initial `nc_constrained_types` mask:\n   ```rust\n   let mut nc_constrained_types: NcTypeMask = match &nc_permitted {\n       None => NcTypeMask::EMPTY,\n       Some(permitted) => { let mut bits = NcTypeMask::EMPTY; for st in permitted { ... } bits }\n   };\n   ```\n\nCaveat: site 2 has a comment explaining the `clone()` is intentional, and the\n`map_or_else` rewrite reduces readability for the explicit `None` arm. Sites\n1 and 3 are clear wins; site 2 is closer to a wash.\n\nFix: rewrite sites 1 and 3 using `map_or` / `map_or_else`. Leave site 2 if the\nmaintainer prefers the explicit `match` for the readability anchor on the\n`None` branch.\n\nThese are clippy nursery (default-allow) so this is purely a stylistic\nnudge; not blocking.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.26",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: clippy nursery option_if_let_else flags 3 sites in pkix-path that could use Option::map_or/map_or_else",
+  "updated_at": "2026-05-07T22:35:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:16:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

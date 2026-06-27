@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed in rm8.68: added pub use pkix_path_builder to pkix-chain",
+  "closed_at": "2026-06-15T18:30:22Z",
+  "compaction_level": 0,
+  "content_hash": "84c85da7c1ed2864c9a8f5ef471b76724dda0c17f6922ba2b06ba8a450a3d2e1",
+  "created_at": "2026-05-14T14:49:26Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:223 \u2014 `Error::PathBuild(pkix_path_builder::Error)` puts\n`pkix_path_builder::Error` into pkix-chain's public surface. The\n`From<pkix_path_builder::Error>` impl at src/lib.rs:292-296 makes the\ntype visible there too.\n\nBut pkix-chain does NOT re-export pkix-path-builder. Compare the other\nupstream-error variants:\n\n  - Error::Path(pkix_path::Error)         \u2014 `pub use pkix_path::{self, ...}` \u2713\n  - Error::Revocation(pkix_revocation::Error) \u2014 `pub use pkix_revocation::{self, ...}` \u2713\n  - Error::Identity(pkix_identity::IdentityError) \u2014 `pub use pkix_identity::{IdentityError, ...}` \u2713\n  - Error::Aia(pkix_aia::AiaError)        \u2014 `pub use pkix_aia::{AiaError, ...}` \u2713\n  - Error::PathBuild(pkix_path_builder::Error) \u2014 NO re-export of pkix_path_builder\n\nConsequences for callers:\n\n1. A caller matching `Err(Error::PathBuild(pkix_path_builder::Error::NoPathFound))`\n   must add pkix-path-builder as a *direct* dependency in their own\n   Cargo.toml, then pin its version to match pkix-chain's pinned version.\n   The Cargo.lock will paper over the version mismatch some of the time;\n   when it doesn't, you get \\\"the type `pkix_path_builder::Error` doesn't\n   match\\\" compile errors that have no obvious fix from the caller's\n   perspective.\n\n2. The error variant cannot be programmatically distinguished without\n   that direct dep. Callers who only want to log the error via\n   `Display` are fine, but callers wanting to react to specific\n   path-builder errors (e.g., \\\"retry on transient,\\\" \\\"give up on\n   NoPathFound\\\") are forced into the direct-dep model.\n\nTwo reasonable fixes:\n\na) Add `pub use pkix_path_builder::{self};` to the re-export block,\n   matching the existing pattern. Cheapest fix; commits to the same\n   forever-coupling cost as the other re-exports (see the sibling\n   finding on `pub use foo::{self, ...}`).\n\nb) Wrap path-builder errors into a stable local enum in pkix-chain.\n   More work, smaller forever surface, but means the From impl\n   degrades information (e.g., \\\"PathBuild { kind: NoPathFound }\\\"\n   instead of the upstream variant). Likely overkill.\n\nEither is acceptable. Status quo (have the type in the surface, don't\nre-export it) is not \u2014 it forces every caller into a coupling pkix-chain\nhasn't acknowledged in its Cargo.toml or rustdoc.\n\nCaller impact: anyone wanting AIA chain reassembly with structured error\nhandling.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::PathBuild exposes pkix_path_builder::Error without re-export",
+  "updated_at": "2026-06-15T18:30:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:49:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c16d5df5d959b748dae44ce952a4bada5674a110796de9b811c01302dca781d8",
+  "created_at": "2026-05-14T19:29:07Z",
+  "created_by": "Mark Atwood",
+  "description": "What is unclear and for whom: pkix-aia/src/lib.rs:497-503 (CachingFetcher doctest commentary) says: 'The inner result \u2014 success or failure \u2014 is what gets cached; the wrapper treats every AiaError as \"the inner fetcher said no for this URI\" and records it, which is appropriate for callers who don't want to retry fast-failing URIs.'\n\nA reader copying this pattern will cache transient failures (Timeout, IoFailure) as if they were permanent. A subsequent fetch for the same URI returns the cached Timeout forever. This is bad behavior for any real workload \u2014 transient failures should be retried.\n\nThe doctest comment acknowledges the behavior ('appropriate for callers who don't want to retry fast-failing URIs') but does not flag that this is a footgun. A future contributor copying this doctest into a production caching wrapper will replicate the bug.\n\nWhat would make it clear: amend the doctest comment to distinguish:\n- Permanent failures (UriUnsupported, FetchingDisabled, MalformedCertificate): correct to cache\n- Transient failures (Timeout, IoFailure, HttpStatus(5xx)): SHOULD NOT be cached without expiry; the doctest's behavior is wrong for these\n\nOr, rewrite the doctest to demonstrate the correct pattern: cache successes, propagate failures uncached. The current shape models the simpler API contract but invites a misuse class.\n\nCoupled to PKIX-o3op.5 (HttpStatus contract) because the right answer depends on which failures are permanent.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.12",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AiaFetcher doctest mentions FetchingDisabled-as-cache-entry without warning",
+  "updated_at": "2026-05-14T19:29:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:29:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

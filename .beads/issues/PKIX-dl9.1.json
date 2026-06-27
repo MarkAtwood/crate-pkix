@@ -1,0 +1,33 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Investigated: match_count pattern is correct per RFC 5280 \u00a76.1.3(d)(1)(i). Multiple children with same valid_policy OID are the correct output when multiple parents match. Downstream code handles duplicates correctly via any()/contains(). Pre-existing, no bug.",
+  "closed_at": "2026-05-07T01:55:09Z",
+  "compaction_level": 0,
+  "content_hash": "24440ce8b803ff06ed3db8e0be3c2c316270425290817dab3136ce7440183a92",
+  "created_at": "2026-05-07T01:49:04Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2107-2122 (pre-existing, not introduced by today's commits) \u2014 match_count counts all parent nodes at depth cert_depth-1 whose expected_policy_set contains p_oid, then creates one new PolicyNode per parent count. RFC 5280 \u00a76.1.3(d)(1)(i) says: for each matching parent, create one child with valid_policy = p_oid. With policy mappings, multiple parents can have the same p_oid in their expected_policy_set. This correctly creates multiple children, each representing a different inheritance path. However, all children have the same valid_policy = p_oid, creating duplicate OIDs at cert_depth in the flat tree. The \u00a76.1.5(g) intersection logic and prune_policy_tree both iterate the tree by valid_policy and may over-count or behave incorrectly when the same policy OID appears multiple times at the same depth. Separately: for the typical case (zero or one parent), this is correct. The bug manifests only with policy-mapped certificates where multiple parents carry the same expected policy. Needs a PKITS policy-mapping test case to confirm.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Investigation: The match_count pattern is correct per RFC 5280 \u00a76.1.3(d)(1)(i) \u2014 one child per matching parent is the intended behavior. Duplicate valid_policy OIDs at the same depth are handled correctly by downstream code: prune_policy_tree uses any(), \u00a76.1.5(g) uses contains() for dedup. This is pre-existing, not introduced today. Deferring; would need PKITS 4.12.x (policy mapping) suite to confirm. No code change needed.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "policy tree \u00a76.1.3(d)(1)(i) creates duplicate child nodes",
+  "updated_at": "2026-05-07T01:55:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:49:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

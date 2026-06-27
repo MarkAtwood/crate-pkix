@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:53:59Z",
+  "compaction_level": 0,
+  "content_hash": "20ab764eb9f25e4edff200aed3d95ef4face5023443753380e5900ef0e80833e",
+  "created_at": "2026-05-07T04:37:53Z",
+  "created_by": "Mark Atwood",
+  "description": "In crl.rs, parse_issuing_dp() silently ignores DER decode failures on IssuingDistributionPoint (PKIX-fy1b.3 tracks fixing it). Independently, there is no test in crl_checker_tests.rs that exercises a CRL with a present-but-malformed IDP extension, so the current fail-open behavior is not observable in the test suite. Even after PKIX-fy1b.3 fixes the fail-open, a regression test with a malformed-IDP fixture would prevent the fix from being reverted.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.15",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing test for CrlChecker where IssuingDistributionPoint has malformed DER \u2014 current fail-open is untested",
+  "updated_at": "2026-05-07T04:53:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:37:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

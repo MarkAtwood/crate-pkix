@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "1b26ebac87a15403c304ff87810fe4e1c495a6ed8656acc198c0b4ed97b29494",
+  "created_at": "2026-05-14T14:24:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:80-87 \u2014 insert() uses BTreeMap::insert and discards the returned Option<CtLog>. The docstring says 'Inserting a log with a log_id already present overwrites the previous entry' but the caller cannot tell whether their insert was an add or an overwrite.\n\nWhy this matters: a caller loading a log list incrementally (e.g., merging multiple sources: Google's list + Apple's list + a local addition) wants to detect duplicate log_ids \u2014 possibly with conflicting descriptions or different usable_from_ms windows. Silent overwrite means whichever source loads last wins, with no warning.\n\nSuggested fix: change insert signature to return Result<Option<CtLog>> \u2014 Ok(Some(prev_log)) for overwrite, Ok(None) for new insert, Err for consistency-check failure. Pre-1.0 this is a free fix; post-1.0 it becomes a wrapping addition (insert_or_replace + try_insert).\n\nAlternatively: add a try_insert() that returns Err if the log_id is already present, leaving insert() as the overwriting variant with the new return value.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CtLogList::insert overwrites existing entries silently, no signal to caller",
+  "updated_at": "2026-05-14T14:24:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:24:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

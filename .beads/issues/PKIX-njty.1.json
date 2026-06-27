@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "b932e7afe96e03ac44279c6c820bbf6fc26e64e223d743e1db99736779ded4be",
+  "created_at": "2026-05-14T18:46:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: a user reads README.md to understand what the crate enforces.\n\nREADME rows misrepresent shipped behavior:\n- Line 18 (WebPkiProfile): claims 'path len \u2264 2'. Removed in PKIX-d5rh (commit 9d6c193b) \u2014 max_path_len is no longer set.\n- Line 19 (SmimeProfile): claims 'max validity 1185 days, path len \u2264 1'. Cap was corrected to 825 days in PKIX-jbvb.7 (commit 79417054). max_path_len removed in PKIX-d5rh.\n- Line 20 (CodeSigningProfile): claims 'path len \u2264 1'. Removed.\n- All four tier profiles added since PKIX-jbvb.2 (SmimeSponsorValidated, SmimeIndividualValidated, SmimeSponsorValidatedMultipurpose, SmimeIndividualValidatedMultipurpose) are missing from the table.\n- README claims SmimeProfile is 'CA/B Forum S/MIME BR v1.0' but the code version stamp says 1.0.14.\n\nBad behavior: a downstream user reads README, configures their pipeline expecting path-len-2 cap enforcement on TLS chains, ships, and discovers in production that no cap is enforced. README is the first thing every new user reads \u2014 it's the most consequential doc surface in the crate.",
+  "ephemeral": 0,
+  "id": "PKIX-njty.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "README.md severely stale: wrong validity cap, removed max_path_len, missing 4 profiles",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:46:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-njty",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

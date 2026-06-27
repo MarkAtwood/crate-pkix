@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "334562f01443ec9113e1d9549b2147431a8c4287177076546b87e868e345c40f",
+  "created_at": "2026-05-14T17:41:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/lib.rs:89-94\n\nThe `UnsupportedSignatureAlgorithm { hash_alg: u8, sig_alg: u8 }`\nvariant exposes the wire-format RFC 5246 \u00a77.4.1.4.1 tags directly.\nOnce shipped, callers can match the variant and extract the raw tag\nvalues \u2014 locking the maintainer in.\n\nThe struct variant prevents a later cleanup like:\n\n```rust\nUnsupportedSignatureAlgorithm(SctAlgorithm)\n```\n\nwhere `SctAlgorithm` is a typed enum, because doing so is a breaking\nchange for any caller that destructured the inline fields.\n\n`Error` already has `#[non_exhaustive]` on the enum so adding new\nvariants is fine. But struct variants like this one need their own\n`#[non_exhaustive]` to allow adding fields. RFC 5246's hash_alg /\nsig_alg space is fixed today, but RFC 8446 deprecated some entries\nand added the `SignatureScheme` namespace. If pkix-ct ever wants to\nsurface \"this is actually a `SignatureScheme` from TLS 1.3\" the\nvariant needs more fields.\n\nRecommendation: `#[non_exhaustive]` on the struct-variant fields, OR\nwrap the pair in a small typed struct that itself can be extended:\n\n```rust\n#[non_exhaustive]\nUnsupportedSignatureAlgorithm {\n    hash_alg: u8,\n    sig_alg: u8,\n}\n```\n\nAlso: same applies to `Error::UnsupportedVersion(u8)` \u2014 tuple variant\nallows callers to match `Error::UnsupportedVersion(v)`. If the wire\nversion becomes a typed enum later, that's a breaking change. Less\nimportant because `u8` is the right representation here; just noting.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Error::UnsupportedSignatureAlgorithm exposes raw u8 hash_alg/sig_alg \u2014 locks RFC 5246 wire encoding",
+  "updated_at": "2026-05-14T17:41:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:41:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

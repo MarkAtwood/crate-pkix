@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T03:58:59Z",
+  "compaction_level": 0,
+  "content_hash": "ea3ae776e811e06727c101ddf0cad0e36f49a0d120e46087f984a7849b09067a",
+  "created_at": "2026-05-07T03:49:32Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:727-751 \u2014 run_chain docs say 'Callers are responsible for identifying [the AnchorIssued] position and passing SubjectKind::AnchorIssued in kinds.' but provides no guidance on how to determine which index is anchor-issued without access to the trust anchors. This is especially subtle for users of DeviationRunner::run_chain who don't directly call validate_path. Fix: add an example or reference to the caller pattern: 'The anchor-issued cert is typically chain[chain.len() - 1] \u2014 the cert whose issuer DN matches a trust anchor. Check against pkix_path::TrustAnchor::subject using names_match.'",
+  "ephemeral": 0,
+  "id": "PKIX-mxj.6",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "LintRunner::run_chain doc doesn't explain AnchorIssued kind gap",
+  "updated_at": "2026-05-07T03:58:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T20:49:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mxj",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

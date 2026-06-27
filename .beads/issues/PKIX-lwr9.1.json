@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T17:10:03Z",
+  "compaction_level": 0,
+  "content_hash": "391c27bbe94339ef41a3e13b512049eb3de8282ba9fad962f37509e68e6a786d",
+  "created_at": "2026-05-11T16:29:36Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nFoundation for PKIX-lwr9.2/.3/.4 (the actual heuristic implementations). Without offline fixtures, the heuristic beads can't have integration tests that don't require an external limbo.json checkout.\n\n## What\n\n1. Pick ~25 representative testcases from the 47 `bettertls::pathbuilding::*` cases in `~/GIT/x509-limbo/limbo.json`. Distribute across the four failure-mode buckets:\n   - cross-signed candidate selection (~6 fixtures from the 22 cases)\n   - signature-invalid-at-depth-N (~6 fixtures from the 10 + 10 + 1 cases)\n   - pathLenConstraint backtracking (~6 fixtures from the 8 cases)\n   - certificate-not-CA at depth (~2 fixtures from the 2 cases)\n   - 'no path to a trusted anchor' (~5 fixtures from the 22 cases)\n2. Commit fixtures under `pkix-path-builder/tests/fixtures/bettertls/<testcase-id>/` with each testcase as its own subdirectory holding PEM files (chain, anchors, leaf) plus a `testcase.json` summarizing the limbo expected result and provenance.\n3. Filename convention: use the limbo testcase ID as the directory name so provenance back to BetterTLS is preserved.\n4. Add an integration test harness in `pkix-path-builder/tests/bettertls.rs` that walks the fixture tree, loads each case, runs pkix-path-builder + pkix-path, and asserts against the testcase.json expected result.\n\n## Acceptance\n\n- [ ] ~25 fixtures committed under `pkix-path-builder/tests/fixtures/bettertls/`\n- [ ] Test harness loads fixtures offline (no ~/GIT/x509-limbo dependency)\n- [ ] Test harness currently FAILS for the cases that PKIX-lwr9.2/.3/.4 will fix \u2014 failure is the baseline; passing comes with the heuristic implementations.\n- [ ] Documentation in the fixture directory README noting provenance from limbo + BetterTLS\n\n## Out of scope\n\n- Fixing any of the test failures (that's .2/.3/.4)\n- Including online::* cases (those are P-384, separate harness limitation tracked under PKIX-wmch)\n\n## Filed by\n\nPKIX-lwr9 decomposition decision 2026-05-11 (Mark).",
+  "ephemeral": 0,
+  "id": "PKIX-lwr9.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: import bettertls fixtures + test scaffolding",
+  "updated_at": "2026-05-11T17:10:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:29:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

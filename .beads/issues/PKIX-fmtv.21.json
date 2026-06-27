@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:16:30Z",
+  "compaction_level": 0,
+  "content_hash": "2e9085e5956e66b96c69ed33c3ed669930b0a5602972112e08e16b225994472e",
+  "created_at": "2026-05-12T05:04:14Z",
+  "created_by": "Mark Atwood",
+  "description": "Scaffold a new workspace crate `pkix-identity` for cert-side identity matching. Decision per `.3`: option B (separate crate, not inline in profiles or pkix-chain).\n\n## Deliverable\n\nA new top-level workspace crate `pkix-identity/`:\n\n- **`Cargo.toml`**: name `pkix-identity`, version `0.1.0`, edition 2021, `rust-version = \"1.73\"`, license `Apache-2.0 OR MIT`, repository pointer, `publish = true`.\n- **`no_std`** (matches `pkix-path` discipline). `#![cfg_attr(not(test), no_std)]` in lib.rs. `extern crate alloc` where needed.\n- **Dependencies**: `x509-cert` (no default features, for `Certificate`), `der` (for parsing extensions), `idna` (for IDN A-label/U-label conversion). NO dep on pkix-path, pkix-chain, or pkix-profiles (one-way dep flow).\n\n## Public API skeleton\n\n```rust\n// pkix-identity/src/lib.rs\n\n#![cfg_attr(not(test), no_std)]\nextern crate alloc;\n\nuse x509_cert::Certificate;\n\n/// Parsed server identity: DNS hostname or IP literal.\npub struct ServerName<'a> { /* ... */ }\n\nimpl<'a> ServerName<'a> {\n    pub fn dns_name(name: &'a str) -> Result<Self, IdentityError> { unimplemented!() }\n    pub fn ip_address(ip: &'a str) -> Result<Self, IdentityError> { unimplemented!() }\n}\n\n/// Parsed RFC 5322 / RFC 8398 mailbox.\npub struct MailboxName<'a> { /* ... */ }\n\nimpl<'a> MailboxName<'a> {\n    pub fn parse(mailbox: &'a str) -> Result<Self, IdentityError> { unimplemented!() }\n}\n\n/// Identity-binding errors.\n#[non_exhaustive]\npub enum IdentityError {\n    NotYetImplemented,\n    MalformedInput,\n    NoMatchingSan,\n    MissingSan,\n    // ... fleshed out in .11/.12\n}\n\n/// RFC 6125 \u00a76.4 hostname binding: does leaf cert authorize `name`?\npub fn verify_dns_name(cert: &Certificate, name: &ServerName<'_>) -> Result<(), IdentityError> {\n    Err(IdentityError::NotYetImplemented)\n}\n\n/// RFC 5280 \u00a74.2.1.6 + RFC 8398 mailbox binding: does leaf cert authorize `mailbox`?\npub fn verify_mailbox(cert: &Certificate, mailbox: &MailboxName<'_>) -> Result<(), IdentityError> {\n    Err(IdentityError::NotYetImplemented)\n}\n```\n\n`NotYetImplemented` is explicit (not `panic!`) so callers in this window get a loud, structured signal. `.11` and `.12` fill in the bodies.\n\n## Workspace integration\n\n- **Workspace `Cargo.toml`**: add `pkix-identity` to `members` array.\n- **AGENTS.md**: add to the \"Adjacent / specialized crates\" list with a one-line description and scope-discipline note.\n- **`pkix-identity/README.md`**: short \u2014 what this crate does, what's in scope, what's deliberately NOT in scope (name constraints stay in pkix-path; DN canonicalization stays in pkix-path; public suffix list NOT enforced \u2014 caller's responsibility).\n\n## Scope discipline (load-bearing)\n\nThis crate has high risk of \"what doesn't go in here?\" scope creep. Discipline:\n\n**In scope:**\n- `ServerName` parsing (DNS hostname + IP literal).\n- `MailboxName` parsing (RFC 5322 + RFC 8398 SmtpUTF8Mailbox via otherName).\n- `verify_dns_name` (RFC 6125 \u00a76.4 matching).\n- `verify_mailbox` (RFC 5280 \u00a74.2.1.6 + RFC 8398 matching).\n- IDN A-label/U-label normalization via `idna` crate.\n- Internal helpers: wildcard matching, case folding, IP byte compare.\n\n**Out of scope:**\n- Name constraints matching (lives in `pkix-path/src/lib.rs:2190` as `dns_name_matches_constraint` \u2014 different semantics: constraint check, not target match).\n- DN canonicalization (RFC 4518 string prep \u2014 already in pkix-path).\n- CSR parsing (not a verifier crate concern).\n- Public Suffix List enforcement (eTLD blocking) \u2014 out, deliberately. Callers who need it pull in their own PSL crate. webpki makes this choice; we follow.\n- Anything that requires chain context or trust-anchor knowledge.\n\n## Acceptance\n\n- Crate compiles in workspace (`cargo build --workspace`).\n- Crate compiles standalone with no_std (`cargo build -p pkix-identity --no-default-features`).\n- All public API declared with `NotYetImplemented` stubs.\n- AGENTS.md `## What this is` section updated to include `pkix-identity` in the adjacent-crates list.\n- Workspace tests still pass (`cargo test --workspace`).\n- `pkix-identity/README.md` includes the scope-discipline block above.\n- CHANGELOG entry in `pkix-identity/CHANGELOG.md` for v0.1.0.\n\n## What this unblocks\n\nAfter scaffold lands, `.11` fills in `verify_dns_name` body + ships `verify_tls_server` wrapper in pkix-chain. `.12` fills in `verify_mailbox` body + ships `verify_smime_signer`/`verify_smime_recipient` wrappers.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Create pkix-identity crate scaffold (workspace member, no_std, public API skeleton)",
+  "updated_at": "2026-05-12T05:16:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:04:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fmtv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

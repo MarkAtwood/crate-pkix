@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:05Z",
+  "compaction_level": 0,
+  "content_hash": "3847ba082aeeb1ed2fa624891731795570000a1fa37113b4cf2f76783e6095f2",
+  "created_at": "2026-05-07T20:28:01Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\n`pkix-path/tests/pkits_helper.rs:44`:\n\n```rust\n.unwrap_or_else(|e| panic!(\"failed to read PKITS cert '{name}': {e} (path: {path:?})\"));\n```\n\nThe `{path:?}` format spec uses `Debug` formatting on a `PathBuf`, which produces output like `\"/tmp/.../foo.crt\"` (with quotes). `Display` would be more appropriate for a panic message intended for human reading.\n\nClippy: `unnecessary Debug formatting in panic! args`.\n\n## Fix\n\n```rust\n.unwrap_or_else(|e| panic!(\"failed to read PKITS cert '{name}': {e} (path: {})\", path.display()));\n```\n\n## Priority\n\nP4 \u2014 test-only ergonomic nit.\n",
+  "ephemeral": 0,
+  "id": "PKIX-fx1u",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: unnecessary Debug formatting in panic! at pkix-path/tests/pkits_helper.rs:44",
+  "updated_at": "2026-05-07T21:49:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:28:01Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

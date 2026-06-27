@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "added has_key_cert_sign using x509-cert KeyUsage::key_cert_sign()",
+  "closed_at": "2026-05-02T06:36:27Z",
+  "compaction_level": 0,
+  "content_hash": "7f39f4e41aa5825e47c08d22889274753fff40698cff8ce706de4b7bcea0849e",
+  "created_at": "2026-05-02T05:51:18Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement has_key_cert_sign(cert: &Certificate) -> Option<bool> that returns whether the keyCertSign bit is set in the KeyUsage extension.\n\nRFC 5280 \u00a74.2.1.3: KeyUsage is a BIT STRING. keyCertSign is bit 5 (counting from MSB of the first byte, index 5). If KeyUsage is absent, the extension places no constraint.\n\nReturn semantics:\n  None  \u2014 KeyUsage extension not present (no constraint; not an error by itself)\n  Some(true)  \u2014 KeyUsage present and keyCertSign bit is set\n  Some(false) \u2014 KeyUsage present but keyCertSign bit is NOT set\n\nUsage in \u00a76.1 state machine: when ValidationPolicy::enforce_key_usage is true and an intermediate cert has KeyUsage present with keyCertSign=false, return Error::KeyUsageMissing { index }.\n\nImplementation note: x509-cert may have KeyUsage decoded in x509_cert::ext::pkix::KeyUsage with individual bit accessors. Prefer that.\n\nNote: this function is only meaningful for intermediate and trust anchor certs. Calling it on the leaf is valid but the result is used differently (the leaf's key usage is not checked during path validation, only during the application-level signature operation).",
+  "ephemeral": 0,
+  "id": "PKIX-8ae",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: KeyUsage extraction (keyCertSign bit)",
+  "updated_at": "2026-05-02T06:36:27Z"
+}

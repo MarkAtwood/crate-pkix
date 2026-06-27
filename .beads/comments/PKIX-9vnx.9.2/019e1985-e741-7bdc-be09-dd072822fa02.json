@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T00:11:06Z",
+  "id": "019e1985-e741-7bdc-be09-dd072822fa02",
+  "issue_id": "PKIX-9vnx.9.2",
+  "text": "Decision recorded 2026-05-11 (Mark, interactive): option (i) \u2014 add pkix-lint as a workspace dep of both pkix-profiles and pkix-profiles-cabf. Direct, explicit, matches the PKIX-8qz1 per-rule split stance (Rust handles executable side, OSCAL handles policy side). Both profile crates implement LintProfile and expose the convenience aliases. Recommendation accepted."
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:42:07Z",
+  "compaction_level": 0,
+  "content_hash": "4185b3b9414365fedf3e1f615a98ee8a075833a7a796c1e7b2b7c9e1bcfc8727",
+  "created_at": "2026-05-06T20:38:23Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs: The DFS cycle guard computes spki_der_bytes for each in-path cert on every candidate comparison, giving O(depth^2) allocations per DFS frame. Not a correctness issue. Fix when profiling shows it matters: cache encoded SPKI bytes alongside the path Vec, or use SubjectPublicKeyInfoOwned::PartialEq directly (no allocation).",
+  "ephemeral": 0,
+  "id": "PKIX-tug.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "spki_der_bytes re-encodes in-path certs on every candidate comparison",
+  "updated_at": "2026-05-06T20:42:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:38:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tug",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

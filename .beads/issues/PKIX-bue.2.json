@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-bue.2",
+  "title": "ASCII MailboxName matches SmtpUTF8Mailbox SAN, contradicting rustdoc",
+  "description": "Old: PKIX-68mt.3",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "bug",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:26Z",
+  "updated_at": "2026-06-15T17:54:26Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-bue",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 10:54:26"
+    }
+  ]
+}

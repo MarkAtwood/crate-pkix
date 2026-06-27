@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T22:28:46Z",
+  "compaction_level": 0,
+  "content_hash": "d8f8311ef1be563df15edf76e755c195d6bb1cd13ef8bfb3f2dc6c8f85c0b5e7",
+  "created_at": "2026-05-13T21:11:50Z",
+  "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+  "description": "## What\n\nA single workspace-level document for the 1.0 announcement. Location TBD \u2014 recommend top-level `/home/mark/PROJECT/PKIX/RELEASE_NOTES.md` since the workspace already has a top-level `CHANGELOG.md` carrying detailed unified history.\n\n## Contents per PKIX-wlsr.7\n\n- Summary: 'RFC 5280 X.509 for Rust, done right from the start. 12 crates shipping at 1.0; adjacent ecosystem continues at independent 0.x cadence.'\n- What's included: list of the 12 narrow-scope crates, one-line each (purpose + RFC scope)\n- What's not included: AIA online fetching (`pkix-aia-http` post-1.0), AC (`pkix-ac`), CT (`pkix-ct`), DANE (`pkix-dane`), composite/PQC (`pkix-composite`), platform trust stores (`pkix-truststore-{system,pkcs11}`), comprehensive CA/B Forum policy adapter (`pkix-policy-zlint`, `pkix-policy-pkilint`) \u2014 all available as 0.x sibling crates with independent roadmaps\n- Quick start example: show `verify_tls_server` hostname binding\n- Stability promise: 1.0 = semver stability; future breaking changes require major bump\n- Acknowledgments: RustCrypto upstream, NIST PKITS, pyca/cryptography, OpenSSL, others as appropriate\n\n## Acceptance\n\n- [ ] Document drafted at the chosen location\n- [ ] Cross-references to per-crate CHANGELOGs work\n- [ ] Quick-start example compiles (verify with `cargo doc` or extract as a real doctest somewhere)\n- [ ] No fabricated content \u2014 every claim traces to real workspace state\n\n## Cross-references\n\n- PKIX-wlsr.7 (parent)\n- PKIX-wlsr.7.1 (CHANGELOGs the RELEASE_NOTES references)\n- PKIX-wlsr.7.2 (1.0 entries the RELEASE_NOTES summarizes)",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.7.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Workspace-level RELEASE_NOTES.md for 1.0 announcement",
+  "updated_at": "2026-05-13T22:28:46Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T14:11:49Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T14:11:56Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:11:57Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-wlsr.7.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

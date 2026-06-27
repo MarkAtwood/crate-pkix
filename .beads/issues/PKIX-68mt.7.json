@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "644044d88492a5bbb9afe24e40e3f4893b69116793559c59be6bcc3708ee201f",
+  "created_at": "2026-05-14T19:14:09Z",
+  "created_by": "Mark Atwood",
+  "description": "MailboxName::is_internationalized (pkix-identity/src/lib.rs:233-236, 280) is set from `!local_raw.is_ascii()` only. The field name evokes RFC 6532's 'internationalized email address', which per RFC 6532 \u00a73.2 is an address with non-ASCII in EITHER local-part OR domain.\n\nThe current usage is correct for its purpose \u2014 it gates whether the rfc822Name branch is eligible, and rfc822Name (IA5String) cannot carry non-ASCII LOCAL-PARTs. Domain non-ASCII is harmless because domain_a_label is always normalized to ASCII.\n\nSuggested rewrite: rename to `local_is_non_ascii` (what it actually means) so a future contributor doesn't add a 'is_internationalized = !local_raw.is_ascii() || domain_was_u_label' line that breaks the rfc822Name dispatch. Either rename the field or add a one-line comment explaining the gate semantics (local-only by design).",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "is_internationalized name suggests RFC 6532 'internationalized email address' but only checks local-part",
+  "updated_at": "2026-05-14T19:14:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

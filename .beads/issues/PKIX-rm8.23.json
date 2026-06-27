@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.23",
+  "title": "pkix-chain-simple::Error wraps pkix_path::Error directly in public surface",
+  "description": "pkix_chain_simple::Error::Path(PathError) wraps pkix_path::Error directly without an opaque boundary. This locks pkix-chain-simple's major version to pkix-path's major version. The From<PathError> impl at line 386 and the Error::Path variant expose the upstream type directly.\n\nThe sibling pkix-chain crate makes the same choice (Error::Path(pkix_path::Error)), so this is a workspace-wide pattern rather than an isolated case. However, pkix-chain is documented as a high-level umbrella that intentionally re-exports pkix-path types, while pkix-chain-simple is documented as the 'strict, opinionated' simplified alternative \u2014 it has more reason to present a fully-opaque error surface since its callers are explicitly not looking for pkix-path-level granularity.\n\nWhat goes wrong if this stays as-is: A major version bump in pkix-path forces a major version bump in pkix-chain-simple even though the simplified API's contract ('pass/fail with diagnostic') does not need the upstream error's structure. Pre-1.0 this is free, but post-1.0 this creates unnecessary cascade.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-chain-simple/src/lib.rs line 329 (Error::Path variant) and line 385 (From impl)",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:00Z",
+  "updated_at": "2026-06-15T17:07:38Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:00"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Replaced 4 sites of [`X`]`(...)` style with <code>[X](...)</code> blocks for cleaner rustdoc rendering. RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features passes.",
+  "closed_at": "2026-05-07T22:37:06Z",
+  "compaction_level": 0,
+  "content_hash": "685f8faa320b67f7175902818fbc890f8e550ce7cd9367dd2381a0a116d6856e",
+  "created_at": "2026-05-07T22:16:54Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nClippy nursery `doc_link_code` flags four sites where a rustdoc intra-doc link\n\\`[`X`]\\` is placed next to backticked plain text. The visible result has a\nsmall gap between the linked code and the adjacent code, which looks like a\nrendering bug. The fix is to wrap the entire group in `<code>...</code>`.\n\nSites:\n\n1. **`pkix-revocation/src/lib.rs:295`**\n   ```\n   /// `Err(`[`Error::OcspStatusUnknown`]`)` when no matching `SingleResponse` is found.\n   ```\n   Suggested:\n   `/// <code>Err([Error::OcspStatusUnknown])</code> when no matching SingleResponse is found.`\n\n2. **`pkix-ac/src/lib.rs:127`**\n   ```\n   /// [`Error::AaPathInvalid`]`(`[`pkix_path::Error::NoTrustedPath`]`)`\n   ```\n\n3. **`pkix-chain-simple/src/lib.rs:33`**\n   ```\n   //! - At most `1 + `[`MAX_INTERMEDIATES`]` ` certificates (...\n   ```\n\n4. **`pkix-chain-simple/src/lib.rs:274`**\n   ```\n   /// Chain has more certificates than `1 + `[`MAX_INTERMEDIATES`].\n   ```\n\nThese are pure-cosmetic rustdoc rendering improvements. The lint is in\n`clippy::nursery` (default-allow); no functional impact.\n\nFix: rewrite each per the clippy `--fix` suggestion (use `<code>...</code>`\nto keep the entire expression as one code block).",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.28",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: clippy nursery doc_link_code flags 4 sites with [`X`] adjacent to backtick text",
+  "updated_at": "2026-05-07T22:37:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:16:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

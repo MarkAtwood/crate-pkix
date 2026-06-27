@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "198dba944fc6f8836feae8ab6beb447e21a36e752f794a913dc59b3d45a7a132",
+  "created_at": "2026-05-14T18:29:47Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:563: `let path = alloc::vec![target.clone()];` \u2014 the only reason path[0] needs to be an owned Certificate is so it has the same type as the popped/pushed intermediates further down. The public API takes &Certificate, so the clone is necessarily allocated each call. Alternative: have PathCandidates hold the leaf as a separate &'a Certificate and the rest of path as Vec<Certificate>. Saves one Certificate clone (potentially KB of TBS bytes) per iterator. Modest win. The current shape is more uniform inside next() \u2014 the loop body treats path entries identically \u2014 and that uniformity is genuine value. Not worth churning unless profiling shows leaf clone as a hot allocation. Flag for awareness.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.11",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "PathCandidates::new clones the target Certificate into path[0]",
+  "updated_at": "2026-05-14T18:29:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:29:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

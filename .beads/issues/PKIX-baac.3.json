@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T09:00:30Z",
+  "compaction_level": 0,
+  "content_hash": "05324db2a60cb2670952d2f606712b9cfc84728be949355bf6553f158bd4be80",
+  "created_at": "2026-05-11T08:19:20Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nThe actual SCT trust check: given a parsed SCT, a cert, and a log list, verify the SCT's signature against the trusted log's pubkey.\n\nDepends on the parser (child .1) and the log list (child .2).\n\n## What\n\nReconstruct the TBSCertificate-with-signature input that the log signed, then verify the SCT's signature using the log's pubkey from the list.\n\n**Signed structure** (RFC 6962 \u00a73.2 `signed_certificate_timestamp`):\n\n```\nstruct {\n    SCTVersion sct_version;       // 0\n    SignatureType signature_type; // 0 = certificate_timestamp\n    uint64 timestamp;\n    LogEntryType entry_type;      // 0 = x509_entry, 1 = precert_entry\n    opaque tbs_cert<1..2^24-1>;   // for x509_entry: DER of cert\n                                  // for precert_entry: special PreCert format\n    CtExtensions extensions;\n}\n```\n\nFor x509_entry: `tbs_cert` is the DER of the leaf certificate.\n\nFor precert_entry: `tbs_cert` is `struct { opaque issuer_key_hash[32]; TBSCertificate tbs; }` where the TBSCertificate has the poison extension STRIPPED. Pre-cert handling is child .4; this bead delivers x509_entry first and stubs precert_entry with a clear NotImplemented error.\n\n## Public API\n\n```rust\npub struct SctVerifier<V: SignatureVerifier> {\n    logs: CtLogList,\n    verifier: V,\n}\n\nimpl<V: SignatureVerifier> SctVerifier<V> {\n    pub fn new(logs: CtLogList, verifier: V) -> Self;\n\n    /// Verify ONE SCT against a final-cert (entry_type = x509_entry).\n    pub fn verify_sct_for_cert(\n        &self,\n        sct: &SignedCertificateTimestamp,\n        cert_der: &[u8],\n    ) -> Result<&CtLog, Error>;\n}\n```\n\n`SignatureVerifier` is pkix-path's existing trait \u2014 reuse it so all the algorithm dispatching (ECDSA-P256-SHA256, RSA-PKCS1v15-SHA256, etc.) is shared. Log signatures are typically ECDSA-P256-SHA256 per RFC 6962 \u00a72.1.4 but the cert SubjectPublicKeyInfo + the SCT's hash_alg/sig_alg bytes determine the actual algorithm.\n\n## Test fixtures + oracle\n\nReal-world test vector: a cert with embedded SCTs from a known CT log, plus that log's pubkey. Verify with pyca/cryptography first as the oracle.\n\n```python\n# oracle script (pkix-ct/tests/oracle/verify_sct.py)\nimport cryptography\n# parse cert, extract SCT list, for each SCT look up log key, verify, print pass/fail\n```\n\nRun the oracle once, commit the inputs + expected-pass status, then run pkix-ct's verifier and check bit-exact agreement.\n\n## Acceptance\n\n- [ ] x509_entry path: signature verifies cleanly for a real-world SCT.\n- [ ] precert_entry path: stubbed with `Error::NotImplemented` (or equivalent) \u2014 completed in child .4.\n- [ ] Negative tests: tampered SCT signature rejects; SCT for wrong cert rejects; SCT from unknown log returns `NoTrustedSct`.\n- [ ] Independent oracle (pyca) produces same verdict per test cert.\n\n## Effort\n\n~200 lines + tests. ~1 day.\n\n## Filed as\n\nChild .3 of PKIX-baac per its recommended decomposition.",
+  "ephemeral": 0,
+  "id": "PKIX-baac.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: SCT signature verification (single SCT, no Merkle)",
+  "updated_at": "2026-05-11T09:00:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T01:19:19Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T01:20:11Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T01:20:12Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac.2",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

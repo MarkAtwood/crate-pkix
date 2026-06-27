@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:15:59Z",
+  "compaction_level": 0,
+  "content_hash": "e23c0d3134727f9e54b33d1e69f9707eab86c11cf75e7ceed62dfbe041221ea8",
+  "created_at": "2026-05-02T13:42:35Z",
+  "created_by": "Mark Atwood",
+  "description": "crl.rs line 48 and ocsp.rs line 51: both ::new constructors take Vec<u8> for the DER bytes parameter. Callers who have a &[u8] or a fixed-size array must allocate before calling. Accepting impl Into<Vec<u8>> would allow passing &[u8], Box<[u8]>, or Vec<u8> without a separate allocation at the call site. This is a minor ergonomics issue.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CrlChecker::new and OcspChecker::new take Vec<u8> instead of impl Into<Vec<u8>>",
+  "updated_at": "2026-05-02T14:15:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

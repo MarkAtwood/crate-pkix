@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "31cd5deba573c22705e2260c370d40e3898a933852196af46353f7a64ca0cc14",
+  "created_at": "2026-05-14T12:50:21Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:608:\n\n    impl core::fmt::Display for Finding {\n        /// Format: \\\"lint_id [severity]: message\\\" for findings, \\\"lint_id [pass]\\\" for non-findings.\n        fn fmt(&self, ...) -> ... {\n            let severity_label = match &self.result {\n                LintResult::Warn(_) => \\\"warn\\\",\n                LintResult::Error(_) => \\\"error\\\",\n                ...\n            };\n            match self.result.detail() {\n                Some(msg) => write!(f, \\\"{} [{}]: {}\\\", self.lint_id, severity_label, msg),\n                None => write!(f, \\\"{} [{}]\\\", self.lint_id, severity_label),\n            }\n        }\n    }\n\nThe format is documented in the rustdoc as `\\\"lint_id [severity]: message\\\"`,\nbut it's not declared as STABLE. The doc reads like API documentation.\nCallers will assume the format is stable and parse it (`format!(\\\"{f}\\\")`\nin their own logging, then grep for `[error]`).\n\nTwo failure modes:\n\n1. *Lint ID has a `[`, `]`, or `:` in it.* The unparsing is ambiguous.\n   Today, by convention, lint ids are `<regime>.<section>.<noun>` \u2014\n   none of those chars. But the doc on `Lint::id` doesn't actually\n   forbid `[`. And RFC-style citations (e.g. \\\"RFC 5280 \u00a74.2.1\\\") which\n   appear in `citation()` definitely contain `\u00a7` and could appear in\n   future ids if loosened.\n\n2. *Format change is a silent breaking change.* If we ever decide\n   `\\\"lint_id severity: message\\\"` is cleaner, every caller's log\n   parser breaks.\n\n# What the caller cannot tell\n\n- Is `Display` stable across minor versions? (Convention says no for\n  Display impls in std, but pkix-lint does not document its own\n  stance.)\n- Is `Debug` stable? (Per convention, no \u2014 but should be stated.)\n- Is there a structured-emit path the caller should use instead\n  (e.g., serde_json::to_string when serde is enabled)?\n\n# Suggested fix\n\nAdd to the impl Display doc:\n\n    /// # Stability\n    ///\n    /// The Display format is intended for human consumption only.\n    /// It is not stable across minor versions and MUST NOT be parsed\n    /// by callers. For machine-readable output, enable the `serde`\n    /// feature and use serde_json or other structured serializers.\n\nOr, if you DO want to stabilize it: declare format unambiguously and\nescape lint_id / message chars that conflict with the field separator.\n\n# Why P3\n\nThis is the textbook case of 'looks like a contract, isn't a\ncontract'. Not yet a real bug, but is a footgun the moment a caller\ngreps the Display output.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: Display impl for Finding is parsed by callers but format is undocumented as stable/unstable",
+  "updated_at": "2026-05-14T12:50:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:50:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

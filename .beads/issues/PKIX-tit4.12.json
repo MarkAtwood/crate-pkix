@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed when MalformedAnchor was promoted to a struct variant under PKIX-tit4.3. The variant rustdoc now states 'iterator passed to from_der_iter' and does not mention from_pem. The factually-wrong claim is gone.",
+  "closed_at": "2026-05-14T08:12:29Z",
+  "compaction_level": 0,
+  "content_hash": "22e125930f14cffc7709e12fd53f3b5d6b5649262770d8e2f7530e3fc581b1d3",
+  "created_at": "2026-05-14T05:05:55Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:232-236 documents Error::MalformedAnchor as:\n\n  /// One certificate in a multi-cert input was malformed. The wrapped\n  /// `usize` is the 0-based position of the offending entry in the input\n  /// stream (PEM block index for [`from_pem`], iterator index for\n  /// [`from_der_iter`]).\n  MalformedAnchor(usize),\n\nThe 'PEM block index for from_pem' claim is factually wrong. from_pem\n(lib.rs:314-335) never returns MalformedAnchor. Its error paths are:\n\n  1. Error::NoCertificates \u2014 empty input or no BEGIN boundary.\n  2. Error::Pem(DerError) \u2014 via map_pem_chain_error when der::ErrorKind::Pem(_).\n  3. Error::Der(DerError) \u2014 via map_pem_chain_error for any other der::ErrorKind.\n\nmap_pem_chain_error at lib.rs:422-428 has no branch that produces\nMalformedAnchor. Confirmed by searching: only from_der_iter at lib.rs:378\nconstructs Error::MalformedAnchor(i).\n\nWhat goes wrong for a caller in production:\n\n  - A caller writing exhaustive `match err { ... }` over the Error variants\n    will be misled into preparing a MalformedAnchor branch for from_pem\n    callers \u2014 code that will never execute. Wasted code, false sense of\n    coverage.\n  - A caller writing diagnostic output ('on PEM block %d, ...') will write\n    code keyed off MalformedAnchor that the from_pem path never reaches.\n    The real PEM-block-index information is hidden inside DerError's\n    position field, which is not surfaced through the public API.\n  - A reader auditing the public API surface for stability inferences will\n    treat the doc as a contract: 'from_pem may produce MalformedAnchor in\n    future versions.' That is not the current design intent.\n\nFix options:\n\n  a) Correct the doc to reference only from_der_iter:\n       /// The wrapped `usize` is the 0-based iterator index of the\n       /// offending entry. Returned only by [`from_der_iter`].\n\n  b) Make the claim true by routing from_pem failures through MalformedAnchor\n     with the PEM block index. This requires either reworking\n     map_pem_chain_error to extract the block index from der::Error::position\n     (currently discarded), or moving away from x509-cert::load_pem_chain\n     to a hand-written multi-block parser that tracks block boundaries.\n\nOption (a) is the cheap fix; option (b) is the principled fix but is a\nbigger change that intersects PKIX-tit4.3 (surface der::Error context) and\nPKIX-tit4.2 (NoCertificates masks real input errors).",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.12",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::MalformedAnchor doc references from_pem but only from_der_iter produces it",
+  "updated_at": "2026-05-14T08:12:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:05:54Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

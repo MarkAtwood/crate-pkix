@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b91845759c6b750a4d250e7b4943f9ddfe061f7c8499ae975a54857d5f8778d8",
+  "created_at": "2026-05-14T16:02:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/oscal/profile.rs:203-206 \u2014 resolve_profile signature:\n\n  pub fn resolve_profile(\n      profile: &Value,\n      sources: &HashMap<String, Value>,\n  ) -> Result<ResolvedProfile, ParseError>\n\nThe sources parameter is &HashMap<String, Value>. This fixes:\n- the storage shape (HashMap, not BTreeMap, IndexMap, or any other Map),\n- the key shape (String, not Cow<'static, str> or &str),\n- the value shape (serde_json::Value \u2014 already separately flagged for the broader leakage concern).\n\nCALLER IMPACT: A caller whose source profiles live in BTreeMap (deterministic iteration), IndexMap (insertion-ordered), or a file-fetched lazy cache must allocate a fresh HashMap snapshot to call this function. The HashMap allocation is forced even for one-shot one-source use.\n\nThe function does not actually need HashMap semantics \u2014 it only does .get(href) lookups (oscal/profile.rs:228, search for `sources.get`). Any keyed lookup works.\n\nREMEDIATION: Accept a callback or trait object instead of a concrete map:\n\n  pub fn resolve_profile(\n      profile: &Value,\n      sources: impl Fn(&str) -> Option<&Value>,\n  ) -> Result<ResolvedProfile, ParseError>\n\nOr with a small trait for ergonomics:\n  pub trait OscalProfileSource {\n      fn get(&self, href: &str) -> Option<&Value>;\n  }\n  impl OscalProfileSource for HashMap<String, Value> { ... }\n  impl OscalProfileSource for BTreeMap<String, Value> { ... }\n  // plus blanket impl for Fn\n\nCallers with a HashMap still pass it directly. Callers with anything else aren't forced to allocate a HashMap.\n\nThis finding is orthogonal to (but stacked with) the serde_json::Value leakage on the same function \u2014 fix both together for a clean signature, or fix this one independently if the serde_json migration is deferred.\n\nPre-1.0 free.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.32",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "resolve_profile takes &HashMap<String, serde_json::Value>; locks the caller's source-lookup storage choice (HashMap, not BTreeMap, IndexMap, or callback)",
+  "updated_at": "2026-05-14T16:02:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:02:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

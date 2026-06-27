@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added PartialEq behavior warning to TrustAnchor rustdoc: explains byte-level comparison and directs users to names_match + key-bytes comparison for deduplication",
+  "closed_at": "2026-05-02T22:03:42Z",
+  "compaction_level": 0,
+  "content_hash": "41fe9ad9a0a102ac0b08de98678b1bc1110a7e47ff5e6d6057455d2d13453544",
+  "created_at": "2026-05-02T21:58:09Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor derives PartialEq, which includes SubjectPublicKeyInfoOwned::PartialEq \u2014 a field-by-field comparison that treats Some(NULL) != None for algorithm parameters. A user who deduplicates their trust store by comparing TrustAnchor values with == could get false negatives for two anchors representing the same CA but with different parameter encodings. This is the same issue that was just fixed in the validate_path guard. The fix should either: (a) document the footgun on TrustAnchor::PartialEq, or (b) implement a custom PartialEq that uses spki_key_matches logic (would require making spki_key_matches or a variant pub(crate)).",
+  "ephemeral": 0,
+  "id": "PKIX-c2p.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor::PartialEq has same NULL-vs-absent footgun as the fixed guard",
+  "updated_at": "2026-05-02T22:03:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T14:58:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-c2p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

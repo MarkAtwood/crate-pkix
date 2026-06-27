@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "FALSE POSITIVE: code correctly implements RFC 5280 \u00a76.1.3(d)(2). RFC condition is (a) inhibit_anyPolicy > 0 OR (b) i<n AND self-issued. Code's i > 0 is equivalent to RFC's i < n (leaf is i=0 in code = i=n in RFC). The condition is correct.",
+  "closed_at": "2026-05-07T16:23:58Z",
+  "compaction_level": 0,
+  "content_hash": "2cb4f85a952596f65ef7c7351a3721b8db397e959c0aa1c1449d08be39c31671",
+  "created_at": "2026-05-07T16:08:47Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2149 \u2014 the condition for \u00a76.1.3(d)(2) anyPolicy expansion is:\n  `let may_expand = inhibit_any > 0 || (i > 0 && is_self_issued_cert(cert));`\n\nRFC 5280 \u00a76.1.3(d)(2) says: 'if anyPolicy is in the certificate, for each node at depth i-1 in the valid_policy_tree, create a child node with the same expected_policy_set, unless: (a) the inhibitAnyPolicy indicator is TRUE, or (b) the certificate is not self-issued and the current certificate is not the final certificate in the path.'\n\nThe RFC logic is: expand anyPolicy ONLY if inhibit_any == 0 AND (cert is self-issued OR it's the final cert). The code uses inhibit_any > 0 (counter still non-zero = NOT yet inhibited = allowed) combined with OR self-issued. This is confusing but may actually be correct given the counter semantics (counter > 0 means inhibition has NOT yet activated). However, the check `(i > 0 && is_self_issued_cert(cert))` uses chain index \u2014 i == 0 is the leaf. RFC 5280 says self-issued non-final certs are exempt. When i == 0 (leaf, final cert), RFC \u00a76.1.3(d)(2) should allow expansion regardless. The code's `i > 0 &&` guard BLOCKS anyPolicy expansion for self-issued leaf certs (i==0). This is a subtle off-by-one in the RFC state machine interpretation.\n\nSuggested fix: The leaf (i==0) should always be allowed to expand anyPolicy when inhibit_any > 0 (not yet inhibited). The condition should be:\n  `let may_expand = inhibit_any > 0 || is_self_issued_cert(cert);`\nwithout the `i > 0 &&` guard, since the leaf is the final cert and the RFC allows anyPolicy at the final cert position regardless of self-issue status.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "policy-tree anyPolicy (d)(2) uses wrong condition for self-issued check",
+  "updated_at": "2026-05-07T16:23:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:08:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

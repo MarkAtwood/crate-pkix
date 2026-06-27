@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.19",
+  "title": "OCSP: check_revocation duplicates steps (6)-(9) across two methods",
+  "description": "Location: pkix-revocation/src/ocsp.rs, check_revocation (lines 142-268) and check_revocation_against_anchor (lines 283-391)\n\nThe two methods share the same structure (steps 6-9: resolve signing key, verify signature, find SingleResponse, verify CertID hashes, check validity windows, match certStatus). The only difference is the identity source (issuer Certificate vs TrustAnchor). The pattern mirrors the CRL checker (PKIX-rm8.4) but is less severe here because the OCSP methods are shorter (~130 lines each) and the identity-source difference is more dispersed.\n\nSame 'what goes wrong' as PKIX-rm8.4: parallel maintenance risk. A refactor to extract a private 'verify_basic_response(issuer_subject, issuer_spki_raw, issuer_spki_ref, cert)' helper would collapse both methods to a thin adapter layer.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:51Z",
+  "updated_at": "2026-06-15T17:25:47Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:51"
+    }
+  ]
+}

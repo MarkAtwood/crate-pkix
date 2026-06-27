@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:28:59Z",
+  "compaction_level": 0,
+  "content_hash": "a470dda884877419b11879db6378bf315d513d1321cbec497886f063c2e32089",
+  "created_at": "2026-05-07T17:22:43Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:209 \u2014 Error::source() has two match arms with identical bodies (both return Some(e)):\n\n    Error::CrlParseError(e) => Some(e),\n    Error::OcspParseError(e) => Some(e),\n\nclippy::match_same_arms (pedantic) flags this. Fix: merge with an or-pattern:\n\n    Error::CrlParseError(e) | Error::OcspParseError(e) => Some(e),\n\nStrictly readability/idiomatic \u2014 no functional change.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation] merge identical match arms in Error::source()",
+  "updated_at": "2026-05-07T17:28:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

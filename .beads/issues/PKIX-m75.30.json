@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:57:21Z",
+  "compaction_level": 0,
+  "content_hash": "90f25ec4e18eba56a9d08add1d7bddf209d5f73eb6714e37ad50191e0746fc34",
+  "created_at": "2026-05-06T20:53:06Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.30",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-revocation/src/ocsp.rs check_revocation() lines 182-190. When now_unix < produced_at (the OCSP response claims to have been produced in the future), the code returns Err(Error::OcspStatusUnknown). OcspStatusUnknown per the doc comment means 'The OCSP responder returned an unknown status (hard-fail mode)'. But the actual condition here is a validity window failure, not an unknown status. The same validity-window logic in check_revocation returns OcspStatusUnknown for thisUpdate > now (line 192-195) and nextUpdate < now (line 198-205), so the pattern is consistent within ocsp.rs. However, CrlChecker returns Error::CrlExpired for its time-window failures, while OcspChecker returns OcspStatusUnknown. This creates an asymmetry: callers who want to distinguish 'cert status unknown' from 'OCSP response is stale/future-dated' cannot do so from OcspChecker. Fix: Add a new Error variant (e.g., OcspExpired or OcspNotYetValid) for validity window failures, or return the existing OcspMalformed variant (since a response from the future is structurally suspicious). The security is not affected (fail-closed), but diagnostic quality suffers. Priority: P3 (diagnostic/error quality).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: OcspChecker returns OcspStatusUnknown for future producedAt (wrong error)",
+  "updated_at": "2026-05-06T20:57:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:53:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "50be10a8da0367b9e3fdddf32c04f6638d377f9ba52b360a4fb1809398d3a54f",
+  "created_at": "2026-05-14T19:28:17Z",
+  "created_by": "Mark Atwood",
+  "description": "What is awkward: pkix-aia/src/lib.rs:566 declares fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError>. The caching-wrapper doctest at lines 503-525 stores Result<Vec<u8>, AiaError> in a BTreeMap and clones the entry on every replay. For a multi-KiB cert response, every cache hit allocates and copies.\n\nThe trait design admits caching by the &self choice and the Clone+Eq+Send+Sync invariant on AiaError (great \u2014 see PKIX-o3op-G2). But the byte payload itself is owned-Vec, so every cache hit pays an allocation+copy.\n\nSuggested rewrite: not the trait signature itself \u2014 Vec<u8> as the return type is the right call (ownership transfer to the caller who will parse it; aligns with raw-bytes-not-parsed-certs principle stated in rustdoc lines 437-443). But the rustdoc-level commentary should:\n\n(a) State explicitly that caching wrappers wanting zero-copy replay should wrap the inner fetcher with their own Arc<[u8]> indirection \u2014 the trait returns owned bytes so the caller's wrapper can choose ownership shape downstream.\n(b) Optionally include this as a second doctest, or amend the existing CachingFetcher doctest with a comment noting the Clone cost.\n\nThis is a defensible-design-decision finding more than a code defect. The current design is correct; it just doesn't document why. Without explanation, a future contributor might propose 'return Arc<[u8]>' or 'return Cow<'a, [u8]>' and the maintainer will have to re-derive the rationale.",
+  "ephemeral": 0,
+  "id": "PKIX-o3op.7",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AiaFetcher returns Vec<u8>: caching wrappers must Clone the bytes per replay",
+  "updated_at": "2026-05-14T19:28:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:28:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-o3op",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

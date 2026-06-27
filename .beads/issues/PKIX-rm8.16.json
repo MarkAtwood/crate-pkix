@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.16",
+  "title": "pkix-ct Error missing serde feature parity",
+  "description": "pkix-ct::Error derives `Clone, Debug, PartialEq, Eq, Hash` but has NO `#[cfg_attr(feature = \"serde\", derive(serde::Serialize, serde::Deserialize))]` attribute, despite the crate having a `serde` Cargo feature (`dep:serde` + `dep:serde_json` + `dep:base64` behind `log-list-json`). Every other crate in the core path-validation stack (pkix-path, pkix-revocation, pkix-chain, pkix-path-builder, pkix-identity, pkix-aia, pkix-truststore, pkix-zlint-bridge) gates serde derives on a `serde` feature, meeting AGENTS.md non-negotiable #6 ('result/error types ... SHOULD support serde::Serialize + Deserialize behind a serde feature flag for cross-process / persistent caches').\n\npkix-ct::Error does not. The crate has `serde` as a dependency (for `log-list-json`) but does not expose it as a standalone feature gating Error derives.\n\nImpact: callers caching CT verification failures across processes cannot serde-roundtrip pkix_ct::Error the way they can with every other workspace error type. This breaks the uniformity callers depend on when building a generic cache over `impl serde::Serialize` error values.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-ct/src/lib.rs line 67-69",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:47Z",
+  "updated_at": "2026-06-15T17:13:17Z",
+  "closed_at": "2026-06-15T17:13:17Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:46"
+    }
+  ]
+}

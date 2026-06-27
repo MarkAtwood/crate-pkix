@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:31Z",
+  "compaction_level": 0,
+  "content_hash": "c24a497a08b391135252af936d749def12b4a2d286a2490ea09f8ce4e1a55409",
+  "created_at": "2026-05-14T17:33:17Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: the Google log_list.json schema can carry a log with `state.rejected` set (a log the browser/CT operator has explicitly removed from trust). The parser at log_list.rs:193-227 only inspects `state.usable` and `state.retired`; any other state \u2014 `pending`, `qualified`, `readonly`, `rejected` \u2014 is silently treated as 'present-but-state-unknown' and the log is inserted with `usable_from_ms = None`, `retired_at_ms = None`.\n\nActual bad behavior: a 'rejected' log \u2014 explicitly distrusted by the browser program that publishes the list \u2014 is imported as a trusted CT log. Combined with PKIX-ppbr.1 (the None-passes-window-check bug), any SCT signed by that log's key verifies successfully. The CT log list is the trust-anchor seam for SCT verification; importing a rejected log is the equivalent of importing a rejected root CA into the trust store.\n\nCompounding factor: this is silent. There is no log-level diagnostic, no warning, no skipped-log counter. A consumer reading 'parsed N logs, all verified consistent' from `from_google_log_list_json` has no way to know that some of those N logs are explicitly distrusted.\n\nFix: explicitly handle each state variant. At minimum, skip logs whose state is `pending`, `qualified`, `rejected`. Treat `readonly` as usable with a stored `retired_at_ms` if the timestamp is present. Document the policy in the rustdoc for `from_google_log_list_json`.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_google_log_list_json silently imports 'rejected' and other non-usable logs as trusted",
+  "updated_at": "2026-06-04T19:32:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:33:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

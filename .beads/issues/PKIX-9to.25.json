@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:26:44Z",
+  "compaction_level": 0,
+  "content_hash": "ffbb423fa4351dd2e2d96b93ad669a48e1a6d8e963fa0bd0fe9e06581cdc7380",
+  "created_at": "2026-05-06T22:20:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs: CertPool derives Debug, Default, PartialEq, Eq but not Clone. CertPool holds Vec<Certificate> and Certificate: Clone, so Clone is derivable. The absence of Clone forces callers to rebuild the pool from scratch when they need two independent copies (e.g., testing the same pool against different path-building scenarios in parallel). The doc comment notes Hash cannot be derived due to upstream Certificate not implementing Hash, but Clone has no such obstacle.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.25",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CertPool missing Clone derive",
+  "updated_at": "2026-05-06T22:26:44Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:20:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T22:24:59Z",
+  "compaction_level": 0,
+  "content_hash": "d0854a302edace3a654d8b5903fe9d4e1c79b67548dd1bb613d3a67e7b9f2000",
+  "created_at": "2026-05-02T22:21:32Z",
+  "created_by": "Mark Atwood",
+  "description": "Line 674: 'a.value() == b.value()' compares DER content bytes without comparing tag bytes. For non-string DirectoryString values, if two values have the same content but different tags (e.g., theoretical SEQUENCE vs SET), they would incorrectly match. Should be: 'a.tag() == b.tag() && a.value() == b.value()' for safety. Current practical risk is LOW (different content for different values), but spec-correct behavior requires tag comparison.",
+  "ephemeral": 0,
+  "id": "PKIX-0gl.12",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Missing tag comparison in ava_values_match (None, None case)",
+  "updated_at": "2026-05-02T22:24:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T15:21:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0gl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

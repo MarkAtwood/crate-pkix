@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:18:30Z",
+  "compaction_level": 0,
+  "content_hash": "73110188bb35cb511fb29b756a97b1b90b42d5af39ac9413b235d7568f2c1633",
+  "created_at": "2026-05-11T07:15:53Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nPure data-type change. Add an optional CRL bundle to the harness Chain.\n\n## What\n\nModify pkix-difftest/src/lib.rs:\n\n- Add Chain.crls: Vec<Vec<u8>> (DER-encoded CRL bytes). Default empty.\n- Update Chain::from_pem_file / from_pem_bytes signatures or add new constructors that accept CRL bytes. Two options:\n  (a) Add optional 'crls' parameter to the loaders (breaking the existing test fixtures).\n  (b) Add separate Chain::with_crls(self, crls: Vec<Vec<u8>>) -> Self builder.\n  Recommend (b) \u2014 additive, keeps existing loaders working.\n- Update Chain rustdoc to document the new field's purpose and the 'empty means skip revocation' contract.\n\n## Out of scope\n\n- Wiring the field through to any oracle (sibling beads).\n- Loading CRLs from corpus fixtures (sibling beads).\n- Baseline regeneration.\n\n## Acceptance\n\n- [ ] Chain.crls field present.\n- [ ] Existing tests pass unchanged.\n- [ ] At least one new unit test constructs a Chain with crls and inspects them.\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Extend pkix-difftest Chain struct with crls: Vec<Vec<u8>>",
+  "updated_at": "2026-05-11T07:18:30Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:15:53Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

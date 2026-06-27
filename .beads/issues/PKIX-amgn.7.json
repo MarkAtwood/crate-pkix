@@ -1,0 +1,46 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T002136Z-1705809",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T01:37:55Z",
+  "compaction_level": 0,
+  "content_hash": "023533a7889d945f808e81d79048a4ec1dba4bceb26744c534bcfb026ba1ead0",
+  "created_at": "2026-05-11T05:46:06Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe framework/policy split is a public-API breaking change for downstream consumers of `pkix-profiles` and `pkix-lint`. Migration needs to be documented at the workspace level.\n\n## What\n\n### Top-level README.md updates\n\n1. Crate table: add `pkix-profiles-cabf` and `pkix-lint-cabf` rows. Mark them as 'CA/B Forum reference (not authoritative).' Possibly a separate sub-table for the `-cabf` reference crates so the distinction is visually clear.\n2. New section near the architecture overview explaining the framework/policy split philosophy. One paragraph.\n\n### CHANGELOG.md updates\n\nNew top-of-file entry under `[unreleased]`:\n\n```\n### Workspace: framework / policy split (2026-05-11)\n\nCA/B Forum-specific profile and lint implementations moved out of\n`pkix-profiles` and `pkix-lint` into sibling reference crates:\n\n  pkix-profiles  \u2192  pkix-profiles-cabf  (TlsBrProfile, SmimeBrProfile family)\n  pkix-lint      \u2192  pkix-lint-cabf      (cabf.br.* lint bundles)\n\nThe `-cabf` crates carry a 'reference, not authoritative' framing and\nare explicitly not maintained as a canonical CA/B Forum encoding.\n\nMigration for downstream consumers:\n\n  # Cargo.toml\n  - pkix-profiles = \"0.x\"\n  + pkix-profiles = \"y.0\"\n  + pkix-profiles-cabf = \"0.1\"\n\n  # imports\n  - use pkix_profiles::TlsBrProfile;\n  + use pkix_profiles_cabf::TlsBrProfile;\n\nSame pattern for `pkix-lint` rule-bundle identifiers (\"cabf.br.tls\"\nmoves to `pkix-lint-cabf`).\n\n`pkix-profiles` retains the `Profile` trait, `ValidationPolicy`\nstruct, framework helpers, and adds `BasicSmimeProfile` (RFC 8551 \u00a73)\n+ `BasicTlsProfile` (RFC 5280 + RFC 6125 + serverAuth EKU) as\nstandards-baseline references.\n\n`pkix-lint` retains the `Lint` trait, `LintRunner`, `Finding`,\n`EvaluationReport`, `DeviationStore`, and the RFC-conformance lint\nbundle.\n\nSee PKIX-amgn for the full rationale and the framework/policy\nstance encoded in AGENTS.md.\n```\n\n### Per-crate README updates\n\n- `pkix-profiles/README.md` \u2014 note in the intro that this crate is framework + RFC-baseline references. CA/B Forum content lives in `pkix-profiles-cabf`.\n- `pkix-lint/README.md` \u2014 same framing.\n\n## Acceptance\n\n- [ ] Top-level README has the new `-cabf` crate rows.\n- [ ] CHANGELOG entry committed with the migration guide.\n- [ ] `pkix-profiles/README.md` and `pkix-lint/README.md` updated.\n\n## Depends on\n\nPKIX-amgn.2, PKIX-amgn.3, PKIX-amgn.4, PKIX-amgn.5 (crates must exist and have moved content before docs describe the new state).",
+  "ephemeral": 0,
+  "id": "PKIX-amgn.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "README + CHANGELOG migration docs for the framework/policy split",
+  "updated_at": "2026-05-12T01:37:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:46:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-10T22:46:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-10T22:46:48Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.5",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

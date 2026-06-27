@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:16Z",
+  "compaction_level": 0,
+  "content_hash": "e20da15900ee6858e4125a4ae96bb72d155a856f775ca97fde960bb70ac0cc60",
+  "created_at": "2026-05-07T20:14:04Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\nThe following doctests are marked \\`rust,ignore\\` (compile-only when ignored is set off, but with rust,ignore they are skipped entirely \u2014 not even compiled):\n\n- \\`pkix-chain/src/lib.rs:18\\` (covered separately as P1 because it's the marquee example)\n- \\`pkix-composite/src/lib.rs:17\\` (CompositeVerifier example)\n- \\`pkix-profiles/src/lib.rs:29\\` (WebPkiProfile example)\n- \\`pkix-path/src/lib.rs:316\\` (SignatureVerifier impl example)\n- \\`pkix-path/src/lib.rs:690\\` (Profile impl example)\n\n\\`cargo test --workspace\\` reports them as \\`ignored\\`.\n\nOther crates already use \\`no_run\\` correctly: \\`pkix-chain-simple/src/lib.rs:425\\`, \\`pkix-lint\\` doctests, \\`pkix-lint/src/cabf_tls_br.rs:20,513\\`. The \\`no_run\\` examples compile-test the API.\n\n## Why P3\n- API drift (rename, signature change) silently invalidates these examples without test failure.\n- These are the canonical onboarding examples for each crate. Compile-checking them prevents stale-doc drift.\n\n## Fix\nConvert each \\`rust,ignore\\` to \\`rust,no_run\\` and add minimal scaffolding to make the example compile (e.g., \\`# fn _x(...) -> Result<()>\\`, \\`unimplemented!()\\`, etc.). The pattern at \\`pkix-lint/src/lib.rs:74\\` is a clean example.\n\n## Scope reference\nThe 5 sites above; not including \\`pkix-chain/src/lib.rs:18\\` which is a separate P1.",
+  "ephemeral": 0,
+  "id": "PKIX-12we",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: 5+ rust,ignore doctests should be no_run for compile coverage",
+  "updated_at": "2026-05-07T21:25:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

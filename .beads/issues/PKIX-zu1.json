@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-zu1",
+  "title": "Realign pkix-profiles + pkix-lint: framework + RFC-baseline in main crates, CA/B Forum in -cabf",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:58:20Z",
+  "updated_at": "2026-06-15T17:58:20Z",
+  "closed_at": "2026-06-15T17:58:20Z"
+}

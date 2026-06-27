@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added #[non_exhaustive] to pub struct CtLogList. Error enum already had it (the issue's diff was accurate to a stale snapshot \u2014 verified live). pkix-ct still builds.",
+  "closed_at": "2026-05-07T22:24:28Z",
+  "compaction_level": 0,
+  "content_hash": "ac21715c7fc2ce0a271a03e89b77d946335559c17495685a34e0209160ef7b54",
+  "created_at": "2026-05-07T22:02:16Z",
+  "created_by": "Mark Atwood",
+  "description": "Peer stub crates pkix-ac (lines 41/52/60/70), pkix-revocation-http (line 52), pkix-composite all mark every public enum #[non_exhaustive]. pkix-ct/src/lib.rs:55-66 does NOT, even though it is at version 0.0.0 and is explicitly stub-status:\n\n  #[derive(Debug)]\n  // missing #[non_exhaustive]\n  pub enum Error {\n      NoScts,\n      NoTrustedSct,\n      InvalidSignature,\n      ParseError,\n  }\n\nWhen the crate gains real variants for SCT log-list parsing, RFC 9162 v2 differences, etc., downstream pattern-matches will break.\n\nFix: add `#[non_exhaustive]` to `pub enum Error` (and to `pub struct CtLogList` at line 41 for the same reason).\n\nSeverity: P3 / opinion. The crate is v0.0.0 (deliberately pre-release) so technically there is no compatibility commitment yet, but using #[non_exhaustive] now costs nothing and is consistent with the rest of the workspace. The P4 commit 01908663 already added #[non_exhaustive] to pkix-ac IssuerSerial (PKIX-bcf0); this is the same pattern not applied to pkix-ct.\n\nPass-1 attribution: pass 1 missed pkix-ct entirely on the non_exhaustive sweep.",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.9",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-ct::Error missing #[non_exhaustive] (inconsistent with peer stub crates)",
+  "updated_at": "2026-05-07T22:24:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:02:16Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

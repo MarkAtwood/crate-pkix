@@ -1,0 +1,54 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T212242Z-1478141",
+  "close_reason": "Both children closed: .9.1 (core check_shape API in pkix-lint, shipped commit 5c0d67de) and .9.2 (five per-profile convenience aliases, shipped commits e9c52dd8 + 472d27b4). The pkix-lint::check_shape convenience layer + per-profile shape-check aliases now exist as designed (single-cert structural sanity check sitting between pkix_path::validate_path and OSCAL Assessment Results output). 10 integration tests cross-validate the aliases against known-good and known-bad fixtures. All five aliases ship with the naming Mark approved 2026-05-12 (mirror Profile struct slug).",
+  "closed_at": "2026-05-13T19:11:33Z",
+  "compaction_level": 0,
+  "content_hash": "fe79c92c2f8648fee880db299fb164972f3d6ee2c6e52ac5fe4e40df96f2abf7",
+  "created_at": "2026-05-11T16:42:58Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nConsumers regularly hold a single cert and want a fast Rust answer to \"is this a sanely-shaped X cert?\" \u2014 without running full path validation (no chain, maybe no anchors) and without OSCAL JSON output. Just `Result<(), Vec<Finding>>` in microseconds.\n\nUse cases surfaced in conversation:\n\n- TLS server logging client certs and pre-filtering noise.\n- MTA classifying inbound S/MIME signatures.\n- Operators triaging a cert dump.\n- Pre-flight check before submitting a CSR for issuance.\n\nThis sits between `pkix-path::ValidationPolicy` (the path-validation gate concern) and OSCAL Assessment Results JSON (the compliance-assertion concern). It's a fast Rust convenience layer over the lint engine.\n\nClosest ecosystem analog: zlint (Go, used by Let's Encrypt's issuance pipeline). It runs a per-purpose lint suite and emits structured findings. Slow per-cert because of its plugin architecture. A Rust equivalent that is in-process and OSCAL-aligned would be a real value-add.\n\n## What\n\n### Core API (in pkix-lint)\n\n```rust\n/// Run a profile's lints against a single cert.\n/// Returns Ok if no Error/Fatal findings.\n/// Returns Err with the findings list otherwise (may include Warn/Notice findings).\npub fn check_shape(cert: &Certificate, profile: &dyn LintProfile) -> Result<(), Vec<Finding>>;\n```\n\nThe implementation iterates lints in the Profile's resolved Catalog and runs each against the cert. No chain walk, no signature verification, no I/O. O(number of lints in profile) where each lint is a structural check on parsed DER.\n\n### Convenience aliases (in pkix-profiles)\n\n```rust\n/// RFC 5280 + RFC 6125 + serverAuth EKU \u2014 TLS server cert shape.\npub fn check_basic_tls_shape(cert: &Certificate) -> Result<(), Vec<Finding>>;\n\n/// RFC 8551 \u00a73 \u2014 S/MIME cert baseline shape.\npub fn check_basic_smime_shape(cert: &Certificate) -> Result<(), Vec<Finding>>;\n```\n\n### Convenience aliases (in pkix-profiles-cabf, reference / not authoritative)\n\n```rust\n/// CA/B Forum TLS BR shape (reference snapshot, not authoritative).\npub fn check_cabf_tls_br_shape(cert: &Certificate) -> Result<(), Vec<Finding>>;\n\n/// CA/B Forum S/MIME BR Mailbox-validated shape (reference snapshot).\npub fn check_cabf_smime_br_shape(cert: &Certificate) -> Result<(), Vec<Finding>>;\n\n/// CA/B Forum Code Signing BR shape (reference snapshot).\npub fn check_cabf_code_signing_shape(cert: &Certificate) -> Result<(), Vec<Finding>>;\n```\n\nEach alias is a one-liner calling `pkix_lint::check_shape(cert, &BasicTlsProfile)` etc.\n\n## Acceptance\n\n- [ ] `pkix_lint::check_shape()` core API exists.\n- [ ] `pkix_profiles::check_basic_tls_shape()` and `check_basic_smime_shape()` convenience aliases exist.\n- [ ] `pkix-profiles-cabf` convenience aliases exist (depends on the crate existing per PKIX-amgn.2 + .4 having moved the Profile types in).\n- [ ] Test vectors: known-good cert returns `Ok`; known-bad cert (e.g., missing serverAuth EKU for `check_basic_tls_shape`) returns `Err` with appropriate `Finding`s.\n- [ ] Rustdoc clearly distinguishes shape-check (single cert, fast, structural) vs path-validation (chain, slow, full RFC 5280 \u00a76) vs compliance-assertion (OSCAL Assessment Results, audit-trail).\n- [ ] Performance smoke test: shape-check on a typical TLS cert runs in microseconds, not milliseconds. (Not a hard CI gate, just a sanity check.)\n\n## Out of scope\n\n- Path-validation concerns (those go through `pkix-path::validate_path`).\n- OSCAL Assessment Results output (callers who want compliance vocabulary go through `pkix-lint`'s OSCAL serializer per PKIX-9vnx.3).\n- Caching or memoization of repeated shape checks against the same cert.\n- Async / streaming APIs.\n\n## Depends on\n\n- PKIX-9vnx.6 (Lint-as-Control mapping; needed so `check_shape()` can iterate registered lints from a Catalog by id).\n- PKIX-amgn.4 (BasicTls / BasicSmime exist in pkix-profiles; CABF Profile types exist in pkix-profiles-cabf).\n\n## Filed by\n\nSurfaced in conversation 2026-05-11. Anchored by the per-rule-split stance PKIX-8qz1 (\"Rust handles the executable side at every layer; OSCAL handles the policy-selection side\") \u2014 this bead is the consumer-facing Rust convenience over the lint engine.\n",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.9",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Framing rework 2026-05-12 (PKIX-ncab.3, decision B): OSCAL is no longer the source of truth; it is one supported output format. The check_shape() API and per-profile aliases are independent of which output format consumers use for compliance reporting. .9.1 already shipped (commit 5c0d67de). User-facing docs in .9.x descendants should not present OSCAL as central. The 'OSCAL-aligned' phrasing in the rationale above is historical context, not a current goal. See memory pkix-oscal-demoted-2026-05-11.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: check_shape() convenience API + per-profile aliases",
+  "updated_at": "2026-05-13T19:11:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T09:43:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8qz1",
+      "metadata": {},
+      "type": "relates-to"
+    },
+    {
+      "created_at": "2026-05-11T09:42:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T09:43:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9vnx.6",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T09:43:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-amgn.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

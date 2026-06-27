@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.54",
+  "title": "Genuinely well-done: verify_ocsp_responder cryptographic delegation binding",
+  "description": "In pkix-chain/src/lib.rs lines 1358-1409, verify_responder_is_delegated_by enforces both DN equality AND cryptographic signature binding when checking that an OCSP responder cert was delegated by the claimed issuer. The comment (lines 1341-1350) explains the DN-twin attack in cross-signed topologies that motivates the second check. This exceeds what many validators do (OpenSSL's OCSP delegate check historically only checked DN equality). The function also correctly uses the DefaultVerifier rather than threading through a caller-supplied verifier, which is documented as a limitation. This is a genuine security improvement over the common implementation pattern.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:29Z",
+  "updated_at": "2026-06-15T17:15:58Z",
+  "closed_at": "2026-06-15T17:15:58Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:29"
+    }
+  ]
+}

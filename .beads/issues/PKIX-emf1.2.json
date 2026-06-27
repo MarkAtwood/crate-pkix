@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:30:28Z",
+  "compaction_level": 0,
+  "content_hash": "e6551d0b5398aece83d794654bfaa13c2aee158f4a39434a2465279859cc56ab",
+  "created_at": "2026-05-11T07:16:03Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nIn pkix-difftest/src/oracles/pkix_path.rs, when Chain.crls is non-empty, construct a pkix-revocation::CrlChecker and pass it to validate_path.\n\n## What\n\n- When chain.crls.is_empty(): existing behavior (no revocation).\n- When chain.crls has 1+ DER blobs: construct CrlChecker. If multiple CRLs, future work \u2014 start with single-CRL support.\n- Single-CRL: CrlChecker::new(crls[0], now_unix, verifier). Hand the checker to a wrapper that ties revocation check into chain walk.\n\nThe current pkix-path validate_path API does not directly accept a RevocationChecker (that's pkix-chain's role). The harness wires this by calling validate_path then, on Ok, iterating the chain and calling checker.check_revocation pairwise. Or \u2014 preferred \u2014 uses pkix-chain::verify_chain in 'revocation enabled' mode.\n\n## Acceptance\n\n- [ ] pkix-path oracle accepts Chain.crls and routes revocation through pkix-revocation when non-empty.\n- [ ] Empty crls path unchanged.\n- [ ] One test with a known-revoked PKITS leaf and the relevant CRL \u2014 verdict is Fail with reason mentioning 'revoked'.\n\n## Depends on\n\nPKIX-emf1.1 (Chain.crls field must exist first).\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Wire pkix-path oracle to use CrlChecker when Chain.crls is non-empty",
+  "updated_at": "2026-05-11T07:30:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:03Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T00:17:02Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

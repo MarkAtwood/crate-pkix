@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:39Z",
+  "compaction_level": 0,
+  "content_hash": "d0a9f2fb7d7b95a7a844fd3cff05f2feaac71a6d1793f7aac00314124b0c49fa",
+  "created_at": "2026-05-06T15:19:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs line 2362:\n  .flat_map(|nd| nd.expected_policy_set.iter().cloned())\n\nObjectIdentifier implements Copy (it is a fixed-size stack value). Using cloned() on an iterator over a Copy type forces through the Clone trait rather than Copy, which is semantically equivalent but signals incorrect understanding of the type. Use .copied() instead.\n\nClippy pedantic fires: 'used cloned where copied could be used instead'\n\nSame pattern likely appears in other places where Vec<ObjectIdentifier> is iterated. A search for .cloned() in lib.rs would find any others.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cloned() should be copied() for ObjectIdentifier iterator in policy tree \u00a76.1.5(g)",
+  "updated_at": "2026-05-06T15:24:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:19:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

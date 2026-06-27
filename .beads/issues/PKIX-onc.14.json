@@ -1,0 +1,32 @@
+{
+  "close_reason": "opinion: absence of rationale in #[non_exhaustive] doc covered by Fix 6 (Stability section)",
+  "closed_at": "2026-05-03T13:29:09Z",
+  "compaction_level": 0,
+  "content_hash": "12e99bf931ddcd18c78118577a6d180c61571d733a4363a80938cd1c0f44e723",
+  "created_at": "2026-05-03T13:15:50Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor carries #[non_exhaustive] (line 238 of pkix-path/src/lib.rs) but the struct-level doc comment never explains why. A contributor who hits 'cannot construct TrustAnchor with struct literal syntax' or 'match on TrustAnchor requires ..rest' will not know if this was intentional or an oversight. The ValidatedPath doc block at line 371 has the correct explanation ('preserving the ability to add fields in future minor versions without a breaking change'). The TrustAnchor doc block should include the same rationale \u2014 one sentence, e.g. '#[non_exhaustive]: use TrustAnchor::new or from_cert to construct; new fields may be added in minor versions.'",
+  "ephemeral": 0,
+  "id": "PKIX-onc.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "SEC7: Absence of a rationale sentence in a doc block is style, not engineering. ValidatedPath has it; TrustAnchor lacks it. Consistent doc style is good but this does not affect correctness or safety. Labeled opinion.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TrustAnchor #[non_exhaustive]: no rationale in doc block",
+  "updated_at": "2026-05-03T13:29:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:49Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

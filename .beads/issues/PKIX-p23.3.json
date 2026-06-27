@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:31Z",
+  "compaction_level": 0,
+  "content_hash": "c82ea72b3f0bf0b01ad55e10920182c3c7c8501d9eda4ca415c5211509c2036b",
+  "created_at": "2026-05-06T21:29:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs lines 529-536: DeviationStore::add asserts that deviation.justification is non-empty and deviation.authorized_by is non-empty, panicking if either is empty. These are assert! (not debug_assert!), so they fire in release builds. If a Deviation is constructed from deserialized JSON (e.g., loading a stored deviation store file), a malformed or adversarially crafted file with empty strings would panic the process rather than returning an error.\n\nThe doc comment says \"Panics if...\" which documents the behaviour, but from a safety standpoint: (a) the panic is reachable from a public API method with externally-supplied input if Deviation can be deserialized, (b) DeviatedFinding has serde derives, and (c) the module doc shows loading stored evidence packs. The correct fix is to return a new DeviationAddError variant (e.g., EmptyField) instead of panicking, or at minimum document this clearly as a programming-error-only panic with a note that callers loading from external sources must validate fields before calling add.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P1: DeviationStore::add panics on untrusted data (justification/authorized_by from deserialized Deviation)",
+  "updated_at": "2026-05-06T21:36:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:29:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "da9cb809ec4e9fe300b0bfb9ea908e38a14351fbd9e50ee226b0e7a9f3953b08",
+  "created_at": "2026-05-14T14:27:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/verify.rs:152-156 \u2014 SctVerifier<V: SignatureVerifier> wraps a generic V instead of hardcoding ECDSA or RSA implementations. Algorithm dispatch is delegated to pkix-path's SignatureVerifier trait via tls_alg_to_x509_oid (line 106).\n\nThis is exactly what workspace non-negotiable #3 requires for pkix-path ('SignatureVerifier is the only place algorithm-specific code lives in pkix-path'). pkix-ct extends the same pattern: no signature crate or key parsing crate is pulled in by pkix-ct itself; the caller's SignatureVerifier handles ECDSA/RSA/anything-else.\n\nConcrete consequences:\n- pkix-ct works with any backend the caller plugs in (pkix-path::DefaultVerifier, a custom ring-based one, a custom FIPS-validated one, a PQ-ready one).\n- pkix-ct does not pull in p256/p384/rsa as direct deps; those live in pkix-path's optional features.\n- Adding a new algorithm to pkix-ct (e.g., the EdDSA-Ed25519 combo that future CT logs might use) is a one-line addition to tls_alg_to_x509_oid \u2014 no new dep in pkix-ct itself.\n\nA future contributor might suggest 'simplify by hardcoding ECDSA-P256-SHA256 since that's all CT logs use today' \u2014 would break the abstraction and lock pkix-ct to one algorithm. The trait-based design is the right call. Defend it.",
+  "ephemeral": 0,
+  "id": "PKIX-q74z.21",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SignatureVerifier dispatch keeps algorithm code out of pkix-ct, in line with workspace non-negotiable #3",
+  "updated_at": "2026-05-14T14:27:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:27:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q74z",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

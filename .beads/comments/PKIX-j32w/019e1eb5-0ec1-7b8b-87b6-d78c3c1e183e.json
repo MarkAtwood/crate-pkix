@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-13T00:20:43Z",
+  "id": "019e1eb5-0ec1-7b8b-87b6-d78c3c1e183e",
+  "issue_id": "PKIX-j32w",
+  "text": "DEFERRED 2026-05-12 (Mark, interactive): all DANE work paused. Architectural commitment in AGENTS.md non-negotiable #5 (three-mode model names DANE as one industry-forum policy class) and AGENTS.md crate inventory (pkix-dane / pkix-dane-resolver listed as planned siblings) STAYS -- DANE remains the right design when work resumes. What's deferred is just scheduling: implementation work (.1 pkix-dane crate, .2 pkix-dane-resolver crate, .3 pkix-chain DANE integration), decision-gates (.4 failure mode, .5 DNS config source, .6 SMTP-DANE default), and the parent epic itself. RESUMPTION TRIGGER: not set. Mark un-defers when ready to engage; no scheduled re-evaluation date. Memory pkix-dane-architecture-2026-05-12 captures the architectural commitment that survives the defer."
+}

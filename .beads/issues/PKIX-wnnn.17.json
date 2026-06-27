@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6c56b2847ff9b3c05af67a376ffc6382d0ebca889b356d12e5af855e13c39138",
+  "created_at": "2026-05-14T18:30:31Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/bettertls.rs is a characterization test asserting observed behavior matches baseline-pkix-path.json, not a pass/fail conformance test. A contributor will eventually suggest \"these fixtures should all return built_and_valid; flip the test to assert that\". This is wrong: 23 of 25 fixtures already validate end-to-end (tc41 is a corpus-FAILURE correctly rejected; tc60 is a documented divergence resolved at the build_first_valid_path layer, not at build_path). The snapshot pattern means: a regression in build_path's DFS ordering immediately surfaces as a baseline diff, not as a silent behavior change. The discover-mode (BETTERTLS_BASELINE_DISCOVER=1) plus the readme guidance to review the diff before regenerating is the right discipline. Mirrors the pkix-difftest/baseline-*.json pattern that already exists in the workspace.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.17",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "bettertls characterization test as a snapshot (not pass/fail) is the right pattern",
+  "updated_at": "2026-05-14T18:30:31Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:30:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

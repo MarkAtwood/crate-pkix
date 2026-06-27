@@ -1,0 +1,31 @@
+{
+  "closed_at": "2026-05-02T17:33:40Z",
+  "compaction_level": 0,
+  "content_hash": "e46212baeaa08459a13c81c1d3df05e5b55d967b3ed1709c1570fda863357e6d",
+  "created_at": "2026-05-02T17:32:13Z",
+  "created_by": "Mark Atwood",
+  "description": "OID_ECDSA_P256_SHA256 and OID_SHA256_WITH_RSA are gated #[cfg(any(feature = \"p256\", feature = \"rsa\"))]. EcdsaP256Verifier is gated #[cfg(feature = \"p256\")] only. If only feature=p256 is active OID_ECDSA_P256_SHA256 is visible but if only feature=rsa is active OID_ECDSA_P256_SHA256 is still compiled (due to the 'any'). The deeper problem: EcdsaP256Verifier's local OID const and OID_ECDSA_P256_SHA256 are independently defined strings; if the local const in the verifier were replaced by a reference to the module-level const, the gating must match exactly. The current independent-definition approach avoids the gating mismatch but introduces the duplication risk filed in PKIX-841.20.",
+  "ephemeral": 0,
+  "id": "PKIX-841.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Re-examined: cfg gating is not broken. Both OIDs compile when either backend is active, which is correct. The real issue is duplication risk already filed in PKIX-841.20. This issue overlaps with PKIX-841.20.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DUPLICATE of PKIX-841.20: OID cfg gating analysis (not a real issue)",
+  "updated_at": "2026-05-02T17:33:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:32:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

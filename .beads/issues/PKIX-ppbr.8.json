@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "06c7bde75241c1ea7bb527b9cce22b614271b7e6846b0100905e689162466d85",
+  "created_at": "2026-05-14T17:35:08Z",
+  "created_by": "Mark Atwood",
+  "description": "sct.rs:138: `pub struct SctList(pub Vec<SignedCertificateTimestamp>);` exposes the inner Vec as public. The parser (`from_serialized_list`) carefully rejects empty lists per RFC 6962 \u00a73.3 (`sct_list<1..2^16-1>`), but a caller writing `SctList(Vec::new())` directly produces an empty list that the type system claims is valid.\n\nPublic-surface fossilization risk: the doctest at verify.rs:144 ALREADY uses this pattern: `let sct_list = SctList(vec![]);`. The library's own example demonstrates bypassing the parser's invariant.\n\nMaintenance consequence: callers will produce code like\n  let scts = if cert_has_extension { parse(...)? } else { SctList(vec![]) };\nand library invariants ('every SctList has at least one SCT') are violated. The next person to touch `SctList` will have to deal with the fact that the invariant cannot be relied on, even though the parser enforces it.\n\nFix options:\n1. Make the inner field private. Provide `.scts() -> &[SignedCertificateTimestamp]`, `.into_inner() -> Vec<...>`, and an explicit constructor that re-validates the RFC 6962 \u00a73.3 non-empty rule. Breaking change; pre-1.0 is the time.\n2. Document that the type is just 'a Vec of SCTs with no invariants beyond the inner SCT's invariants' and remove the empty-list rejection from the parser.\n\nEither is acceptable; the current 'parser enforces an invariant the type can't' is the worst of both worlds.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "SctList's inner Vec is pub \u2014 callers can bypass parser invariants",
+  "updated_at": "2026-05-14T17:35:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:35:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

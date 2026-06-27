@@ -1,0 +1,23 @@
+{
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-13T22:08:34Z",
+  "compaction_level": 0,
+  "content_hash": "8ce7faf97c2f41ff96a0841426bc4e8c502d6dc1dabddab8e1e4b729787ade1d",
+  "created_at": "2026-05-12T19:15:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAGENTS.md non-negotiable #6 (added 2026-05-12, memory pkix-caching-batch-prevalidation-2026-05-12) ratifies that no workspace API forecloses on prevalidation, batch validation, or caching. Current state spot-check on 2026-05-12 confirmed all major load-bearing result types (ValidatedPath, ValidationPolicy, TrustAnchor, three Error enums) derive Clone + Debug + PartialEq + Eq + non_exhaustive. Finding has serde behind a feature flag.\n\nThis epic captures the cache-friendliness work that #6 makes desirable but not yet shipped:\n\n1. `serde::Serialize + Deserialize` is currently only on Finding. #6 says result types SHOULD support it behind a feature flag. Extending to ValidatedPath, Error, TrustAnchor, ValidationPolicy enables cross-process caches, on-disk caches, distributed prevalidation.\n\n2. `Send + Sync` is asserted as a MUST in #6 but not currently verified across all load-bearing types. Almost certainly auto-derived because no current load-bearing type contains Rc<T> / RefCell<T> / raw pointers, but a one-shot audit confirms it and adds compile-time assertions to prevent regression.\n\n3. `verify_chain` itself is per-chain shaped, not batch shaped. #6 explicitly calls out adapter crates with subprocess overhead as needing batch. `verify_chain` is in-process and per-chain setup is light, so it may be fine; worth a deliberate decision rather than 'we never thought about it.'\n\n## Children\n\n- .1 \u2014 Add serde feature flag derives to ValidatedPath, Error variants, TrustAnchor, ValidationPolicy\n- .2 \u2014 Audit + verify Send+Sync on all load-bearing result types; add static_assertions\n- .3 \u2014 Decide whether verify_chain needs a batch entry point\n\n## Out of scope\n\n- Building actual cache implementations. The workspace ships traits + framework + cache-friendly types; consumers build caches.\n- Designing distributed-cache wire formats. Serde-feature flag is the door-opener; the wire format is the consumer's choice.\n\n## Filed by\n\nFiled 2026-05-12 as follow-on to AGENTS.md non-negotiable #6 ratification (commit d8ee4428). Surfaced as flagged implications during the design-framing recalibration session.",
+  "ephemeral": 0,
+  "id": "PKIX-2l0v",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 child .1 decisions locked]\n\nPKIX-2l0v.1's three open design decisions resolved by Mark:\n- D1 wire form = format-adaptive via serde_with (base64 in JSON, raw bytes in binary)\n- D3 io::Error replacement = IoFailure { kind, message } (drops os_error; gains Clone+Eq+Serialize)\n- D4 ValidatedPath scope = whole struct, no subsetting\n\nhuman label can come off this parent too once .1 closes. Until then, parent stays open with no autonomous frontier (its only open child is now ready for the autonomous loop, but the loop won't pick the parent up directly).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Cache-friendliness audit and follow-ups (AGENTS.md non-negotiable #6)",
+  "updated_at": "2026-05-13T22:08:34Z"
+}

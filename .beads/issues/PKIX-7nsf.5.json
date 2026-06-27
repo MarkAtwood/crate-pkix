@@ -1,0 +1,60 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T17:51:42Z",
+  "compaction_level": 0,
+  "content_hash": "c6b0fe819bc94b43dad8bc40c162c18b6ceaa627793f613be7a292e84007c987",
+  "created_at": "2026-05-08T15:19:10Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nThe whole point of the harness. Comparing N oracle verdicts and bucketing into useful categories is what produces actionable signal.\n\n## What\n\nIn `pkix-difftest/src/classify.rs` and `pkix-difftest/src/report.rs`:\n\n1. **Comparison classes** (per bead PKIX-7nsf):\n   - `Agreement` \u2014 all oracles (including pkix-path) agree (Pass or Fail).\n   - `StricterThanWild` \u2014 pkix-path `Fail`, \u22651 oracle `Pass` (we reject; openssl/pyca accept).\n   - `LooserThanWild` \u2014 pkix-path `Pass`, \u22651 oracle `Fail`.\n   - `OracleDivergence` \u2014 pkix-path agrees with at least one oracle, oracles among themselves disagree.\n   - `DiagnosticDivergence` \u2014 all agree on Pass/Fail, but the `Fail` reason strings differ. (Low priority bucket.)\n\n2. **Class precedence**: `LooserThanWild` > `StricterThanWild` > `OracleDivergence` > `DiagnosticDivergence` > `Agreement`. (Worst-first.)\n\n3. **Reporter**:\n   - `report.rs::write_markdown(out: &mut impl Write, classified: &[Classified])` \u2014 emits a markdown report with a summary table and one section per class containing a representative sample (configurable count, default 10).\n   - `report.rs::write_json(out, classified)` \u2014 full machine-readable dump.\n   - Both writers are pure (no I/O beyond the supplied writer).\n\n4. **CLI integration**: `pkix-difftest run <corpus-spec> --oracles openssl,pyca --output-md report.md --output-json report.json`.\n\n## Acceptance\n\n- [ ] Classifier covers all 5 classes with property-based or table-driven tests (\u22653 cases per class).\n- [ ] Class precedence is implemented and unit-tested.\n- [ ] Markdown report opens cleanly in a renderer; tables are valid GFM.\n- [ ] JSON report parses with `serde_json::from_str::<Vec<ClassifiedJson>>`.\n- [ ] When PKITS provides ground truth (`expected_verdict_opt = Some`), the report flags ground-truth disagreements as a separate top-level category (orthogonal to oracle disagreement).\n\n## Notes\n\n- The classifier should not assume a fixed oracle list \u2014 it accepts `Vec<(OracleName, Verdict)>` so future oracles (BC, Apple) drop in without code change.\n- Diagnostic-divergence bucket is the dumping ground for noise. v1 emits a count only by default (samples optional flag).",
+  "ephemeral": 0,
+  "id": "PKIX-7nsf.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "diff harness: verdict classifier + reporter (markdown + JSON)",
+  "updated_at": "2026-05-08T17:51:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-08T08:19:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-08T08:20:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.1",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-08T08:20:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7nsf.4",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

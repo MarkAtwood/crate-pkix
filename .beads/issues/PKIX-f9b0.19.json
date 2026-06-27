@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:09Z",
+  "compaction_level": 0,
+  "content_hash": "028e18eea5177663cbd2b85d9b0db6b275e76f1f7794d628276896293455827a",
+  "created_at": "2026-05-07T17:22:47Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:23 (NameConstraints), lib.rs:66 (NameConstraints), lib.rs:68 (RustCrypto), lib.rs:394 (RustCrypto) \u2014 clippy::doc_markdown flags these identifiers as needing backtick quoting. Fix: wrap each bare identifier in backticks. Cosmetic but keeps pedantic clippy clean.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.19",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-chain-simple] fix doc_markdown backtick gaps in lib.rs",
+  "updated_at": "2026-05-07T17:32:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "pub use NameConstraints added",
+  "closed_at": "2026-05-03T13:26:35Z",
+  "compaction_level": 0,
+  "content_hash": "31eb4d286f068c488e71ba2404e4dd4429be5778322f066ea9687116264b7eb5",
+  "created_at": "2026-05-03T13:15:10Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor.name_constraints is typed as x509_cert::ext::pkix::constraints::name::NameConstraints, which is now part of the semver contract via the public field. Users constructing TrustAnchor programmatically with NC must import this deeply nested path from x509_cert directly; pkix_path provides no re-export or type alias for it. Any upstream rename or restructuring of that x509_cert path requires a pkix_path semver bump.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "name_constraints field type not re-exported from pkix_path",
+  "updated_at": "2026-05-03T13:26:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

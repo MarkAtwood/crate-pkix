@@ -1,0 +1,31 @@
+{
+  "close_reason": "Added DEFAULT_TIMEOUT=30s to UreqFetcher::new() and ReqwestFetcher::new(). with_agent/with_client escape hatches preserved.",
+  "closed_at": "2026-06-04T19:30:10Z",
+  "compaction_level": 0,
+  "content_hash": "9e300e22a47b3010efbb8e2d89d79f314f44baa7e4ea076aceda37d4b294c188",
+  "created_at": "2026-05-14T18:56:12Z",
+  "created_by": "Mark Atwood",
+  "description": "src/clients/reqwest.rs:52 and src/clients/ureq.rs:51: `ReqwestFetcher::new()` uses `::reqwest::Client::new()`; `UreqFetcher::new()` uses `::ureq::agent()`. Neither sets a connect timeout, read timeout, or per-request total timeout. `reqwest::Client::new()` explicitly defaults to no timeout; `ureq::agent()` likewise.\n\nTrigger: a certificate's cRLDistributionPoints or AIA OCSP URL points at a slowloris responder (attacker-controlled or simply broken). pkix-revocation-http calls fetch(); the underlying client hangs indefinitely (or until kernel TCP keepalive fires, minutes-to-hours).\n\nBad behavior: `check_revocation` does not return. In a path-validator wired into a TLS server, this hangs the TLS handshake for the offending client cert. In a batch validation job, the worker stalls. The certificate's contents \u2014 including the AIA/CDP URL \u2014 are attacker-controlled in many threat models (S/MIME signer cert from untrusted source, client cert mutual-TLS from an attacker, etc.).\n\nThe crate-level Limitations docstring says 'No retry / backoff policy'. That is not the same as 'no default timeout' \u2014 a missing timeout is a sharper footgun than a missing retry policy because a missing timeout is a liveness bug, not a robustness one.\n\nFix: ship sane defaults on both reference clients (e.g. 30s connect, 60s read, 90s total). Document the value. Allow override via with_timeout / with_agent / with_client. Document in the crate-level Limitations that callers building their own RevocationFetcher MUST impose a timeout.\n\nThis is the kind of footgun where the reference implementation in a published crate becomes the de-facto default \u2014 copy-paste from the rustdoc example into production, no timeout, CVE.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Reference HTTP clients have no default timeouts \u2192 remote DoS via malicious AIA/CDP URLs",
+  "updated_at": "2026-06-04T19:30:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:56:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

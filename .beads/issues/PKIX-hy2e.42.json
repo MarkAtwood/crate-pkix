@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b906f353cc9044eb6bfee4fb3157cab9b32e938f07af9bda902f8dfedf864b20",
+  "created_at": "2026-05-14T13:04:18Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: finding_seed (oscal/emit.rs:776-793), risk_seed (797-807), subject_seed (811-816), and the EvidenceKey::seed implementations write the cert_index / position-index value via usize::to_le_bytes(). usize is 8 bytes on 64-bit targets and 4 bytes on 32-bit targets.\n\nActual bad behavior: an OSCAL evaluation report emitted on a 32-bit host produces different Observation / Finding / Risk UUIDs from the same logical inputs evaluated on a 64-bit host. Evidence-pack provenance is documented as deterministic ('Two Findings with identical (cert_sha256, cert_index) produce the same...' at oscal/emit.rs:226-228) but the determinism only holds within a single target architecture.\n\nNot a security exploit, but it undermines the documented provenance binding. A consumer who replays a report's UUIDs on a different host arch sees mismatches. CT/audit workflows that compare reports across infrastructure with mixed arch will silently disagree.\n\nSection G \u2014 'parameters are explicit; deterministic nonce \u2192 derivation function and collision argument' applies to the seed construction. The fix is trivially mechanical and tracks the workspace's overall portability stance.\n\nFix: replace every usize::to_le_bytes() in the seed builders with (value as u64).to_le_bytes(). The seed length grows by 4 bytes per index field on 32-bit; UUIDs change once (a breaking provenance change) and become portable thereafter.\n\nAffected functions:\n- report_seed (chain_length is already u64-ish via the .to_le_bytes() on a u64-typed field \u2014 verify)\n- finding_seed (uses i: usize \u2192 to_le_bytes; uses cert_index: Option<usize>)\n- risk_seed (uses i: usize \u2192 to_le_bytes)\n- subject_seed (uses cert_index: usize \u2192 to_le_bytes)\n- EvidenceKey::seed (oscal/emit.rs:226-247, check the cert_index serialization)\n\nSection: G (algorithm and parameter choice \u2014 deterministic derivation must be platform-portable)",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.42",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "UUIDv8 seeds use usize::to_le_bytes \u2014 UUIDs are non-portable across 32-bit vs 64-bit hosts",
+  "updated_at": "2026-05-14T13:04:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T06:04:17Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

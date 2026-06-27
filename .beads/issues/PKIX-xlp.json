@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T23:25:07Z",
+  "compaction_level": 0,
+  "content_hash": "cd45cdf6cbe8302184f472d1f114299a7f711c09c968876afaaba1b64b107ee2",
+  "created_at": "2026-05-02T23:20:38Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\nAdd a private helper `cert_name_constraints(cert) -> Option<NameConstraints>` in pkix-path/src/lib.rs that extracts and decodes the NameConstraints extension from a certificate.\n\n## Algorithm\n- Iterate `cert.tbs_certificate.extensions` (if Some)\n- Match on OID_NAME_CONSTRAINTS (2.5.29.30)\n- Decode the extension value as `x509_cert::ext::pkix::constraints::name::NameConstraints`\n- Return Some(nc) on success, None if absent; propagate decode errors as OcspParseError or equivalent\n\n## Acceptance criteria\n- Returns Some(nc) for CA certs with NameConstraints\n- Returns None for EE certs and certs without the extension\n- Decode error surfaces as Err rather than silently returning None",
+  "ephemeral": 0,
+  "id": "PKIX-xlp",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add cert_name_constraints() extractor helper",
+  "updated_at": "2026-05-02T23:25:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T16:21:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-0v7",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-02T16:21:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-pjz",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

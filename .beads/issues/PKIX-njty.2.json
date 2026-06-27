@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "7aca42f3ac425298089df883d0835f23ef4f1a3185c919cb1f070561b5d53e3c",
+  "created_at": "2026-05-14T18:46:34Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: a positive-path test fails and prints its panic message.\n\nsrc/lib.rs line 2396 (smime_individual_givenname_surname_form_passes): panic message says 'policy OID 2.23.140.1.5.4.1' (Legacy generation). The fixture and the test require 2.23.140.1.5.4.3 (Strict). Migration was done in PKIX-jbvb.6.\n\nsrc/lib.rs line 2569 (smime_sponsor_givenname_surname_form_passes): same issue \u2014 panic message says 'policy OID 2.23.140.1.5.3.1' (Legacy) instead of .3.3 (Strict).\n\nBad behavior: if either test fails for some unrelated reason (e.g., a fixture regeneration drops the OID), the panic message will lie about which OID the test expected, sending the debugger to look for a banned-Legacy-OID mismatch that doesn't exist. The whole point of these tests is to discriminate Strict from Legacy/Mailbox; the diagnostic strings invert that discrimination.",
+  "ephemeral": 0,
+  "id": "PKIX-njty.2",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Stale Legacy OID in test panic messages (lib.rs:2396, 2569)",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:46:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-njty",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

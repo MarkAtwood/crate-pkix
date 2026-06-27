@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:49:14Z",
+  "compaction_level": 0,
+  "content_hash": "065b3a126a6c4a14f168a5c6da3a062b0829c7113094bfde7703dd93e06e9631",
+  "created_at": "2026-05-02T17:28:40Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk is a private function (no pub modifier) called directly by tests in the same lib.rs module. This works because #[cfg(test)] modules have access to private items in the same file. However, external integration tests (tests/*.rs) cannot call chain_walk because it is private. The tests_chain_walk module in lib.rs forms an implicit test surface for a private API. A comment explaining that chain_walk is intentionally private (implementation detail of validate_path) and why (to force callers through the public API with its input guards) would prevent a contributor from making it pub to write integration tests. This is a bus-factor/contribution clarity issue.",
+  "ephemeral": 0,
+  "id": "PKIX-841.16",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk is not pub but directly tested \u2014 visibility contract unclear",
+  "updated_at": "2026-05-02T17:49:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:28:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

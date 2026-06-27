@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:16Z",
+  "compaction_level": 0,
+  "content_hash": "1198b5fa93c5610c0b752ca07bc5e1baaf6f53bd92afe367233b9cd515a75def",
+  "created_at": "2026-05-14T05:06:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs nowhere documents what from_pem / from_der_iter\ndo when the input contains the same certificate twice (or more). The impl\npreserves duplicates: the returned Vec<TrustAnchor> has N entries for N\ncopies in the input, and no equality dedup is performed.\n\nWhat goes wrong for a caller in production:\n\n  - Real-world bundles ship with the same root multiple times. Debian's\n    update-ca-certificates can include the same CA from multiple source\n    packages (e.g., 'mozilla-ca' + a vendor-specific package). A caller\n    loading such a bundle gets N anchors for the same SPKI+Subject,\n    consuming memory and slowing path validation (every anchor is a\n    candidate in chain_walk's anchor-matching loop).\n  - A caller intersecting two trust stores ('my custom roots' UNION 'OS\n    bundle') has no contract telling them whether intersection by content\n    is necessary or whether the crate handles it.\n  - Diagnostic tools reporting 'you trust 147 roots' vs 'you trust 145\n    distinct roots' get different answers depending on whether the tool\n    dedups.\n\nFix options:\n\n  a) Document the current behavior:\n       /// Duplicate certificates in the input are preserved as duplicate\n       /// `TrustAnchor` values. Callers needing deduplication should filter\n       /// the returned `Vec` on their preferred equality (typically\n       /// `subject_public_key_info`).\n\n  b) Add a dedup pass keyed off SPKI bytes before returning. This is what\n     most real callers want. Performance is fine \u2014 anchor loads happen once\n     at startup, and dedup on a HashSet<&[u8]> over the SPKI bytes is O(N).\n\n  c) Add a `from_pem_dedup` variant. The default stays 'preserve', the\n     opt-in variant filters.\n\nOption (a) is the minimal fix; (b) makes the API do the right thing by\ndefault; (c) is the conservative middle ground. Pre-1.0 the maintainer can\npick (b) cheaply; post-1.0 it is a breaking semantic change.\n\nNote: TrustAnchor derives PartialEq (per pkix-path/src/lib.rs:648), so\ncontent-equality dedup is straightforward for either crate-side or\ncaller-side filtering. The contract gap is documentation, regardless of\nwhich option is chosen.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Duplicate-cert behavior is unspecified: load(N copies of root) yields N TrustAnchors with no dedup",
+  "updated_at": "2026-05-14T08:14:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:06:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

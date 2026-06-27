@@ -1,0 +1,32 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:29:32Z",
+  "compaction_level": 0,
+  "content_hash": "ac2bea685d1c7968b3dade678b134ef2922c7c7526ac6e5289666c23a8a9bcae",
+  "created_at": "2026-05-06T22:16:16Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:248: path.push(candidate.clone()) clones the full Certificate struct (which may be multiple KB for enterprise/gov certs with extensions) on every DFS node push. Iterative deepening re-traverses the same nodes at each depth level, so each cert may be cloned O(depth) times per build. For ITAR/gov PKI with large certs (8+ KB each) and deep hierarchies, this creates significant heap pressure. The fix is to store indices (or references) into the pool rather than cloning certs into the path Vec.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Certificate clone in DFS push is inherent to the Vec<Certificate> ownership model in CertPool. Fixing requires index-based paths instead of owned certs. Out of scope for v0.1.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "build_path DFS clones full Certificate on every push \u2014 excessive alloc for large certs",
+  "updated_at": "2026-05-06T22:29:32Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:16:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

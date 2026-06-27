@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "3fa2e3bf40a0597f00dd9cfcd781ba98f41831ac7717e0bbb887f14a9c748980",
+  "created_at": "2026-05-14T12:49:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs\n\nDeviation is a pub struct with all-pub fields and no constructor. The\nvalidation (non-empty justification, non-empty authorized_by) lives in\nDeviationStore::add at line 667-674:\n\n    pub fn add(&mut self, mut deviation: Deviation) -> Result<(), DeviationAddError> {\n        if deviation.justification.is_empty() {\n            return Err(DeviationAddError::EmptyField(\\\"justification\\\".into()));\n        }\n        if deviation.authorized_by.is_empty() {\n            return Err(DeviationAddError::EmptyField(\\\"authorized_by\\\".into()));\n        }\n        ...\n        // Normalize the issuer-dn-contains substring to lowercase\n        if deviation.scope.kind == SCOPE_KIND_ISSUER_DN_CONTAINS {\n            ...\n        }\n    }\n\nThis means a Deviation constructed via struct literal:\n\n    let d = Deviation {\n        id: \\\"x\\\".into(),\n        target_lint: \\\"foo\\\".into(),\n        scope: DeviationScope::issuer_dn_contains(\\\"ACME CORP\\\"),\n        ...\n        justification: \\\"\\\".into(),       // \u2190 empty, would be rejected by add\n        authorized_by: \\\"\\\".into(),       // \u2190 empty, would be rejected by add\n        ...\n    };\n\nis *constructable but useless*. The validation never runs. And then:\n\n    d.scope.matches(cert)  // works \u2014 scope is matched\n    d.applies_to(cert, now)  // works \u2014 but doesn't check\n                             //   justification/authorized_by\n\nSo a caller can use a Deviation directly (e.g., pass it to\nDeviationScope::matches) and bypass the validation entirely.\n\n# What goes wrong for the caller\n\n1. *Implicit dependency on the add path.* The struct literal looks\n   like it should work, doc comments describe it, but unless the\n   caller routes through DeviationStore::add, the invariants are\n   uncomputed.\n\n2. *Issuer-DN-contains case folding.* The add() method lowercase-\n   normalizes the substring. A Deviation constructed directly with\n   `DeviationScope::issuer_dn_contains(\\\"ACME CORP\\\")` and then matched\n   without going through add() will silently fail to match (because\n   matches() compares against pre-lowercased substring per the\n   constructor's own contract).\n\n3. *Builder construction.* OSCAL parse creates Deviation values then\n   pushes them to add(). That's correct. But a caller who reads\n   deviations from their own source (TOML, YAML, a database) and\n   constructs Deviation literals directly bypasses all validation.\n\n# The right shape\n\nEither:\n\n  (a) Provide Deviation::new(...) -> Result<Deviation, EmptyField>\n      that does the validation and field-normalization at\n      construction time. Make the fields pub(crate) so direct\n      struct-literal construction outside the crate is not\n      allowed. DeviationStore::add then becomes a duplicate-check.\n\n  (b) A typestate builder: DeviationBuilder::new(id, target_lint,\n      scope).justification(...).authorized_by(...).build()\n      with the builder enforcing required fields at compile time.\n\n  (c) #[non_exhaustive] on Deviation forces callers through some\n      constructor (struct literals fail to compile outside the\n      crate). Pair that with Deviation::new(...) for the\n      constructor.\n\n# Forward fit\n\nPre-1.0 fix. Closes both this and PKIX-hy2e.22 partially (the\n#[non_exhaustive] line of attack). The two together produce a\nproperly validated, evolvable Deviation type.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.27",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "API contract: Deviation construction-vs-validation split forces every caller to use DeviationStore::add",
+  "updated_at": "2026-05-14T12:49:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:49:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:25:15Z",
+  "compaction_level": 0,
+  "content_hash": "05e9befee71b6967ccf01b312bc0f7a854c434340561545ce8693b2d20bad88c",
+  "created_at": "2026-05-06T23:19:47Z",
+  "created_by": "Mark Atwood",
+  "description": "de_static_str leaks every deserialized string permanently via Box::leak. DeviatedFinding uses this on lint_id and citation; EvaluationReport serde pulls in all findings and deviated_findings. A tool that deserializes corpus-scale JSON reports in a loop will grow memory without bound. Fix: switch lint_id/citation in Finding and DeviatedFinding to String, or use a thread-local interning map bounded by the number of unique lint IDs (small and finite). File: pkix-lint/src/lib.rs lines 125-132.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: de_static_str leak unbounded for batch deserialization",
+  "updated_at": "2026-05-06T23:25:15Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:19:46Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: corrected intra-doc link display text to Profile::policy",
+  "closed_at": "2026-05-07T01:57:16Z",
+  "compaction_level": 0,
+  "content_hash": "1fecd9f7dfe10ae6e76372d6c5af88833878022ad160b44d88a2519a35b9261a",
+  "created_at": "2026-05-07T01:50:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:856 \u2014 The doc comment for validate_path_with_profile says: \"The profile's [`Policy::policy`][Profile::policy] method...\" The display text says Policy::policy but the link target says Profile::policy. The correct method name is Profile::policy. The link resolves correctly due to the explicit path, but the visible text in rendered docs says 'Policy::policy' which is confusing to readers.",
+  "ephemeral": 0,
+  "id": "PKIX-dl9.6",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "validate_path_with_profile doc: wrong cross-reference 'Policy::policy' should be 'Profile::policy'",
+  "updated_at": "2026-05-07T01:57:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:50:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-dl9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c4f899d134329df988298a92ae60b19bc4e9991fd4a31c9804e04c0a56562498",
+  "created_at": "2026-05-14T18:02:26Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs lines 16-38 (the crate-level Quick start doc) shows verify_chain with six arguments including '&NoAiaFetcher' but the comment next to the last arg is:\n\n    &NoAiaFetcher,      // or an  from \n\nThat is misleading on two axes:\n\n1. A new reader has no way to tell from this snippet whether NoAiaFetcher is 'the default for offline use' or 'something I should replace.' The Quick start is the first thing users read. They will copy NoAiaFetcher and never look at it again.\n\n2. The cross-reference points at pkix-aia-http but the snippet doesn't say WHEN to use it. The user has to read the Limitations section (line 73) to find out that the use-case wrappers (verify_tls_server, etc.) bake NoAiaFetcher internally and that 'callers that want AIA fetching must drop down to verify_chain or construct a Verifier directly.'\n\nSUGGESTED REWRITE: add a one-line decision rule next to the NoAiaFetcher in the snippet:\n\n    &NoAiaFetcher,      // use  from  if the\n                        // caller-supplied chain may be missing intermediates\n\n\u2026and split the Quick start into 'common case: complete chain' and 'with AIA fetching: incomplete chain' subsections, mirroring the README's structure. The Quick start currently has one example (Reusable verifier) that ALSO uses new_no_aia (line 56) \u2014 so a reader learns two ways to disable AIA before being told what AIA is.\n\nAlternatively, drop the Quick start use of '&NoAiaFetcher' entirely and show '&HttpFetcher::new()' from pkix-aia-http (gated behind a feature). The default should communicate the recommended path, not the do-nothing path.\n\nThe CHANGELOG entry for PKIX-zkjb.7 ('AIA chain reassembly') describes the feature in detail but the user-facing Quick start gives no indication that AIA exists or matters.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.14",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Quick-start docstring uses NoAiaFetcher with 6-arg verify_chain but doesnt explain why or when to opt into AIA",
+  "updated_at": "2026-05-14T18:02:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:02:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

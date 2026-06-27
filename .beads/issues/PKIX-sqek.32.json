@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "093963aee78a3b20abbce5e96055a487749ffcb1b17ba094284926ef354983fe",
+  "created_at": "2026-05-14T18:13:23Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:319-322 (verify_chain_default's Errors section):\n\n    /// # Errors\n    ///\n    /// Returns `Err(Error)` for any validation failure. See [`Error`] in `pkix_path`\n    /// and `pkix_revocation` for the full list of failure conditions.\n\nThe text says \"See [`Error`] in `pkix_path` and `pkix_revocation`.\" This points at TWO upstream Error types, but the function's actual return is `crate::Result<ValidatedPath>` which uses the local `pkix_chain::Error`. The local Error wraps the upstream errors but ALSO has six other variants (ProfileViolation, OcspDelegation, Aia, PathBuild, AiaDepthExceeded, Identity) that don't exist in either pkix_path or pkix_revocation.\n\nA reader following the cross-reference learns about path/revocation errors only and misses:\n\n- Error::Aia (via NoAiaFetcher's FetchingDisabled when chain is incomplete)\n- Error::PathBuild (when the path builder runs out of candidates)\n- Error::AiaDepthExceeded (when the AIA recursion cap is hit)\n\n(Error::ProfileViolation, OcspDelegation, and Identity are only produced by the use-case wrappers and verify_chain_default never reaches them, so omitting those is technically fine \u2014 but the rustdoc doesn't explain that, so a reader can't tell which omissions are intentional.)\n\nWHY IT MATTERS:\n\nThis is the slash-command checklist's:\n\n> Doc comments that describe what the function does at the implementation level rather than what callers should rely on.\n\nPlus the cross-reference is broken: rustdoc renders `[`Error`]` as a link to the local Error symbol (because `Error` resolves first in scope), but the prose says \"in pkix_path and pkix_revocation\" \u2014 which is at best ambiguous and at worst points at types the caller will never see in this function's return.\n\nFix:\n\n    /// # Errors\n    ///\n    /// Returns `Err(Error)` for any validation failure. See [`Error`] for the\n    /// full set of failure modes; this convenience wrapper can produce any\n    /// of `Error::Path`, `Error::Revocation`, or `Error::Aia` (the latter\n    /// always as `AiaError::FetchingDisabled` because `NoAiaFetcher` is\n    /// hardwired).\n\nPRIORITY 3 because the inaccuracy is a doc-only nit and the reader can find the actual Error variants by visiting the local link. Filed for completeness; flag with the opinion label if you'd prefer not to track this scale of finding.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.32",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_chain_default rustdoc points at pkix_path::Error and pkix_revocation::Error instead of local Error",
+  "updated_at": "2026-05-14T18:13:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:13:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

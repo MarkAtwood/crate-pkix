@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:18Z",
+  "compaction_level": 0,
+  "content_hash": "18932039a98826defe935d8316b9556196b91e2a509a329261d9e2fefe339817",
+  "created_at": "2026-05-05T15:47:56Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:179\u2013190\n\nIn the per-candidate loop body:\n\n    let candidate_subject = candidate.tbs_certificate.subject.clone();  // clone 1\n    let already_in_path = path.iter().any(...candidate_subject...);\n    if already_in_path { continue; }\n\n    let candidate_clone = pool[i].clone();  // clone 2 (full Certificate)\n    path.push(candidate_clone);\n\nThe subject is cloned first (to avoid holding an immutable reference into pool while later borrowing path as mutable).  Then the full certificate is cloned again (pool[i].clone()) even though 'candidate' already holds &pool[i] and could have been cloned once:\n\n    let candidate = pool[i].clone();            // clone once\n    let already_in_path = path.iter().any(|in_path|\n        pkix_path::names_match(&in_path.tbs_certificate.subject, &candidate.tbs_certificate.subject)\n    );\n    if already_in_path { continue; }\n    path.push(candidate);                       // move, not clone\n\nThis eliminates one clone per candidate per DFS step.  The comment at line 163 ('We iterate over the pool by index to avoid borrowing path and pool simultaneously') documents the reason for index iteration but does not explain the double-clone pattern.  With a single early clone the dual-borrow problem is also solved, and the code becomes clearer.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.24",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "dfs(): candidate cloned twice per iteration (candidate_subject + candidate_clone)",
+  "updated_at": "2026-05-05T16:06:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:47:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

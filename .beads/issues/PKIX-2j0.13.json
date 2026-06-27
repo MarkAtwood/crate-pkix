@@ -1,0 +1,32 @@
+{
+  "close_reason": "Superseded by PKIX-q1nf (closed in commit a15f2485). pkix-path now exposes pub fn cert_is_ca returning Result<bool, DerError>; pkix-path-builder::cert_is_ca and pkix-revocation::crl::cert_is_ca_cert are both thin wrappers calling it. The DRY violation tracked here is fixed; the local OID_BASIC_CONSTRAINTS const in pkix-revocation/src/crl.rs has been removed.",
+  "closed_at": "2026-05-08T03:25:04Z",
+  "compaction_level": 0,
+  "content_hash": "424ad4f60f63529031373ae53cc7efc948e610dce6c6477553a46a508519536a",
+  "created_at": "2026-05-06T16:51:28Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs:479-491 and pkix-path-builder/src/lib.rs:126-138\n\nBoth `pkix-revocation::crl` and `pkix-path-builder` contain nearly identical functions that extract `BasicConstraints.cA` from a certificate:\n\nIn crl.rs (lines 479-491):\n```rust\nfn cert_is_ca_cert(cert: &Certificate) -> bool {\n    use x509_cert::ext::pkix::BasicConstraints;\n    cert.tbs_certificate\n        .extensions.as_deref().unwrap_or(&[])\n        .iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)\n        .and_then(|e| BasicConstraints::from_der(e.extn_value.as_bytes()).ok())\n        .map(|bc| bc.ca)\n        .unwrap_or(false)\n}\n```\n\nIn pkix-path-builder/lib.rs (lines 126-138):\n```rust\nfn cert_is_ca(cert: &Certificate) -> bool {\n    // nearly identical implementation\n}\n```\n\nThis logic is also effectively duplicated in `pkix-path` itself (chain_walk's NotCA check). \n\nSince `pkix-revocation` already depends on `pkix-path`, the cleanest fix would be to expose a `pub(crate)` or `pub` helper from `pkix-path` (e.g., `cert_basic_constraints()` or `is_ca_cert()`), avoiding three independent copies of the same OID-lookup + DER-decode pattern.\n\nAlternatively, accept the duplication but ensure all three copies use the same logic (e.g., consistent fail-open semantics on decode errors).",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Three-crate refactoring of a helper function. Deferred to v0.2. Each copy is internally consistent.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "crl.rs: cert_is_ca_cert duplicates pkix-path-builder cert_is_ca \u2014 share via pkix-path re-export",
+  "updated_at": "2026-05-08T03:25:04Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:51:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

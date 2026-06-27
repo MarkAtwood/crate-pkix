@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:35:49Z",
+  "compaction_level": 0,
+  "content_hash": "98b4fc3563088f4bbcbb15b56474a95093d8298b6781a57880681b3ed0cf15ef",
+  "created_at": "2026-05-13T05:30:33Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Wrapper-level differential test for pkix_chain::verify_tls_server against 'openssl verify -purpose sslserver -verify_hostname X'.\n\nMirrors the structure of pkix-difftest/tests/verify_wrapper_pyca.rs (PKIX-fmtv.19): drive the curated RFC 6125 corpus from pkix-chain/tests/fixtures/ through both verifiers, classify per-case agreement, emit a matrix.\n\nAcceptance:\n- pkix-difftest/tests/verify_wrapper_openssl_server.rs runs the corpus and asserts zero Rust-looser cases.\n- pkix-difftest/baseline-verify-openssl.md gets a TLS-server section with per-case agreement table.\n\nBlocks on PKIX-fmtv.18.1.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: verify_tls_server vs -purpose sslserver -verify_hostname",
+  "updated_at": "2026-05-13T05:35:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:33Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T22:30:56Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

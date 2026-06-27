@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6bd4985b5bea33c7d3d3f1ef1a0c26820264b49ede5f42edd438e34cf7e7d5db",
+  "created_at": "2026-05-14T18:57:38Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:273-313: when get_crl finds an entry with next_update in the past, it returns None but does NOT remove the entry. Same for OCSP. The entry stays until the key is overwritten by a fresh put.\n\nThe Limitations docstring says 'the in-memory cache is unbounded by design'. That is true in steady-state \u2014 but it's worse than 'unbounded'. The cache also retains entries forever after they expire, even though they will never be returned again. Over time, on a workload where keys turn over (e.g., different certs with different (issuer_dn, dp_uri) tuples), the cache fills with garbage.\n\nWorst-case scenario: attacker controls the AIA/CDP URLs of certs they can get a validator to check (S/MIME signer certs, mutually-authenticated TLS client certs from a hostile peer). Each unique URL is a new cache key. Even without serving a successful response, if the URL is never reached because of a transport failure (HTTP 404), no entry is added \u2014 so the immediate DoS is bounded. But IF the URL serves a valid CRL/OCSP response (e.g., the attacker proxies to a real CA's CRL distribution), each unique URL adds a cache entry. With one-shot URLs (different path component per cert), cache grows unbounded with attacker input.\n\nRecommendation: at minimum, lazy-evict on read. If the entry is expired, remove it on read. Document the policy. This does not solve the 'unbounded by design' issue but at least caps the live working set at 'currently-fresh' entries rather than 'every entry ever cached'.\n\nBetter long-term: make eviction explicit in the trait surface, even if InMemoryCache uses a trivial policy. RevocationCache::evict_expired(now) or similar. Then a deployer needing eviction wires up a periodic call.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Cache has no expired-entry eviction \u2014 unbounded growth amplifies the documented unboundedness",
+  "updated_at": "2026-05-14T18:57:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

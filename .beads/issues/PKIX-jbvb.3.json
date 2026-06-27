@@ -1,0 +1,61 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T233709Z-3219518",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T00:00:27Z",
+  "compaction_level": 0,
+  "content_hash": "31e4cd834983e7b621505172bfc8f5ccaec72e73716dfe68a43cb2bb630715cb",
+  "created_at": "2026-05-13T16:46:12Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nImplement the **Individual-validated** S/MIME tier as a Profile type in `pkix-profiles-cabf`. Per CA/B Forum S/MIME BR \u00a77.6.x: strictest non-organization tier; requires real-world identity proofing (passport / national ID / driver's license per BR \u00a76.x evidence requirements).\n\n## API shape\n\n```rust\n/// Individual-validated S/MIME BR subscriber-certificate profile.\n///\n/// Reference, not authoritative. CA/B Forum S/MIME Baseline Requirements\n/// v1.0.14 (or whichever revision the cabf workspace has refreshed to).\n///\n/// Asserts policy OID `2.23.140.1.5.4.1` (Individual-validated).\n///\n/// Required Subject DN fields per BR: givenName + surname (or pseudonym),\n/// serialNumber (subject-unique identifier). No organizationName required.\n/// Subject SAN: rfc822Name (one or more).\npub struct SmimeIndividualValidated;\n\nimpl Profile for SmimeIndividualValidated {\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // - required_leaf_eku: id-kp-emailProtection\n        // - require_rfc822_san: true\n        // - max_validity: per BR \u00a76.3.2\n        // - required_policy_oids: [2.23.140.1.5.4.1]\n        // - required_subject_dn_attributes: [givenName + surname]\n    }\n    fn version(&self) -> &'static str { \"1.0.14\" }\n}\n\npub const fn smime_individual_policy(now_unix: u64) -> ValidationPolicy {\n    SmimeIndividualValidated.policy(now_unix)\n}\n```\n\n## Test fixtures\n\nSame dual-oracle convention. Note: Individual-validated is the rarest tier in practice, so fixture availability from zlint testdata / pkilint fixtures may be thinner. If both upstreams lack fixtures, fall back to hand-generating certs cross-verified against both linters in subprocess (composed-oracle pattern per memory `pkix-composed-oracle-pattern-2026-05-13`).\n\n## Acceptance\n\n- [ ] `pkix_profiles_cabf::SmimeIndividualValidated` ships and impls `Profile`\n- [ ] `smime_individual_policy(now_unix)` free function alias exists\n- [ ] Reference-not-authoritative rustdoc disclaimer\n- [ ] Rustdoc cites CA/B Forum S/MIME BR v1.0.14 with correct section numbers (post-PKIX-d5rh refresh)\n- [ ] At least 2 positive + 2 negative fixtures (or composed-oracle equivalents if upstream fixtures unavailable)\n- [ ] Tests pass\n- [ ] CHANGELOG entry in `pkix-profiles-cabf`\n\n## Out of scope\n\n- Other tiers (PKIX-jbvb.1 Organization, PKIX-jbvb.2 Sponsor)\n- Real-world identity-proofing logic \u2014 Profile validates the cert AS IF the CA correctly proofed the subscriber; the BR's proofing requirements are CA-side, not validator-side\n\n## Blocks on\n\n- PKIX-mzsk (AGENTS.md amendment)\n- PKIX-d5rh (CABF citation refresh)\n\n## Cross-references\n\n- PKIX-jbvb (parent)\n- Memory `pkix-composed-oracle-pattern-2026-05-13` (if oracle fixtures unavailable)\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 do-beads loop] Escalating with parent PKIX-jbvb: ValidationPolicy lacks required_policy_oids / required_subject_dn_attributes fields, so per-tier policy() outputs would be byte-identical. See PKIX-jbvb notes for the full options analysis and recommendation (option B).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeIndividualValidated profile + cross-validated fixtures",
+  "updated_at": "2026-05-14T00:00:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:47:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-d5rh",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:46:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:46:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.4",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T14:35:47Z",
+      "created_by": "bd-spin/bd-spin-20260513T202312Z-3017126",
+      "depends_on_id": "PKIX-jbvb.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-13T09:47:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mzsk",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

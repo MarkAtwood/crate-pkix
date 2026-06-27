@@ -1,0 +1,38 @@
+{
+  "close_reason": "All sub-issues complete: check_algorithm, check_extensions, RustCryptoVerifier delegation, and 12 integration tests passing",
+  "closed_at": "2026-05-02T07:29:23Z",
+  "compaction_level": 0,
+  "content_hash": "5aec245a6efc38ac0b2a2ae5927338456b3d20d927263567ba31ba8128ed22d3",
+  "created_at": "2026-05-02T05:50:29Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement the three stub functions in pkix-chain-simple and add integration tests.\n\nBLOCKED BY: Epic PKIX-lwr (path validator) and Epic PKIX-ehn (RustCrypto backends, specifically the DefaultVerifier dispatch wrapper).\n\nFunctions to implement:\n\ncheck_algorithm (pkix-chain-simple/src/lib.rs:321):\n  - Compare cert.signature_algorithm.oid against ALLOWED_SIG_ALGS slice\n  - Also verify outer signatureAlgorithm == inner TBSCertificate.signature per RFC 5280 \u00a74.1.1.2 (these must be identical; mismatch is a forgery vector)\n  - Return Error::AlgorithmNotAllowed { index } on failure\n\ncheck_extensions (pkix-chain-simple/src/lib.rs:335):\n  Leaf cert (is_leaf=true):\n    - Walk all extensions; any OID not in ALLOWED_LEAF_EXTENSIONS \u2192 Error::UnexpectedExtension\n    - If BasicConstraints present and cA=TRUE \u2192 Error::LeafIsCA\n  Intermediate cert (is_leaf=false):\n    - Walk all extensions; any OID not in ALLOWED_INTERMEDIATE_EXTENSIONS \u2192 Error::UnexpectedExtension\n    - If BasicConstraints absent or cA=FALSE \u2192 Error::MissingRequiredExtension\n    - If KeyUsage absent or keyCertSign not set \u2192 Error::MissingRequiredExtension\n\nRustCryptoVerifier::verify_signature (pkix-chain-simple/src/lib.rs:354):\n  - Do not re-implement; delegate to the DefaultVerifier from pkix-path (Epic PKIX-ehn issue 3)\n  - RustCryptoVerifier becomes a thin newtype wrapper around DefaultVerifier\n\nIntegration tests:\n  - Happy path: leaf + 1 intermediate + root anchor (use rcgen or PKITS fixtures)\n  - Rejected: chain with 3 intermediates (ChainTooLong)\n  - Rejected: cert with ecdsa-with-SHA384 (AlgorithmNotAllowed)\n  - Rejected: intermediate with CRLDistributionPoints extension (UnexpectedExtension)\n  - Rejected: intermediate missing BasicConstraints (MissingRequiredExtension)\n  - Rejected: leaf cert with cA=TRUE (LeafIsCA)\n  Test vectors must use external oracle (OpenSSL or rcgen) \u2014 never self-derived.\n\nSub-issues to create:\n1. Implement check_algorithm\n2. Implement check_extensions (leaf path)\n3. Implement check_extensions (intermediate path)\n4. Wire RustCryptoVerifier to DefaultVerifier\n5. Integration test suite for verify_simple\n\nAcceptance: verify_simple happy path passes with a real chain. All rejection cases tested. Clippy clean.",
+  "ephemeral": 0,
+  "id": "PKIX-868",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: pkix-chain-simple full implementation",
+  "updated_at": "2026-05-02T07:29:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:50:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ehn",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:50:35Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

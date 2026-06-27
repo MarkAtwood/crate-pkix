@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:43:11Z",
+  "compaction_level": 0,
+  "content_hash": "e99cd50a5bc57fffb9c9ca68e7bf16f97ba6a08d9d2e6747a40c9460550b6988",
+  "created_at": "2026-05-13T05:30:51Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Wrapper-level differential test for pkix_chain::verify_ocsp_responder against 'openssl verify -purpose ocsphelper'.\n\nSource corpus: pkix-chain/tests/fixtures/leaf-ocsp-responder*.der.\n\nAcceptance:\n- pkix-difftest/tests/verify_wrapper_openssl_ocsp.rs covers the OCSP-responder fixtures.\n- baseline-verify-openssl.md gets an OCSP-responder section.\n\nNote: PKIX-fmtv.13.3 has a pending design clarification for verify_ocsp_responder. This subbead may be partially blocked on that bead's resolution.\n\nBlocks on PKIX-fmtv.18.1.",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.18.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "OpenSSL diff: verify_ocsp_responder vs -purpose ocsphelper",
+  "updated_at": "2026-05-13T05:43:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-12T22:30:50Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-12T22:31:01Z",
+      "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+      "depends_on_id": "PKIX-fmtv.18.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

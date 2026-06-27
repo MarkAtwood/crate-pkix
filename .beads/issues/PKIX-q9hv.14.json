@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "caae5e3657402624f72c866bab4e662dca62a12f990321678cc5136b8b833c16",
+  "created_at": "2026-05-14T14:40:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:644-648: `let results = self.aia.batch_fetch(&uri_refs); for (uri, result) in new_uris.iter().zip(results)`. The AiaFetcher::batch_fetch contract says return Vec is aligned-by-index with input URIs (pkix-aia/src/lib.rs:569-572), but the trait default-impl loops calling fetch (same length), and there is no runtime check that overridden implementations honor this. zip() silently truncates to the shorter of the two iterators. A buggy AiaFetcher implementation that returns one fewer result drops one URI silently \u2014 that URI is in tried_uris (so it won't be retried) but its result is never consulted. This is a footgun for future contributors writing custom AiaFetchers. Fix: add `assert_eq!(results.len(), uri_refs.len(), \"AiaFetcher::batch_fetch must return one result per URI\")` immediately after the call. (Or use debug_assert for release-mode laxness \u2014 but in security code, panicking on contract violation is the safer default.)",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "build_with_aia trusts batch_fetch return length without assertion",
+  "updated_at": "2026-05-14T14:40:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:40:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "Decision recorded in issue; no code change needed \u2014 these are preservation notes.",
+  "closed_at": "2026-05-03T02:47:00Z",
+  "compaction_level": 0,
+  "content_hash": "e1efa087161fd8d46042369885b1f97653e90d7596ca0a0e77179462b1c9065a",
+  "created_at": "2026-05-03T02:41:46Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_dns_name: constraint '.example.com' matches subdomains only (apex excluded). Constraint 'example.com' matches exact host AND subdomains. This asymmetry is correct per RFC 5280 \u00a74.2.1.10: 'DNS name restrictions are expressed as host.example.com. Any DNS name that can be constructed by simply adding zero or more labels to the left-hand side of the name satisfies the name constraint.' A contributor who makes both cases behave like leading-dot (subdomains only) would break PKITS tests 4.13.30\u201338.",
+  "ephemeral": 0,
+  "id": "PKIX-27p.10",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DNS leading-dot vs. no-leading-dot asymmetry follows RFC 5280 \u00a74.2.1.10 exactly",
+  "updated_at": "2026-05-03T02:47:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T19:41:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-27p",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

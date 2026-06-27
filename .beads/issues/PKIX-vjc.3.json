@@ -1,0 +1,31 @@
+{
+  "close_reason": "FALSE ALARM: dn_within_subtree uses prefix match (tests 7,8,9,15,16 pass)",
+  "closed_at": "2026-05-03T00:33:55Z",
+  "compaction_level": 0,
+  "content_hash": "079ab1aa582405bedbf195a99a4b0ce4fc61cf950ac3c9f69b13bf75243307a3",
+  "created_at": "2026-05-03T00:10:32Z",
+  "created_by": "Mark Atwood",
+  "description": "dn_within_subtree (line 883) checks that the constraint DN is a PREFIX of the subject DN by zipping the two RDN sequences. The zip silently truncates to the shorter \u2014 but if the constraint has MORE RDNs than the subject, the len check on line 889 catches it. The logic itself appears correct for the 'permitted' direction. However the tests show DN excluded subtree checks (PKITS 4.13.7\u20139, 4.13.15\u201316) all return Ok when they should return NameConstraintViolation. The root cause: check_name_constraints calls check_names(nc_excluded.as_slice(), false) which checks the SUBJECT DN. The subject DN of the EE cert in PKITS 4.13.7 is C=US, O=Test Certificates, CN=Invalid DN name Constraints Test7, which does NOT match the constraint OU=excludedSubtree1 because the constraint is not a prefix of the subject. But the actual test oracle says it SHOULD fail \u2014 meaning the excluded constraint OU=excludedSubtree1 applies as a subtree that the subject IS inside (reversed: subject contains constraint), not that the constraint is a prefix of the subject. This is a fundamental inversion of the subtree direction for excluded checks. Filed as correctness since 8 PKITS 'invalid' tests pass when they should reject.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DN excluded subtrees not checked: dn_within_subtree has prefix-match bug",
+  "updated_at": "2026-05-03T00:33:55Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:10:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

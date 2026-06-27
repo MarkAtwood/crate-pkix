@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:35Z",
+  "compaction_level": 0,
+  "content_hash": "0cefdc256d3b3d4fc3044ec35b46a0eded984472ef9c6afd6e46a8e6838d90f6",
+  "created_at": "2026-05-06T20:47:44Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: LintResult (pkix-lint/src/lib.rs:201) and Severity (line 121) are public enums with no #[non_exhaustive] attribute. Any downstream crate that pattern-matches exhaustively on these enums will break when a new variant is added (e.g., a future 'Timeout' or 'Skipped' LintResult variant, or a new Severity tier). Since pkix-lint is explicitly designed to be extended, these enums will grow. MSRV is 1.73 so #[non_exhaustive] is available. Fix: add #[non_exhaustive] to LintResult, Severity, Scope, and SubjectKind. Note: SubjectKind is used in internal matching (SubjectKind::matches) with a match arm on 'other' that catches everything, so adding non_exhaustive there is safe internally. The risk is to external code that pattern-matches these enums.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: LintResult not #[non_exhaustive]",
+  "updated_at": "2026-05-06T20:58:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:47:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

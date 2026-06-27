@@ -1,0 +1,31 @@
+{
+  "close_reason": "validate_path fully implemented with 22 tests; all sub-issues closed",
+  "closed_at": "2026-05-02T07:15:33Z",
+  "compaction_level": 0,
+  "content_hash": "b6524e4c32aaa073095b24ea0567dc561cd7c6757a7b42e7ad5b724f4ceaa6a8",
+  "created_at": "2026-05-02T05:49:33Z",
+  "created_by": "Mark Atwood",
+  "description": "Implement pkix_path::validate_path \u2014 the RFC 5280 \u00a76.1 Basic Path Validation algorithm. This is the largest and most critical piece of the project.\n\nBLOCKED BY: Epic PKIX-cfh (API shape fixes must land first).\n\nThe \u00a76.1 algorithm walks the chain leaf-to-root, maintains a state machine with variables defined in \u00a76.1.2 (valid_policy_tree, explicit_policy, inhibit_anyPolicy, etc.), and performs the following checks at each step:\n\nPer-certificate checks (\u00a76.1.3):\n- Verify certificate signature using issuer's SPKI (calls SignatureVerifier)\n- Verify current time is within notBefore..notAfter\n- Check issuer field of cert[i] matches subject of cert[i+1] (DN comparison per RFC 4518, NOT byte equality)\n- Check BasicConstraints cA=TRUE on every certificate except the leaf\n- Enforce pathLenConstraint\n- Check KeyUsage keyCertSign on intermediates when present\n- Reject any critical extension not in the known-handled set\n\nTrust anchor termination:\n- Match last chain cert's issuer DN to one of the provided TrustAnchors\n- Return ValidatedPath { anchor_index, depth }\n\nSub-issues to create:\n1. Name comparison (RFC 4518 DN string prep)\n2. Validity period checker\n3. BasicConstraints extraction (cA flag, pathLenConstraint)\n4. KeyUsage extraction (keyCertSign bit)\n5. Critical extension guard (known OIDs vs unhandled)\n6. Trust anchor matching\n7. \u00a76.1 main state machine (wires 1-6 together, implements validate_path)\n\nAcceptance: PKITS \u00a74.1 happy-path tests pass. Clippy clean.",
+  "ephemeral": 0,
+  "id": "PKIX-lwr",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: pkix-path RFC 5280 \u00a76.1 core validator",
+  "updated_at": "2026-05-02T07:15:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:50:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-cfh",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

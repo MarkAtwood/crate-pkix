@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "52a9774789d8c4ecf2fd070a4520f025bea08ff00fc5df58cfad8fa4001931c1",
+  "created_at": "2026-05-14T18:08:06Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:140 declares:\n\n    pub const AIA_MAX_DEPTH: usize = 5;\n\nBeing `pub const`, this is part of the API surface in two ways:\n\n1. **Value-level dependency.** A caller can write `[u8; pkix_chain::AIA_MAX_DEPTH]`, `static SCRATCH: [u8; AIA_MAX_DEPTH] = [...]`, or branch on `if depth == AIA_MAX_DEPTH`. The literal value `5` is locked in: a maintainer who later decides 5 is wrong (e.g. raises to 8 to cover an exotic enterprise PKI, or lowers to 3 because real-world cross-signed roots never need more than 3) cannot change it without a SemVer-breaking change of the constant value. `pub const`s are exempt from `#[non_exhaustive]`-style soft compatibility \u2014 any change to the value can break a caller's `const`-context use.\n\n2. **Visibility-level dependency.** Callers can pattern-match on `Error::AiaDepthExceeded` and reference `AIA_MAX_DEPTH` in user-facing diagnostics (\"AIA fetching gave up after {AIA_MAX_DEPTH} hops\"). That binds pkix-chain to expose this internal tuning parameter as a stable identifier.\n\nWHY IT MATTERS FOR THE CALLER: a caller building a defensive log line (\"AIA depth limit ({AIA_MAX_DEPTH}) reached, dropping connection\") gets a different log message on every pkix-chain minor bump that touches the value. There is no `#[deprecated]` story for the value of a `pub const` \u2014 only for the name.\n\nOPTIONS (any one resolves the lock-in):\n\n(a) Make it `pub(crate) const AIA_MAX_DEPTH: usize = 5;` and have `Error::AiaDepthExceeded`'s Display impl print the depth value at runtime (it already does \u2014 line 257). External callers neither need nor benefit from referencing the constant by name; the error variant alone is sufficient signal.\n\n(b) Replace with `pub fn aia_max_depth() -> usize { 5 }`. Function returns are not const-context callable, so the literal-baking-in hazard is gone; future tunings are non-breaking.\n\n(c) Keep `pub` but bind it explicitly to the variant: `Error::AiaDepthExceeded(usize)` carrying the depth at which it triggered. The const becomes informational, not normative.\n\nThe current rustdoc (lines 127-140) frames AIA_MAX_DEPTH as a tunable-but-fixed default. The framing argues for (b) or (c). PKIX-sqek.16 separately defends the cap's existence against future contributors who would make it configurable; this finding is about WHO can see the value, not whether the cap exists. The two are orthogonal.\n\nThis is a 0.x architectural-completeness call: per AGENTS.md's \"Project phase and decision framing,\" picking the right shape now is free; picking it after 1.0 ships requires a major bump.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.18",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "AIA_MAX_DEPTH is a pub const at value 5; callers can depend on the literal value forever",
+  "updated_at": "2026-05-14T18:08:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:08:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

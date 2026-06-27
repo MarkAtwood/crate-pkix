@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Hoisted the Digest trait import to the top of hash_certid_input. sha1 and sha2 both re-export digest::Digest; one import is sufficient (verified by clippy unused_imports). Comment added explaining the re-export.",
+  "closed_at": "2026-05-07T23:26:51Z",
+  "compaction_level": 0,
+  "content_hash": "8b0dacb02b9368617eeb42b01ee692117dfe6871ab2191aeb861210e13018614",
+  "created_at": "2026-05-07T23:04:35Z",
+  "created_by": "Mark Atwood",
+  "description": "## Location\npkix-revocation/src/ocsp.rs:429-449 \u2014 fn hash_certid_input.\n\n## Finding\n```\nfn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<HashOutput> {\n    match *oid {\n        OID_SHA1 => {\n            use sha1::Digest as _;\n            Ok(HashOutput::Sha1(sha1::Sha1::digest(data).into()))\n        }\n        OID_SHA256 => {\n            use sha2::Digest as _;\n            Ok(HashOutput::Sha256(sha2::Sha256::digest(data).into()))\n        }\n        OID_SHA384 => {\n            use sha2::Digest as _;\n            Ok(HashOutput::Sha384(sha2::Sha384::digest(data).into()))\n        }\n        OID_SHA512 => {\n            use sha2::Digest as _;\n            Ok(HashOutput::Sha512(sha2::Sha512::digest(data).into()))\n        }\n        _ => Err(Error::OcspMalformed),\n    }\n}\n```\n\nThe Digest trait is a single trait imported from two crates. The use statements are duplicated across all four arms. Idiomatic Rust would hoist the imports to the top of the function:\n\n```\nfn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<HashOutput> {\n    use sha1::Digest as _;\n    use sha2::Digest as _;\n    match *oid {\n        OID_SHA1 => Ok(HashOutput::Sha1(sha1::Sha1::digest(data).into())),\n        OID_SHA256 => Ok(HashOutput::Sha256(sha2::Sha256::digest(data).into())),\n        OID_SHA384 => Ok(HashOutput::Sha384(sha2::Sha384::digest(data).into())),\n        OID_SHA512 => Ok(HashOutput::Sha512(sha2::Sha512::digest(data).into())),\n        _ => Err(Error::OcspMalformed),\n    }\n}\n```\n\n## Severity\nP4 (opinion / cosmetic). This is purely stylistic \u2014 the per-arm imports work correctly because they bring the trait into scope just for that arm and the trait is used as '_' (anonymous). No correctness or perf difference.\n\n## Possible justification for current form\nA reader could argue per-arm imports make it clearer which sha* crate provides which Digest implementation. Counter-argument: 'use sha1::Digest as _' / 'use sha2::Digest as _' are imports of a *trait*, not an impl, so they are pure namespace decoration anyway.\n\n## Recommendation\nHoist for readability. Low priority \u2014 the match body remains readable either way.",
+  "ephemeral": 0,
+  "id": "PKIX-xarw",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: hash_certid_input repeats 'use sha1::Digest as _' / 'use sha2::Digest as _' in each match arm",
+  "updated_at": "2026-05-07T23:26:51Z"
+}

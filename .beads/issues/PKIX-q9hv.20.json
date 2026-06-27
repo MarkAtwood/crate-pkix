@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "b7d8d1f272783c82d13bd021656ebf8bbde9424cf73eb286cea70d7c96e41d3c",
+  "created_at": "2026-05-14T14:50:03Z",
+  "created_by": "Mark Atwood",
+  "description": "src/lib.rs:109-120 re-exports four upstream crates using the\n`pub use foo::{self, Items...}` form, which makes the full upstream\nmodule reachable as `pkix_chain::foo`:\n\n    pub use pkix_aia::{self, AiaError, AiaFetcher, NoAiaFetcher};\n    pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};\n    pub use pkix_path::{\n        self, DefaultVerifier, Profile, SignatureVerifier,\n        TrustAnchor, ValidatedPath, ValidationPolicy,\n    };\n    pub use pkix_revocation::{self, NoRevocation, RevocationChecker};\n\nThe `self` half (not just the listed items) means *every public item*\nof pkix_aia / pkix_identity / pkix_path / pkix_revocation is reachable\nas `pkix_chain::pkix_aia::*`, etc. README.md:204-218 documents this as\na feature (\\\"This crate re-exports the full public API of both\ncomponent crates\\\").\n\nImplications the README does not mention:\n\n1. Any breaking change in any of the four upstream crates is also a\n   breaking change in pkix-chain \u2014 even if pkix-chain doesn't use the\n   changed item itself. A new variant on `pkix_path::Error` is\n   non-breaking *for pkix-path* (it's non_exhaustive), but if a caller\n   was matching on `pkix_chain::pkix_path::Error::SpecificVariant`,\n   they receive the same exposure.\n\n2. pkix-chain cannot swap an upstream crate for an equivalent in the\n   future (e.g., a hypothetical `pkix_path_2`) while preserving the\n   `pkix_chain::pkix_path` path. That's a forever-name commitment.\n\n3. Cargo.toml:4 already acknowledges this: \\\"transitively breaking:\n   pkix-path 0.3 ValidatedPath re-export\\\". The lock-step major bump\n   is the maintenance cost; it's working today because the workspace\n   coordinates it. Post-1.0, with external consumers, the cost is\n   borne by every downstream Cargo.lock.\n\nTwo reasonable directions:\n\na) Keep the `{self, ...}` form, but document the version-coupling cost\n   explicitly in the crate-level rustdoc and README so callers can opt\n   into the model with eyes open. Add a sentence like: \\\"This is a\n   deliberate version-coupling commitment: pkix-chain's major version\n   is bumped in lockstep with any of its upstream crates' major\n   versions.\\\"\n\nb) Drop the `self` half of each re-export, keeping only the named\n   items. Callers who want the rest add the upstream crate themselves.\n   Reduces the API surface from \\\"everything in 4 crates\\\" to \\\"~15\n   named items\\\". Loses the convenience but unlocks future independent\n   versioning.\n\n(a) is cheaper and aligns with what's already shipped; the issue is\nthe silent commitment, not the contents.\n\nCaller impact: indirect \u2014 manifests as forced lockstep version bumps\npost-1.0. Worth documenting now while the contract is still 0.x.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pub use pkix_*::{self, ...} locks the major version of every upstream crate",
+  "updated_at": "2026-05-14T14:50:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:50:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

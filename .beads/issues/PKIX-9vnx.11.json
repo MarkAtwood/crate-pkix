@@ -1,0 +1,39 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T18:26:17Z",
+  "compaction_level": 0,
+  "content_hash": "318330b39f53cc8c17626377b00268b8d1886c4546a0d709b37787ee7fefcb48",
+  "created_at": "2026-05-11T17:28:17Z",
+  "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+  "description": "## Why\n\nThe current `DeviationScope` is a closed enum with four variants (`Any`, `IssuerDnContains`, `IssuerDnExact`, `SerialRange`). PKIX-9vnx (Arch 2 / PKIX-ztmr stance) and the PKIX-9vnx.5 notes call for scope axes to live in an open-ended props bag rather than as enum variants, so new scope axes (e.g., PKIX-8mzp's `SubjectDnContains`, `PolicyOid`) can be added without growing the public enum surface.\n\nThe OSCAL Subject representation already supports this \u2014 an arbitrary `type` discriminator plus a typed-prop bag. The work here is to mirror that on the Rust side.\n\n## What\n\nReplace `pub enum DeviationScope { ... }` with a struct holding a typed-prop bag:\n\n```rust\npub struct DeviationScope {\n    /// Subject type discriminator, e.g. \"pkix-lint.scope.issuer-dn-exact\".\n    pub kind: String,\n    /// Typed props (name \u2192 value).\n    pub props: Vec<(String, ScopePropValue)>,\n}\n\npub enum ScopePropValue {\n    Text(String),\n    Bytes(Vec<u8>),\n    // \u2026 future numeric / range / OID variants as needed\n}\n```\n\n(Exact shape is open \u2014 `HashMap<String, String>` is also a candidate per the .5 notes. The `Vec<(String, _)>` form preserves insertion order, which matters for deterministic emit.)\n\nMigrate the four current variants to canonical-kind constants:\n- `\"pkix-lint.scope.any\"`\n- `\"pkix-lint.scope.issuer-dn-contains\"` with prop `pkix-lint.issuer-dn-substring`\n- `\"pkix-lint.scope.issuer-dn-exact\"` with prop `pkix-lint.issuer-dn-der` (DER bytes)\n- `\"pkix-lint.scope.serial-range\"` with props `pkix-lint.issuer-dn-der`, `pkix-lint.serial-start`, `pkix-lint.serial-end`\n\nProvide ergonomic constructors so today's call-sites stay readable:\n\n```rust\nimpl DeviationScope {\n    pub fn any() -> Self { ... }\n    pub fn issuer_dn_contains(s: impl Into<String>) -> Self { ... }\n    pub fn issuer_dn_exact(name: &Name) -> Result<Self, der::Error> { ... }\n    pub fn serial_range(issuer: &Name, start: Vec<u8>, end: Vec<u8>) -> Result<Self, der::Error> { ... }\n}\n```\n\n`DeviationScope::matches` dispatches on `kind`. Unknown kinds match nothing (fail-closed) and emit a warning via the runner's diagnostics.\n\n## Acceptance\n\n- [ ] `DeviationScope` is a struct (not a closed enum).\n- [ ] Existing call-sites compile after migrating to constructor methods.\n- [ ] PKIX-8mzp's `SubjectDnContains` / `PolicyOid` are expressible via new `kind` strings + props \u2014 no enum variant added.\n- [ ] OSCAL emit and parse (PKIX-9vnx.10) work without any change to their subject-type discriminators.\n- [ ] Existing deviation tests pass after migration.\n- [ ] BREAKING change: bumped pkix-lint version, CHANGELOG entry describing the migration.\n\n## Depends on\n\nPKIX-9vnx.10 (parser must already exist so we can verify round-trip survives the refactor).\n\n## Out of scope\n\n- Specific new scope axes (those are PKIX-8mzp's domain; this bead is the structural prerequisite).\n- DeviationStore persistence changes beyond what's required to keep round-trip working.\n\n## Filed by\n\nPKIX-9vnx.5 closure 2026-05-11 (the .5 notes call for this; deferred from the emit half).",
+  "ephemeral": 0,
+  "id": "PKIX-9vnx.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: refactor DeviationScope from closed enum to open-ended props bag",
+  "updated_at": "2026-05-11T18:26:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T10:28:16Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T10:28:20Z",
+      "created_by": "bd-spin/bd-spin-20260511T170116Z-854030",
+      "depends_on_id": "PKIX-9vnx.10",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

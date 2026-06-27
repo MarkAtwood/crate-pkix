@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Fixed: replaced sig_alg == &SHA1_WITH_RSA || sig_alg == &ECDSA_WITH_SHA1 with matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1)",
+  "closed_at": "2026-05-07T01:57:29Z",
+  "compaction_level": 0,
+  "content_hash": "62fab21978200495f368f7c0927d45db8cc21f8672bf2fcbe476d570dc5b167a",
+  "created_at": "2026-05-07T01:48:24Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:179 \u2014 'if sig_alg == &SHA1_WITH_RSA || sig_alg == &ECDSA_WITH_SHA1' compares a &&ObjectIdentifier against &ObjectIdentifier constants via auto-ref. The idiomatic Rust form is either 'if *sig_alg == SHA1_WITH_RSA || *sig_alg == ECDSA_WITH_SHA1' or 'if matches!(*sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1)'. The &CONST form works but reads as though address comparison is intended; a senior reviewer will flag it.",
+  "ephemeral": 0,
+  "id": "PKIX-d6m.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "R4: cabf_tls_br.rs: compare OID directly, not via &CONST",
+  "updated_at": "2026-05-07T01:57:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T18:48:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-d6m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

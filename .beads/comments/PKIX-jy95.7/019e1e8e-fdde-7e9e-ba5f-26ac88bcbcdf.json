@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T23:39:08Z",
+  "id": "019e1e8e-fdde-7e9e-ba5f-26ac88bcbcdf",
+  "issue_id": "PKIX-jy95.7",
+  "text": "ERROR HANDLING 2026-05-12 (cascade from PKIX-jy95.4): bridge exposes structured BridgeError + PerCertError with rich discrimination; no baked-in degradation policy.\n\nBridgeError variants (Clone + Debug + PartialEq + Eq + Send + Sync + non_exhaustive; serde feature-gated):\n- BinaryNotFound { path }\n- BinaryNotExecutable { path, detail }\n- SubprocessFailed { exit_code, stderr }\n- SubprocessKilled { signal }\n- SubprocessTimeout { elapsed_secs }\n- OutputParseError { detail }\n\nPerCertError variants:\n- MalformedDer { detail }\n- UnsupportedCertType { detail }\n- Other { detail }\n\nrun_on_certs returns: Result<Vec<Result<Vec<(CheckId, Verdict)>, PerCertError>>, BridgeError>. Bridge-level errors fail the whole call; per-cert errors are inline entries.\n\nZlintBridge::new() is fallible (returns Result). BridgeConfig accepts timeout (default 60s; configurable). Version-mismatch is not checked (runtime enumeration; output-format issues surface as OutputParseError).\n\nIMPLEMENTATION DETAILS DEFERRED:\n- Subprocess timeout impl (tokio::time::timeout vs std::process::Command + watchdog thread)\n- Exact PerCertError discrimination (need to see what zlint emits)\n- stderr capture vs streaming (probably full capture for diagnostics)\n- Whether to expose stderr in success-path BridgeOutput for logging"
+}

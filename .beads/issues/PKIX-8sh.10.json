@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T18:37:50Z",
+  "compaction_level": 0,
+  "content_hash": "8ce1e425ebf5168622cee33bc646f1f6b27ace2b7cbe343d492ecb57455d254a",
+  "created_at": "2026-05-02T18:31:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs has_key_cert_sign() and cert_basic_constraints() iterate over extensions with a for loop and an early return. Both could be written with .find().and_then().map() which is idiomatic Rust for Option-chained lookups. The for-loop versions are readable but inconsistent with Rust style \u2014 a contributor will copy the for-return pattern when adding new extension parsers. Rewrite: cert.tbs_certificate.extensions.as_ref()?.iter().find(|e| e.extn_id == OID_KEY_USAGE).and_then(|ext| KeyUsage::from_der(ext.extn_value.as_bytes()).ok()).map(|ku| ku.key_cert_sign()). Same transformation for cert_basic_constraints.",
+  "ephemeral": 0,
+  "id": "PKIX-8sh.10",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "has_key_cert_sign and cert_basic_constraints use for-return instead of iterator chain",
+  "updated_at": "2026-05-02T18:37:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T11:31:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-8sh",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

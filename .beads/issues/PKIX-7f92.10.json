@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Implemented option (a) from the bead: pinned the matching strategy in the issuer_dn_contains constructor rustdoc and added a multi-RDN regression test using the PKITS GoodCACert fixture (CN=Trust Anchor,O=Test Certificates 2011,C=US \u2014 the only multi-RDN issuer in workspace fixtures). The test asserts the rendered DN as an independent oracle and exercises four positive substring patterns plus three negative ones (space-after-comma, C-first reordering, long attribute name). Documentation now explicitly warns against multi-RDN substrings spanning the renderer's comma separator and recommends single-RDN-value patterns; the renderer-version-coupling hazard is documented as a known caveat. Commit landing.",
+  "closed_at": "2026-05-14T17:05:36Z",
+  "compaction_level": 0,
+  "content_hash": "431604ea605609bc53d7a8a817c10572db56d72cfc83bfd5678c17859ad79ff2",
+  "created_at": "2026-05-14T15:44:12Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:608-625 (DeviationScope::matches for SCOPE_KIND_ISSUER_DN_CONTAINS): substring match runs against cert.tbs_certificate.issuer.to_string().to_lowercase(). The .to_string() of a Name is RFC 4514 rendering \u2014 comma-separated, RDN-ordered, attribute-type prefixes included.\n\nFailure mode: an operator writes 'issuer_dn_contains: agency-x ca' expecting to match a cert whose CN is 'Agency-X CA'. RFC 4514 rendering produces something like 'CN=Agency-X CA,O=Department of X,C=US'. The lowercase comparison against 'agency-x ca' works (no commas in the substring), but extending to 'agency-x ca, department' breaks because the actual rendering may use different separator whitespace, attribute order, or escape characters. In particular RFC 4514 mandates RDN reversal \u2014 the operator who writes 'agency-x ca,o=department' expecting CN-first ordering will silently miss certs whose Name encoder reverses RDNs.\n\nWorse: cert.tbs_certificate.issuer.to_string() depends on x509-cert's RFC 4514 implementation. Any change there (escaping rules, ordering, attribute display name) silently changes which certs match without any version bump in pkix-lint.\n\nMaintainer consequence: this is a class of 'why doesn't my deviation match' tickets. The fix is to either (a) document the matching strategy precisely (cert.to_string() RFC 4514 form, lowercase, substring-only) and warn against multi-RDN patterns; or (b) switch the matcher to a per-RDN scan (iterate RDNs, lowercase each attribute value, check substring) which is more predictable but doesn't allow cross-RDN patterns. The current shape is the worst of both \u2014 operators write patterns that look like they should work and silently don't.\n\nPin the strategy. Document it on the constructor. Add a regression test with a multi-RDN issuer showing what does and doesn't match.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationScope::issuer_dn_contains substring matches on Name::to_string output not on RDN values",
+  "updated_at": "2026-05-14T17:05:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:44:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

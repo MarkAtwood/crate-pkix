@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:25:51Z",
+  "compaction_level": 0,
+  "content_hash": "2ddd1b9d518dfd9c59715c2e01f896839e63b178b01d858a189b64ee798cfa34",
+  "created_at": "2026-05-07T16:12:42Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2094-2096 \u2014 CertificatePolicies is decoded via find_cert_ext (fail-open):\n  `let cert_cp: Option<...CertificatePolicies> = find_cert_ext(cert, OID_CERTIFICATE_POLICIES);`\n\nIf CertificatePolicies is structurally present in a cert but its DER value is malformed, find_cert_ext returns None. This is then treated at line 2178-2181 as if the cert has NO certificate policies, which causes policy_tree to be set to None (\u00a76.1.3(e): absence of CertificatePolicies \u2192 tree becomes NULL).\n\nThis means a malformed critical CertificatePolicies would:\n1. Pass the check_critical_extensions (it's in HANDLED_CRITICAL_OIDS)\n2. Be decoded via find_cert_ext as None\n3. Be treated as 'no policies \u2192 tree = None'\n4. If explicit_policy == 0, trigger PolicyViolation\n5. If explicit_policy > 0, silently pass with NULL tree (no valid policies found)\n\nFor case 5: if initial_explicit_policy = false (the default), explicit_policy starts at n_u32+1 >> 0, so the chain may pass even though a critical CertificatePolicies extension was silently ignored.\n\nSuggested fix: use try_find_cert_ext for CertificatePolicies (and probably PolicyMappings, PolicyConstraints). PolicyMappings already uses try_find_cert_ext (line 2316). The inconsistency between CertificatePolicies (fail-open) and PolicyMappings (fail-closed) is itself a finding.\n\nP1 \u2014 malformed critical CertificatePolicies silently treated as absent, bypassing policy tree checks.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.21",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: CertificatePolicies extension decoded fail-open via find_cert_ext",
+  "updated_at": "2026-05-07T16:25:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:12:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

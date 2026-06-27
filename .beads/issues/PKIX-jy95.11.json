@@ -1,0 +1,37 @@
+{
+  "compaction_level": 0,
+  "content_hash": "0adff30c9c4042aedefbea36499c1ffbcf7d8e1dd80446f0b3630f5647ab182c",
+  "created_at": "2026-05-13T16:23:45Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nThin adapter crate wrapping `pkix-pkilint-bridge` (PKIX-jy95.8) findings as workspace `Lint` impls.\n\nAnalogous to `pkix-policy-zlint` (PKIX-jy95.10), but for pkilint (Python, DigiCert, strong on S/MIME BR + ETSI).\n\n## Open sub-decision (granularity)\n\nPKIX-jy95.1 decided **A2: per-check, runtime-enumerated** for zlint. The cascade note explicitly flagged: \"Likely same A2 pattern for PKIX-jy95.8 (pkix-pkilint-bridge) but that's an independent decision (pkilint's lint organization differs).\"\n\npkilint's lint organization is **module-based** (e.g., `cabf_serverauth`, `cabf_smime`, `etsi`). Each module exposes checks. Two reasonable adapter shapes:\n\n- **(a) Per-check (mirror zlint A2):** one `Lint` per pkilint check across all modules. Probably hundreds.\n- **(b) Per-module:** one `Lint` per pkilint module, where the Lint runs all checks in the module and aggregates findings.\n\n(a) keeps parity with `pkix-policy-zlint` and matches the workspace's \"one Lint = one rule\" framing. (b) matches pkilint's natural shape but loses per-check granularity in workspace Finding output.\n\n**Recommend (a) for parity** unless pkilint's per-check API is awkward to enumerate. If pkilint only exposes module-level entry points and not per-check enumeration, that forces (b).\n\nFile this as a sub-decision on PKIX-jy95.11 when implementation starts. Marking the sub-decision with `human` label so it surfaces for a decision before code lands.\n\n## Shape (assuming per-check)\n\n```rust\npub struct PkilintLint {\n    info: PkilintLintInfo,        // from pkix_pkilint_bridge::enumerate_lints()\n    bridge: Arc<PkilintBridge>,\n}\n\nimpl Lint for PkilintLint {\n    fn id(&self) -> &str { self.info.check_id }\n    fn citation(&self) -> &str { /* from info */ }\n    fn check(&self, cert: &Certificate, ctx: &LintContext) -> LintResult {\n        // call bridge.run_on_cert(cert) \u2014 cached per cert\n        // look up self.info.check_id in returned per-check verdicts\n    }\n}\n\npub fn all_lints(bridge: Arc<PkilintBridge>) -> Vec<Box<dyn Lint>> { /* ... */ }\n```\n\n## Acceptance\n\n- [ ] `pkix-policy-pkilint` crate added to workspace\n- [ ] Granularity sub-decision recorded (per-check vs per-module)\n- [ ] Round-trip test against pkilint's own testdata (cite pkilint upstream)\n- [ ] CHANGELOG entry\n- [ ] AGENTS.md updated to mention `pkix-policy-pkilint` ships\n\n## Out of scope\n\n- Bridge crate implementation (PKIX-jy95.8)\n- Migrating workspace S/MIME or ETSI lints to defer to pkilint (those don't exist in workspace today; pkix-lint-cabf is the small reference set)\n\n## Blocks on\n\n- PKIX-jy95.8 \u2014 pkix-pkilint-bridge ships first\n- (a)/(b) granularity sub-decision (file as PKIX-jy95.11.1 when work begins)\n\n## Cross-references\n\n- PKIX-jy95 (parent, closed after .10/.11 filed)\n- PKIX-jy95.1 (zlint granularity = A2 per-check; pkilint granularity is independent)\n- PKIX-jy95.6 (two-layer adapter pattern)\n- AGENTS.md non-negotiable #5\n",
+  "ephemeral": 0,
+  "id": "PKIX-jy95.11",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 do-beads loop escalation] Two gating concerns:\n\n(a) Bridge crate gap: PKIX-jy95.11 description says 'Blocks on PKIX-jy95.8 \u2014 pkix-pkilint-bridge ships first.' PKIX-jy95.8 is currently in 'blocked' status, and the pkix-pkilint-bridge crate does not exist in the workspace yet. Cannot implement the adapter without the bridge.\n\n(b) Human sub-decision: PKIX-jy95.11 description explicitly says 'File this as a sub-decision on PKIX-jy95.11 when implementation starts. Marking the sub-decision with human label so it surfaces for a decision before code lands.' The decision is per-check (mirror zlint A2, ~hundreds of Lint instances) vs per-module (pkilint's native organization with handful of module-level Lints). Both shapes have trade-offs the bead description spells out.\n\nPKIX-jy95.10 (zlint adapter, shipped 2026-05-13 at 81026ae5) sets a per-check precedent. For parity it's natural to mirror that here; for pkilint-native ergonomics the per-module shape better matches pkilint's API. Need Mark's call before code lands.\n\nLoop moves on. Will surface naturally after (a) PKIX-jy95.8 unblocks AND ships, and (b) granularity sub-decision is recorded.\n[2026-05-13 cleanup] human label dropped \u2014 bead is blocked-on-cascade (PKIX-jy95.8 bridge crate must ship first). The per-check vs per-module granularity decision will be filed as PKIX-jy95.11.1 child bead when implementation work begins after .jy95.8 closes; the question doesn't need an answer right now.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "pkix-policy-pkilint: thin Lint-adapter over pkix-pkilint-bridge findings",
+  "updated_at": "2026-05-13T19:37:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:23:44Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-13T12:37:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jy95.8",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

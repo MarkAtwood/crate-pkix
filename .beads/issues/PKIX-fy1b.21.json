@@ -1,0 +1,31 @@
+{
+  "close_reason": "deferred P4: DeviationRunner allocation pattern is minor; accepting as-is for now",
+  "closed_at": "2026-05-07T05:00:53Z",
+  "compaction_level": 0,
+  "content_hash": "123410ec796d5aa36cb8cf93d3e282d2179281c43413db3490d5bda6af64fa6d",
+  "created_at": "2026-05-07T04:40:59Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs DeviationRunner::run_chain (lines 743-755):\n\n    let mut result = DeviationRunResult::default();\n    for (i, cert) in chain.iter().enumerate() {\n        ...\n        let partial = self.apply_deviations(raw, cert, now_unix);\n        result.findings.extend(partial.findings);\n        result.deviated.extend(partial.deviated);\n    }\n\napply_deviations returns a fresh DeviationRunResult on each iteration, which is then immediately extended into the outer result. This means:\n1. Two Vec allocations per iteration (partial.findings, partial.deviated).\n2. Two extend calls per iteration, copying elements.\n\nA better pattern: have apply_deviations accept &mut DeviationRunResult and push directly into the caller's Vecs, eliminating the intermediate allocation entirely.\n\nAlternatively, pre-size with_capacity based on chain.len() * runner.lints().len().\n\nCategory: R5 (unnecessary intermediate Vec allocation in hot path)",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.21",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "rusty: DeviationRunner::run_chain calls apply_deviations in loop \u2014 two Vec extends per cert",
+  "updated_at": "2026-05-07T05:00:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:40:58Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

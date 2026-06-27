@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T20:46:50Z",
+  "compaction_level": 0,
+  "content_hash": "42a280d82b7c630bf11b9b159b15c743dba8c6d34e080b5069db841cef3cd1c9",
+  "created_at": "2026-05-07T20:13:09Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-lint/src/cabf_tls_br.rs:217-267\\`. Lint \\`cabf.br.tls.rsa.min_key_size\\`:\n- Doc title (L195): \\\"RSA certificates ... must have a modulus of at least 2048 bits.\\\"\n- Citation: CA/B Forum TLS BR \u00a76.1.5.\n- Implementation: checks DER INTEGER byte length \\`>= 256\\`. The doc explains that a 2047-bit modulus also encodes as 256 bytes (no leading 0x00 because high bit of first byte is 0).\n- \\\"This matches zlint's floor-byte comparison behavior: 2047-bit keys with 256 bytes pass this check.\\\"\n\n## Why P2\n- CA/B Forum BR \u00a76.1.5 says \\\"at least 2048 bits.\\\" 2047 \u2260 2048; accepting 2047-bit keys is non-conformant.\n- zlint behavior is not the spec oracle. AGENTS.md test-integrity rule says external oracles must be the spec or independent reference implementations, not implementations under audit.\n- The lint doc title and citation imply spec-conformance but the check is intentionally relaxed below spec.\n\n## Fix\nTwo coherent options:\n1. Tighten the check to actually require 2048 bits: count high-bit position of the modulus first byte and require \\`bit_len >= 2048\\`. The pkix-path \\`rsa_public_key_bits\\` helper already does this byte_len * 8 calculation; reuse that pattern.\n2. Document the leniency as a deliberate lint relaxation (and rename the lint id, e.g., \\`cabf.br.tls.rsa.min_key_size_lenient\\`) so callers wanting strict conformance can layer a separate lint on top.\n\nOption 1 is closer to the citation. Option 2 preserves zlint compatibility.\n\n## Scope reference\n\\`pkix-lint/src/cabf_tls_br.rs:195-267\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-h45u",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: RsaMinKeySizeLint accepts 2047-bit RSA keys despite \"2048-bit minimum\" claim",
+  "updated_at": "2026-05-07T20:46:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:21Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

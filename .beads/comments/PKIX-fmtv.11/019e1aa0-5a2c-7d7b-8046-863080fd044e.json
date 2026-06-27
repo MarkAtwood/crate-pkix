@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "created_at": "2026-05-12T05:19:37Z",
+  "id": "019e1aa0-5a2c-7d7b-8046-863080fd044e",
+  "issue_id": "PKIX-fmtv.11",
+  "text": "Decomposed 2026-05-11 during do-beads loop (symmetric with PKIX-fmtv.12 decomposition): original bead covered both halves (pkix-identity verify_dns_name body + pkix-chain TLS wrappers) but the pkix-chain wrapper half is blocked on PKIX-fmtv.7 (human-labeled, wrapper-set decision). Split into PKIX-fmtv.11.1 (autonomous: pkix-identity verify_dns_name + ServerName constructors body) and PKIX-fmtv.11.2 (blocked on .7 + .11.1: pkix-chain TLS wrappers). This bead is now an umbrella; close once both children close. Rationale: keeps the autonomous queue moving without holding .11 in claimed state waiting on a human decision."
+}

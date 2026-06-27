@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:26:16Z",
+  "compaction_level": 0,
+  "content_hash": "6ad509cfe85a996ae60af13866c6ef9ef48bcca5b4ac31436dec90895c1dd1f1",
+  "created_at": "2026-05-06T15:11:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-profiles/src/lib.rs: smime_policy() and code_signing_policy() do not set max_path_len. Only web_pki_policy() sets it to 2 (TLS BR \u00a77.1.1). The CA/B Forum S/MIME BR \u00a77.2.2 specifies max path length for S/MIME certificate hierarchies. The Code Signing BR also has path length constraints. Both functions leave max_path_len at the ValidationPolicy default of 10, which is too permissive for these profiles. This means a malicious intermediate chain of up to 10 CAs would pass smime_policy / code_signing_policy validation, where the actual BR documents restrict this to 1-2 intermediates. Reference: S/MIME BR \u00a77.2.2 (Root CA signs Subordinate CA cert only), Code Signing BR \u00a77.1.1.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "smime_policy and code_signing_policy missing max_path_len",
+  "updated_at": "2026-05-06T15:26:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:11:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

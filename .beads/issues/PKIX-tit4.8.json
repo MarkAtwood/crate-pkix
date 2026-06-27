@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done. Refresh-procedure comment added above the *_BUNDLE_CERT_COUNT constants in tests/fixtures.rs warning maintainers to source the count from grep, not from the failed test output.",
+  "closed_at": "2026-05-14T08:18:03Z",
+  "compaction_level": 0,
+  "content_hash": "920fdfc1d8ad63a5d2fb476a53bcd15bf73885ed67c7f9f13752bde7110d38fa",
+  "created_at": "2026-05-14T04:59:45Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/fixtures.rs:54-70 documents DEBIAN_BUNDLE_CERT_COUNT, ALPINE_BUNDLE_CERT_COUNT, FEDORA_BUNDLE_CERT_COUNT as the result of `grep -c \"-----BEGIN CERTIFICATE-----\"` at fixture-creation time.\n\nThe `count_begin_boundaries` helper at line 75 re-derives the count from the bytes-on-disk and the test asserts it equals the constant \u2014 but if a future maintainer refreshes the fixture and lets the test \"tell\" them the new count, they update the constant from the FAILED ASSERTION, not from an external grep. At that point the constant is no longer an independent oracle: it is whatever the in-process windows() scan produces.\n\nThe windows() scan in count_begin_boundaries IS the same algorithm pkix-truststore uses in its empty-input guard. It is not pkix-truststore the loader, but it is the same logic. So in the failure case (\"fixture refresh, just update the constant\") the oracle and the system-under-test share a logic chunk.\n\nWhat would make it clear: a one-line comment at each constant: \"TO REFRESH: run `grep -c \\\"-----BEGIN CERTIFICATE-----\\\" tests/fixtures/<file>` on a known-good system; do not copy the number from the test failure output.\"\n\nLow priority \u2014 this is a process-discipline concern, not a code defect. Filed so the test-discipline rule about external oracles stays explicit for future fixture refreshes.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.8",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Test fixture count constants are not independent oracles unless externally re-verified on refresh",
+  "updated_at": "2026-05-14T08:18:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T21:59:45Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

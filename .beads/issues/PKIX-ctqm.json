@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:49:10Z",
+  "compaction_level": 0,
+  "content_hash": "0908bba50e5db5adb9a6ae44eb9f9e4cced4463d12fcb04d40ec222e55550be0",
+  "created_at": "2026-05-07T20:15:07Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`README.md:25\\` crate-map row:\n> \\`pkix-revocation\\` | CRL and OCSP revocation checking (offline) | core only | v0.2\n\nA reader sees \\`core only \u2713\\` and may interpret this as \\\"the entire crate is no_std with default features.\\\" That is not quite right. The real situation:\n\n- The crate's *core* (\\`NoRevocation\\`, the \\`RevocationChecker\\` trait, \\`Error\\` enum) is no_std.\n- The \\`crl\\` feature requires \\`std\\` (Cargo.toml:20: \\`crl = [\\\"std\\\"]\\`).\n- The \\`ocsp\\` feature requires \\`std\\` and pulls in \\`x509-ocsp\\`, \\`sha1\\`, \\`sha2\\`.\n- The \\`std\\` impl of \\`std::error::Error\\` is gated.\n\n## Why P4\n- \\`pkix-revocation\\` README explains this clearly (line 17\u201319).\n- The workspace README compresses to \\`core only \u2713\\` which is technically accurate but ambiguous.\n\n## Fix\nChange the workspace README crate-map cell to: \\`core; CRL/OCSP need std\\` or \\`partial (NoRevocation only)\\`.\n\n## Scope reference\n\\`README.md:25\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-ctqm",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: workspace README claim \"core only \u2713\" for pkix-revocation no_std should clarify what \"core only\" means",
+  "updated_at": "2026-05-07T21:49:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:31Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

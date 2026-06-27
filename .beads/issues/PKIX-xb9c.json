@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:24:43Z",
+  "compaction_level": 0,
+  "content_hash": "a0d7491364957f5d0bd504afec4646233ab458945db262e8fcd378cc2da306fc",
+  "created_at": "2026-05-07T15:19:37Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs:50 starts a new bullet '- SingleResponse matching uses both serial number...' that is textually outside the Limitations section above it but inside the struct docblock. The Limitations section ends at line 49, and lines 50-66 add post-limitation bullet points directly in the struct doc without a section header. This makes the struct docstring structurally ambiguous (are those bullets sub-bullets of the last Limitation or standalone notes?). Add a '# Notes' or '# Behavior' section header before line 50 to clarify the structure.",
+  "ephemeral": 0,
+  "id": "PKIX-xb9c",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: OcspChecker doc block has misplaced bullet point",
+  "updated_at": "2026-05-07T15:24:43Z"
+}

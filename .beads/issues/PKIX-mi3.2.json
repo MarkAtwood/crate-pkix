@@ -1,0 +1,39 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T15:25:18Z",
+  "compaction_level": 0,
+  "content_hash": "1f5465019c323c3a8e592b824f2f47ceb2ba8422c2b9de72784c2fc85a78d3cc",
+  "created_at": "2026-05-05T14:33:33Z",
+  "created_by": "Mark Atwood",
+  "description": "Add private PolicyNode struct (depth, valid_policy, qualifier_set, expected_policy_set). Add helpers: init_policy_tree(), prune_childless_nodes(tree, depth), nodes_at_depth(tree, d). Use Vec<PolicyNode> as the tree representation for no_std compatibility.",
+  "ephemeral": 0,
+  "id": "PKIX-mi3.2",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Implement PolicyNode type and policy tree helpers",
+  "updated_at": "2026-05-05T15:25:18Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:33:33Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-05T07:33:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-mi3.1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

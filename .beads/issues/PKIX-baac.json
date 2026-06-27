@@ -1,0 +1,23 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T19:36:57Z",
+  "compaction_level": 0,
+  "content_hash": "830ddfeec882c7d2fd06625ac2af522df5a16d17a24558b177df5afd728ce221",
+  "created_at": "2026-05-08T19:00:29Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\n`pkix-ct` is at version 0.0.0 \u2014 pure skeleton. `verify_scts()` returns `Err(Error::NoTrustedSct)` unconditionally regardless of input. RFC 6962 (CTv1) and RFC 9162 (CTv2) Merkle/SCT logic is entirely unimplemented.\n\nReal-world need: TLS certs in modern browser contexts (Chrome, Safari) require Certificate Transparency proof. Without this crate working, downstream consumers using pkix-path/pkix-chain for TLS-style validation cannot verify SCT inclusion proofs.\n\n## What\n\nBuild out the pkix-ct crate:\n\n1. **SCT parsing** \u2014 parse `SignedCertificateTimestampList` from the cert extension (`1.3.6.1.4.1.11129.2.4.2`) and from OCSP responses (`1.3.6.1.4.1.11129.2.4.5`) and TLS extensions. RFC 6962 \u00a73.3 binary format.\n2. **Log list management** \u2014 type for ingesting Google's CT log list JSON or equivalent. Pluggable so consumers can supply their own (Apple, browser-specific lists).\n3. **SCT signature verification** \u2014 the SCT is signed by the log's key with ECDSA-SHA256 typically. Reuse pkix-path's `SignatureVerifier` trait.\n4. **Merkle inclusion proof verification** (RFC 6962 \u00a72.1.1) \u2014 for online verification when the proof is fetched from the log. Optional; static SCT-only verification is also useful.\n5. **CTv2 (RFC 9162) shape** \u2014 design for compatibility but implement v1 first (the only deployed protocol today).\n6. **Pre-cert SCT vs final-cert SCT** \u2014 pre-certs have a `poison` extension (`1.3.6.1.4.1.11129.2.4.3`) and SCT signed over the TBSCertificate-with-poison. RFC 6962 \u00a73.1.\n\n## Recommended decomposition (file children when work starts)\n\n1. **SCT binary-format parser** \u2014 reusable across cert/OCSP/TLS sources.\n2. **CT log list type and Google-format JSON loader.**\n3. **SCT signature verification** (one log, one SCT, no Merkle).\n4. **Pre-cert detection + poison-stripping for SCT verification.**\n5. **Merkle inclusion proof verification** (online).\n6. **TLS-ext / OCSP-ext SCT extraction shims** \u2014 narrow scopes.\n\n## Acceptance\n\n- [ ] `verify_scts()` accepts a cert + log list + (optional) inclusion proofs and returns the count of valid SCTs by trusted log.\n- [ ] Test corpus includes real-world certs with embedded SCTs (e.g. badssl.com or any current TLS cert) \u2014 independent oracle: Chromium's CT enforcement decisions, or pyca/cryptography's own SCT verifier (it has one).\n- [ ] Pre-cert handling tested: a pre-cert SCT validates correctly against the issued cert when the poison extension is properly stripped.\n- [ ] no_std preserved.\n- [ ] Crate published with proper publication metadata.\n\n## Out of scope\n\n- Building a CT monitor / log auditor. This is consumer-side SCT verification only.\n- DNS-based SCT delivery (RFC 7633-ish).\n- SCT submission to logs.\n- Static log list shipped in-tree (consumer supplies it).\n\n## Effort\n\n~600 lines + tests. 2-3 days of focused work spread across the children. The Merkle proof verification is the trickiest part.\n\n## Filed as\n\nLow-impact gap per audit (specifically because pkix-ct is currently 0.0.0 stub and not blocking other work). Becomes high-impact for any consumer doing TLS-style validation on modern certs.\n",
+  "ephemeral": 0,
+  "id": "PKIX-baac",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "do-beads loop 2026-05-11 (post PKIX-baac.8 close):\n\nUmbrella acceptance criteria status:\n- verify_scts() helper landed in PKIX-baac.7 \u2713\n- Pre-cert SCT validation via PKIX-baac.4 \u2713\n- Real-world certs with embedded SCTs: PKIX-baac.7's tests/verify_precert.rs::embedded plus PKIX-baac.8's tests/live_log.rs \u2713\n- no_std preserved \u2713\n- Crate published \u2014 version still 0.0.0; this is a maintainer decision (release timing)\n\nOutstanding open work:\n- PKIX-yzb6 (filed by PKIX-baac.8 work) \u2014 public MerkleTreeLeaf builder helper. P4 ergonomics nit, not blocking the bead's original goals.\n\nRecommendation: maintainer ratifies release decision separately (cargo publish + version bump), then closes this umbrella. Autonomous loop won't take that step.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: real RFC 6962 / RFC 9162 SCT verification",
+  "updated_at": "2026-05-11T19:36:57Z"
+}

@@ -1,0 +1,31 @@
+{
+  "close_reason": "from_cert now has explicit fail-open/fail-closed rustdoc",
+  "closed_at": "2026-05-03T13:26:20Z",
+  "compaction_level": 0,
+  "content_hash": "ca5255fa8abce5694be71c57c252c6281f1581d96f549b98973ad6a00abb4e8e",
+  "created_at": "2026-05-03T13:15:23Z",
+  "created_by": "Mark Atwood",
+  "description": "TrustAnchor::from_cert silently treats a malformed NameConstraints DER value as absent (name_constraints = None), which is fail-open: an anchor with a corrupt NC extension gets no constraints applied. This behavior is tested in anchor_nc.rs test 5, and mentioned in the field-level doc comment, but from_cert has no function-level doc warning about this. A future contributor refactoring find_cert_ext to propagate errors could accidentally change from_cert to fail-closed, breaking the invariant that from_cert is infallible.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_cert fail-open for malformed NC not documented at function level",
+  "updated_at": "2026-05-03T13:26:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

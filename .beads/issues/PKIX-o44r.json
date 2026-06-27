@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "False alarm: cascade iterates top-down and each depth's retain only removes nodes at depth d, so any_parent reads from the already-updated tree at d-1. Correct behavior.",
+  "closed_at": "2026-05-07T15:22:26Z",
+  "compaction_level": 0,
+  "content_hash": "5ce8c3b3ed4a109a0423c1afd2580e7e7b8cd9d80f2cb1ac7e8de461fe57b8c0",
+  "created_at": "2026-05-07T15:19:16Z",
+  "created_by": "Mark Atwood",
+  "description": "In chain_walk (lib.rs:2596-2648), \u00a76.1.5(g)(iii)(2) cascade-deletion logic iterates d from 2..=leaf_depth, at each step collecting 'reachable' as the union of expected_policy_sets of all parents at depth d-1. However the any_parent variable (line 2640) does not filter to 'living' anyPolicy parents \u2014 it checks any anyPolicy node at parent_depth without verifying that anyPolicy node itself is reachable. In a multi-level tree where an anyPolicy node at depth k was previously deleted but the variable still reads the original slice, an orphaned anyPolicy could shadow the deletion and incorrectly preserve child nodes. This is a correctness risk on deep policy trees with anyPolicy at intermediate levels. The deletion pass does NOT update the slice before the next iteration \u2014 it calls tree.retain() in-place, so subsequent iterations within the same for-loop see the post-retain state. Verify whether the in-place retain makes the cascade correct or whether iteration order is still problematic for deep trees (>2 levels with anyPolicy at non-root depths).",
+  "ephemeral": 0,
+  "id": "PKIX-o44r",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: \u00a76.1.5(g) initial_policy_set intersection misses cascade-prune downward for multi-level trees",
+  "updated_at": "2026-05-07T15:22:26Z"
+}

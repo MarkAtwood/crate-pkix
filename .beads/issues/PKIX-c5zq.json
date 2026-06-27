@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T15:24:43Z",
+  "compaction_level": 0,
+  "content_hash": "1ab8c3f0f278bfff5b9c1be27cd28594ac9afdc3562bc3a18d1e1d22a6e1796d",
+  "created_at": "2026-05-07T15:19:30Z",
+  "created_by": "Mark Atwood",
+  "description": "validate_path_with_profile (lib.rs:874) overwrites policy.current_time_unix with now_unix after calling profile.policy(now_unix), saying 'prevents a buggy Profile from silently using the wrong clock in release builds'. The comment is correct but slightly misleading: a Profile that correctly implements the contract already sets current_time_unix = now_unix inside policy(), so the overwrite is a defense-in-depth measure for incorrect implementations, not a required correctness step. The comment should clarify that this is a belt-and-suspenders guard, not compensation for a known bug \u2014 as currently worded it implies existing Profile impls might be buggy. Minor documentation clarity fix.",
+  "ephemeral": 0,
+  "id": "PKIX-c5zq",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path: validate_path_with_profile overwrites current_time_unix but comment misstates purpose",
+  "updated_at": "2026-05-07T15:24:43Z"
+}

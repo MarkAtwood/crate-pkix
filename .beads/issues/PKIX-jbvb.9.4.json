@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260514T024333Z-3287470",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-14T03:00:29Z",
+  "compaction_level": 0,
+  "content_hash": "3615d14b7aa886d0380cc9e4bfd53a3e5b89601a2150d1a4e5edeb2aca5345f6",
+  "created_at": "2026-05-14T02:40:15Z",
+  "created_by": "Mark Atwood",
+  "description": "## What\n\nMultipurpose-generation sibling to `SmimeSponsorValidated` (Sponsor\nStrict, shipped via PKIX-jbvb.7). Per CA/B Forum S/MIME BR \u00a77.1.6.1:\nMultipurpose certs assert policy OID `2.23.140.1.5.3.2` and permit\nadditional EKU values beyond `emailProtection` (document-signing\ncrossover use cases).\n\nNot blocked \u2014 Sponsor Strict is shipped. Structural template is in\n`pkix-profiles-cabf/src/lib.rs` `SmimeSponsorValidated`.\n\n## API shape\n\n```rust\npub struct SmimeSponsorValidatedMultipurpose;\n\nimpl Profile for SmimeSponsorValidatedMultipurpose {\n    fn id(&self) -> &'static str { \"cabf.smime.sponsor.multipurpose\" }\n    fn version(&self) -> &'static str { \"1.0.14\" }\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        // Baseline same as SmimeSponsorValidated (Strict), with:\n        // - required_leaf_policy_oids: [2.23.140.1.5.3.2]\n        // - EKU permissiveness per \u00a77.1.2.3(f) Multipurpose row\n        // - same DN rule: organizationName \u2227 organizationIdentifier \u2227\n        //   ((givenName \u2227 surname) \u2228 pseudonym) per \u00a77.1.4.2.5 Note 2\n    }\n}\n\npub const fn smime_sponsor_multipurpose_policy(now_unix: u64) -> ValidationPolicy { ... }\n```\n\n## Subject DN rule\n\nPer \u00a77.1.4.2.5 Multipurpose column: identical to Strict (same SHALL\nattrs, same Note 2 covering both Multipurpose and Strict). Reuse the\nexact same `DnAttrRule` construction as `SmimeSponsorValidated`.\n\n## OID constant\n\nAdd `CABF_SMIME_SPONSOR_VALIDATED_MULTIPURPOSE_POLICY` =\n`ObjectIdentifier::new_unwrap(\"2.23.140.1.5.3.2\")`.\n\n## Test fixture\n\nGenerate `smime-sponsor-multipurpose-self-signed-365d.der` and\n`smime-sponsor-multipurpose-pseudonym-self-signed-365d.der` (matching\nthe two-form pattern used for Sponsor Strict). Extension to\n`gen-smime-tier-fixtures.py` \u2014 Sponsor Multipurpose form is identical\nto Sponsor Strict except for the policy OID.\n\n## Acceptance\n\n- Type, alias, OID constant ship.\n- 2 positive fixtures (givenName+surname form, pseudonym form).\n- Negative: Sponsor Strict cert fails this profile by OID mismatch; this\n  profile's cert fails Sponsor Strict by OID mismatch.\n- CHANGELOG + divergences.md updated.\n- Same clippy/fmt/test bars as PKIX-jbvb.9.2.\n\n## Not blocked\n\nSponsor Strict (PKIX-jbvb.7) is shipped. This bead can be claimed by\nthe autonomous loop as soon as the epic priority surfaces it.\n\n## Cross-references\n\n- PKIX-jbvb.9 (epic)\n- PKIX-jbvb.7 (Sponsor Strict \u2014 structural template)\n- specs/cabforum-smime-BR.md \u00a77.1.6.1, \u00a77.1.2.3(f), \u00a77.1.4.2.5\n",
+  "ephemeral": 0,
+  "id": "PKIX-jbvb.9.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles-cabf: SmimeSponsorValidatedMultipurpose profile + fixtures",
+  "updated_at": "2026-05-14T03:00:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T19:40:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-jbvb.9",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

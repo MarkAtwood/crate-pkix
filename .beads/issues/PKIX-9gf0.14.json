@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:31:14Z",
+  "compaction_level": 0,
+  "content_hash": "5b85c5cc15ae3fc00c423fc9b39a469122e1bba258643461e3b4945647faa7b4",
+  "created_at": "2026-05-07T16:11:14Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple/src/lib.rs:143-148 \u2014 ALLOWED_INTERMEDIATE_EXTENSIONS contains only:\n  - OID_EXT_BASIC_CONSTRAINTS\n  - OID_EXT_KEY_USAGE\n  - OID_EXT_SUBJECT_KEY_ID\n  - OID_EXT_AUTHORITY_KEY_ID\n\nThe check_extensions() function (line 435) rejects any extension not in this whitelist with UnexpectedExtension. This means intermediate CA certificates with NameConstraints, CRLDistributionPoints, AuthorityInfoAccess, or PolicyConstraints extensions will be rejected.\n\nIn practice, most CA certs carry at least CRLDistributionPoints and AuthorityInfoAccess. Even 'simple' chains from major public CAs (e.g., Let's Encrypt, DigiCert) include these on intermediate certs. This makes pkix-chain-simple much less useful than advertised.\n\nThe doc says 'chains issued by a CA hierarchy you control or fully trust' \u2014 but even internal CAs often include CDP and AIA.\n\nP2 \u2014 the crate is less useful than documented; operators expecting it to work with typical 'simple' chains from commercial CAs will get unexpected errors. Suggest adding CDP and AIA to ALLOWED_INTERMEDIATE_EXTENSIONS, or at minimum documenting that typical commercial CA intermediates will fail.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.14",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-chain-simple: ALLOWED_INTERMEDIATE_EXTENSIONS blocks certificates with NameConstraints",
+  "updated_at": "2026-05-07T16:31:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:11:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

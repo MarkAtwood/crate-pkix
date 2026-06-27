@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f9a8a9f45db6ef7a438b248b22577a3a8d2bee16f31d3fa1c9d8635386ab345f",
+  "created_at": "2026-05-14T19:14:27Z",
+  "created_by": "Mark Atwood",
+  "description": "san_entry_matches_mailbox at pkix-identity/src/lib.rs:487-492 calls decode_utf8_string_any on the OtherName.value. If decode fails (e.g., the OtherName carries a BMPString or a malformed Utf8StringRef), the function returns false \u2014 the entry is silently skipped.\n\nThe verify_mailbox doc (lib.rs:469) lists MalformedSan as 'the SAN extension is present but cannot be parsed'. Currently MalformedSan is only returned when the outer SubjectAltName SEQUENCE itself fails to decode (find_san line 798). Inner per-entry malformation of an OtherName is treated as 'just doesn't match'.\n\nThe current behavior is defensible (liberal-in-what-you-accept, don't reject a whole match because one OtherName is corrupt). But it's not documented. A contributor reading the code will read decode_utf8_string_any returning Result<_, IdentityError::MalformedSan>, see it discarded as 'Err(_) => false', and wonder if that was intentional.\n\nSuggested rewrite: add a one-line code comment on line 490 saying 'malformed OtherName values are skipped, not propagated \u2014 matching continues across remaining SAN entries' and add a corresponding sentence to the verify_mailbox rustdoc's MalformedSan entry: 'MalformedSan is returned only when the outer SubjectAltName SEQUENCE cannot be decoded; corruption inside an individual OtherName value is treated as non-match.'",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.10",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Malformed otherName(SmtpUTF8Mailbox) value silently no-matches rather than propagating MalformedSan",
+  "updated_at": "2026-05-14T19:14:27Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:14:27Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

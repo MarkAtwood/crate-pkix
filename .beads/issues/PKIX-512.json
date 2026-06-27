@@ -1,0 +1,22 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:31:38Z",
+  "compaction_level": 0,
+  "content_hash": "187fb2dac7bf37ce54fcf02d5f5b70e6ee24d1057d453a61b7c4dcc6207e9b13",
+  "created_at": "2026-05-06T20:16:19Z",
+  "created_by": "Mark Atwood",
+  "description": "Findings from pre-merge correctness review of today's work: pkix-lint, pkix-profiles, pkix-path, pkix-revocation, pkix-path-builder",
+  "ephemeral": 0,
+  "id": "PKIX-512",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "epic",
+  "updated_at": "2026-05-06T20:31:38Z"
+}

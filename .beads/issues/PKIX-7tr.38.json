@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:08:58Z",
+  "compaction_level": 0,
+  "content_hash": "37c75ca78aa60335f88926833bbbd8e1a79c36919b142190997ed2181771e34b",
+  "created_at": "2026-05-02T13:42:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain-simple/src/lib.rs lines 366-368: if cert.signature_algorithm != cert.tbs_certificate.signature, returns Error::AlgorithmNotAllowed{index}. RFC 5280 \u00a74.1.1.2 requires these two fields to be identical; a mismatch is a structural violation, not an algorithm whitelist violation. Using AlgorithmNotAllowed for this case is misleading: the algorithm may be in ALLOWED_SIG_ALGS but the fields simply disagree. A distinct error variant (e.g. Error::AlgorithmMismatch or Error::Path wrapping a structural error) would be more accurate.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.38",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_algorithm misreports inner/outer mismatch as AlgorithmNotAllowed",
+  "updated_at": "2026-05-02T14:08:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:56Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

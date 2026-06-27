@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:22:22Z",
+  "compaction_level": 0,
+  "content_hash": "f88d00c0a97f79063e7ea8971663fdf23f8f719a5753f59a64ec1bb29532783a",
+  "created_at": "2026-05-06T23:19:38Z",
+  "created_by": "Mark Atwood",
+  "description": "RFC 5280 \u00a76.1.5(b) requires explicit_policy = min(explicit_policy, requireExplicitPolicy) for the leaf cert's PolicyConstraints. The current code only handles == 0 case; a leaf cert with requireExplicitPolicy = 1 is silently ignored. Intermediates use the correct min() clamp at lines 2364-2366. Fix: apply explicit_policy = explicit_policy.min(req) in the \u00a76.1.5(b) block. File: pkix-path/src/lib.rs ~lines 2526-2533.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.4",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "path: leaf PolicyConstraints requireExplicitPolicy clamp is incomplete",
+  "updated_at": "2026-05-06T23:22:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:19:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

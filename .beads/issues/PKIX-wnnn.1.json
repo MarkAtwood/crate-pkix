@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "cfc36438c84f1f994e1e9922fdb04d1d4a727be26818608df5afebaf760073d7",
+  "created_at": "2026-05-14T18:28:29Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:21-26 (module-level rustdoc) says build_path uses iterative-deepening DFS and guarantees the shortest valid path. The actual implementation since the PathCandidates rewrite is a single-pass DFS at the configured max_depth (with a depth+1 probe to distinguish NoPathFound from DepthExceeded), and PathCandidates' own rustdoc (lib.rs:489-495) explicitly says \"No iterative deepening ... Shortest-first is no longer guaranteed\". The two docs contradict each other on the same page. Trigger: any caller who reads the crate landing page and relies on the shortest-path guarantee \u2014 they will be surprised by a deeper chain returned first in adversarial pools. Fix: rewrite lines 21-26 to describe the single-pass DFS + depth probe behavior, or delete the # Algorithm section and defer to build_path / PathCandidates rustdoc which already describe it correctly.",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "module-level doc lies: \"iterative-deepening DFS\" + \"shortest valid path\" guarantee no longer true",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:28:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

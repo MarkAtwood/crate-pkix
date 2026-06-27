@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "6cab8983141048332428e641f0e75633f42f7d23c73cbb220584f92187591be1",
+  "created_at": "2026-05-14T14:40:23Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-chain/src/lib.rs:1451-1463: the second and third match arms have IDENTICAL error bodies. `[_]` (single non-timestamping OID) and `_` (empty or multi-OID) produce the same Cow::Borrowed reason string. Collapse to: match eku.0.as_slice() { [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()), _ => Err(ProfileViolation { reason: ... }), }. The two-arm split adds no information.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "enforce_timestamping_eku_critical_and_sole has duplicate match arms",
+  "updated_at": "2026-05-14T14:40:23Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:40:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

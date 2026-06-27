@@ -1,0 +1,23 @@
+{
+  "close_reason": "all steps complete",
+  "closed_at": "2026-05-11T19:44:32Z",
+  "compaction_level": 0,
+  "content_hash": "802a125054c181e614b4853d1d482eb72b15c453f9d6e011e8e3f0592ff2480a",
+  "created_at": "2026-05-11T06:29:50Z",
+  "created_by": "Mark Atwood",
+  "description": "## Scope\n\nRFC 5280 \u00a76.3 (path-level revocation policy) completeness. Items that govern how `pkix-revocation` participates in path validation, distinct from transport (`pkix-revocation-http`, tracked under PKIX-a1yc).\n\n## Children (reparented)\n\n- **PKIX-cqwt** \u2014 path-level CRL signer discovery (RFC 5280 \u00a76.3.3(f)) (was orphan, P2)\n- **PKIX-0x9z** \u2014 cRLSign enforcement policy for path validation (PKITS \u00a74.7.4/.5) (was orphan, P3)\n\n## Goal\n\nAfter this epic closes:\n\n- A CRL signed by an issuer-delegated signer (indirect CRL, indirectCRL=true, or CRL DP signedBy) is resolved correctly during path validation, per \u00a76.3.3(f).\n- `keyUsage.cRLSign` is enforced as a hard error when a cert is used to sign a CRL during path validation, matching PKITS \u00a74.7.4/.5 expected outcomes.\n- These behaviours are covered by PKITS regression tests in the differential harness.\n\n## Out of scope\n\n- Online HTTP fetching of CRLs / OCSP \u2014 already tracked under PKIX-a1yc.\n- OCSP responder cert resolution \u2014 file separately if needed.\n- Delta CRL handling (RFC 5280 \u00a75.2.4) \u2014 file separately if needed.",
+  "ephemeral": 0,
+  "id": "PKIX-yi7k",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Marked human 2026-05-11: this epic's only actionable children (PKIX-cqwt, PKIX-0x9z) are themselves labeled human. The umbrella cannot make autonomous progress until those root decisions land. Re-evaluate when the children's human labels come off.\nChildren unblocked 2026-05-11: PKIX-cqwt and PKIX-0x9z both ratified by Mark with clear implementation paths. Umbrella no longer human-gated.\nRe-labeled human 2026-05-11 (post-PKIX-cqwt/0x9z close): primary children PKIX-cqwt and PKIX-0x9z closed and shipped autonomously. Epic remains open because the only outstanding child PKIX-yi7k.1 (filed by the PKIX-cqwt subagent) is itself human-labeled \u2014 it asks a strictness-policy decision about whether new_with_signer_discovery's anchor-reachability gate should require full chain verification rather than a structural self-issued-cert walk. Re-evaluate when PKIX-yi7k.1's human label comes off.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-revocation: RFC 5280 \u00a76.3 path-level policy completeness",
+  "updated_at": "2026-05-11T19:44:32Z"
+}

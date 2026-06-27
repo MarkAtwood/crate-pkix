@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.6",
+  "title": "CRL delta entries cloned unnecessarily in verify_delta_crl_and_collect",
+  "description": "In pkix-revocation/src/crl.rs lines 1070-1083, verify_delta_crl_and_collect clones the entire delta CRL revoked-certificates Vec on every check_revocation call. The comment acknowledges this ('Deferred as a low-priority perf cleanup') and notes a borrow-based design returning Option<&[RevokedCert]> is feasible now that delta_crl is borrowed from self.delta_crl.\n\nWhat goes wrong: For CRLs with large revoked-certificate lists, every call to check_revocation pays an O(N) clone of the delta entries. In a batch-validation scenario (AGENTS.md non-negotiable #6), this becomes O(certs * delta_entries).\n\nLocations:\n- pkix-revocation/src/crl.rs:1070-1083 (verify_delta_crl_and_collect return)\n- pkix-revocation/src/crl.rs:648 (call site in check_revocation)\n- pkix-revocation/src/crl.rs:842 (call site in check_revocation_against_anchor)\n\nRecommendation: Change verify_delta_crl_and_collect to return a borrowed slice, updating check_revocation_status_indirect to accept &[RevokedCert] (which it already does).",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:10Z",
+  "updated_at": "2026-06-15T17:18:43Z",
+  "closed_at": "2026-06-15T17:18:43Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:09"
+    }
+  ]
+}

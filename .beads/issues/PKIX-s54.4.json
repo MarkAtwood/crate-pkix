@@ -1,0 +1,31 @@
+{
+  "close_reason": "duplicate of PKIX-s54.8 (SEC1 P1); canonical issue is PKIX-s54.8",
+  "closed_at": "2026-05-03T13:35:25Z",
+  "compaction_level": 0,
+  "content_hash": "08afbac052c25204e30ab31488e2cb56722a7abd405ec803df0d801cefb15450",
+  "created_at": "2026-05-03T13:31:16Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk doc header lists steps a\u2013i (e=NC check, f=BasicConstraints, g=KeyUsage, h=pathLen, i=NC update). Inside the 'if i > 0' block the inline comments say (e) BasicConstraints, (f) KeyUsage, (g) pathLen, (h) NC update \u2014 each off by one. A contributor cross-referencing the lettered list to the code hits four mismatches. Fix: change the four inner labels to (f), (g), (h), (i) respectively, and correct line 1311 comment 'Decode BasicConstraints once for both checks' which says '(e)\u2026 (g)' when both should be (f) and (h).",
+  "ephemeral": 0,
+  "id": "PKIX-s54.4",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "chain_walk inline step labels are off by one vs doc header",
+  "updated_at": "2026-05-03T13:35:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:31:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-s54",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

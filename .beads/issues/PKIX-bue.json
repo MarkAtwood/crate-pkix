@@ -1,0 +1,11 @@
+{
+  "id": "PKIX-bue",
+  "title": "pkix-identity remaining work",
+  "description": "Remaining issues from PKIX-68mt review pass. 3 P1 items still open (after rm8 fixed accessors, PartialEq, and NotYetImplemented).",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "epic",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T17:54:17Z",
+  "updated_at": "2026-06-15T17:54:17Z"
+}

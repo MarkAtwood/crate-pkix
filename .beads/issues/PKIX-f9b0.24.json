@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:29:14Z",
+  "compaction_level": 0,
+  "content_hash": "e74e78f7b7cab3a7a05ffb398549c313483b1edd931d17c8bb4147f26cd7de1b",
+  "created_at": "2026-05-07T17:22:55Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:312 \u2014 The default method check_revocation_against_anchor() returns crate::Result<()> but has no # Errors section. clippy::missing_errors_doc (pedantic) flags this.\n\nThe default always returns Ok(()), so the correct fix is a # Errors section noting:\n'The default implementation always returns Ok(()) and never errors. Overriding implementations should document their own error conditions.'\n\nThis is documentation completeness, not a behaviour change.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.24",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-revocation] add # Errors to RevocationChecker::check_revocation_against_anchor default",
+  "updated_at": "2026-05-07T17:29:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:22:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

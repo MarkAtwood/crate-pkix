@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.37",
+  "title": "What is good: trust-domain callback architecture",
+  "description": "The three-callback trust-domain seam (SignatureVerifier + RevocationChecker + AiaFetcher) is a clean architectural choice worth defending:\n\n1. Each callback has a zero-cost default (DefaultVerifier, NoRevocation, NoAiaFetcher) so callers pay only for what they use. The defaults are Copy types that inline to nothing.\n\n2. The Verifier<'a, V, R, A> struct in pkix-chain packages slow-changing inputs once and exposes verify_one/verify_batch, separating setup cost from per-chain cost. The generic defaults (A = NoAiaFetcher) mean callers who don't need AIA fetching never name the parameter.\n\n3. RevocationChecker::check_revocation_against_anchor has a default implementation (skip) with a loud security warning in the doc. This is the right trade: the default is safe for the common case (offline/embedded), and the doc makes the security gap explicit for full-chain-revocation callers. Both CrlChecker and OcspChecker override it, so production revocation implementations get automatic anchor coverage.\n\n4. The callback trait surface admits caller-side caching by design (AGENTS.md non-negotiable #6). A caching SignatureVerifier or RevocationChecker wrapper is a zero-change drop-in because the trait interface is the seam.\n\nLocations: pkix-path/src/lib.rs (SignatureVerifier trait), pkix-revocation/src/lib.rs (RevocationChecker trait), pkix-aia/src/lib.rs (AiaFetcher trait), pkix-chain/src/lib.rs (Verifier struct, verify_chain free function).",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:35Z",
+  "updated_at": "2026-06-15T17:15:40Z",
+  "closed_at": "2026-06-15T17:15:40Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:35"
+    }
+  ]
+}

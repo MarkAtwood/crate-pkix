@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T04:59:28Z",
+  "compaction_level": 0,
+  "content_hash": "2b515f6db11b72e2f01ef6189ee3769242aa32d56cbb26981d82a423a6b6817f",
+  "created_at": "2026-05-07T04:37:22Z",
+  "created_by": "Mark Atwood",
+  "description": "The default implementation of RevocationChecker::check_revocation_against_anchor (pkix-revocation/src/lib.rs line 286) always returns Ok(()). While CrlChecker and OcspChecker both override it, there is no integration test that verifies: (a) a custom checker that does NOT override it truly silently skips the check, and (b) that the skip is observable in the chain output. The security doc warns 'Failing to override...is a silent security gap' but no test proves this gap is observable. A test using a stub checker that asserts the anchor-issued cert check is NOT called would document the intentional behavior and prevent future regression.",
+  "ephemeral": 0,
+  "id": "PKIX-fy1b.11",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path check_revocation_against_anchor default implementation not tested in any integration test",
+  "updated_at": "2026-05-07T04:59:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T21:37:22Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-fy1b",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

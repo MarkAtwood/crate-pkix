@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c72cd58b73b5c103d2a59d8fe1b063d6a2b45d709171655c795cf482bacf5ac6",
+  "created_at": "2026-05-14T15:45:13Z",
+  "created_by": "Mark Atwood",
+  "description": "Two files define UUID namespace constants in nearly the same shape:\n\n- emit.rs:88-93: NS_REPORT / NS_RESULT / NS_OBSERVATION / NS_FINDING / NS_RISK / NS_RISK_POLICY\n- catalog.rs:81-83: NS_CATALOG / NS_CONTROL / NS_PARAM\n\nEach is local to the file with no central registry. A future contributor adding a new OSCAL object kind would need to grep two files to verify their new salt doesn't collide.\n\nSuggested rewrite: a single pkix-lint/src/oscal/namespaces.rs (or a const block in oscal/mod.rs) collecting all namespace strings, with rustdoc explaining the collision invariant ('two object kinds derived from the same seed bytes must use distinct namespaces').\n\nMinor readability \u2014 the current setup works, but the implicit cross-file invariant is the kind of thing that quietly breaks during refactors.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.17",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "OSCAL emitter and Catalog emitter use parallel-but-separate uuid_v8 namespace constants",
+  "updated_at": "2026-05-14T15:45:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:13Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

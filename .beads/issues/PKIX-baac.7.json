@@ -1,0 +1,32 @@
+{
+  "assignee": "opencode-do-beads-20260511T091525Z",
+  "close_reason": "Decision: Option B+ \u2014 drop standalone verify_scts helper, put count-returning loop on SctVerifier as verify_embedded_scts. Cleaner than the bead's proposed A (avoids ownership shuffle of CtLogList) and provides what B promised (point users at SctVerifier) without sacrificing the convenience. Cert-embedded SCTs are always precert_entry (RFC 6962 \u00a73.1), so the method takes (leaf, issuer) and dispatches each SCT through verify_sct_for_precert. Returns Ok(count) for per-SCT verification failures (caller checks against policy threshold like CA/B BR \u00a73.2.2.9); reserves Err for input-shape problems (NoScts on missing extension, ParseError on malformed wire bytes). Also retired stale Error variants NoTrustedSct + PrecertEntryNotImplemented (both unreachable after this change). README + CHANGELOG updated. 5 new integration tests under embedded:: mod in tests/verify_precert.rs cover the positive count, empty-logs zero, wrong-issuer zero, no-extension error, and retired-log SCTs zero cases. All workspace dependents (pkix-chain, pkix-chain-simple) build clean.",
+  "closed_at": "2026-05-11T09:21:07Z",
+  "compaction_level": 0,
+  "content_hash": "7d5504834d0e6cc38e5b64e9e40ca18b2a368af13ecf1bd6f186f8d870d54151",
+  "created_at": "2026-05-11T08:59:58Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "The crate-level `verify_scts(&Certificate, &CtLogList) -> Result<()>` helper is an unconditional `Err(NoTrustedSct)` stub. PKIX-baac.3 shipped `SctVerifier::verify_sct_for_cert` which actually performs verification, but updating `verify_scts` to dispatch through it requires adding a `SignatureVerifier` generic parameter, which is an API-breaking change (pkix-ct is at 0.0.0 so this is cheap, but it needs a deliberate decision about the helper's exact shape).\n\n## Two reasonable shapes\n\n**A. Generic over the verifier, narrow contract:**\n\n```rust\npub fn verify_scts<V: SignatureVerifier>(\n    cert: &Certificate,\n    logs: &CtLogList,\n    verifier: V,\n) -> Result<usize>;  // count of valid SCTs found in cert's extension\n```\n\n**B. Drop `verify_scts` entirely and document that callers use `SctVerifier` directly.** Simpler and there is no real value-add over iterating the SCT list yourself.\n\n## Coupling\n\nImplementing this helper meaningfully requires either:\n- Stubbing pre-cert handling clearly (PKIX-baac.4 is the real fix for cert-embedded SCTs, which are almost always precert_entry), or\n- Documenting that cert-embedded SCTs return `PrecertEntryNotImplemented` until baac.4 lands.\n\nEither way the helper is barely useful for the common 'cert with embedded SCTs' case until baac.4. So this is best done AFTER baac.4 closes.\n\n## Acceptance\n\n- [ ] Decision: keep helper or remove?\n- [ ] If kept: signature settled, doc-tested, all existing call sites in tree updated.\n- [ ] If removed: `README.md` and crate docs updated to point at `SctVerifier` exclusively.",
+  "ephemeral": 0,
+  "id": "PKIX-baac.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-ct: replace verify_scts stub with SctVerifier-backed helper",
+  "updated_at": "2026-05-11T09:21:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T01:59:57Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-baac",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

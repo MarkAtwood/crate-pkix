@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T171233Z-2765851",
+  "created_at": "2026-05-13T19:26:31Z",
+  "id": "019e22ce-1122-7101-95bb-5f7fe3a468e3",
+  "issue_id": "PKIX-2l0v",
+  "text": "[2026-05-13 do-beads convergence] Only open child is PKIX-2l0v.1 (serde feature flag on result types), which carries human label with detailed analysis of four open design decisions: wire form (bytes vs base64), round-trip semantics, io::Error handling in pkix-truststore::Error, and per-cert chain in ValidatedPath. None of those decisions can be made autonomously \u2014 they shape the public API at 1.0. Labeling PKIX-2l0v human per the convergence pattern (memory do-beads-loop-convergence-2026-05-11-autonomous) so the bd ready frontier stops cycling on this umbrella each session. Unlabel after PKIX-2l0v.1's design decisions are recorded."
+}

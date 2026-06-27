@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T04:48:25Z",
+  "compaction_level": 0,
+  "content_hash": "1961383adec74c30c01a675d151f8714675b97f2a33e5bda10d0c955991a167b",
+  "created_at": "2026-05-03T00:13:53Z",
+  "created_by": "Mark Atwood",
+  "description": "check_name_constraints signature (line 1365): nc_permitted: &Option<x509_cert::ext::pkix::constraints::name::GeneralSubtrees>. Idiomatic Rust passes Option<&T> when you only need to read the inner value, not &Option<T>. &Option<T> forces the callee to dereference through the outer reference before doing anything with the Option. The callers at line 1234 pass &nc_permitted (reference to a local Option), which compiles but is anti-idiomatic. Should be nc_permitted: Option<&...GeneralSubtrees> with callers passing nc_permitted.as_ref(). This applies to nc_excluded too (line 1366) but there it's &GeneralSubtrees which is fine since GeneralSubtrees is always present.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "check_name_constraints takes &Option<GeneralSubtrees> instead of Option<&GeneralSubtrees>",
+  "updated_at": "2026-05-05T04:48:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:13:53Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

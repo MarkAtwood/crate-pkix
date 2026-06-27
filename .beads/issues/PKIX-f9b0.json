@@ -1,0 +1,22 @@
+{
+  "close_reason": "All 45 issues resolved across 11 crates",
+  "closed_at": "2026-05-07T20:01:24Z",
+  "compaction_level": 0,
+  "content_hash": "392bda311afe3f3bb38af0e3fa4dd4e9ee1af5abfadd7b1724b5749d10b9200b",
+  "created_at": "2026-05-07T17:20:54Z",
+  "created_by": "Mark Atwood",
+  "description": "Parallel per-crate Rust idiom review. One subagent per crate. File findings as child issues under this epic.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "review-rusty-loop: all pkix-* crates",
+  "updated_at": "2026-05-07T20:01:24Z"
+}

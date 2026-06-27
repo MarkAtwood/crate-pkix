@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:29:11Z",
+  "compaction_level": 0,
+  "content_hash": "f69deaf0050bc36bf868e1810f471b8c3c854c62e9d292955e1443bf0bbc0286",
+  "created_at": "2026-05-06T20:17:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:LintProfile doc comment says 'If you need to run lints repeatedly, call LintProfile::lints() and construct a LintRunner manually to avoid repeated allocation.' But lints() returns &[Box<dyn Lint>] \u2014 a shared reference \u2014 and LintRunner::new() takes Vec<Box<dyn Lint>> (owned), so you cannot construct a LintRunner from a borrowed slice without cloning. The documented avoidance pattern is impossible as written. CabfTlsBrProfile::lint_runner() calls all_lints() which allocates fresh Box<dyn Lint> objects on every call. The OnceLock in lints() is never used by lint_runner(). This is an API design gap: the guidance is wrong, and lint_runner() does unnecessary allocation on every call.",
+  "ephemeral": 0,
+  "id": "PKIX-512.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "LintProfile::lint_runner allocates fresh lints every call (documented but wrong guidance)",
+  "updated_at": "2026-05-06T20:29:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:17:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

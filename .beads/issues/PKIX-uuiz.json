@@ -1,0 +1,23 @@
+{
+  "assignee": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-13T05:02:50Z",
+  "compaction_level": 0,
+  "content_hash": "815b2bf0f80f7f0e89cb5206e4dbc954336eca4fd6af0834fbfeacc7b1cbc27c",
+  "created_at": "2026-05-13T04:58:52Z",
+  "created_by": "bd-spin/bd-spin-20260513T044329Z-2514582",
+  "description": "Add an RFC 5280-baseline TLS-client-authentication profile to pkix-profiles, paired with verify_tls_client_dns / verify_tls_client_mailbox (shipped under PKIX-fmtv.11.2 in pkix-chain 0.4.x).\n\n## Why\n\nverify_tls_client_dns and verify_tls_client_mailbox are generic over <P: Profile>; production callers need a profile that:\n\n- Sets required_leaf_eku = Some(vec![ID_KP_CLIENT_AUTH])\n- Does NOT set require_subject_alt_name (client-auth flows commonly read identity from Subject DN, which is fine \u2014 the wrapper's Option<&ServerName>/None mode covers that case)\n- Otherwise tracks BasicTlsProfile's shape\n\n## Sibling pattern\n\nBasicTlsProfile -> BasicTlsClientProfile is the exact RFC-5280-EKU sibling of BasicCodeSigningProfile, mirroring the symmetric server/client split common in TLS code.\n\n## Deliverable\n\nIn pkix-profiles:\n\n```rust\npub struct BasicTlsClientProfile;\nimpl Profile for BasicTlsClientProfile {\n    fn id(&self) -> &'static str { \"ietf.tls-client-basic\" }\n    fn version(&self) -> &'static str { \"RFC 5280 \u00a74.2.1.12\" }\n    fn policy(&self, now_unix: u64) -> ValidationPolicy {\n        let mut p = ValidationPolicy::new(now_unix);\n        p.required_leaf_eku = Some(vec![ID_KP_CLIENT_AUTH]);\n        p\n    }\n    fn policy_oids(&self) -> &[ObjectIdentifier] { &[] }\n}\n\npub fn basic_tls_client_policy(now_unix: u64) -> ValidationPolicy {\n    BasicTlsClientProfile.policy(now_unix)\n}\n```\n\nID_KP_CLIENT_AUTH = ObjectIdentifier(\"1.3.6.1.5.5.7.3.2\") (RFC 5280 \u00a74.2.1.12).\n\n## Tests\n\nIn pkix-profiles unit tests:\n- BasicTlsClientProfile.id() / version() pinned\n- policy(NOW).required_leaf_eku contains exactly ID_KP_CLIENT_AUTH\n- policy.require_subject_alt_name is FALSE (different from BasicTlsProfile; client-auth flows commonly use DN identity)\n\nIn pkix-chain tests/verify_tls_client.rs:\n- One smoke test under BasicTlsClientProfile using the leaf-clientauth-dns.der fixture (which has EKU=clientAuth) \u2014 proves the profile wiring works end-to-end\n\n## CHANGELOG\n\npkix-profiles: minor bump (additive)\npkix-chain: note in next CHANGELOG entry that verify_tls_client_* can now be paired with BasicTlsClientProfile out-of-the-box.\n\n## Out of scope\n\n- CA/B Forum equivalent (pkix-profiles-cabf::TlsClientProfile if one exists) \u2014 separate bead if needed.\n- WebPkiClientProfile \u2014 webpki has historically been server-cert-focused; whether to ship a client equivalent is a separate question.\n\n## Context\n\nFiled by the do-beads loop when shipping PKIX-fmtv.11.2 client half (verify_tls_client_dns + verify_tls_client_mailbox, 2026-05-12). The wrappers shipped without this profile because (a) they are generic over Profile (the caller decides), and (b) shipping a new pkix-profiles public type is a separate non-coupled API addition that deserved its own bead. Without this profile, callers either roll their own ValidationPolicy or use Rfc5280Profile (which doesn't enforce id-kp-clientAuth).",
+  "ephemeral": 0,
+  "id": "PKIX-uuiz",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "BasicTlsClientProfile + basic_tls_client_policy for verify_tls_client_* production use",
+  "updated_at": "2026-05-13T05:02:50Z"
+}

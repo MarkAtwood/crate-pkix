@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Confirmed panic: cert_sha256_hex::deserialize sliced &hex[i*2..i*2+1] after a byte-length check, allowing a 64-byte multi-byte UTF-8 payload to hit a non-char-boundary panic before reaching the from_str_radix error path. Verified externally via probe (rustc-stable repro). Fixed by switching the inner loop to byte-indexed access through a local nibble() helper that returns Option<u8>, matching the proven oscal/parse.rs::hex_decode pattern. Regression test finding_cert_sha256_rejects_non_ascii_multibyte_utf8 added under the serde feature using '\u00fc'.repeat(32) as the attacker payload. Local nibble() duplication of oscal::parse's helper is documented in-source and tracked under PKIX-7f92.14 (broader hex codec consolidation). Commit 273da0ea.",
+  "closed_at": "2026-05-14T16:37:20Z",
+  "compaction_level": 0,
+  "content_hash": "f5775eeb20952b9c5320fbe4cd8b3319f377b425d36a55e4049f332911d750cc",
+  "created_at": "2026-05-14T15:42:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:218-228 in cert_sha256_hex::deserialize checks hex.len() == 64 (byte length) then slices &hex[i*2..i*2+1] for i in 0..32. If the JSON input is a 64-byte string containing any multibyte UTF-8 character (e.g. '\u00fc' as 0xC3 0xBC), the slice falls on a non-char-boundary and Rust panics with 'start byte index N is not a char boundary'.\n\nTrigger: an attacker controls a JSON Finding payload and sets cert_sha256 to a 64-byte string with a multi-byte UTF-8 char in the first byte position. Verified out-of-band with a 3-line repro on stable rustc.\n\nBad behavior: serde_json::from_str / from_slice panics inside deserialize_with, terminating any host process that decodes Findings from untrusted JSON (CI pipelines, evidence-pack importers, OSCAL viewers). Bypasses the explicit invalid_length / non-hex-char error paths the deserializer wrote.\n\nFix: validate hex.chars().all(|c| c.is_ascii_hexdigit()) before slicing, OR iterate over hex.as_bytes() with index arithmetic instead of slicing the &str. The hex_decode helper in oscal/parse.rs already uses the bytes-indexed pattern (parse.rs:875-886) and demonstrates the correct shape.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_sha256_hex deserializer panics on non-ASCII 64-byte hex input",
+  "updated_at": "2026-05-14T16:37:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:42:39Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

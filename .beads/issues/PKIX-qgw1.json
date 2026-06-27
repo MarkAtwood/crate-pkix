@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-08T20:43:38Z",
+  "compaction_level": 0,
+  "content_hash": "bcd16232a6b6557c90fb30b039655e100aee12f7c58556db79f21cbea1a25a6e",
+  "created_at": "2026-05-08T19:17:12Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAudit identified this as 'High' severity for S/MIME-in-production.\n\nWhen any cert in the pool has a malformed-but-present `BasicConstraints` extension (decodable to `BasicConstraints` ASN.1, but the contents fail to parse), `cert_is_ca` propagates `Error::MalformedIntermediate` (`pkix-path-builder/src/lib.rs:182-184`, `:245-247`) and the entire build aborts.\n\nFor S/MIME this is wrong. CMS `SignedData.certificates` bags routinely contain certs the verifier did not solicit:\n\n* Certs for other recipients (in a multi-recipient encrypted message).\n* Intermediates from unrelated CAs that happened to ride along.\n* Old / expired / corrupt certs that some sender's pipeline appended.\n\nOne malformed cert in the bag should not poison verification of an otherwise-valid chain. The current behaviour is hostile to wire-format reality.\n\n## What\n\nIn `pkix-path-builder/src/lib.rs:237-247`, change the candidate-evaluation loop to **skip** candidates whose `cert_is_ca` returns `Err(MalformedIntermediate)`, rather than propagating the error.\n\nSpecifically:\n\n* `Err(MalformedIntermediate)` from `cert_is_ca` \u2192 `continue` to the next candidate.\n* `Ok(false)` (cert is not a CA) \u2192 `continue` (existing behaviour).\n* `Ok(true)` (cert is a CA) \u2192 enter the candidate (existing behaviour).\n\nThe error is **not** lost: when no valid path exists and skipping malformed certs prevented finding one, the build returns `Error::NoPathFound` as it would for any other no-path case. If callers want diagnostic detail (\"why didn't this path build?\"), that is a separate bead about adding a diagnostic mode.\n\nAlternative considered: keep the error-propagating behaviour but add a config flag `skip_malformed_intermediates: bool`. Rejected because the default (skip) is what virtually every real-world consumer wants; making it opt-in adds complexity for the niche \"strict CMS validator\" use case.\n\n## Acceptance\n\n- [ ] Test fixture: pool with one valid intermediate + one cert with deliberately malformed BasicConstraints + valid root + target. `build_path` returns the valid chain through the good intermediate, ignoring the malformed cert.\n- [ ] Test: pool where ONLY a malformed-BC intermediate exists between target and root. `build_path` returns `Error::NoPathFound` (not `MalformedIntermediate`).\n- [ ] No regressions on the existing test suite (well-formed-bag tests should be unaffected).\n- [ ] Doc update at `src/lib.rs:138-144` and `src/lib.rs:171-179` to reflect skip-not-fail behaviour.\n- [ ] `Error::MalformedIntermediate` variant retained in the public enum (semver) but is now unreachable from `build_path`. Document it as 'reserved for future error reporting' or mark as deprecated.\n\n## Out of scope\n\n- Diagnostic API for 'why didn't this build' (separate bead).\n- Skipping certs with other malformed extensions (only BasicConstraints is the candidate-evaluation gate today).\n\n## Filed as\n\nS/MIME-in-production audit, 'High' severity. The crate is well-engineered for its current scope; this is one of three substantive gaps for the smime bar.",
+  "ephemeral": 0,
+  "id": "PKIX-qgw1",
+  "is_template": 0,
+  "issue_type": "feature",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path-builder: skip-not-fail on MalformedIntermediate (don't poison build on one bad cert)",
+  "updated_at": "2026-05-08T20:43:38Z"
+}

@@ -1,0 +1,60 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T07:34:12Z",
+  "compaction_level": 0,
+  "content_hash": "c013c0c1004ecf8ba1902460e755e3a2cd5711fa9574746636aa72baa3c4af5a",
+  "created_at": "2026-05-11T07:16:50Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Scope\n\nAfter PKIX-emf1.1 through .6 land, re-run the diff harness end-to-end with CRL-aware chains and regenerate baseline-pkits.json.\n\n## What\n\n- Re-run pkix-difftest CLI against the PKITS corpus with revocation enabled.\n- Compare new verdicts to current baseline (currently 'StricterThanWild' for \u00a74.4 / \u00a74.14 because pkix-path doesn't see the CRLs).\n- Expected outcomes:\n  - \u00a74.4 (Separate Cert/CRL Keys): all three oracles agree on Pass/Fail.\n  - \u00a74.14 (Indirect CRL): pyca diverges or skips depending on the strategy from PKIX-emf1.4.\n- Document at least one new divergence (or written-out justification that all agree).\n- Update baseline-pkits-analysis.md to reflect the new buckets.\n\n## Acceptance\n\n- [ ] baseline-pkits.json regenerated.\n- [ ] baseline-pkits-analysis.md updated with new CRL-related buckets.\n- [ ] At least one new divergence documented (or written-out 'all agree' note for PKITS \u00a74.4).\n\n## Depends on\n\nPKIX-emf1.1 .2 .3 .5 .6 (and .4's resolution for pyca).\n\n## Parent\n\nPKIX-emf1.",
+  "ephemeral": 0,
+  "id": "PKIX-emf1.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Regenerate baseline-pkits.json with CRL revocation enabled; document new divergences",
+  "updated_at": "2026-05-11T07:34:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T00:16:49Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1",
+      "metadata": {},
+      "type": "parent-child"
+    },
+    {
+      "created_at": "2026-05-11T00:17:06Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.2",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T00:17:06Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.3",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T00:17:07Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.5",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-11T00:17:08Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-emf1.6",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

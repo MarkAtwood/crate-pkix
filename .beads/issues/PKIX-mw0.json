@@ -1,0 +1,60 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T18:39:02Z",
+  "compaction_level": 0,
+  "content_hash": "1f005dddd1d4109e68741a9aa3277fc6ea9200c903bdc511e369d06d0f5dca3a",
+  "created_at": "2026-05-02T05:55:19Z",
+  "created_by": "Mark Atwood",
+  "description": "Ship the first real release of the pkix crate family: pkix-path, pkix-revocation, pkix-chain, and pkix-chain-simple.\n\nv0.1 scope (from CLAUDE.md and AGENTS.md):\n- RSA-PKCS1v15-SHA-256 and ECDSA-P-256-SHA-256 signature verification\n- RFC 5280 \u00a76.1 path validation: signatures, validity periods, BasicConstraints, KeyUsage, pathLenConstraint, critical extension guard\n- No NameConstraints, no PolicyConstraints, no revocation (documented limitations)\n- PKITS happy-path subset green (\u00a74.1, \u00a74.2, \u00a74.6, \u00a74.7)\n- All four crates published to crates.io as 0.2.0 (0.1.0 was namespace-grab; yank it)\n\nSub-epics:\n- PKIX-cfh: Fix API shape before any implementation (P0, blocks all others)\n- PKIX-lwr: pkix-path RFC 5280 \u00a76.1 core validator (P1)\n- PKIX-ehn: pkix-path RustCrypto signature backends (P1)\n- PKIX-qkl: PKITS integration test suite (P1, needs lwr + ehn)\n- PKIX-ahk: pkix-revocation error type + CRL/OCSP (P2, can trail v0.1)\n- PKIX-868: pkix-chain-simple full implementation (P2, needs lwr + ehn)\n\nAcceptance criteria for release:\n  cargo test --workspace passes\n  cargo clippy --workspace -- -D warnings passes\n  cargo +1.73 check --workspace passes (MSRV)\n  RUSTDOCFLAGS='--cfg docsrs -D warnings' cargo +nightly doc --no-deps --all-features --workspace passes\n  PKITS \u00a74.1, \u00a74.2, \u00a74.6, \u00a74.7 all green\n  0.1.0 yanked on crates.io, 0.2.0 published",
+  "ephemeral": 0,
+  "id": "PKIX-mw0",
+  "is_template": 0,
+  "issue_type": "epic",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Epic: pkix v0.1 release",
+  "updated_at": "2026-05-06T18:39:02Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-01T22:55:25Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-868",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:55:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-cfh",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:55:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ehn",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:55:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lwr",
+      "metadata": {},
+      "type": "blocks"
+    },
+    {
+      "created_at": "2026-05-01T22:55:24Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qkl",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

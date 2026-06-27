@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:21:58Z",
+  "compaction_level": 0,
+  "content_hash": "e4f186744763466b8754f7e7cef4b78d9977361a99503df092c6e5bda7f29e28",
+  "created_at": "2026-05-06T20:16:47Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:apply_deviations iterates ALL raw findings \u2014 including Pass and NotApplicable \u2014 and will match them against the deviation store. If a deviation store entry matches a lint that returned Pass, the Pass finding will be moved to deviated output. This is semantically wrong: deviations should only be applied to actionable findings (Warn, Error, Fatal). Applying a deviation to Pass is misleading \u2014 it implies a waiver was needed but the cert actually passed. Fix: in apply_deviations, only call find_deviation when finding.result.is_finding() is true; otherwise unconditionally push to findings.",
+  "ephemeral": 0,
+  "id": "PKIX-512.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationRunner.apply_deviations deviate Pass/NotApplicable findings",
+  "updated_at": "2026-05-06T20:21:58Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:16:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-512",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

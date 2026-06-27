@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "60f587a0394a2b724953c32de9e1ca3ea0d5e2a43195f310a16f9c6473b54886",
+  "created_at": "2026-05-14T19:38:08Z",
+  "created_by": "Mark Atwood",
+  "description": "discover_crl_signer (pkix-revocation/src/signer_discovery.rs:87-113) returns the FIRST cert in bundle order that matches AKI/SKI; falls through to FIRST cert that matches issuer-DN if no AKI present.\n\nExisting tests (aki_ski_picks_correct_rollover_signer, aki_ski_is_order_independent) verify order-independence ONLY for the case where one bundle cert has matching SKI and others share its subject DN. They do NOT exercise:\n\n1. Two bundle certs with byte-identical SKI (improbable but possible \u2014 SKI is a hash truncation in some profiles). Discovery returns the first; semantics are first-wins. No test asserts this.\n2. AKI absent, issuer-DN fallback, multiple bundle certs sharing the CRL issuer DN. Discovery returns the first. For the \u00a74.5 PKITS case AKI is always present, so this path is untested.\n\nAdd tests:\n1. Bundle order [A, B] where both A and B have matching SKI bytes. Assert discover returns A.\n2. Bundle of [bridge_cert, new_key_cert] where the CRL has no AKI (synthetic \u2014 strip the AKI from the CRL before parsing, or use a different CRL fixture). Assert discover returns the first DN-matching cert.\n\nThese are not bug reports; they are coverage gaps that allow future refactors to silently change first-wins semantics without test failure.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.8",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Bundle order sensitivity in discover_crl_signer not exercised by tests",
+  "updated_at": "2026-05-14T19:38:08Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:38:08Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

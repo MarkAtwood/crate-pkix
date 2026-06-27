@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-04T19:32:28Z",
+  "compaction_level": 0,
+  "content_hash": "2c4d0abb3fc5b742e8611668bff80a79b47b9e50127c1b911ad4468490cc5000",
+  "created_at": "2026-05-14T19:13:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: ServerName::ip_address(\"fe80::\") or any IPv6 textual form ending in '::' that is not bare '::'.\n\nBad behavior: returns IdentityError::MalformedInput. Affected forms include 'fe80::' (link-local self), '2001:db8::', '::ffff:0:0' inverted, and any well-formed RFC 5952 address ending in a zero-run.\n\nRoot cause: pkix-identity/src/lib.rs:725-738. When the loop encounters an empty part from split(':') and sets zero_run_at = Some(...), it only breaks on iter.peek().is_none(). For input 's = \"fe80::\"', split(':') yields [\"fe80\", \"\", \"\"]. After consuming the middle empty, peek returns Some(&\"\") (the trailing empty), so the loop continues, sees the second empty, and returns None on the multiple-'::' guard.\n\nFix: when an empty part is consumed in the loop body and the NEXT part is also empty (or iterator is exhausted), treat it as the trailing '::' terminator and break. Or: normalize the input by handling trailing-'::' the same way the leading-'::' branch is special-cased at line 713-720.\n\nVerification: an existing test (parse_ipv6 unit-tested via ServerName::ip_address) does not cover trailing '::' \u2014 add tests for 'fe80::', '2001:db8::', and 'a:b:c:d:e:f:0::' to lock in.\n\nSecurity impact: lower than the leading/middle cases \u2014 an SAN entry with a trailing-'::' IPv6 address cannot be matched even by a correctly-formed target. Operationally, fe80:: link-local SANs would silently fail to match. No misvalidation in the unsafe direction (Ok where it should be Err).",
+  "ephemeral": 0,
+  "id": "PKIX-68mt.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "parse_ipv6 rejects trailing '::' forms ('fe80::', '2001:db8::')",
+  "updated_at": "2026-06-04T19:32:28Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:13:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-68mt",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

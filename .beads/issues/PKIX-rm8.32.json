@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.32",
+  "title": "What is good: test discipline and oracle independence",
+  "description": "The workspace's test discipline is exemplary and worth defending against 'just test the round-trip' simplification pressure:\n\n1. Every test module documents its independent oracle: openssl x509 -text output for serial lengths, python hashlib for SHA hashes, hand-computed DER bytes for wire-format assertions, PKITS NIST fixtures for integration coverage. No test uses the code under test as its own oracle.\n\n2. The serde_der module's tests verify against hand-computed base64 and DER bytes, not against re-encoding. The binary-serializer test (line 424) builds a minimal Serializer impl to verify the helper takes the non-human-readable branch \u2014 this level of branch-coverage specificity catches subtle mode bugs that a JSON-only round-trip would miss.\n\n3. CRL signer_discovery tests exercise order-independence (same result regardless of bundle ordering) and edge cases (empty bundle, unrelated bundle) with PKITS fixtures.\n\n4. The pkix-ct verify.rs tests use hand-decoded RFC 6962 wire layouts as byte-literal expectations, and the precert TBS-reconstruction test cross-validates against a Python oracle script that independently strips the SCT extension from the cert.\n\n5. Lint tests in pkix-lint/src/rfc5280.rs use openssl-derived oracles for fixture serial lengths and extension shapes, and the parametric lint (Rfc5280MaxSerialLengthLint) has regression tests that verify both the constructor and set_parameter reject out-of-range values.\n\nThis is the test discipline section of AGENTS.md ('no test may use the code under test as its own oracle') made real. Someone suggesting 'just encrypt-then-decrypt' style testing should be pointed here.",
+  "status": "closed",
+  "priority": 3,
+  "issue_type": "decision",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:25:21Z",
+  "updated_at": "2026-06-15T17:15:34Z",
+  "closed_at": "2026-06-15T17:15:34Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:25:21"
+    }
+  ]
+}

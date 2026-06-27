@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:47Z",
+  "compaction_level": 0,
+  "content_hash": "b05ab97917a2ff7af405dcfb262ba677a6a507b5ae423ac08d1ba3c833514ff3",
+  "created_at": "2026-05-05T15:49:15Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:804\u2013853\n\nTwo helpers exist with opposite error semantics:\n- find_cert_ext: fail-open (silently drops DER errors)\n- try_find_cert_ext: fail-closed (propagates DER errors)\n\nThe doc-comment on each helper explains its own behaviour well. The concern is at the call sites:\n\n- BasicConstraints uses find_cert_ext (fail-open): line 856\n- NameConstraints uses cert_name_constraints which calls try_find_cert_ext (fail-closed): line 877\n- CertificatePolicies uses find_cert_ext (fail-open): line 1588\n- PolicyMappings uses find_cert_ext (fail-open): line 1785\n- PolicyConstraints uses find_cert_ext (fail-open): lines 1739, 1904\n- InhibitAnyPolicy uses find_cert_ext (fail-open): line 1919\n\nThe asymmetry between BasicConstraints (fail-open) and NameConstraints (fail-closed) is intentional and well-motivated (NC is security-critical; a malformed NC could be used to widen constraints, so fail-closed is correct). However this distinction is not documented at the call site for BasicConstraints.\n\nA future maintainer refactoring cert_basic_constraints to use try_find_cert_ext for 'consistency' would introduce a regression: a cert with malformed BasicConstraints DER would fail with MalformedCertificate instead of being treated as a non-CA. The current fail-open behaviour is correct for BC (malformed BC \u2192 treated as no constraint present \u2192 cert fails the cA=TRUE check for a different reason). Add a comment to cert_basic_constraints explaining why fail-open is the correct choice here.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.32",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "find_cert_ext/try_find_cert_ext asymmetry not documented at call sites",
+  "updated_at": "2026-05-05T16:06:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:49:15Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

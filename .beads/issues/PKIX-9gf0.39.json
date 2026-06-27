@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T16:36:34Z",
+  "compaction_level": 0,
+  "content_hash": "e4b913065e97f80e0c518674c5bb6571883ea60b3e2037b2e636cc4d6b99c5ec",
+  "created_at": "2026-05-07T16:19:20Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/deviation.rs:80-83\n\n  DeviationAddError::DuplicateId(id) => {\n      write!(f, \"deviation id '{}' already exists in the store\", id)\n  }\n  DeviationAddError::EmptyField(field) => {\n      write!(f, \"deviation field '{}' must not be empty\", field)\n  }\n\nClippy pedantic flags both of these as 'variables can be used directly in the format! string'. The idiomatic form since Rust 1.58 is:\n\n  write!(f, \"deviation id '{id}' already exists in the store\")\n  write!(f, \"deviation field '{field}' must not be empty\")\n\nThis is available at MSRV 1.73.",
+  "ephemeral": 0,
+  "id": "PKIX-9gf0.39",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty] pkix-lint deviation.rs: format! string can use variable directly",
+  "updated_at": "2026-05-07T16:36:34Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T09:19:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9gf0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

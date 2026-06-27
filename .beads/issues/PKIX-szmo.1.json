@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Skoll v0.1.292 already installed at ~/.local/bin/skoll. fenrir repo at ~/GIT/fenrir. Dry-run confirms adaptive auto-detection works on PKIX workspace (detected crate-pkix, Rust/Python/Shell, correct directory structure).",
+  "closed_at": "2026-06-04T17:30:25Z",
+  "compaction_level": 0,
+  "content_hash": "5adfcf586cddeb9dd9862d9bd8fad6a25386551082ce7fea9518c281c2296e2e",
+  "created_at": "2026-06-04T17:28:04Z",
+  "created_by": "Mark Atwood",
+  "description": "Clone github.com/wolfSSL/fenrir into ~/GIT/fenrir and run ./skoll/install.sh to symlink skoll into ~/.local/bin. Prerequisites: claude CLI on PATH, git, python3, jinja2, pyyaml. Verify install with 'skoll --version'. Dry-run 'skoll security --dry-run' from ~/PROJECT/PKIX to confirm adaptive auto-detection works on a non-wolfSSL project.",
+  "ephemeral": 0,
+  "id": "PKIX-szmo.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Install Skoll CLI from wolfSSL/fenrir",
+  "updated_at": "2026-06-04T17:30:25Z",
+  "dependencies": [
+    {
+      "created_at": "2026-06-04T10:28:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-szmo",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "ebd38ccfead321390185456bf080fe704d11cf12970ac6a9caf27efb3fea17aa",
+  "created_at": "2026-05-14T12:42:26Z",
+  "created_by": "Mark Atwood",
+  "description": "Sites: rfc5280.rs:582-613, oscal/emit.rs:953-994, oscal/parse.rs:909-925, deviation.rs:1009-1066. Every test module in this scope carries a module-level rustdoc block citing its independent oracle: 'openssl x509 -text', 'date -u -d @<unix>', the OSCAL JSON Schema field list, RFC 8398 \u00a73 wording cross-checked with python idna. The test_rfc3339_known_value test even includes the shell command used to verify the expected output 'before commit.' This is the correct discipline for crypto-adjacent tests and the workspace explicitly forbids the alternative (AGENTS.md: 'A test that uses the code under test as its own oracle proves nothing'). A future contributor under deadline pressure will be tempted to assert 'cert.serial_number == cert.serial_number after round-trip' \u2014 that pattern proves nothing. The discipline of always citing an external oracle (openssl, pyca, RFC text, hand-computed Punycode) is what makes the test suite meaningful. Defend this against any PR that introduces a test without an oracle comment. The cert_sha256_of test (lib.rs:1877-1898) is particularly well-done: it recomputes the expected hash with sha2 directly outside the lint engine, then compares \u2014 that's the right shape.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.20",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Test discipline \u2014 every test cites an independent oracle, not the code under test",
+  "updated_at": "2026-05-14T12:42:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:42:26Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

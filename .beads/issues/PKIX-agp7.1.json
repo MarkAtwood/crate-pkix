@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "AGENTS.md and CHANGELOG.md updated. AGENTS.md line 35 now reflects pkix-path-builder reality. 'v0.1 deliverable' section replaced with 'Status' section that explicitly drops version-milestone gating. CHANGELOG [unreleased] gets a new 'Policy: drop v0.x milestone gating (2026-05-11)' subsection inserted above the 0.3 follow-up wave content. grep confirms zero Category-A language remains in AGENTS.md.",
+  "closed_at": "2026-05-11T05:08:16Z",
+  "compaction_level": 0,
+  "content_hash": "721fb529a2394706e2959faa0f6a072c787db0b4a129eddb9385acbc4c200589",
+  "created_at": "2026-05-11T05:06:20Z",
+  "created_by": "Mark Atwood",
+  "description": "## Why\n\nAGENTS.md is the policy anchor. Until this lands, every other sweep is editing under stale top-level policy. Do this first.\n\n## What\n\n### AGENTS.md edits\n\n1. Line 35 (\"Key design facts\"): `Path building (RFC 4158 \u2014 cross-signed certs, multiple candidate issuers) is out of scope for v0.1.`\n   \u2192 Replace with: `Path building (RFC 4158 \u2014 cross-signed certs, multiple candidate issuers) lives in \\`pkix-path-builder\\`. \\`pkix-path\\` itself is positional: chain[i+1] must be the issuer of chain[i].`\n\n2. Lines 59\u201362 (\"## v0.1 deliverable\" section):\n   ```\n   ## v0.1 deliverable\n\n   RSA-PKCS1v15 + P-256 signing, no NameConstraints, no revocation, configurable max depth.\n   PKITS happy-path subset green. All unimplemented features have rustdoc `# Limitations` sections.\n   ```\n   \u2192 Replace section with:\n   ```\n   ## Status\n\n   Crypto coverage, RFC compliance, and feature surfaces land incrementally.\n   Per-crate `# Limitations` rustdoc sections describe what each crate's\n   shipped code currently does and does not do. The driving goal is full\n   RFC 5280 and adjacent-RFC coverage; no work is gated by a version\n   milestone.\n\n   PKITS (NIST) test corpus is the integration-test bar. See\n   `pkix-difftest/baseline-pkits-analysis.md` for current state.\n   ```\n\n### CHANGELOG.md edits\n\nAdd a new top-of-file entry under an Unreleased / next-version section:\n\n```\n- **Policy:** Dropped v0.x milestone gating. The project drives to full RFC 5280\n  and adjacent-RFC coverage; no features are gated by a version milestone.\n  Per-crate `# Limitations` rustdoc sections describe current shipped behavior.\n  See PKIX-agp7 for the sweep.\n```\n\nDo NOT rewrite historical entries.\n\n## Acceptance\n\n- [ ] AGENTS.md line 35 reflects pkix-path-builder reality.\n- [ ] AGENTS.md no longer has `## v0.1 deliverable` section heading.\n- [ ] CHANGELOG.md has the policy-shift entry, dated 2026-05-11.\n- [ ] No other AGENTS.md or CHANGELOG sections touched.\n\n## Out of scope (Category B, legitimate)\n\n- The 'What this is' AGENTS.md section listing only 3 crates while we have 13 \u2014 separate hygiene issue, separate bead if anyone cares.\n- Per-crate sweep \u2014 that's PKIX-agp7.2.\n- Bead description sweep \u2014 that's PKIX-agp7.3.",
+  "ephemeral": 0,
+  "id": "PKIX-agp7.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "AGENTS.md + CHANGELOG anchor: drop v0.1 deliverable section, kill path-building scope line",
+  "updated_at": "2026-05-11T05:08:16Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-10T22:06:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-agp7",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

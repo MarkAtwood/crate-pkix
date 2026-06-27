@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "f277000b11fa1d427067cc52697c8676c2b0b2b8c279f9b25d9421e7c9e76a48",
+  "created_at": "2026-05-14T18:57:42Z",
+  "created_by": "Mark Atwood",
+  "description": "src/cache.rs:446-457 + src/cache.rs:755-760: CachedHttpOcspFetcher::check_revocation builds an OCSP request via build_ocsp_request, then calls extract_cert_id_identity(&req_bytes.body) to pull (cert_serial, issuer_key_hash) back out via a fresh DER parse. The (serial, hash) values were both COMPUTED INSIDE build_ocsp_request a few lines earlier \u2014 they're discarded and recomputed by re-parsing the DER the builder just emitted.\n\nThis is dead-reckoning: the data exists, gets thrown away, gets reconstructed from a serialised form.\n\nCost: one der::Decode per OCSP check (low) plus the cognitive load of two ways to compute the same thing. The comment defends this as 'so the two cannot drift apart' but the cleaner version is 'the two are unified' \u2014 expose serial + issuer_key_hash directly from OcspRequestBytes (or a sibling type returned alongside).\n\nMaintenance consequence: future contributor changes build_ocsp_request's hashing logic (e.g., adds a per-cert salt for nonces) and is now responsible for keeping extract_cert_id_identity in step. The current approach guards against THAT class of drift by re-parsing, but the cost is that the cache key is computed from the wire format of the request, not the inputs \u2014 a representation choice the cache shouldn't care about.\n\nRecommendation: extend OcspRequestBytes with cert_serial: Vec<u8> and issuer_key_hash: Vec<u8> fields; CachedHttpOcspFetcher reads them directly. extract_cert_id_identity becomes test-only or is deleted. The 'no drift' invariant moves from 'reparse what we just emitted' to 'the same code path computed both values', which is the conventional shape.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "extract_cert_id_identity reparses the OCSP request body to recover key material build_ocsp_request already had",
+  "updated_at": "2026-05-14T18:57:42Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

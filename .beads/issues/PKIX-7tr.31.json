@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T14:19:36Z",
+  "compaction_level": 0,
+  "content_hash": "79e4bd845e6a7c0d13b5843bab31f1ee54133e984850410c21ad69f829f4e579",
+  "created_at": "2026-05-02T13:42:31Z",
+  "created_by": "Mark Atwood",
+  "description": "Error::Der(der::Error) (line 76) exposes the der crate's error type directly in the public API. Callers who match on Error::Der must take a dep on the der crate to use der::Error's variants, creating an implicit semver coupling. The only place Error::Der is produced is chain_walk when encode_to_slice fails \u2014 an internal encoding step callers cannot meaningfully handle. This should be replaced with an opaque Error::Internal variant or the encode path should be removed entirely. Exposing a dependency's error type in a public enum is an idiomatic Rust violation and a maintainer burden.",
+  "ephemeral": 0,
+  "id": "PKIX-7tr.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Error::Der exposes der::Error in public API with no useful match patterns",
+  "updated_at": "2026-05-02T14:19:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T06:42:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7tr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

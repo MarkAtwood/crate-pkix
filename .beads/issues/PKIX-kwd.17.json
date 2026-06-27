@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:37Z",
+  "compaction_level": 0,
+  "content_hash": "f59b0ef682a72987f02db7f2a584a95dc756f9f490af8b1fa193e1606952d44b",
+  "created_at": "2026-05-06T15:18:40Z",
+  "created_by": "Mark Atwood",
+  "description": "Multiple public constructors and pure query functions in the in-scope files are missing #[must_use]. Clippy pedantic (must_use_candidate) flags all of these:\n\npkix-path/src/lib.rs:\n- TrustAnchor::new() (line 352) \u2014 constructor\n- TrustAnchor::from_cert() (line 382) \u2014 constructor\n- ValidationPolicy::new() (line 557) \u2014 constructor\n- names_match() (line 1080) \u2014 pure predicate used in security checks\n\npkix-path-builder/src/lib.rs:\n- CertPool::new() (line 52) \u2014 constructor\n- CertPool::len() (line 62) \u2014 pure query\n- CertPool::is_empty() (line 67) \u2014 pure query\n- build_path() (line 223) \u2014 main API function returning Result<Vec<_>>\n\npkix-profiles/src/lib.rs:\n- web_pki_policy() (line 89) \u2014 factory returning ValidationPolicy\n- smime_policy() (line 127) \u2014 factory returning ValidationPolicy\n- code_signing_policy() (line 159) \u2014 factory returning ValidationPolicy\n- rfc5280_policy() (line 176) \u2014 factory returning ValidationPolicy\n\nMissing #[must_use] on constructors means the compiler will not warn if a caller writes TrustAnchor::new(name, spki); (discarding the result), which is almost certainly a bug. This is especially important on security-critical types like TrustAnchor and on policy factories where discarding the returned policy means no policy is applied.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Public constructors and pure functions missing #[must_use]",
+  "updated_at": "2026-05-06T15:24:37Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:18:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

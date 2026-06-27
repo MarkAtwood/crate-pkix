@@ -1,0 +1,20 @@
+{
+  "id": "PKIX-rm8.20",
+  "title": "general_name_matches falls back to DER encode+compare",
+  "description": "In pkix-revocation/src/crl.rs:1320-1324, the non-DirectoryName arm of general_name_matches encodes both GeneralName values to DER and compares the resulting byte buffers. This allocates two Vecs per comparison for non-DN GeneralName types.\n\nWhat goes wrong: For CRLs with IDP using URI-type distribution points, every CDP-vs-IDP comparison pair allocates two DER-encoding buffers. In practice IDP/CDP entries are overwhelmingly DirectoryName (which takes the fast names_match path) or URIs (typically 1-2 entries), so the cost is small. But the allocation is gratuitous when both sides are the same variant - for example, two UniformResourceIdentifier values could be compared via their inner IA5String directly.\n\nLocation: pkix-revocation/src/crl.rs:1320-1324\n\nRecommendation: Match on same-variant pairs (URI==URI, DnsName==DnsName, etc.) and compare inner values directly; only fall back to DER encoding for cross-variant comparisons.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:55Z",
+  "updated_at": "2026-06-15T16:30:35Z",
+  "closed_at": "2026-06-15T16:30:35Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:54"
+    }
+  ]
+}

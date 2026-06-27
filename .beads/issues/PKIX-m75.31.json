@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:38Z",
+  "compaction_level": 0,
+  "content_hash": "9f1fd6e207324d35a6112cc9cb05124bb1a3c37f47d3b74cb05068591ace1153",
+  "created_at": "2026-05-06T20:53:33Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.31",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: pkix-lint/src/lib.rs SubjectKind::AnchorIssued (line 163-164). This variant exists and the SubjectKind::matches() implementation at line 182 correctly includes AnchorIssued as a sub-kind of IntermediateCa. However, there is no API in pkix-path or pkix-lint to determine which certificate in a validated chain occupies the AnchorIssued position (the certificate directly issued by the trust anchor). The ValidatedPath struct only provides anchor_index and depth. To set up the kinds array for LintRunner::run_chain() with AnchorIssued at the correct position, callers must manually compute: last_position = chain.len() - 1 is AnchorIssued when chain.len() > 1. But this is not obvious from the API. Callers who do not set AnchorIssued correctly will have the last intermediate linted as IntermediateCa (which is semantically correct per matches() semantics, since AnchorIssued is a sub-kind of IntermediateCa). The practical impact is that lints specifically declaring applies_to = AnchorIssued would only fire if the caller correctly identifies the position. Fix: Add a method to ValidatedPath or provide a helper function like kinds_for_chain(chain: &[Certificate], path: &ValidatedPath) -> Vec<SubjectKind> that auto-populates the kinds array correctly. Priority: P2 (API usability gap).",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "FINDING: No API to identify AnchorIssued position in validated chain",
+  "updated_at": "2026-05-06T20:58:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:53:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

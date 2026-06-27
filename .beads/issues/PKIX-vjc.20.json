@@ -1,0 +1,31 @@
+{
+  "close_reason": "Confirmed correct per RFC 5280; defensive note recorded in issue",
+  "closed_at": "2026-05-03T00:38:07Z",
+  "compaction_level": 0,
+  "content_hash": "4bd687b56de8d2e8ea096b994d6e3497a4625fa2968d06499289714501795f48",
+  "created_at": "2026-05-03T00:13:13Z",
+  "created_by": "Mark Atwood",
+  "description": "matches_dns_name correctly implements the RFC 5280 \u00a74.2.1.10 leading-dot semantics: a constraint '.example.com' does NOT match the apex 'example.com' (lines 963-966), only true subdomains. And a constraint without leading dot matches both the apex AND subdomains (lines 973-980). These are distinct rules that contributors often conflate. The apex exclusion guard with the strip_prefix().eq_ignore_ascii_case() check is the right way to implement it. Defend against suggestions to 'simplify' by treating leading-dot identically to no-dot.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.20",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "matches_dns_name apex-exclusion logic is correct per RFC 5280",
+  "updated_at": "2026-05-03T00:38:07Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:13:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

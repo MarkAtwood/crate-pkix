@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added #[derive(Clone, Debug)] to HttpCrlFetcher<F> and HttpOcspFetcher<F> stubs, matching the CrlChecker/OcspChecker pattern. Derive macro adds the appropriate where F: Clone/Debug bounds.",
+  "closed_at": "2026-05-07T22:37:36Z",
+  "compaction_level": 0,
+  "content_hash": "839f298c6918140c8b9b8da8d4e1a3df8d0425253a8c03c31a0ab4874838baf9",
+  "created_at": "2026-05-07T22:17:10Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\n`pkix-revocation-http/src/lib.rs:95` (`HttpCrlFetcher<F>`) and line 125\n(`HttpOcspFetcher<F>`) declare structs with no `#[derive(...)]` attribute:\n\n```rust\n#[cfg(feature = \\\"crl\\\")]\n#[cfg_attr(docsrs, doc(cfg(feature = \\\"crl\\\")))]\n#[allow(dead_code)] // fields used once HttpCrlFetcher is implemented\npub struct HttpCrlFetcher<F> {\n    fetcher: F,\n    now_unix: u64,\n}\n```\n\nIdiomatic Rust for a generic struct intended to be wrapped around a user-supplied\ntype is to derive `Debug, Clone` with a per-trait bound on `F`. Even without a\nDebug bound on `F`, the struct authors should at least add:\n\n```rust\n#[derive(Debug)]   // or Debug, Clone \u2014 bound: where F: Debug (Clone)\n```\n\nThe `#[derive(Debug)]` macro expansion already adds `where F: Debug` for the\ngeneric param, so the impl is conditional on the user's `F` supporting it.\nThis is the same pattern used by `CrlChecker<V>` in `pkix-revocation/src/crl.rs:93`\n(`#[derive(Clone, Debug)]`) and by `OcspChecker<V>` in `pkix-revocation/src/ocsp.rs:67`.\n\nThis is a stub crate (functionality not yet implemented), so this is a P4\ncosmetic gap \u2014 but it's the same idiom observed elsewhere in the workspace\nthat was not applied uniformly.\n\nFix: add `#[derive(Debug, Clone)]` to both structs, matching the pattern in\n`pkix-revocation::CrlChecker`.\n\nLocations:\n- `pkix-revocation-http/src/lib.rs:92-98` (`HttpCrlFetcher`)\n- `pkix-revocation-http/src/lib.rs:122-128` (`HttpOcspFetcher`)",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.29",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P4: HttpCrlFetcher and HttpOcspFetcher lack any derive (no Debug) in pkix-revocation-http stub",
+  "updated_at": "2026-05-07T22:37:36Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:17:09Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

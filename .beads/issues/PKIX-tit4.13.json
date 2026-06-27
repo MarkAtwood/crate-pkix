@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed in single doc pass commit. The new '# Contract guarantees' (or '# Features') section in pkix-truststore/src/lib.rs covers this finding.",
+  "closed_at": "2026-05-14T08:14:09Z",
+  "compaction_level": 0,
+  "content_hash": "d9654bbdd3b1ec939a0be6667a06c66b17eeebb86edb58e39a0d73f828f8b1db",
+  "created_at": "2026-05-14T05:06:11Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:314-385 documents return values as Vec<TrustAnchor>\nbut nowhere states whether the order of the returned vec corresponds to the\norder of certs in the input.\n\nImplementation-derived behavior (lib.rs:334, 379):\n\n  Ok(certs.into_iter().map(TrustAnchor::from_cert).collect())\n\nand\n\n  for (i, bytes) in iter.into_iter().enumerate() {\n      ...\n      anchors.push(TrustAnchor::from_cert(cert));\n  }\n\nBoth preserve input order. But neither rustdoc says so. Without a documented\ncontract, the maintainer is free to reorder internally \u2014 and a caller cannot\ncatch this with the type system.\n\nWhat goes wrong for a caller in production:\n\n  - A trust-store loader that uses 'first-match-wins' priority (anchor #0\n    in the file takes precedence over anchor #5 for the same Subject DN)\n    is silently broken if order is not preserved. This is a real pattern\n    in PKI deployments where local roots are listed first to shadow public\n    roots in dev/test environments.\n  - A diagnostic tool that reports 'anchor #42 has expired' assumes the\n    Vec index aligns with the PEM block index in the source file. Without\n    a contract, this is not guaranteed.\n  - Cross-deployment comparison ('this prod box loaded these anchors in\n    this order, this dev box loaded them in a different order \u2014 why are\n    we trusting different things?') becomes impossible to reason about\n    if order is not in the contract.\n\nThis is a small docstring addition with no impl change. The maintainer is\nalready doing the right thing; it just needs to be a documented promise so\ncallers can depend on it and so a future refactor that breaks order is\ncaught at API-review time, not at deployment.\n\nFix: add to from_pem and from_der_iter rustdoc:\n\n  /// The returned `Vec` preserves the order of certificates in the input\n  /// (PEM block order for `from_pem`, iterator yield order for\n  /// `from_der_iter`).\n\nSame line on from_pem_file / from_der_iter file wrappers (delegate to\nthe underlying parser's order).",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "from_pem / from_der_iter: returned-Vec iteration order vs input order is unspecified",
+  "updated_at": "2026-05-14T08:14:09Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:06:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

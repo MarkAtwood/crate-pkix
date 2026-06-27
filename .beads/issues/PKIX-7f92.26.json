@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Extended the const _ block at lib.rs:1764 to cover all 13 additional load-bearing public types listed in the bead (12 unconditional + 2 cfg(oscal)-gated). All types satisfy Send+Sync today; the assertions pin the invariant going forward. 286 pkix-lint tests pass with --all-features; clippy clean.",
+  "closed_at": "2026-05-14T16:57:22Z",
+  "compaction_level": 0,
+  "content_hash": "381147c6af017afd38f0b26e73bb504c669704ea90472cad1652fc0243ba86fb",
+  "created_at": "2026-05-14T16:00:34Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/lib.rs:1463-1469 \u2014 The Send+Sync compile-time assertion block added in commit c64dc840 only asserts Finding:\n\n  const _: fn() = || {\n      fn _assert_send_sync<T: Send + Sync>() {}\n      _assert_send_sync::<Finding>();\n  };\n\nThe commit message described \"AGENTS.md non-negotiable #6 requires load-bearing result and error types to be Send+Sync.\" Finding satisfies this. The following public types ALSO load-bear under non-negotiable #6 and are not asserted:\n\nLIB.RS:\n- LintRunner (lib.rs:1142)\n- LintResult (lib.rs:557)\n- LintParameter (lib.rs:387)\n- ParameterError (lib.rs:498)\n\nDEVIATION.RS:\n- Deviation (deviation.rs:127)\n- DeviationScope (deviation.rs:467)\n- DeviationStore (deviation.rs:855)\n- DeviationAddError (deviation.rs:69)\n- DeviationRunResult (deviation.rs:1062)\n- DeviationRunner (deviation.rs:1112)\n- ScopePropValue (deviation.rs:445)\n- DeviatedFinding (report.rs:13)\n\nREPORT.RS:\n- EvaluationReport (report.rs:61)\n\nOSCAL:\n- ParseError (oscal/parse.rs:43) \u2014 separately flagged for missing Clone derives, but Send+Sync untested here too\n- ResolvedProfile (oscal/profile.rs:102)\n\nEvery type listed satisfies Send+Sync today (auto-derived from its fields). The point of the assertion block is to PIN that invariant against future regression: a maintainer who adds an Rc<T>, RefCell<T>, or unsync interior cache field will not catch the breakage at compile time without an assertion.\n\nCALLER IMPACT: A caller depending on these types being Send+Sync for cross-thread caching, async tasks, or rayon-style batch evaluation gets silent breakage on the version that adds the offending field. The \"cache-friendly result types\" requirement in non-negotiable #6 cannot be relied on for any type other than Finding.\n\nREMEDIATION: Extend the const _: fn() block at lib.rs:1463 to assert every public result, error, config, and value-carrier type. ~15 additional _assert_send_sync calls. Pre-1.0 free.\n\nSuggested grouping:\n  // Lint-engine surface\n  _assert_send_sync::<LintRunner>();\n  _assert_send_sync::<LintResult>();\n  _assert_send_sync::<LintParameter>();\n  _assert_send_sync::<ParameterError>();\n  // Deviation surface\n  _assert_send_sync::<Deviation>();\n  _assert_send_sync::<DeviationScope>();\n  _assert_send_sync::<DeviationStore>();\n  _assert_send_sync::<DeviationAddError>();\n  _assert_send_sync::<DeviationRunResult>();\n  _assert_send_sync::<DeviationRunner>();\n  _assert_send_sync::<ScopePropValue>();\n  _assert_send_sync::<DeviatedFinding>();\n  // Report surface\n  _assert_send_sync::<EvaluationReport>();\n  // OSCAL surface (oscal feature only \u2014 gate with #[cfg])\n  #[cfg(feature = \"oscal\")]\n  _assert_send_sync::<crate::oscal::parse::ParseError>();\n  #[cfg(feature = \"oscal\")]\n  _assert_send_sync::<crate::oscal::profile::ResolvedProfile>();",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.26",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Send+Sync compile-time assertions only cover Finding; LintRunner, EvaluationReport, DeviationStore, Deviation, DeviationScope, DeviationAddError, ParseError, DeviatedFinding all uncovered",
+  "updated_at": "2026-05-14T16:57:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T09:00:34Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

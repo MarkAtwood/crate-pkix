@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Advisory-only contract documented in crate-level doc and LintRunner; Fatal clarified as lint-evaluation stop only",
+  "closed_at": "2026-05-06T19:25:36Z",
+  "compaction_level": 0,
+  "content_hash": "dfede14da10903c9753ef108dec2bbcfa688b9fa6d60bd809b836d36619e721b",
+  "created_at": "2026-05-06T19:20:39Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint must be explicitly documented and enforced as report-only. LintResult::Fatal means 'stop evaluating further lints for this item' \u2014 it does NOT propagate to the TLS stack as a cert rejection. Hard-fail behavior at the TLS layer is the responsibility of the integration layer (pkix-chain or wolfSSL binding), not pkix-lint.\n\nChanges needed:\n1. Add explicit rustdoc to LintResult::Fatal clarifying it stops lint evaluation, not cert acceptance\n2. Add explicit rustdoc to LintRunner stating findings are advisory only\n3. Ensure there is no code path in pkix-lint that returns an Err() causing a cert rejection\n4. Document in crate-level docs: 'pkix-lint findings are advisory. Whether to reject a cert based on findings is the caller's decision, configured per finding-ID at the integration layer.'\n\nThe integration layer design (which finding-IDs map to hard-fail in pkix-chain) is a separate issue.",
+  "ephemeral": 0,
+  "id": "PKIX-9i4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: LintResult::Fatal is report-only, never TLS-stack hard-fail",
+  "updated_at": "2026-05-06T19:25:36Z"
+}

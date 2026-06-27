@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T22:30:26Z",
+  "compaction_level": 0,
+  "content_hash": "1ec8d92c4e6ccacb551e6bd17e64051cc1b8df4e043750713fca3ce09845b804",
+  "created_at": "2026-05-06T22:14:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-lint/src/cabf_tls_br.rs:255: check 'n_bytes >= 256' passes a 2047-bit modulus (256 bytes, no leading 0x00 since high bit is 0) as compliant with the 2048-bit minimum. The doc comment acknowledges this but claims it matches zlint behavior. CA/B Forum TLS BR \u00a76.1.5 requires >= 2048 bits strictly; 2047-bit keys should fail. The same bug exists in pkix-path/src/lib.rs:rsa_public_key_bits where UintRef::as_bytes() strips the leading sign byte so the bit count is magnitude_bytes*8, flooring a 2048-bit key (2048 bits, 256 magnitude bytes) to 2048. Actually wait \u2014 rsa_public_key_bits returns magnitude bytes * 8, and a 2048-bit key has 256 magnitude bytes (UintRef strips 0x00) \u2192 2048 bits \u2014 this path is correct. But the lint uses raw DER length (including 0x00), so a 2047-bit key (256 DER bytes) passes. The two paths disagree: pkix-path rejects 2047-bit keys (magnitude = 256 bytes \u2192 2048 reported, passes min_rsa_key_bits=2048), while the lint passes 2047-bit keys.",
+  "ephemeral": 0,
+  "id": "PKIX-9to.3",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RsaMinKeySizeLint accepts 2047-bit RSA keys as passing the 2048-bit floor",
+  "updated_at": "2026-05-06T22:30:26Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T15:14:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-9to",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

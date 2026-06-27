@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Promoted the duplicate-lint-ID check from debug_assert! (gated by #[cfg(debug_assertions)]) to an unconditional check that panics in both debug and release builds. Extracted as LintRunner::check_unique_ids() so both constructors (new and with_bundle_version) enforce the same invariant. Panic message names the duplicated id for diagnosability. Three regression tests: lint_runner_new_panics_on_duplicate_lint_ids, lint_runner_with_bundle_version_panics_on_duplicate_lint_ids (both #[should_panic]), and lint_runner_new_accepts_distinct_ids (positive). Verified the panic surfaces in release mode via cargo test --release. Updated rustdoc on both constructors with a # Panics section documenting the precondition. Considered Result<Self, Error> but rejected for this fix: the panic is the correct loud-fail signal for a config bug that can't be meaningfully recovered from (no LintRunner without the duplicate makes sense), and the API churn is unwarranted pre-1.0. Workspace tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:33:13Z",
+  "compaction_level": 0,
+  "content_hash": "91cfe2e3ab5c91f7cfa617478741d57df537d30044b9e143ffea29804b24ef9c",
+  "created_at": "2026-05-14T12:40:19Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: lib.rs:1013-1029. LintRunner::new asserts uniqueness of lint IDs only under #[cfg(debug_assertions)]. In release builds, duplicate IDs are accepted silently. Doc on LintRunner says 'while the runner does not reject duplicate lint IDs, supplying lints with duplicate IDs interacts poorly with the deviation mechanism: a deviation keyed on a given ID will apply to every finding with that ID, which is unlikely to be the intended behavior and makes the audit trail ambiguous.' That's not 'unlikely'; it's silently wrong: DeviationStore::find_deviation returns the first matching deviation, which gets applied to every finding with that lint_id. If a caller has registered the same lint twice (e.g., from two different LintProfiles unioned at runtime), both findings get the deviation applied, halving the visible work and producing a false sense of compliance. The fix is to promote debug_assert!() to assert!() (single comparison, no measurable cost for typical lint sets) or to return Result<Self, Error> and let callers handle the duplicate case. Maintenance scenario: a user reports 'my deviation says it's applied but the report shows 2 findings instead of 1' \u2014 debugging takes hours because the duplicate-ID is the proximate cause but it's never logged or asserted in the binary the user is running. P1 because every cargo install user gets the release-build path.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.7",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "LintRunner duplicate-ID check is debug_assert only \u2014 silent confusing behavior in release",
+  "updated_at": "2026-05-14T13:33:13Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

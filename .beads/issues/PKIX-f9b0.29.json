@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:32:17Z",
+  "compaction_level": 0,
+  "content_hash": "6f08830a848a8446fe93446550ee947552d1efa84748bdcf76a7d4b118d79afa",
+  "created_at": "2026-05-07T17:23:06Z",
+  "created_by": "Mark Atwood",
+  "description": "tests/verify_simple_tests.rs multiple lines \u2014 clippy::doc_markdown flags bare identifiers in test-doc comments. Fix: wrap each in backticks. Cosmetic.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.29",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-chain-simple] fix doc_markdown backtick gaps in tests",
+  "updated_at": "2026-05-07T17:32:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:06Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

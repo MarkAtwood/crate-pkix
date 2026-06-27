@@ -1,0 +1,31 @@
+{
+  "close_reason": "chain_walk NC init comment now explains RFC \u00a76.1.2 scope covers all certs including intermediates",
+  "closed_at": "2026-05-03T13:26:50Z",
+  "compaction_level": 0,
+  "content_hash": "599ad0614a4683f18be66636cc647cbcaeaaf5db8e53441cf3d3b659cff10a48",
+  "created_at": "2026-05-03T13:15:47Z",
+  "created_by": "Mark Atwood",
+  "description": "chain_walk seeds nc_permitted and nc_excluded from the trust anchor's name_constraints before iterating the chain root-to-leaf. This means anchor NC constraints are applied to intermediate CA certs in the chain as well as the leaf \u2014 which is correct per RFC 5280 \u00a76.1 initial state, but the comment only says 'seed initial state from trust anchor NC (\u00a76.1.2 step e/f)'. A future contributor who sees that intermediates are being checked against anchor NC may assume this is a bug and remove the seeding, breaking the invariant. The comment should explicitly note that RFC 5280 \u00a76.1 requires anchor NC to be enforced on all certs including intermediates.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.13",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "anchor NC seeding applied to intermediate CAs not documented",
+  "updated_at": "2026-05-03T13:26:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:47Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

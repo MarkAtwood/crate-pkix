@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T16:58:45Z",
+  "compaction_level": 0,
+  "content_hash": "6693298891f3e5f9272a11b0e1a75fd6ea4dc8b98d8a93d9f55e966919a346c5",
+  "created_at": "2026-05-06T16:50:57Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/ocsp.rs:204-213\n\n`hash_certid_input` uses an if-else chain to dispatch on OID:\n\n```rust\nfn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {\n    if oid == &OID_SHA1 {\n        use sha1::Digest as _;\n        Ok(sha1::Sha1::digest(data).to_vec())\n    } else if oid == &OID_SHA256 {\n        use sha2::Digest as _;\n        Ok(sha2::Sha256::digest(data).to_vec())\n    } else {\n        Err(Error::OcspMalformed)\n    }\n}\n```\n\nRust idiom strongly prefers `match` for exhaustive dispatch, especially when the default arm is the catch-all error. The `match` form is both more idiomatic and more readable, and scales gracefully when SHA-384 is added in v0.2:\n\n```rust\nfn hash_certid_input(oid: &der::asn1::ObjectIdentifier, data: &[u8]) -> crate::Result<Vec<u8>> {\n    match *oid {\n        OID_SHA1 => {\n            use sha1::Digest as _;\n            Ok(sha1::Sha1::digest(data).to_vec())\n        }\n        OID_SHA256 => {\n            use sha2::Digest as _;\n            Ok(sha2::Sha256::digest(data).to_vec())\n        }\n        _ => Err(Error::OcspMalformed),\n    }\n}\n```\n\nP4: style-only, no behavior change.",
+  "ephemeral": 0,
+  "id": "PKIX-2j0.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "ocsp.rs: hash_certid_input should use match instead of if-else chain",
+  "updated_at": "2026-05-06T16:58:45Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T09:50:57Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-2j0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

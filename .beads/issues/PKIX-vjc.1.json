@@ -1,0 +1,31 @@
+{
+  "close_reason": "Updated crate-level doc and ValidationPolicy doc; NC is implemented in v0.1",
+  "closed_at": "2026-05-03T00:33:50Z",
+  "compaction_level": 0,
+  "content_hash": "4a3f6889f5e5b1db785cf2e0ecebfd8c19fa3008d629153aa4ef78c719489039",
+  "created_at": "2026-05-03T00:10:11Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs crate-level doc (line 26) and ValidationPolicy doc (line 289) both say 'v0.1 does not implement NameConstraints' \u2014 but the feature is now implemented. A caller reading the crate docs will believe NC is silently skipped and may rely on that misstatement, leading to security bypasses in environments that audit documentation rather than code.",
+  "ephemeral": 0,
+  "id": "PKIX-vjc.1",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "module doc still lists NameConstraints as unimplemented",
+  "updated_at": "2026-05-03T00:33:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T17:10:11Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-vjc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

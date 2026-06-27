@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:06Z",
+  "compaction_level": 0,
+  "content_hash": "8786489be39234205613919974a7cc038a5d42bb4576f9f650bfc6c015a268d6",
+  "created_at": "2026-05-05T15:45:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1162\u20131168\n\nAfter introducing the NcTypeMask newtype with associated constants (RFC822, DNS, DIRECTORY_NAME, URI, IP_ADDRESS), five module-level const aliases were kept 'for backwards-compatible internal use':\n\n    const NC_TYPE_RFC822: NcTypeMask = NcTypeMask::RFC822;\n    // \u2026 etc.\n\nThese are private internal constants; there is no backwards-compatibility obligation for internal items.  All use sites (lines 1175\u20131179, 2240, 2304, 2315, 2330) already use the NC_TYPE_* names.  This is noise: a future reader sees two names for every concept and must understand the comment to know they are identical.  The idiomatic fix is to remove the aliases and update the five use sites to NcTypeMask::RFC822, NcTypeMask::DIRECTORY_NAME, etc.  This makes the newtype self-contained and removes the only justification for the comment block.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.4",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NC_TYPE_* module aliases are dead weight after NcTypeMask",
+  "updated_at": "2026-05-05T16:06:06Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:45:42Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

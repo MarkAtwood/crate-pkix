@@ -1,0 +1,31 @@
+{
+  "close_reason": "fixed: removed excluded loop from nc_constrained_types seeding",
+  "closed_at": "2026-05-03T13:25:21Z",
+  "compaction_level": 0,
+  "content_hash": "7cb6ebf8b5dabce46508cabb6257403a23c3ed75ca0904f248acbde2a6c4f31e",
+  "created_at": "2026-05-03T13:18:04Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: anchor NC has excluded_subtrees=[dNSName:.evil.com] with no permitted_subtrees; later intermediate CA has permitted_subtrees=[iPAddress:10.0.0.0/8]. The anchor seeding loop (chain_walk lines ~1230-1233) ORs NC_TYPE_DNS into nc_constrained_types from the excluded entry. When the intermediate's permitted_subtrees transitions nc_permitted from None to Some([iPAddress:...]), the permitted check fires for all constrained types. dNSName type has its bit set (from the anchor excluded loop) but no entry in nc_permitted \u2014 every leaf with a dNSName SAN receives NameConstraintViolation. Bad behavior: false rejection of valid chains. The excluded check (require_match=false) does NOT use nc_constrained_types at all, so setting excluded-type bits there serves no legitimate purpose and only causes this false-positive. The existing PKIX-onc.18 note claims this seeding is 'critically correct' but that reasoning is wrong: the excluded check fires unconditionally without consulting nc_constrained_types.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.20",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 0,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "nc_constrained_types seeded from anchor excluded: false NC violation",
+  "updated_at": "2026-05-03T13:25:21Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:18:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d8209a59c0ed5dc68fb52724423bca357a60d3162470c4a51286edbeabe8f899",
+  "created_at": "2026-05-14T19:39:00Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/lib.rs:66-124 (crl_reason_serde) and the round-trip test at pkix-revocation/tests/serde_round_trip.rs:111-125 commit to: the on-the-wire form of Option<CrlReason> uses the RFC 5280 \u00a75.3.1 numeric codes (KeyCompromise = 1, etc.).\n\nA future contributor might suggest using the variant name strings (KeyCompromise as the JSON string \"KeyCompromise\") for 'readability' \u2014 they should NOT. Reasons:\n\n1. The numeric codes are the spec's canonical identifier. RFC 5280 \u00a75.3.1 defines them as enumerated INTEGERs with stable numeric values. The variant names are an x509-cert crate naming choice that could change across major versions.\n\n2. Forward compatibility: from_code returns None for unrecognized values (line 94-108). A future RFC adding reason code 11 round-trips as None for current consumers without a parse error. A variant-name encoding would either fail to parse (breaking) or accept arbitrary strings (silent).\n\n3. Interop: any external system reading the serialized form against RFC 5280 will use the numeric codes.\n\nThe hand-written deserialize_opt + serialize_opt impl IS the right shape. Do not switch to a derived serde representation.",
+  "ephemeral": 0,
+  "id": "PKIX-lnnl.12",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Serde wire form for CrlReason uses RFC numeric codes, not variant names",
+  "updated_at": "2026-05-14T19:39:00Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T12:39:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-lnnl",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

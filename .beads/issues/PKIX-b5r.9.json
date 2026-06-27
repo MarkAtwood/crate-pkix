@@ -1,0 +1,31 @@
+{
+  "close_reason": "Fixed: added Debug to CheckMode derive.",
+  "closed_at": "2026-05-05T16:08:17Z",
+  "compaction_level": 0,
+  "content_hash": "d4a7ea6f8cc38094bbd7256d7b05f1385e730f0d35c5364a8b769cb050450e2e",
+  "created_at": "2026-05-05T15:46:10Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:2190\u20132196\n\nCheckMode is declared as:\n\n    #[derive(Clone, Copy, PartialEq, Eq)]\n    enum CheckMode { Excluded, Permitted }\n\nIt is missing Debug.  Any type that can appear in a match arm or be held in a struct that derives Debug should itself derive Debug.  Without it, if someone wraps CheckMode in a struct or Result for debugging purposes they get a compiler error rather than an automatic impl.\n\nBy Rust convention, all concrete types that are Clone + PartialEq should also be Debug unless there is a specific reason to suppress it (e.g., containing a non-Debug third-party type).  There is no such reason here.\n\nFix: add Debug to the derive list.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.9",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "CheckMode missing Debug impl",
+  "updated_at": "2026-05-05T16:08:17Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:46:10Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

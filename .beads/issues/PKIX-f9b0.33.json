@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T17:29:40Z",
+  "compaction_level": 0,
+  "content_hash": "929eb249c56adedc5719f0ffa47426f83a3293e7687d095e83fc5d3329108790",
+  "created_at": "2026-05-07T17:23:29Z",
+  "created_by": "Mark Atwood",
+  "description": "deviation.rs:577 DeviationStore::all(), deviation.rs:714 DeviationRunner::lint_runner(), deviation.rs:719 DeviationRunner::deviation_store(), lib.rs:683 LintRunner::lints(), lib.rs:688 LintRunner::bundle_version() \u2014 all return owned/borrowed data with no side effects; clippy::must_use_candidate fires on all five. Fix: add #[must_use] to each. Compare: active_at() and find_deviation() already have #[must_use]; these five are inconsistently missing it.",
+  "ephemeral": 0,
+  "id": "PKIX-f9b0.33",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "[rusty/pkix-lint] #[must_use] missing on accessor methods",
+  "updated_at": "2026-05-07T17:29:40Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T10:23:28Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f9b0",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

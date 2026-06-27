@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T20:58:35Z",
+  "compaction_level": 0,
+  "content_hash": "6a0ee1aea36b0c247f2a966e62142611f8cc9c33b87037a9b09020c16926e6f7",
+  "created_at": "2026-05-06T20:48:21Z",
+  "created_by": "Mark Atwood",
+  "ephemeral": 0,
+  "id": "PKIX-m75.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "Full description: LintProfile::lint_runner (pkix-lint/src/lib.rs:670) returns a LintRunner but is not annotated with #[must_use]. If a caller writes 'profile.lint_runner();' without capturing the result, the compiler emits no warning. Since the entire purpose of calling lint_runner() is to obtain a runner for subsequent use, silently discarding it is always a bug. Fix: add #[must_use] to the lint_runner() method in the LintProfile trait definition. Consistent with the existing #[must_use] on LintRunner::new(), LintRunner::run_cert() etc. in the same codebase.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "RUSTY: LintProfile::lint_runner missing #[must_use]",
+  "updated_at": "2026-05-06T20:58:35Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T13:48:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-m75",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

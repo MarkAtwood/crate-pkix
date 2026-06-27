@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T18:34:35Z",
+  "id": "019e1d78-2bed-7b2a-ab6b-37d7af6c0cf1",
+  "issue_id": "PKIX-fmtv.14",
+  "text": "WONTFIX 2026-05-12 -- mechanical cascade per this bead's own description. PKIX-fmtv.6 closed as B (parallel pipeline); the bead body says: 'If option B (parallel pipeline), this child closes as WONTFIX and pkix-lint stays standalone.' No adapter type to implement. pkix-lint::LintRunner remains the only way to run lints; pkix-chain's verify_* wrappers do not invoke it. Composition pattern (caller invokes verify_* then LintRunner) is documented in PKIX-fmtv.6's decision comment. If a thin pkix_chain::verify_and_lint() convenience function is desired later, file it as a new bead -- not part of this child's scope."
+}

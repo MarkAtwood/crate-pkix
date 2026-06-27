@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c9bb30c006507852fcb9fd0067ce5c7d50d4c75f8d7b03e55517cd83cd1935a6",
+  "created_at": "2026-05-14T18:28:51Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:49-53 (# Limitations) says: \"A single bettertls path-building corner case (pathbuilding::tc60) is documented as a known divergence; closing it is a 1.0 release blocker tracked under PKIX-lwr9.4.\" CHANGELOG [0.3.1] simultaneously claims build_first_valid_path \"closes the consumer-ergonomics gap surfaced by PKIX-lwr9.4 / BetterTLS tc60\". Either tc60 IS resolved (CHANGELOG view) or it ISN'T (Limitations view) \u2014 can't be both. Two consequences: (a) users reading the rustdoc will think the crate has a known correctness bug at 1.0 when the upstream story is that the helper resolves it; (b) when 1.0 actually ships, this stale text will look like a missed line in the audit and erode trust. Decide: is the residual build_path divergence a documented limitation (\"build_path is single-shot; use build_first_valid_path for cross-signed pools\") or a release blocker? Rewrite the Limitations bullet accordingly. The bettertls fixture README has the same dual framing (line 49-72 vs CHANGELOG line 28-30).",
+  "ephemeral": 0,
+  "id": "PKIX-wnnn.4",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Limitations section claims tc60 still a 1.0 blocker but 0.3.1 ships the resolution",
+  "updated_at": "2026-05-14T18:28:51Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:28:51Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wnnn",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

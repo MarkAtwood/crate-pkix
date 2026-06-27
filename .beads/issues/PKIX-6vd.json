@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "copied 405 PKITS cert files and vectors.json from Go toolchain source to pkix-path/tests/pkits/; created README.md with provenance",
+  "closed_at": "2026-05-02T06:28:57Z",
+  "compaction_level": 0,
+  "content_hash": "23a353629c8ace9cf6deb8b68e9b038c8deba7b86af473d9e02e04b17f3a8391",
+  "created_at": "2026-05-02T05:52:35Z",
+  "created_by": "Mark Atwood",
+  "description": "Download the NIST PKITS test suite and commit the DER certificate and CRL fixtures to the repository.\n\nSource: https://csrc.nist.gov/projects/pki-testing (PKITS zip download)\nThe ZIP contains a Data/ directory with Certificates/ and CRLs/ subdirectories.\n\nCommit location: pkix-path/tests/pkits/certs/ and pkix-path/tests/pkits/crls/\n\nAlso commit a pkix-path/tests/pkits/README.md (this is an exception to the no-markdown rule \u2014 it documents the fixture provenance) containing:\n  - Source URL\n  - SHA-256 of the ZIP file downloaded\n  - Date downloaded\n  - How to verify: sha256sum instructions\n\nThe PKITS trust anchor certificate is TrustAnchorRootCertificate.crt \u2014 this is the root against which all PKITS chains are validated.\n\nDo NOT commit the ZIP itself \u2014 only the individual DER files. This keeps git history clean and avoids committing a large binary blob.\n\nThis issue has no code dependencies and can be done before any other epic.",
+  "ephemeral": 0,
+  "id": "PKIX-6vd",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "PKITS: obtain and commit DER certificate fixtures",
+  "updated_at": "2026-05-02T06:28:57Z"
+}

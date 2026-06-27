@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:28:10Z",
+  "compaction_level": 0,
+  "content_hash": "90e7a6d957f28270025ecbf788f4abb0c40fe8c30564bfe2af9ec9581f72f785",
+  "created_at": "2026-05-06T23:20:36Z",
+  "created_by": "Mark Atwood",
+  "description": "The round-trip test serializes EvaluationReport to JSON then deserializes into serde_json::Value, not back into EvaluationReport. The Deserialize impl (including de_cow_static) is never exercised. Fix: add serde_json::from_str::<EvaluationReport>(&json) and assert fields round-trip correctly. File: pkix-lint/src/report.rs lines 290-310.",
+  "ephemeral": 0,
+  "id": "PKIX-tog.17",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-lint: report.rs json_round_trip test doesn't deserialize back to EvaluationReport",
+  "updated_at": "2026-05-06T23:28:10Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T16:20:36Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tog",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

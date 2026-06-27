@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "078e1f1e2d7a728db21e0cd472110c9d11d00f4a501a8140144e47597c328b96",
+  "created_at": "2026-05-14T15:46:05Z",
+  "created_by": "Mark Atwood",
+  "description": "lib.rs:281-301 inserts Severity::Notice between Info and Warn, mid-enum. The Severity test severity_ordering_is_info_notice_warn_error_fatal at lib.rs:1934-1942 pins the ordering explicitly: assert!(Severity::Info < Severity::Notice); \u2026\n\nDefense: inserting a variant in the middle of a #[derive(PartialOrd, Ord)] enum silently reorders existing variants. Without an explicit ordering test, a future contributor adding 'Critical' (or any other variant) in the wrong position would silently break every consumer that filters by '>= Warn'. The explicit test catches this at compile-error-via-test-fail time.\n\nThe PartialOrd derivation depends on declaration order. The test makes that order load-bearing rather than an accident.\n\nWhat a contributor might suggest changing: 'just sort the Severity enum alphabetically' \u2014 would break the ordering. Or 'use a custom PartialOrd impl with explicit cases' \u2014 more code, equivalent behavior, easier to break with a refactor. The current shape (declaration order + ordering test) is the simplest correct option.\n\nLock this in. Add similar ordering pins to any other deriving-PartialOrd enum in the workspace.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.23",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Severity::Notice slotted into existing ordering with explicit pin test",
+  "updated_at": "2026-05-14T15:46:05Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:46:05Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

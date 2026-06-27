@@ -1,0 +1,31 @@
+{
+  "close_reason": "Known duplication, minor. Both certs_is_ca functions are in different crates with no shared dependency path. Acceptable for v0.1.",
+  "closed_at": "2026-05-05T16:10:22Z",
+  "compaction_level": 0,
+  "content_hash": "b6e16f911ef1fd5f8fd2b4ca86cb742a37f90a8bdfe88e7cec829d8bfe534d2f",
+  "created_at": "2026-05-05T15:48:08Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path-builder/src/lib.rs:113\u2013126 and pkix-revocation/src/crl.rs:416\u2013428\n\nBoth crates define a near-identical function that returns true iff BasicConstraints cA=TRUE:\n\npkix-path-builder: cert_is_ca()\npkix-revocation:   cert_is_ca_cert()\n\nBoth use the same OID (2.5.29.19), same pattern (extensions.as_deref().unwrap_or(&[]).iter().find().and_then().map().unwrap_or(false)), and same semantics.\n\npkix-path already performs this check in chain_walk (cert_basic_constraints + .ca), so the logic exists in three places across two crates.  If pkix-path were to expose a helper (e.g., is_ca_certificate) as pub(crate) or a thin public utility in a future version, both duplicates could be removed.\n\nFor now, the duplication is a maintenance burden: if the semantics change (e.g., 'no extensions' should be treated differently), two files must be updated.  The cert_is_ca in pkix-path-builder also uses the hardcoded OID string rather than sharing a constant with pkix-path, compounding the duplication.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.25",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "cert_is_ca in pkix-path-builder duplicates cert_is_ca_cert in pkix-revocation",
+  "updated_at": "2026-05-05T16:10:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:48:07Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

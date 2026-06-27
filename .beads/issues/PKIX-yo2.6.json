@@ -1,0 +1,31 @@
+{
+  "close_reason": "Closed",
+  "closed_at": "2026-05-02T20:36:49Z",
+  "compaction_level": 0,
+  "content_hash": "36830eb707316988a590626dfc5d020a051bffc405286fd9145b24eadfa8ccd0",
+  "created_at": "2026-05-02T20:34:41Z",
+  "created_by": "Mark Atwood",
+  "description": "ValidationPolicy::new(now_unix) exists as the preferred constructor precisely because Default::default() sets current_time_unix=0 (1970-01-01). A caller using Default will silently fail every notBefore check. The preferred constructor forces the caller to supply a timestamp. This design decision should not be 'simplified' by removing the new() constructor or by setting a non-zero Default \u2014 the zero default is intentional to make the silent failure mode impossible to miss if Default is used.",
+  "ephemeral": 0,
+  "id": "PKIX-yo2.6",
+  "is_template": 0,
+  "issue_type": "decision",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decision: ValidationPolicy::new(now_unix) forces clock supply, prevents silent clock=0 failures",
+  "updated_at": "2026-05-02T20:36:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T13:34:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yo2",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

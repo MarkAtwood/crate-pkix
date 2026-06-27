@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T21:36:29Z",
+  "compaction_level": 0,
+  "content_hash": "10a20168df19630849dbbad3e471494f5442c133fc49727d8bb43e6561e442b9",
+  "created_at": "2026-05-06T21:31:12Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs lines 185-188: The DuplicateCertificate error variant doc says: \"A certificate appearing at two positions in the chain (or two distinct certificates that share the same public key) indicates a likely error in chain construction.\" The second clause \u2014 \"two distinct certificates that share the same public key ... indicates a likely error\" \u2014 is incorrect for cross-certification topologies where two different CA certs intentionally carry the same key. The doc should either: (a) narrow the claim to only cover the same DER cert at two positions, or (b) note this as a known false-positive for cross-signed chains and reference the P0 issue above.",
+  "ephemeral": 0,
+  "id": "PKIX-p23.10",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P4: check_inputs DuplicateCertificate doc says 'two distinct certs sharing same key indicates chain construction error' \u2014 this is false for cross-signed certs",
+  "updated_at": "2026-05-06T21:36:29Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T14:31:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-p23",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

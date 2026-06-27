@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "379545302111ad416d9ffc690dcd47d9e3fd96a53a98961c7b2421733ce04e1d",
+  "created_at": "2026-05-14T13:04:03Z",
+  "created_by": "Mark Atwood",
+  "description": "Trigger: oscal/emit.rs:776-793 (finding_seed), 797-807 (risk_seed), and the similar buf.extend_from_slice patterns in report_seed / subject_seed / EvidenceKey::seed concatenate fields into the UUIDv8 SHA-256 input WITHOUT unambiguous separators between every field. finding_seed places exactly one separator byte (after lint_id) but appends the severity_label byte, detail message, cert_index bytes, and cert_sha256 directly without trailing markers.\n\nConcrete collision shape: two distinct findings can produce the same seed bytes when the bytes appended after the single 0x00 separator can be split in two ways. E.g.:\n  finding A: lint_id='foo', severity='e', detail='bar'      \u2192 seed = ...|foo|0x00|e|bar\n  finding B: lint_id='foo', severity='e', detail='bar' but with a different cert_index that happens to be ASCII bytes equal to the next region \u2192 the same byte sequence\n\nActual bad behavior: distinct findings can in principle collide on UUID. The 122-bit version-8 output gives ~2^61 birthday-bound collision resistance against a brute-force attacker, but an attacker with ANY influence over the detail message (which comes from certificate content via lint message strings \u2014 see e.g. ExtendedKeyUsage extension absent from leaf certificate in rfc5280.rs:362) does not need to brute-force the full hash. They only need to collide the seed bytes.\n\nCurrently exploitable? No \u2014 lint_id values are author-controlled, severity_labels are fixed, and the cert_index + cert_sha256 fields are positionally fixed-width. The realistic worst case is an attacker-crafted certificate whose detail string differs from a benign one but produces the same seed. This requires bit-precise alignment that the current field set makes impractical.\n\nWhy P3 (defense-in-depth, not P2): the engineering posture is wrong even though no concrete exploit exists today. Adding a new field to Finding in a future version could remove the positional guarantee that currently saves us. The standard cure is length-prefixed serialization or explicit separators after every variable-length field.\n\nFix: in finding_seed, risk_seed, and EvidenceKey::seed, prefix every variable-length field with a 4- or 8-byte length tag (u32::to_le_bytes(s.len() as u32)) instead of, or in addition to, the trailing 0x00 separators. Equivalently, hash a tagged structured input: hasher.update(&(f.lint_id.len() as u32).to_le_bytes()); hasher.update(f.lint_id.as_bytes()); ...\n\nSection: G (algorithm and parameter choice \u2014 hash input canonicalization)",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.41",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "UUIDv8 seed construction in oscal::emit has delimiter-ambiguous field concatenation",
+  "updated_at": "2026-05-14T13:04:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T06:04:02Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "author": "Mark Atwood",
+  "created_at": "2026-05-12T23:43:15Z",
+  "id": "019e1e92-c0c5-74b1-a638-521805c20e04",
+  "issue_id": "PKIX-fmtv.12",
+  "text": "API SHAPE UPDATE 2026-05-12 (cascade from PKIX-2l0v.3 = C, filed as PKIX-gsd9): verify_smime_signer / verify_smime_recipient compose Verifier internally same as verify_tls_server (PKIX-fmtv.11). Verifier::new() + verify_one() + mailbox binding via pkix-identity. PKIX-gsd9 lands first."
+}

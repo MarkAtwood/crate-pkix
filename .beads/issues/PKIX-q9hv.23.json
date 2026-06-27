@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c33ba3c3c487e73a7bc29e81f906cb0e5fa8ee520cae0601ed32d10da8a80f00",
+  "created_at": "2026-05-14T14:51:03Z",
+  "created_by": "Mark Atwood",
+  "description": "The TLS client wrappers take an *optional* identity binding:\n\n    pub fn verify_tls_client_dns<P, R>(\n        chain: &[Certificate],\n        anchors: &[TrustAnchor],\n        identity: Option<&ServerName<'_>>,   // <-- optional\n        profile: &P,\n        now_unix: u64,\n        revocation: &R,\n    ) -> crate::Result<ValidatedPath>;\n\n    pub fn verify_tls_client_mailbox<P, R>(\n        ...\n        identity: Option<&MailboxName<'_>>,   // <-- optional\n        ...\n    );\n\nThe rustdoc rationale (src/lib.rs:776-787 and similar) \u2014 \\\"callers fall\ninto two camps... pin a DNS or IP identity in the SAN, or callers that\nwant path-only validation\\\" \u2014 applies equally to S/MIME. An MTA\noperator validating inbound S/MIME signatures may want chain validity\n+ EKU enforcement (`emailProtection`) but read the identity out of the\nRFC 5322 From header, not the cert SAN. A document-archiving system\nmay want to verify the chain validates and the cert was for S/MIME use\nat all, deferring identity binding to a different layer.\n\nBut:\n\n    pub fn verify_smime_signer<P, R>(\n        chain: &[Certificate],\n        anchors: &[TrustAnchor],\n        mailbox: &MailboxName<'_>,   // <-- required\n        ...\n    );\n\n    pub fn verify_smime_recipient<P, R>(\n        ...\n        mailbox: &MailboxName<'_>,   // <-- required\n        ...\n    );\n\nThere's no way to invoke these wrappers without supplying a mailbox.\nCallers wanting the EKU + KU enforcement that the recipient/signer\nprofile encodes, without identity binding, are forced to:\n\n1. Drop down to `verify_chain` directly, AND\n2. Reimplement the profile EKU/KU enforcement themselves (since the\n   wrapper does it via the supplied Profile, and the wrapper body is\n   the thing pulling that profile into play).\n\nThis is the api-contract,defensive smell: a wrapper exists for the\ncommon case, but the slightly-less-common case (path-only S/MIME\nvalidation) is *worse* served than if no wrapper existed at all\n(because the caller has to recreate the wrapper logic).\n\nSuggested fix: change both signatures to `mailbox: Option<&MailboxName<'_>>`,\nmatching `verify_tls_client_mailbox`. Body is one `if let Some(m) = mailbox`\nguard, identical to the TLS-client side. The signer-vs-recipient distinction\nremains in the caller-supplied Profile (which is the contract anyway,\nper PKIX-q9hv.5).\n\nCaller impact: MTAs / document-archiving / batch S/MIME validators\nthat read identity from a non-cert source.",
+  "ephemeral": 0,
+  "id": "PKIX-q9hv.23",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "verify_smime_signer/recipient take required mailbox; no path-only mode",
+  "updated_at": "2026-05-14T14:51:03Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T07:51:03Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-q9hv",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

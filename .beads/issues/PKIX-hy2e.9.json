@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added DeviationAddError::MalformedScope variant + validate_scope() helper called by DeviationStore::add. Malformed scopes (missing required props, wrong-typed props) for the canonical scope kinds (any, issuer_dn_contains, issuer_dn_exact, serial_range) now produce a specific error at insertion time naming the offending kind and the structural problem, instead of silently never matching at evaluation time. The operator-perception bug ('my deviation isn't being applied') is now caught at the API boundary. Custom / caller-defined scope kinds are accepted without inspection (the documented fail-closed extensibility contract). Six regression tests cover the canonical kinds: missing prop on issuer_dn_contains, wrong-typed prop on issuer_dn_contains, missing prop on issuer_dn_exact, missing prop on serial_range, well-formed scopes pass, custom kinds pass. Considered option (a) make-fields-private but rejected: the public-field shape is needed for the OSCAL serde shape, and PKIX-hy2e.22's #[non_exhaustive] already blocks the external struct-literal construction path; the remaining hand-built malformed scope path is hit at insertion-time validation. 265 lib tests + 7 doc tests pass; clippy --all-features --all-targets clean.",
+  "closed_at": "2026-05-14T13:53:19Z",
+  "compaction_level": 0,
+  "content_hash": "2eb2f426ebf95fece4bb982d25baeb1e3a5ed24c231c6c28e3271f3d53feae58",
+  "created_at": "2026-05-14T12:40:41Z",
+  "created_by": "Mark Atwood",
+  "description": "Site: deviation.rs:444-495. DeviationScope::matches returns false for: (a) unknown kind, (b) missing required prop, (c) wrong-typed prop, (d) malformed DER. All four also produce false from a legitimate 'this cert is not within scope' result. Scenario: an operator hand-edits an OSCAL Risk JSON file and forgets the issuer_dn_substring prop. Parse-time validation catches MOST shape errors, but the deviation.rs side itself doesn't reject \u2014 it accepts a hand-constructed DeviationScope { kind: SCOPE_KIND_ISSUER_DN_CONTAINS, props: vec![] } via direct struct literal (which is publicly accessible \u2014 props and kind are pub fields). DeviationScope::matches against any cert returns false. Maintenance consequence: 'my deviation isn't being applied' tickets where the cause is a silently malformed scope; no way to distinguish from 'cert isn't in scope.' Fix: either (a) make kind and props non-pub and force construction through validating constructors only (breaking change but the scope of breakage is small at 0.x); (b) split DeviationScope::matches return type into Result<bool, ScopeError> where ScopeError covers the malformed cases; (c) log a warning at first encounter. (a) is the right answer pre-1.0. The deviation.rs tests cover the fail-closed behavior but do not cover the operator-perception 'I configured this and it doesn't work' angle.",
+  "ephemeral": 0,
+  "id": "PKIX-hy2e.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "DeviationScope::matches fail-closed on missing prop is indistinguishable from no-match",
+  "updated_at": "2026-05-14T13:53:19Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T05:40:40Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hy2e",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

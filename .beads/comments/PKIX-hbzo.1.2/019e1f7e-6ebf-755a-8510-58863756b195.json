@@ -1,0 +1,7 @@
+{
+  "author": "bd-spin/bd-spin-20260513T014512Z-2345176",
+  "created_at": "2026-05-13T04:00:40Z",
+  "id": "019e1f7e-6ebf-755a-8510-58863756b195",
+  "issue_id": "PKIX-hbzo.1.2",
+  "text": "Blocked on PKIX-jy95.8 (pkix-pkilint-bridge crate not yet shipped \u2014 status=blocked as of 2026-05-12). bd refused blocks:PKIX-jy95.8 dep because epic-task edges are policy-disallowed; using status=blocked + this comment instead."
+}

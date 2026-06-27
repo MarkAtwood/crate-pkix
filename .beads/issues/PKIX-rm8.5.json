@@ -1,0 +1,19 @@
+{
+  "id": "PKIX-rm8.5",
+  "title": "pkix-chain::Error wraps upstream error types in public surface",
+  "description": "pkix-chain::Error wraps five upstream crate error types directly in its public enum variants: pkix_path::Error (Path), pkix_revocation::Error (Revocation), pkix_identity::IdentityError (Identity), pkix_aia::AiaError (Aia), and pkix_path_builder::Error (PathBuild). Each of these is a re-exported type from an upstream crate whose major version is locked into pkix-chain's API surface. A major version bump in any of these five crates forces a major version bump in pkix-chain even if pkix-chain itself has no API change.\n\nThis is more concerning for the non-workspace crate pkix_aia::AiaError and pkix_path_builder::Error than for the others, since pkix-path and pkix-revocation are tightly co-versioned within the workspace. However the From impls (e.g. From<pkix_path::Error> for Error, From<pkix_aia::AiaError> for Error) make the upstream type a first-class public API element.\n\nWhat goes wrong if this stays as-is: Each upstream major bump cascades as a forced major bump of pkix-chain. Pre-1.0 this is free per project policy, but post-1.0 it becomes a coordination headache. The pattern of mapping upstream errors into local stable error enums (like pkix-path does with DerError wrapping der::Error) is already established in the workspace for exactly this reason.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 150-243 (Error enum definition)\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 278-306 (From impls)",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "task",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:24:08Z",
+  "updated_at": "2026-06-15T17:07:39Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:24:08"
+    }
+  ]
+}

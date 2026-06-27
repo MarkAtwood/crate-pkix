@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "d98c0187d4658101d10e6dc0f0675b7b3dd5376ea17684f06a19cceeb03dfcbd",
+  "created_at": "2026-05-14T18:08:52Z",
+  "created_by": "Mark Atwood",
+  "description": "The eight use-case wrappers (verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper, verify_ocsp_responder) are concrete free functions with concrete signatures. Each one bakes in:\n\n- Signature verifier: always &DefaultVerifier (hardcoded; PKIX-sqek.9 covers the runtime cost).\n- AIA fetcher: always &NoAiaFetcher (hardcoded; PKIX-sqek.4 covers the runtime cost).\n- Argument ordering: (chain, anchors, [identity], profile, now_unix, revocation).\n- Return type: Result<ValidatedPath, Error>.\n\nEvery callsite of `verify_tls_server(chain, anchors, name, profile, now, revocation)` depends on this exact six-argument shape. Adding any new parameter \u2014 a fetcher, a logger, a metrics sink, a per-call policy override \u2014 is a breaking change to a published signature.\n\nWHY IT MATTERS FOR THE CALLER:\n\nThe slash-command checklist's \"Public surface immutability\" section calls out \"Once a function signature, trait method, struct field, enum variant, type alias, or re-export ships in a 0.x.y release, callers depend on it. A breaking change requires a major version bump and caller-side migration.\"\n\nThis is the classic \"config struct vs positional args\" question. Three credible patterns exist:\n\n(a) **Status quo.** Keep eight concrete functions; accept that future evolution adds parameters as breaking changes. The argument structure is read-at-the-callsite and self-documenting. Cost: every parameter add is a 2.0.\n\n(b) **Single config struct per use case.** `verify_tls_server(config: &TlsServerVerification<'_>)` where the struct is `#[non_exhaustive]` and uses the builder pattern. Adding fields is non-breaking. Cost: callsites lose the positional-arg discipline that makes wrong-order bugs unlikely.\n\n(c) **Builder on the verifier itself.** Make each wrapper a method on `Verifier`: `verifier.verify_tls_server(chain, &name)`. The signature evolution problem then lives on `Verifier` (covered by PKIX-sqek.19, also closely related to PKIX-sqek.4's wrapper-genericity question). This collapses the three filings into one re-shape decision.\n\n(c) is the most natural fit given PKIX-sqek.4 (wrappers should grow generic over A: AiaFetcher = NoAiaFetcher to match Verifier's shape) and PKIX-sqek.19 (Verifier itself wants a builder-shaped construction). The natural endpoint is: Verifier owns the trust state; wrappers are methods; signature evolution lives on Verifier. Eight free functions becomes eight methods + Verifier construction, and parameter adds become non-breaking via #[non_exhaustive] config structs argument types.\n\nThe CHANGELOG entry already describes verify_chain as a \"thin wrapper around Verifier::verify_one.\" The use-case wrappers should follow the same model \u2014 wrappers as methods, not free functions.\n\nPRE-1.0 FRAMING (AGENTS.md): every wrapper that ships at 1.0 as a free function commits the maintainer to that signature forever. The cost of moving from free-function to method (or to a config struct) is one breaking-change minor bump before 1.0; the cost of doing it after 1.0 is a 2.0 affecting every consumer.\n\nThis finding is intentionally a sibling of PKIX-sqek.4 and PKIX-sqek.19 \u2014 same root question, different angles. The right resolution is unified.",
+  "ephemeral": 0,
+  "id": "PKIX-sqek.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Use-case wrapper signatures (8 concrete fns) are locked: signature evolution requires breaking change or new function",
+  "updated_at": "2026-05-14T18:08:52Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:08:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-sqek",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

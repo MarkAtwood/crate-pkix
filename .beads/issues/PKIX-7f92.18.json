@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "55b694eb8338f563f36bfd57d53852a0daee91547f910e774d3a12862b104f12",
+  "created_at": "2026-05-14T15:45:20Z",
+  "created_by": "Mark Atwood",
+  "description": "rfc8398.rs:380-411 emits Error detail strings like:\n\n  'rfc822Name SAN entry alice@example.com is malformed for equivalence checking (no @ delimiter); RFC 8398 \u00a73 presupposes well-formed RFC 5322 mailbox addresses'\n\nThe wording presupposes-well-formed-addresses is correct but reads as defensive after-the-fact justification. The user at 2am sees 'malformed for equivalence checking' and wonders whether the lint is broken or their cert is.\n\nCleaner shape:\n\n  'SmtpUTF8Mailbox SAN entry contains no @ delimiter; RFC 5322 mailbox required (per RFC 8398 \u00a73)'\n\nThe principle: the user wants to know what failed and what spec said it should. Two halves: (1) one-line factual description of the broken thing; (2) one-line spec pointer. The current 'presupposes well-formed addresses' wording adds defensive context that obscures both halves.\n\nMinor \u2014 every error message in the codebase deserves a once-over for 2am-readability. Flagged because rfc8398's equivalence detail is the longest and most easily misread.",
+  "ephemeral": 0,
+  "id": "PKIX-7f92.18",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Rfc8398SmimeMailboxEquivalenceLint detail messages bury the spec citation",
+  "updated_at": "2026-05-14T15:45:20Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T08:45:20Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-7f92",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

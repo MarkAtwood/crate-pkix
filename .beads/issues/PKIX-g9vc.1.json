@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-11T09:46:50Z",
+  "compaction_level": 0,
+  "content_hash": "44fb370b41af8eb30cbbbe8a84e840ed28617ad1e6a3cfa9d1abd802e9ed6c47",
+  "created_at": "2026-05-11T09:38:56Z",
+  "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+  "description": "## Why\n\nPKIX-g9vc's foundation: limbo testcases supply per-case `validation_time` (RFC 3339 string). The current pkix-difftest uses `SystemTime::now()` everywhere, so a 2024 limbo case with a 2024-pinned cert and a 2026 wallclock will spuriously fail. Every oracle must see the same instant per chain.\n\n## What\n\n1. Add `pub validation_time_unix: Option<u64>` to `Chain` (`pkix-difftest/src/lib.rs:137-151`). Add a `with_validation_time(secs: u64)` builder. When `None`, oracles fall back to current behaviour (system clock) so PKITS / PEM-tree / pem-multi are unaffected.\n2. **pkix-path oracle** (`src/oracles/pkix_path.rs:98-101`): replace the `SystemTime::now()` block with a read from `chain.validation_time_unix`, falling back to system time. The existing `check_revocation(..., now_unix: u64)` helper at line 132 already takes time as a param.\n3. **OpenSSL oracle** (`src/oracles/openssl.rs:101-123`): when `chain.validation_time_unix` is `Some`, append `-attime <secs>` to the `openssl verify` argv. (Available in OpenSSL 1.1+; canonical mechanism for pinning verify time.)\n4. **pyca oracle** (`src/oracles/pyca.rs:170-174` + `python/pyca_oracle.py:135-136`): serialise `validation_time` (unix seconds) into the JSON spec when set; on the Python side, build with `builder.time(datetime.fromtimestamp(unix_secs, tz=utc))` instead of `datetime.now(utc)`.\n5. Unit tests: synthesize a short-lived self-signed chain (e.g. notBefore=2020 notAfter=2021), drive each oracle with `validation_time_unix` inside the window (pass) and outside (fail), confirm correct verdict from each oracle.\n\n## Acceptance\n\n- [ ] `Chain` has `validation_time_unix: Option<u64>` and a builder.\n- [ ] All three oracles consume it; `None` preserves existing behaviour exactly.\n- [ ] Integration test demonstrates a chain that passes at one time and fails at another for every oracle.\n- [ ] No regressions in existing PKITS or PEM-tree baseline runs (manual spot-check OK; full regen deferred to .4).\n\n## Out of scope\n\n- LimboCorpus loader (PKIX-g9vc.2).\n- CLI wiring (PKIX-g9vc.3).\n- Baseline run (PKIX-g9vc.4).\n\n## Filed as\n\nDecomposition of PKIX-g9vc per AGENTS.md (>3 files, multi-step). Most-independent sub-bead; foundation for the loader.",
+  "ephemeral": 0,
+  "id": "PKIX-g9vc.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-difftest: thread validation_time_unix through Chain and all 3 oracles",
+  "updated_at": "2026-05-11T09:46:50Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T02:38:55Z",
+      "created_by": "bd-spin/bd-spin-20260511T070125Z-233736",
+      "depends_on_id": "PKIX-g9vc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

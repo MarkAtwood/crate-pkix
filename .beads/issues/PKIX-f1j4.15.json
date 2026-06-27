@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-06-15T18:51:22Z",
+  "compaction_level": 0,
+  "content_hash": "79702f78448c03a1be61ea114374a95ac15871a88590d2e758ff37ca28f907b7",
+  "created_at": "2026-05-14T18:59:01Z",
+  "created_by": "Mark Atwood",
+  "description": "src/extract.rs:210-215:\n    #[allow(dead_code)]\n    const _: fn() = || {\n        let _: fn(Ia5String) -> Ia5String = core::convert::identity;\n    };\n\nThe accompanying comment says 'Compile-time bridge so the unused-import lint doesn't fire if the Ia5String reference becomes purely documentary in a refactor.'\n\nBut Ia5String IS already used in src/extract.rs/tests (`Ia5String::new(*u).unwrap()` line 220 of tests/integration_async.rs and similar in extract.rs tests). It's brought into scope via `use der::{asn1::Ia5String, Decode};` at the top. The const _ creates a use of Ia5String in non-test code \u2014 outside #[cfg(test)] \u2014 to suppress the dead_code warning that would fire if tests were not compiled. But the lint that needs suppressing is unused_imports, not dead_code, and the suppression mechanism is wrong:\n\n(a) The cleanest fix: drop the const _ entirely, gate the import on cfg(test):\n    #[cfg(test)] use der::asn1::Ia5String;\n    use der::Decode;\n\n(b) Or remove Ia5String from the use entirely; tests can import it themselves:\n    use der::Decode;\n    // tests reach it via der::asn1::Ia5String directly\n\nThe current shape looks like the author wanted to keep the use idiomatic-looking and hide the test-only-ness behind a no-op const. Net negative: the const is unfamiliar Rust (a const fn() = || { ... } that uses but doesn't call identity), takes 6 lines including the comment, and obscures the fact that the import is test-only. Rewrite: option (b) \u2014 three lines deleted, one #[cfg(test)] added on the import that introduces Ia5String.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.15",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "extract.rs dead-code const _ Ia5String bridge is cargo-cult",
+  "updated_at": "2026-06-15T18:51:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:59:00Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

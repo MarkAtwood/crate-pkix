@@ -1,0 +1,31 @@
+{
+  "close_reason": "fixed by PKIX-onc.9 fix (clone\u2192move in TryFrom)",
+  "closed_at": "2026-05-03T13:25:41Z",
+  "compaction_level": 0,
+  "content_hash": "487e062539ddf1210e6ec1b0ad48d3ff39f1877ab99876c9b739cc0395dd5f40",
+  "created_at": "2026-05-03T13:15:04Z",
+  "created_by": "Mark Atwood",
+  "description": "TryFrom<Certificate> for TrustAnchor (lib.rs ~L302-303) takes cert by value but calls .clone() on cert.tbs_certificate.subject and .subject_public_key_info before dropping cert. Both fields are heap-allocated (Name = Vec<RelativeDistinguishedName>, SubjectPublicKeyInfoOwned = owned BitString). They should be moved, not cloned. Impact: 2 unnecessary heap allocations per TrustAnchor construction via TryFrom, affecting callers that build trust stores at startup or during OCSP/CRL anchor construction.",
+  "ephemeral": 0,
+  "id": "PKIX-onc.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "TryFrom<Certificate>: needless clone of subject/SPKI",
+  "updated_at": "2026-05-03T13:25:41Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-03T06:15:04Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-onc",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

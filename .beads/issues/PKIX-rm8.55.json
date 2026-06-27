@@ -1,0 +1,21 @@
+{
+  "id": "PKIX-rm8.55",
+  "title": "pkix-identity ServerName and MailboxName missing PartialEq/Eq",
+  "description": "In pkix-identity/src/lib.rs:129-133, ServerName derives only Debug and Clone. MailboxName (line 222) similarly derives only Debug and Clone. Neither derives PartialEq/Eq, which means callers cannot compare parsed identity values.\n\nWhat goes wrong: A test that wants to assert two ServerName values are equal cannot use assert_eq!. A cache keyed by ServerName cannot use a HashMap. Callers working with these types lose basic equality semantics.\n\nThe inner types (ServerNameRepr, IpRepr) already derive PartialEq/Eq (IpRepr at line 143); ServerNameRepr (line 136) derives Debug + Clone but not PartialEq because Cow<str> comparison might have subtle semantics. However, Cow<'a, str>: PartialEq so the derive would work correctly.\n\nLocations:\n- pkix-identity/src/lib.rs:129 (ServerName)\n- pkix-identity/src/lib.rs:136 (ServerNameRepr - missing PartialEq)\n- pkix-identity/src/lib.rs:222 (MailboxName)\n\nRecommendation: Add #[derive(PartialEq, Eq)] to ServerName, ServerNameRepr, and MailboxName. Also consider Hash for HashMap-keyed use.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "created_by": "Mark Atwood",
+  "created_at": "2026-06-15T16:26:32Z",
+  "updated_at": "2026-06-15T17:03:22Z",
+  "closed_at": "2026-06-15T17:03:22Z",
+  "dependencies": [
+    {
+      "depends_on_id": "PKIX-rm8",
+      "dep_type": "parent_child",
+      "created_by": "Mark Atwood",
+      "created_at": "2026-06-15 09:26:31"
+    }
+  ]
+}

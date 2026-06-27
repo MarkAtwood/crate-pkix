@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "8dfcd0a1ed677d3fb10424452cbaf592b8b3f77792cc472eadfa480bbef821db",
+  "created_at": "2026-05-14T18:57:33Z",
+  "created_by": "Mark Atwood",
+  "description": "src/async_fetcher.rs:139-145: `AsyncRevocationChecker::check_revocation_against_anchor` defaults to `Ok(())`. Same shape as the sync `pkix_revocation::RevocationChecker` \u2014 and same footgun.\n\nScenario: a consumer writes `impl AsyncRevocationChecker for MyChecker` providing only check_revocation. The anchor-issued certificate (the intermediate CA directly signed by the root) is silently NOT revocation-checked. A trust anchor's directly-issued certificate is the most security-sensitive cert in the chain \u2014 if that intermediate is compromised, every cert under it is mis-trusted. Defaulting that path to Ok(()) is the wrong default for a security primitive.\n\nThe rustdoc warns about this but the warning is buried in the trait docs. Anyone copy-pasting the trait impl from another consumer's code or from a tutorial will hit this and not notice. Real-world consumers of this trait will get this wrong eventually.\n\nThis is inherited from the sync trait in pkix-revocation, which already has the same problem (out of scope for THIS review). What is in scope: the async trait could deliberately diverge \u2014 make check_revocation_against_anchor non-default, force every impl to make an explicit choice. Pre-1.0 trait change. The sync trait stays as is; the async trait, being newly added in this diff, is the right place to fix the pattern without breaking existing consumers.\n\nRecommendation: remove the default. Or, if keeping the default for ergonomic reasons, make it `unimplemented!()` \u2014 a runtime panic on first invocation is louder than silent Ok.",
+  "ephemeral": 0,
+  "id": "PKIX-f1j4.5",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "Async checker default check_revocation_against_anchor=Ok(()) replicates known footgun",
+  "updated_at": "2026-05-14T18:57:33Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T11:57:32Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-f1j4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

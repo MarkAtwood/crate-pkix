@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added a # Versioning section to pkix-ac crate-level rustdoc documenting the v0.1.1 \u2192 v0.0.0 placeholder transition and the three Error variant renames (ParseError \u2192 AcParseError, SignatureInvalid \u2192 AcSignatureInvalid, ValidityPeriod \u2192 AcExpired).",
+  "closed_at": "2026-05-07T23:26:48Z",
+  "compaction_level": 0,
+  "content_hash": "fdc599419f9bec9f9ccfbb9d037e12888a1e0d85d87f5aa704fa524c6c7d0fb9",
+  "created_at": "2026-05-07T22:49:14Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPass-2 commit e586bc49 closed PKIX-qwzx.1 (\"P1: pkix-ac rustdoc fails docs.rs build\"). The fix renamed three pub enum variants:\n- `Error::ParseError` \u2192 `Error::AcParseError`\n- `Error::SignatureInvalid` \u2192 `Error::AcSignatureInvalid`\n- `Error::ValidityPeriod` \u2192 `Error::AcExpired`\n\n## Finding\nThe original PKIX-qwzx.1 issue was about *broken intra-doc links* (3 doc-comment links to nonexistent variants). The minimal fix is to update the doc-comment paths. Pass-2 instead chose to rename the variants. While the new names are arguably better (consistent with peer crates' Crl*/Ocsp* prefixing), this is:\n\n1. A breaking change to a public enum (technically masked by `#[non_exhaustive]` on the enum, but pattern-matches on the old names still break).\n2. Not called out in the commit message (the commit lists only \"rustdoc -D warnings clean\").\n3. Done in a stub crate (always returns AaPathInvalid), so no internal callers are affected \u2014 but the API is published-ready in v0.2.\n\n## Severity\nP3 / opinion. The crate is a stub that returns one variant; the rename is unobservable in practice. But:\n- The commit message does not flag the breaking change.\n- A user who depended on `use pkix_ac::Error;` and wrote `Error::ParseError` (e.g. for a future implementation) would silently see their code break on next minor.\n\n## Recommendation\nEither (a) document the rename in CHANGELOG/release notes and the v0.2.x \u2192 v0.3 migration guide, OR (b) revert the rename and just fix the intra-doc link paths to point to new names if the new names already existed elsewhere \u2014 neither did, so option (a) is the right call now. **No code change required**, just documentation of the API rename.\n\n## Pass-2 attribution\nPKIX-qwzx.1 closure scope-creep: rustdoc-fix \u2192 API rename.",
+  "ephemeral": 0,
+  "id": "PKIX-7i5a",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-ac::Error variant rename is a silent breaking API change in pass-2",
+  "updated_at": "2026-05-07T23:26:48Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:50:12Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yydv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Made CertPool::new const fn (uses Vec::new(), which is const). Added impl FromIterator<Certificate> and impl Extend<Certificate> for CertPool. Builds clean.",
+  "closed_at": "2026-05-07T22:33:22Z",
+  "compaction_level": 0,
+  "content_hash": "052f5afd981f08babb01ac12ff4b1e83047b614d241f4e337b1b95980328e1d2",
+  "created_at": "2026-05-07T22:15:38Z",
+  "created_by": "Mark Atwood",
+  "description": "Pass 2 idiom finding under epic PKIX-qwzx.\n\nTwo related collection-wrapper idiom misses on `pkix-path-builder::CertPool`:\n\n**1. `CertPool::new()` is not `const fn`.**\n\n`pkix-path-builder/src/lib.rs:64-69`:\n```rust\nimpl CertPool {\n    /// Create an empty pool.\n    #[must_use]\n    pub fn new() -> Self {\n        Self::default()\n    }\n}\n```\n\n`Vec::new()` is `const`. Making `CertPool::new` `const fn` (as a direct\nstruct literal `Self { certs: Vec::new() }` rather than `Self::default()`)\nallows callers to write `static EMPTY_POOL: CertPool = CertPool::new();`,\nmatching the pattern already used by `PathBuilderConfig::new` in the same file\n(line 327: `pub const fn new() -> Self { ... }`).\n\n**2. `CertPool` lacks `FromIterator<Certificate>` and `Extend<Certificate>` impls.**\n\nThe Rust idiom for a single-field collection wrapper is to provide:\n- `FromIterator<T>` so callers can write `let pool: CertPool = certs.into_iter().collect()`\n- `Extend<T>` so callers can write `pool.extend(more_certs)`\n\n`CertPool` already has `IntoIterator` for `&CertPool` (line 101) but not the\ninverse. This is asymmetric and forces callers into a manual loop:\n```rust\nlet mut pool = CertPool::new();\nfor c in candidates { pool.add(c); }   // could be `pool.extend(candidates)`\n```\n\nFix: add both impls; they are 5-line each. Same idiom as `Vec` and `HashMap`.\n\n```rust\nimpl FromIterator<Certificate> for CertPool {\n    fn from_iter<I: IntoIterator<Item = Certificate>>(iter: I) -> Self {\n        Self { certs: iter.into_iter().collect() }\n    }\n}\nimpl Extend<Certificate> for CertPool {\n    fn extend<I: IntoIterator<Item = Certificate>>(&mut self, iter: I) {\n        self.certs.extend(iter);\n    }\n}\n```\n\nLocations: `pkix-path-builder/src/lib.rs:60-99`",
+  "ephemeral": 0,
+  "id": "PKIX-qwzx.23",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "(IDIOM) P3: CertPool::new is not const fn; CertPool missing FromIterator/Extend impls",
+  "updated_at": "2026-05-07T22:33:22Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:15:38Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-qwzx",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

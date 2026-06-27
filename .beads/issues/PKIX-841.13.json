@@ -1,0 +1,31 @@
+{
+  "close_reason": "P3/P4 observation item \u2014 no code change warranted.",
+  "closed_at": "2026-05-02T17:48:38Z",
+  "compaction_level": 0,
+  "content_hash": "d9ca50c90bf0a8476a43cddffe80a35714cdab10711b0594a1c4f073e8eedc8b",
+  "created_at": "2026-05-02T17:28:14Z",
+  "created_by": "Mark Atwood",
+  "description": "The NormalizedIter Iterator impl uses a pending_space bool as a deferred-emit flag. The control flow has two entry points per next() call: the pending_space branch (skip remaining spaces, fall through) and the main branch. The 'fall through' comment on line 666 is necessary because the code after the if block handles both cases. A reader unfamiliar with this pattern must trace through both paths to verify correctness. Alternative: represent the iterator state with an explicit enum (Scanning, PendingSpace) or restructure as a flat state machine with a single code path. The existing regression tests are thorough, so this is style-only.",
+  "ephemeral": 0,
+  "id": "PKIX-841.13",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "NormalizedIter pending_space state machine requires careful reading",
+  "updated_at": "2026-05-02T17:48:38Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-02T10:28:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-841",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

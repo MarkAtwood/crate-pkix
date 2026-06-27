@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Removed #[doc(hidden)] from CompositeVerifier::new, validate_attribute_cert, and verify_scts. Each function already has a # Limitations rustdoc block warning of stub status, which is the visible-but-loud signal the bead recommended.",
+  "closed_at": "2026-05-07T23:26:47Z",
+  "compaction_level": 0,
+  "content_hash": "c26d94116b08f2a7026cb07926f56f05d6e96ef3f8b7a5f322c2e77af2cb80fa",
+  "created_at": "2026-05-07T22:50:03Z",
+  "created_by": "Mark Atwood",
+  "description": "## Anchor\nPass-2 commit e586bc49 closed PKIX-qwzx.20 (\"misuse of #[deprecated] on stub APIs in pkix-ac/pkix-ct/pkix-composite\"). The fix replaced `#[deprecated]` with `#[doc(hidden)]` on:\n- pkix_ac::validate_attribute_cert\n- pkix_composite::CompositeVerifier::new\n- pkix_ct::verify_scts\n\n## Finding\nThe replacement `#[doc(hidden)]` has stronger consequences than `#[deprecated]`:\n1. It removes the function from rustdoc output entirely (the function is not listed in the crate's documented surface).\n2. It does NOT prevent compilation at call sites (verified: `cargo check` against `pkix_composite::CompositeVerifier::new(0u8, 0u8)` from an external crate succeeds with no warning).\n3. There is no compiler signal at the call site that this is a stub.\n\nThe most problematic case is **pkix-composite/src/lib.rs:71-77**:\n- `pub struct CompositeVerifier` is documented and rendered in rustdoc.\n- `pub fn new` is the *only* constructor.\n- `#[doc(hidden)]` on `new` means rustdoc users see the struct exists but have no documented way to construct one.\n\nFor pkix_ac::validate_attribute_cert and pkix_ct::verify_scts the same problem exists \u2014 the entry point is hidden, but the crate-level docs still describe the planned behavior.\n\n## Severity\nP3 / opinion. None of these stubs are functional yet, so users calling them just get `Err(...)`. But:\n- Doc/API surface mismatch is exactly the kind of consistency issue PKIX-qwzx.20 was filed to address (it just shifted the inconsistency rather than fixing it).\n- A user who reads the docs cannot discover the constructor.\n\n## Fix options\n- (preferred) Drop `#[doc(hidden)]` and instead add a prominent rustdoc `# Limitations` block (which is already there for two of the three) \u2014 let the function be visible and the docs make the stub status loud.\n- Alternatively, restore `#[deprecated(note = \"stub; not yet implemented\")]` if the goal is a compile-time warning at call sites \u2014 that's the original PKIX-qwzx.20 motivation reversed but at least is consistent and visible.\n\n## Pass-2 attribution\nPKIX-qwzx.20 closure swapped one inconsistency for another.",
+  "ephemeral": 0,
+  "id": "PKIX-nygs",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: #[doc(hidden)] on pkix-composite::CompositeVerifier::new makes the only constructor invisible to users",
+  "updated_at": "2026-05-07T23:26:47Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T15:50:14Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-yydv",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

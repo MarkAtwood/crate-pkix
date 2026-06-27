@@ -1,0 +1,23 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T23:52:11Z",
+  "compaction_level": 0,
+  "content_hash": "9171793a9f6da112e0192b313140f1d74c352e0c33dc1ad4c9a7bdb90d539a55",
+  "created_at": "2026-05-06T23:17:35Z",
+  "created_by": "Mark Atwood",
+  "description": "ocsp.rs line 371: hash_certid_input returns Vec<u8> and is called twice per check_revocation (once for issuerNameHash, once for issuerKeyHash at lines 153-154 and 260-261). The hash output sizes are statically known (20, 32, 48, 64 bytes). Using Vec<u8> causes two heap allocations per OCSP check where none are necessary. Suggested fix: return a fixed-size enum or a SmallVec, or change the comparison logic to hash directly into a stack-allocated array and compare inline (using the sha1/sha2 Digest trait's generic_array output). A simple approach: match the OID, compute the hash, and compare inline without collecting to a Vec. This also avoids exposing the allocation as part of a hot path in future cached designs.",
+  "ephemeral": 0,
+  "id": "PKIX-15e",
+  "is_template": 0,
+  "issue_type": "bug",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P2: hash_certid_input allocates Vec on every CertID hash call",
+  "updated_at": "2026-05-06T23:52:11Z"
+}

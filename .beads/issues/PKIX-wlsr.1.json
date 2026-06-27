@@ -1,0 +1,32 @@
+{
+  "close_reason": "Narrow scope (12 crates). pkix-aia added to scope by Verifier 3-generic decision in .3. Matches AGENTS.md driving goal verbatim. Adjacent ecosystem ships at 0.x sibling cadence post-1.0.",
+  "closed_at": "2026-05-13T17:07:14Z",
+  "compaction_level": 0,
+  "content_hash": "69c4d7979d4dca052e1b6164fc881355afb205db8a671b68fa9a3e0768b47a9f",
+  "created_at": "2026-05-13T16:57:55Z",
+  "created_by": "Mark Atwood",
+  "description": "## Decide 1.0 scope\n\nSingle biggest call for the 1.0 release. All other roadmap children cascade from this.\n\n## Options\n\n### (A) Narrow scope (Recommended)\n\n11 crates ship at 1.0:\n\n- pkix-path\n- pkix-revocation\n- pkix-chain\n- pkix-path-builder\n- pkix-truststore\n- pkix-identity\n- pkix-profiles\n- pkix-profiles-cabf\n- pkix-lint\n- pkix-lint-cabf\n- pkix-revocation-http\n\nAll adjacent and skeleton crates (pkix-aia, pkix-aia-http, pkix-policy-zlint, pkix-policy-pkilint, pkix-zlint-bridge, pkix-pkilint-bridge, pkix-ac, pkix-ct, pkix-composite, pkix-dane, pkix-dane-resolver, pkix-truststore-system, pkix-truststore-pkcs11) stay at 0.x and ship independently post-1.0.\n\n**Rationale:**\n- Matches AGENTS.md driving goal verbatim (\"RFC 5280 X.509 for Rust, done right from the start\")\n- 1.0 promise is \"you can verify X.509 cert chains for TLS / S/MIME / code signing / time-stamping / OCSP\" \u2014 which works today with current shipped code\n- Adjacent ecosystem is genuinely additive, not part of the core promise\n- Shortest path to a real release\n\n**Behavior change:** chains needing AIA-fetched intermediates fail validation with `Error::AiaChainBuildFailed` \u2014 caller must provide full chain. This is the current behavior; 1.0 documents it as intentional. AiaFetcher ships in pkix-aia-0.x post-1.0.\n\n### (B) Wide scope\n\nAdds the adjacent ecosystem to 1.0:\n\n- pkix-aia + pkix-aia-http (AIA online fetching; PKIX-zkjb cascade)\n- pkix-policy-zlint + pkix-pkilint + bridges (PKIX-jy95.7/.8/.10/.11 cascade)\n\n17 crates total. Requires the AiaFetcher cascade + adapter crates to land before publishing.\n\n**Rationale:** \"complete PKIX experience\" at 1.0. Callers don't need to discover and assemble adjacent crates separately.\n\n**Cost:** 2-3 weeks of cascade work before publish-ready.\n\n### (C) Very wide scope\n\nAdds DANE and fully-implemented AC/CT to 1.0:\n\n- pkix-dane + pkix-dane-resolver (PKIX-j32w cascade)\n- pkix-ac with all 4 children implemented (PKIX-ng0x cascade)\n- pkix-ct (would need design + implementation; currently skeleton)\n\n22+ crates total. 2-3 months.\n\n**Rationale:** comprehensive PKIX-related coverage in one release.\n\n**Cost:** months. Risks scope creep; some of these (DANE, CT) might benefit from being shaped by community feedback after their own 0.x release.\n\n## Recommendation\n\n**(A) narrow.** Cleanest 1.0 promise. Adjacent crates have their own value and roadmap; bundling them into 1.0 conflates \"RFC 5280 done right\" with \"complete PKIX ecosystem,\" which isn't the same thing.\n\n## Cascade after this decision\n\n- .2 skeleton/stub disposition is implicit under (A): all hold at 0.x (or stay deferred)\n- .3 API stability pass scopes to the 11 crates\n- .6 Limitations audit scopes to the 11 crates\n- .7 CHANGELOG roll-up scopes to the 11 crates\n\nUnder (B)/(C), .2 expands into per-crate ship-at-1.0 sub-decisions.\n\n## Out of scope\n\n- Implementation work on any 1.0-included crate (its own beads)\n- Post-1.0 roadmap for adjacent ecosystem (separate planning surface)\n\n## Cross-references\n\n- PKIX-wlsr (parent)\n- AGENTS.md driving goal\n",
+  "ephemeral": 0,
+  "id": "PKIX-wlsr.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "notes": "[2026-05-13 narrow scope amendment from Verifier decision]\n\nMark's PKIX-wlsr.3 decision (Verifier 3-generic with NoAiaFetcher default) requires AiaFetcher trait + NoAiaFetcher + AiaError to exist in pkix-aia core crate at 1.0 publish. pkix-aia is added to narrow scope: **12 crates**, not 11. pkix-aia-http stays post-1.0.\n\nAmended narrow scope:\n\n1. pkix-path\n2. pkix-revocation\n3. pkix-chain (now 3-generic Verifier)\n4. pkix-path-builder\n5. pkix-truststore\n6. pkix-identity\n7. pkix-profiles\n8. pkix-profiles-cabf\n9. pkix-lint\n10. pkix-lint-cabf\n11. pkix-revocation-http\n12. **pkix-aia** (NEW; trait + NoAiaFetcher + AiaError only; no fetching behavior)\n[2026-05-13 RESOLVED: narrow scope]\n\n**Decision: (A) narrow \u2014 12 crates.**\n\nOriginal narrow scope was 11 crates; amended to 12 by the Verifier 3-generic decision in PKIX-wlsr.3 which requires pkix-aia (trait + NoAiaFetcher + AiaError) at 1.0 publish.\n\nFinal 1.0 crate list:\n\n1. pkix-path\n2. pkix-revocation\n3. pkix-chain (3-generic Verifier)\n4. pkix-path-builder\n5. pkix-truststore\n6. pkix-identity\n7. pkix-profiles\n8. pkix-profiles-cabf\n9. pkix-lint\n10. pkix-lint-cabf\n11. pkix-revocation-http\n12. pkix-aia (trait + NoAiaFetcher + AiaError only)\n\nRejected:\n- (B) wide: scope creep; adjacent ecosystem (pkix-aia-http, pkix-policy-zlint, pkix-policy-pkilint, bridges) genuinely belongs at 0.x sibling cadence\n- (C) very wide: months of work; DANE / fully-implemented AC / CT all benefit from 0.x iteration before 1.0 lock-in\n\nRationale: matches AGENTS.md driving goal verbatim ('RFC 5280 X.509 for Rust, done right from the start'). Anything beyond this list is scope creep dressed up as completeness.",
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 1,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Decide 1.0 scope: narrow (~11 crates) / wide (~17) / very wide (~22+)",
+  "updated_at": "2026-05-13T17:07:14Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T09:57:55Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-wlsr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

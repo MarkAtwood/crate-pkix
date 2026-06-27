@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Added OID constants, uint_to_u64/crl_number/base_crl_number helpers, issuer_has_crl_sign, CrlSignMissing/DeltaCrlBaseMismatch/CrlNumberMismatch error variants.",
+  "closed_at": "2026-05-05T14:41:11Z",
+  "compaction_level": 0,
+  "content_hash": "88a1b2d1649a78a0ea042372e4cc0fd1b245b8c4c4f344dfa5cfbafc7d05be2e",
+  "created_at": "2026-05-05T14:34:23Z",
+  "created_by": "Mark Atwood",
+  "description": "Add OID constants: OID_CRL_NUMBER(2.5.29.20), OID_DELTA_CRL_INDICATOR(2.5.29.27), OID_ISSUING_DISTRIBUTION_POINT(2.5.29.28), OID_CRL_DISTRIBUTION_POINTS(2.5.29.31). Add helpers to extract CRLNumber and BaseCrlNumber from CertificateList extensions. Add cRLSign KeyUsage check for the CRL issuer.",
+  "ephemeral": 0,
+  "id": "PKIX-58m.1",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Add CRL extension OIDs and CRLNumber/BaseCRLNumber parsing",
+  "updated_at": "2026-05-05T14:41:11Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T07:34:23Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-58m",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

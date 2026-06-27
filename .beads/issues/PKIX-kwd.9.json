@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:35:12Z",
+  "compaction_level": 0,
+  "content_hash": "1b845e0cd2229df364d46e02b9b0dcef41e62134e44c6b7c47a611b160973fbf",
+  "created_at": "2026-05-06T15:12:43Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-revocation/src/crl.rs CrlChecker: The CRL DER bytes are re-parsed (CertificateList::from_der) on every check_revocation() call. When validating a chain of N certificates against the same CRL, this causes N redundant parses of potentially large CRL DER. The existing doc comment (line 64-66) acknowledges this: 'The CRL is re-parsed from DER on every check_revocation call... Tracked for v0.2.' This finding confirms the limitation is tracked and matches the doc. No action needed for v0.1, but the same issue now applies to the delta CRL (which is also re-parsed on every call at line 228) \u2014 the doc comment only mentions the base CRL. The doc should be updated to note that the delta CRL has the same re-parse cost.",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.9",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-path chain_walk re-parses delta CRL on every check_revocation call",
+  "updated_at": "2026-05-06T15:35:12Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:12:43Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

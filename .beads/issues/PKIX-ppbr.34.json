@@ -1,0 +1,29 @@
+{
+  "compaction_level": 0,
+  "content_hash": "c5f4049fbe5f3d9527086033bf339182cb4039882f6f2e544732b767b7098ff2",
+  "created_at": "2026-05-14T17:46:53Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-ct/src/log_list.rs:61-111\n\nPublic API of `CtLogList` consists of:\n\n- `new()`\n- `insert(log) -> Result<()>`\n- `get(&log_id) -> Option<&CtLog>`\n- `len()`, `is_empty()`\n- `iter() -> impl Iterator<Item = &CtLog>`\n\nMissing for any realistic deployment:\n\n1. `remove(&log_id) -> Option<CtLog>` \u2014 when a log is retired or\n   rejected by Chrome, the caller needs to drop it from their\n   trust set. Today they have to rebuild the entire list.\n\n2. `clear()` \u2014 for \"reset all trust state, start over from a fresh\n   list\".\n\n3. `extend<I: IntoIterator<Item = CtLog>>(&mut self, iter: I)` \u2014 for\n   \"merge multiple log list sources\" (Google + Apple + custom).\n\n4. `impl FromIterator<CtLog> for CtLogList` \u2014 constructor from\n   raw vec of CtLog values, with the same SHA-256 consistency\n   check.\n\n5. `iter_mut()` \u2014 to mutate `usable_from_ms` / `retired_at_ms`\n   in-place when refreshing metadata. Without it, the caller has to\n   `clone`, mutate, `remove`, `insert`.\n\n6. `contains_log_id(&log_id) -> bool` \u2014 small, but common, and\n   currently has to be done via `get(..).is_some()`.\n\n7. `impl IntoIterator for CtLogList` \u2014 `for log in list { ... }`\n   ergonomics; `for log in list.iter()` is the only path today.\n\nThe contract today is \"build once, query, discard\". A long-running\ndeployment that refreshes log lists weekly has to allocate-and-drop\na fresh `CtLogList` on every refresh because the type provides no\nin-place mutation.\n\nRecommendation: add `remove`, `clear`, `extend`, `FromIterator`,\n`IntoIterator`, `iter_mut`, `contains_log_id` \u2014 the standard\nBTreeMap-shaped accessor set. The implementation is trivial (one-\nline delegations); the contract gain is large.\n\nNote on consistency check: `insert` verifies log_id == SHA256(key_der).\nThe added methods should preserve this invariant. For `iter_mut`,\nthe danger is the caller mutating `key_der` and breaking the\ninvariant. Either skip `iter_mut` and provide only field-specific\nsetters like `update_usable_from_ms(&log_id, new_ms)`, or document\nthat `iter_mut` is \"unsafe-ish\" and the caller is responsible for\nre-validating with a `Self::check_invariants()` method.\n\nPriority P2: defensive-forcing for the production refresh use case,\nnot blocking but ugly.",
+  "ephemeral": 0,
+  "id": "PKIX-ppbr.34",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "open",
+  "timeout_ns": 0,
+  "title": "CtLogList missing remove/clear/extend/FromIterator \u2014 caller must rebuild to update",
+  "updated_at": "2026-05-14T17:46:53Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-14T10:46:52Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-ppbr",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-12T05:45:59Z",
+  "compaction_level": 0,
+  "content_hash": "efcbb855094992d40abb6566a83be6aa51b0628f5040dfa73bfd4e5b46ffa030",
+  "created_at": "2026-05-12T05:31:26Z",
+  "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+  "description": "PKIX-fmtv.11.1's bead description claimed 'bettertls.com hostname-matching corpus is already vendored in pkix-difftest' \u2014 that is not accurate. The workspace currently vendors only the bettertls::pathbuilding subset (in pkix-path-builder/tests/fixtures/bettertls/) and the bettertls::nameconstraints suite via x509-limbo. Neither is a hostname-matching corpus.\n\nThe upstream Netflix/bettertls project (https://github.com/Netflix/bettertls) ships a 'dnsnames' test suite that exercises RFC 6125 \u00a76.4 SAN matching at scale (wildcard placement, IDN handling, IP-vs-DNS dispatch, etc.).\n\n## Deliverable\n\n- Vendor a subset of the bettertls 'dnsnames' corpus under pkix-difftest/ (or pkix-identity/tests/fixtures/bettertls-dnsnames/) following the existing extract.py + baseline.json pattern from pkix-path-builder/tests/fixtures/bettertls/.\n- Add an integration test that walks the corpus and asserts pkix_identity::verify_dns_name's verdict against a baseline JSON file (regenerable via env-var-gated discover mode, same shape as pkix-path-builder's bettertls.rs).\n- Document the upstream commit pin + extraction script in fixtures/README.md.\n\n## Out of scope\n\n- Hooking the corpus into the broader pkix-difftest 3-way diff (OpenSSL / pyca / pkix-path) \u2014 verify_dns_name is pkix-identity-only; oracle comparison would need a separate harness.\n- bettertls's 'nameconstraints' suite \u2014 already covered by x509-limbo Tier-2.\n\n## Why P3\n\nPKIX-fmtv.11.1 shipped with 26 unit tests + 18 integration tests covering exact match / wildcard rules / IDN / IP / SAN-missing / mixed-case scenarios drawn directly from RFC 6125 \u00a76.4 spec text. This bead is additional coverage, not a correctness gap. Filed because PKIX-fmtv.11.1 explicitly described bettertls integration as an acceptance criterion, and we didn't satisfy it in the original bead's scope (the corpus isn't vendored).\n",
+  "ephemeral": 0,
+  "id": "PKIX-fmtv.11.3",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Wire bettertls dnsnames corpus through pkix-identity verify_dns_name",
+  "updated_at": "2026-05-12T05:45:59Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-11T22:31:26Z",
+      "created_by": "bd-spin/bd-spin-20260512T050614Z-1940543",
+      "depends_on_id": "PKIX-fmtv.11",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

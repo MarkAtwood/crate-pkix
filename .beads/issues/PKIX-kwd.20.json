@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-06T15:24:39Z",
+  "compaction_level": 0,
+  "content_hash": "cbb394ccd59b9cf664f1cda9223f44912d6ce6b49909ce2d9ca39e2e8d91a20f",
+  "created_at": "2026-05-06T15:19:19Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs lines 1535 and 1576: The EcdsaP256Verifier::verify_signature and RsaPkcs1v15Sha256Verifier::verify_signature bodies contain use declarations after executable statements (the OID guard check):\n\nEcdsaP256Verifier (line 1531-1535):\n  if algorithm.oid != OID_ECDSA_P256_SHA256 { return Err(...) }\n  use p256::ecdsa::{...};   // item after statement\n\nClippy pedantic fires: 'adding items after statements is confusing, since items exist from the start of the scope'\n\nFix: move the use declarations to the top of the function body (before the oid guard). This is a readability issue \u2014 items are actually hoisted to the scope's start by the compiler regardless, but placing use after an early return can confuse readers who scan top-down.\n\nSame pattern in RsaPkcs1v15Sha256Verifier::verify_signature (line ~1576).",
+  "ephemeral": 0,
+  "id": "PKIX-kwd.20",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 4,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "use declarations inside verify_signature function bodies (items_after_statements)",
+  "updated_at": "2026-05-06T15:24:39Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-06T08:19:18Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-kwd",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

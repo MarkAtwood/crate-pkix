@@ -1,0 +1,22 @@
+{
+  "close_reason": "CABF_ALLOWED_ALGS split into CABF_TLS/SMIME/CS_BR_ALLOWED_ALGS; independence test added",
+  "closed_at": "2026-05-06T18:54:51Z",
+  "compaction_level": 0,
+  "content_hash": "3b4f56d3c0c0c78b4088dc67c5823ce0c6fb790f5683f2a49f9db9c9b02840e0",
+  "created_at": "2026-05-06T18:44:02Z",
+  "created_by": "Mark Atwood",
+  "description": "CABF_ALLOWED_ALGS is a module-level constant used by web_pki_policy, smime_policy, and code_signing_policy alike. This couples non-CABF profiles (S/MIME, code signing) to CABF's algorithm list rather than their own regime's list.\n\nEach profile should own its algorithm policy explicitly:\n- web_pki_policy: CABF BR \u00a77.1.3 algorithm list\n- smime_policy: CABF S/MIME BR \u00a77.1.3 algorithm list (currently identical to TLS BR but will diverge)\n- code_signing_policy: CABF CSBRs \u00a77.1.3 (currently requires RSA >= 3072, stricter than TLS BR)\n- fpki/dod/etsi profiles: their own lists\n\nMechanically: rename CABF_ALLOWED_ALGS to CABF_TLS_BR_ALLOWED_ALGS, define separate constants for each profile, and make it clear in docs where each list comes from. When the Profile trait (PKIX-8c6) exists, algorithm policy should be an associated method on Profile, not a shared constant.",
+  "ephemeral": 0,
+  "id": "PKIX-vha",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "pkix-profiles: CABF_ALLOWED_ALGS bleeds into non-CABF profiles",
+  "updated_at": "2026-05-06T18:54:51Z"
+}

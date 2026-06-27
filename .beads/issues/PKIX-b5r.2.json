@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-05T16:06:01Z",
+  "compaction_level": 0,
+  "content_hash": "35dc6ebc59e21a5a8ebb8e66a7acc1715cc4164b24eb4ba0422e16e2085d6188",
+  "created_at": "2026-05-05T15:45:31Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-path/src/lib.rs:1613\u20131635\n\nThe code collects matching parent indices into a Vec<usize> and then immediately loops over it just to set matched_via_i = true and push one PolicyNode per match.  The collect is unused for anything that requires a materialised list \u2014 neither the indices nor the count beyond 'non-empty' matter.  The whole block can be replaced without any allocation:\n\n    let match_count = tree.iter().filter(|parent| {\n        parent.depth == cert_depth - 1 && parent.expected_policy_set.contains(p_oid)\n    }).count();\n    let matched_via_i = match_count > 0;\n    for _ in 0..match_count { new_nodes.push(...); }\n\nOr, if the RFC 5280 intent is that at most one child per matched parent is created, simply use .any() and a single push.  Either way the Vec<usize> allocation (plus the enumerate + map step) is wasted work on the hot path inside the per-cert, per-policy loop.",
+  "ephemeral": 0,
+  "id": "PKIX-b5r.2",
+  "is_template": 0,
+  "issue_type": "chore",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "parents_with_match: collect+loop wastes an allocation",
+  "updated_at": "2026-05-05T16:06:01Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-05T08:45:30Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-b5r",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Closed",
+  "closed_at": "2026-05-07T21:25:24Z",
+  "compaction_level": 0,
+  "content_hash": "1d422497a10618d0c2f2b954dee7f7a60a7068b7a34d0e976b897e68fad6ac46",
+  "created_at": "2026-05-07T20:14:52Z",
+  "created_by": "Mark Atwood",
+  "description": "## Finding\n\\`pkix-path-builder/src/lib.rs\\`:\n- \\`MAX_DEPTH: usize = 10\\` (private, in build_path body)\n- \\`DFS_BUDGET: usize = 10_000\\` (private constant)\n\nEmbedded callers, callers with restricted compute, and callers with adversarially large untrusted pools all have different sweet spots. There is no public API to tune.\n\n## Why P3\n- \\`pkix-path\\` exposes \\`max_path_len\\` via \\`ValidationPolicy\\` for its own depth check (defaults to 10) \u2014 pkix-path-builder hardcodes the same value separately.\n- An embedded caller bringing pkix-path-builder for a small attestation chain may want budget=1_000 and depth=4. They cannot get that today without forking.\n\n## Fix\nAdd a \\`PathBuilderConfig\\` (or take \\`max_depth: usize, dfs_budget: usize\\` parameters on \\`build_path\\`) and thread through. Default to current values for backwards compatibility.\n\n## Scope reference\n\\`pkix-path-builder/src/lib.rs:285,337\\`.",
+  "ephemeral": 0,
+  "id": "PKIX-1uxb",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 3,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "P3: pkix-path-builder MAX_DEPTH and DFS_BUDGET hardcoded; not callable-tunable",
+  "updated_at": "2026-05-07T21:25:24Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-07T13:15:29Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-hxu1",
+      "metadata": {},
+      "type": "blocks"
+    }
+  ]
+}

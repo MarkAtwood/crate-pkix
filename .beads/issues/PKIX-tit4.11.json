@@ -1,0 +1,32 @@
+{
+  "assignee": "Mark Atwood",
+  "close_reason": "Done in commit. from_der_iter rustdoc now explicitly says fail-fast and notes the iterator is not drained after the first failure.",
+  "closed_at": "2026-05-14T08:11:49Z",
+  "compaction_level": 0,
+  "content_hash": "e46ee7853cf1f05ee61064a051f3e8a58e56c62db22b4dba3611a1e350920134",
+  "created_at": "2026-05-14T05:05:37Z",
+  "created_by": "Mark Atwood",
+  "description": "pkix-truststore/src/lib.rs:362 documents from_der_iter as:\n\n  /// The iterator is consumed eagerly; all anchors are decoded before returning.\n\nRead literally, this implies collect-all-then-report semantics: every iterator\nitem is polled, every blob is attempted, then a single error (perhaps with\nmultiple problems aggregated) is returned. That is what 'all anchors are\ndecoded' says in English.\n\nThe impl at lib.rs:377-380 is fail-fast:\n\n  for (i, bytes) in iter.into_iter().enumerate() {\n      let cert = Certificate::from_der(bytes.as_ref()).map_err(|_| Error::MalformedAnchor(i))?;\n      anchors.push(TrustAnchor::from_cert(cert));\n  }\n\nThe `?` exits at the first malformed entry. The iterator is dropped without\npolling subsequent items. The Error::MalformedAnchor doc text on lib.rs:233-236\nis consistent with fail-fast (it refers to 'the offending entry,' singular).\nThe function-level doc on lib.rs:362 is not.\n\nWhat goes wrong for a caller in production:\n\n  - A caller relying on the docs to write 'I expect this to either succeed or\n    surface the first failure index' is correct in practice, wrong in docs.\n  - A caller relying on the docs to write 'I can pass an infinite or expensive\n    iterator and trust that all items will be polled before return' is wrong:\n    fail-fast means an iterator that produces items lazily from a network or\n    HSM stops being polled after the first bad item. That may be the desired\n    behavior, but the caller cannot know it from the docs.\n  - A caller writing a wrapping adapter that needs to know whether the\n    iterator is fully drained after a Result::Err return (for cleanup,\n    resource release, or retry) cannot tell from the docs.\n\nFix: rewrite the line to state fail-fast plainly. Suggested:\n\n  /// The iterator is consumed eagerly (not lazy). On the first malformed\n  /// entry, the function returns Err(Error::MalformedAnchor(i)) where i is\n  /// the 0-based index of the failing item, and the rest of the iterator\n  /// is not polled.\n\nThis pairs naturally with PKIX-tit4.3 (which surfaces the missing der::Error\nin MalformedAnchor) \u2014 fixing both gives callers a precise contract for the\nadapter entry point.",
+  "ephemeral": 0,
+  "id": "PKIX-tit4.11",
+  "is_template": 0,
+  "issue_type": "task",
+  "metadata": {},
+  "no_history": 0,
+  "owner": "mark@reviewcommit.com",
+  "pinned": 0,
+  "priority": 2,
+  "status": "closed",
+  "timeout_ns": 0,
+  "title": "Doc/impl mismatch: from_der_iter claims 'all anchors are decoded before returning' but impl is fail-fast",
+  "updated_at": "2026-05-14T08:11:49Z",
+  "dependencies": [
+    {
+      "created_at": "2026-05-13T22:05:37Z",
+      "created_by": "Mark Atwood",
+      "depends_on_id": "PKIX-tit4",
+      "metadata": {},
+      "type": "parent-child"
+    }
+  ]
+}
