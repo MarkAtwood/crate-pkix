@@ -301,7 +301,10 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // response signature. See `check_revocation` above for the full
         // commentary on the two paths.
         let anchor_subject = &anchor.subject;
-        let anchor_spki_raw = anchor.subject_public_key_info.subject_public_key.raw_bytes();
+        let anchor_spki_raw = anchor
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes();
         let signing_spki = resolve_signing_key_for_response(
             basic,
             anchor_subject,

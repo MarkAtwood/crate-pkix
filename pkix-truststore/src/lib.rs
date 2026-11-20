@@ -292,10 +292,7 @@ mod io_error_kind_serde {
     use serde::{Deserialize as _, Deserializer, Serializer};
     use std::io;
 
-    pub fn serialize<S: Serializer>(
-        kind: &io::ErrorKind,
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(kind: &io::ErrorKind, s: S) -> Result<S::Ok, S::Error> {
         // `Debug` on `ErrorKind` produces the variant name verbatim
         // ("NotFound", "PermissionDenied", …) on every stdlib version
         // shipped to date; the format is not contractually stable but
@@ -581,12 +578,11 @@ where
         .into_iter()
         .enumerate()
         .map(|(index, bytes)| {
-            let cert = Certificate::from_der(bytes.as_ref()).map_err(|e| {
-                Error::MalformedAnchor {
+            let cert =
+                Certificate::from_der(bytes.as_ref()).map_err(|e| Error::MalformedAnchor {
                     index,
                     source: DerError::new(e),
-                }
-            })?;
+                })?;
             TrustAnchor::try_from(cert).map_err(|source| Error::MalformedAnchor { index, source })
         })
         .collect::<core::result::Result<_, _>>()?;
@@ -628,10 +624,7 @@ pub fn from_pem_file(path: impl AsRef<Path>) -> Result<Vec<TrustAnchor>> {
 /// # Errors
 ///
 /// Same as [`from_pem_file`], substituting `cap` for the default.
-pub fn from_pem_file_with_cap(
-    path: impl AsRef<Path>,
-    cap: u64,
-) -> Result<Vec<TrustAnchor>> {
+pub fn from_pem_file_with_cap(path: impl AsRef<Path>, cap: u64) -> Result<Vec<TrustAnchor>> {
     let bytes = read_file_capped(path.as_ref(), cap)?;
     from_pem(&bytes)
 }
@@ -663,10 +656,7 @@ pub fn from_der_file(path: impl AsRef<Path>) -> Result<TrustAnchor> {
 /// # Errors
 ///
 /// Same as [`from_der_file`], substituting `cap` for the default.
-pub fn from_der_file_with_cap(
-    path: impl AsRef<Path>,
-    cap: u64,
-) -> Result<TrustAnchor> {
+pub fn from_der_file_with_cap(path: impl AsRef<Path>, cap: u64) -> Result<TrustAnchor> {
     let bytes = read_file_capped(path.as_ref(), cap)?;
     from_der(&bytes)
 }

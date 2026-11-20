@@ -262,11 +262,7 @@ impl InMemoryCache {
     /// sequence where another thread could insert a newer CRL between the
     /// two calls.
     #[cfg(feature = "crl")]
-    pub(crate) fn put_crl_if_not_rollback(
-        &self,
-        key: CrlCacheKey,
-        new_entry: CachedCrl,
-    ) -> bool {
+    pub(crate) fn put_crl_if_not_rollback(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
         let mut guard = match self.crl.write() {
             Ok(g) => g,
             Err(_) => return false,
@@ -562,7 +558,10 @@ impl<T: CrlAtomicPut + ?Sized> CrlAtomicPut for Arc<T> {
 #[cfg(feature = "crl")]
 impl CrlAtomicPut for dyn RevocationCache {
     fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        if is_rollback(self.get_crl(&key).as_deref(), new_entry.crl_number.as_deref()) {
+        if is_rollback(
+            self.get_crl(&key).as_deref(),
+            new_entry.crl_number.as_deref(),
+        ) {
             return false;
         }
         self.put_crl(key, new_entry);
@@ -844,15 +843,11 @@ where
                 responder_url: url.clone(),
             };
 
-            if let Some(cached) = self
-                .cache
-                .get_ocsp(&key)
-                .filter(|e| {
-                    let now = SystemTime::UNIX_EPOCH
-                        + core::time::Duration::from_secs(self.inner.now_unix);
-                    is_live(e.next_update, now)
-                })
-            {
+            if let Some(cached) = self.cache.get_ocsp(&key).filter(|e| {
+                let now =
+                    SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
+                is_live(e.next_update, now)
+            }) {
                 match OcspChecker::new(
                     cached.bytes.as_slice(),
                     self.inner.now_unix,
@@ -1128,7 +1123,9 @@ mod tests {
         let past = SystemTime::now() - Duration::from_secs(60);
         let k = dummy_ocsp_key("http://x/");
         c.put_ocsp(k.clone(), dummy_ocsp_entry(Some(past)));
-        let got = c.get_ocsp(&k).expect("expired OCSP entry must still be returned");
+        let got = c
+            .get_ocsp(&k)
+            .expect("expired OCSP entry must still be returned");
         assert_eq!(got.bytes, b"ocsp-bytes");
     }
 

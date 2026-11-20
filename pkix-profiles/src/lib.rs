@@ -715,7 +715,12 @@ pub fn check_basic_tls_shape(
     cert: &x509_cert::Certificate,
     now_unix: u64,
 ) -> Result<(), Vec<pkix_lint::Finding>> {
-    pkix_lint::check_shape(cert, pkix_lint::SubjectKind::Leaf, now_unix, &BasicTlsProfile)
+    pkix_lint::check_shape(
+        cert,
+        pkix_lint::SubjectKind::Leaf,
+        now_unix,
+        &BasicTlsProfile,
+    )
 }
 
 /// Run the [`BasicSmimeProfile`] lint set against a single S/MIME end-entity
@@ -793,10 +798,7 @@ mod tests {
         assert_eq!(BasicSmimeProfile.id(), "ietf.smime-basic");
         assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
         assert_eq!(BasicTimeStampingProfile.id(), "ietf.time-stamping-basic");
-        assert_eq!(
-            BasicOcspResponderProfile.id(),
-            "ietf.ocsp-responder-basic"
-        );
+        assert_eq!(BasicOcspResponderProfile.id(), "ietf.ocsp-responder-basic");
     }
 
     #[test]
@@ -807,10 +809,7 @@ mod tests {
         assert_eq!(BasicSmimeProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicCodeSigningProfile.policy(NOW).current_time_unix, NOW);
         assert_eq!(BasicTimeStampingProfile.policy(NOW).current_time_unix, NOW);
-        assert_eq!(
-            BasicOcspResponderProfile.policy(NOW).current_time_unix,
-            NOW
-        );
+        assert_eq!(BasicOcspResponderProfile.policy(NOW).current_time_unix, NOW);
     }
 
     #[test]

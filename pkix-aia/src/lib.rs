@@ -357,10 +357,7 @@ mod io_error_kind_serde {
                 // Serialize side: Debug formatting must produce the
                 // expected label.
                 let debug_label = format!("{kind:?}");
-                assert_eq!(
-                    debug_label, *expected_label,
-                    "Debug format for {kind:?}"
-                );
+                assert_eq!(debug_label, *expected_label, "Debug format for {kind:?}");
                 // Deserialize side: kind_for must recover the
                 // original variant.
                 assert_eq!(

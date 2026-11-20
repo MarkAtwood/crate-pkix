@@ -497,7 +497,7 @@ fn risk_for(df: &DeviatedFinding, report_seed: &[u8], i: usize) -> Value {
 /// - `pkix-lint.effective-start` / `pkix-lint.effective-end` — Unix seconds,
 ///   emitted only when `Some`.
 /// - `pkix-lint.authorized-by` — [`Deviation::authorized_by`].
-/// - Scope-axis props on the Risk's `subjects[]` (see [`encode_scope`]).
+/// - Scope-axis props on the Risk's `subjects[]` (see `encode_scope`).
 ///
 /// # Determinism
 ///
@@ -1092,9 +1092,9 @@ mod tests {
     #[test]
     fn test_rfc3339_u64_overflow_saturates_no_panic() {
         for unix in [
-            i64::MAX as u64,         // exactly at the boundary
-            i64::MAX as u64 + 1,     // first u64 above the i64 range
-            u64::MAX,                // worst-case input
+            i64::MAX as u64,     // exactly at the boundary
+            i64::MAX as u64 + 1, // first u64 above the i64 range
+            u64::MAX,            // worst-case input
         ] {
             let s = unix_to_rfc3339(unix);
             assert!(!s.is_empty(), "saturated output must be non-empty");
@@ -1754,11 +1754,7 @@ mod tests {
             .subject
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
-        let scope = DeviationScope::serial_range(
-            issuer_der,
-            vec![0x01, 0x00],
-            vec![0x01, 0xff],
-        );
+        let scope = DeviationScope::serial_range(issuer_der, vec![0x01, 0x00], vec![0x01, 0xff]);
         let subjects = encode_scope(&scope);
         assert_eq!(subjects.len(), 1);
         let subj = &subjects[0];

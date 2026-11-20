@@ -820,7 +820,7 @@ impl Clone for Box<dyn Lint> {
 /// specific *use case* — e.g., TLS server, S/MIME, code-signing,
 /// OCSP responder. The trait does not encode use case in its type
 /// signature; instead, **use-case selection is the
-/// [`LintProfile`][crate::LintProfile] bundle's responsibility.**
+/// [`LintProfile`] bundle's responsibility.**
 ///
 /// Concretely:
 ///
@@ -844,7 +844,7 @@ impl Clone for Box<dyn Lint> {
 /// regardless of cert shape. The correct pattern is to choose the
 /// `LintProfile` bundle that matches the cert's intended use case
 /// (`BasicTlsProfile`, `BasicSmimeProfile`, etc.) and call
-/// [`check_shape`][crate::check_shape] with it.
+/// [`check_shape`] with it.
 ///
 /// Each affected lint's struct-level rustdoc carries a
 /// `# Use-case applicability — operator contract` section reiterating
@@ -1548,9 +1548,11 @@ impl LintRunner {
                 // order.
                 .max_by_key(|(_, prefix_len, _)| *prefix_len)
                 .map(|(i, _, param_id)| (i, param_id))
-                .ok_or_else(|| crate::oscal::parse::ParseError::UnknownParameterOverride {
-                    param_id: over.param_id.clone(),
-                })?;
+                .ok_or_else(
+                    || crate::oscal::parse::ParseError::UnknownParameterOverride {
+                        param_id: over.param_id.clone(),
+                    },
+                )?;
             resolved.push((lint_index, param_id, over));
         }
 
@@ -1570,12 +1572,14 @@ impl LintRunner {
             let clone = clones
                 .entry(lint_index)
                 .or_insert_with(|| self.lints[lint_index].clone_box());
-            clone.set_parameter(param_id, &over.value).map_err(
-                |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
-                    param_id: over.param_id.clone(),
-                    source,
-                },
-            )?;
+            clone
+                .set_parameter(param_id, &over.value)
+                .map_err(
+                    |source| crate::oscal::parse::ParseError::InvalidParameterOverride {
+                        param_id: over.param_id.clone(),
+                        source,
+                    },
+                )?;
         }
 
         // All clones accepted every set_parameter call. Commit by
@@ -2413,15 +2417,31 @@ mod tests {
         struct PreV06Lint;
         #[allow(deprecated)]
         impl Lint for PreV06Lint {
-            fn id(&self) -> &'static str { "test.pre-v06" }
-            fn citation(&self) -> &'static str { "RFC 5280 §X.Y" }
-            fn severity(&self) -> Severity { Severity::Warn }
-            fn scope(&self) -> Scope { Scope::Certificate }
-            fn applies_to(&self) -> SubjectKind { SubjectKind::Any }
-            fn title(&self) -> &str { "Pre-v06 lint" }
+            fn id(&self) -> &'static str {
+                "test.pre-v06"
+            }
+            fn citation(&self) -> &'static str {
+                "RFC 5280 §X.Y"
+            }
+            fn severity(&self) -> Severity {
+                Severity::Warn
+            }
+            fn scope(&self) -> Scope {
+                Scope::Certificate
+            }
+            fn applies_to(&self) -> SubjectKind {
+                SubjectKind::Any
+            }
+            fn title(&self) -> &str {
+                "Pre-v06 lint"
+            }
             // Only the deprecated method is overridden — the 0.5.x shape.
-            fn rfc_section_id(&self) -> Option<&str> { Some("rfc5280-x.y") }
-            fn rfc_url(&self) -> Option<&str> { Some("https://example/x.y") }
+            fn rfc_section_id(&self) -> Option<&str> {
+                Some("rfc5280-x.y")
+            }
+            fn rfc_url(&self) -> Option<&str> {
+                Some("https://example/x.y")
+            }
             fn check_cert(&self, _: &Certificate, _: SubjectKind, _: u64) -> LintResult {
                 LintResult::Pass
             }
@@ -2441,15 +2461,31 @@ mod tests {
         #[derive(Clone)]
         struct V06Lint;
         impl Lint for V06Lint {
-            fn id(&self) -> &'static str { "test.v06" }
-            fn citation(&self) -> &'static str { "RFC 5280 §X.Y" }
-            fn severity(&self) -> Severity { Severity::Warn }
-            fn scope(&self) -> Scope { Scope::Certificate }
-            fn applies_to(&self) -> SubjectKind { SubjectKind::Any }
-            fn title(&self) -> &str { "v06 lint" }
+            fn id(&self) -> &'static str {
+                "test.v06"
+            }
+            fn citation(&self) -> &'static str {
+                "RFC 5280 §X.Y"
+            }
+            fn severity(&self) -> Severity {
+                Severity::Warn
+            }
+            fn scope(&self) -> Scope {
+                Scope::Certificate
+            }
+            fn applies_to(&self) -> SubjectKind {
+                SubjectKind::Any
+            }
+            fn title(&self) -> &str {
+                "v06 lint"
+            }
             // Only the canonical method is overridden — the 0.6.0+ shape.
-            fn spec_section_id(&self) -> Option<&str> { Some("rfc5280-x.y") }
-            fn spec_url(&self) -> Option<&str> { Some("https://example/x.y") }
+            fn spec_section_id(&self) -> Option<&str> {
+                Some("rfc5280-x.y")
+            }
+            fn spec_url(&self) -> Option<&str> {
+                Some("https://example/x.y")
+            }
             fn check_cert(&self, _: &Certificate, _: SubjectKind, _: u64) -> LintResult {
                 LintResult::Pass
             }
@@ -2635,7 +2671,11 @@ mod tests {
         // panic, on this input.
         let payload: String = "ü".repeat(32);
         assert_eq!(payload.len(), 64, "test oracle: payload is 64 bytes");
-        assert_eq!(payload.chars().count(), 32, "test oracle: payload has 32 chars");
+        assert_eq!(
+            payload.chars().count(),
+            32,
+            "test oracle: payload has 32 chars"
+        );
 
         let json = format!(
             r#"{{"lint_id":"x","citation":"c","rule_bundle_version":"","result":"Pass","cert_index":null,"evaluated_at_unix":0,"cert_sha256":"{payload}"}}"#

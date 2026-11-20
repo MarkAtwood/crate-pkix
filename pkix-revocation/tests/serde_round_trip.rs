@@ -6,11 +6,7 @@
 
 use der::{Decode as _, Encode as _};
 use pkix_revocation::{Error, OutOfScopeReason};
-use x509_cert::{
-    certificate::Rfc5280,
-    ext::pkix::crl::CrlReason,
-    serial_number::SerialNumber,
-};
+use x509_cert::{certificate::Rfc5280, ext::pkix::crl::CrlReason, serial_number::SerialNumber};
 
 // Explicit `Profile` parameter so type inference does not choke on the
 // generic default. `SerialNumber<Rfc5280>` matches the type used by

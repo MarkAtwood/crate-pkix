@@ -1,8 +1,8 @@
-//! OSCAL Catalog JSON emitter for a registered set of [`Lint`][crate::Lint]
+//! OSCAL Catalog JSON emitter for a registered set of [`Lint`]
 //! implementations.
 //!
 //! The output is a [`serde_json::Value`] whose top-level shape matches the
-//! NIST OSCAL Catalog v1.1.2 JSON Schema. Each [`Lint`][crate::Lint] maps
+//! NIST OSCAL Catalog v1.1.2 JSON Schema. Each [`Lint`] maps
 //! to one OSCAL `Control` carrying the lint's id, title, citation,
 //! standards-body section pointer, RFC URL, severity / scope / applies-to
 //! props, and tunable parameters.
@@ -51,7 +51,7 @@
 //! # Determinism
 //!
 //! Output is byte-deterministic across runs with the same input. UUIDs
-//! are derived via [`crate::oscal::emit::uuid_v8`] from
+//! are derived via `crate::oscal::emit::uuid_v8` from
 //! `(catalog_id, catalog_version, lint id)` so identical catalog inputs
 //! produce identical OSCAL bytes — important for CI diffability and
 //! evidence-pack reproducibility.
@@ -407,10 +407,7 @@ mod tests {
         assert_eq!(controls.len(), 2);
 
         let rfc_control = &controls[0]; // first input = first output
-        assert_eq!(
-            rfc_control["id"],
-            "rfc5280.cert.serial_number.max_octets"
-        );
+        assert_eq!(rfc_control["id"], "rfc5280.cert.serial_number.max_octets");
         assert_eq!(rfc_control["class"], "pkix-lint");
         assert_eq!(
             rfc_control["title"],
@@ -578,8 +575,8 @@ mod tests {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../pkix-path/tests/fixtures/policy-checks/")
             .join(name);
-        let der = std::fs::read(&path)
-            .unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
+        let der =
+            std::fs::read(&path).unwrap_or_else(|e| panic!("read fixture {}: {e}", path.display()));
         <x509_cert::Certificate as der::Decode>::from_der(&der)
             .unwrap_or_else(|e| panic!("decode {name}: {e}"))
     }
@@ -760,9 +757,9 @@ mod tests {
                 Err(ParseError::UnsupportedOscalVersion { found: got }) => {
                     assert_eq!(got, found);
                 }
-                other => panic!(
-                    "expected UnsupportedOscalVersion for version {found}; got: {other:?}"
-                ),
+                other => {
+                    panic!("expected UnsupportedOscalVersion for version {found}; got: {other:?}")
+                }
             }
         }
     }

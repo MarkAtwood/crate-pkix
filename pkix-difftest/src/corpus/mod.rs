@@ -155,7 +155,8 @@ AAAA
 
     #[test]
     fn filter_handles_empty_input() {
-        assert!(filter_non_certificate_blocks(b"").is_empty());
+        let got = filter_non_certificate_blocks(b"");
+        assert!(got.is_empty(), "expected empty, got {got:?}");
     }
 
     #[test]
@@ -165,6 +166,7 @@ AAAA
 xxxx
 -----END RSA PRIVATE KEY-----
 ";
-        assert!(filter_non_certificate_blocks(input).is_empty());
+        let got = filter_non_certificate_blocks(input);
+        assert!(got.is_empty(), "expected empty, got {got:?}");
     }
 }

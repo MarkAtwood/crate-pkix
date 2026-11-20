@@ -806,14 +806,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_dns_name(&chain[0], name)?;
     Ok(validated)
@@ -894,14 +887,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     if let Some(name) = identity {
         debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
         pkix_identity::verify_dns_name(&chain[0], name)?;
@@ -974,14 +960,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     if let Some(mailbox) = identity {
         debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
         pkix_identity::verify_mailbox(&chain[0], mailbox)?;
@@ -1047,14 +1026,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
@@ -1086,14 +1058,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     pkix_identity::verify_mailbox(&chain[0], mailbox)?;
     Ok(validated)
@@ -1141,14 +1106,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )
+    verify_chain(chain, anchors, &policy, verifier, revocation, aia)
 }
 
 /// Verify a certificate chain for Time Stamping Authority (TSA) use.
@@ -1213,14 +1171,7 @@ where
     A: AiaFetcher,
 {
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        revocation,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, revocation, aia)?;
     debug_assert!(!chain.is_empty(), "verify_chain must reject empty chains");
     enforce_timestamping_eku_critical_and_sole(&chain[0])?;
     enforce_timestamping_ku_shape(&chain[0])?;
@@ -1350,14 +1301,7 @@ where
     };
 
     let policy = profile.policy(now_unix);
-    let validated = verify_chain(
-        chain,
-        anchors,
-        &policy,
-        verifier,
-        &shim,
-        aia,
-    )?;
+    let validated = verify_chain(chain, anchors, &policy, verifier, &shim, aia)?;
 
     verify_responder_is_delegated_by(&chain[0], issuer)?;
 

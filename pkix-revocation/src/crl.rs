@@ -430,7 +430,8 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         // A malformed or overflowing base CRLNumber is treated as CrlParseError
         // rather than silently skipping the freshness check.
         if let Some(base_num_result) = crl_number(&base_crl) {
-            let base_num = base_num_result.map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
+            let base_num =
+                base_num_result.map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
             if delta_base_num > base_num {
                 return Err(Error::CrlNumberMismatch);
             }
@@ -981,7 +982,8 @@ fn find_matching_entry<'a>(
         if is_indirect {
             if let Some(exts) = entry.crl_entry_extensions.as_deref() {
                 if let Some(ce_ext) = exts.iter().find(|e| e.extn_id == OID_CERTIFICATE_ISSUER) {
-                    effective = Cow::Owned(parse_certificate_issuer_dn(ce_ext.extn_value.as_bytes())?);
+                    effective =
+                        Cow::Owned(parse_certificate_issuer_dn(ce_ext.extn_value.as_bytes())?);
                 }
             }
         }
@@ -1016,7 +1018,9 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
     // "structurally valid extension but no directoryName GeneralName
     // found", distinguishing it from a DER parse failure.
     Err(Error::CrlParseError(crate::DerError::new(der::Error::new(
-        der::ErrorKind::Value { tag: der::Tag::Sequence },
+        der::ErrorKind::Value {
+            tag: der::Tag::Sequence,
+        },
         der::Length::ZERO,
     ))))
 }

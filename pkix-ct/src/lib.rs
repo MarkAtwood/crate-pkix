@@ -59,8 +59,8 @@ pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg(feature = "log-list")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
 pub use verify::{
-    merkle_leaf_hash, merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert,
-    MerkleAuditPath, SctVerifier, SignedTreeHead,
+    merkle_leaf_hash, merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert, MerkleAuditPath,
+    SctVerifier, SignedTreeHead,
 };
 
 /// Errors returned by SCT parsing and verification.

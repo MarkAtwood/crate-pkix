@@ -181,7 +181,10 @@ fn error_unit_and_index_variants_round_trip() {
         Error::SubjectDnAttrRuleUnmet,
         Error::SignatureInvalid { index: 3 },
         Error::ValidityPeriod { index: 0 },
-        Error::DuplicateCertificate { first: 1, second: 4 },
+        Error::DuplicateCertificate {
+            first: 1,
+            second: 4,
+        },
     ];
     for err in &cases {
         let json = serde_json::to_string(err).expect("variant serializes");

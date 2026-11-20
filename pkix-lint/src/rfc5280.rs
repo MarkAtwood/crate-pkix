@@ -172,7 +172,7 @@ impl Rfc5280MaxSerialLengthLint {
     /// # Panics
     ///
     /// Panics if `max_octets` is outside the valid range `1..=21`
-    /// (see [`MAX_OCTETS_RANGE`] for the rationale on each bound).
+    /// (see `MAX_OCTETS_RANGE` for the rationale on each bound).
     /// PKIX-7f92.5 / PKIX-7f92.39 closed the two-paths-different-
     /// validation gap by routing both this constructor and
     /// [`Lint::set_parameter`] through the same range check. The panic
@@ -864,7 +864,11 @@ mod tests {
         // = 0x00 (sign byte) || 0x80 0x00..0x00 (20 unsigned bytes).
         let mut serial_der: Vec<u8> = vec![0x02, 0x15, 0x00, 0x80];
         serial_der.extend(std::iter::repeat(0x00).take(19));
-        assert_eq!(serial_der.len(), 2 + 21, "test oracle: 21 octets of INTEGER content");
+        assert_eq!(
+            serial_der.len(),
+            2 + 21,
+            "test oracle: 21 octets of INTEGER content"
+        );
 
         let synthetic_serial: SerialNumber = SerialNumber::from_der(&serial_der)
             .expect("Rfc5280 profile permits decode of up to 21 octets");
@@ -976,7 +980,12 @@ mod tests {
     #[test]
     fn set_parameter_rejects_values_above_21() {
         let mut lint = Rfc5280MaxSerialLengthLint::default();
-        for bogus in ["22", "64", "100", "18446744073709551615" /* usize::MAX */] {
+        for bogus in [
+            "22",
+            "64",
+            "100",
+            "18446744073709551615", /* usize::MAX */
+        ] {
             let err = lint
                 .set_parameter("max-octets", bogus)
                 .expect_err("out-of-range value must error");

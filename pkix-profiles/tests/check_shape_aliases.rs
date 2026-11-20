@@ -85,9 +85,7 @@ fn check_basic_tls_shape_err_on_missing_san() {
     );
     let findings = result.unwrap_err();
     assert!(
-        findings
-            .iter()
-            .any(|f| f.lint_id.starts_with("rfc6125.")),
+        findings.iter().any(|f| f.lint_id.starts_with("rfc6125.")),
         "expected an rfc6125.* finding among: {:?}",
         findings.iter().map(|f| &f.lint_id).collect::<Vec<_>>()
     );
@@ -121,9 +119,9 @@ fn check_basic_smime_shape_err_on_tls_leaf() {
     );
     let findings = result.unwrap_err();
     assert!(
-        findings.iter().any(|f| {
-            f.lint_id.starts_with("rfc8551.") || f.lint_id.starts_with("rfc8398.")
-        }),
+        findings
+            .iter()
+            .any(|f| { f.lint_id.starts_with("rfc8551.") || f.lint_id.starts_with("rfc8398.") }),
         "expected an rfc8551.* or rfc8398.* finding among: {:?}",
         findings.iter().map(|f| &f.lint_id).collect::<Vec<_>>()
     );

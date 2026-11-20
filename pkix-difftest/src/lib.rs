@@ -418,7 +418,7 @@ BBBB
     #[test]
     fn split_pem_blocks_empty_input() {
         let blocks = split_pem_blocks(b"").unwrap();
-        assert!(blocks.is_empty());
+        assert!(blocks.is_empty(), "expected empty, got {blocks:?}");
     }
 
     #[test]

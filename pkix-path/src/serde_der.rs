@@ -37,7 +37,7 @@
 //!
 //! # Why not `serde_with`?
 //!
-//! [`serde_with`] would express these helpers more concisely via
+//! [`serde_with`](https://docs.rs/serde_with) would express these helpers more concisely via
 //! `#[serde_as(as = "DerBase64")]`. We avoid the dependency because the
 //! workspace MSRV is 1.73 and the latest `serde_with` 3.x releases
 //! (3.18+) require rustc 1.88. Pinning to 3.12 was a viable alternative,
@@ -174,9 +174,9 @@ pub mod option {
 /// element is encoded independently per the top-level format rule.
 pub mod vec {
     use super::{Base64, Decode, Deserialize, Deserializer, Encode, Encoding, Serializer};
-    use serde::ser::SerializeSeq;
     #[cfg(not(feature = "std"))]
     use alloc::{string::String, vec::Vec};
+    use serde::ser::SerializeSeq;
 
     /// Serialize a `Vec` of DER-encodable values as a sequence.
     ///
@@ -240,12 +240,14 @@ pub mod vec {
 ///
 /// Use as `#[serde(with = "crate::serde_der::option_vec")]` on the
 /// field. `None` serializes as `null` / unit; `Some(vec)` serializes as
-/// a sequence per [`vec`].
+/// a sequence per [`mod@crate::serde_der::vec`].
 pub mod option_vec {
-    use super::{Base64, Decode, Deserialize, Deserializer, Encode, Encoding, Serialize, Serializer};
-    use serde::ser::SerializeSeq;
+    use super::{
+        Base64, Decode, Deserialize, Deserializer, Encode, Encoding, Serialize, Serializer,
+    };
     #[cfg(not(feature = "std"))]
     use alloc::{string::String, vec::Vec};
+    use serde::ser::SerializeSeq;
 
     /// Serialize an optional `Vec` of DER-encodable values.
     ///
@@ -310,8 +312,7 @@ pub mod option_vec {
                 Some(strs) => {
                     let mut out = Vec::with_capacity(strs.len());
                     for s in strs {
-                        let der_bytes =
-                            Base64::decode_vec(&s).map_err(serde::de::Error::custom)?;
+                        let der_bytes = Base64::decode_vec(&s).map_err(serde::de::Error::custom)?;
                         let v = T::from_der(&der_bytes).map_err(serde::de::Error::custom)?;
                         out.push(v);
                     }

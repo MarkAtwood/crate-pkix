@@ -227,11 +227,19 @@ mod tests {
     #[test]
     fn lint_oracle_result_constructors() {
         let empty = LintOracleResult::ok_empty();
-        assert!(empty.findings.is_empty());
+        assert!(
+            empty.findings.is_empty(),
+            "expected empty, got {:?}",
+            empty.findings
+        );
         assert!(empty.oracle_error.is_none());
 
         let err = LintOracleResult::oracle_error("zlint binary not found");
-        assert!(err.findings.is_empty());
+        assert!(
+            err.findings.is_empty(),
+            "expected empty, got {:?}",
+            err.findings
+        );
         assert_eq!(err.oracle_error.as_deref(), Some("zlint binary not found"));
     }
 

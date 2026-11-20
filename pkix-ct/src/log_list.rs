@@ -432,18 +432,36 @@ mod google_schema {
                 )
             }
 
-            let usable = entry(b"key-usable", "usable-log",
-                r#"{"usable":{"timestamp":"2024-01-01T00:00:00Z"}}"#);
-            let readonly = entry(b"key-readonly", "readonly-log",
-                r#"{"readonly":{"timestamp":"2025-06-01T00:00:00Z"}}"#);
-            let retired = entry(b"key-retired", "retired-log",
-                r#"{"retired":{"timestamp":"2025-03-01T00:00:00Z"}}"#);
-            let qualified = entry(b"key-qualified", "qualified-log",
-                r#"{"qualified":{"timestamp":"2024-06-01T00:00:00Z"}}"#);
-            let pending = entry(b"key-pending", "pending-log",
-                r#"{"pending":{"timestamp":"2024-02-01T00:00:00Z"}}"#);
-            let rejected = entry(b"key-rejected", "rejected-log",
-                r#"{"rejected":{"timestamp":"2024-05-01T00:00:00Z"}}"#);
+            let usable = entry(
+                b"key-usable",
+                "usable-log",
+                r#"{"usable":{"timestamp":"2024-01-01T00:00:00Z"}}"#,
+            );
+            let readonly = entry(
+                b"key-readonly",
+                "readonly-log",
+                r#"{"readonly":{"timestamp":"2025-06-01T00:00:00Z"}}"#,
+            );
+            let retired = entry(
+                b"key-retired",
+                "retired-log",
+                r#"{"retired":{"timestamp":"2025-03-01T00:00:00Z"}}"#,
+            );
+            let qualified = entry(
+                b"key-qualified",
+                "qualified-log",
+                r#"{"qualified":{"timestamp":"2024-06-01T00:00:00Z"}}"#,
+            );
+            let pending = entry(
+                b"key-pending",
+                "pending-log",
+                r#"{"pending":{"timestamp":"2024-02-01T00:00:00Z"}}"#,
+            );
+            let rejected = entry(
+                b"key-rejected",
+                "rejected-log",
+                r#"{"rejected":{"timestamp":"2024-05-01T00:00:00Z"}}"#,
+            );
 
             alloc::format!(
                 r#"{{"operators":[{{"name":"test","logs":[{usable},{readonly},{retired},{qualified},{pending},{rejected}]}}]}}"#
@@ -473,7 +491,10 @@ mod google_schema {
         fn readonly_timestamp_stored_as_retired_at_ms() {
             let json = synthetic_log_list_json();
             let list = CtLogList::from_google_log_list_json(&json).unwrap();
-            let readonly_log = list.iter().find(|l| l.description == "readonly-log").unwrap();
+            let readonly_log = list
+                .iter()
+                .find(|l| l.description == "readonly-log")
+                .unwrap();
             // 2025-06-01T00:00:00Z = 1748736000000 ms
             // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2025,6,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
             assert_eq!(readonly_log.retired_at_ms, Some(1_748_736_000_000));

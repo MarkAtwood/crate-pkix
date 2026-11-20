@@ -629,11 +629,7 @@ pub struct MerkleAuditPath {
 impl MerkleAuditPath {
     /// Construct a `MerkleAuditPath` from its constituent fields.
     #[must_use]
-    pub fn new(
-        leaf_index: u64,
-        tree_size: u64,
-        audit_path: alloc::vec::Vec<[u8; 32]>,
-    ) -> Self {
+    pub fn new(leaf_index: u64, tree_size: u64, audit_path: alloc::vec::Vec<[u8; 32]>) -> Self {
         Self {
             leaf_index,
             tree_size,

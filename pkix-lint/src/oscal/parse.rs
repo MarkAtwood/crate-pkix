@@ -175,7 +175,7 @@ pub enum ParseError {
     /// metadata block.
     MissingOscalVersion,
     /// The full OSCAL document declared an `oscal-version` that is not
-    /// in [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`]. The pkix-lint
+    /// in `crate::oscal::SUPPORTED_OSCAL_VERSIONS`. The pkix-lint
     /// parsers are pinned to a known schema version; loading a
     /// different-version document silently could mis-interpret fields
     /// whose shape changed between versions.
@@ -587,7 +587,7 @@ impl std::error::Error for ParseError {
 /// version validation. Callers wrapping the Risk array in an enclosing
 /// OSCAL document (Assessment Results, Plan of Action and Milestones)
 /// are responsible for validating the document's
-/// `metadata.oscal-version` themselves — use [`check_oscal_version`]
+/// `metadata.oscal-version` themselves — use `check_oscal_version`
 /// on the enclosing object before feeding the Risk subset here.
 ///
 /// # Errors
@@ -993,7 +993,7 @@ pub(crate) fn check_oscal_version(
 /// * [`ParseError::MissingOscalVersion`] /
 ///   [`ParseError::UnsupportedOscalVersion`] — the input Catalog's
 ///   `metadata.oscal-version` is absent or names a version outside
-///   [`crate::oscal::SUPPORTED_OSCAL_VERSIONS`]. The version check
+///   `crate::oscal::SUPPORTED_OSCAL_VERSIONS`. The version check
 ///   runs before any other shape validation so callers fail fast on
 ///   wrong-version input.
 /// * [`ParseError::CatalogNotObject`] — top-level value is not a JSON
@@ -1256,54 +1256,48 @@ mod tests {
         let mut store = DeviationStore::new();
         // Positive priority (highest precedence in tie-break).
         store
-            .add(
-                Deviation {
-                    id: "policy-priority-high".to_string(),
-                    target_lint: "rfc5280.bc.ca-true-required".to_string(),
-                    scope: DeviationScope::any(),
-                    effective_start: None,
-                    effective_end: None,
-                    action: DeviationAction::Suppress,
-                    justification: "High-priority suppression".to_string(),
-                    authorized_by: "lead@example.com".to_string(),
-                    evidence_uri: None,
-                    priority: 1000,
-                },
-            )
+            .add(Deviation {
+                id: "policy-priority-high".to_string(),
+                target_lint: "rfc5280.bc.ca-true-required".to_string(),
+                scope: DeviationScope::any(),
+                effective_start: None,
+                effective_end: None,
+                action: DeviationAction::Suppress,
+                justification: "High-priority suppression".to_string(),
+                authorized_by: "lead@example.com".to_string(),
+                evidence_uri: None,
+                priority: 1000,
+            })
             .expect("add high");
         // Negative priority (deprioritized resolution).
         store
-            .add(
-                Deviation {
-                    id: "policy-priority-low".to_string(),
-                    target_lint: "rfc5280.aki.required".to_string(),
-                    scope: DeviationScope::any(),
-                    effective_start: None,
-                    effective_end: None,
-                    action: DeviationAction::Suppress,
-                    justification: "Low-priority suppression".to_string(),
-                    authorized_by: "lead@example.com".to_string(),
-                    evidence_uri: None,
-                    priority: -500,
-                },
-            )
+            .add(Deviation {
+                id: "policy-priority-low".to_string(),
+                target_lint: "rfc5280.aki.required".to_string(),
+                scope: DeviationScope::any(),
+                effective_start: None,
+                effective_end: None,
+                action: DeviationAction::Suppress,
+                justification: "Low-priority suppression".to_string(),
+                authorized_by: "lead@example.com".to_string(),
+                evidence_uri: None,
+                priority: -500,
+            })
             .expect("add low");
         // Zero priority (default; no prop emitted).
         store
-            .add(
-                Deviation {
-                    id: "policy-priority-zero".to_string(),
-                    target_lint: "rfc5280.ski.required".to_string(),
-                    scope: DeviationScope::any(),
-                    effective_start: None,
-                    effective_end: None,
-                    action: DeviationAction::Suppress,
-                    justification: "Default-priority suppression".to_string(),
-                    authorized_by: "lead@example.com".to_string(),
-                    evidence_uri: None,
-                    priority: 0,
-                },
-            )
+            .add(Deviation {
+                id: "policy-priority-zero".to_string(),
+                target_lint: "rfc5280.ski.required".to_string(),
+                scope: DeviationScope::any(),
+                effective_start: None,
+                effective_end: None,
+                action: DeviationAction::Suppress,
+                justification: "Default-priority suppression".to_string(),
+                authorized_by: "lead@example.com".to_string(),
+                evidence_uri: None,
+                priority: 0,
+            })
             .expect("add zero");
 
         let risks = super::super::emit::risks_from_store(&store);

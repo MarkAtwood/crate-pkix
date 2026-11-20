@@ -349,8 +349,7 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         // Ok(_); the .expect() carries that invariant in the type.
         for r in &rfc822_addrs {
             if !smtputf8_addrs.iter().any(|u| {
-                mailbox_equivalent(r, u)
-                    .expect("pre-validation ensures inputs are well-formed")
+                mailbox_equivalent(r, u).expect("pre-validation ensures inputs are well-formed")
             }) {
                 let safe_r = truncate_for_detail(r);
                 return LintResult::error(format!(
@@ -362,8 +361,7 @@ impl Lint for Rfc8398SmimeMailboxEquivalenceLint {
         }
         for u in &smtputf8_addrs {
             if !rfc822_addrs.iter().any(|r| {
-                mailbox_equivalent(r, u)
-                    .expect("pre-validation ensures inputs are well-formed")
+                mailbox_equivalent(r, u).expect("pre-validation ensures inputs are well-formed")
             }) {
                 let safe_u = truncate_for_detail(u);
                 return LintResult::error(format!(
@@ -433,7 +431,8 @@ fn mailbox_equivalent(rfc822: &str, smtputf8: &str) -> Result<bool, &'static str
 
     // Domain comparison: convert smtputf8 domain (U-label form) to
     // A-label form and compare case-insensitively to rfc822 domain.
-    let u_ascii = idna::domain_to_ascii(u_domain).map_err(|_| "U-label → A-label conversion failed")?;
+    let u_ascii =
+        idna::domain_to_ascii(u_domain).map_err(|_| "U-label → A-label conversion failed")?;
     Ok(u_ascii.eq_ignore_ascii_case(r_domain))
 }
 

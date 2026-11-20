@@ -465,8 +465,7 @@ fn ocsp_delegated_check_against_anchor_good() {
     let ca = load_cert("ocsp-delegated-ca.der");
     let anchor = TrustAnchor::from(&ca);
     let leaf = load_cert("ocsp-delegated-leaf.der");
-    let result = checker("ocsp-delegated-good.der")
-        .check_revocation_against_anchor(&leaf, &anchor);
+    let result = checker("ocsp-delegated-good.der").check_revocation_against_anchor(&leaf, &anchor);
     result.expect("valid delegated response must return Ok(()) against anchor");
 }
 

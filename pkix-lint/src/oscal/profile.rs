@@ -862,9 +862,9 @@ mod tests {
                 Err(ParseError::UnsupportedOscalVersion { found: got }) => {
                     assert_eq!(got, found);
                 }
-                other => panic!(
-                    "expected UnsupportedOscalVersion for version {found}; got: {other:?}"
-                ),
+                other => {
+                    panic!("expected UnsupportedOscalVersion for version {found}; got: {other:?}")
+                }
             }
         }
     }
@@ -1348,11 +1348,7 @@ mod tests {
         fn applies_to(&self) -> crate::SubjectKind {
             crate::SubjectKind::Leaf
         }
-        fn set_parameter(
-            &mut self,
-            id: &str,
-            _value: &str,
-        ) -> Result<(), crate::ParameterError> {
+        fn set_parameter(&mut self, id: &str, _value: &str) -> Result<(), crate::ParameterError> {
             if id == "thresholds.warn" {
                 Ok(())
             } else {
@@ -1483,16 +1479,15 @@ mod tests {
             }
         }
 
-        let lints: Vec<Box<dyn Lint>> =
-            vec![Box::new(ShortPrefixLint), Box::new(LongPrefixLint)];
+        let lints: Vec<Box<dyn Lint>> = vec![Box::new(ShortPrefixLint), Box::new(LongPrefixLint)];
         let mut runner = LintRunner::new(lints);
         let overrides = vec![ParameterOverride {
             param_id: "test.prefix.long.knob".to_owned(),
             value: "v".to_owned(),
         }];
-        runner.apply_parameter_overrides(&overrides).expect(
-            "longest-prefix match must route to test.prefix.long not test.prefix",
-        );
+        runner
+            .apply_parameter_overrides(&overrides)
+            .expect("longest-prefix match must route to test.prefix.long not test.prefix");
     }
 
     #[test]
@@ -1605,11 +1600,7 @@ mod tests {
         fn applies_to(&self) -> crate::SubjectKind {
             crate::SubjectKind::Leaf
         }
-        fn set_parameter(
-            &mut self,
-            id: &str,
-            value: &str,
-        ) -> Result<(), crate::ParameterError> {
+        fn set_parameter(&mut self, id: &str, value: &str) -> Result<(), crate::ParameterError> {
             if id != "knob" {
                 return Err(crate::ParameterError::UnknownParameter(id.to_owned()));
             }
@@ -1652,7 +1643,7 @@ mod tests {
         // parameter value verbatim in the Error detail string. We
         // observe the REGISTERED lint's state by running it against
         // a cert and reading the finding's detail.
-        use crate::{LintRunner, LintResult, SubjectKind};
+        use crate::{LintResult, LintRunner, SubjectKind};
 
         let cert = load_atomicity_fixture_cert();
         let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {
@@ -1686,7 +1677,8 @@ mod tests {
         let findings = runner.run_cert(&cert, SubjectKind::Leaf, 0, 0);
         match &findings[0].result {
             LintResult::Error(detail) => assert_eq!(
-                detail.as_ref(), "value=default",
+                detail.as_ref(),
+                "value=default",
                 "atomicity violation: the registered lint slot was mutated by the \
                  failed apply. Expected default value preserved; got: {detail:?}"
             ),
@@ -1698,7 +1690,7 @@ mod tests {
     fn apply_parameter_overrides_commits_on_full_success() {
         // Positive control: a fully-successful apply must commit
         // every override into the registered slots.
-        use crate::{LintRunner, LintResult, SubjectKind};
+        use crate::{LintResult, LintRunner, SubjectKind};
 
         let cert = load_atomicity_fixture_cert();
         let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {
@@ -1735,7 +1727,7 @@ mod tests {
         // (I.e., atomicity does not regress the lint to its
         // construction-time default — it preserves the most-recently-
         // committed value.)
-        use crate::{LintRunner, LintResult, SubjectKind};
+        use crate::{LintResult, LintRunner, SubjectKind};
 
         let cert = load_atomicity_fixture_cert();
         let lints: Vec<Box<dyn Lint>> = vec![Box::new(EchoParamLint {

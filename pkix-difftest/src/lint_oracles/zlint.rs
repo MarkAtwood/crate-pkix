@@ -236,13 +236,13 @@ mod tests {
     #[test]
     fn normalize_verdicts_empty_input_yields_empty() {
         let findings = ZlintOracle::normalize_verdicts(&vmap(&[]));
-        assert!(findings.is_empty());
+        assert!(findings.is_empty(), "expected empty, got {findings:?}");
     }
 
     #[test]
     fn normalize_verdicts_all_pass_yields_empty() {
         let input = vmap(&[("a", Verdict::Pass), ("b", Verdict::NotApplicable)]);
         let findings = ZlintOracle::normalize_verdicts(&input);
-        assert!(findings.is_empty());
+        assert!(findings.is_empty(), "expected empty, got {findings:?}");
     }
 }

@@ -637,11 +637,7 @@ impl DeviationScope {
     /// returned `Result<Self, der::Error>`. See [`Self::issuer_dn_exact`]
     /// for the migration rationale.
     #[must_use]
-    pub fn serial_range(
-        issuer_der: impl Into<Vec<u8>>,
-        start: Vec<u8>,
-        end: Vec<u8>,
-    ) -> Self {
+    pub fn serial_range(issuer_der: impl Into<Vec<u8>>, start: Vec<u8>, end: Vec<u8>) -> Self {
         Self {
             kind: SCOPE_KIND_SERIAL_RANGE.to_string(),
             props: vec![
@@ -1753,7 +1749,10 @@ mod tests {
         // ASCII-only fold leaves Ü/ü unchanged — that is the bug shape.
         let mut s = String::from("MÜLLER");
         s.make_ascii_lowercase();
-        assert_eq!(s, "mÜller", "ASCII-only fold is documented to leave non-ASCII alone");
+        assert_eq!(
+            s, "mÜller",
+            "ASCII-only fold is documented to leave non-ASCII alone"
+        );
         // The pre-fix code on the cert side did exactly this fold, so
         // a lowercase stored substring 'müller' could not match 'mÜller'.
     }
@@ -2148,7 +2147,9 @@ mod tests {
             },
             ..make_deviation("malformed", "test.lint")
         };
-        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        let err = store
+            .add(bad)
+            .expect_err("malformed scope must be rejected");
         match err {
             DeviationAddError::MalformedScope { kind, reason } => {
                 assert_eq!(kind, SCOPE_KIND_ISSUER_DN_CONTAINS);
@@ -2174,7 +2175,9 @@ mod tests {
             },
             ..make_deviation("malformed", "test.lint")
         };
-        let err = store.add(bad).expect_err("wrong-typed prop must be rejected");
+        let err = store
+            .add(bad)
+            .expect_err("wrong-typed prop must be rejected");
         match err {
             DeviationAddError::MalformedScope { kind, reason } => {
                 assert_eq!(kind, SCOPE_KIND_ISSUER_DN_CONTAINS);
@@ -2197,7 +2200,9 @@ mod tests {
             },
             ..make_deviation("malformed", "test.lint")
         };
-        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        let err = store
+            .add(bad)
+            .expect_err("malformed scope must be rejected");
         assert!(matches!(err, DeviationAddError::MalformedScope { .. }));
     }
 
@@ -2221,7 +2226,9 @@ mod tests {
             },
             ..make_deviation("malformed", "test.lint")
         };
-        let err = store.add(bad).expect_err("malformed scope must be rejected");
+        let err = store
+            .add(bad)
+            .expect_err("malformed scope must be rejected");
         match err {
             DeviationAddError::MalformedScope { reason, .. } => {
                 assert!(

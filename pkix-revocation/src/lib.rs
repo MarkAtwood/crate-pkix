@@ -107,17 +107,12 @@ mod crl_reason_serde {
         }
     }
 
-    pub fn serialize_opt<S: Serializer>(
-        v: &Option<CrlReason>,
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
+    pub fn serialize_opt<S: Serializer>(v: &Option<CrlReason>, s: S) -> Result<S::Ok, S::Error> {
         use serde::Serialize as _;
         v.map(to_code).serialize(s)
     }
 
-    pub fn deserialize_opt<'de, D: Deserializer<'de>>(
-        d: D,
-    ) -> Result<Option<CrlReason>, D::Error> {
+    pub fn deserialize_opt<'de, D: Deserializer<'de>>(d: D) -> Result<Option<CrlReason>, D::Error> {
         let opt = Option::<u32>::deserialize(d)?;
         Ok(opt.and_then(from_code))
     }

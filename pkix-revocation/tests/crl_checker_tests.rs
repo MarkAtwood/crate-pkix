@@ -552,8 +552,8 @@ fn pkits_cert(name: &str) -> Certificate {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../pkix-path/tests/pkits/certs")
         .join(format!("{name}.crt"));
-    let der = std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("PKITS fixture {name} not found: {e}"));
+    let der =
+        std::fs::read(&path).unwrap_or_else(|e| panic!("PKITS fixture {name} not found: {e}"));
     Certificate::from_der(&der).unwrap_or_else(|e| panic!("parse PKITS {name}: {e}"))
 }
 
@@ -561,8 +561,7 @@ fn pkits_crl_bytes(name: &str) -> Vec<u8> {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../pkix-path/tests/pkits/crls")
         .join(format!("{name}.crl"));
-    std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("PKITS CRL fixture {name} not found: {e}"))
+    std::fs::read(&path).unwrap_or_else(|e| panic!("PKITS CRL fixture {name} not found: {e}"))
 }
 
 /// PKITS validity window: 2010-01-01 .. 2030-12-31. Use 2020-01-26 = `1_580_000_000`
@@ -712,16 +711,11 @@ fn pkix_8zxm_indirect_crl_per_entry_certificate_issuer() {
     let crl_der = fixture("indirect-per-entry-crl.der");
 
     // Same checker handles both queries (the CRL covers both CAs).
-    let checker_a = CrlChecker::new_with_crl_issuer(
-        crl_der.clone(),
-        crl_issuer.clone(),
-        NOW,
-        DefaultVerifier,
-    )
-    .expect("indirect CRL DER is well-formed");
-    let checker_b =
-        CrlChecker::new_with_crl_issuer(crl_der, crl_issuer, NOW, DefaultVerifier)
+    let checker_a =
+        CrlChecker::new_with_crl_issuer(crl_der.clone(), crl_issuer.clone(), NOW, DefaultVerifier)
             .expect("indirect CRL DER is well-formed");
+    let checker_b = CrlChecker::new_with_crl_issuer(crl_der, crl_issuer, NOW, DefaultVerifier)
+        .expect("indirect CRL DER is well-formed");
 
     // Leaf under CA-A: serial=1, not in any entry whose effective issuer
     // matches CA-A. Expected: not revoked.

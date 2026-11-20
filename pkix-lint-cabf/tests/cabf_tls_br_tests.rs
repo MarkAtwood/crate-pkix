@@ -24,11 +24,11 @@
 //!   smime-self-signed-365d.der  : P-256, emailProtection EKU, 365 days
 
 use der::Decode as _;
+use pkix_lint::{Lint, LintResult, SubjectKind};
 use pkix_lint_cabf::cabf_tls_br::{
     BcCaFlagLint, EkuServerAuthLint, RsaMinKeySizeLint, SanRequiredLint, Sha1ProhibitedLint,
     ValidityMaxLint,
 };
-use pkix_lint::{Lint, LintResult, SubjectKind};
 use x509_cert::Certificate;
 
 // ---------------------------------------------------------------------------

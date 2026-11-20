@@ -104,8 +104,5 @@ fn io_failure_wire_form_uses_debug_variant_name() {
     // Independent oracle: the wire form is `{"kind":"PermissionDenied",
     // "message":"<rendered>"}`. Display of `io::Error::new(..., msg)` is
     // exactly `msg`, so the message field equals "forbidden".
-    assert_eq!(
-        json,
-        r#"{"kind":"PermissionDenied","message":"forbidden"}"#
-    );
+    assert_eq!(json, r#"{"kind":"PermissionDenied","message":"forbidden"}"#);
 }
