@@ -93,7 +93,10 @@
 //!   [`AuthorityInfoAccess`] extension. Restrictions on which hosts /
 //!   schemes are acceptable for revocation fetches (e.g., enforcing
 //!   HTTPS or blocking private-network URIs) are a deployment-policy
-//!   decision and stay outside this crate.
+//!   decision and stay outside this crate. The reference clients
+//!   (`clients::ureq::UreqFetcher`, `clients::reqwest::ReqwestFetcher`)
+//!   only follow same-origin redirects by default, so a vetted URL cannot
+//!   be redirected to a different host behind the caller's back.
 //!
 //! [`CRLDistributionPoints`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13
 //! [`AuthorityInfoAccess`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1
@@ -155,7 +158,9 @@ pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
 pub(crate) const OCSP_REQUEST_CT: &str = "application/ocsp-request";
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
-pub use ocsp_request::{build_ocsp_request, BuildError, OcspHashAlg, OcspRequestBytes};
+pub use ocsp_request::{
+    build_ocsp_request, build_ocsp_request_for_anchor, BuildError, OcspHashAlg, OcspRequestBytes,
+};
 
 /// Errors returned by the URL-extraction helpers
 /// ([`extract_cdp_http_urls`], [`extract_aia_http_urls`]).

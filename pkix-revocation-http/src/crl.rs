@@ -23,26 +23,28 @@
 //!   wrap this checker; v0.x explicitly defers stricter policy to
 //!   composition.
 //!
-//! The `check_revocation_against_anchor` method is intentionally left at
-//! the trait default (`Ok(())`) — same shape as
-//! [`pkix_revocation::CrlChecker`] itself, which does not override it
-//! either. Full anchor-aware coverage requires a `TrustAnchor`-shaped
-//! API on `CrlChecker` and is tracked as future work.
+//! `check_revocation_against_anchor` (used for the certificate issued
+//! directly by a trust anchor) runs the same fetch loop and delegates to
+//! [`pkix_revocation::CrlChecker::check_revocation_against_anchor`], which
+//! verifies the CRL against the anchor's subject and SPKI.
 
 use crate::{extract_cdp_http_urls, FetchRequest, HttpCrlFetcher, RevocationFetcher};
-use pkix_path::SignatureVerifier;
+use pkix_path::{SignatureVerifier, TrustAnchor};
 use pkix_revocation::{CrlChecker, Error as RevError, RevocationChecker};
 use x509_cert::Certificate;
 
-impl<F, V> RevocationChecker for HttpCrlFetcher<F, V>
+impl<F, V> HttpCrlFetcher<F, V>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
 {
-    fn check_revocation(
+    /// Fetch loop shared by both [`RevocationChecker`] methods: `verdict`
+    /// runs the issuer- or anchor-flavoured `CrlChecker` check on the first
+    /// CRL that fetches and parses.
+    fn fetch_and_check(
         &self,
         cert: &Certificate,
-        issuer: &Certificate,
+        verdict: impl Fn(&CrlChecker<V>) -> pkix_revocation::Result<()>,
     ) -> pkix_revocation::Result<()> {
         // Step 1 — Extract HTTP/HTTPS CDP URLs from the cert.
         //
@@ -76,14 +78,14 @@ where
             match self.fetcher.fetch(&req) {
                 Ok(resp) => {
                     // We have bytes. Try to construct a CrlChecker and
-                    // run check_revocation. If construction fails (parse
+                    // run the check. If construction fails (parse
                     // error etc.), continue to the next URL per the
                     // bead's failure semantics. If construction
                     // succeeds, the checker's verdict is
                     // returned IMMEDIATELY — see module docs for why we
                     // do not retry on e.g. CrlExpired.
                     match CrlChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
-                        Ok(checker) => return checker.check_revocation(cert, issuer),
+                        Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: CRL parse: {e}"));
                             continue;
@@ -102,9 +104,34 @@ where
             description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
         })
     }
+}
 
-    // check_revocation_against_anchor: keep the trait default (Ok(())).
-    // Documented in the module-level docstring above.
+impl<F, V> RevocationChecker for HttpCrlFetcher<F, V>
+where
+    F: RevocationFetcher,
+    V: SignatureVerifier + Clone,
+{
+    fn check_revocation(
+        &self,
+        cert: &Certificate,
+        issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, |checker| checker.check_revocation(cert, issuer))
+    }
+
+    /// Fetches the certificate's CRL exactly as
+    /// [`check_revocation`](RevocationChecker::check_revocation) does and
+    /// verifies it against `anchor` via
+    /// [`CrlChecker::check_revocation_against_anchor`].
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+    }
 }
 
 #[cfg(test)]

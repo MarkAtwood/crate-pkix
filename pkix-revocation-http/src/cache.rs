@@ -61,7 +61,7 @@ use der::Decode as _;
 #[cfg(feature = "crl")]
 use der::Encode as _;
 #[cfg(any(feature = "crl", feature = "ocsp"))]
-use pkix_path::SignatureVerifier;
+use pkix_path::{SignatureVerifier, TrustAnchor};
 #[cfg(any(feature = "crl", feature = "ocsp"))]
 use pkix_revocation::{Error as RevError, RevocationChecker};
 #[cfg(any(feature = "crl", feature = "ocsp"))]
@@ -575,27 +575,36 @@ impl CrlAtomicPut for dyn RevocationCache {
 // ---------------------------------------------------------------------------
 
 /// [`HttpCrlFetcher`]-shaped wrapper that consults a [`RevocationCache`]
-/// before issuing network requests, and populates the cache on every
-/// successful fetch + parse.
+/// before issuing network requests, and populates the cache only with CRLs
+/// that have produced a verified verdict.
 ///
 /// # Lookup flow
 ///
 /// For each candidate CDP URL on a certificate:
 ///
-/// 1. Compute the [`CrlCacheKey`]: `(issuer_dn, Some(url))`.
-/// 2. `cache.get_crl(&key)` — on hit, hand the cached bytes to a fresh
-///    [`pkix_revocation::CrlChecker`] and return its verdict.
+/// 1. Compute the [`CrlCacheKey`]: `(issuer_dn, Some(url))`, where
+///    `issuer_dn` is the issuer certificate's subject (or the trust
+///    anchor's subject in `check_revocation_against_anchor`).
+/// 2. `cache.get_crl(&key)` — on a live hit (`nextUpdate` in the future),
+///    hand the cached bytes to a fresh [`pkix_revocation::CrlChecker`]. A
+///    *determinative* verdict (`Ok(())` or [`RevError::Revoked`]) is
+///    returned; any other outcome (for example `CrlExpired` because the
+///    clock passed `nextUpdate`, or an out-of-scope result) falls through
+///    to a network refetch of the same URL. Undecodable cached bytes are
+///    invalidated.
 /// 3. On miss, fetch the URL via the underlying [`RevocationFetcher`].
-/// 4. On successful fetch, parse `(CRLNumber, thisUpdate, nextUpdate)`
-///    and store the entry. **Rollback rejection:** if a cached entry
-///    existed for this key with a `CRLNumber` numerically greater than
-///    the fetched one, the new entry is dropped on the floor (the cache
-///    retains the older-but-newer entry) and the wrapper proceeds with
-///    the *cached* CRL. RFC 5280 §5.2.3 makes CRLNumber monotonic per
-///    series; a refresh that goes backwards is either a misconfigured
-///    responder serving a stale snapshot or an attack.
-/// 5. Verdict propagation is identical to [`HttpCrlFetcher`]: first
-///    constructible `CrlChecker` decides.
+/// 4. The fetched CRL's verdict is returned exactly as [`HttpCrlFetcher`]
+///    would return it. The CRL is cached **only** when that verdict is
+///    determinative — which implies its signature, issuer and validity
+///    window were verified — and it carries a `nextUpdate`. Unverified
+///    bytes (bad signature, wrong issuer, expired, …) therefore never reach
+///    the cache, and neither does their `CRLNumber`.
+/// 5. **Rollback rejection:** if a cached entry exists for this key with a
+///    `CRLNumber` numerically greater than the fetched (verified) one, the
+///    new entry is not stored. RFC 5280 §5.2.3 makes CRLNumber monotonic
+///    per series; a refresh that goes backwards is either a misconfigured
+///    responder serving a stale snapshot or an attack. The verdict of the
+///    fetched CRL is still returned.
 ///
 /// `Clone` is derived to mirror [`HttpCrlFetcher`]; consumers typically
 /// `Arc`-share the cache and `Clone` the wrapper.
@@ -619,6 +628,14 @@ impl<F, V, C> CachedHttpCrlFetcher<F, V, C> {
     }
 }
 
+/// `true` for verdicts that required a fully verified revocation source:
+/// "not revoked" or "revoked". Only such sources are cached or served from
+/// the cache.
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+fn is_determinative(verdict: &pkix_revocation::Result<()>) -> bool {
+    matches!(verdict, Ok(()) | Err(RevError::Revoked { .. }))
+}
+
 #[cfg(feature = "crl")]
 #[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
 impl<F, V, C> RevocationChecker for CachedHttpCrlFetcher<F, V, C>
@@ -631,6 +648,41 @@ where
         &self,
         cert: &Certificate,
         issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, issuer.tbs_certificate().subject(), |checker| {
+            checker.check_revocation(cert, issuer)
+        })
+    }
+
+    /// Same cached fetch flow, keyed by and verified against `anchor`
+    /// (see [`HttpCrlFetcher`]'s anchor support).
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, &anchor.subject, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+    }
+}
+
+#[cfg(feature = "crl")]
+#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
+impl<F, V, C> CachedHttpCrlFetcher<F, V, C>
+where
+    F: RevocationFetcher,
+    V: SignatureVerifier + Clone,
+    C: RevocationCache + CrlAtomicPut,
+{
+    /// Cached fetch loop shared by both [`RevocationChecker`] methods.
+    /// `issuer_subject` keys the cache; `verdict` runs the issuer- or
+    /// anchor-flavoured `CrlChecker` check.
+    fn fetch_and_check(
+        &self,
+        cert: &Certificate,
+        issuer_subject: &x509_cert::name::Name,
+        verdict: impl Fn(&pkix_revocation::CrlChecker<V>) -> pkix_revocation::Result<()>,
     ) -> pkix_revocation::Result<()> {
         use pkix_revocation::CrlChecker;
 
@@ -646,7 +698,8 @@ where
         // Issuer-DN bytes are computed once and reused for every key.
         // A non-encodable Name shouldn't happen on a successfully-parsed
         // cert; if it does, fall back to "no cache hits possible".
-        let issuer_dn_der = issuer.tbs_certificate().subject().to_der().ok();
+        let issuer_dn_der = issuer_subject.to_der().ok();
+        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
 
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
@@ -658,19 +711,25 @@ where
             if let Some(cached) = key
                 .as_ref()
                 .and_then(|k| self.cache.get_crl(k))
-                .filter(|e| {
-                    let now = SystemTime::UNIX_EPOCH
-                        + core::time::Duration::from_secs(self.inner.now_unix);
-                    is_live(e.next_update, now)
-                })
+                .filter(|e| is_live(e.next_update, now))
             {
-                // Cache hit: construct CrlChecker from cached bytes.
                 match CrlChecker::new(
                     cached.bytes.as_slice(),
                     self.inner.now_unix,
                     self.inner.verifier.clone(),
                 ) {
-                    Ok(checker) => return checker.check_revocation(cert, issuer),
+                    Ok(checker) => {
+                        let cached_verdict = verdict(&checker);
+                        if is_determinative(&cached_verdict) {
+                            return cached_verdict;
+                        }
+                        // Not determinative for this cert (e.g. the
+                        // clock moved past a boundary): refetch below
+                        // rather than pinning the cached outcome.
+                        if let Err(e) = cached_verdict {
+                            failures.push(format!("{url}: cached CRL: {e}"));
+                        }
+                    }
                     Err(e) => {
                         // Treat a corrupt cache entry as a miss. Invalidate
                         // and fall through to network fetch so a one-off
@@ -679,12 +738,11 @@ where
                             self.cache.invalidate_crl(k);
                         }
                         failures.push(format!("{url}: cached CRL parse: {e}"));
-                        // Fall through to network fetch.
                     }
                 }
             }
 
-            // Step 3 — Cache miss. Fetch over the network.
+            // Step 3 — Cache miss (or unusable hit). Fetch over the network.
             let req = FetchRequest::get(url);
             match self.inner.fetcher.fetch(&req) {
                 Ok(resp) => {
@@ -696,12 +754,14 @@ where
                         self.inner.verifier.clone(),
                     ) {
                         Ok(checker) => {
-                            // Best-effort cache populate. Parse metadata
-                            // independently of the verifier-bound CrlChecker
-                            // so a future refactor of pkix-revocation
-                            // cannot break the cache.
-                            self.maybe_populate_cache(&resp, key);
-                            return checker.check_revocation(cert, issuer);
+                            let fetched_verdict = verdict(&checker);
+                            // Cache only CRLs that produced a verified
+                            // verdict (signature, issuer and freshness all
+                            // checked); see the type-level docs.
+                            if is_determinative(&fetched_verdict) {
+                                self.maybe_populate_cache(&resp, key);
+                            }
+                            return fetched_verdict;
                         }
                         Err(e) => {
                             failures.push(format!("{url}: CRL parse: {e}"));
@@ -720,17 +780,12 @@ where
             description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
         })
     }
-}
 
-#[cfg(feature = "crl")]
-#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
-impl<F, V, C> CachedHttpCrlFetcher<F, V, C>
-where
-    C: RevocationCache + CrlAtomicPut,
-{
-    /// Parse freshness metadata out of a fetched CRL response and store
-    /// it under `key`. Drops the new entry on the floor if `CRLNumber`
-    /// monotonicity would be violated.
+    /// Parse freshness metadata out of a fetched, **already verified** CRL
+    /// response and store it under `key`. Drops the new entry if
+    /// `CRLNumber` monotonicity would be violated, and never stores a CRL
+    /// without `nextUpdate` (it could never be served: `CrlChecker` treats
+    /// a missing `nextUpdate` as expired).
     ///
     /// The rollback check and insert are performed atomically via
     /// [`CrlAtomicPut::put_crl_guarded`], which eliminates the TOCTOU
@@ -747,6 +802,9 @@ where
         let Ok(meta) = parse_crl_metadata(&resp.bytes) else {
             return;
         };
+        if meta.next_update.is_none() {
+            return;
+        }
 
         self.cache.put_crl_guarded(
             key,
@@ -769,15 +827,18 @@ where
 ///
 /// Same flow as [`CachedHttpCrlFetcher`] but for OCSP:
 ///
-/// 1. Build the OCSP request body via [`crate::build_ocsp_request`] (we
-///    need its `cert_id_serial` and `cert_id_issuer_key_hash` to form the
-///    cache key — see [`crate::ocsp_request::OcspRequestBytes`]).
+/// 1. Build the OCSP request body via [`crate::build_ocsp_request`] (or
+///    [`crate::build_ocsp_request_for_anchor`] in the anchor flow); its
+///    `CertID` serial and `issuerKeyHash` form the cache key.
 /// 2. For each AIA OCSP URL, look up
 ///    `(cert_serial, issuer_key_hash, responder_url)` in the cache.
-/// 3. On hit, construct an [`pkix_revocation::OcspChecker`] from cached
-///    bytes and return its verdict.
-/// 4. On miss, POST the request body and populate the cache from
-///    `(producedAt, thisUpdate, nextUpdate)`.
+/// 3. On a live hit, construct an [`pkix_revocation::OcspChecker`] from the
+///    cached bytes; a determinative verdict (`Ok(())` / `Revoked`) is
+///    returned, anything else falls through to a network refetch.
+/// 4. On miss, POST the request body. The response is cached only if its
+///    verdict was determinative (so its signature, responder and
+///    freshness were verified) and its `SingleResponse` has a
+///    `nextUpdate`.
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[derive(Clone, Debug)]
@@ -806,16 +867,45 @@ where
         cert: &Certificate,
         issuer: &Certificate,
     ) -> pkix_revocation::Result<()> {
-        use pkix_revocation::OcspChecker;
-
         // Build the OCSP request once; reuse for cache-key derivation
         // AND as the POST body on miss.
-        let req_bytes =
-            crate::build_ocsp_request(cert, issuer, self.inner.hash_alg).map_err(|e| {
-                RevError::RevocationFetchFailed {
-                    description: format!("OCSP request build failed: {e}"),
-                }
-            })?;
+        let req_bytes = crate::build_ocsp_request(cert, issuer, self.inner.hash_alg)
+            .map_err(crate::ocsp::request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation(cert, issuer)
+        })
+    }
+
+    /// Same cached flow with a `CertID` computed from `anchor` and the
+    /// response verified against it.
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        let req_bytes = crate::build_ocsp_request_for_anchor(cert, anchor, self.inner.hash_alg)
+            .map_err(crate::ocsp::request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+    }
+}
+
+#[cfg(feature = "ocsp")]
+impl<F, V, C> CachedHttpOcspFetcher<F, V, C>
+where
+    F: RevocationFetcher,
+    V: SignatureVerifier + Clone,
+    C: RevocationCache,
+{
+    /// Cached POST loop shared by both [`RevocationChecker`] methods.
+    fn fetch_and_check(
+        &self,
+        cert: &Certificate,
+        req_bytes: &crate::OcspRequestBytes,
+        verdict: impl Fn(&pkix_revocation::OcspChecker<V>) -> pkix_revocation::Result<()>,
+    ) -> pkix_revocation::Result<()> {
+        use pkix_revocation::OcspChecker;
 
         let aia =
             crate::extract_aia_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
@@ -827,14 +917,15 @@ where
 
         // Extract (serial, issuer_key_hash) from the request body for
         // cache-key derivation. We parse the body we just built rather
-        // than mirroring `Request::from_cert`'s hashing logic, so the
-        // two cannot drift apart.
+        // than mirroring the CertID hashing logic, so the two cannot
+        // drift apart.
         let (cert_serial, issuer_key_hash) =
             extract_cert_id_identity(&req_bytes.body).map_err(|e| {
                 RevError::RevocationFetchFailed {
                     description: format!("OCSP request CertID extract failed: {e}"),
                 }
             })?;
+        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
 
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
         for url in &aia.ocsp {
@@ -844,27 +935,34 @@ where
                 responder_url: url.clone(),
             };
 
-            if let Some(cached) = self.cache.get_ocsp(&key).filter(|e| {
-                let now =
-                    SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
-                is_live(e.next_update, now)
-            }) {
+            if let Some(cached) = self
+                .cache
+                .get_ocsp(&key)
+                .filter(|e| is_live(e.next_update, now))
+            {
                 match OcspChecker::new(
                     cached.bytes.as_slice(),
                     self.inner.now_unix,
                     self.inner.verifier.clone(),
                 ) {
-                    Ok(checker) => return checker.check_revocation(cert, issuer),
+                    Ok(checker) => {
+                        let cached_verdict = verdict(&checker);
+                        if is_determinative(&cached_verdict) {
+                            return cached_verdict;
+                        }
+                        // Not determinative: refetch below.
+                        if let Err(e) = cached_verdict {
+                            failures.push(format!("{url}: cached OCSP: {e}"));
+                        }
+                    }
                     Err(e) => {
                         self.cache.invalidate_ocsp(&key);
                         failures.push(format!("{url}: cached OCSP parse: {e}"));
-                        // Fall through to network fetch.
                     }
                 }
             }
 
-            const OCSP_REQUEST_CT: &str = "application/ocsp-request";
-            let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
+            let req = FetchRequest::post(url, &req_bytes.body, crate::OCSP_REQUEST_CT);
             match self.inner.fetcher.fetch(&req) {
                 Ok(resp) => match OcspChecker::new(
                     &resp.bytes,
@@ -872,8 +970,12 @@ where
                     self.inner.verifier.clone(),
                 ) {
                     Ok(checker) => {
-                        self.maybe_populate_cache(&resp, key);
-                        return checker.check_revocation(cert, issuer);
+                        let fetched_verdict = verdict(&checker);
+                        // Cache only verified responses; see type docs.
+                        if is_determinative(&fetched_verdict) {
+                            self.maybe_populate_cache(&resp, key);
+                        }
+                        return fetched_verdict;
                     }
                     Err(e) => {
                         failures.push(format!("{url}: OCSP parse: {e}"));
@@ -895,19 +997,18 @@ where
             ),
         })
     }
-}
 
-#[cfg(feature = "ocsp")]
-impl<F, V, C> CachedHttpOcspFetcher<F, V, C>
-where
-    C: RevocationCache,
-{
-    /// Parse freshness metadata out of a fetched OCSP response and store
-    /// it under `key`. Best-effort; silent on metadata parse failure.
+    /// Parse freshness metadata out of a fetched, **already verified** OCSP
+    /// response and store it under `key`. Responses without `nextUpdate`
+    /// are not stored (`OcspChecker` treats them as stale). Best-effort;
+    /// silent on metadata parse failure.
     fn maybe_populate_cache(&self, resp: &FetchResponse, key: OcspCacheKey) {
         let Ok(meta) = parse_ocsp_metadata(&resp.bytes) else {
             return;
         };
+        if meta.next_update.is_none() {
+            return;
+        }
         self.cache.put_ocsp(
             key,
             CachedOcspResponse {

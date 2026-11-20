@@ -7,58 +7,52 @@
 //! only behavioural difference vs the sync side is that `fetch` is
 //! awaited; OCSP parsing and signature verification stay synchronous.
 //!
-//! See `crate::ocsp` for the per-step rationale.
+//! See `crate::ocsp` for the per-step rationale, including the anchor
+//! flow ([`crate::build_ocsp_request_for_anchor`] +
+//! [`pkix_revocation::OcspChecker::check_revocation_against_anchor`]).
 
+use crate::ocsp::request_build_failed;
 use crate::{
-    build_ocsp_request, extract_aia_http_urls, AsyncHttpOcspFetcher, AsyncRevocationChecker,
-    AsyncRevocationFetcher, FetchRequest, OCSP_REQUEST_CT,
+    build_ocsp_request, build_ocsp_request_for_anchor, extract_aia_http_urls, AsyncHttpOcspFetcher,
+    AsyncRevocationChecker, AsyncRevocationFetcher, FetchRequest, OcspRequestBytes,
+    OCSP_REQUEST_CT,
 };
 use async_trait::async_trait;
-use pkix_path::SignatureVerifier;
+use pkix_path::{SignatureVerifier, TrustAnchor};
 use pkix_revocation::{Error as RevError, OcspChecker, RevocationChecker};
 use x509_cert::Certificate;
 
-#[async_trait]
-impl<F, V> AsyncRevocationChecker for AsyncHttpOcspFetcher<F, V>
+impl<F, V> AsyncHttpOcspFetcher<F, V>
 where
     F: AsyncRevocationFetcher,
     V: SignatureVerifier + Clone + Send + Sync,
 {
-    async fn check_revocation(
+    /// POST loop shared by both [`AsyncRevocationChecker`] methods (async
+    /// twin of `HttpOcspFetcher::fetch_and_check`). As with the CRL side we
+    /// serialize rather than fan out in parallel: deterministic ordering,
+    /// predictable responder rate-limit profile.
+    async fn fetch_and_check(
         &self,
         cert: &Certificate,
-        issuer: &Certificate,
+        req_bytes: &OcspRequestBytes,
+        verdict: impl Fn(&OcspChecker<V>) -> pkix_revocation::Result<()> + Send,
     ) -> pkix_revocation::Result<()> {
-        // Step 1 — Build the OCSP request body once. Body reuse across
-        // URLs matches the sync impl.
-        let req_bytes = build_ocsp_request(cert, issuer, self.hash_alg).map_err(|e| {
-            RevError::RevocationFetchFailed {
-                description: format!("OCSP request build failed: {e}"),
-            }
-        })?;
-
-        // Step 2 — Extract HTTP/HTTPS OCSP responder URLs.
         let aia = extract_aia_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
             description: format!("authorityInfoAccess extension parse failed: {e}"),
         })?;
 
-        // Step 3 — No OCSP URLs ⇒ nothing for an OCSP-only checker to
-        // do. Matches sync.
+        // No OCSP URLs ⇒ nothing for an OCSP-only checker to do. Matches sync.
         if aia.ocsp.is_empty() {
             return Ok(());
         }
 
-        // Step 4 — POST to each URL in document order. First successful
-        // POST + parse decides the verdict. As with the CRL side we
-        // serialize rather than fan out in parallel: deterministic
-        // ordering, predictable responder rate-limit profile.
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
         for url in &aia.ocsp {
             let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
             match self.fetcher.fetch(&req).await {
                 Ok(resp) => {
                     match OcspChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
-                        Ok(checker) => return checker.check_revocation(cert, issuer),
+                        Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: OCSP parse: {e}"));
                             continue;
@@ -72,7 +66,6 @@ where
             }
         }
 
-        // Step 5 — All URLs failed.
         Err(RevError::RevocationFetchFailed {
             description: format!(
                 "all {} URL(s) failed: {}",
@@ -81,9 +74,39 @@ where
             ),
         })
     }
+}
 
-    // check_revocation_against_anchor stays at the trait default
-    // (`Ok(())`). Same reason as the sync HttpOcspFetcher.
+#[async_trait]
+impl<F, V> AsyncRevocationChecker for AsyncHttpOcspFetcher<F, V>
+where
+    F: AsyncRevocationFetcher,
+    V: SignatureVerifier + Clone + Send + Sync,
+{
+    async fn check_revocation(
+        &self,
+        cert: &Certificate,
+        issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        let req_bytes =
+            build_ocsp_request(cert, issuer, self.hash_alg).map_err(request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation(cert, issuer)
+        })
+        .await
+    }
+
+    async fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        let req_bytes = build_ocsp_request_for_anchor(cert, anchor, self.hash_alg)
+            .map_err(request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+        .await
+    }
 }
 
 #[cfg(test)]

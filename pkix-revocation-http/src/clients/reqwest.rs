@@ -9,6 +9,19 @@
 //! - rustls feature gives us pure-Rust TLS without `openssl-sys`,
 //!   matching the sync side's posture.
 //!
+//! # Redirects
+//!
+//! [`ReqwestFetcher::new`] / [`ReqwestFetcher::try_new`] install a redirect
+//! policy that follows at most [`MAX_REDIRECTS`] redirects, and only while
+//! they stay on the same origin (scheme, host, port) as the previous URL.
+//! A cross-origin redirect is not followed and surfaces as
+//! [`FetchError::HttpStatus`] with the 3xx code. CDP / AIA URLs come from
+//! certificates; without this, a caller vetting the URL before fetching
+//! could be bypassed by a redirect it never sees. (reqwest's own default
+//! follows up to 10 redirects to any origin.) Clients supplied via
+//! [`ReqwestFetcher::with_client`] keep their own policy; use
+//! [`same_origin_redirect_policy`] when building one.
+//!
 //! # Runtime
 //!
 //! `reqwest::Client` requires a tokio runtime to drive its sockets;
@@ -40,6 +53,30 @@ const DEFAULT_MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
 /// [`ReqwestFetcher::with_client`].
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Maximum number of same-origin redirects followed by the default client.
+pub const MAX_REDIRECTS: usize = 10;
+
+/// Redirect policy used by [`ReqwestFetcher::new`]: follow at most
+/// [`MAX_REDIRECTS`] redirects, each to the same origin as the URL it
+/// redirects from; stop (returning the 3xx response) otherwise.
+#[must_use]
+pub fn same_origin_redirect_policy() -> ::reqwest::redirect::Policy {
+    ::reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() > MAX_REDIRECTS {
+            return attempt.error("too many redirects");
+        }
+        let same_origin = attempt
+            .previous()
+            .last()
+            .is_some_and(|prev| prev.origin() == attempt.url().origin());
+        if same_origin {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
+    })
+}
+
 /// HTTP transport backed by `reqwest`'s async client.
 ///
 /// Adapter from this crate's [`AsyncRevocationFetcher`] trait onto a
@@ -60,22 +97,42 @@ impl Default for ReqwestFetcher {
 
 impl ReqwestFetcher {
     /// Build a fetcher with a default `reqwest::Client`, a 10 MiB body
-    /// cap, and a 30-second per-request timeout.
+    /// cap, a 30-second per-request timeout, and the same-origin redirect
+    /// policy (module docs, "Redirects").
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `reqwest` client cannot be built (for example, the TLS
+    /// backend fails to initialize). Use [`ReqwestFetcher::try_new`] to
+    /// handle that case. The fetcher never silently falls back to a client
+    /// without the timeout.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            client: ::reqwest::ClientBuilder::new()
-                .timeout(DEFAULT_TIMEOUT)
-                .build()
-                .unwrap_or_default(),
+        Self::try_new().expect("failed to build reqwest client for ReqwestFetcher")
+    }
+
+    /// Fallible [`ReqwestFetcher::new`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the `reqwest` builder error if the client cannot be built.
+    pub fn try_new() -> Result<Self, ::reqwest::Error> {
+        let client = ::reqwest::ClientBuilder::new()
+            .timeout(DEFAULT_TIMEOUT)
+            .redirect(same_origin_redirect_policy())
+            .build()?;
+        Ok(Self {
+            client,
             max_response_size: DEFAULT_MAX_RESPONSE_SIZE,
-        }
+        })
     }
 
     /// Build a fetcher around a pre-configured `reqwest::Client`.
     ///
     /// Use this when you need custom TLS config, connection pool
-    /// tuning, proxies, or timeouts. The client is used as-is.
+    /// tuning, proxies, or timeouts. The client is used as-is, including
+    /// its redirect policy; pass [`same_origin_redirect_policy`] to its
+    /// builder to keep the same-origin rule.
     #[must_use]
     pub fn with_client(client: ::reqwest::Client) -> Self {
         Self {

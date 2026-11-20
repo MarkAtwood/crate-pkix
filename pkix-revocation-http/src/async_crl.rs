@@ -10,58 +10,45 @@
 //! See `crate::crl` for the per-step rationale (first-success-wins,
 //! fall-through on transport / parse errors, no-CDPs ⇒ `Ok(())`,
 //! all-failed ⇒ [`pkix_revocation::Error::RevocationFetchFailed`] with
-//! a per-URL summary).
+//! a per-URL summary, anchor flow delegating to
+//! [`pkix_revocation::CrlChecker::check_revocation_against_anchor`]).
 
 use crate::{
     extract_cdp_http_urls, AsyncHttpCrlFetcher, AsyncRevocationChecker, AsyncRevocationFetcher,
     FetchRequest,
 };
 use async_trait::async_trait;
-use pkix_path::SignatureVerifier;
+use pkix_path::{SignatureVerifier, TrustAnchor};
 use pkix_revocation::{CrlChecker, Error as RevError, RevocationChecker};
 use x509_cert::Certificate;
 
-#[async_trait]
-impl<F, V> AsyncRevocationChecker for AsyncHttpCrlFetcher<F, V>
+impl<F, V> AsyncHttpCrlFetcher<F, V>
 where
     F: AsyncRevocationFetcher,
     V: SignatureVerifier + Clone + Send + Sync,
 {
-    async fn check_revocation(
+    /// Fetch loop shared by both [`AsyncRevocationChecker`] methods (async
+    /// twin of `HttpCrlFetcher::fetch_and_check`).
+    async fn fetch_and_check(
         &self,
         cert: &Certificate,
-        issuer: &Certificate,
+        verdict: impl Fn(&CrlChecker<V>) -> pkix_revocation::Result<()> + Send,
     ) -> pkix_revocation::Result<()> {
-        // Step 1 — Extract HTTP/HTTPS CDP URLs from the cert. Matches
-        // the sync impl's "malformed CDP ⇒ RevocationFetchFailed" choice.
         let urls = extract_cdp_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
             description: format!("cRLDistributionPoints extension parse failed: {e}"),
         })?;
 
-        // Step 2 — No URLs ⇒ nothing to check. Matches sync.
         if urls.is_empty() {
             return Ok(());
         }
 
-        // Step 3 — Try each URL in document order. First successful
-        // fetch + parse decides the verdict.
-        //
-        // Note: we deliberately do NOT fan out the fetches in parallel
-        // (e.g. via futures::join_all). RFC 5280 §6.3.3 path-validation
-        // CRL checking is described as a per-CDP-URL sequence; the sync
-        // impl iterates document-order; mirroring that here preserves
-        // the "no CRL is ever fetched after the first success" property
-        // that operators rely on for rate-limit / quota planning.
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
             let req = FetchRequest::get(url);
             match self.fetcher.fetch(&req).await {
                 Ok(resp) => {
                     match CrlChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
-                        // CrlChecker::check_revocation is sync; that's
-                        // fine — the work it does is pure CPU (CRL DER
-                        // parse + signature verification).
-                        Ok(checker) => return checker.check_revocation(cert, issuer),
+                        Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: CRL parse: {e}"));
                             continue;
@@ -75,16 +62,37 @@ where
             }
         }
 
-        // Step 4 — All URLs failed.
         Err(RevError::RevocationFetchFailed {
             description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
         })
     }
+}
 
-    // check_revocation_against_anchor stays at the trait default
-    // (`Ok(())`) for the same reason as the sync HttpCrlFetcher: the
-    // underlying CrlChecker does not currently expose a
-    // TrustAnchor-shaped entry point. Tracked as future work.
+#[async_trait]
+impl<F, V> AsyncRevocationChecker for AsyncHttpCrlFetcher<F, V>
+where
+    F: AsyncRevocationFetcher,
+    V: SignatureVerifier + Clone + Send + Sync,
+{
+    async fn check_revocation(
+        &self,
+        cert: &Certificate,
+        issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, |checker| checker.check_revocation(cert, issuer))
+            .await
+    }
+
+    async fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        self.fetch_and_check(cert, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+        .await
+    }
 }
 
 #[cfg(test)]

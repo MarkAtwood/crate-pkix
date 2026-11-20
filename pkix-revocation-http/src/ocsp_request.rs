@@ -4,9 +4,16 @@
 //! specifies the HTTP transport (`POST` with `Content-Type:
 //! application/ocsp-request`). [`build_ocsp_request`] produces both.
 
+use der::asn1::{Null, OctetString};
+use der::oid::AssociatedOid;
 use der::Encode;
+use pkix_path::TrustAnchor;
+use sha1::Digest;
+use x509_cert::name::Name;
+use x509_cert::serial_number::SerialNumber;
+use x509_cert::spki::AlgorithmIdentifierOwned;
 use x509_cert::Certificate;
-use x509_ocsp::{builder::OcspRequestBuilder, Request};
+use x509_ocsp::{builder::OcspRequestBuilder, CertId, Request};
 
 /// Hash algorithm used in the `CertID.hashAlgorithm` field of an OCSP
 /// request (RFC 6960 §4.1.1).
@@ -98,18 +105,64 @@ pub fn build_ocsp_request(
     issuer: &Certificate,
     hash_alg: OcspHashAlg,
 ) -> Result<OcspRequestBytes, BuildError> {
-    // Request::from_cert::<D>(issuer, cert) builds a CertID by hashing the
-    // issuer's DN and SPKI bits with D, and pulling the serial from cert.
-    // This matches RFC 6960 §4.1.1 directly. We map x509-ocsp's builder
-    // Error to ours; only the Asn1 variant is reachable here because
-    // from_cert does no signing.
-    let request = match hash_alg {
-        OcspHashAlg::Sha1 => Request::from_cert::<sha1::Sha1>(issuer, cert),
-        OcspHashAlg::Sha256 => Request::from_cert::<sha2::Sha256>(issuer, cert),
-    }
-    .map_err(map_builder_err)?;
+    // Same CertID derivation as x509-ocsp's `Request::from_cert::<D>`:
+    // hash the issuer's DN and SPKI bits with D, take the serial from cert.
+    let issuer_tbs = issuer.tbs_certificate();
+    build_for_issuer_identity(
+        cert,
+        issuer_tbs.subject(),
+        issuer_tbs
+            .subject_public_key_info()
+            .subject_public_key
+            .raw_bytes(),
+        hash_alg,
+    )
+}
 
-    let req = OcspRequestBuilder::default().with_request(request).build();
+/// Build an OCSP request for `cert` issued directly by a trust anchor.
+///
+/// Identical to [`build_ocsp_request`] except that the `CertID`'s
+/// `issuerNameHash` / `issuerKeyHash` are computed from `anchor.subject`
+/// and `anchor.subject_public_key_info` (RFC 6960 §4.1.1), because a
+/// [`TrustAnchor`] has no issuer `Certificate`. Used by the HTTP OCSP
+/// fetchers' `check_revocation_against_anchor`.
+///
+/// # Errors
+///
+/// Returns [`BuildError::Asn1`] if the anchor's subject DN cannot be
+/// re-encoded for hashing or the request cannot be DER-encoded.
+pub fn build_ocsp_request_for_anchor(
+    cert: &Certificate,
+    anchor: &TrustAnchor,
+    hash_alg: OcspHashAlg,
+) -> Result<OcspRequestBytes, BuildError> {
+    build_for_issuer_identity(
+        cert,
+        &anchor.subject,
+        anchor
+            .subject_public_key_info
+            .subject_public_key
+            .raw_bytes(),
+        hash_alg,
+    )
+}
+
+/// Shared body of [`build_ocsp_request`] / [`build_ocsp_request_for_anchor`].
+fn build_for_issuer_identity(
+    cert: &Certificate,
+    issuer_name: &Name,
+    issuer_key: &[u8],
+    hash_alg: OcspHashAlg,
+) -> Result<OcspRequestBytes, BuildError> {
+    let serial = cert.tbs_certificate().serial_number().clone();
+    let cert_id = match hash_alg {
+        OcspHashAlg::Sha1 => cert_id::<sha1::Sha1>(issuer_name, issuer_key, serial),
+        OcspHashAlg::Sha256 => cert_id::<sha2::Sha256>(issuer_name, issuer_key, serial),
+    }?;
+
+    let req = OcspRequestBuilder::default()
+        .with_request(Request::new(cert_id))
+        .build();
 
     let body = req.to_der()?;
 
@@ -119,21 +172,23 @@ pub fn build_ocsp_request(
     })
 }
 
-/// Convert an x509-ocsp builder error to our [`BuildError`].
-///
-/// `Request::from_cert` only hits the `Asn1` arm in practice (no signing
-/// is performed), but match exhaustively so a future x509-ocsp release
-/// adding variants is a compile-time error rather than a silent drop.
-fn map_builder_err(e: x509_ocsp::builder::Error) -> BuildError {
-    match e {
-        x509_ocsp::builder::Error::Asn1(d) => BuildError::Asn1(d),
-        x509_ocsp::builder::Error::PublicKey(_) | x509_ocsp::builder::Error::Signature(_) => {
-            // Build path is non-signing; these arms are unreachable in
-            // practice but we still convert safely. Wrap as a synthetic
-            // DER error so the public surface remains a single variant.
-            BuildError::Asn1(der::Error::from(der::ErrorKind::Failed))
-        }
-    }
+/// RFC 6960 §4.1.1 `CertID` from an issuer identity. Mirrors x509-ocsp's
+/// `CertId::from_issuer::<D>` (which needs a whole issuer `Certificate`),
+/// including `AlgorithmIdentifier.parameters = NULL`.
+fn cert_id<D: Digest + AssociatedOid>(
+    issuer_name: &Name,
+    issuer_key: &[u8],
+    serial_number: SerialNumber,
+) -> Result<CertId, der::Error> {
+    Ok(CertId {
+        hash_algorithm: AlgorithmIdentifierOwned {
+            oid: D::OID,
+            parameters: Some(Null.into()),
+        },
+        issuer_name_hash: OctetString::new(D::digest(issuer_name.to_der()?).to_vec())?,
+        issuer_key_hash: OctetString::new(D::digest(issuer_key).to_vec())?,
+        serial_number,
+    })
 }
 
 #[cfg(test)]

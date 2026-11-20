@@ -20,50 +20,56 @@
 //!   [`pkix_revocation::Error::RevocationFetchFailed`].
 //! - Cert with no AIA OCSP URL ⇒ `Ok(())` (documented).
 //!
-//! `check_revocation_against_anchor` is left at the trait default (`Ok(())`)
-//! for the same reason as in [`crate::HttpCrlFetcher`]: pkix-revocation's
-//! OcspChecker does not currently expose a TrustAnchor-shaped entry point
-//! and adding one is tracked as future work.
+//! `check_revocation_against_anchor` (used for the certificate issued
+//! directly by a trust anchor) builds the request with
+//! [`crate::build_ocsp_request_for_anchor`], runs the same POST loop and
+//! delegates to [`OcspChecker::check_revocation_against_anchor`].
+//!
+//! [`OcspHashAlg`]: crate::OcspHashAlg
 
 use crate::{
-    build_ocsp_request, extract_aia_http_urls, FetchRequest, HttpOcspFetcher, RevocationFetcher,
-    OCSP_REQUEST_CT,
+    build_ocsp_request, build_ocsp_request_for_anchor, extract_aia_http_urls, BuildError,
+    FetchRequest, HttpOcspFetcher, OcspRequestBytes, RevocationFetcher, OCSP_REQUEST_CT,
 };
-use pkix_path::SignatureVerifier;
+use pkix_path::{SignatureVerifier, TrustAnchor};
 use pkix_revocation::{Error as RevError, OcspChecker, RevocationChecker};
 use x509_cert::Certificate;
 
-impl<F, V> RevocationChecker for HttpOcspFetcher<F, V>
+/// Map a request-build failure to the crate's revocation error.
+///
+/// A failure here means the cert / issuer pair could not be turned into a
+/// CertID — almost always a structurally broken input, surfaced through
+/// RevocationFetchFailed for caller convenience (the alternative is mapping
+/// the BuildError to a different pkix_revocation::Error variant, which
+/// would either lie about what happened or require yet another variant
+/// addition).
+pub(crate) fn request_build_failed(e: BuildError) -> RevError {
+    RevError::RevocationFetchFailed {
+        description: format!("OCSP request build failed: {e}"),
+    }
+}
+
+impl<F, V> HttpOcspFetcher<F, V>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
 {
-    fn check_revocation(
+    /// POST loop shared by both [`RevocationChecker`] methods. `req_bytes`
+    /// is built once by the caller and reused for every responder URL;
+    /// `verdict` runs the issuer- or anchor-flavoured `OcspChecker` check
+    /// on the first response that parses.
+    fn fetch_and_check(
         &self,
         cert: &Certificate,
-        issuer: &Certificate,
+        req_bytes: &OcspRequestBytes,
+        verdict: impl Fn(&OcspChecker<V>) -> pkix_revocation::Result<()>,
     ) -> pkix_revocation::Result<()> {
-        // Step 1 — Build the OCSP request body. We only need to do this
-        // once per check_revocation call; the body is the same for every
-        // candidate responder URL. A failure here means the cert /
-        // issuer pair could not be turned into a CertID — almost always
-        // a structurally broken input, surfaced through
-        // RevocationFetchFailed for caller convenience (the alternative
-        // is mapping the BuildError to a different pkix_revocation::Error
-        // variant, which would either lie about what happened or
-        // require yet another variant addition).
-        let req_bytes = build_ocsp_request(cert, issuer, self.hash_alg).map_err(|e| {
-            RevError::RevocationFetchFailed {
-                description: format!("OCSP request build failed: {e}"),
-            }
-        })?;
-
-        // Step 2 — Extract HTTP/HTTPS OCSP responder URLs from the cert.
+        // Step 1 — Extract HTTP/HTTPS OCSP responder URLs from the cert.
         let aia = extract_aia_http_urls(cert).map_err(|e| RevError::RevocationFetchFailed {
             description: format!("authorityInfoAccess extension parse failed: {e}"),
         })?;
 
-        // Step 3 — No OCSP URLs ⇒ nothing for this checker to do.
+        // Step 2 — No OCSP URLs ⇒ nothing for this checker to do.
         // Same rationale as HttpCrlFetcher: a cert without OCSP AIA
         // entries does not advertise OCSP-based revocation. Returning
         // Ok(()) is the only reasonable behaviour for an OCSP-only
@@ -73,7 +79,7 @@ where
             return Ok(());
         }
 
-        // Step 4 — POST to each URL in document order.
+        // Step 3 — POST to each URL in document order.
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
         for url in &aia.ocsp {
             let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
@@ -84,7 +90,7 @@ where
                     // the next URL. On construction success the
                     // checker's verdict is returned immediately.
                     match OcspChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
-                        Ok(checker) => return checker.check_revocation(cert, issuer),
+                        Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: OCSP parse: {e}"));
                             continue;
@@ -98,7 +104,7 @@ where
             }
         }
 
-        // Step 5 — Every URL failed.
+        // Step 4 — Every URL failed.
         Err(RevError::RevocationFetchFailed {
             description: format!(
                 "all {} URL(s) failed: {}",
@@ -107,9 +113,41 @@ where
             ),
         })
     }
+}
 
-    // check_revocation_against_anchor: trait default (Ok(())). See module
-    // docs for rationale; full coverage is future work.
+impl<F, V> RevocationChecker for HttpOcspFetcher<F, V>
+where
+    F: RevocationFetcher,
+    V: SignatureVerifier + Clone,
+{
+    fn check_revocation(
+        &self,
+        cert: &Certificate,
+        issuer: &Certificate,
+    ) -> pkix_revocation::Result<()> {
+        // The OCSP request body is the same for every candidate responder
+        // URL, so build it once.
+        let req_bytes =
+            build_ocsp_request(cert, issuer, self.hash_alg).map_err(request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation(cert, issuer)
+        })
+    }
+
+    /// Queries the certificate's OCSP responders with a `CertID` computed
+    /// from `anchor`'s subject and SPKI, and verifies the response against
+    /// `anchor` via [`OcspChecker::check_revocation_against_anchor`].
+    fn check_revocation_against_anchor(
+        &self,
+        cert: &Certificate,
+        anchor: &TrustAnchor,
+    ) -> pkix_revocation::Result<()> {
+        let req_bytes = build_ocsp_request_for_anchor(cert, anchor, self.hash_alg)
+            .map_err(request_build_failed)?;
+        self.fetch_and_check(cert, &req_bytes, |checker| {
+            checker.check_revocation_against_anchor(cert, anchor)
+        })
+    }
 }
 
 #[cfg(test)]

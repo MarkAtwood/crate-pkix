@@ -9,7 +9,20 @@
 //! - it fits this crate's MSRV (`1.87`).
 //!
 //! HTTPS support is enabled via the `rustls` feature on `ureq`, configured
-//! at the workspace level. Consumers who need a custom TLS configuration,
+//! at the workspace level.
+//!
+//! # Redirects
+//!
+//! CDP / AIA URLs come from certificates, so they are attacker-influenced.
+//! A caller that vets the URL before fetching (host / scheme policy is a
+//! deployment decision, see the crate docs) only ever sees the *first* URL,
+//! so [`UreqFetcher::new`] does not let `ureq` follow redirects itself.
+//! Instead [`RevocationFetcher::fetch`] follows at most [`MAX_REDIRECTS`]
+//! redirects that stay on the same origin (scheme, host and port); a
+//! redirect to any other origin is not followed and surfaces as
+//! [`FetchError::HttpStatus`] with the 3xx code. `GET` follows 301, 302,
+//! 303, 307 and 308; `POST` (OCSP) follows only 307 / 308, which preserve
+//! the method and body. Consumers who need a custom TLS configuration,
 //! proxy, or connection pool should construct their own
 //! [`ureq::Agent`] and pass it via [`UreqFetcher::with_agent`].
 
@@ -37,6 +50,10 @@ const DEFAULT_MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024;
 /// and pass it via [`UreqFetcher::with_agent`].
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Maximum number of same-origin redirects [`UreqFetcher`] follows for one
+/// request (see the module-level "Redirects" section).
+pub const MAX_REDIRECTS: u32 = 10;
+
 /// HTTP transport backed by `ureq`.
 ///
 /// `UreqFetcher` is a thin adapter from this crate's [`RevocationFetcher`]
@@ -57,11 +74,15 @@ impl Default for UreqFetcher {
 
 impl UreqFetcher {
     /// Build a fetcher with the default `ureq::Agent`, a 10 MiB body
-    /// cap, and a 30-second per-request timeout.
+    /// cap, a 30-second per-request timeout, and same-origin-only
+    /// redirect following (module docs, "Redirects").
     #[must_use]
     pub fn new() -> Self {
         let agent: ::ureq::Agent = ::ureq::Agent::config_builder()
             .timeout_global(Some(DEFAULT_TIMEOUT))
+            // Redirects are followed by `fetch` itself so the target's
+            // origin can be checked; ureq must hand back the 3xx response.
+            .max_redirects(0)
             .build()
             .into();
         Self {
@@ -75,6 +96,11 @@ impl UreqFetcher {
     /// Use this when you need custom TLS config, connection pool tuning,
     /// proxies, or timeouts. The agent is used as-is; this fetcher does
     /// not override its settings.
+    ///
+    /// **Redirects:** an agent that follows redirects itself (ureq's
+    /// default is up to 10, to any origin) bypasses this fetcher's
+    /// same-origin rule, because `fetch` never sees the 3xx response.
+    /// Configure the agent with `.max_redirects(0)` to keep it.
     #[must_use]
     pub fn with_agent(agent: ::ureq::Agent) -> Self {
         Self {
@@ -98,17 +124,40 @@ impl UreqFetcher {
 
 impl RevocationFetcher for UreqFetcher {
     fn fetch(&self, req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
-        // Issue the request with the appropriate method. ureq's
-        // RequestBuilder::send / call return Result<Response, ureq::Error>.
-        let response = match &req.method {
-            FetchMethod::Get => self.agent.get(req.url).call(),
-            FetchMethod::Post { body, content_type } => self
-                .agent
-                .post(req.url)
-                .header("Content-Type", *content_type)
-                .send(*body),
-        }
-        .map_err(map_ureq_err)?;
+        // Issue the request with the appropriate method, following
+        // same-origin redirects only (module docs, "Redirects").
+        let mut url = req.url.to_owned();
+        let mut redirects = 0;
+        let response = loop {
+            let response = match &req.method {
+                FetchMethod::Get => self.agent.get(&url).call(),
+                FetchMethod::Post { body, content_type } => self
+                    .agent
+                    .post(&url)
+                    .header("Content-Type", *content_type)
+                    .send(*body),
+            }
+            .map_err(map_ureq_err)?;
+
+            let status = response.status();
+            if !status.is_redirection() {
+                break response;
+            }
+            let method_preserving = matches!(status.as_u16(), 307 | 308);
+            let followable = matches!(req.method, FetchMethod::Get) || method_preserving;
+            let next = response
+                .headers()
+                .get(::ureq::http::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|location| same_origin_target(&url, location));
+            match next {
+                Some(next) if followable && redirects < MAX_REDIRECTS => {
+                    redirects += 1;
+                    url = next;
+                }
+                _ => return Err(FetchError::HttpStatus(status.as_u16())),
+            }
+        };
 
         // ureq returns an Err for non-2xx by default (when
         // http_status_as_error is on, the default), so reaching here
@@ -154,6 +203,37 @@ impl RevocationFetcher for UreqFetcher {
             content_type,
         })
     }
+}
+
+/// Resolve a redirect `location` against `base` and return it only if it
+/// has the same origin (scheme, host, port — default ports made explicit)
+/// as `base`. Absolute URLs and absolute paths (`/x`) are supported;
+/// anything else (relative paths, scheme-relative `//host/x`, unparsable
+/// values) is refused.
+fn same_origin_target(base: &str, location: &str) -> Option<String> {
+    use ::ureq::http::Uri;
+
+    fn origin(u: &Uri) -> Option<(String, String, u16)> {
+        let scheme = u.scheme_str()?.to_ascii_lowercase();
+        let port = match (u.port_u16(), scheme.as_str()) {
+            (Some(p), _) => p,
+            (None, "http") => 80,
+            (None, "https") => 443,
+            (None, _) => return None,
+        };
+        Some((scheme, u.host()?.to_ascii_lowercase(), port))
+    }
+
+    let base: Uri = base.parse().ok()?;
+    let target: Uri = if location.starts_with('/') && !location.starts_with("//") {
+        format!("{}://{}{location}", base.scheme_str()?, base.authority()?)
+            .parse()
+            .ok()?
+    } else {
+        location.parse().ok()?
+    };
+    let same = origin(&base)? == origin(&target)?;
+    same.then(|| target.to_string())
 }
 
 /// Map a `ureq::Error` into our [`FetchError`].
