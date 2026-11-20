@@ -408,6 +408,8 @@ impl MailboxName<'_> {
     ///
     /// An internationalized mailbox can only match `otherName(SmtpUTF8Mailbox)`
     /// SAN entries, never `rfc822Name` entries (which are IA5String, ASCII-only).
+    /// Conversely an ASCII mailbox matches `rfc822Name` entries only
+    /// (RFC 8398 §3).
     pub fn is_internationalized(&self) -> bool {
         self.is_internationalized
     }
@@ -602,6 +604,11 @@ impl std::error::Error for IdentityError {}
 ///   case-insensitively. SAN entries may contain a single leftmost
 ///   wildcard label per RFC 6125 §6.4.3 (`*.foo.com` matches `a.foo.com`
 ///   but not `a.b.foo.com` or bare `foo.com`).
+/// - A SAN entry in absolute form (one trailing dot, `www.foo.com.`) is
+///   treated as the same name as `www.foo.com`, just as the target's
+///   trailing dot is stripped. `pkix-path` applies the same normalization
+///   when it checks dNSName name constraints, so a trailing dot cannot
+///   move a name out of an excluded subtree.
 /// - IP-literal targets are compared against `GeneralName::IpAddress`
 ///   entries by byte-equal comparison of the canonical 4- or 16-octet
 ///   form.
@@ -665,9 +672,13 @@ pub fn verify_dns_name(cert: &Certificate, name: &ServerName<'_>) -> Result<(), 
 /// An internationalized [`MailboxName`] (non-ASCII local-part) can only
 /// match an `otherName(SmtpUTF8Mailbox)` SAN entry — `rfc822Name` is
 /// IA5String and cannot carry non-ASCII bytes. An ASCII [`MailboxName`]
-/// matches `rfc822Name` only. RFC 8398 §4 requires CAs to use
-/// `SmtpUTF8Mailbox` exclusively for non-ASCII mailboxes, so the two
-/// SAN forms encode disjoint identity spaces.
+/// matches `rfc822Name` only. RFC 8398 §3 requires `SmtpUTF8Mailbox` to be
+/// used only when the local-part contains non-ASCII characters (an ASCII
+/// local-part MUST use `rfc822Name`), so the two SAN forms encode disjoint
+/// identity spaces; a non-conformant `SmtpUTF8Mailbox` entry with an ASCII
+/// local-part never matches. This also keeps mailbox binding aligned with
+/// path validators that apply rfc822Name name constraints only to
+/// `rfc822Name` entries.
 ///
 /// # Errors
 ///
@@ -694,7 +705,12 @@ fn san_entry_matches_mailbox(entry: &GeneralName, target: &MailboxName<'_>) -> b
         GeneralName::Rfc822Name(rfc822) if !target.is_internationalized => {
             matches_rfc822_mailbox(rfc822.as_str(), target)
         }
-        GeneralName::OtherName(other) if other.type_id == OID_SMTP_UTF8_MAILBOX => {
+        // RFC 8398 §3: SmtpUTF8Mailbox is only for non-ASCII local-parts.
+        // An ASCII target therefore never matches one, even if a CA issued a
+        // non-conformant entry with an ASCII local-part.
+        GeneralName::OtherName(other)
+            if target.is_internationalized && other.type_id == OID_SMTP_UTF8_MAILBOX =>
+        {
             match decode_utf8_string_any(&other.value) {
                 Ok(utf8) => matches_smtp_utf8_mailbox(&utf8, target),
                 Err(_) => false,
@@ -896,7 +912,11 @@ fn parse_ipv4(s: &str) -> Option<[u8; 4]> {
         // Reject leading zeros (e.g. "01.02.03.04") to match
         // pyca/cryptography's IPv4Address strictness and avoid the
         // octal-vs-decimal ambiguity inet_aton has historically caused.
-        if part.is_empty() || (part.len() > 1 && part.starts_with('0')) {
+        // Digits only: `u32::from_str` would also accept a leading '+'.
+        if part.is_empty()
+            || (part.len() > 1 && part.starts_with('0'))
+            || !part.bytes().all(|b| b.is_ascii_digit())
+        {
             return None;
         }
         let value: u32 = part.parse().ok()?;
@@ -949,7 +969,9 @@ fn parse_ipv6(s: &str) -> Option<[u8; 16]> {
             }
             continue;
         }
-        if part.len() > 4 {
+        // Hex digits only: `u16::from_str_radix` would also accept a
+        // leading '+'.
+        if part.len() > 4 || !part.bytes().all(|b| b.is_ascii_hexdigit()) {
             return None;
         }
         let value = u16::from_str_radix(part, 16).ok()?;

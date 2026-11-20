@@ -103,22 +103,30 @@ fn smtputf8_local_part_case_sensitive() {
 }
 
 #[test]
-fn smtputf8_u_label_target_matches_u_label_san() {
-    // SAN domain is `bücher.example`; target supplies the same in
-    // U-label form.
+fn smtputf8_ascii_local_part_u_label_san_does_not_match_u_label_target() {
+    // SAN is SmtpUTF8Mailbox `user@bücher.example`: an ASCII local-part,
+    // which RFC 8398 §3 forbids in SmtpUTF8Mailbox (ASCII local-parts MUST
+    // use rfc822Name). An ASCII target matches rfc822Name entries only, so
+    // this non-conformant entry does not bind. The conformant case (non-ASCII
+    // local-part + U-label domain) is covered in `review_identity.rs`.
     let cert = load("san-smtputf8-u-label-domain.der");
     let mailbox = MailboxName::parse("user@bücher.example").unwrap();
-    assert_eq!(verify_mailbox(&cert, &mailbox), Ok(()));
+    assert_eq!(
+        verify_mailbox(&cert, &mailbox),
+        Err(IdentityError::NoMatchingSan)
+    );
 }
 
 #[test]
-fn smtputf8_a_label_target_matches_u_label_san() {
-    // SAN domain is `bücher.example` (U-label, per RFC 8398 §3);
-    // target supplies the A-label form. Both forms normalize through
-    // idna 2008 to the same canonical A-label before comparison.
+fn smtputf8_ascii_local_part_u_label_san_does_not_match_a_label_target() {
+    // Same non-conformant SAN as above; the A-label form of the target
+    // does not bind either.
     let cert = load("san-smtputf8-u-label-domain.der");
     let mailbox = MailboxName::parse("user@xn--bcher-kva.example").unwrap();
-    assert_eq!(verify_mailbox(&cert, &mailbox), Ok(()));
+    assert_eq!(
+        verify_mailbox(&cert, &mailbox),
+        Err(IdentityError::NoMatchingSan)
+    );
 }
 
 #[test]
