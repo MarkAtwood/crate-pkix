@@ -30,11 +30,11 @@ serde      = { workspace = true, optional = true }
 der = { workspace = true, features = ["derive"] }
 pkix-path = { path = "../pkix-path", features = ["rsa", "p256", "std"] }
 # Used by the `AlwaysRejectVerifier` in `tests/build_first_valid_path.rs` to
-# spell out the `pkix_path::SignatureVerifier` trait's argument types. Both
-# are transitive deps via pkix-path's public API; declared here only so the
-# integration test's `impl SignatureVerifier` block can name the types.
+# spell out the `pkix_path::SignatureVerifier` trait's argument types (the
+# error type is pkix-path's own `VerificationError`). spki is a transitive
+# dep via pkix-path's public API; declared here only so the integration
+# test's `impl SignatureVerifier` block can name the types.
 spki      = { workspace = true }
-signature = { workspace = true }
 # `pem` for `Certificate::load_pem_chain` in the BetterTLS fixture loaders
 # (tests/bettertls.rs, tests/build_first_valid_path.rs); without it those
 # targets only compile when another workspace member unifies the feature in.

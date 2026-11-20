@@ -1250,7 +1250,6 @@ version = "0.2.0"
 dependencies = [
  "der",
  "pkix-path",
- "signature",
  "spki",
  "x509-cert",
 ]
@@ -1265,7 +1264,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "signature",
  "x509-cert",
  "x509-ocsp",
 ]
@@ -1362,7 +1360,6 @@ dependencies = [
  "der",
  "pkix-path",
  "serde",
- "signature",
  "spki",
  "x509-cert",
 ]

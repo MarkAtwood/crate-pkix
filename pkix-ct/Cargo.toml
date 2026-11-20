@@ -42,7 +42,6 @@ log-list-json = ["log-list", "serde", "dep:serde_json", "dep:base64"]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
-signature  = { workspace = true }
 x509-ocsp  = { workspace = true, optional = true }
 sha2       = { workspace = true, optional = true }
 serde      = { workspace = true, optional = true }

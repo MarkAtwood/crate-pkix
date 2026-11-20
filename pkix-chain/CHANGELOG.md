@@ -10,6 +10,9 @@ Planned release: **0.5.0** (breaking: pkix-path 0.4, x509-cert 0.3).
 
 ### Added
 
+- Re-exports `VerificationError` and `VerificationErrorKind`, the new
+  `SignatureVerifier` error type (**breaking** for implementors: the
+  trait no longer returns `signature::Error`).
 - `AiaConfig` (`max_depth`, `max_uris_per_cert`, `max_total_fetches`,
   `max_certs_per_response`, `deadline`) and `Verifier::with_aia_config`;
   `Error::AiaFetchLimitExceeded`, `Error::AiaDeadlineExceeded`.
@@ -17,7 +20,7 @@ Planned release: **0.5.0** (breaking: pkix-path 0.4, x509-cert 0.3).
 
 ### Changed
 
-- `PathTooLong` from the supplied ordering falls back to rebuilding from
+- `SignatureNotVerified` and `PathTooLong` from the supplied ordering fall back to rebuilding from
   the certificates as an unordered bag.
 - `AiaDepthExceeded`'s Display text no longer prints the depth.
 

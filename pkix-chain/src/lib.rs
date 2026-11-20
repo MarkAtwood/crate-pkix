@@ -111,7 +111,8 @@
 pub use pkix_aia::{self, AiaError, AiaFetcher, NoAiaFetcher};
 pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
-    self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath, ValidationPolicy,
+    self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath,
+    ValidationPolicy, VerificationError, VerificationErrorKind,
 };
 pub use pkix_path_builder;
 #[cfg(feature = "crl")]
@@ -622,9 +623,9 @@ where
     /// already in the pool are added.
     ///
     /// The slow path runs whenever the supplied ordering fails with
-    /// `ChainBroken`, `NoTrustedPath`, `SignatureInvalid` or `PathTooLong`,
-    /// including
-    /// with [`NoAiaFetcher`]: the supplied certs are then treated as an
+    /// `ChainBroken`, `NoTrustedPath`, `SignatureInvalid`,
+    /// `SignatureNotVerified` or `PathTooLong`, including with
+    /// [`NoAiaFetcher`]: the supplied certs are then treated as an
     /// unordered bag and re-built with [`pkix_path_builder`]. If that
     /// fails and the orphaned cert has caIssuers URIs, [`NoAiaFetcher`]
     /// returns [`AiaError::FetchingDisabled`] without doing any I/O and
@@ -1760,7 +1761,8 @@ const _: fn() = || {
 /// an AIA fetch on the topmost cert may produce a parent that does.
 /// `SignatureInvalid { index }` is included because a wrong-but-DN-matching
 /// intermediate in the pool can be displaced by a correctly-signed
-/// alternative fetched via AIA.
+/// alternative fetched via AIA; `SignatureNotVerified` likewise, since a
+/// cross-certificate with a supported algorithm may exist.
 /// `PathTooLong` is included because pkix-path rejects an over-long input
 /// before looking at it; an unordered bag with extra certificates (an
 /// S/MIME `SignedData.certificates` set, for example) can still contain a
@@ -1777,6 +1779,7 @@ fn is_aia_recoverable(e: &pkix_path::Error) -> bool {
         pkix_path::Error::ChainBroken { .. }
             | pkix_path::Error::NoTrustedPath
             | pkix_path::Error::SignatureInvalid { .. }
+            | pkix_path::Error::SignatureNotVerified { .. }
             | pkix_path::Error::PathTooLong
     )
 }

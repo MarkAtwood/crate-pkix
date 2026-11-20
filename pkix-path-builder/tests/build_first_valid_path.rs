@@ -69,8 +69,8 @@ impl pkix_path::SignatureVerifier for AlwaysRejectVerifier {
         _issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
         _message: &[u8],
         _signature: &[u8],
-    ) -> Result<(), signature::Error> {
-        Err(signature::Error::new())
+    ) -> Result<(), pkix_path::VerificationError> {
+        Err(pkix_path::VerificationError::invalid_signature())
     }
 }
 

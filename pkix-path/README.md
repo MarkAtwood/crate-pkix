@@ -55,7 +55,7 @@ impl SignatureVerifier for MyFipsVerifier {
         issuer_spki: SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
-    ) -> Result<(), signature::Error> {
+    ) -> Result<(), pkix_path::VerificationError> {
         // dispatch to your FIPS-validated backend
         todo!()
     }

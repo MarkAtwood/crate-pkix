@@ -29,11 +29,11 @@
 use crate::SignatureVerifier;
 #[cfg(any(feature = "p256", feature = "p384", feature = "p521", feature = "rsa"))]
 use crate::Vec;
+use crate::{VerificationError, VerificationErrorKind};
 use der::asn1::ObjectIdentifier;
-use signature::Error as SignatureError;
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 
-type VerifyResult = core::result::Result<(), SignatureError>;
+type VerifyResult = core::result::Result<(), VerificationError>;
 
 // ---------------------------------------------------------------------------
 // OIDs
@@ -165,11 +165,14 @@ macro_rules! ecdsa_curve_verify {
             use signature::hazmat::PrehashVerifier as _;
             use $krate::ecdsa::{DerSignature, VerifyingKey};
 
-            let vk = VerifyingKey::try_from(spki).map_err(|_| SignatureError::new())?;
-            let sig = DerSignature::try_from(signature).map_err(|_| SignatureError::new())?;
+            let vk =
+                VerifyingKey::try_from(spki).map_err(|_| VerificationError::malformed_key())?;
+            let sig = DerSignature::try_from(signature)
+                .map_err(|_| VerificationError::invalid_signature())?;
             let prehash = pad_prehash(sha2_digest(digest, message), $field_len);
-            vk.verify_prehash(&prehash, &sig)
-                .map_err(|_| SignatureError::new())
+            vk.verify_prehash(&prehash, &sig).map_err(|e| {
+                VerificationError::with_source(VerificationErrorKind::InvalidSignature, e)
+            })
         }
     };
 }
@@ -194,12 +197,13 @@ fn verify_ecdsa(
     message: &[u8],
     signature: &[u8],
 ) -> VerifyResult {
-    let digest = ecdsa_digest(algorithm.oid).ok_or_else(SignatureError::new)?;
+    let digest =
+        ecdsa_digest(algorithm.oid).ok_or_else(VerificationError::unsupported_algorithm)?;
     // RFC 5758 §3.2: the parameters field MUST be absent.
     if algorithm.parameters.is_some() {
-        return Err(SignatureError::new());
+        return Err(VerificationError::unsupported_algorithm());
     }
-    let curve = ec_named_curve(&issuer_spki).ok_or_else(SignatureError::new)?;
+    let curve = ec_named_curve(&issuer_spki).ok_or_else(VerificationError::unsupported_key)?;
     match curve {
         #[cfg(feature = "p256")]
         OID_SECP256R1 if curves.p256 => verify_ecdsa_p256(issuer_spki, digest, message, signature),
@@ -207,7 +211,7 @@ fn verify_ecdsa(
         OID_SECP384R1 if curves.p384 => verify_ecdsa_p384(issuer_spki, digest, message, signature),
         #[cfg(feature = "p521")]
         OID_SECP521R1 if curves.p521 => verify_ecdsa_p521(issuer_spki, digest, message, signature),
-        _ => Err(SignatureError::new()),
+        _ => Err(VerificationError::unsupported_key()),
     }
 }
 
@@ -292,20 +296,21 @@ ecdsa_verifier!(
 fn rsa_public_key(
     spki: &SubjectPublicKeyInfoRef<'_>,
     allow_pss_key: bool,
-) -> core::result::Result<rsa::PublicKey, SignatureError> {
+) -> core::result::Result<rsa::PublicKey, VerificationError> {
     use rsa::pkcs1::DecodeRsaPublicKey as _;
 
     let oid_ok = spki.algorithm.oid == OID_RSA_ENCRYPTION
         && spki.algorithm.parameters.is_none_or(|p| p.is_null());
     let pss_ok = allow_pss_key && spki.algorithm.oid == OID_RSASSA_PSS;
     if !(oid_ok || pss_ok) {
-        return Err(SignatureError::new());
+        return Err(VerificationError::unsupported_key());
     }
     let key_bytes = spki
         .subject_public_key
         .as_bytes()
-        .ok_or_else(SignatureError::new)?;
-    rsa::PublicKey::from_pkcs1_der(key_bytes).map_err(|_| SignatureError::new())
+        .ok_or_else(VerificationError::malformed_key)?;
+    rsa::PublicKey::from_pkcs1_der(key_bytes)
+        .map_err(|e| VerificationError::with_source(VerificationErrorKind::MalformedKey, e))
 }
 
 /// RSA PKCS#1 v1.5 verification with the given digest.
@@ -323,16 +328,16 @@ fn verify_rsa_pkcs1v15(
     // RFC 4055 §5: parameters MUST be NULL; absent is accepted for
     // interoperability, matching the issuer-key decoding above.
     if !algorithm.parameters.is_none_or(|p| p.is_null()) {
-        return Err(SignatureError::new());
+        return Err(VerificationError::unsupported_algorithm());
     }
     let key = rsa_public_key(&issuer_spki, false)?;
-    let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
+    let sig = Signature::try_from(signature).map_err(|_| VerificationError::invalid_signature())?;
     let result = match digest {
         Sha2::Sha256 => VerifyingKey::<sha2::Sha256>::new(key).verify(message, &sig),
         Sha2::Sha384 => VerifyingKey::<sha2::Sha384>::new(key).verify(message, &sig),
         Sha2::Sha512 => VerifyingKey::<sha2::Sha512>::new(key).verify(message, &sig),
     };
-    result.map_err(|_| SignatureError::new())
+    result.map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
 }
 
 /// Hash named by an RFC 4055 `HashAlgorithm` identifier (parameters NULL or
@@ -369,22 +374,23 @@ fn verify_rsa_pss(
 
     let params_der = algorithm
         .parameters
-        .ok_or_else(SignatureError::new)?
+        .ok_or_else(VerificationError::unsupported_algorithm)?
         .to_der()
-        .map_err(|_| SignatureError::new())?;
-    let params = RsaPssParamsOwned::from_der(&params_der).map_err(|_| SignatureError::new())?;
-    let hash = rfc4055_hash(&params.hash).ok_or_else(SignatureError::new)?;
+        .map_err(|_| VerificationError::unsupported_algorithm())?;
+    let params = RsaPssParamsOwned::from_der(&params_der)
+        .map_err(|_| VerificationError::unsupported_algorithm())?;
+    let hash = rfc4055_hash(&params.hash).ok_or_else(VerificationError::unsupported_algorithm)?;
     if params.mask_gen.oid != OID_MGF1 {
-        return Err(SignatureError::new());
+        return Err(VerificationError::unsupported_algorithm());
     }
     let mgf_hash = params
         .mask_gen
         .parameters
         .as_ref()
         .and_then(rfc4055_hash)
-        .ok_or_else(SignatureError::new)?;
+        .ok_or_else(VerificationError::unsupported_algorithm)?;
     if mgf_hash != hash || params.trailer_field != TrailerField::BC {
-        return Err(SignatureError::new());
+        return Err(VerificationError::unsupported_algorithm());
     }
     // RFC 4055 §3.1: when the issuer key is an id-RSASSA-PSS key with
     // parameters, the signature must use the same hash and MGF and a salt
@@ -392,17 +398,20 @@ fn verify_rsa_pss(
     // way still verifies only signatures that match its own parameters.
     if issuer_spki.algorithm.oid == OID_RSASSA_PSS {
         if let Some(key_params) = issuer_spki.algorithm.parameters {
-            let key_params_der = key_params.to_der().map_err(|_| SignatureError::new())?;
-            let key_params =
-                RsaPssParamsOwned::from_der(&key_params_der).map_err(|_| SignatureError::new())?;
-            let key_hash = rfc4055_hash(&key_params.hash).ok_or_else(SignatureError::new)?;
+            let key_params_der = key_params
+                .to_der()
+                .map_err(|_| VerificationError::malformed_key())?;
+            let key_params = RsaPssParamsOwned::from_der(&key_params_der)
+                .map_err(|_| VerificationError::malformed_key())?;
+            let key_hash =
+                rfc4055_hash(&key_params.hash).ok_or_else(VerificationError::unsupported_key)?;
             if key_hash != hash || params.salt_len < key_params.salt_len {
-                return Err(SignatureError::new());
+                return Err(VerificationError::unsupported_key());
             }
         }
     }
     let key = rsa_public_key(&issuer_spki, true)?;
-    let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
+    let sig = Signature::try_from(signature).map_err(|_| VerificationError::invalid_signature())?;
     let salt_len = usize::from(params.salt_len);
     let prehash = sha2_digest(hash, message);
     let result = match hash {
@@ -413,7 +422,7 @@ fn verify_rsa_pss(
         Sha2::Sha512 => VerifyingKey::<sha2::Sha512>::new_with_salt_len(key, salt_len)
             .verify_prehash(&prehash, &sig),
     };
-    result.map_err(|_| SignatureError::new())
+    result.map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
 }
 
 macro_rules! rsa_pkcs1v15_verifier {
@@ -434,7 +443,7 @@ macro_rules! rsa_pkcs1v15_verifier {
                 signature: &[u8],
             ) -> VerifyResult {
                 if algorithm.oid != $oid {
-                    return Err(SignatureError::new());
+                    return Err(VerificationError::unsupported_algorithm());
                 }
                 verify_rsa_pkcs1v15(Sha2::$digest, algorithm, issuer_spki, message, signature)
             }
@@ -494,7 +503,7 @@ impl SignatureVerifier for RsaPssVerifier {
         signature: &[u8],
     ) -> VerifyResult {
         if algorithm.oid != OID_RSASSA_PSS {
-            return Err(SignatureError::new());
+            return Err(VerificationError::unsupported_algorithm());
         }
         verify_rsa_pss(algorithm, issuer_spki, message, signature)
     }
@@ -525,24 +534,23 @@ impl SignatureVerifier for Ed25519Verifier {
         message: &[u8],
         signature: &[u8],
     ) -> VerifyResult {
-        if algorithm.oid != OID_ED25519
-            || algorithm.parameters.is_some()
-            || issuer_spki.algorithm.oid != OID_ED25519
-            || issuer_spki.algorithm.parameters.is_some()
-        {
-            return Err(SignatureError::new());
+        if algorithm.oid != OID_ED25519 || algorithm.parameters.is_some() {
+            return Err(VerificationError::unsupported_algorithm());
+        }
+        if issuer_spki.algorithm.oid != OID_ED25519 || issuer_spki.algorithm.parameters.is_some() {
+            return Err(VerificationError::unsupported_key());
         }
         let key_bytes: &[u8; 32] = issuer_spki
             .subject_public_key
             .as_bytes()
             .and_then(|b| b.try_into().ok())
-            .ok_or_else(SignatureError::new)?;
+            .ok_or_else(VerificationError::malformed_key)?;
         let vk = ed25519_dalek::VerifyingKey::from_bytes(key_bytes)
-            .map_err(|_| SignatureError::new())?;
-        let sig =
-            ed25519_dalek::Signature::from_slice(signature).map_err(|_| SignatureError::new())?;
+            .map_err(|_| VerificationError::malformed_key())?;
+        let sig = ed25519_dalek::Signature::from_slice(signature)
+            .map_err(|_| VerificationError::invalid_signature())?;
         vk.verify_strict(message, &sig)
-            .map_err(|_| SignatureError::new())
+            .map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
     }
 }
 
@@ -563,8 +571,10 @@ impl SignatureVerifier for Ed25519Verifier {
 /// - RSASSA-PSS as described on [`RsaPssVerifier`] (feature `rsa`).
 /// - Ed25519 (feature `ed25519`).
 ///
-/// Anything else returns `Err(signature::Error::new())`, including SHA-1
-/// based algorithms.
+/// Anything else returns an [`UnsupportedAlgorithm`] error, including
+/// SHA-1 based algorithms.
+///
+/// [`UnsupportedAlgorithm`]: crate::VerificationErrorKind::UnsupportedAlgorithm
 ///
 /// To support additional algorithms, implement [`SignatureVerifier`]
 /// directly and fall back to `DefaultVerifier` for the rest.
@@ -631,6 +641,6 @@ impl SignatureVerifier for DefaultVerifier {
         if oid == OID_ED25519 {
             return Ed25519Verifier.verify_signature(algorithm, issuer_spki, message, signature);
         }
-        Err(SignatureError::new())
+        Err(VerificationError::unsupported_algorithm())
     }
 }

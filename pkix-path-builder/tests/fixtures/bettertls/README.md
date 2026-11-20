@@ -60,6 +60,12 @@ already pass** end-to-end (`build_path` builds a chain and
   3. This is a genuine path-selection issue — the builder picked a
   wrong-key intermediate in a 6-deep chain.
 
+Since pkix-path 0.4 both fixtures report `SignatureNotVerified { reason:
+UnsupportedAlgorithm }` instead of `SignatureInvalid`: the rejected link
+is signed with ecdsa-with-SHA1, which the bundled verifiers do not
+implement, so for tc60 the builder picked a SHA-1-signed intermediate
+rather than a wrong-key one.
+
 This contradicts the framing in the parent epic PKIX-lwr9, which
 states pkix-path-builder fails on 47 cases. The 47-case figure comes
 from `pkix-difftest/baseline-limbo.json` — but the limbo corpus loader

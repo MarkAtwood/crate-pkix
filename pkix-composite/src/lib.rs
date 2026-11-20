@@ -33,8 +33,7 @@
 //! Not yet implemented. OIDs from the composite-sigs draft are subject to change
 //! until the draft is published as an RFC.
 
-use pkix_path::SignatureVerifier;
-use signature::Error as SignatureError;
+use pkix_path::{SignatureVerifier, VerificationError};
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 
 /// A [`SignatureVerifier`] that requires both a classical and a post-quantum
@@ -66,7 +65,7 @@ impl<C, P> CompositeVerifier<C, P> {
     ///
     /// `pkix-composite` is not yet implemented. The constructor is exposed for
     /// API discovery, but [`SignatureVerifier::verify_signature`] currently
-    /// returns `Err(SignatureError::new())` unconditionally.
+    /// returns an `UnsupportedAlgorithm` [`VerificationError`] unconditionally.
     pub const fn new(classical: C, post_quantum: P) -> Self {
         Self {
             classical,
@@ -82,9 +81,9 @@ impl<C: SignatureVerifier, P: SignatureVerifier> SignatureVerifier for Composite
         _issuer_spki: SubjectPublicKeyInfoRef<'_>,
         _message: &[u8],
         _signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
+    ) -> core::result::Result<(), VerificationError> {
         // Not yet implemented: composite OID dispatch, SPKI component splitting,
         // and signature component splitting per draft-ietf-lamps-pq-composite-sigs.
-        Err(SignatureError::new())
+        Err(VerificationError::unsupported_algorithm())
     }
 }

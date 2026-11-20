@@ -16,6 +16,11 @@ Planned release: **0.4.0** (breaking: pkix-path 0.4, x509-cert 0.3).
   `dfs_budget` is charged per frame and per candidate examined.
   Byte-identical pool certificates are considered once.
 
+- Test-only: `SignatureVerifier` mocks use `pkix_path::VerificationError`;
+  the `signature` dev-dependency is gone. The BetterTLS baseline records
+  tc41 / tc60 as `SignatureNotVerified { reason: UnsupportedAlgorithm }`
+  (their rejected link is signed with ecdsa-with-SHA1).
+
 ### Fixed
 
 - 40 same-name, same-SKI decoys exhausted the budget before the real

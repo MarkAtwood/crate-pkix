@@ -11,7 +11,8 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 **Breaking for every crate that exposes x509-cert, der, spki or
 signature types.** The workspace moves from x509-cert 0.2, der 0.7,
 spki 0.7, signature 2 and the p256/p384 0.13, rsa 0.9, sha2 0.10 stack
-to x509-cert 0.3, der 0.8, spki 0.8, signature 3, p256/p384/p521 0.14,
+to x509-cert 0.3, der 0.8, spki 0.8, signature 3 (internal only; see
+the `SignatureVerifier` entry below), p256/p384/p521 0.14,
 ed25519-dalek 3, rsa 0.10, sha1/sha2 0.11 and x509-ocsp 0.3.0-rc.1
 (pinned exactly; no stable 0.3 yet). The lockfile carries one copy of
 the stack; RUSTSEC-2023-0071 (rsa 0.9, GitHub #8) and RUSTSEC-2026-0387
@@ -54,10 +55,21 @@ pkix-aia-http, pkix-zlint-bridge, pkix-policy-zlint 0.2.0; pkix-aia
   truncating the length prefix (release).
 - Precertificate reconstruction keeps validity times as parsed.
 
+#### `SignatureVerifier` error type
+
+**Breaking** for every `SignatureVerifier` implementor: the trait returns
+pkix-path's own `VerificationError` (kinds `UnsupportedAlgorithm`,
+`UnsupportedKey`, `MalformedKey`, `InvalidSignature`, plus an optional
+source) instead of `signature::Error`, and `validate_path` reports
+non-signature failures as the new `Error::SignatureNotVerified { index,
+reason }`. pkix-chain re-exports both types and treats
+`SignatureNotVerified` like `SignatureInvalid` when deciding to rebuild
+a chain. pkix-composite and pkix-ct no longer depend on `signature`.
+
 #### `pkix-chain-simple` 0.5.0, `pkix-ac` 0.2.0, `pkix-composite` 0.2.0
 
-Dependency-driven breaking bumps (pkix-path 0.4, x509-cert 0.3,
-signature 3). pkix-chain-simple's Limitations no longer claim that name
+Dependency-driven breaking bumps (pkix-path 0.4, x509-cert 0.3).
+pkix-composite's `CompositeVerifier` returns `UnsupportedAlgorithm`. pkix-chain-simple's Limitations no longer claim that name
 constraints are not validated.
 
 ### Workspace: codify temporal-posture non-negotiable in AGENTS.md (PKIX-e3nl)

@@ -81,7 +81,6 @@ use alloc::borrow::Cow;
 use std::borrow::Cow;
 
 use der::Tagged;
-use signature::Error as SignatureError;
 use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
@@ -94,6 +93,9 @@ use x509_cert::Certificate;
 pub mod serde_der;
 
 mod policy_graph;
+mod verification_error;
+pub use verification_error::{VerificationError, VerificationErrorKind};
+
 mod verifiers;
 #[cfg(any(
     feature = "p256",
@@ -284,10 +286,22 @@ const _: () = {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {
-    /// Certificate signature verification failed at the given chain index.
+    /// Certificate signature verification failed at the given chain index:
+    /// the signature does not verify, or is not a well-formed signature
+    /// value ([`VerificationErrorKind::InvalidSignature`]).
     SignatureInvalid {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
+    },
+    /// The certificate's signature could not be checked at the given chain
+    /// index: the [`SignatureVerifier`] does not support its algorithm or
+    /// the issuer's key, or the issuer's key is malformed. `reason` says
+    /// which; it is never [`VerificationErrorKind::InvalidSignature`].
+    SignatureNotVerified {
+        /// Zero-based index into the `chain` slice of the certificate.
+        index: usize,
+        /// Why the verifier could not check the signature.
+        reason: VerificationErrorKind,
     },
     /// A structural encoding error was found in a certificate.
     ///
@@ -489,6 +503,9 @@ impl core::fmt::Display for Error {
             Self::SignatureInvalid { index } => {
                 write!(f, "signature invalid at chain index {index}")
             }
+            Self::SignatureNotVerified { index, reason } => {
+                write!(f, "signature not verified at chain index {index}: {reason}")
+            }
             Self::ValidityPeriod { index } => {
                 write!(f, "validity period check failed at chain index {index}")
             }
@@ -565,6 +582,7 @@ impl std::error::Error for Error {
         match self {
             Self::Der(e) => Some(e),
             Self::SignatureInvalid { .. }
+            | Self::SignatureNotVerified { .. }
             | Self::MalformedCertificate { .. }
             | Self::ValidityPeriod { .. }
             | Self::ChainBroken { .. }
@@ -624,11 +642,11 @@ pub type Result<T> = core::result::Result<T, Error>;
 ///         _issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
 ///         _message: &[u8],
 ///         _signature: &[u8],
-///     ) -> core::result::Result<(), signature::Error> {
+///     ) -> Result<(), pkix_path::VerificationError> {
 ///         match algorithm.oid {
 ///             MY_RSA_OID => { Ok(()) /* RSA verification */ }
 ///             MY_ECDSA_OID => { Ok(()) /* ECDSA verification */ }
-///             _ => Err(signature::Error::new()),
+///             _ => Err(pkix_path::VerificationError::unsupported_algorithm()),
 ///         }
 ///     }
 /// }
@@ -641,20 +659,30 @@ pub trait SignatureVerifier {
     /// - `message`      — DER-encoded `TBSCertificate` (the bytes that were signed)
     /// - `signature`    — raw signature bytes (`BitString` content, not the wrapper)
     ///
-    /// Returns `Ok(())` on success or `Err(signature::Error)` on failure.
-    /// The caller ([`validate_path`]) maps the error to [`Error::SignatureInvalid`]
-    /// with the correct chain index — the verifier does not need to know it.
+    /// Returns `Ok(())` when the signature verifies. The caller
+    /// ([`validate_path`]) adds the chain index: an error of kind
+    /// [`VerificationErrorKind::InvalidSignature`] becomes
+    /// [`Error::SignatureInvalid`], any other kind
+    /// [`Error::SignatureNotVerified`] — the verifier does not need to know
+    /// the index.
     ///
     /// # Errors
     ///
-    /// Returns `Err(signature::Error)` if the signature does not verify against the given public key and data.
+    /// Returns a [`VerificationError`] whose kind says why the signature
+    /// was not accepted: the algorithm is not supported
+    /// ([`UnsupportedAlgorithm`](VerificationErrorKind::UnsupportedAlgorithm)),
+    /// the issuer key is unsupported or does not fit the algorithm
+    /// ([`UnsupportedKey`](VerificationErrorKind::UnsupportedKey)) or does
+    /// not decode ([`MalformedKey`](VerificationErrorKind::MalformedKey)),
+    /// or the signature is malformed or does not verify
+    /// ([`InvalidSignature`](VerificationErrorKind::InvalidSignature)).
     fn verify_signature(
         &self,
         algorithm: AlgorithmIdentifierRef<'_>,
         issuer_spki: SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
-    ) -> core::result::Result<(), SignatureError>;
+    ) -> core::result::Result<(), VerificationError>;
 }
 
 /// A trust anchor used to terminate path validation.
@@ -1564,7 +1592,7 @@ where
                     valid_policy_tree,
                 });
             }
-            Err(Error::SignatureInvalid { index })
+            Err(Error::SignatureInvalid { index } | Error::SignatureNotVerified { index, .. })
                 if top_key_differs && index == chain.len() - 1 =>
             {
                 // Name collision, not a rollover: keep the previous error
@@ -3191,7 +3219,10 @@ fn verify_cert_signature<V: SignatureVerifier>(
             tbs_bytes,
             cert.signature().raw_bytes(),
         )
-        .map_err(|_| Error::SignatureInvalid { index })?;
+        .map_err(|e| match e.kind() {
+            VerificationErrorKind::InvalidSignature => Error::SignatureInvalid { index },
+            reason => Error::SignatureNotVerified { index, reason },
+        })?;
     Ok(())
 }
 

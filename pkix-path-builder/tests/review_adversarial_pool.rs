@@ -49,7 +49,7 @@ impl SignatureVerifier for CountingVerifier {
         issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
         message: &[u8],
         signature: &[u8],
-    ) -> Result<(), signature::Error> {
+    ) -> Result<(), pkix_path::VerificationError> {
         self.0.set(self.0.get() + 1);
         DefaultVerifier.verify_signature(algorithm, issuer_spki, message, signature)
     }

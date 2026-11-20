@@ -10,6 +10,21 @@ Planned release: **0.4.0** (breaking).
 
 ### Changed
 
+- **BREAKING:** `SignatureVerifier::verify_signature` returns the new
+  crate-owned `VerificationError` instead of `signature::Error`, so the
+  trait no longer follows the `signature` crate's semver and callers can
+  tell why a signature was refused. `VerificationError` carries a
+  `VerificationErrorKind` (`#[non_exhaustive]`: `UnsupportedAlgorithm`,
+  `UnsupportedKey`, `MalformedKey`, `InvalidSignature`) and an optional
+  backend error as its `source()`; constructors `new`, `with_source` and
+  one shorthand per kind. It implements `core::error::Error` without the
+  `std` feature. `validate_path` reports `InvalidSignature` as
+  `Error::SignatureInvalid { index }` and every other kind as the new
+  `Error::SignatureNotVerified { index, reason }`, so an unsupported
+  algorithm (for example ecdsa-with-SHA1) is no longer reported as an
+  invalid signature. Implementors change the return type and pick a
+  kind; `signature::Error::new()` maps to
+  `VerificationError::invalid_signature()`.
 - **BREAKING:** moved to x509-cert 0.3, der 0.8, spki 0.8 and signature
   3. Every public type from those crates (`Certificate`, `Name`,
   `ObjectIdentifier`, `SubjectPublicKeyInfoOwned`, `signature::Error` in

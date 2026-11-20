@@ -24,7 +24,7 @@ use der::Decode as _;
 use pkix_path::{
     validate_path, DefaultVerifier, EcdsaP256Verifier, EcdsaP384Verifier, EcdsaP521Verifier,
     Ed25519Verifier, Error, RsaPkcs1v15Sha256Verifier, RsaPssVerifier, SignatureVerifier,
-    TrustAnchor, ValidationPolicy,
+    TrustAnchor, ValidationPolicy, VerificationErrorKind,
 };
 use x509_cert::Certificate;
 
@@ -154,7 +154,10 @@ fn rsa_pss_verifier_accepts_openssl_pss() {
 fn pkcs1v15_verifier_rejects_pss_signature() {
     assert_eq!(
         validate("rsa-pss-sha256", &RsaPkcs1v15Sha256Verifier),
-        Err(Error::SignatureInvalid { index: 0 })
+        Err(Error::SignatureNotVerified {
+            index: 0,
+            reason: VerificationErrorKind::UnsupportedAlgorithm
+        })
     );
 }
 
@@ -163,6 +166,69 @@ fn ed25519_verifier_accepts_openssl_ed25519() {
     validate("ed25519", &Ed25519Verifier).expect("Ed25519");
     assert_eq!(
         validate("p256-sha256", &Ed25519Verifier),
-        Err(Error::SignatureInvalid { index: 0 })
+        Err(Error::SignatureNotVerified {
+            index: 0,
+            reason: VerificationErrorKind::UnsupportedAlgorithm
+        })
     );
+}
+
+/// Calls `verifier` directly on `leaf`'s signature with `ca`'s key.
+fn verify_direct<V: SignatureVerifier>(
+    verifier: &V,
+    leaf: &Certificate,
+    issuer_spki: &spki::SubjectPublicKeyInfoOwned,
+) -> Result<(), pkix_path::VerificationError> {
+    use spki::der::referenced::OwnedToRef as _;
+    let tbs = pkix_path::tbs_certificate_der(leaf).expect("encode TBS");
+    verifier.verify_signature(
+        leaf.signature_algorithm().owned_to_ref(),
+        issuer_spki.owned_to_ref(),
+        &tbs,
+        leaf.signature().raw_bytes(),
+    )
+}
+
+#[test]
+fn verification_error_kinds() {
+    use core::error::Error as _;
+    let kind = |r: Result<(), pkix_path::VerificationError>| r.map_err(|e| e.kind());
+
+    let (leaf, ca) = pair("p384-sha384");
+    let ca_spki = ca.tbs_certificate().subject_public_key_info().clone();
+
+    // P-384 key handed to the P-256 verifier: the key is the problem.
+    assert_eq!(
+        kind(verify_direct(&EcdsaP256Verifier, &leaf, &ca_spki)),
+        Err(VerificationErrorKind::UnsupportedKey)
+    );
+    // ECDSA signature handed to an RSA verifier: the algorithm is.
+    assert_eq!(
+        kind(verify_direct(&RsaPkcs1v15Sha256Verifier, &leaf, &ca_spki)),
+        Err(VerificationErrorKind::UnsupportedAlgorithm)
+    );
+    // An RSA key where an ECDSA key is needed.
+    let (_, rsa_ca) = pair("rsa-pss-sha256");
+    let rsa_spki = rsa_ca.tbs_certificate().subject_public_key_info().clone();
+    assert_eq!(
+        kind(verify_direct(&DefaultVerifier, &leaf, &rsa_spki)),
+        Err(VerificationErrorKind::UnsupportedKey)
+    );
+    // A truncated EC point.
+    let mut bad_spki = ca_spki.clone();
+    let point = bad_spki.subject_public_key.raw_bytes().to_vec();
+    bad_spki.subject_public_key =
+        der::asn1::BitString::from_bytes(&point[..point.len() - 1]).expect("bit string");
+    assert_eq!(
+        kind(verify_direct(&DefaultVerifier, &leaf, &bad_spki)),
+        Err(VerificationErrorKind::MalformedKey)
+    );
+    // A tampered signature, with the backend error kept as the source.
+    let err = verify_direct(&DefaultVerifier, &tamper(&leaf), &ca_spki).unwrap_err();
+    assert_eq!(err.kind(), VerificationErrorKind::InvalidSignature);
+    assert_eq!(err.to_string(), "invalid signature");
+    let (rsa_leaf, _) = pair("rsa-pss-sha256");
+    let err = verify_direct(&RsaPssVerifier, &tamper(&rsa_leaf), &rsa_spki).unwrap_err();
+    assert_eq!(err.kind(), VerificationErrorKind::InvalidSignature);
+    assert!(err.source().is_some(), "backend error must be the source");
 }
