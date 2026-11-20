@@ -70,13 +70,21 @@ const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
 /// the certificate type and the serial number was not found in the revoked list
 /// (**not revoked**).
 ///
-/// When the CRL's `IssuingDistributionPoint` scope flags
-/// (`onlyContainsUserCerts`, `onlyContainsCACerts`, `onlyContainsAttributeCerts`)
-/// indicate the CRL does not apply to this certificate type, the checker returns
+/// When the CRL does not cover the certificate — its `IssuingDistributionPoint`
+/// scope flags (`onlyContainsUserCerts`, `onlyContainsCACerts`,
+/// `onlyContainsAttributeCerts`) exclude this certificate type, none of the
+/// certificate's `cRLDistributionPoints` points at this CRL (RFC 5280
+/// §6.3.3(b)), or the CRL covers only some revocation reasons
+/// (`onlySomeReasons`) and does not list the certificate — the checker returns
 /// `Err(`[`Error::OutOfScope`]`)` with a variant describing the mismatch.
 /// Callers enforcing a **hard-fail** revocation policy should treat `OutOfScope`
 /// as a non-determination and require that at least one CRL or OCSP response
 /// actually covers the certificate in question.
+///
+/// A CRL that cannot be used at all is refused regardless of the certificate:
+/// a delta CRL supplied as the complete CRL ([`Error::DeltaCrlAsComplete`])
+/// and a CRL carrying an unrecognized critical CRL or CRL-entry extension
+/// ([`Error::CrlUnsupportedCriticalExtension`], RFC 5280 §5.2 / §5.3).
 ///
 /// # Indirect CRLs (RFC 5280 §5.2.6)
 ///
@@ -103,19 +111,18 @@ const OID_CERTIFICATE_ISSUER: der::asn1::ObjectIdentifier =
 ///   [`pkix_path::names_match`] (proper DN equivalence); other variants
 ///   (URI, dNSName, rfc822Name, IP address, etc.) compare via byte-exact DER
 ///   encoding equality.
-///   The per-DP `cRLIssuer` field on a `DistributionPoint` entry is **not**
-///   currently honored when resolving the cert's CDP base DN; the
-///   certificate's issuer is always used. This is correct for the common
-///   case (RFC 5280 §4.2.1.13: "If the certificate issuer is also the CRL
-///   issuer, then conforming CAs MUST omit the cRLIssuer field"). Indirect
-///   CRLs with a non-issuer cRLIssuer that also use `nameRelativeToCRLIssuer`
-///   on the cert's CDP would resolve against the wrong base; that scenario
-///   has no PKITS coverage and is deferred.
-/// - **Reasons-subset check** (`onlySomeReasons` on the IDP must cover the
-///   reasons the cert's CDP asks to be checked, RFC 5280 §6.3.3(b)(1)) is
-///   not implemented. PKITS §4.14 fixtures do not exercise this. Tracked
-///   as future work; a separate `OutOfScopeReason` variant will be added at
-///   that time.
+///   The per-DP `cRLIssuer` field is honored (RFC 5280 §6.3.3(b)(1)): a DP
+///   carrying `cRLIssuer` only matches an indirect CRL issued by that
+///   `cRLIssuer`, and its `nameRelativeToCRLIssuer` is resolved against the
+///   `cRLIssuer` DN (§4.2.1.13); a DP without `cRLIssuer` only matches a
+///   CRL issued by the certificate's issuer. Failing DPs surface as
+///   `OutOfScopeReason::CrlDistributionPointIssuerMismatch` /
+///   `CrlIdpDistributionPointMismatch`.
+/// - **Reason partitioning** (`onlySomeReasons`) is handled fail-safe: such a
+///   CRL can report a listed certificate as revoked, but an unlisted
+///   certificate yields `OutOfScopeReason::CrlOnlySomeReasons` instead of
+///   `Ok(())`. Accumulating a full reasons mask over several partitioned
+///   CRLs (RFC 5280 §6.3.3 `reasons_mask`) is not implemented.
 /// - The checker enforces `onlyContainsUserCerts`, `onlyContainsCACerts`,
 ///   and `onlyContainsAttributeCerts` scope flags directly; see
 ///   `OutOfScopeReason` for the surfaced variants.
@@ -208,13 +215,13 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ///
     /// Returns [`Error::CrlParseError`] if `crl_der` cannot be DER-decoded.
     ///
-    /// # Security
+    /// # Delta CRLs
     ///
-    /// **Do not pass a delta CRL** (a `CertificateList` containing a
-    /// `deltaCRLIndicator` extension) as the sole `crl_der` argument. Delta CRLs
-    /// contain only the changes since the last base CRL; using one alone silently
-    /// under-covers revocations. Pass it via [`CrlChecker::with_delta`] together
-    /// with the matching base CRL to get correct coverage.
+    /// `crl_der` must be a complete CRL. A delta CRL (a `CertificateList`
+    /// containing a `deltaCRLIndicator` extension) contains only the changes
+    /// since its base CRL, so [`RevocationChecker::check_revocation`] refuses it
+    /// with [`Error::DeltaCrlAsComplete`]. Pass it via [`CrlChecker::with_delta`]
+    /// together with the matching base CRL instead.
     pub fn new(crl_der: impl AsRef<[u8]>, now_unix: u64, verifier: V) -> crate::Result<Self> {
         let crl = CertificateList::<x509_cert::certificate::Rfc5280>::from_der(crl_der.as_ref())
             .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
@@ -453,7 +460,9 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ///
     /// The delta CRL must be signed by the same cRLIssuer cert and be
     /// declared indirect via its own `IssuingDistributionPoint.indirectCRL`
-    /// flag (verified at `check_revocation` time).
+    /// flag. This is verified at `check_revocation` time as part of the
+    /// RFC 5280 §6.3.3(c) rule that the delta's `IssuingDistributionPoint` be
+    /// identical to the base CRL's ([`Error::DeltaCrlBaseMismatch`]).
     ///
     /// # Errors
     ///
@@ -479,6 +488,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     fn check_revocation(&self, cert: &Certificate, issuer: &Certificate) -> crate::Result<()> {
         // (1) Reuse the pre-parsed base CRL (parsed once at construction).
         let crl = &self.crl;
+        // (1a) RFC 5280 §5.2 / §5.3 / §5.2.4: refuse a delta CRL in the
+        //      complete-CRL slot and any CRL carrying a critical extension
+        //      (CRL-level or entry-level) this checker does not process.
+        check_crl_usable_as_complete(crl)?;
 
         // (2) Determine the effective CRL signer: either the cert's
         //     issuer (direct CRL) or a separate cRLIssuer cert (indirect
@@ -624,82 +637,9 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             // Verifier returns an opaque error; no additional context available.
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
-        // (5) RFC 5280 §5.2.5: if the CRL has an IssuingDistributionPoint extension
-        //     (critical), check scope constraints against the certificate.
-        // Scope mismatches surface as Error::OutOfScope so callers can distinguish
-        // "verified not-revoked" (Ok(())) from "no determination made"
-        // (Err(OutOfScope(...))). Hard-fail revocation policies should treat
-        // OutOfScope as a failure.
-        if let Some(idp) = &parsed_idp {
-            // onlyContainsAttributeCerts: attribute cert validation is out of scope
-            // for pkix-revocation (RFC 5755 is handled by pkix-ac).
-            if idp.only_contains_attribute_certs {
-                return Err(Error::OutOfScope(
-                    crate::OutOfScopeReason::CrlOnlyAttributeCerts,
-                ));
-            }
-            let cert_is_ca = cert_is_ca_cert(cert)?;
-            // onlyContainsUserCerts: CRL only covers end-entity (non-CA) certs.
-            if idp.only_contains_user_certs && cert_is_ca {
-                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyUserCerts));
-            }
-            // onlyContainsCACerts: CRL only covers CA certs.
-            if idp.only_contains_ca_certs && !cert_is_ca {
-                return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
-            }
-            // RFC 5280 §6.3.3(b)(1): IDP distributionPoint must match the
-            // cert's CDP (cross-form `nameRelativeToCRLIssuer` ↔ `fullName`
-            // resolution is performed by `dpn_to_general_names`).
-            check_idp_dp_scope(cert, idp, cert.tbs_certificate().issuer(), signer_subject)?;
-        }
-
-        // (6) §5.2.4 delta CRL merge: if a delta CRL is present, verify and collect
-        //     its revoked entries.  verify_delta_crl_and_collect handles sig, expiry,
-        //     and the primary issuer-name check.  The extra checks below are
-        //     defense-in-depth: they guard against any future code path that bypasses
-        //     the with_delta() constructor and against subtle cross-name mismatches.
-        let delta_entries: &[RevokedCert] = if let Some(delta_crl) = &self.delta_crl {
-            // Reuse the pre-parsed delta CRL (parsed once at construction).
-
-            // Extra check: delta CRL issuer must also match the base CRL issuer
-            // (construction-time invariant, re-checked here for defense-in-depth).
-            if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
-                return Err(Error::CrlIssuerMismatch);
-            }
-            // The delta CRL must be signed by the same effective signer as the base.
-            // This is guaranteed by issuer DN match plus the cRLIssuer-vs-issuer
-            // selection above, but verify_delta_crl_and_collect will recheck.
-            verify_delta_crl_and_collect(
-                delta_crl,
-                &self.verifier,
-                signer_spki,
-                signer_subject,
-                self.now_unix,
-            )?
-        } else {
-            &[]
-        };
-
-        // (7) Search for the certificate's (issuer, serial) in the delta and base
-        //     CRL entries. Delta CRL entries take precedence (RFC 5280 §5.2.4);
-        //     a removeFromCRL reason in the delta un-revokes a cert.
-        //
-        //     For indirect CRLs the per-entry `certificateIssuer` extension may
-        //     change the effective issuer of subsequent entries (RFC 5280 §5.3.3);
-        //     entries inherit the previous extension's value, defaulting to the
-        //     CRL's own issuer for the first entry.
-        let cert_issuer = cert.tbs_certificate().issuer();
-        let cert_serial = cert.tbs_certificate().serial_number();
-        let crl_default_issuer = &crl.tbs_cert_list.issuer;
-        let is_indirect = self.crl_issuer_cert.is_some();
-        check_revocation_status_indirect(
-            cert_issuer,
-            cert_serial,
-            delta_entries,
-            crl,
-            crl_default_issuer,
-            is_indirect,
-        )
+        // (5)-(7) Scope, delta merge and serial lookup are shared with the
+        //     anchor flow.
+        self.check_scope_delta_and_status(cert, parsed_idp.as_ref(), signer_spki, signer_subject)
     }
 
     /// Check revocation for `cert` issued directly by a trust anchor.
@@ -735,6 +675,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
     ) -> crate::Result<()> {
         // (1) Reuse the pre-parsed base CRL (parsed once at construction).
         let crl = &self.crl;
+        // (1a) Same complete-CRL usability gate as check_revocation.
+        check_crl_usable_as_complete(crl)?;
 
         // (2) Determine the effective CRL signer as in check_revocation.
         //     For the anchor flow, the "issuer" identity is the anchor itself.
@@ -829,35 +771,71 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             )
             .map_err(|_| Error::CrlSignatureInvalid)?;
 
-        // (6) IssuingDistributionPoint scope check.
-        if let Some(idp) = &parsed_idp {
+        // (6)-(8) Scope, delta merge and serial lookup (shared with
+        //     check_revocation).
+        self.check_scope_delta_and_status(cert, parsed_idp.as_ref(), signer_spki, signer_subject)
+    }
+}
+
+impl<V: SignatureVerifier> CrlChecker<V> {
+    /// Steps shared by [`RevocationChecker::check_revocation`] and
+    /// [`RevocationChecker::check_revocation_against_anchor`] once the base
+    /// CRL's signer, freshness and signature have been verified: the
+    /// RFC 5280 §6.3.3(b) scope checks, the §5.2.4 delta merge, the serial
+    /// lookup, and the §6.3.3 reasons-coverage gate.
+    ///
+    /// Scope mismatches surface as [`Error::OutOfScope`] so callers can
+    /// distinguish "verified not-revoked" (`Ok(())`) from "no determination
+    /// made". Hard-fail revocation policies should treat `OutOfScope` as a
+    /// failure.
+    fn check_scope_delta_and_status(
+        &self,
+        cert: &Certificate,
+        parsed_idp: Option<&x509_cert::ext::pkix::crl::IssuingDistributionPoint>,
+        signer_spki: spki::SubjectPublicKeyInfoRef<'_>,
+        signer_subject: &x509_cert::name::Name,
+    ) -> crate::Result<()> {
+        let crl = &self.crl;
+
+        // (a) RFC 5280 §5.2.5 IssuingDistributionPoint certificate-type flags.
+        if let Some(idp) = parsed_idp {
+            // onlyContainsAttributeCerts: attribute cert validation is out of scope
+            // for pkix-revocation (RFC 5755 is handled by pkix-ac).
             if idp.only_contains_attribute_certs {
                 return Err(Error::OutOfScope(
                     crate::OutOfScopeReason::CrlOnlyAttributeCerts,
                 ));
             }
             let cert_is_ca = cert_is_ca_cert(cert)?;
+            // onlyContainsUserCerts: CRL only covers end-entity (non-CA) certs.
             if idp.only_contains_user_certs && cert_is_ca {
                 return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyUserCerts));
             }
+            // onlyContainsCACerts: CRL only covers CA certs.
             if idp.only_contains_ca_certs && !cert_is_ca {
                 return Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlyCaCerts));
             }
-            // RFC 5280 §6.3.3(b)(1): IDP distributionPoint must match the
-            // cert's CDP. The cert's CDP base DN for resolving
-            // `nameRelativeToCRLIssuer` is the cert's issuer; the CRL's IDP
-            // base DN is the CRL signer's subject (anchor's subject in the
-            // direct anchor flow, cRLIssuer's subject in the indirect flow).
-            check_idp_dp_scope(cert, idp, cert.tbs_certificate().issuer(), signer_subject)?;
         }
 
-        // (7) Delta CRL merge.
+        // (b) RFC 5280 §6.3.3(b)(1)/(b)(2)(i): some entry of the cert's
+        //     cRLDistributionPoints must point at this CRL — by CRL issuer
+        //     (the DP's cRLIssuer, or the cert issuer when absent) and, when
+        //     the IDP names a distribution point, by name.
+        check_dp_scope(cert, parsed_idp, &crl.tbs_cert_list.issuer)?;
+
+        // (c) §5.2.4 delta CRL merge: if a delta CRL is present, verify and
+        //     collect its revoked entries. verify_delta_crl_and_collect
+        //     handles the delta's critical extensions, scope (IDP) equality
+        //     with the base, expiry, signature and issuer name.
         let delta_entries: &[RevokedCert] = if let Some(delta_crl) = &self.delta_crl {
+            // Delta CRL issuer must also match the base CRL issuer
+            // (construction-time invariant, re-checked here for defense-in-depth).
             if !names_match(&delta_crl.tbs_cert_list.issuer, &crl.tbs_cert_list.issuer) {
                 return Err(Error::CrlIssuerMismatch);
             }
             verify_delta_crl_and_collect(
                 delta_crl,
+                crl,
                 &self.verifier,
                 signer_spki,
                 signer_subject,
@@ -867,20 +845,41 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             &[]
         };
 
-        // (8) Look up the cert's (issuer, serial) in delta then base entries,
-        //     honoring per-entry certificateIssuer for indirect CRLs.
+        // (d) Search for the certificate's (issuer, serial) in the delta and base
+        //     CRL entries. Delta CRL entries take precedence (RFC 5280 §5.2.4);
+        //     a removeFromCRL reason in the delta un-revokes a cert.
+        //
+        //     For indirect CRLs the per-entry `certificateIssuer` extension may
+        //     change the effective issuer of subsequent entries (RFC 5280 §5.3.3);
+        //     entries inherit the previous extension's value, defaulting to the
+        //     CRL's own issuer for the first entry.
         let cert_issuer = cert.tbs_certificate().issuer();
         let cert_serial = cert.tbs_certificate().serial_number();
         let crl_default_issuer = &crl.tbs_cert_list.issuer;
         let is_indirect = self.crl_issuer_cert.is_some();
-        check_revocation_status_indirect(
+        let status = check_revocation_status_indirect(
             cert_issuer,
             cert_serial,
             delta_entries,
             crl,
             crl_default_issuer,
             is_indirect,
-        )
+        );
+
+        // (e) RFC 5280 §6.3.3(d)/(k): a CRL whose IDP `onlySomeReasons` does
+        //     not cover every reason can prove "revoked" but not "not
+        //     revoked". Combining several partitioned CRLs into a full
+        //     reasons mask is not implemented, so fail safe.
+        if status.is_ok() {
+            if let Some(reasons) = parsed_idp.and_then(|idp| idp.only_some_reasons) {
+                if !covers_all_reasons(reasons) {
+                    return Err(Error::OutOfScope(
+                        crate::OutOfScopeReason::CrlOnlySomeReasons,
+                    ));
+                }
+            }
+        }
+        status
     }
 }
 
@@ -1035,9 +1034,16 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
 ///
 /// Performs (in order):
 /// 1. Check that the delta CRL issuer matches `expected_issuer_name`.
-/// 2. Check the delta validity window against `now_unix`.
-/// 3. Verify the delta signature using `issuer_spki`.
-/// 4. Return the delta's revoked-certificates list (empty if absent).
+/// 2. Reject the delta if it carries a critical CRL or CRL-entry extension
+///    this crate does not process (RFC 5280 §5.2 / §5.3) —
+///    [`Error::CrlUnsupportedCriticalExtension`].
+/// 3. Require the delta's `IssuingDistributionPoint` to be identical to the
+///    base CRL's, or both to be absent (RFC 5280 §6.3.3(c)(2)/(3)) —
+///    [`Error::DeltaCrlBaseMismatch`]. Byte equality of the IDP also carries
+///    the base's `indirectCRL` flag over to the delta.
+/// 4. Check the delta validity window against `now_unix`.
+/// 5. Verify the delta signature using `issuer_spki`.
+/// 6. Return the delta's revoked-certificates list (empty if absent).
 ///
 /// The caller is responsible for parsing the `CertificateList` and for any
 /// additional issuer-name cross-checks needed by the calling context (e.g.,
@@ -1045,6 +1051,7 @@ fn parse_certificate_issuer_dn(ext_value_der: &[u8]) -> crate::Result<x509_cert:
 /// certificate's issuer).
 fn verify_delta_crl_and_collect<'a, V: SignatureVerifier>(
     delta_crl: &'a CertificateList,
+    base_crl: &CertificateList,
     verifier: &V,
     issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
     expected_issuer_name: &x509_cert::name::Name,
@@ -1052,6 +1059,17 @@ fn verify_delta_crl_and_collect<'a, V: SignatureVerifier>(
 ) -> crate::Result<&'a [RevokedCert]> {
     if !names_match(&delta_crl.tbs_cert_list.issuer, expected_issuer_name) {
         return Err(Error::CrlIssuerMismatch);
+    }
+
+    check_crl_critical_extensions(delta_crl)?;
+
+    // Compare the DER of the IDP extension values: RFC 5280 requires the
+    // delta's scope to be *identical* to the complete CRL's, so no semantic
+    // comparison is needed.
+    if crl_extension_value(delta_crl, &OID_ISSUING_DISTRIBUTION_POINT)
+        != crl_extension_value(base_crl, &OID_ISSUING_DISTRIBUTION_POINT)
+    {
+        return Err(Error::DeltaCrlBaseMismatch);
     }
 
     // Check validity window before signature verification (same rationale as
@@ -1097,6 +1115,103 @@ fn verify_delta_crl_and_collect<'a, V: SignatureVerifier>(
 // ---------------------------------------------------------------------------
 // Extension helpers
 // ---------------------------------------------------------------------------
+
+/// CRL extensions (RFC 5280 §5.2) this crate recognizes. A *critical* CRL
+/// extension outside this list makes the CRL unusable (§5.2: "If a CRL
+/// contains a critical extension that the application cannot process, then
+/// the application MUST NOT use that CRL to determine the status of
+/// certificates"). AKI, issuerAltName, freshestCRL and authorityInfoAccess
+/// are informational for this checker (the signer is fixed by the caller)
+/// and are listed so that a CA marking them critical is not refused.
+const KNOWN_CRL_EXTENSIONS: &[der::asn1::ObjectIdentifier] = &[
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.35"), // authorityKeyIdentifier
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.18"), // issuerAltName
+    OID_CRL_NUMBER,
+    OID_DELTA_CRL_INDICATOR,
+    OID_ISSUING_DISTRIBUTION_POINT,
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.46"), // freshestCRL
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1"), // authorityInfoAccess
+];
+
+/// CRL entry extensions (RFC 5280 §5.3) this crate recognizes; same
+/// critical-extension rule as [`KNOWN_CRL_EXTENSIONS`] (§5.3: an
+/// unprocessable critical entry extension forbids using the whole CRL).
+const KNOWN_CRL_ENTRY_EXTENSIONS: &[der::asn1::ObjectIdentifier] = &[
+    OID_CRL_REASONS,
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.23"), // holdInstructionCode
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.24"), // invalidityDate
+    OID_CERTIFICATE_ISSUER,
+];
+
+/// Returns [`Error::CrlUnsupportedCriticalExtension`] if `crl` or any of its
+/// entries carries a critical extension outside the recognized lists.
+fn check_crl_critical_extensions(crl: &CertificateList) -> crate::Result<()> {
+    let tbs = &crl.tbs_cert_list;
+    let crl_exts = tbs.crl_extensions.as_deref().unwrap_or(&[]);
+    if crl_exts
+        .iter()
+        .any(|e| e.critical && !KNOWN_CRL_EXTENSIONS.contains(&e.extn_id))
+    {
+        return Err(Error::CrlUnsupportedCriticalExtension);
+    }
+    let entries = tbs.revoked_certificates.as_deref().unwrap_or(&[]);
+    for entry in entries {
+        let exts = entry.crl_entry_extensions.as_deref().unwrap_or(&[]);
+        if exts
+            .iter()
+            .any(|e| e.critical && !KNOWN_CRL_ENTRY_EXTENSIONS.contains(&e.extn_id))
+        {
+            return Err(Error::CrlUnsupportedCriticalExtension);
+        }
+    }
+    Ok(())
+}
+
+/// Gate for the CRL supplied as the *complete* CRL (every constructor's
+/// `crl_der` / `base_der`), applied at `check_*` time:
+///
+/// - A delta CRL (`deltaCRLIndicator` present) lists only changes since its
+///   base, so on its own it can never establish "not revoked" (RFC 5280
+///   §5.2.4) → [`Error::DeltaCrlAsComplete`].
+/// - Unrecognized critical CRL / entry extensions →
+///   [`Error::CrlUnsupportedCriticalExtension`].
+fn check_crl_usable_as_complete(crl: &CertificateList) -> crate::Result<()> {
+    if has_delta_crl_indicator(crl) {
+        return Err(Error::DeltaCrlAsComplete);
+    }
+    check_crl_critical_extensions(crl)
+}
+
+/// Raw DER of the value of the CRL extension `oid`, if present.
+fn crl_extension_value<'a>(
+    crl: &'a CertificateList,
+    oid: &der::asn1::ObjectIdentifier,
+) -> Option<&'a [u8]> {
+    crl.tbs_cert_list
+        .crl_extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .find(|e| &e.extn_id == oid)
+        .map(|e| e.extn_value.as_bytes())
+}
+
+/// Returns `true` if `reasons` (an IDP `onlySomeReasons` value) includes
+/// every RFC 5280 §5.2.5 reason flag, i.e. the CRL is not actually
+/// reason-partitioned. The `unused` bit (0) is ignored.
+fn covers_all_reasons(reasons: x509_cert::ext::pkix::crl::dp::ReasonFlags) -> bool {
+    use x509_cert::ext::pkix::crl::dp::Reasons;
+    reasons.contains(
+        Reasons::KeyCompromise
+            | Reasons::CaCompromise
+            | Reasons::AffiliationChanged
+            | Reasons::Superseded
+            | Reasons::CessationOfOperation
+            | Reasons::CertificateHold
+            | Reasons::PrivilegeWithdrawn
+            | Reasons::AaCompromise,
+    )
+}
 
 /// Convert a DER [`Uint`][der::asn1::Uint] to a `u64`, padding from the left.
 ///
@@ -1349,66 +1464,98 @@ fn general_names_intersect(
         .any(|ga| b.iter().any(|gb| general_name_matches(ga, gb)))
 }
 
-/// Check that the CRL's `IssuingDistributionPoint.distributionPoint`
-/// matches the certificate's `cRLDistributionPoints` per RFC 5280 §6.3.3(b)(1).
+/// Check that some entry of the certificate's `cRLDistributionPoints`
+/// points at this CRL, per RFC 5280 §6.3.3(b)(1) and (b)(2)(i).
 ///
-/// Returns `Err(Error::OutOfScope(CrlIdpDistributionPointMismatch))` if
-/// the CRL is structurally well-formed but does not cover the certificate's
-/// distribution point claim.
+/// A distribution point `dp` matches when both hold:
 ///
-/// Algorithm:
+/// 1. **Issuer.** If `dp.cRLIssuer` is present, one of its `directoryName`s
+///    equals the CRL issuer *and* the CRL is indirect (IDP `indirectCRL`);
+///    otherwise the CRL issuer equals the certificate issuer.
+/// 2. **Name** (only when the IDP names a distribution point). The DP's
+///    `distributionPoint` names — or, when that field is absent, its
+///    `cRLIssuer` names — intersect the IDP's. `nameRelativeToCRLIssuer`
+///    is resolved against the CRL issuer on both sides: for the DP this is
+///    `dp.cRLIssuer` when present (RFC 5280 §4.2.1.13) and otherwise the
+///    certificate issuer, which (1) has just shown to equal the CRL issuer.
 ///
-/// | cert CDP | CRL IDP DP | Outcome |
-/// |---|---|---|
-/// | absent   | absent     | match (no DP scoping either side) |
-/// | absent   | present    | mismatch (CRL is scoped, cert isn't) |
-/// | present  | absent     | match (IDP doesn't constrain DP) |
-/// | present  | present    | at least one CDP entry's resolved name must intersect IDP's resolved name |
+/// | cert CDP | Outcome |
+/// |---|---|
+/// | absent  | match unless the IDP names a distribution point |
+/// | present | at least one DP must satisfy (1) and (2) |
 ///
-/// `cert_issuer` is the certificate's issuer DN (used as the base when the
-/// cert's CDP uses `NameRelativeToCRLIssuer`). `crl_signer_subject` is the
-/// CRL signer's subject DN (used as the base when the CRL's IDP uses
-/// `NameRelativeToCRLIssuer`).
-fn check_idp_dp_scope(
+/// Errors: [`Error::OutOfScope`] with
+/// [`CrlDistributionPointIssuerMismatch`](crate::OutOfScopeReason::CrlDistributionPointIssuerMismatch)
+/// if no DP passes (1), or
+/// [`CrlIdpDistributionPointMismatch`](crate::OutOfScopeReason::CrlIdpDistributionPointMismatch)
+/// if some DP passes (1) but none passes (2).
+fn check_dp_scope(
     cert: &Certificate,
-    idp: &x509_cert::ext::pkix::crl::IssuingDistributionPoint,
-    cert_issuer: &x509_cert::name::Name,
-    crl_signer_subject: &x509_cert::name::Name,
+    idp: Option<&x509_cert::ext::pkix::crl::IssuingDistributionPoint>,
+    crl_issuer: &x509_cert::name::Name,
 ) -> crate::Result<()> {
-    let cert_cdps = cert_crl_distribution_points(cert)?;
+    use std::borrow::Cow;
+    use x509_cert::ext::pkix::name::GeneralName;
 
-    match (cert_cdps.as_ref(), idp.distribution_point.as_ref()) {
-        (None, None) | (Some(_), None) => Ok(()),
-        (None, Some(_)) => Err(Error::OutOfScope(
-            crate::OutOfScopeReason::CrlIdpDistributionPointMismatch,
-        )),
-        (Some(cert_cdps), Some(idp_dpn)) => {
-            let idp_names = dpn_to_general_names(idp_dpn, crl_signer_subject)?;
-            // At least one cert CDP entry must have a distributionPoint that
-            // intersects the IDP's. CDP entries with no distributionPoint
-            // (RFC 5280 §4.2.1.13: "If the distributionPoint field is omitted,
-            // the cRL distribution point must not include cRLIssuer that
-            // …") cannot constrain to a specific name, so they cannot match
-            // a non-empty IDP DPName here.
-            let matched = cert_cdps.0.iter().any(|dp| {
-                let Some(cdp_dpn) = &dp.distribution_point else {
-                    return false;
-                };
-                let cdp_names = match dpn_to_general_names(cdp_dpn, cert_issuer) {
-                    Ok(n) => n,
-                    Err(_) => return false,
-                };
-                general_names_intersect(&cdp_names, &idp_names)
-            });
-            if matched {
-                Ok(())
-            } else {
-                Err(Error::OutOfScope(
-                    crate::OutOfScopeReason::CrlIdpDistributionPointMismatch,
-                ))
+    let idp_names = idp
+        .and_then(|idp| idp.distribution_point.as_ref())
+        .map(|dpn| dpn_to_general_names(dpn, crl_issuer))
+        .transpose()?;
+    let crl_is_indirect = idp.is_some_and(|idp| idp.indirect_crl);
+
+    let Some(cert_cdps) = cert_crl_distribution_points(cert)? else {
+        // No CDP: the cert does not constrain which CRL applies, but a CRL
+        // scoped to a named distribution point cannot be shown to cover it.
+        return match idp_names {
+            Some(_) => Err(Error::OutOfScope(
+                crate::OutOfScopeReason::CrlIdpDistributionPointMismatch,
+            )),
+            None => Ok(()),
+        };
+    };
+
+    let cert_issuer = cert.tbs_certificate().issuer();
+    let mut issuer_matched = false;
+    for dp in cert_cdps.0.iter() {
+        // (1) Issuer: which DN does this DP say issues its CRLs?
+        let base_dn = match &dp.crl_issuer {
+            Some(crl_issuer_names) => {
+                let named = crl_issuer_names.iter().find_map(|gn| match gn {
+                    GeneralName::DirectoryName(dn) if names_match(dn, crl_issuer) => Some(dn),
+                    _ => None,
+                });
+                match named {
+                    Some(dn) if crl_is_indirect => dn,
+                    _ => continue,
+                }
             }
+            None if names_match(crl_issuer, cert_issuer) => cert_issuer,
+            None => continue,
+        };
+        issuer_matched = true;
+
+        // (2) Name, when the IDP is scoped to a distribution point.
+        let Some(idp_names) = idp_names.as_deref() else {
+            return Ok(());
+        };
+        let dp_names: Cow<'_, [GeneralName]> = match (&dp.distribution_point, &dp.crl_issuer) {
+            (Some(dpn), _) => match dpn_to_general_names(dpn, base_dn) {
+                Ok(names) => names,
+                Err(_) => continue,
+            },
+            (None, Some(crl_issuer_names)) => Cow::Borrowed(crl_issuer_names.as_slice()),
+            (None, None) => continue,
+        };
+        if general_names_intersect(&dp_names, idp_names) {
+            return Ok(());
         }
     }
+
+    Err(Error::OutOfScope(if issuer_matched {
+        crate::OutOfScopeReason::CrlIdpDistributionPointMismatch
+    } else {
+        crate::OutOfScopeReason::CrlDistributionPointIssuerMismatch
+    }))
 }
 
 /// Returns `Ok(true)` if `cert` is a CA certificate (`BasicConstraints`

@@ -166,6 +166,19 @@ pub enum OutOfScopeReason {
     /// not cover the certificate, and a separate CRL/OCSP source must be
     /// consulted.
     CrlIdpDistributionPointMismatch,
+    /// None of the certificate's `cRLDistributionPoints` entries names this
+    /// CRL's issuer (RFC 5280 §6.3.3(b)(1)): a DP with a `cRLIssuer` field
+    /// requires the CRL to be issued by that `cRLIssuer` and to be indirect
+    /// (`IssuingDistributionPoint.indirectCRL`); a DP without one requires
+    /// the CRL to be issued by the certificate's issuer.
+    CrlDistributionPointIssuerMismatch,
+    /// The CRL's `IssuingDistributionPoint` has `onlySomeReasons` that does
+    /// not include every revocation reason, and the certificate is not listed
+    /// on it. Such a CRL can show that a certificate *is* revoked, but not
+    /// that it is not revoked for the remaining reasons (RFC 5280
+    /// §6.3.3(d)/(k)). Combining several reason-partitioned CRLs is not
+    /// implemented; consult a CRL that covers all reasons, or OCSP.
+    CrlOnlySomeReasons,
 }
 
 impl core::fmt::Display for OutOfScopeReason {
@@ -182,6 +195,12 @@ impl core::fmt::Display for OutOfScopeReason {
             }
             Self::CrlIdpDistributionPointMismatch => f.write_str(
                 "CRL IssuingDistributionPoint distributionPoint does not match the certificate's CRLDistributionPoints",
+            ),
+            Self::CrlDistributionPointIssuerMismatch => f.write_str(
+                "no CRLDistributionPoints entry of the certificate names this CRL's issuer",
+            ),
+            Self::CrlOnlySomeReasons => f.write_str(
+                "CRL covers only some revocation reasons (onlySomeReasons) and does not list the certificate",
             ),
         }
     }
@@ -417,6 +436,11 @@ pub enum Error {
     /// - The supplied "delta" CRL has no `deltaCRLIndicator` extension and is
     ///   therefore not a delta CRL at all.
     /// - The base and delta CRL have different issuers.
+    /// - At check time: the delta's `IssuingDistributionPoint` is not
+    ///   identical to the base CRL's (or only one of them has one), i.e. the
+    ///   two CRLs have different scopes (RFC 5280 §6.3.3(c)(2)/(3)). This also
+    ///   covers an indirect base CRL paired with a delta that is not declared
+    ///   indirect.
     ///
     /// Note: when the delta's `BaseCRLNumber` exceeds the base CRL's `CRLNumber`
     /// (a staleness mismatch), [`Error::CrlNumberMismatch`] is returned instead.
@@ -425,6 +449,27 @@ pub enum Error {
     /// The CRL's CRL number is lower than expected (base CRL must have a number
     /// ≥ the delta's `BaseCRLNumber`).
     CrlNumberMismatch,
+
+    /// The CRL supplied as the complete CRL is a delta CRL (it carries a
+    /// `deltaCRLIndicator` extension).
+    ///
+    /// A delta CRL lists only the changes since its base CRL, so on its own it
+    /// can never establish "not revoked" (RFC 5280 §5.2.4 / §6.3.3). Supply it
+    /// together with its base via [`CrlChecker::with_delta`].
+    ///
+    /// [`CrlChecker::with_delta`]: crate::CrlChecker::with_delta
+    DeltaCrlAsComplete,
+
+    /// The CRL (base or delta) carries a critical CRL extension (RFC 5280
+    /// §5.2) or a critical CRL entry extension (§5.3) that this crate does
+    /// not recognize, so the CRL MUST NOT be used to determine the status of
+    /// any certificate.
+    ///
+    /// Recognized CRL extensions: authorityKeyIdentifier, issuerAltName,
+    /// cRLNumber, deltaCRLIndicator, issuingDistributionPoint, freshestCRL,
+    /// authorityInfoAccess. Recognized entry extensions: reasonCode,
+    /// holdInstructionCode, invalidityDate, certificateIssuer.
+    CrlUnsupportedCriticalExtension,
 
     /// A subject certificate's `BasicConstraints` extension is present but
     /// could not be DER-decoded.
@@ -445,10 +490,12 @@ pub enum Error {
     /// treat any `OutOfScope` as a failure; soft-fail callers can match on
     /// the [`OutOfScopeReason`] and decide which scopes to tolerate.
     ///
-    /// Currently produced by [`CrlChecker`] for the three
+    /// Currently produced by [`CrlChecker`] for the
     /// `IssuingDistributionPoint` scope-flag mismatches in RFC 5280 §5.2.5
     /// (`onlyContainsAttributeCerts`, `onlyContainsUserCerts`, and
-    /// `onlyContainsCACerts`). [`OcspChecker`] does **not** produce this
+    /// `onlyContainsCACerts`), for distribution-point mismatches
+    /// (RFC 5280 §6.3.3(b)), and for reason-partitioned CRLs
+    /// (`onlySomeReasons`) that do not list the certificate. [`OcspChecker`] does **not** produce this
     /// variant: it returns [`Error::OcspStatusUnknown`] when no matching
     /// `SingleResponse` is found, which is its analogue of "not covered" and
     /// already fail-closed.
@@ -561,10 +608,16 @@ impl core::fmt::Display for Error {
             Self::CrlSignerNotTrusted => f.write_str(
                 "discovered CRL signer does not chain back to a self-signed anchor in the supplied bundle",
             ),
-            Self::DeltaCrlBaseMismatch => {
-                f.write_str("delta CRL BaseCRLNumber does not match the base CRL's CRLNumber")
-            }
+            Self::DeltaCrlBaseMismatch => f.write_str(
+                "delta CRL cannot be combined with the base CRL (BaseCRLNumber, issuer or scope mismatch)",
+            ),
             Self::CrlNumberMismatch => f.write_str("CRL number is lower than expected"),
+            Self::DeltaCrlAsComplete => {
+                f.write_str("a delta CRL was supplied where a complete CRL is required")
+            }
+            Self::CrlUnsupportedCriticalExtension => {
+                f.write_str("CRL carries an unrecognized critical CRL or CRL entry extension")
+            }
             Self::MalformedCertificate => f.write_str(
                 "certificate BasicConstraints extension is present but cannot be decoded",
             ),

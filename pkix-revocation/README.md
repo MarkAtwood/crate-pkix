@@ -94,15 +94,23 @@ impl RevocationChecker for MyRevocationChecker {
 
 1. Verifies that `issuer` is the actual issuer of `cert` (subject/issuer DN match).
 2. Parses the DER-encoded `CertificateList` (RFC 5280 §5).
-3. Checks the CRL's `issuer` field matches the certificate's `issuer`.
-4. Verifies the CRL signature against the issuer's SPKI.
-5. Checks `thisUpdate ≤ now ≤ nextUpdate` (absent `nextUpdate` → fail).
-6. When a delta CRL is present (`with_delta`), verifies and merges the delta's
-   revoked entries with the base CRL's entries (RFC 5280 §5.2.4).
+3. Refuses a delta CRL supplied as the complete CRL (`DeltaCrlAsComplete`) and
+   any CRL with an unrecognized critical CRL or CRL-entry extension
+   (`CrlUnsupportedCriticalExtension`, RFC 5280 §5.2 / §5.3).
+4. Checks the CRL's `issuer` field matches the certificate's `issuer`.
+5. Verifies the CRL signature against the issuer's SPKI.
+6. Checks `thisUpdate ≤ now ≤ nextUpdate` (absent `nextUpdate` → fail).
 7. Checks the `IssuingDistributionPoint` scope flags if present (onlyContainsUserCerts,
-   onlyContainsCACerts, onlyContainsAttributeCerts).
-8. Searches `revokedCertificates` for the certificate's serial number.
-9. Returns `Err(Revoked { serial, reason_code })` if found, `Ok(())` if not.
+   onlyContainsCACerts, onlyContainsAttributeCerts), and that one of the
+   certificate's `cRLDistributionPoints` points at this CRL by issuer
+   (`cRLIssuer`) and name (RFC 5280 §6.3.3(b)).
+8. When a delta CRL is present (`with_delta`), verifies it (same critical-extension
+   rule, identical `IssuingDistributionPoint` to the base) and merges the delta's
+   revoked entries with the base CRL's entries (RFC 5280 §5.2.4).
+9. Searches `revokedCertificates` for the certificate's serial number.
+10. Returns `Err(Revoked { serial, reason_code })` if found. Otherwise returns
+    `Ok(())`, unless the CRL covers only some reasons (`onlySomeReasons`), in
+    which case it returns `Err(OutOfScope(CrlOnlySomeReasons))`.
 
 ## How OCSP checking works
 
@@ -124,12 +132,16 @@ impl RevocationChecker for MyRevocationChecker {
 ## Limitations
 
 - CRL checking does not follow CRL Distribution Points — caller supplies the CRL.
-- Indirect CRLs (RFC 5280 §5.2.6) are not yet supported (tracked).
+- Indirect CRLs (RFC 5280 §5.2.6) are supported via
+  `CrlChecker::new_with_crl_issuer`; the cRLIssuer's own chain must be
+  validated by the caller.
+- CRLs partitioned by reason (`onlySomeReasons`) cannot be combined: an
+  unlisted certificate yields `OutOfScope(CrlOnlySomeReasons)`.
 - OCSP checking supports both issuer-signed (direct) responses and CA
   Designated Responder (delegated) responses (RFC 6960 §4.2.2.2). The
   third RFC 6960 case — a Trusted Responder whose key the requester
-  trusts out-of-band — is not separately modeled (callers can pass that
-  responder cert as the `issuer` argument).
+  trusts out-of-band — is not modeled; such responses are rejected
+  (`issuer` must be the certificate's actual issuer).
 - The `id-pkix-ocsp-nocheck` extension on delegate certs (RFC 6960
   §4.2.2.2.1) is documented but not enforced — this crate is a
   single-shot offline checker and never recurses into delegate

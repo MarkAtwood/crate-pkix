@@ -69,8 +69,12 @@ const OID_KP_OCSP_SIGNING: der::asn1::ObjectIdentifier =
 /// # Limitations
 ///
 /// - **Trusted Responder** (third RFC 6960 case — a responder whose key
-///   the requester trusts out-of-band) is not modeled. Callers needing
-///   it can supply the trusted responder cert as the `issuer` argument.
+///   the requester trusts out-of-band) is not modeled. Passing the trusted
+///   responder's cert as the `issuer` argument does **not** work:
+///   `check_revocation` requires `issuer` to be the certificate's actual
+///   issuer ([`Error::OcspIssuerCertMismatch`]) and hashes it into the
+///   `CertID` comparison. Such responses are rejected (fail-closed), usually
+///   with [`Error::OcspResponderIdMismatch`].
 /// - No OCSP request generation. The response DER must be supplied at
 ///   construction time; the checker is offline. The OCSP `nonce` extension
 ///   is therefore not generated or checked.
@@ -622,8 +626,9 @@ fn validate_delegate_responder_cert<V: SignatureVerifier>(
 ///    a designated responder, and use its SPKI.
 /// 3. **Trusted Responder** (out of scope for this crate): a responder
 ///    whose key the caller already trusts out-of-band. Not supported here;
-///    callers needing this can supply the trusted responder cert as the
-///    `issuer` argument when the cert under check has been issued by it.
+///    a response whose `ResponderId` matches neither the issuer nor an
+///    embedded designated-responder cert is rejected with
+///    [`Error::OcspResponderIdMismatch`].
 ///
 /// The returned reference borrows from one of `basic` or `issuer`,
 /// constrained to the same lifetime via `'a`. The caller drops the SPKI

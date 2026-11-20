@@ -59,19 +59,11 @@ fn pkits_4_15_1_invalid_delta_no_base_construction_fails() {
     );
 }
 
-/// §4.15.1 (part 2): Attempting to use the delta CRL as a plain base CRL also fails
-/// to prove the cert is not revoked, because the delta CRL has an empty revoked list
-/// but the cert's revocation status is unknown (the base is missing).
-///
-/// Here we just verify that the checker constructed with the delta-only CRL
-/// returns Ok for a cert that happens not to be in the revoked list — demonstrating
-/// that our code does NOT incorrectly treat a delta CRL as a complete revocation
-/// source (the path validator layer must enforce that a base is present; our
-/// lower-level checker can only check the revoked entries it is given).
+/// §4.15.1 (part 2): Attempting to use the delta CRL as a plain (complete)
+/// CRL must fail: a delta CRL lists only changes since its base, so it cannot
+/// prove the cert is not revoked (RFC 5280 §5.2.4). PKITS: invalid.
 #[test]
-fn pkits_4_15_1_invalid_delta_as_plain_crl_is_accepted_by_checker() {
-    // This confirms our CrlChecker::new doesn't reject delta CRLs — that is a
-    // path-validator-level concern. The checker itself only looks at revoked entries.
+fn pkits_4_15_1_invalid_delta_as_plain_crl_is_rejected() {
     let delta_as_crl = pkits_crl("deltaCRLIndicatorNoBaseCACRL");
     let ca_der = pkits_cert("deltaCRLIndicatorNoBaseCACert");
     let ee_der = pkits_cert("InvaliddeltaCRLIndicatorNoBaseTest1EE");
@@ -80,14 +72,11 @@ fn pkits_4_15_1_invalid_delta_as_plain_crl_is_accepted_by_checker() {
 
     let checker = CrlChecker::new(delta_as_crl, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
-    // The delta CRL has no revoked entries; checker returns Ok.
-    // Note: this does NOT mean the cert is truly valid — the path validator
-    // must also verify a proper base CRL is present.
     let result = checker.check_revocation(&ee, &ca);
-    // The CRL has no revoked certs and is structurally valid, so Ok is expected.
-    result.expect(
-        "§4.15.1: delta-only CRL has no revoked entries; checker returns Ok \
-         (path validator must enforce base presence)",
+    assert_eq!(
+        result,
+        Err(Error::DeltaCrlAsComplete),
+        "§4.15.1: a delta CRL must not be used as a complete CRL"
     );
 }
 
@@ -295,30 +284,25 @@ fn pkits_4_15_9_invalid_only_delta_no_base_construction_fails() {
 /// §4.15.10: Invalid — only a delta CRL is available; no base CRL is present (CA3).
 ///
 /// Same scenario as §4.15.9. Uses `InvaliddeltaCRLTest10EE` (serial=1, CA3 issuer).
-/// See §4.15.9 note: path validator must enforce base presence.
+/// The checker refuses the delta at `check_revocation` time.
 #[test]
 fn pkits_4_15_10_invalid_only_delta_no_base_ca3() {
-    // deltaCRLCA3CRL is actually the base CRL but with no revoked entries (empty).
-    // deltaCRLCA3deltaCRL is the delta. Provide only the delta as a plain CRL and
-    // verify that the cert (serial=1) is not flagged as revoked (empty delta list).
-    // Note: a real path validator would fail §4.15.10 at a higher level.
+    // Provide only the delta CRL (deltaCRLCA3deltaCRL) as a plain CRL. Its
+    // revoked list does not contain the EE, but a delta alone cannot prove
+    // "not revoked", so the checker must refuse it. PKITS: invalid.
     let ca_der = pkits_cert("deltaCRLCA3Cert");
     let ee_der = pkits_cert("InvaliddeltaCRLTest10EE");
     let ca = load_cert(&ca_der);
     let ee = load_cert(&ee_der);
 
-    // Provide the delta CRL as a plain CRL — the checker accepts it but the delta
-    // has an empty revoked list, so the cert passes at this level.
     let delta_as_base = pkits_crl("deltaCRLCA3deltaCRL");
     let checker = CrlChecker::new(delta_as_base, PKITS_NOW, DefaultVerifier)
         .expect("PKITS fixture is a valid DER-encoded CRL");
-    // The EE cert (serial=1) is not in the delta's (empty) revoked list → Ok().
-    // Path-level validation would still fail because no proper base is provided,
-    // but that invariant is enforced at construction time (see §4.15.9 test).
     let result = checker.check_revocation(&ee, &ca);
-    assert!(
-        result.is_ok(),
-        "§4.15.10: EE not in empty delta list → checker must return Ok(); got {result:?}"
+    assert_eq!(
+        result,
+        Err(Error::DeltaCrlAsComplete),
+        "§4.15.10: a delta CRL must not be used as a complete CRL"
     );
 }
 

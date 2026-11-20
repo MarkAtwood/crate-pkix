@@ -65,6 +65,14 @@ name = "pkits_4_5"
 required-features = ["crl"]
 
 [[test]]
+name = "crl_rfc5280_gaps"
+required-features = ["crl"]
+
+[[test]]
+name = "review_crl"
+required-features = ["crl"]
+
+[[test]]
 name = "serde_round_trip"
 required-features = ["serde"]
 
