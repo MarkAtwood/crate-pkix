@@ -49,12 +49,15 @@
 //! metadata strings (`check_id`, `citation`, `description`) are
 //! `String`s owned by [`pkix_zlint_bridge::ZlintLintInfo`]. To satisfy
 //! the `&'static str` contract, [`all_lints`] leaks each `ZlintLintInfo`
-//! once at construction time via `Box::leak`, and the resulting
-//! [`ZlintLint`] holds a `&'static ZlintLintInfo`.
+//! via `Box::leak`, and the resulting [`ZlintLint`] holds a
+//! `&'static ZlintLintInfo`. Leaked records are interned process-wide,
+//! so calling [`all_lints`] again (or on another bridge) reuses the
+//! record for any catalog entry already seen instead of leaking again.
 //!
-//! The leak is **bounded and intentional**: ~400 leaks of small
-//! `ZlintLintInfo` records (~150 bytes each, dominated by the catalog's
-//! description string) at startup, never growing. This trades a small
+//! The leak is **bounded and intentional**: one small `ZlintLintInfo`
+//! record (~150 bytes, dominated by the catalog's description string)
+//! per distinct catalog entry — ~400 for one zlint version — never
+//! growing with the number of `all_lints` calls. This trades a small
 //! one-time program-lifetime allocation for `&'static str`-shaped
 //! metadata methods on the workspace [`pkix_lint::Lint`] trait. The
 //! alternative — broadening the trait to `Cow<'static, str>` or
@@ -254,8 +257,11 @@ impl Lint for ZlintLint {
 ///
 /// Each [`ZlintLintInfo`] returned by the bridge is leaked via
 /// `Box::leak` so the resulting `ZlintLint` can return `&'static str`
-/// slices for its `id()` and `citation()` methods. See the crate-level
-/// rustdoc for the rationale and the bounded-leak design.
+/// slices for its `id()` and `citation()` methods. Leaks are interned:
+/// repeated calls reuse the leaked record for an identical catalog
+/// entry, so the total leak is bounded by the number of distinct
+/// entries ever seen, not by the number of calls. See the crate-level
+/// rustdoc for the rationale.
 ///
 /// # Errors
 ///
@@ -270,14 +276,35 @@ pub fn all_lints(bridge: Arc<ZlintBridge>) -> Result<Vec<Box<dyn Lint>>, BridgeE
     let lints: Vec<Box<dyn Lint>> = infos
         .into_iter()
         .map(|info| -> Box<dyn Lint> {
-            // Leak the ZlintLintInfo so its String fields can be
-            // returned as &'static str slices. Bounded leak: ~400
-            // small structs, one-time at adapter construction. See
-            // crate-level rustdoc for the rationale.
-            let leaked: &'static ZlintLintInfo = Box::leak(Box::new(info));
-            Box::new(ZlintLint::new(leaked, bridge.clone()))
+            Box::new(ZlintLint::new(intern_lint_info(info), bridge.clone()))
         })
         .collect();
 
     Ok(lints)
+}
+
+/// Return a `&'static` copy of `info`, leaking it only the first time
+/// an identical record is seen in this process.
+///
+/// The `&'static` is needed so `ZlintLint` can hand out `&'static str`
+/// metadata (see the crate-level rustdoc). Interning keeps the leak
+/// bounded by the number of distinct catalog entries rather than
+/// growing on every [`all_lints`] call.
+fn intern_lint_info(info: ZlintLintInfo) -> &'static ZlintLintInfo {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+
+    static INTERNED: OnceLock<Mutex<HashSet<&'static ZlintLintInfo>>> = OnceLock::new();
+    let set = INTERNED.get_or_init(|| Mutex::new(HashSet::new()));
+    // A poisoned lock only means another thread panicked mid-insert;
+    // the set itself is still a valid set of leaked records.
+    let mut set = set
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(existing) = set.get(&info) {
+        return existing;
+    }
+    let leaked: &'static ZlintLintInfo = Box::leak(Box::new(info));
+    set.insert(leaked);
+    leaked
 }
