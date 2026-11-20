@@ -195,6 +195,13 @@ pub enum BridgeError {
         /// The timeout that was exceeded.
         timeout: Duration,
     },
+    /// The zlint subprocess wrote more than
+    /// [`BridgeConfig::max_output_bytes`] to stdout or stderr. The
+    /// subprocess was killed and its output discarded.
+    OutputTooLarge {
+        /// The per-stream cap that was exceeded, in bytes.
+        limit: usize,
+    },
     /// The zlint subprocess produced output the bridge could not
     /// parse. Indicates either a zlint version mismatch or a
     /// catastrophic upstream regression; either way, the bridge
@@ -233,6 +240,9 @@ impl core::fmt::Display for BridgeError {
             },
             Self::SubprocessTimeout { timeout } => {
                 write!(f, "zlint subprocess exceeded timeout {timeout:?}")
+            }
+            Self::OutputTooLarge { limit } => {
+                write!(f, "zlint output exceeded the {limit}-byte per-stream cap")
             }
             Self::OutputParseError { detail } => write!(f, "zlint output parse error: {detail}"),
         }
@@ -369,10 +379,10 @@ fn truncate_for_display(s: &str) -> String {
 
 /// Runtime configuration for [`ZlintBridge`].
 ///
-/// Defaults to invoking `zlint` from `PATH` with a 60-second timeout.
-/// Override either field to point at a vendored binary, a CI-built
-/// development snapshot, or to tighten/loosen the timeout for batch
-/// workloads.
+/// Defaults to invoking `zlint` from `PATH` with a 60-second timeout
+/// and a 64 MiB per-stream output cap. Override any field to point at
+/// a vendored binary or a CI-built development snapshot, or to
+/// tighten/loosen the timeout and output cap for batch workloads.
 ///
 /// `Clone + Debug + PartialEq + Eq + Send + Sync + non_exhaustive` per
 /// AGENTS.md non-negotiable #6.
@@ -389,6 +399,22 @@ pub struct BridgeConfig {
     /// size and timeout interact and callers may need to raise the
     /// timeout for large batches.
     pub timeout: Duration,
+    /// Per-stream cap, in bytes, on captured zlint stdout and stderr.
+    /// Defaults to [`DEFAULT_MAX_OUTPUT_BYTES`] (64 MiB). A stream that
+    /// exceeds it fails the call with [`BridgeError::OutputTooLarge`]
+    /// and the subprocess is killed. One certificate produces on the
+    /// order of tens of KiB of verdict JSON, so very large
+    /// [`ZlintBridge::run_on_certs`] batches may need a larger cap.
+    #[cfg_attr(feature = "serde", serde(default = "default_max_output_bytes"))]
+    pub max_output_bytes: usize,
+}
+
+/// Default for [`BridgeConfig::max_output_bytes`]: 64 MiB per stream.
+pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
+
+#[cfg(feature = "serde")]
+const fn default_max_output_bytes() -> usize {
+    DEFAULT_MAX_OUTPUT_BYTES
 }
 
 impl Default for BridgeConfig {
@@ -396,6 +422,7 @@ impl Default for BridgeConfig {
         Self {
             zlint_path: PathBuf::from("zlint"),
             timeout: Duration::from_secs(60),
+            max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES,
         }
     }
 }
@@ -477,6 +504,9 @@ impl ZlintBridge {
     ///   but cannot be executed.
     /// - [`BridgeError::SubprocessTimeout`] — the zlint subprocess
     ///   exceeded [`BridgeConfig::timeout`] and was killed.
+    /// - [`BridgeError::OutputTooLarge`] — zlint wrote more than
+    ///   [`BridgeConfig::max_output_bytes`] to stdout or stderr and
+    ///   was killed.
     /// - [`BridgeError::SubprocessFailed`] — zlint exited with a
     ///   non-zero status; stderr is captured for diagnostics.
     /// - [`BridgeError::SubprocessKilled`] — zlint was terminated
@@ -493,7 +523,7 @@ impl ZlintBridge {
     pub fn enumerate_lints(&self) -> Result<Vec<ZlintLintInfo>, BridgeError> {
         let mut cmd = Command::new(&self.config.zlint_path);
         cmd.arg("-list-lints-json");
-        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)?;
+        let output = run_subprocess(cmd, &self.config)?;
 
         if !output.status.success() {
             return Err(classify_exit(output.status, &output.stderr));
@@ -519,7 +549,7 @@ impl ZlintBridge {
     /// # Errors
     ///
     /// - [`Error::Bridge`] — the bridge could not run zlint (binary
-    ///   missing, timeout, subprocess crash, output parse error).
+    ///   missing, timeout, output cap, subprocess crash, output parse error).
     /// - [`Error::Cert`] — zlint ran and rejected the input.
     ///   [`PerCertError::MalformedDer`] for parse failures;
     ///   [`PerCertError::Other`] for any other non-zero exit.
@@ -533,8 +563,7 @@ impl ZlintBridge {
         let path = scratch.write_der(cert_der, &key).map_err(Error::Bridge)?;
         let mut cmd = Command::new(&self.config.zlint_path);
         cmd.arg("-format").arg("der").arg(&path);
-        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)
-            .map_err(Error::Bridge)?;
+        let output = run_subprocess(cmd, &self.config).map_err(Error::Bridge)?;
         // scratch dir cleaned up on drop after this point
 
         if !output.status.success() {
@@ -576,7 +605,7 @@ impl ZlintBridge {
     /// Per-certificate errors (malformed DER, unsupported cert type)
     /// are reported in the inner `Result`; they do not poison the
     /// batch. Bridge-level errors (binary missing, subprocess
-    /// crash, timeout, output parse error) fail the whole call and
+    /// crash, timeout, output cap, output parse error) fail the whole call and
     /// are returned as the outer `Err`.
     ///
     /// # Caching
@@ -666,7 +695,7 @@ impl ZlintBridge {
         for p in &paths {
             cmd.arg(p);
         }
-        let output = run_subprocess(cmd, &self.config.zlint_path, self.config.timeout)?;
+        let output = run_subprocess(cmd, &self.config)?;
         // scratch dir cleaned up on drop after this point
 
         // Parse however many NDJSON lines zlint produced. Whether
@@ -766,119 +795,203 @@ fn spawn_error(path: &Path, err: std::io::Error) -> BridgeError {
     }
 }
 
-/// Run a subprocess to completion, honouring the bridge's timeout.
+/// Grace period, after the bridge kills a timed-out or over-producing
+/// child's process group, for the reader threads to see EOF and report.
+/// Killing the group closes every pipe holder the bridge spawned, so
+/// this is normally immediate; it bounds the wait only for a
+/// descendant that left the group (e.g. via `setsid`).
+const KILL_GRACE: Duration = Duration::from_millis(500);
+
+/// Which captured stream a reader-thread message belongs to.
+#[derive(Clone, Copy)]
+enum Stream {
+    Stdout,
+    Stderr,
+}
+
+/// A reader thread's final report: the drained bytes, or `None` when
+/// the stream exceeded the output cap (reading stopped at cap + 1).
+type DrainResult = std::io::Result<Option<Vec<u8>>>;
+
+/// Run a subprocess to completion, honouring the bridge's timeout and
+/// output cap.
 ///
 /// stdin is closed; stdout and stderr are captured. Output is
 /// drained on dedicated reader threads to avoid the classic
 /// pipe-buffer deadlock where the child blocks writing to a full
 /// pipe while the parent waits for the child to exit.
 ///
-/// On timeout, the child is killed and reaped before this returns
-/// [`BridgeError::SubprocessTimeout`]. Reader threads are joined
-/// after the child exits (or is killed) so we never leak threads
-/// past the function return.
+/// [`BridgeConfig::timeout`] bounds the whole call — the child's exit
+/// *and* EOF on both pipes. The latter matters for wrapper scripts:
+/// a backgrounded grandchild inherits the pipes and would otherwise
+/// keep the reader threads (and this function) blocked after the
+/// direct child exits. On Unix the child runs in its own process
+/// group, and on timeout or cap overrun the whole group is killed,
+/// which closes the pipes held by any descendant still in the group.
+///
+/// Reader threads are joined before this returns. The one exception
+/// is a descendant that left the process group and still holds a
+/// pipe after [`KILL_GRACE`]: its reader thread is detached (it exits
+/// when that descendant closes the pipe) rather than letting it
+/// unbound the call.
 fn run_subprocess(
     mut cmd: Command,
-    path: &Path,
-    timeout: Duration,
+    config: &BridgeConfig,
 ) -> Result<std::process::Output, BridgeError> {
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // Own process group (pgid = child pid) so a timeout can kill the
+    // child together with everything it spawned. Also keeps a
+    // terminal Ctrl-C from reaching zlint directly; the bridge's
+    // caller decides when to give up.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt as _;
+        cmd.process_group(0);
+    }
+    let path = &config.zlint_path;
     let mut child = cmd.spawn().map_err(|e| spawn_error(path, e))?;
+    let deadline = Instant::now() + config.timeout;
 
     // Take pipe handles before the wait loop so the reader threads
     // can drain them. If the underlying piped() spec succeeded these
     // are always Some; treat `take()` returning None as a
     // bridge-internal invariant violation surfaced as
     // SubprocessFailed rather than panicking.
-    let stdout_pipe = child
-        .stdout
-        .take()
-        .ok_or_else(|| BridgeError::SubprocessFailed {
+    let (Some(stdout_pipe), Some(stderr_pipe)) = (child.stdout.take(), child.stderr.take()) else {
+        kill_child_tree(&mut child);
+        return Err(BridgeError::SubprocessFailed {
             exit_code: None,
-            stderr: "child stdout pipe missing".into(),
-        })?;
-    let stderr_pipe = child
-        .stderr
-        .take()
-        .ok_or_else(|| BridgeError::SubprocessFailed {
-            exit_code: None,
-            stderr: "child stderr pipe missing".into(),
-        })?;
+            stderr: "child stdout/stderr pipe missing".into(),
+        });
+    };
 
-    let stdout_thread = std::thread::spawn(move || drain_pipe(stdout_pipe));
-    let stderr_thread = std::thread::spawn(move || drain_pipe(stderr_pipe));
+    let cap = config.max_output_bytes;
+    let (tx, rx) = std::sync::mpsc::channel::<(Stream, DrainResult)>();
+    let tx_err = tx.clone();
+    let readers = [
+        std::thread::spawn(move || {
+            let _ = tx.send((Stream::Stdout, drain_pipe(stdout_pipe, cap)));
+        }),
+        std::thread::spawn(move || {
+            let _ = tx_err.send((Stream::Stderr, drain_pipe(stderr_pipe, cap)));
+        }),
+    ];
 
-    let status = wait_for_child(&mut child, timeout)?;
-
-    // Reader threads exit naturally when the child closes its
-    // stdout/stderr; join collects the buffered bytes.
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| BridgeError::SubprocessFailed {
-            exit_code: status.code(),
-            stderr: "stdout reader thread panicked".into(),
-        })?
-        .map_err(|e| BridgeError::SubprocessFailed {
-            exit_code: status.code(),
-            stderr: format!("stdout drain io error: {e}"),
-        })?;
-    let stderr = stderr_thread
-        .join()
-        .map_err(|_| BridgeError::SubprocessFailed {
-            exit_code: status.code(),
-            stderr: "stderr reader thread panicked".into(),
-        })?
-        .map_err(|e| BridgeError::SubprocessFailed {
-            exit_code: status.code(),
-            stderr: format!("stderr drain io error: {e}"),
-        })?;
-
-    Ok(std::process::Output {
-        status,
-        stdout,
-        stderr,
-    })
-}
-
-/// Drain a pipe to end-of-file. Returns the buffered bytes or an
-/// `io::Error` on read failure.
-fn drain_pipe<R: std::io::Read>(mut pipe: R) -> std::io::Result<Vec<u8>> {
-    let mut buf = Vec::new();
-    pipe.read_to_end(&mut buf)?;
-    Ok(buf)
-}
-
-/// Wait for a child process with a deadline. On timeout, kills and
-/// reaps the child before returning [`BridgeError::SubprocessTimeout`].
-fn wait_for_child(
-    child: &mut std::process::Child,
-    timeout: Duration,
-) -> Result<std::process::ExitStatus, BridgeError> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status),
-            Ok(None) => {
-                if Instant::now() >= deadline {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(BridgeError::SubprocessTimeout { timeout });
+    let mut status = None;
+    let mut stdout = None;
+    let mut stderr = None;
+    let failure = loop {
+        if status.is_none() {
+            match child.try_wait() {
+                Ok(s) => status = s,
+                Err(e) => {
+                    break BridgeError::SubprocessFailed {
+                        exit_code: None,
+                        stderr: e.to_string(),
+                    }
                 }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            Err(e) => {
-                return Err(BridgeError::SubprocessFailed {
-                    exit_code: None,
-                    stderr: e.to_string(),
-                });
             }
         }
+        if let (Some(status), Some(out), Some(err)) = (status, stdout.as_mut(), stderr.as_mut()) {
+            let output = std::process::Output {
+                status,
+                stdout: std::mem::take(out),
+                stderr: std::mem::take(err),
+            };
+            join_readers(readers);
+            return Ok(output);
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            break BridgeError::SubprocessTimeout {
+                timeout: config.timeout,
+            };
+        }
+        // Sleep until a reader reports, the next exit poll, or the
+        // deadline — whichever comes first.
+        let wait = (deadline - now).min(Duration::from_millis(10));
+        match rx.recv_timeout(wait) {
+            Ok((stream, Ok(Some(bytes)))) => match stream {
+                Stream::Stdout => stdout = Some(bytes),
+                Stream::Stderr => stderr = Some(bytes),
+            },
+            Ok((_, Ok(None))) => break BridgeError::OutputTooLarge { limit: cap },
+            Ok((stream, Err(e))) => {
+                let name = match stream {
+                    Stream::Stdout => "stdout",
+                    Stream::Stderr => "stderr",
+                };
+                break BridgeError::SubprocessFailed {
+                    exit_code: status.and_then(|s| s.code()),
+                    stderr: format!("{name} drain io error: {e}"),
+                };
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {} // poll tick
+            // Both readers already reported (pipes closed) but the
+            // child has not exited yet: plain poll, without spinning.
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => std::thread::sleep(wait),
+        }
+    };
+
+    // Failure path: kill the group (closing descendant-held pipes),
+    // then give the readers a bounded grace period to see EOF.
+    kill_child_tree(&mut child);
+    let pending = usize::from(stdout.is_none()) + usize::from(stderr.is_none());
+    let grace_deadline = Instant::now() + KILL_GRACE;
+    let mut reported = 2 - pending;
+    while reported < 2 {
+        let left = grace_deadline.saturating_duration_since(Instant::now());
+        if rx.recv_timeout(left).is_err() {
+            break;
+        }
+        reported += 1;
+    }
+    if reported == 2 {
+        join_readers(readers);
+    }
+    // Otherwise a descendant outside the process group still holds a
+    // pipe; dropping the JoinHandles detaches those reader threads,
+    // which exit on their own once the pipe closes.
+    Err(failure)
+}
+
+/// Join reader threads that have already sent their final message.
+/// They return right after sending, so this does not block for long.
+fn join_readers(readers: [std::thread::JoinHandle<()>; 2]) {
+    for r in readers {
+        let _ = r.join();
     }
 }
 
-/// Classify a non-zero exit status into the right `BridgeError`.
+/// Kill the child and, on Unix, its whole process group, then reap it.
+fn kill_child_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        // pgid == child pid because of `process_group(0)` at spawn.
+        // ESRCH (group already empty) is fine to ignore.
+        let pgid = rustix::process::Pid::from_child(child);
+        let _ = rustix::process::kill_process_group(pgid, rustix::process::Signal::KILL);
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Read `pipe` to EOF, keeping at most `cap` bytes. Returns `Ok(None)`
+/// as soon as more than `cap` bytes arrive; the pipe is then dropped,
+/// so a child still writing gets EPIPE / SIGPIPE.
+fn drain_pipe<R: std::io::Read>(pipe: R, cap: usize) -> DrainResult {
+    use std::io::Read as _;
+    let mut buf = Vec::new();
+    let limit = u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1);
+    pipe.take(limit).read_to_end(&mut buf)?;
+    if buf.len() > cap {
+        return Ok(None);
+    }
+    Ok(Some(buf))
+}
+
 fn classify_exit(status: std::process::ExitStatus, stderr_bytes: &[u8]) -> BridgeError {
     #[cfg(unix)]
     {
@@ -1275,6 +1388,7 @@ mod tests {
             BridgeError::SubprocessTimeout {
                 timeout: Duration::from_secs(5),
             },
+            BridgeError::OutputTooLarge { limit: 1 },
             BridgeError::OutputParseError {
                 detail: "garbage".into(),
             },
