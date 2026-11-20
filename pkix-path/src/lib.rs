@@ -74,9 +74,10 @@ use std::vec::Vec;
 // Unified Cow import: same cfg-gate pattern as Vec. `Cow` is owned by
 // `alloc` but `std` re-exports it; we can't write `alloc::borrow::Cow`
 // unconditionally because `extern crate alloc` is gated to no_std mode.
-#[cfg(not(feature = "std"))]
+// Only the serde wire helper uses it (DN comparison is allocation-free).
+#[cfg(all(feature = "serde", not(feature = "std")))]
 use alloc::borrow::Cow;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "serde", feature = "std"))]
 use std::borrow::Cow;
 
 use der::Tagged;
@@ -362,6 +363,13 @@ pub enum Error {
         index: usize,
     },
     /// Certificate name constraints violated (RFC 5280 §4.2.1.10); `index` is the 0-based chain position.
+    ///
+    /// Also returned when a constraint is in effect for a name the validator
+    /// cannot evaluate: a URI without an authority or with an IP-address
+    /// host, a name of an unsupported form (`otherName`, `ediPartyName`,
+    /// `registeredID`) under a constraint of that form, a non-IA5String
+    /// subject `emailAddress`, or a `SmtpUTF8Mailbox` whose domain is not
+    /// ASCII.
     NameConstraintViolation {
         /// Zero-based index into the `chain` slice of the failing certificate.
         index: usize,
@@ -2021,6 +2029,15 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 // Name comparison — RFC 4518 string prep (PKIX-drv)
 // ---------------------------------------------------------------------------
 
+/// Maximum number of attribute-value assertions in one RDN that
+/// [`names_match`] will compare.
+///
+/// RFC 5280 does not limit multi-valued RDNs, but real certificates use
+/// one AVA per RDN (occasionally two or three). The cap bounds the
+/// quadratic AVA matching in [`names_match`], which runs on unauthenticated
+/// input; an RDN above the cap matches nothing.
+pub const MAX_AVAS_PER_RDN: usize = 64;
+
 /// Compare two distinguished names per RFC 4518 string prep rules.
 ///
 /// Currently implements ASCII case-fold and insignificant-whitespace
@@ -2060,6 +2077,13 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 ///   tables). Byte-equal `TeletexString` AVAs match; `TeletexString`
 ///   never matches any other string type. Well-formed chains that copy
 ///   the issuer DN bytes per RFC 5280 §4.1.2.4 are unaffected.
+///
+/// # Work bound
+///
+/// AVA matching within an RDN is quadratic in the RDN's size. To bound the
+/// work an attacker-supplied name can cause, an RDN with more than
+/// [`MAX_AVAS_PER_RDN`] attribute-value assertions never matches anything
+/// (`names_match` returns `false`), so such a name cannot chain.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
     if a.len() != b.len() {
@@ -2070,6 +2094,14 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
 
     for (a_rdn, b_rdn) in a_rdns.zip(b_rdns) {
         if a_rdn.len() != b_rdn.len() {
+            return false;
+        }
+        // Work bound: the AVA matching below is quadratic in the RDN size,
+        // and names_match runs on attacker-supplied names before any
+        // signature has been checked. Real-world RDNs carry one AVA (rarely
+        // two or three), so an RDN above the cap is treated as matching
+        // nothing (fail-closed).
+        if a_rdn.len() > MAX_AVAS_PER_RDN {
             return false;
         }
         // Bijective AVA matching: every AVA in a_rdn must match some AVA in b_rdn,
@@ -2169,12 +2201,20 @@ fn cert_has_san_identity(cert: &Certificate) -> bool {
 }
 
 /// Compare two `AttributeTypeAndValue` values after RFC 4518 normalization.
+///
+/// Allocation-free: `BMPString` values are transcoded to UTF-8 lazily by
+/// [`DirStringBytes`] while the two normalized byte streams are compared,
+/// so the cost of one comparison is linear in the value lengths with no
+/// heap traffic (review A1 item 10: `names_match` used to allocate two
+/// transcoding buffers per AVA comparison).
 fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     let a_str = any_to_str_bytes(a);
     let b_str = any_to_str_bytes(b);
 
     match (a_str, b_str) {
-        (Some(a_bytes), Some(b_bytes)) => normalized_eq(a_bytes.as_ref(), b_bytes.as_ref()),
+        (Some(a_bytes), Some(b_bytes)) => {
+            NormalizedIter::new(a_bytes).eq(NormalizedIter::new(b_bytes))
+        }
         // Both values are non-string types (e.g. OID, INTEGER) or unhandled string
         // types (TeletexString, UniversalString — UniversalString is parser-rejected
         // upstream by `der` 0.7's `Tag::try_from`, so this branch in practice covers
@@ -2190,36 +2230,34 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
     }
 }
 
-/// Extract the string content bytes from a `DirectoryString` Any value,
+/// Classify a `DirectoryString` Any value as a stream of UTF-8 bytes,
 /// returning `None` for types that require special pre-processing before
 /// normalization (see `ava_values_match` for the dispatch logic).
 ///
-/// The return type is `Cow<'_, [u8]>` because some string types
-/// (currently `BMPString`) must be transcoded into a heap-allocated UTF-8
-/// buffer before normalization, while others (`UTF8String`,
-/// `PrintableString`, `IA5String`, `VisibleString`) can be borrowed
-/// directly from the `der::Any` value's content bytes.
+/// The returned [`DirStringBytes`] iterator borrows the `der::Any` content
+/// bytes; no string type allocates.
 ///
 /// # Normalization strategy by string type
 ///
-/// **Borrowed (zero-copy) — bytes already comparable as UTF-8/ASCII:**
+/// **Passed through — bytes already comparable as UTF-8/ASCII:**
 /// `UTF8String`, `PrintableString`, `IA5String`, `VisibleString`. These
 /// types are encoded as ASCII (or UTF-8 in the case of `UTF8String`) at
-/// the DER level. The borrowed slice is fed directly to `NormalizedIter`
+/// the DER level. The bytes are fed directly to `NormalizedIter`
 /// which applies ASCII case-folding and insignificant-space handling
 /// (RFC 4518 §2.4 step 6 subset).
 ///
-/// **Owned (transcoded) — UCS-2-BE → UTF-8:**
+/// **Transcoded on the fly — UCS-2-BE → UTF-8:**
 /// `BMPString`. RFC 4518 §2.1 treats `BMPString` as "a subset of Unicode"
 /// — every two-byte big-endian unit is a Unicode code point in the BMP.
-/// We transcode to UTF-8 so the same normalization pipeline used for
-/// `UTF8String` applies to the result. ASCII-range code points in the BMP
-/// (U+0000..=U+007F) round-trip to single-byte UTF-8, so a BMPString-encoded
-/// "Foo Co" compares equal to a UTF8String-encoded "Foo Co" after this
-/// step. Malformed `BMPString` content (odd-length bytes, or values in
-/// the surrogate range U+D800..=U+DFFF which are not valid Unicode scalar
-/// values) returns `None` (fail-closed): a malformed value will not match
-/// anything via `ava_values_match`.
+/// Each unit is encoded to UTF-8 as it is consumed so the same
+/// normalization pipeline used for `UTF8String` applies to the result.
+/// ASCII-range code points in the BMP (U+0000..=U+007F) become
+/// single-byte UTF-8, so a BMPString-encoded "Foo Co" compares equal to a
+/// UTF8String-encoded "Foo Co". Malformed `BMPString` content (odd-length
+/// bytes, or values in the surrogate range U+D800..=U+DFFF which are not
+/// valid Unicode scalar values) is detected up front by
+/// [`bmp_is_well_formed`] and returns `None` (fail-closed): a malformed
+/// value will not match anything via `ava_values_match`.
 ///
 /// **Rejected at parse time — UniversalString:**
 /// `der` 0.7 omits tag 0x1C (`UniversalString`) from `Tag::try_from`,
@@ -2251,60 +2289,93 @@ fn ava_values_match(a: &der::Any, b: &der::Any) -> bool {
 /// same Unicode code points but differ in canonical decomposition (e.g.
 /// precomposed U+00E9 'é' vs decomposed U+0065 U+0301 'e'+ combining
 /// acute) compare unequal even though RFC 4518 says they should match.
-fn any_to_str_bytes(a: &der::Any) -> Option<Cow<'_, [u8]>> {
+fn any_to_str_bytes(a: &der::Any) -> Option<DirStringBytes<'_>> {
     use der::Tag;
     match a.tag() {
         Tag::Utf8String | Tag::PrintableString | Tag::Ia5String | Tag::VisibleString => {
-            Some(Cow::Borrowed(a.value()))
+            Some(DirStringBytes::Plain(a.value().iter()))
         }
-        Tag::BmpString => bmp_string_to_utf8(a.value()).map(Cow::Owned),
+        Tag::BmpString if bmp_is_well_formed(a.value()) => Some(DirStringBytes::Bmp {
+            units: a.value().chunks_exact(2),
+            buf: [0; 4],
+            len: 0,
+            pos: 0,
+        }),
         _ => None,
     }
 }
 
-/// Decode a `BMPString` content byte slice (UCS-2 big-endian, BMP-only
-/// Unicode code points per X.680 / RFC 4518 §2.1) into a UTF-8 byte
-/// vector.
+/// Returns `true` if `bytes` is well-formed `BMPString` content: an even
+/// number of octets (UCS-2 units are 16 bits) and no unit in the UTF-16
+/// surrogate range U+D800..=U+DFFF. Surrogates are *reserved* by Unicode
+/// and do not represent characters; they appear in UTF-16 only as paired
+/// surrogates encoding supplementary-plane code points (which are
+/// forbidden in `BMPString` by definition — `BMP` = Basic Multilingual
+/// Plane, U+0000..=U+FFFF).
+fn bmp_is_well_formed(bytes: &[u8]) -> bool {
+    bytes.len().is_multiple_of(2)
+        && bytes
+            .chunks_exact(2)
+            .all(|u| !(0xD8..=0xDF).contains(&u[0]))
+}
+
+/// UTF-8 byte stream over a `DirectoryString` value (see [`any_to_str_bytes`]).
 ///
-/// Returns `None` if the input is malformed, specifically:
-/// - odd byte length (UCS-2 units are 16 bits = 2 bytes each), or
-/// - any 16-bit unit falls in the UTF-16 surrogate range
-///   (U+D800..=U+DFFF). Surrogates are *reserved* by Unicode and do not
-///   represent characters; they appear in UTF-16 only as paired
-///   surrogates encoding supplementary-plane code points (which are
-///   forbidden in `BMPString` by definition — `BMP` = Basic Multilingual
-///   Plane, U+0000..=U+FFFF).
+/// The `Bmp` variant transcodes one UCS-2-BE unit at a time into `buf`
+/// and yields its UTF-8 bytes; it must only be constructed over content
+/// that passed [`bmp_is_well_formed`].
+enum DirStringBytes<'a> {
+    /// Content bytes that are already UTF-8 / ASCII.
+    Plain(core::slice::Iter<'a, u8>),
+    /// UCS-2-BE content, transcoded lazily.
+    Bmp {
+        /// Remaining two-byte units.
+        units: core::slice::ChunksExact<'a, u8>,
+        /// UTF-8 encoding of the current unit.
+        buf: [u8; 4],
+        /// Number of valid bytes in `buf`.
+        len: u8,
+        /// Next byte of `buf` to yield.
+        pos: u8,
+    },
+}
+
+impl Iterator for DirStringBytes<'_> {
+    type Item = u8;
+    fn next(&mut self) -> Option<u8> {
+        match self {
+            Self::Plain(it) => it.next().copied(),
+            Self::Bmp {
+                units,
+                buf,
+                len,
+                pos,
+            } => {
+                if *pos == *len {
+                    let unit = units.next()?;
+                    let cp = u16::from_be_bytes([unit[0], unit[1]]);
+                    // Surrogates were rejected by `bmp_is_well_formed`; the
+                    // fallback keeps this total without a panic path.
+                    let ch = char::from_u32(u32::from(cp)).unwrap_or(char::REPLACEMENT_CHARACTER);
+                    // A BMP scalar value encodes to 1..=3 UTF-8 bytes.
+                    *len = ch.encode_utf8(buf).len() as u8;
+                    *pos = 0;
+                }
+                let b = buf[usize::from(*pos)];
+                *pos += 1;
+                Some(b)
+            }
+        }
+    }
+}
+
+/// Transcode `BMPString` content to UTF-8 (test helper over [`DirStringBytes`]).
 ///
-/// On a well-formed input the return value is a UTF-8 encoding of the
-/// same Unicode code points, suitable for byte-level comparison against
-/// other UTF-8 string types via [`normalized_eq`].
-///
-/// No `unsafe`. No new dependencies — uses only `core::char::from_u32`
-/// and `char::encode_utf8`.
+/// Returns `None` for malformed content (see [`bmp_is_well_formed`]).
+#[cfg(test)]
 fn bmp_string_to_utf8(bytes: &[u8]) -> Option<Vec<u8>> {
-    if !bytes.len().is_multiple_of(2) {
-        // RFC 4518 §2.1 requires `BMPString` to be a sequence of Unicode
-        // code points; the underlying DER encoding is UCS-2-BE which is
-        // exactly two bytes per unit. An odd-length content octet string
-        // is malformed and we fail-closed by returning None.
-        return None;
-    }
-    // Capacity hint: each UCS-2 unit (2 bytes) becomes at most 3 UTF-8
-    // bytes (BMP code points U+0800..=U+FFFF take 3 bytes; below that
-    // they take 1 or 2). Worst-case sizing avoids reallocation in the
-    // common all-CJK case.
-    let mut out = Vec::with_capacity((bytes.len() / 2) * 3);
-    let mut buf = [0u8; 4];
-    for chunk in bytes.chunks_exact(2) {
-        let cp = u16::from_be_bytes([chunk[0], chunk[1]]);
-        // `char::from_u32` rejects surrogates (U+D800..=U+DFFF) by
-        // returning None. Any other u16 in 0..=0xFFFF is a valid Unicode
-        // scalar value in the Basic Multilingual Plane.
-        let ch = char::from_u32(u32::from(cp))?;
-        let s = ch.encode_utf8(&mut buf);
-        out.extend_from_slice(s.as_bytes());
-    }
-    Some(out)
+    let any = der::Any::new(der::Tag::BmpString, bytes).ok()?;
+    any_to_str_bytes(&any).map(Iterator::collect)
 }
 
 /// Compare two byte slices after RFC 4518 whitespace normalization and case-folding.
@@ -2315,11 +2386,16 @@ fn bmp_string_to_utf8(bytes: &[u8]) -> Option<Vec<u8>> {
 ///    is future work.
 /// 2. Leading/trailing spaces: ignored
 /// 3. Internal multiple spaces: collapsed to single space
+#[cfg(test)]
 fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
-    NormalizedIter::new(a).eq(NormalizedIter::new(b))
+    NormalizedIter::new(a.iter().copied()).eq(NormalizedIter::new(b.iter().copied()))
 }
 
-/// Iterator that yields bytes after ASCII case-fold and whitespace normalization.
+/// Streaming adapter that yields bytes after ASCII case-fold and whitespace
+/// normalization (RFC 4518 §2 subset, see `normalized_eq`).
+///
+/// Works over any byte iterator, so `BMPString` values can be normalized
+/// while they are being transcoded, without an intermediate buffer.
 ///
 /// # Known limitation
 ///
@@ -2328,58 +2404,41 @@ fn normalized_eq(a: &[u8], b: &[u8]) -> bool {
 /// Unicode whitespace variants pass through unchanged. Full RFC 4518
 /// insignificant-space handling requires Unicode-aware processing deferred
 /// to a future release.
-struct NormalizedIter<'a> {
-    bytes: &'a [u8],
-    pos: usize,
-    pending_space: bool,
+struct NormalizedIter<I: Iterator<Item = u8>> {
+    inner: core::iter::Peekable<I>,
+    /// Set once the first non-space byte has been yielded; spaces seen
+    /// before that are leading spaces and are dropped.
+    started: bool,
 }
 
-impl<'a> NormalizedIter<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        // Skip leading spaces.
-        let start = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
-        // Find end (skip trailing spaces).
-        let end = bytes[start..]
-            .iter()
-            .rposition(|&b| b != b' ')
-            .map_or(start, |i| start + i + 1);
+impl<I: Iterator<Item = u8>> NormalizedIter<I> {
+    fn new(bytes: I) -> Self {
         Self {
-            bytes: &bytes[start..end],
-            pos: 0,
-            pending_space: false,
+            inner: bytes.peekable(),
+            started: false,
         }
     }
 }
 
-impl Iterator for NormalizedIter<'_> {
+impl<I: Iterator<Item = u8>> Iterator for NormalizedIter<I> {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
-        // Invariant: `pending_space = true` means we emitted a space on the previous
-        // call but have not yet consumed the consecutive space run that follows it.
-        // On the next call we skip the entire run and resume with the next non-space
-        // byte. This ensures:
-        //   (a) internal space runs collapse to exactly one space, and
-        //   (b) trailing space runs do not emit a trailing space, because the run
-        //       ends at the trim boundary established in `new()` (trailing spaces
-        //       are excluded from `self.bytes` before iteration begins).
-        if self.pending_space {
-            self.pending_space = false;
-            while self.pos < self.bytes.len() && self.bytes[self.pos] == b' ' {
-                self.pos += 1;
+        loop {
+            let b = self.inner.next()?;
+            if b != b' ' {
+                self.started = true;
+                return Some(b.to_ascii_lowercase());
             }
-            // Fall through: process the next non-space byte (or return None if at end).
-        }
-        if self.pos >= self.bytes.len() {
-            return None;
-        }
-        let b = self.bytes[self.pos];
-        self.pos += 1;
-        if b == b' ' {
-            // Emit one space; next call will skip any further consecutive spaces.
-            self.pending_space = true;
-            Some(b' ')
-        } else {
-            Some(b.to_ascii_lowercase())
+            // Consume the rest of this space run.
+            while self.inner.peek() == Some(&b' ') {
+                self.inner.next();
+            }
+            // Leading run: drop it and continue with the first non-space byte.
+            // Trailing run (nothing follows): drop it and end.
+            // Internal run: collapse to exactly one space.
+            if self.started && self.inner.peek().is_some() {
+                return Some(b' ');
+            }
         }
     }
 }
@@ -2410,6 +2469,15 @@ impl NcTypeMask {
     /// inline DN-path code for this type; SAN `IpAddress` entries are handled by the
     /// generic SAN loop in `check_name_constraints` via `type_constrained(name)`.
     const IP_ADDRESS: Self = Self(1 << 4);
+    /// `otherName` (any type-id). `pkix-path` cannot match otherName
+    /// constraints; an `otherName` SAN is rejected whenever any otherName
+    /// constraint is in effect. `SmtpUTF8Mailbox` SANs are additionally
+    /// checked against rfc822Name constraints (RFC 8398 §6).
+    const OTHER_NAME: Self = Self(1 << 5);
+    /// `ediPartyName`: unsupported, fail-closed like `OTHER_NAME`.
+    const EDI_PARTY_NAME: Self = Self(1 << 6);
+    /// `registeredID`: unsupported, fail-closed like `OTHER_NAME`.
+    const REGISTERED_ID: Self = Self(1 << 7);
 
     /// Returns `true` if `self` and `other` share at least one bit (non-empty intersection).
     ///
@@ -2434,8 +2502,15 @@ impl core::ops::BitOrAssign for NcTypeMask {
     }
 }
 
-/// Return the `NcTypeMask` bit for the name type of `name`, or `EMPTY` for
-/// unrecognized types.
+/// Return the `NcTypeMask` bit for the name form of `name`.
+///
+/// Every `GeneralName` form has a bit, including the forms `pkix-path`
+/// cannot match (`otherName`, `ediPartyName`, `registeredID`). Tracking
+/// those lets
+/// `check_name_constraints` reject a certificate that carries an
+/// unsupported form a constraint applies to, as RFC 5280 §4.2.1.10
+/// requires. `x400Address` is not representable in `x509-cert` 0.3 (a SAN
+/// containing one fails to decode and is rejected as malformed).
 const fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcTypeMask {
     use x509_cert::ext::pkix::name::GeneralName;
     match name {
@@ -2444,7 +2519,9 @@ const fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcType
         GeneralName::DirectoryName(_) => NcTypeMask::DIRECTORY_NAME,
         GeneralName::UniformResourceIdentifier(_) => NcTypeMask::URI,
         GeneralName::IpAddress(_) => NcTypeMask::IP_ADDRESS,
-        _ => NcTypeMask::EMPTY,
+        GeneralName::OtherName(_) => NcTypeMask::OTHER_NAME,
+        GeneralName::EdiPartyName(_) => NcTypeMask::EDI_PARTY_NAME,
+        GeneralName::RegisteredId(_) => NcTypeMask::REGISTERED_ID,
     }
 }
 
@@ -2472,10 +2549,10 @@ fn dn_within_subtree(subject: &x509_cert::name::Name, constraint: &x509_cert::na
     })
 }
 
-/// Returns true if `a` and `b` are the same handled `GeneralName` variant.
+/// Returns true if `a` and `b` are the same `GeneralName` form.
 ///
 /// Uses `name_type_bit` as the single source of truth so that adding a new
-/// handled type to `name_type_bit` automatically extends this check with no
+/// form to `name_type_bit` automatically extends this check with no
 /// separate update required.
 fn same_nc_variant(
     a: &x509_cert::ext::pkix::name::GeneralName,
@@ -2484,7 +2561,11 @@ fn same_nc_variant(
     name_type_bit(a) != NcTypeMask::EMPTY && name_type_bit(a) == name_type_bit(b)
 }
 
-/// Returns true if `name` satisfies the `subtree` constraint.
+/// Returns true if `name` (a certificate's subject or SAN name) satisfies
+/// the `subtree` constraint.
+///
+/// Unsupported forms never match; `check_name_constraints` rejects them
+/// separately whenever a constraint of their form is in effect.
 fn name_matches_subtree(
     name: &x509_cert::ext::pkix::name::GeneralName,
     subtree: &x509_cert::ext::pkix::constraints::name::GeneralSubtree,
@@ -2512,56 +2593,148 @@ fn name_matches_subtree(
     }
 }
 
+/// Returns true if every name inside constraint `a` is also inside
+/// constraint `b` (`a ⊆ b`), for two `GeneralSubtree` bases of the same form.
+///
+/// Used to intersect permitted subtrees (RFC 5280 §6.1.4(g)(1)) and to
+/// de-duplicate excluded subtrees. A constraint is *not* a certificate name
+/// (an iPAddress constraint is address + mask, a URI or rfc822Name
+/// constraint is a bare host or `.domain`), so this cannot reuse
+/// [`name_matches_subtree`]. Unsupported forms return `false`.
+fn subtree_within(
+    a: &x509_cert::ext::pkix::name::GeneralName,
+    b: &x509_cert::ext::pkix::name::GeneralName,
+) -> bool {
+    use x509_cert::ext::pkix::name::GeneralName;
+    match (a, b) {
+        (GeneralName::DnsName(a), GeneralName::DnsName(b)) => {
+            dns_constraint_within(a.as_str(), b.as_str())
+        }
+        (GeneralName::DirectoryName(a), GeneralName::DirectoryName(b)) => dn_within_subtree(a, b),
+        (GeneralName::Rfc822Name(a), GeneralName::Rfc822Name(b)) => {
+            rfc822_constraint_within(a.as_str(), b.as_str())
+        }
+        (GeneralName::UniformResourceIdentifier(a), GeneralName::UniformResourceIdentifier(b)) => {
+            uri_constraint_within(a.as_str(), b.as_str())
+        }
+        (GeneralName::IpAddress(a), GeneralName::IpAddress(b)) => {
+            ip_constraint_within(a.as_bytes(), b.as_bytes())
+        }
+        _ => false,
+    }
+}
+
+/// Strip one trailing `.` (the RFC 1034 absolute form) from a DNS name or
+/// URI host.
+///
+/// `pkix-identity` strips the same dot when it binds a dNSName SAN to a
+/// reference identity, so name-constraint matching must normalize
+/// identically: otherwise `www.evil.com.` escapes an excluded `evil.com`
+/// here yet binds to `www.evil.com` there.
+fn strip_root_dot(s: &str) -> &str {
+    s.strip_suffix('.').unwrap_or(s)
+}
+
+/// Returns true if `name` is a proper subdomain of `parent` (one or more
+/// labels added to the left), compared ASCII case-insensitively.
+///
+/// Works on bytes, so it cannot panic on a non-ASCII input.
+fn is_strict_subdomain(name: &str, parent: &str) -> bool {
+    let (name, parent) = (name.as_bytes(), parent.as_bytes());
+    name.len() > parent.len() + 1
+        && name[name.len() - parent.len() - 1] == b'.'
+        && name[name.len() - parent.len()..].eq_ignore_ascii_case(parent)
+}
+
 /// DNS name constraint matching (RFC 5280 §4.2.1.10).
 ///
-/// If `constraint` starts with '.', `subject` must be a subdomain of it
-/// (label-aware suffix check). Otherwise exact match (case-insensitive).
+/// - A constraint without a leading period matches the name itself and any
+///   subdomain ("adding zero or more labels to the left-hand side").
+/// - A constraint with a leading period (`.example.com`, a widespread
+///   extension) matches proper subdomains only.
+/// - The empty constraint has zero labels, so it matches every DNS name;
+///   an empty excluded dNSName therefore forbids all DNS names, matching
+///   OpenSSL, Go and BoringSSL.
+/// - One trailing dot is ignored on both sides (see [`strip_root_dot`]).
+///
+/// Comparison is ASCII case-insensitive.
 fn matches_dns_name(subject: &str, constraint: &str) -> bool {
+    let subject = strip_root_dot(subject);
+    let constraint = strip_root_dot(constraint);
     if constraint.is_empty() {
-        return false;
+        return true;
     }
-    if let Some(suffix) = constraint.strip_prefix('.') {
-        // Subdomain match: subject must end with ".suffix" (not just "suffix").
-        if subject.eq_ignore_ascii_case(suffix) {
-            // The constraint is ".example.com"; subject "example.com" is the
-            // apex — RFC 5280 §4.2.1.10 excludes the apex from subdomain constraints.
-            return false;
-        }
-        let dot_suffix = constraint; // already starts with '.'
-        subject.len() > dot_suffix.len()
-            && subject[subject.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
+    if let Some(parent) = constraint.strip_prefix('.') {
+        // The apex itself is excluded from a leading-period constraint.
+        is_strict_subdomain(subject, parent)
     } else {
-        // RFC 5280 §4.2.1.10: a constraint without a leading period matches
-        // the hostname exactly AND any subdomain (labels added to the left).
-        // E.g., "example.com" matches "example.com" and "host.example.com".
-        subject.eq_ignore_ascii_case(constraint)
-            || (subject.len() > constraint.len() + 1
-                && subject.as_bytes()[subject.len() - constraint.len() - 1] == b'.'
-                && subject[subject.len() - constraint.len()..].eq_ignore_ascii_case(constraint))
+        subject.eq_ignore_ascii_case(constraint) || is_strict_subdomain(subject, constraint)
+    }
+}
+
+/// `a ⊆ b` for two dNSName constraints (see [`subtree_within`]).
+///
+/// `x` denotes `{x} ∪ subdomains(x)` and `.x` denotes `subdomains(x)`, so
+/// `.x ⊆ b` exactly when `x` itself or every subdomain of `x` is covered,
+/// which reduces to matching `x` against `b` with any leading period of `b`
+/// dropped.
+fn dns_constraint_within(a: &str, b: &str) -> bool {
+    let a = strip_root_dot(a);
+    match a.strip_prefix('.') {
+        Some(a_parent) => {
+            let b = strip_root_dot(b);
+            matches_dns_name(a_parent, b.strip_prefix('.').unwrap_or(b))
+        }
+        None => matches_dns_name(a, b),
+    }
+}
+
+/// Match a mailbox's domain part against a host (`example.com`) or domain
+/// (`.example.com`) rfc822Name constraint.
+fn rfc822_domain_matches(domain: &str, constraint: &str) -> bool {
+    match constraint.strip_prefix('.') {
+        // Any host under the domain; the apex is excluded.
+        Some(parent) => is_strict_subdomain(domain, parent),
+        None => domain.eq_ignore_ascii_case(constraint),
     }
 }
 
 /// RFC 822 (email) name constraint matching (RFC 5280 §4.2.1.10).
+///
+/// The domain part of `subject` is the text after the **last** `@`: an
+/// RFC 5322 quoted local-part may itself contain `@`
+/// (`"x@good.com"@evil.com` is a mailbox at `evil.com`).
 fn matches_rfc822_name(subject: &str, constraint: &str) -> bool {
     if constraint.contains('@') {
         // Constraint is a specific mailbox address: exact match required.
         return subject.eq_ignore_ascii_case(constraint);
     }
-    // Constraint is a domain (or .domain); extract the domain part of subject.
-    let Some((_, domain)) = subject.split_once('@') else {
+    let Some((_, domain)) = subject.rsplit_once('@') else {
         return false; // malformed subject
     };
-    if let Some(suffix) = constraint.strip_prefix('.') {
-        // Domain must end with .suffix.
-        if domain.eq_ignore_ascii_case(suffix) {
-            return false; // apex excluded
+    rfc822_domain_matches(domain, constraint)
+}
+
+/// `a ⊆ b` for two rfc822Name constraints (see [`subtree_within`]).
+///
+/// The three constraint shapes are a mailbox (`u@host`, one address), a
+/// host (`host`, all mailboxes at that host) and a domain (`.domain`, all
+/// mailboxes at any host under it).
+fn rfc822_constraint_within(a: &str, b: &str) -> bool {
+    if a.contains('@') {
+        return matches_rfc822_name(a, b);
+    }
+    if b.contains('@') {
+        // A host or domain is never inside a single mailbox.
+        return false;
+    }
+    match (a.strip_prefix('.'), b.strip_prefix('.')) {
+        (None, _) => rfc822_domain_matches(a, b),
+        // Every host under a domain is never inside one host.
+        (Some(_), None) => false,
+        (Some(a_dom), Some(b_dom)) => {
+            a_dom.eq_ignore_ascii_case(b_dom) || is_strict_subdomain(a_dom, b_dom)
         }
-        let dot_suffix = constraint;
-        domain.len() > dot_suffix.len()
-            && domain[domain.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
-    } else {
-        // Domain must equal the constraint exactly.
-        domain.eq_ignore_ascii_case(constraint)
     }
 }
 
@@ -2570,18 +2743,17 @@ fn matches_rfc822_name(subject: &str, constraint: &str) -> bool {
 /// URI constraints use different semantics from DNS constraints:
 /// - Leading period: subdomains only (same as DNS).
 /// - No leading period: **exact host only** (unlike DNS, which also matches subdomains).
+///
+/// One trailing dot is ignored on both sides (see [`strip_root_dot`]).
 fn matches_uri_host(host: &str, constraint: &str) -> bool {
+    let host = strip_root_dot(host);
+    let constraint = strip_root_dot(constraint);
     if constraint.is_empty() {
         return false;
     }
-    if let Some(suffix) = constraint.strip_prefix('.') {
+    if let Some(parent) = constraint.strip_prefix('.') {
         // Leading dot: subdomains only, apex excluded (same rule as DNS).
-        if host.eq_ignore_ascii_case(suffix) {
-            return false;
-        }
-        let dot_suffix = constraint;
-        host.len() > dot_suffix.len()
-            && host[host.len() - dot_suffix.len()..].eq_ignore_ascii_case(dot_suffix)
+        is_strict_subdomain(host, parent)
     } else {
         // RFC 5280 §4.2.1.10: URI constraint without leading period matches
         // the exact host only — subdomains are NOT included.
@@ -2589,22 +2761,83 @@ fn matches_uri_host(host: &str, constraint: &str) -> bool {
     }
 }
 
+/// `a ⊆ b` for two URI host constraints (see [`subtree_within`]).
+fn uri_constraint_within(a: &str, b: &str) -> bool {
+    let (a, b) = (strip_root_dot(a), strip_root_dot(b));
+    match (a.strip_prefix('.'), b.strip_prefix('.')) {
+        (None, _) => matches_uri_host(a, b),
+        // All subdomains of a domain are never inside one exact host.
+        (Some(_), None) => false,
+        (Some(a_dom), Some(b_dom)) => {
+            a_dom.eq_ignore_ascii_case(b_dom) || is_strict_subdomain(a_dom, b_dom)
+        }
+    }
+}
+
+/// Extract the host of a URI for name-constraint matching (RFC 3986 §3.2).
+///
+/// Returns `None` when RFC 5280 §4.2.1.10 requires the certificate to be
+/// rejected under a URI constraint: the URI "doesn't include an authority
+/// component with a host name specified as a fully qualified domain name
+/// ... or includes an authority component in which the host name is
+/// specified as an IP address". Concretely `None` is returned for:
+///
+/// - no `scheme ":" "//"` prefix (e.g. `urn:`, `mailto:`), or a malformed
+///   scheme;
+/// - an empty host (`file:///x`);
+/// - an IP-literal (`[2001:db8::1]`) or dotted-quad IPv4 host;
+/// - a non-numeric port.
+///
+/// The authority ends at the first `/`, `?` or `#`; userinfo is everything
+/// before the **last** `@` inside the authority, so an `@` in the path,
+/// query or fragment cannot change the host. One trailing dot is stripped.
+fn uri_host(uri: &str) -> Option<&str> {
+    let (scheme, rest) = uri.split_once(':')?;
+    let mut scheme_bytes = scheme.bytes();
+    if !scheme_bytes.next().is_some_and(|b| b.is_ascii_alphabetic())
+        || !scheme_bytes.all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+    {
+        return None;
+    }
+    let rest = rest.strip_prefix("//")?;
+    let authority = &rest[..rest.find(['/', '?', '#']).unwrap_or(rest.len())];
+    let host_port = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    if host_port.starts_with('[') {
+        return None; // IP-literal
+    }
+    let host = match host_port.split_once(':') {
+        Some((host, port)) if port.bytes().all(|b| b.is_ascii_digit()) => host,
+        Some(_) => return None,
+        None => host_port,
+    };
+    let host = strip_root_dot(host);
+    if host.is_empty() || is_ipv4_literal(host) {
+        return None;
+    }
+    Some(host)
+}
+
+/// Returns true if `host` has the shape of an RFC 3986 `IPv4address`
+/// (four dot-separated runs of one to three decimal digits).
+fn is_ipv4_literal(host: &str) -> bool {
+    let mut parts = 0usize;
+    for part in host.split('.') {
+        parts += 1;
+        if part.is_empty() || part.len() > 3 || !part.bytes().all(|b| b.is_ascii_digit()) {
+            return false;
+        }
+    }
+    parts == 4
+}
+
 /// URI name constraint matching (RFC 5280 §4.2.1.10).
 ///
-/// Extracts the host from the URI and applies URI host matching rules.
+/// Extracts the host with [`uri_host`] and applies URI host matching
+/// rules. A URI without a usable host matches nothing here;
+/// `check_name_constraints` rejects such URIs outright whenever a URI
+/// constraint is in effect.
 fn matches_uri(subject_uri: &str, constraint: &str) -> bool {
-    // Extract host: everything between "://" and the next '/' or '?' or '#' or end.
-    let host = if let Some(after_scheme) = subject_uri.find("://") {
-        let rest = &subject_uri[after_scheme + 3..];
-        // Strip userinfo if present (user:pass@host).
-        let rest = rest.split_once('@').map_or(rest, |(_, h)| h);
-        // Strip port and path.
-        let host_end = rest.find(['/', '?', '#', ':']).unwrap_or(rest.len());
-        &rest[..host_end]
-    } else {
-        return false; // not a URI with scheme
-    };
-    matches_uri_host(host, constraint)
+    uri_host(subject_uri).is_some_and(|host| matches_uri_host(host, constraint))
 }
 
 /// IP address name constraint matching (RFC 5280 §4.2.1.10).
@@ -2625,6 +2858,21 @@ fn matches_ip_address(subject_bytes: &[u8], constraint_bytes: &[u8]) -> bool {
         .iter()
         .zip(addr.iter().zip(mask.iter()))
         .all(|(s, (a, m))| s & m == a & m)
+}
+
+/// `a ⊆ b` for two iPAddress constraints (address + mask, see
+/// [`subtree_within`]): same address family, `b`'s mask bits are a subset
+/// of `a`'s, and the two addresses agree under `b`'s mask.
+fn ip_constraint_within(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() || !(a.len() == 8 || a.len() == 32) {
+        return false;
+    }
+    let half = a.len() / 2;
+    let (a_addr, a_mask) = a.split_at(half);
+    let (b_addr, b_mask) = b.split_at(half);
+    (0..half).all(|i| {
+        a_mask[i] & b_mask[i] == b_mask[i] && a_addr[i] & b_mask[i] == b_addr[i] & b_mask[i]
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -3600,6 +3848,9 @@ fn chain_walk<V: SignatureVerifier>(
                             // For entries of matching type, keep:
                             //   1. new entries within (⊆) some same-type current entry.
                             //   2. current entries within (⊆) some same-type new entry.
+                            // Containment is decided by `subtree_within`, which
+                            // compares two constraints (address+mask, bare host,
+                            // `.domain`) rather than treating one as a cert name.
                             // (If neither is within the other the intersection for that
                             // type is empty — tracked via nc_constrained_types.)
                             let mut result = GeneralSubtrees::default();
@@ -3618,7 +3869,7 @@ fn chain_walk<V: SignatureVerifier>(
                                     result.push(n.clone());
                                 } else if same_type_in_current
                                     .iter()
-                                    .any(|c| name_matches_subtree(&n.base, c))
+                                    .any(|c| subtree_within(&n.base, &c.base))
                                 {
                                     // n is within some same-type current entry → keep.
                                     result.push(n.clone());
@@ -3637,7 +3888,7 @@ fn chain_walk<V: SignatureVerifier>(
                                     result.push(c.clone());
                                 } else if same_type_in_new
                                     .iter()
-                                    .any(|n| name_matches_subtree(&c.base, n))
+                                    .any(|n| subtree_within(&c.base, &n.base))
                                 {
                                     // c is more specific than some new entry; keep unless
                                     // an equivalent entry is already in result (dedup
@@ -3645,8 +3896,8 @@ fn chain_walk<V: SignatureVerifier>(
                                     let same_type_in_result: &[_] = result.as_slice();
                                     let already_in_result = same_type_in_result.iter().any(|e| {
                                         same_nc_variant(&e.base, &c.base)
-                                            && name_matches_subtree(&e.base, c)
-                                            && name_matches_subtree(&c.base, e)
+                                            && subtree_within(&e.base, &c.base)
+                                            && subtree_within(&c.base, &e.base)
                                     });
                                     if !already_in_result {
                                         result.push(c.clone());
@@ -3664,14 +3915,14 @@ fn chain_walk<V: SignatureVerifier>(
                 // when the same excluded subtrees are repeated across multiple CAs (vjc.12).
                 if let Some(new_excluded) = nc.excluded_subtrees {
                     for new_entry in &new_excluded {
-                        // Deduplication uses name_matches_subtree as a two-way equality
+                        // Deduplication uses subtree_within as a two-way equality
                         // check: two entries are considered the same subtree when each
-                        // matches the other (i.e., they are semantically equivalent, not
+                        // contains the other (i.e., they are semantically equivalent, not
                         // just byte-equal).
                         let already_present = state.nc_excluded.iter().any(|existing| {
                             same_nc_variant(&existing.base, &new_entry.base)
-                                && name_matches_subtree(&existing.base, new_entry)
-                                && name_matches_subtree(&new_entry.base, existing)
+                                && subtree_within(&existing.base, &new_entry.base)
+                                && subtree_within(&new_entry.base, &existing.base)
                         });
                         if !already_present {
                             state.nc_excluded.push(new_entry.clone());
@@ -4003,8 +4254,6 @@ fn check_name_constraints(
     nc_constrained_types: NcTypeMask,
     index: usize,
 ) -> crate::Result<()> {
-    use x509_cert::ext::pkix::name::GeneralName;
-
     let subject = cert.tbs_certificate().subject();
     let subject_is_empty = subject.is_empty();
 
@@ -4026,6 +4275,28 @@ fn check_name_constraints(
         Ok(())
     };
 
+    // (0) Name forms the generic matchers cannot decide. A form is "in
+    //     effect" when some permitted subtree of that form has been seen in
+    //     the path (`nc_constrained_types`, which survives an emptied
+    //     intersection) or the excluded set holds an entry of that form.
+    let excluded_forms = nc_excluded
+        .iter()
+        .fold(NcTypeMask::EMPTY, |m, st| m | name_type_bit(&st.base));
+    let forms_in_effect = nc_constrained_types | excluded_forms;
+    let rfc822_permitted_active = nc_constrained_types.intersects(NcTypeMask::RFC822);
+    if let Some(san_ext) = san {
+        for name in &san_ext.0 {
+            check_san_name_form(
+                name,
+                forms_in_effect,
+                nc_permitted,
+                nc_excluded,
+                rfc822_permitted_active,
+                index,
+            )?;
+        }
+    }
+
     // (1) Excluded check: any excluded subtree match → violation.
     check_names(nc_excluded.as_slice(), CheckMode::Excluded)?;
 
@@ -4038,76 +4309,141 @@ fn check_name_constraints(
     // (3) RFC 5280 §4.2.1.10: emailAddress attributes in the subject DN MUST
     //     be checked against the rfc822Name constraint.
     //     Guard: only enter the RDN walk if RFC822 constraints are actually
-    //     present — either a permitted-subtrees entry for RFC822 exists, OR at
-    //     least one excluded entry is an Rfc822Name.  Checking !nc_excluded.is_empty()
-    //     without filtering by type would cause the walk whenever ANY excluded
-    //     name type exists, even if none are Rfc822Name (vjc.11).
-    let has_rfc822_excluded = nc_excluded
-        .iter()
-        .any(|st| matches!(st.base, GeneralName::Rfc822Name(_)));
-    let has_rfc822_constraint =
-        nc_constrained_types.intersects(NcTypeMask::RFC822) || has_rfc822_excluded;
-
-    if has_rfc822_constraint && !subject_is_empty {
-        // Collect the RFC822 permitted subtrees once, outside the RDN loop,
-        // to avoid re-checking the Option and iterating nc_permitted on every
-        // emailAddress AVA found (vjc.26). `None` means the permitted check is
-        // inactive (only an excluded check may apply); the NcTypeMask::RFC822
-        // condition is evaluated once here and the result carried forward via
-        // `permitted_rfc822`. `permitted_rfc822_storage` holds the allocation
-        // when the check is active; `Option` avoids a dummy assignment that
-        // would trigger an unused-assignment warning.
-        let permitted_rfc822_storage: Option<GeneralSubtrees> =
-            if nc_constrained_types.intersects(NcTypeMask::RFC822) {
-                Some(
-                    nc_permitted
-                        .map(|p| {
-                            p.iter()
-                                .filter(|st| matches!(st.base, GeneralName::Rfc822Name(_)))
-                                .cloned()
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                )
-            } else {
-                None
-            };
-        let permitted_rfc822: Option<&[x509_cert::ext::pkix::constraints::name::GeneralSubtree]> =
-            permitted_rfc822_storage.as_deref();
-
+    //     in effect — a permitted RFC822 entry has been seen, OR at least one
+    //     excluded entry is an Rfc822Name (vjc.11).
+    if forms_in_effect.intersects(NcTypeMask::RFC822) && !subject_is_empty {
         for rdn in subject.iter_rdn() {
             for ava in rdn.iter() {
                 if ava.oid != OID_EMAIL_ADDRESS {
                     continue;
                 }
+                // PKCS #9 defines emailAddress as IA5String. Any other
+                // encoding cannot be checked, so it fails closed instead of
+                // silently skipping the constraint.
                 let Ok(email_ia5) = ava.value.decode_as::<der::asn1::Ia5StringRef<'_>>() else {
-                    continue;
+                    return Err(Error::NameConstraintViolation { index });
                 };
-                let email_str = email_ia5.as_str();
-                // Excluded check — walk only Rfc822Name excluded entries.
-                for st in nc_excluded {
-                    if let GeneralName::Rfc822Name(constraint) = &st.base {
-                        if matches_rfc822_name(email_str, constraint.as_str()) {
-                            return Err(Error::NameConstraintViolation { index });
-                        }
-                    }
-                }
-                // Permitted check (only when RFC822 has been constrained).
-                if let Some(permitted) = permitted_rfc822 {
-                    if !permitted.iter().any(|st| {
-                        if let GeneralName::Rfc822Name(constraint) = &st.base {
-                            matches_rfc822_name(email_str, constraint.as_str())
-                        } else {
-                            false
-                        }
-                    }) {
-                        return Err(Error::NameConstraintViolation { index });
-                    }
-                }
+                check_mailbox_against_rfc822(
+                    email_ia5.as_str(),
+                    nc_permitted,
+                    nc_excluded,
+                    rfc822_permitted_active,
+                    index,
+                )?;
             }
         }
     }
 
+    Ok(())
+}
+
+/// OID for the `SmtpUTF8Mailbox` otherName (RFC 8398 §3), `id-on-SmtpUTF8Mailbox`.
+const OID_SMTP_UTF8_MAILBOX: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.8.9");
+
+/// Pre-check one SAN entry whose form the generic subtree matchers cannot
+/// decide on their own (RFC 5280 §4.2.1.10, RFC 8398 §6).
+///
+/// - `otherName(SmtpUTF8Mailbox)`: checked against rfc822Name constraints
+///   when any are in effect (RFC 8398 §6 extends them to this form). The
+///   value must be a UTF8String and its domain part must be ASCII; a
+///   U-label domain would need IDNA mapping, which this `no_std` crate
+///   does not carry, so it fails closed.
+/// - `otherName` (any type-id, including SmtpUTF8Mailbox), `ediPartyName`,
+///   `registeredID`: `pkix-path` does not process constraints of these
+///   forms, so the name is rejected when a constraint of the same form is
+///   in effect ("MUST either process the constraint or reject the
+///   certificate"). The `otherName` check is per form, not per type-id: an
+///   otherName constraint of one type-id rejects otherName SANs of every
+///   type-id.
+/// - `uniformResourceIdentifier`: when a URI constraint is in effect, a URI
+///   without an authority, or whose host is an IP address, is rejected
+///   (see [`uri_host`]).
+fn check_san_name_form(
+    name: &x509_cert::ext::pkix::name::GeneralName,
+    forms_in_effect: NcTypeMask,
+    nc_permitted: Option<&GeneralSubtrees>,
+    nc_excluded: &GeneralSubtrees,
+    rfc822_permitted_active: bool,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    let violation = Err(Error::NameConstraintViolation { index });
+    match name {
+        GeneralName::OtherName(other) => {
+            if forms_in_effect.intersects(NcTypeMask::OTHER_NAME) {
+                return violation;
+            }
+            if other.type_id == OID_SMTP_UTF8_MAILBOX
+                && forms_in_effect.intersects(NcTypeMask::RFC822)
+            {
+                let Ok(mailbox) = der::asn1::Utf8StringRef::try_from(&other.value) else {
+                    return violation;
+                };
+                check_mailbox_against_rfc822(
+                    mailbox.as_str(),
+                    nc_permitted,
+                    nc_excluded,
+                    rfc822_permitted_active,
+                    index,
+                )?;
+            }
+        }
+        GeneralName::EdiPartyName(_) | GeneralName::RegisteredId(_)
+            if forms_in_effect.intersects(name_type_bit(name)) =>
+        {
+            return violation;
+        }
+        GeneralName::UniformResourceIdentifier(uri)
+            if forms_in_effect.intersects(NcTypeMask::URI) && uri_host(uri.as_str()).is_none() =>
+        {
+            return violation;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Check a mailbox that does not arrive as an rfc822Name SAN (a subject
+/// `emailAddress` attribute or an `SmtpUTF8Mailbox` otherName) against the
+/// rfc822Name subtrees.
+///
+/// Excluded entries always apply; permitted entries apply when
+/// `rfc822_permitted_active` (some CA in the path permitted rfc822Name
+/// subtrees). The domain part (after the last `@`) must be ASCII, otherwise
+/// the mailbox cannot be compared and the check fails closed.
+fn check_mailbox_against_rfc822(
+    mailbox: &str,
+    nc_permitted: Option<&GeneralSubtrees>,
+    nc_excluded: &GeneralSubtrees,
+    rfc822_permitted_active: bool,
+    index: usize,
+) -> crate::Result<()> {
+    use x509_cert::ext::pkix::name::GeneralName;
+
+    let violation = Err(Error::NameConstraintViolation { index });
+    match mailbox.rsplit_once('@') {
+        Some((_, domain)) if domain.is_ascii() => {}
+        _ => return violation,
+    }
+    for st in nc_excluded {
+        if let GeneralName::Rfc822Name(c) = &st.base {
+            if matches_rfc822_name(mailbox, c.as_str()) {
+                return violation;
+            }
+        }
+    }
+    if rfc822_permitted_active {
+        let permitted = nc_permitted.map_or(&[][..], |p| p.as_slice());
+        let ok = permitted.iter().any(|st| match &st.base {
+            GeneralName::Rfc822Name(c) => matches_rfc822_name(mailbox, c.as_str()),
+            _ => false,
+        });
+        if !ok {
+            return violation;
+        }
+    }
     Ok(())
 }
 
@@ -4855,6 +5191,107 @@ mod tests_bmp_string {
         let a = Any::new(Tag::BmpString, ucs2_be_ascii("Acme")).unwrap();
         let b = Any::new(Tag::BmpString, ucs2_be_ascii("acme")).unwrap();
         assert!(ava_values_match(&a, &b));
+    }
+}
+
+// Review A1: NameConstraints helper unit tests (URI host extraction,
+// constraint containment, streaming DN normalization).
+#[cfg(test)]
+mod tests_nc_review_a1 {
+    use super::{
+        dns_constraint_within, ip_constraint_within, matches_dns_name, matches_rfc822_name,
+        normalized_eq, rfc822_constraint_within, uri_constraint_within, uri_host,
+    };
+
+    #[test]
+    fn uri_host_extraction() {
+        assert_eq!(uri_host("https://good.com/x"), Some("good.com"));
+        assert_eq!(
+            uri_host("HTTPS://u:p@Good.com:443/a@b?c@d#e@f"),
+            Some("Good.com")
+        );
+        assert_eq!(uri_host("https://evil.com/@good.com"), Some("evil.com"));
+        assert_eq!(uri_host("https://evil.com#@good.com"), Some("evil.com"));
+        assert_eq!(uri_host("https://evil.com./"), Some("evil.com"));
+        // RFC 5280 §4.2.1.10 "MUST reject" shapes.
+        assert_eq!(uri_host("urn:example:x"), None);
+        assert_eq!(uri_host("mailto:a@b.example"), None);
+        assert_eq!(uri_host("file:///etc/passwd"), None);
+        assert_eq!(uri_host("https://192.0.2.1/"), None);
+        assert_eq!(uri_host("https://[2001:db8::1]:8443/"), None);
+        assert_eq!(uri_host("https://good.com:x/"), None);
+        assert_eq!(uri_host("1http://good.com/"), None);
+        assert_eq!(uri_host("://good.com/"), None);
+    }
+
+    #[test]
+    fn dns_matching_edges() {
+        assert!(matches_dns_name("anything.example", ""));
+        assert!(matches_dns_name("www.evil.com.", "evil.com"));
+        assert!(matches_dns_name("www.evil.com", "evil.com."));
+        assert!(!matches_dns_name("evil.com", ".evil.com"));
+        assert!(!matches_dns_name("notevil.com", "evil.com"));
+    }
+
+    #[test]
+    fn rfc822_uses_last_at() {
+        assert!(matches_rfc822_name("\"x@good.com\"@evil.com", "evil.com"));
+        assert!(!matches_rfc822_name("\"x@good.com\"@evil.com", "good.com"));
+    }
+
+    #[test]
+    fn constraint_containment() {
+        // DNS: x = {x} ∪ subdomains(x); .x = subdomains(x).
+        assert!(dns_constraint_within(".example.com", "example.com"));
+        assert!(!dns_constraint_within("example.com", ".example.com"));
+        assert!(dns_constraint_within("a.example.com", ".example.com"));
+        assert!(dns_constraint_within("example.com", ""));
+        assert!(!dns_constraint_within("", "example.com"));
+        // rfc822
+        assert!(rfc822_constraint_within("host.example.com", ".example.com"));
+        assert!(rfc822_constraint_within(
+            "a@host.example.com",
+            "host.example.com"
+        ));
+        assert!(!rfc822_constraint_within(
+            ".example.com",
+            "host.example.com"
+        ));
+        assert!(!rfc822_constraint_within(
+            "host.example.com",
+            "a@host.example.com"
+        ));
+        assert!(rfc822_constraint_within(".a.example.com", ".example.com"));
+        // URI: no-dot = exact host only.
+        assert!(uri_constraint_within("example.com", "example.com"));
+        assert!(!uri_constraint_within("a.example.com", "example.com"));
+        assert!(uri_constraint_within("a.example.com", ".example.com"));
+        assert!(!uri_constraint_within(".example.com", "example.com"));
+        // IP
+        let v4 = |a: [u8; 4], m: [u8; 4]| [a, m].concat();
+        assert!(ip_constraint_within(
+            &v4([10, 1, 0, 0], [255, 255, 0, 0]),
+            &v4([10, 0, 0, 0], [255, 0, 0, 0])
+        ));
+        assert!(!ip_constraint_within(
+            &v4([10, 0, 0, 0], [255, 0, 0, 0]),
+            &v4([10, 1, 0, 0], [255, 255, 0, 0])
+        ));
+        assert!(!ip_constraint_within(
+            &v4([11, 1, 0, 0], [255, 255, 0, 0]),
+            &v4([10, 0, 0, 0], [255, 0, 0, 0])
+        ));
+        assert!(!ip_constraint_within(
+            &v4([10, 0, 0, 0], [255, 0, 0, 0]),
+            &[0u8; 32]
+        ));
+    }
+
+    #[test]
+    fn streaming_normalization_matches_slice_semantics() {
+        assert!(normalized_eq(b"  a  B   c ", b"a b c"));
+        assert!(normalized_eq(b" ", b""));
+        assert!(!normalized_eq(b"a b", b"ab"));
     }
 }
 

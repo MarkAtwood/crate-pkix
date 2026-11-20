@@ -87,7 +87,11 @@ Per RFC 5280 §6.1, for each certificate in the chain:
   `requireExplicitPolicy`, and policy inhibit counters
 - **Policy mappings** — §6.1.3–6.1.5 mapping and constraint enforcement
 - **Name constraints** — §4.2.1.10 subtree checking for DNS names, RFC 822
-  addresses, URIs, distinguished names, and IP addresses (IPv4/IPv6)
+  addresses (including subject `emailAddress` and RFC 8398 `SmtpUTF8Mailbox`
+  SANs), URIs, distinguished names, and IP addresses (IPv4/IPv6). Name forms
+  whose constraints are not processed (`otherName`, `ediPartyName`,
+  `registeredID`) are rejected whenever a constraint of that form is in
+  effect, as §4.2.1.10 requires
 - **Duplicate detection** — issuer+serial uniqueness across the chain
 
 ## Not validated
