@@ -102,13 +102,19 @@ false-failure" cases that flipped from all-Fail (DiagDiv) to all-Pass
 accept; both expect SUCCESS and gt now agrees.
 
 The one regression-shaped flip — `rfc5280::nc::permitted-self-issued`
-moving DiagDiv → StricterThanWild with `gt_agreement=false` — reflects
-that the new chain ordering causes openssl + pyca to pass a chain the
-corpus expects to fail (pkix-path correctly still rejects). The
-underlying harness contract is preserved (we classify whatever each
-oracle says about whatever chain we give them); the case moved because
-the chain bytes changed, not because pkix-path got worse. Tracked in
-this run's analysis only; no follow-up bead.
+moving DiagDiv → StricterThanWild with `gt_agreement=false` — is a
+pkix-path false reject, not a harness artefact: the corpus expects
+SUCCESS (root → same-name key-rollover ICA → leaf), openssl + pyca
+pass, and pkix-path failed. (An earlier version of this note said the
+corpus expects failure; `gt_agreement=false` with pkix-path failing
+means the opposite.) GitHub issue #11 has two parts. `validate_path`
+used to skip a same-name anchor whose key differed from a self-issued
+top certificate; it now verifies that certificate with the anchor key,
+so `validate_path([leaf, ica])` succeeds (pkix-path
+`tests/review_self_issued_rollover.rs`). `build_first_valid_path` still
+only tries leaf → anchor, so this harness verdict is expected to stay
+StricterThanWild until the builder is fixed. This baseline has not been
+re-run since (the limbo corpus is out of tree).
 
 Prior to this change (PKIX-lwr9.6, 2026-05-11), the limbo loader used
 single-shot `build_path` after PKIX-yn3e (AKI-based candidate
@@ -212,7 +218,7 @@ tolerance). No follow-up beads filed for these.
 | `signature invalid at chain index 0` | 4 | online::stackoverflow.com (P-384, PKIX-wmch, gt=false), webpki::forbidden-dsa-root (DSA, project-policy unsupported, gt=true), webpki::forbidden-p192-root (P-192, project-policy unsupported, gt=true), and bettertls::pathbuilding::tc41 (gt=true). All four are intentional pkix-path limitations or pkix-path-correct rejections; no bug. |
 | `unhandled critical extension at chain index 0` | 1 | rfc5280::ee-critical-aia-invalid (gt=true). **pkix-path correct** — RFC 5280 §4.2.1.1 says AKI MUST NOT be critical. pkix-path enforces; openssl fails too (different wording); pyca passes. |
 | `name constraints violated at certificate index 0` | 1 | rfc5280::nc::nc-permits-invalid-dns-san (gt=true). pkix-path strict NC; openssl lenient; pyca strict too. No bead. |
-| `no path to a trusted anchor` | 1 | rfc5280::nc::permitted-self-issued (gt=false). Flipped from DiagnosticDivergence in this baseline: the new `build_first_valid_path`-built chain ordering causes openssl and pyca to pass, while pkix-path can find no chain that satisfies both topology and signature. Side effect of the harness change, not a pkix-path regression. No bead. |
+| `no path to a trusted anchor` | 1 | rfc5280::nc::permitted-self-issued (gt=false). Flipped from DiagnosticDivergence in this baseline: the corpus expects success and openssl and pyca pass, while pkix-path rejected the same-name key-rollover ICA. GitHub issue #11: fixed in `validate_path`, still open in `build_first_valid_path`. |
 | **Total** | **23** | |
 
 ### Residual ground-truth-disagreement cases (4 of 23)
@@ -228,10 +234,9 @@ Only **4** of the 23 StricterThanWild cases have `gt_agreement=false`
 | `online::stackoverflow.com`           | PKIX-wmch (P-384 harness limitation) |
 
 `rfc5280::nc::permitted-self-issued` is also `gt_agreement=false` but
-sits in a different bucket: it's a side-effect of the chain-ordering
-change in PKIX-lwr9.4.1, not a pkix-path implementation gap. The new
-ordering happens to be one openssl+pyca accept; pkix-path correctly
-sees it as not-a-valid-path. Documented above; no follow-up bead.
+sits in a different bucket: it is the key-rollover false reject of
+GitHub issue #11 (fixed in `validate_path`; the path builder part is
+still open). Documented above.
 
 PKIX-lwr9.4 / `bettertls::pathbuilding::tc60` has been resolved by this
 work (PKIX-lwr9.4.2 helper + PKIX-lwr9.4.1 harness adoption). tc60

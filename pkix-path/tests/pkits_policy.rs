@@ -83,6 +83,24 @@ fn pkits_4_8_1_sp1_anypolicy_explicit() {
     .expect("4.8.1 sp1: anyPolicy set with explicit_policy should validate");
 }
 
+/// 4.8.1 subpart 1 with the default user-initial-policy-set spelled
+/// explicitly as `[anyPolicy]` (GitHub issue #10; Go's PKITS `vectors.json`
+/// uses this spelling). RFC 5280 §6.1.5(g)(ii): a user-initial-policy-set of
+/// any-policy leaves the tree unchanged.
+#[test]
+fn pkits_4_8_1_sp1_explicit_any_policy_oid() {
+    const ANY_POLICY: der::asn1::ObjectIdentifier =
+        der::asn1::ObjectIdentifier::new_unwrap("2.5.29.32.0");
+    pkits_policy_validate(
+        &["ValidCertificatePathTest1EE", "GoodCACert"],
+        &[ANY_POLICY],
+        true,
+        false,
+        false,
+    )
+    .expect("4.8.1 sp1 with initial_policy_set = [anyPolicy] should validate");
+}
+
 /// 4.8.1 All Certificates Same Policy Test1 (Subpart 2)
 /// P1 initial set, `explicit_policy=true` → valid
 #[test]
@@ -516,32 +534,14 @@ fn pkits_4_8_14_sp1_anypolicy_p1_valid() {
 }
 
 /// 4.8.14 `AnyPolicy` Test14 (Subpart 2)
-/// anyPolicy CA, P2 in initial set.
+/// anyPolicy CA, P2 in initial set → fail.
 ///
-/// The PKITS vectors.json marks this as `ShouldValidate: false`, but per
-/// RFC 5280 §6.1.5 this path validates because `explicit_policy = 1 > 0`.
-/// The anyPolicy in the CA causes the EE's P1 to appear in the tree (but not
-/// P2). After filtering by {P2} the tree becomes NULL. However, since
-/// `initial_explicit_policy = false` and no cert in the chain forces
-/// `explicit_policy = 0`, the final check "`explicit_policy` > 0 OR tree != NULL"
-/// (RFC 5280 §6.1.6(b)) allows the path.
-///
-/// This divergence between strict RFC 5280 §6.1.5/6.1.6 semantics and the PKITS
-/// expectation is a documented ambiguity in the NIST test suite:
-///   - PKITS §4.8.14 comment: "The user-initial-policy-set is {P2}. Since P2 is
-///     not in the `valid_policy_tree`, the path should not validate." This reflects
-///     the user's desired semantics, but the RFC's formal check is on
-///     `explicit_policy` (the counter), not on tree membership alone.
-///   - OpenSSL 3.x with `-policy P2` on this chain produces: "OK" (validates),
-///     consistent with this implementation's behaviour.
-///   - RFC 5280 §6.1.6(b) is unambiguous: path is valid iff `explicit_policy` == 0
-///     implies tree != NULL. When `explicit_policy` > 0, the tree is irrelevant.
-///
-/// Our implementation follows the RFC 5280 text literally. If CA/B Forum or NIST
-/// publish an errata tightening this (e.g., "tree != NULL is always required"),
-/// this test should be un-ignored and the §6.1.5(g) logic revisited.
+/// `anyPolicyCACert` carries `requireExplicitPolicy = 0`, so
+/// `explicit_policy` is 0 from that certificate on. The EE's P1 node is a
+/// child of the CA's anyPolicy node, so it is in the §6.1.5(g)(iii)
+/// `valid_policy_node_set`; P1 ∉ {P2}, it is deleted, the tree becomes NULL
+/// and the path fails.
 #[test]
-#[ignore = "PKITS expects fail; RFC 5280 §6.1.6(b) and OpenSSL 3.x say valid: explicit_policy=1>0, final check passes regardless of tree emptiness"]
 fn pkits_4_8_14_sp2_anypolicy_p2_fail() {
     let result = pkits_policy_validate(
         &["AnyPolicyTest14EE", "anyPolicyCACert"],
