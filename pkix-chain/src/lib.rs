@@ -79,7 +79,9 @@
 //!   parsed responses to a candidate pool, and re-runs
 //!   [`pkix_path_builder::build_first_valid_path`]. The fetch loop walks
 //!   up to [`AIA_MAX_DEPTH`] missing-intermediate levels; beyond that
-//!   [`Error::AiaDepthExceeded`] surfaces. With [`NoAiaFetcher`] the
+//!   [`Error::AiaDepthExceeded`] surfaces. Because caIssuers URIs come
+//!   from not-yet-validated certificates, fetching is bounded by
+//!   [`AiaConfig`] (URIs per cert, total fetches, deadline). With [`NoAiaFetcher`] the
 //!   first fetch returns [`AiaError::FetchingDisabled`] and the
 //!   verifier surfaces [`Error::Aia`] without performing any I/O. The
 //!   use-case wrappers (`verify_tls_server` and friends) accept an
@@ -124,6 +126,7 @@ use std::borrow::Cow;
 use x509_cert::Certificate;
 
 mod aia_extract;
+mod aia_response;
 
 /// Maximum number of AIA-fetch iterations performed during chain reassembly.
 ///
@@ -138,7 +141,70 @@ mod aia_extract;
 /// for real-world PKIs (cross-signed roots add at most one intermediate
 /// hop beyond the operating CA's own intermediate; intermediate-of-an-
 /// intermediate-of-an-intermediate is exceedingly rare).
+///
+/// This is the default for [`AiaConfig::max_depth`].
 pub const AIA_MAX_DEPTH: usize = 5;
+
+/// Limits on AIA `caIssuers` chain reassembly in [`Verifier::verify_one`].
+///
+/// caIssuers URIs are read from certificates that have not been validated
+/// yet, so whoever presents a certificate decides what the verifier
+/// fetches. These limits bound the work one verification can cause. The
+/// defaults are conservative: real chains need one or two fetches.
+///
+/// Set via [`Verifier::with_aia_config`]. [`verify_chain`] and the
+/// use-case wrappers use [`AiaConfig::default`].
+///
+/// `#[non_exhaustive]`: construct with [`AiaConfig::new`] / `Default` and
+/// adjust the public fields.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct AiaConfig {
+    /// Maximum number of fetch rounds (missing-intermediate levels).
+    /// Exhaustion surfaces [`Error::AiaDepthExceeded`]. Default:
+    /// [`AIA_MAX_DEPTH`].
+    pub max_depth: usize,
+    /// Maximum number of caIssuers URIs followed per certificate, in the
+    /// order they appear in its `AuthorityInfoAccess` extension. Default: 2.
+    pub max_uris_per_cert: usize,
+    /// Maximum number of fetches per [`Verifier::verify_one`] call, across
+    /// all rounds. When more URIs remain unfetched and no path was found,
+    /// [`Error::AiaFetchLimitExceeded`] surfaces. Default: 8.
+    pub max_total_fetches: usize,
+    /// Maximum number of certificates taken from one certs-only CMS
+    /// response; further entries are ignored. Default: 16.
+    pub max_certs_per_response: usize,
+    /// Overall wall-clock budget for AIA fetching in one
+    /// [`Verifier::verify_one`] call, checked before each fetch round.
+    /// A round already in progress is not interrupted, so the worst case
+    /// is this deadline plus one round (at most
+    /// [`max_total_fetches`](Self::max_total_fetches) times the
+    /// fetcher's per-request timeout). Exceeding it surfaces
+    /// [`Error::AiaDeadlineExceeded`]. `None` disables the check.
+    /// Default: 30 seconds.
+    pub deadline: Option<std::time::Duration>,
+}
+
+impl AiaConfig {
+    /// Construct a config with the default limits.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_depth: AIA_MAX_DEPTH,
+            max_uris_per_cert: 2,
+            max_total_fetches: 8,
+            max_certs_per_response: 16,
+            deadline: Some(std::time::Duration::from_secs(30)),
+        }
+    }
+}
+
+impl Default for AiaConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Combined error type for chain verification.
 ///
@@ -212,8 +278,9 @@ pub enum Error {
     ///
     /// Surfaced when the caller-supplied chain was incomplete (a cert's
     /// issuer is not in the chain and not a trust anchor) and every
-    /// caIssuers URI extracted from the orphaned cert either could not
-    /// be fetched or returned bytes that did not parse as a `Certificate`.
+    /// caIssuers URI followed (within [`AiaConfig`]) either could not be
+    /// fetched or returned no usable CA certificate (neither a DER
+    /// `Certificate` nor a certs-only CMS message containing one).
     /// With the default [`NoAiaFetcher`] this manifests as
     /// `Error::Aia(AiaError::FetchingDisabled)` on the first incomplete
     /// chain.
@@ -234,13 +301,22 @@ pub enum Error {
     PathBuild(pkix_path_builder::Error),
     /// The AIA-fetch recursion cap was reached without closing the chain.
     ///
-    /// Bounded at [`AIA_MAX_DEPTH`] iterations to prevent unbounded
+    /// Bounded at [`AiaConfig::max_depth`] (default [`AIA_MAX_DEPTH`])
+    /// iterations to prevent unbounded
     /// fetching when each fetched intermediate itself has a missing
     /// issuer. Distinct from [`Error::Aia`] (which surfaces the
     /// underlying network/format failure) and from [`Error::PathBuild`]
     /// (which would have surfaced if the builder ran out of candidates
     /// inside a single iteration).
     AiaDepthExceeded,
+    /// [`AiaConfig::max_total_fetches`] fetches were made without closing
+    /// the chain, and further caIssuers URIs remained.
+    AiaFetchLimitExceeded {
+        /// The configured fetch cap.
+        limit: usize,
+    },
+    /// [`AiaConfig::deadline`] elapsed before the chain was closed.
+    AiaDeadlineExceeded,
 }
 
 impl core::fmt::Display for Error {
@@ -253,10 +329,11 @@ impl core::fmt::Display for Error {
             Self::OcspDelegation { reason } => write!(f, "ocsp responder delegation: {reason}"),
             Self::Aia(e) => write!(f, "aia fetch: {e}"),
             Self::PathBuild(e) => write!(f, "path build: {e}"),
-            Self::AiaDepthExceeded => write!(
-                f,
-                "aia fetch recursion cap reached ({AIA_MAX_DEPTH} iterations)"
-            ),
+            Self::AiaDepthExceeded => write!(f, "aia fetch recursion cap reached"),
+            Self::AiaFetchLimitExceeded { limit } => {
+                write!(f, "aia fetch limit reached ({limit} fetches)")
+            }
+            Self::AiaDeadlineExceeded => write!(f, "aia fetch deadline exceeded"),
         }
     }
 }
@@ -271,7 +348,9 @@ impl std::error::Error for Error {
             Self::PathBuild(e) => Some(e),
             Self::ProfileViolation { .. }
             | Self::OcspDelegation { .. }
-            | Self::AiaDepthExceeded => None,
+            | Self::AiaDepthExceeded
+            | Self::AiaFetchLimitExceeded { .. }
+            | Self::AiaDeadlineExceeded => None,
         }
     }
 }
@@ -430,6 +509,7 @@ pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetche
     rev_checker: &'a R,
     policy: &'a ValidationPolicy,
     aia: &'a A,
+    aia_config: AiaConfig,
 }
 
 impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> core::fmt::Debug
@@ -439,6 +519,7 @@ impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> core::fmt::Debug
         f.debug_struct("Verifier")
             .field("anchors_len", &self.anchors.len())
             .field("policy", self.policy)
+            .field("aia_config", &self.aia_config)
             .finish_non_exhaustive()
     }
 }
@@ -487,7 +568,15 @@ where
             rev_checker,
             policy,
             aia,
+            aia_config: AiaConfig::new(),
         }
+    }
+
+    /// Replace the AIA reassembly limits (default [`AiaConfig::default`]).
+    #[must_use]
+    pub fn with_aia_config(mut self, config: AiaConfig) -> Self {
+        self.aia_config = config;
+        self
     }
 
     /// Borrow the `AiaFetcher` this verifier holds.
@@ -523,10 +612,23 @@ where
     /// [`Error::AiaDepthExceeded`] is surfaced. Revocation checks run on
     /// the reassembled chain rather than the caller-supplied ordering.
     ///
-    /// With [`NoAiaFetcher`] (the default), the first AIA fetch returns
-    /// [`AiaError::FetchingDisabled`] and the function surfaces
-    /// [`Error::Aia`] without doing any I/O, preserving the historical
-    /// "caller supplies the full chain" semantics.
+    /// Fetching follows the [`AiaConfig`] limits (see
+    /// [`Verifier::with_aia_config`]): only certs on a potential path from
+    /// the leaf whose issuer is missing are asked for URIs, at most
+    /// [`AiaConfig::max_uris_per_cert`] each and
+    /// [`AiaConfig::max_total_fetches`] in total, within
+    /// [`AiaConfig::deadline`]. Responses may be a DER certificate or a
+    /// certs-only CMS message (RFC 5280 §4.2.2.1); only CA certificates not
+    /// already in the pool are added.
+    ///
+    /// The slow path runs whenever the supplied ordering fails with
+    /// `ChainBroken`, `NoTrustedPath` or `SignatureInvalid`, including
+    /// with [`NoAiaFetcher`]: the supplied certs are then treated as an
+    /// unordered bag and re-built with [`pkix_path_builder`]. If that
+    /// fails and the orphaned cert has caIssuers URIs, [`NoAiaFetcher`]
+    /// returns [`AiaError::FetchingDisabled`] without doing any I/O and
+    /// the function surfaces [`Error::Aia`]; with no URIs to follow it
+    /// surfaces `Error::PathBuild(NoPathFound)`.
     ///
     /// # Errors
     ///
@@ -534,7 +636,9 @@ where
     /// revoked certificate. AIA-fetch failures surface as [`Error::Aia`];
     /// path-builder failures with the augmented pool surface as
     /// [`Error::PathBuild`]; running out of fetch iterations surfaces as
-    /// [`Error::AiaDepthExceeded`].
+    /// [`Error::AiaDepthExceeded`], running out of fetches as
+    /// [`Error::AiaFetchLimitExceeded`], and running out of time as
+    /// [`Error::AiaDeadlineExceeded`].
     ///
     /// # Revocation coverage
     ///
@@ -597,13 +701,27 @@ where
 
     /// Iteratively augment the candidate pool via AIA `caIssuers` fetches
     /// until [`pkix_path_builder::build_first_valid_path`] finds a chain
-    /// or the [`AIA_MAX_DEPTH`] cap is reached.
+    /// or one of the [`AiaConfig`] limits is reached.
     ///
     /// `supplied_chain` is leaf-first; `supplied_chain[0]` is the EE the
     /// builder targets. All certs in the supplied chain seed the pool
     /// (the caller's ordering is treated as a candidate set, not a fixed
     /// path) so a partially-ordered chain with the right intermediates
     /// in the wrong slots still resolves without any AIA fetches.
+    ///
+    /// # Fetch discipline
+    ///
+    /// caIssuers URIs come from certificates that have not been validated
+    /// yet, so every fetch is attacker-steerable. To keep the work bounded:
+    ///
+    /// - only certs on a potential path from the leaf (the leaf, plus CA
+    ///   certs reachable from it by issuer-name links) whose issuer is not
+    ///   yet available are asked for their URIs ([`orphans_on_paths`]);
+    /// - at most [`AiaConfig::max_uris_per_cert`] URIs per cert, at most
+    ///   [`AiaConfig::max_total_fetches`] fetches per call, each URI once;
+    /// - the [`AiaConfig::deadline`] is checked before every fetch round;
+    /// - only CA certificates that are not already pooled are added from a
+    ///   response, at most [`AiaConfig::max_certs_per_response`] of them.
     fn build_with_aia(&self, supplied_chain: &[Certificate]) -> crate::Result<Vec<Certificate>> {
         use pkix_path_builder::CertPool;
         use std::collections::HashSet;
@@ -612,59 +730,43 @@ where
             .first()
             .ok_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound))?;
 
+        let cfg = &self.aia_config;
+        let started = std::time::Instant::now();
         let mut pool: CertPool = supplied_chain.iter().cloned().collect();
         let mut tried_uris: HashSet<String> = HashSet::new();
+        let mut fetches_left = cfg.max_total_fetches;
         let mut last_aia_error: Option<pkix_aia::AiaError> = None;
 
-        for _iteration in 0..AIA_MAX_DEPTH {
-            match pkix_path_builder::build_first_valid_path(
-                leaf,
-                &pool,
-                self.anchors,
-                self.policy,
-                self.sig_verifier,
-            ) {
-                Ok(built) => return Ok(built),
-                Err(pkix_path_builder::Error::NoPathFound) => {
-                    // Pool lacks at least one intermediate; try AIA fetching.
-                }
-                Err(pkix_path_builder::Error::NoValidPath { .. }) => {
-                    // Topology was OK but every candidate chain failed
-                    // validate_path (e.g. expired cert, policy violation).
-                    // Use build_path (topology-only, no validation) to
-                    // recover a chain and return it to the caller so that
-                    // verify_one's own validate_path produces a structured
-                    // Error::Path(...) rather than the builder's
-                    // Error::PathBuild(NoValidPath { last_error: String }).
-                    // This preserves programmatic matchability on the
-                    // specific pkix_path::Error variant (PKIX-sqek.1).
-                    let chain = pkix_path_builder::build_path(leaf, &pool, self.anchors)?;
-                    return Ok(chain);
-                }
-                Err(e) => {
-                    // DepthExceeded / BudgetExceeded cannot be repaired
-                    // by adding more candidate certs: these are
-                    // pool-size problems.
-                    return Err(Error::PathBuild(e));
-                }
+        for _iteration in 0..cfg.max_depth {
+            if let Some(built) = self.try_build(leaf, &pool)? {
+                return Ok(built);
             }
 
-            // Collect caIssuers URIs from every cert whose issuer is not
-            // resolvable in the current pool or anchors. Visit each URI
-            // at most once across the whole loop.
+            // Collect caIssuers URIs from the certs on potential paths
+            // whose issuer is still missing. Visit each URI at most once
+            // across the whole loop.
             let mut new_uris: Vec<String> = Vec::new();
-            for cert in pool.iter() {
-                if issuer_resolvable(cert, &pool, self.anchors) {
-                    continue;
-                }
-                for uri in aia_extract::ca_issuers_http_uris(cert) {
-                    if tried_uris.insert(uri.clone()) {
-                        new_uris.push(uri);
+            let mut over_limit = false;
+            for cert in orphans_on_paths(leaf, &pool, self.anchors, self.sig_verifier) {
+                for uri in aia_extract::ca_issuers_http_uris(cert).take(cfg.max_uris_per_cert) {
+                    if tried_uris.contains(&uri) {
+                        continue;
                     }
+                    if new_uris.len() == fetches_left {
+                        over_limit = true;
+                        break;
+                    }
+                    tried_uris.insert(uri.clone());
+                    new_uris.push(uri);
                 }
             }
 
             if new_uris.is_empty() {
+                if over_limit {
+                    return Err(Error::AiaFetchLimitExceeded {
+                        limit: cfg.max_total_fetches,
+                    });
+                }
                 // Path-builder said NoPathFound, no caIssuers URIs to try.
                 // Surface the last AIA error if we've seen one; otherwise
                 // the honest signal is "path builder cannot complete".
@@ -673,36 +775,38 @@ where
                     .unwrap_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound)));
             }
 
+            if cfg.deadline.is_some_and(|d| started.elapsed() >= d) {
+                return Err(Error::AiaDeadlineExceeded);
+            }
+
+            fetches_left -= new_uris.len();
             let uri_refs: Vec<&str> = new_uris.iter().map(String::as_str).collect();
             let results = self.aia.batch_fetch(&uri_refs);
 
             let mut added_any = false;
-            for (_uri, result) in new_uris.iter().zip(results) {
-                match result {
-                    Ok(der) => match <Certificate as der::Decode>::from_der(&der) {
-                        Ok(cert) => {
-                            pool.add(cert);
-                            added_any = true;
+            for result in results.into_iter().take(new_uris.len()) {
+                let parsed = result.and_then(|bytes| {
+                    aia_response::parse_ca_issuers_response(&bytes, cfg.max_certs_per_response)
+                });
+                match parsed {
+                    Ok(certs) => {
+                        for cert in certs {
+                            // Only CA certs can be issuers; certs already
+                            // pooled add nothing but search work.
+                            let is_ca = pkix_path::cert_is_ca(&cert).unwrap_or(false);
+                            if is_ca && !pool.iter().any(|c| *c == cert) {
+                                pool.add(cert);
+                                added_any = true;
+                            }
                         }
-                        Err(e) => {
-                            // Fetched bytes did not parse as a Certificate.
-                            // Capture as the most-recent AIA error so the
-                            // final surface is "I tried but the responses
-                            // were unusable" rather than the path-builder
-                            // saying NoPathFound with no context.
-                            last_aia_error =
-                                Some(pkix_aia::AiaError::MalformedCertificate(e.to_string()));
-                        }
-                    },
-                    Err(e) => {
-                        last_aia_error = Some(e);
                     }
+                    Err(e) => last_aia_error = Some(e),
                 }
             }
 
             if !added_any {
-                // Every URI failed in this iteration; the next iteration
-                // would do nothing. Surface the AIA error directly.
+                // Nothing usable arrived in this iteration; the next
+                // iteration would do nothing. Surface the AIA error.
                 return Err(Error::Aia(
                     last_aia_error.unwrap_or(pkix_aia::AiaError::FetchingDisabled),
                 ));
@@ -712,22 +816,42 @@ where
         // The last iteration fetched new certs into the pool but the loop
         // exited before trying them. Give the path-builder one final shot
         // with the fully-augmented pool before declaring depth-exceeded.
+        match self.try_build(leaf, &pool) {
+            Ok(Some(built)) => Ok(built),
+            Ok(None) | Err(_) => Err(Error::AiaDepthExceeded),
+        }
+    }
+
+    /// One path-building attempt over `pool`.
+    ///
+    /// `Ok(Some(chain))` is a chain for [`Self::verify_one`] to validate:
+    /// either one that already validated, or — when every topologically
+    /// valid candidate failed `validate_path` — the topology-only chain,
+    /// so that `verify_one`'s own `validate_path` produces a structured
+    /// [`Error::Path`] rather than the builder's
+    /// `PathBuild(NoValidPath { last_error: String })` (PKIX-sqek.1).
+    /// `Ok(None)` means the pool lacks an intermediate (AIA may help).
+    /// `DepthExceeded` / `BudgetExceeded` cannot be repaired by adding
+    /// candidate certs and are returned as errors.
+    fn try_build(
+        &self,
+        leaf: &Certificate,
+        pool: &pkix_path_builder::CertPool,
+    ) -> crate::Result<Option<Vec<Certificate>>> {
         match pkix_path_builder::build_first_valid_path(
             leaf,
-            &pool,
+            pool,
             self.anchors,
             self.policy,
             self.sig_verifier,
         ) {
-            Ok(built) => return Ok(built),
-            Err(pkix_path_builder::Error::NoValidPath { .. }) => {
-                let chain = pkix_path_builder::build_path(leaf, &pool, self.anchors)?;
-                return Ok(chain);
-            }
-            Err(_) => {}
+            Ok(built) => Ok(Some(built)),
+            Err(pkix_path_builder::Error::NoPathFound) => Ok(None),
+            Err(pkix_path_builder::Error::NoValidPath { .. }) => Ok(Some(
+                pkix_path_builder::build_path(leaf, pool, self.anchors)?,
+            )),
+            Err(e) => Err(Error::PathBuild(e)),
         }
-
-        Err(Error::AiaDepthExceeded)
     }
 
     /// Verify many certificate chains, returning per-chain results.
@@ -755,9 +879,12 @@ where
 /// chain against `anchors` under `profile.policy(now_unix)` **and** carry a
 /// Subject Alternative Name entry matching `name`.
 ///
-/// The signature verifier is hardwired to [`DefaultVerifier`]. Callers that
-/// need a custom verifier should drop down to [`verify_chain`] and call
-/// [`pkix_identity::verify_dns_name`] explicitly.
+/// Signatures are checked with the caller-supplied `verifier`
+/// ([`DefaultVerifier`] for the bundled RustCrypto backends), and missing
+/// intermediates are fetched through `aia` ([`NoAiaFetcher`] to disable)
+/// under the default [`AiaConfig`] limits. Callers needing other AIA limits
+/// should use [`Verifier::with_aia_config`] and call
+/// [`pkix_identity::verify_dns_name`] themselves.
 ///
 /// # Arguments
 ///
@@ -769,7 +896,9 @@ where
 ///   typically [`pkix_profiles::BasicTlsProfile`] or
 ///   `pkix_profiles_cabf::WebPkiProfile`
 /// - `now_unix`   — current time, seconds since the Unix epoch
+/// - `verifier`   — signature verification backend ([`DefaultVerifier`] for standard algorithms)
 /// - `revocation` — revocation checker (use [`NoRevocation`] for offline)
+/// - `aia`        — AIA fetcher (use [`NoAiaFetcher`] when the caller supplies the full chain)
 ///
 /// # Order of operations
 ///
@@ -1646,26 +1775,78 @@ fn is_aia_recoverable(e: &pkix_path::Error) -> bool {
     )
 }
 
-/// Return `true` if there is a cert in `pool` (or a trust anchor) whose
-/// subject DN matches `cert`'s issuer DN under RFC 5280 §7.1 / RFC 4518
-/// string-prep equivalence (via [`pkix_path::names_match`]).
-///
-/// Used by [`Verifier::build_with_aia`] to identify orphaned certs whose
-/// issuer is not present in the current candidate set. Only orphaned
-/// certs have their `caIssuers` URIs fetched; certs whose issuer is
-/// already resolvable in-pool or via an anchor are skipped to avoid
-/// fetching certs we already have.
-fn issuer_resolvable(
-    cert: &Certificate,
-    pool: &pkix_path_builder::CertPool,
-    anchors: &[TrustAnchor],
+/// Does `child`'s signature verify under `issuer_spki`?
+fn signed_by<V: SignatureVerifier>(
+    child: &Certificate,
+    issuer_spki: &spki::SubjectPublicKeyInfoOwned,
+    verifier: &V,
 ) -> bool {
-    let target = cert.tbs_certificate().issuer();
-    pool.iter()
-        .any(|c| pkix_path::names_match(c.tbs_certificate().subject(), target))
-        || anchors
-            .iter()
-            .any(|a| pkix_path::names_match(&a.subject, target))
+    use spki::der::referenced::OwnedToRef as _;
+    let Ok(tbs) = pkix_path::tbs_certificate_der(child) else {
+        return false;
+    };
+    verifier
+        .verify_signature(
+            child.signature_algorithm().owned_to_ref(),
+            issuer_spki.owned_to_ref(),
+            &tbs,
+            child.signature().raw_bytes(),
+        )
+        .is_ok()
+}
+
+/// The certificates whose caIssuers URIs [`Verifier::build_with_aia`]
+/// may follow: certs on a potential path from `leaf` whose issuer is not
+/// yet available.
+///
+/// Walks from `leaf` through issuer links: a pool CA cert is an issuer of
+/// `cur` when its subject matches `cur`'s issuer under RFC 4518 string
+/// prep **and** its key verifies `cur`'s signature (so a same-name decoy
+/// can neither stand in for the missing issuer and suppress the fetch,
+/// nor pull its own URIs into the fetch set). A cert with no such pool
+/// issuer and no anchor whose name matches and whose key verifies it is
+/// an orphan. Certs unreachable from the leaf (e.g. unrelated certs in a
+/// CMS bag, or junk added by an earlier fetch) are never asked for URIs.
+fn orphans_on_paths<'p, V: SignatureVerifier>(
+    leaf: &'p Certificate,
+    pool: &'p pkix_path_builder::CertPool,
+    anchors: &[TrustAnchor],
+    verifier: &V,
+) -> Vec<&'p Certificate> {
+    let certs: Vec<&Certificate> = pool.iter().collect();
+    let mut visited = vec![false; certs.len()];
+    let mut queue: Vec<&Certificate> = vec![leaf];
+    let mut orphans = Vec::new();
+    while let Some(cur) = queue.pop() {
+        let issuer = cur.tbs_certificate().issuer();
+        let anchored = anchors.iter().any(|a| {
+            pkix_path::names_match(&a.subject, issuer)
+                && signed_by(cur, &a.subject_public_key_info, verifier)
+        });
+        let mut has_pool_issuer = false;
+        for (idx, cand) in certs.iter().enumerate() {
+            if *cand == cur
+                || !pkix_path::names_match(cand.tbs_certificate().subject(), issuer)
+                || !pkix_path::cert_is_ca(cand).unwrap_or(false)
+                || !signed_by(
+                    cur,
+                    cand.tbs_certificate().subject_public_key_info(),
+                    verifier,
+                )
+            {
+                continue;
+            }
+            has_pool_issuer = true;
+            if !visited[idx] {
+                visited[idx] = true;
+                queue.push(cand);
+            }
+        }
+        if !anchored && !has_pool_issuer {
+            orphans.push(cur);
+        }
+    }
+    orphans
 }
 
 #[cfg(test)]

@@ -57,8 +57,11 @@
 
 extern crate alloc;
 
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use der::referenced::OwnedToRef as _;
 use der::Decode as _;
+use x509_cert::spki;
 use x509_cert::Certificate;
 
 /// An unordered collection of certificates used as input to path building.
@@ -162,8 +165,11 @@ pub enum Error {
     /// The internal DFS node-visit budget was exhausted.
     ///
     /// This guards against adversarial certificate pools that would otherwise
-    /// cause exponential search time. The DFS and the depth probe each start
-    /// with a fresh budget of [`PathBuilderConfig::dfs_budget`] node visits.
+    /// cause exponential search time. Each search pass (the DFS, the depth
+    /// probe, and `build_first_valid_path`'s topology-only fallback) starts
+    /// with a fresh budget of [`PathBuilderConfig::dfs_budget`] units; one
+    /// unit is charged per DFS frame entered and per pool candidate
+    /// examined.
     BudgetExceeded,
     /// [`build_first_valid_path`] exhausted [`build_path_candidates`] without
     /// finding a candidate that [`pkix_path::validate_path`] accepted.
@@ -312,20 +318,35 @@ fn cert_ski_key_id(cert: &Certificate) -> Option<Vec<u8>> {
 ///   no candidate SKI matches, or AKI/SKI parsing failed (fail-soft — see
 ///   [`cert_aki_key_id`]/[`cert_ski_key_id`]).
 ///
-/// The result is sorted **stably** by tier so candidates within the same
-/// tier preserve pool insertion order. This is the documented contract for
-/// the no-AKI-signal case.
+/// With `prefer_anchor_issued` (set for signature-checked searches),
+/// candidates within a tier whose own issuer names a trust anchor come
+/// first, so a path that ends one hop later is tried before deeper
+/// detours (a cheap approximation of RFC 4158 §3.5's shortest-path
+/// preference). Topology-only searches ([`build_path`],
+/// [`build_path_candidates`]) keep the historical order, because their
+/// first yield is returned unverified and the BetterTLS baseline pins it.
+/// The sort is **stable**, so remaining ties preserve pool
+/// insertion order. Later copies of byte-identical pool certificates
+/// (`duplicate[idx]`) are omitted.
 ///
 /// **Not currently used:** the AKI `authorityCertIssuer` /
 /// `authorityCertSerialNumber` fields. They are rare in practice and
 /// parsing `GeneralNames` for that signal is more work than the marginal
 /// disambiguation benefit justifies. Documented as a deferred enhancement.
-fn rank_candidates(cur: &Certificate, pool: &[Certificate]) -> Vec<(u8, usize)> {
+fn rank_candidates(
+    cur: &Certificate,
+    pool: &[Certificate],
+    duplicate: &[bool],
+    anchors: &[pkix_path::TrustAnchor],
+    prefer_anchor_issued: bool,
+) -> Vec<usize> {
     let cur_issuer = cur.tbs_certificate().issuer();
     let target_aki_kid = cert_aki_key_id(cur);
-    let mut ranked: Vec<(u8, usize)> = Vec::with_capacity(pool.len());
+    let mut ranked: Vec<(u8, u8, usize)> = Vec::with_capacity(pool.len());
     for (idx, candidate) in pool.iter().enumerate() {
-        if !pkix_path::names_match(candidate.tbs_certificate().subject(), cur_issuer) {
+        if duplicate[idx]
+            || !pkix_path::names_match(candidate.tbs_certificate().subject(), cur_issuer)
+        {
             continue;
         }
         let tier: u8 = match (
@@ -335,15 +356,18 @@ fn rank_candidates(cur: &Certificate, pool: &[Certificate]) -> Vec<(u8, usize)> 
             (Some(aki), Some(ski)) if aki == ski => 0,
             _ => 1,
         };
-        ranked.push((tier, idx));
+        let reaches_anchor = prefer_anchor_issued
+            && anchors
+                .iter()
+                .any(|a| pkix_path::names_match(&a.subject, candidate.tbs_certificate().issuer()));
+        ranked.push((tier, u8::from(!reaches_anchor), idx));
     }
-    ranked.sort_by_key(|&(tier, _)| tier);
-    ranked
+    ranked.sort_by_key(|&(tier, far, _)| (tier, far));
+    ranked.into_iter().map(|(_, _, idx)| idx).collect()
 }
 
-/// SPKI-based cycle detection: does `path` already contain a cert with the
-/// same `SubjectPublicKeyInfo` algorithm OID and raw public-key bits as
-/// `candidate`?
+/// SPKI-based cycle detection: do `a` and `b` carry the same
+/// `SubjectPublicKeyInfo` algorithm OID and raw public-key bits?
 ///
 /// Algorithm parameters are deliberately excluded from the comparison to
 /// tolerate the RFC 8017 ambiguity between absent and explicit-NULL
@@ -354,16 +378,45 @@ fn rank_candidates(cur: &Certificate, pool: &[Certificate]) -> Vec<(u8, usize)> 
 /// key-rollover or bridge-CA topologies multiple certs may share a subject
 /// DN with different keys, and treating them as the same node would
 /// incorrectly prune valid paths.
-fn spki_already_in_path(candidate: &Certificate, path: &[Certificate]) -> bool {
-    let candidate_spki = candidate.tbs_certificate().subject_public_key_info();
-    path.iter().any(|in_path| {
-        let s = in_path.tbs_certificate().subject_public_key_info();
-        s.algorithm.oid == candidate_spki.algorithm.oid
-            && s.subject_public_key == candidate_spki.subject_public_key
-    })
+fn same_spki(a: &Certificate, b: &Certificate) -> bool {
+    let a = a.tbs_certificate().subject_public_key_info();
+    let b = b.tbs_certificate().subject_public_key_info();
+    a.algorithm.oid == b.algorithm.oid && a.subject_public_key == b.subject_public_key
 }
 
-/// Default DFS node-visit budget per search pass.
+/// Mark every pool entry that equals an earlier entry.
+///
+/// Sorting indices by signature bytes groups candidate duplicates in
+/// `O(n log n)`; only entries with identical signatures are compared in
+/// full. An attacker-supplied bag of many copies of one certificate thus
+/// costs neither quadratic deduplication nor repeated DFS work.
+fn mark_duplicates(pool: &[Certificate]) -> Vec<bool> {
+    let mut order: Vec<usize> = (0..pool.len()).collect();
+    // Stable sort: within a run of equal signatures, indices stay in pool
+    // order, so the first occurrence is the one kept.
+    order.sort_by(|&a, &b| {
+        pool[a]
+            .signature()
+            .raw_bytes()
+            .cmp(pool[b].signature().raw_bytes())
+    });
+    let mut duplicate = alloc::vec![false; pool.len()];
+    let mut run_start = 0;
+    for pos in 0..order.len() {
+        let sig = pool[order[pos]].signature().raw_bytes();
+        if pool[order[run_start]].signature().raw_bytes() != sig {
+            run_start = pos;
+        }
+        let cur = &pool[order[pos]];
+        duplicate[order[pos]] = order[run_start..pos]
+            .iter()
+            .any(|&earlier| !duplicate[earlier] && pool[earlier] == *cur);
+    }
+    duplicate
+}
+
+/// Default DFS budget per search pass (frame entries plus candidates
+/// examined; see [`Error::BudgetExceeded`]).
 ///
 /// Sufficient for legitimate chains (real-world PKI hierarchies have at most
 /// a handful of intermediates and small pools); prevents exponential blow-up
@@ -392,7 +445,8 @@ pub struct PathBuilderConfig {
     /// `max_depth + 1` to distinguish "no path exists" from "path exists
     /// but too deep". Default: [`DEFAULT_MAX_DEPTH`].
     pub max_depth: usize,
-    /// Per-round node-visit budget. Default: [`DEFAULT_DFS_BUDGET`].
+    /// Per-pass search budget: one unit per DFS frame entered and per pool
+    /// candidate examined. Default: [`DEFAULT_DFS_BUDGET`].
     pub dfs_budget: usize,
 }
 
@@ -417,77 +471,92 @@ impl Default for PathBuilderConfig {
 // PathCandidates iterator (PKIX-mszo)
 // =========================================================================
 
+/// Search-node identifier used by [`PathCandidates`].
+///
+/// Node `0` is the target certificate; node `i + 1` is `pool[i]`. Using
+/// indices rather than cloned certificates lets the iterator cache
+/// per-node work (candidate ranking, TBS encoding, link signature
+/// results) across the whole search.
+type NodeId = usize;
+
 /// Per-frame DFS state held by [`PathCandidates`].
 ///
-/// Each [`Frame`] mirrors one stack frame of the recursive DFS: it holds
-/// the AKI-ranked candidate list for the cert at this depth and a cursor
-/// into that list, plus state-machine flags so a paused-and-resumed DFS
-/// can pick up where it left off without re-running the anchor check or
-/// re-yielding the same chain twice.
+/// Each [`Frame`] mirrors one stack frame of the recursive DFS: the node
+/// whose issuer this frame is looking for, a cursor into that node's
+/// (cached) ranked candidate list, and whether the anchor check for this
+/// frame has already run.
 struct Frame {
-    /// Pre-ranked candidate indices (tier, pool index). Stable-sorted
-    /// by tier, lower-tier first. Computed lazily on first use so that
-    /// frames that yield via anchor match never pay the ranking cost.
-    ranked: Option<Vec<(u8, usize)>>,
-    /// Position in `ranked` to try next.
+    /// The certificate at this depth of the current path.
+    node: NodeId,
+    /// Position in the node's ranked candidate list to try next.
     cursor: usize,
-    /// True after the anchor-match check has run for this frame.
+    /// True after the anchor-match check has run for this frame. A frame
+    /// that matched an anchor and yielded a chain keeps exploring its pool
+    /// candidates on the next `next()` call (GitHub #11: an anchor whose
+    /// name matches `cur`'s issuer is not necessarily the key that signed
+    /// `cur`; a same-name pool certificate, e.g. a key-rollover or
+    /// cross-certificate, may be).
     anchor_checked: bool,
-    /// True if this frame yielded a chain via anchor match. On the next
-    /// `next()` call, that frame is immediately backtracked rather than
-    /// trying its candidates (the recursive DFS short-circuits on anchor
-    /// match; the iterator preserves that semantic).
-    anchor_yielded: bool,
 }
 
 impl Frame {
-    const fn new() -> Self {
+    const fn new(node: NodeId) -> Self {
         Self {
-            ranked: None,
+            node,
             cursor: 0,
             anchor_checked: false,
-            anchor_yielded: false,
         }
     }
 }
 
-/// Iterator over topologically-valid certification paths from a target
-/// cert through a candidate pool to one of a set of trust anchors.
+/// Iterator over certification paths from a target cert through a
+/// candidate pool to one of a set of trust anchors.
 ///
 /// Each [`Iterator::next`] call returns either:
 /// - `Some(Ok(chain))` — the next leaf-first chain `[target, ...,
 ///   anchor-issued]` that is topologically valid (DN chain links,
 ///   `BasicConstraints cA=TRUE` on every intermediate, no SPKI cycles).
-///   Signatures are NOT verified; downstream callers must run the
-///   returned chain through [`pkix_path::validate_path`].
+///   Iterators from [`build_path_candidates`] do NOT verify signatures;
+///   downstream callers must run the returned chain through
+///   [`pkix_path::validate_path`]. The iterator used internally by
+///   [`build_first_valid_path`] additionally requires every link
+///   (including the anchor link) to carry a signature that verifies
+///   under the candidate issuer's key before descending (RFC 4158 §3.5.1),
+///   which prunes same-name decoys at the first level.
 /// - `Some(Err(e))` — a fatal error (see [`Error`]). The iterator is
 ///   exhausted; subsequent calls return `None`.
 /// - `None` — DFS has been exhausted; no more chains exist within the
 ///   configured `max_depth`.
 ///
-/// **Resumable DFS**: candidates are explored in AKI-ranked
-/// order (`rank_candidates`); when a chain is yielded, the next call
-/// resumes from the same DFS state and explores alternate paths. This
-/// is the contract S/MIME callers depend on for build-then-validate
-/// retry loops in adversarial pools (CMS bags, federal-bridge cross-cert
-/// topologies, etc.) where the topologically-first chain may not be the
+/// **Resumable DFS**: candidates are explored in ranked order
+/// (`rank_candidates`: AKI/SKI tier first, then — in the signature-checked
+/// search only — candidates whose issuer names a trust anchor, then pool
+/// order); when a chain is yielded, the
+/// next call resumes from the same DFS state and explores alternate
+/// paths. A frame whose issuer name matched an anchor still explores its
+/// same-name pool candidates after yielding (GitHub #11). This is the
+/// contract S/MIME callers depend on for build-then-validate retry loops
+/// in adversarial pools (CMS bags, federal-bridge cross-cert topologies,
+/// etc.) where the topologically-first chain may not be the
 /// cryptographically-verifying one.
+///
+/// **Duplicates**: byte-identical pool certificates are considered once.
 ///
 /// **Bounded enumeration**: a single shared budget (initial value
 /// [`PathBuilderConfig::dfs_budget`]) is decremented once per DFS frame
-/// entry across all `next()` calls. When the budget is exhausted, the
-/// next call returns `Some(Err(`[`Error::BudgetExceeded`]`))` and the
-/// iterator becomes exhausted. This bounds worst-case work to
-/// `O(dfs_budget)` total across the entire iterator's lifetime,
-/// preventing an adversarial pool from causing unbounded enumeration.
+/// entry and once per pool candidate examined, across all `next()` calls.
+/// When the budget is exhausted, the next call returns
+/// `Some(Err(`[`Error::BudgetExceeded`]`))` and the iterator becomes
+/// exhausted. This bounds worst-case work to `O(dfs_budget)` candidate
+/// examinations (plus one `O(pool)` ranking pass per distinct node)
+/// across the entire iterator's lifetime, preventing an adversarial pool
+/// from causing unbounded enumeration.
 ///
-/// **No iterative deepening**: unlike legacy `build_path`, this iterator
-/// performs a single DFS at `max_depth`. Paths are yielded in DFS order
-/// (depth-first, AKI-tier-ordered, then pool insertion order within a
-/// tier). Shortest-first is no longer guaranteed; for typical pools the
-/// first yielded chain is still the shortest, but adversarial pools can
-/// produce a deeper chain first if its branch is explored before a
-/// shallower alternative.
+/// **No iterative deepening**: this iterator performs a single DFS at
+/// `max_depth`. Paths are yielded in DFS order. Shortest-first is not
+/// guaranteed. For typical pools the first yielded chain is the shortest;
+/// the signature-checked search used by [`build_first_valid_path`] also
+/// tries candidates issued by an anchor-named CA first.
 ///
 /// # Examples
 ///
@@ -511,29 +580,35 @@ impl Frame {
 /// }
 /// ```
 ///
-/// The pattern above is exactly what [`build_first_valid_path`] wraps:
-/// callers that only need "find any chain that validates" should prefer
-/// the helper. Drop down to this iterator when you need per-candidate
-/// diagnostics, want to limit the number of candidates tried, or are
-/// composing the retry loop with additional per-candidate policy
-/// (e.g., per-candidate revocation checks).
+/// The pattern above is what [`build_first_valid_path`] wraps (with the
+/// per-link signature pruning described above): callers that only need
+/// "find any chain that validates" should prefer the helper. Drop down to
+/// this iterator when you need per-candidate diagnostics, want to limit
+/// the number of candidates tried, or are composing the retry loop with
+/// additional per-candidate policy (e.g., per-candidate revocation checks).
 pub struct PathCandidates<'a> {
+    target: Certificate,
     pool: &'a [Certificate],
+    /// `duplicate[i]` is true when `pool[i]` equals an earlier pool entry.
+    duplicate: Vec<bool>,
     anchors: &'a [pkix_path::TrustAnchor],
+    /// When set, every link is signature-checked before it is used.
+    verifier: Option<&'a dyn pkix_path::SignatureVerifier>,
     max_depth: usize,
-    /// Current chain, leaf-first. `path[0]` is the target.
-    path: Vec<Certificate>,
-    /// Frame stack; `frames.len() == path.len()` while the iterator is
-    /// active. When both are empty after `started` was true, the
-    /// iterator is exhausted.
+    /// Frame stack, leaf-first. `frames[0].node` is the target. Empty
+    /// once the search space is exhausted.
     frames: Vec<Frame>,
-    /// Shared DFS-frame-entry budget. Decremented once per anchor check
-    /// (one charge per frame entered). Bounded by the configured budget
-    /// across all `next()` calls.
+    /// Shared budget; see "Bounded enumeration" above.
     budget: usize,
-    /// True after the first `next()` call. Used to lazily push the
-    /// initial frame.
-    started: bool,
+    /// Per-node ranked candidate pool indices, computed on first use.
+    ranked: Vec<Option<Vec<usize>>>,
+    /// Per-node TBSCertificate DER (`None` inside = encoding failed),
+    /// computed on first signature check of that node.
+    tbs: Vec<Option<Option<Vec<u8>>>>,
+    /// Cached `(child node, issuer pool index) -> signature verifies`.
+    link_ok: BTreeMap<(NodeId, usize), bool>,
+    /// Cached `(child node, anchor index) -> signature verifies`.
+    anchor_ok: BTreeMap<(NodeId, usize), bool>,
     /// True once the iterator has yielded a fatal error or exhausted
     /// the search space; subsequent calls return `None`.
     done: bool,
@@ -542,35 +617,121 @@ pub struct PathCandidates<'a> {
 impl<'a> PathCandidates<'a> {
     /// Construct a new path-candidate iterator.
     ///
-    /// The `target`, `pool`, and `anchors` references are borrowed for
-    /// the lifetime of the iterator; `config` is read once at construction
-    /// (its `max_depth` and `dfs_budget` values are copied in).
+    /// The `pool` and `anchors` references are borrowed for the lifetime
+    /// of the iterator; `config` is read once at construction (its
+    /// `max_depth` and `dfs_budget` values are copied in). `verifier`
+    /// enables per-link signature pruning.
     fn new(
         target: &Certificate,
         pool: &'a [Certificate],
         anchors: &'a [pkix_path::TrustAnchor],
         config: &PathBuilderConfig,
+        verifier: Option<&'a dyn pkix_path::SignatureVerifier>,
     ) -> Self {
-        // Pre-seed `path` with the target and `frames` with the initial
-        // frame. This avoids an extra branch in `next()` for the
-        // first-call case and keeps the invariant `path.len() ==
-        // frames.len()` true at all times when the iterator is active.
-        let path = alloc::vec![target.clone()];
-        let frames = alloc::vec![Frame::new()];
+        let duplicate = mark_duplicates(pool);
         Self {
+            target: target.clone(),
             pool,
+            duplicate,
             anchors,
+            verifier,
             max_depth: config.max_depth,
-            path,
-            frames,
+            frames: alloc::vec![Frame::new(0)],
             budget: config.dfs_budget,
-            started: false,
+            ranked: alloc::vec![None; pool.len() + 1],
+            tbs: alloc::vec![None; pool.len() + 1],
+            link_ok: BTreeMap::new(),
+            anchor_ok: BTreeMap::new(),
             done: false,
         }
     }
+
+    fn cert(&self, node: NodeId) -> &Certificate {
+        if node == 0 {
+            &self.target
+        } else {
+            &self.pool[node - 1]
+        }
+    }
+
+    /// Spend one unit of budget; `false` when the budget is exhausted.
+    fn charge(&mut self) -> bool {
+        if self.budget == 0 {
+            return false;
+        }
+        self.budget -= 1;
+        true
+    }
+
+    /// Does `child`'s signature verify under `issuer_spki`? Always `true`
+    /// when no verifier is configured (topology-only mode).
+    fn signed_by(&mut self, child: NodeId, issuer_spki: &spki::SubjectPublicKeyInfoOwned) -> bool {
+        let Some(verifier) = self.verifier else {
+            return true;
+        };
+        if self.tbs[child].is_none() {
+            let der = pkix_path::tbs_certificate_der(self.cert(child)).ok();
+            self.tbs[child] = Some(der);
+        }
+        let Some(Some(tbs)) = &self.tbs[child] else {
+            return false;
+        };
+        let cert = self.cert(child);
+        verifier
+            .verify_signature(
+                cert.signature_algorithm().owned_to_ref(),
+                issuer_spki.owned_to_ref(),
+                tbs,
+                cert.signature().raw_bytes(),
+            )
+            .is_ok()
+    }
+
+    /// Does an anchor whose name matches `node`'s issuer (and, with a
+    /// verifier, whose key verifies `node`'s signature) exist?
+    fn anchor_matches(&mut self, node: NodeId) -> bool {
+        for (idx, anchor) in self.anchors.iter().enumerate() {
+            if !pkix_path::names_match(&anchor.subject, self.cert(node).tbs_certificate().issuer())
+            {
+                continue;
+            }
+            let ok = match self.anchor_ok.get(&(node, idx)) {
+                Some(&ok) => ok,
+                None => {
+                    let ok = self.signed_by(node, &anchor.subject_public_key_info);
+                    self.anchor_ok.insert((node, idx), ok);
+                    ok
+                }
+            };
+            if ok {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Is `pool[idx]` an eligible issuer for `child` (CA, and with a
+    /// verifier, its key verifies `child`'s signature)?
+    fn link_matches(&mut self, child: NodeId, idx: usize) -> bool {
+        if let Some(&ok) = self.link_ok.get(&(child, idx)) {
+            return ok;
+        }
+        let pool = self.pool;
+        let ok = cert_is_ca(&pool[idx])
+            && self.signed_by(child, pool[idx].tbs_certificate().subject_public_key_info());
+        self.link_ok.insert((child, idx), ok);
+        ok
+    }
+
+    fn current_chain(&self) -> Vec<Certificate> {
+        self.frames
+            .iter()
+            .map(|f| self.cert(f.node).clone())
+            .collect()
+    }
 }
 
-impl<'a> Iterator for PathCandidates<'a> {
+impl Iterator for PathCandidates<'_> {
     type Item = Result<Vec<Certificate>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -578,132 +739,95 @@ impl<'a> Iterator for PathCandidates<'a> {
             return None;
         }
 
-        // The first call to `next()` finds the first chain (or exhausts
-        // the search). `started` lets us distinguish "iterator just
-        // constructed" (path/frames pre-seeded with the initial target
-        // frame) from "iterator was previously called and yielded a
-        // chain" (resume from the yielded frame).
-        //
-        // When resuming after a yield, the top frame's `anchor_yielded`
-        // flag is true; the loop below will see this and immediately
-        // backtrack from that frame, advancing the parent's candidate
-        // cursor on the next iteration.
-        self.started = true;
-
         loop {
             // Empty stack: search space exhausted.
-            if self.frames.is_empty() {
+            let Some(top) = self.frames.last() else {
                 self.done = true;
                 return None;
-            }
+            };
+            let node = top.node;
 
-            // If the top frame already yielded an anchor match on a
-            // prior call, backtrack from it now (the recursive DFS
-            // short-circuits on anchor match without exploring
-            // candidates; the iterator preserves that semantic).
-            if self.frames.last().expect("non-empty").anchor_yielded {
-                self.frames.pop();
-                self.path.pop();
-                continue;
-            }
-
-            // Anchor check: each frame charges 1 unit of budget at this
-            // point (mirrors the recursive DFS's per-call decrement).
-            // Budget exhaustion makes the iterator terminal.
-            if !self.frames.last().expect("non-empty").anchor_checked {
-                if self.budget == 0 {
+            // Anchor check: each frame charges 1 unit of budget here.
+            // On a match the chain is yielded; the next call resumes this
+            // frame's candidate exploration below (GitHub #11) rather than
+            // backtracking immediately.
+            if !top.anchor_checked {
+                if !self.charge() {
                     self.done = true;
                     return Some(Err(Error::BudgetExceeded));
                 }
-                self.budget -= 1;
                 self.frames.last_mut().expect("non-empty").anchor_checked = true;
-
-                // Read the issuer DN of the cert at the top of the path
-                // — that is the cert this frame is seeking an issuer
-                // for. The path mirrors frames; path.last() corresponds
-                // to frames.last() at all times.
-                let cur_issuer = &self
-                    .path
-                    .last()
-                    .expect("path mirrors frames; non-empty")
-                    .tbs_certificate()
-                    .issuer();
-                let matched = self
-                    .anchors
-                    .iter()
-                    .any(|a| pkix_path::names_match(&a.subject, cur_issuer));
-                if matched {
-                    self.frames.last_mut().expect("non-empty").anchor_yielded = true;
-                    return Some(Ok(self.path.clone()));
+                if self.anchor_matches(node) {
+                    return Some(Ok(self.current_chain()));
                 }
             }
 
-            // Past the anchor check. If this frame is at or beyond the
-            // depth limit, it cannot host any further intermediate
-            // candidates — backtrack. The recursive DFS's
-            // `if depth_remaining == 0 { return Ok(false); }` clause
-            // corresponds to this gate: a frame exists at every depth
-            // up to and including `max_depth + 1` (the deepest frame
-            // performs anchor check then returns immediately).
+            // Past the anchor check. A frame at the depth limit cannot
+            // host any further intermediate candidates — backtrack. A
+            // frame exists at every depth up to and including
+            // `max_depth + 1` (the deepest frame performs the anchor check
+            // then returns immediately).
             if self.frames.len() > self.max_depth {
                 self.frames.pop();
-                self.path.pop();
                 continue;
             }
 
-            // Compute candidate ranking lazily — only frames that
-            // survive the anchor check pay the cost.
-            if self.frames.last().expect("non-empty").ranked.is_none() {
-                let cur = self.path.last().expect("non-empty");
-                let ranked = rank_candidates(cur, self.pool);
-                self.frames.last_mut().expect("non-empty").ranked = Some(ranked);
+            // Rank candidates for this node once per iterator lifetime.
+            if self.ranked[node].is_none() {
+                let ranked = rank_candidates(
+                    self.cert(node),
+                    self.pool,
+                    &self.duplicate,
+                    self.anchors,
+                    self.verifier.is_some(),
+                );
+                self.ranked[node] = Some(ranked);
             }
 
             // Pull the next candidate index, or backtrack if exhausted.
             let frame = self.frames.last_mut().expect("non-empty");
-            let ranked = frame.ranked.as_ref().expect("set above");
-            if frame.cursor >= ranked.len() {
-                // No more candidates: backtrack.
+            let ranked = self.ranked[node].as_ref().expect("set above");
+            let Some(&idx) = ranked.get(frame.cursor) else {
                 self.frames.pop();
-                self.path.pop();
                 continue;
-            }
-            let (_tier, idx) = ranked[frame.cursor];
+            };
             frame.cursor += 1;
 
+            // Every examined candidate costs budget, so pools whose
+            // candidates are all rejected below still terminate within
+            // `dfs_budget` steps.
+            if !self.charge() {
+                self.done = true;
+                return Some(Err(Error::BudgetExceeded));
+            }
+
+            // SPKI cycle guard (cheap; before any signature work).
             let candidate = &self.pool[idx];
-
-            // CA check (BasicConstraints cA=TRUE). Skip-not-fail: a
-            // candidate whose `BasicConstraints` is absent, has
-            // `cA = FALSE`, or fails to DER-decode is treated as
-            // "not a CA" and silently skipped. This keeps DFS alive
-            // when the certificate pool carries unsolicited or corrupt
-            // certs — e.g. CMS `SignedData.certificates` bags routinely
-            // include certs the verifier did not solicit (other
-            // recipients in a multi-recipient message, intermediates
-            // from unrelated CAs that rode along, expired or corrupt
-            // certs from someone's pipeline). One bad cert in the bag
-            // must not poison verification of an otherwise-valid chain.
-            //
-            // The error itself is not lost: when no path can be built
-            // and skipping malformed candidates is what prevented one,
-            // `build_path` returns `Error::NoPathFound`, indistinguishable
-            // from any other no-path case. Callers that want diagnostic
-            // detail ("why didn't this path build?") need a future
-            // diagnostic mode; that is out of scope for skip-not-fail.
-            if !cert_is_ca(candidate) {
+            let in_path = self
+                .frames
+                .iter()
+                .any(|f| same_spki(self.cert(f.node), candidate));
+            if in_path {
                 continue;
             }
 
-            // SPKI cycle guard.
-            if spki_already_in_path(candidate, &self.path) {
+            // CA check (BasicConstraints cA=TRUE) and, with a verifier,
+            // the link signature. Skip-not-fail: a candidate whose
+            // `BasicConstraints` is absent, has `cA = FALSE`, or fails to
+            // DER-decode is treated as "not a CA" and silently skipped.
+            // This keeps DFS alive when the certificate pool carries
+            // unsolicited or corrupt certs — e.g. CMS
+            // `SignedData.certificates` bags routinely include certs the
+            // verifier did not solicit. One bad cert in the bag must not
+            // poison verification of an otherwise-valid chain; nor may a
+            // bag of same-name decoys hide the real issuer, which is what
+            // the signature check prevents.
+            if !self.link_matches(node, idx) {
                 continue;
             }
 
-            // Eligible: push the candidate onto path/frames and let the
-            // outer loop iterate, processing the new top frame.
-            self.path.push(candidate.clone());
-            self.frames.push(Frame::new());
+            // Eligible: push the candidate and let the loop process it.
+            self.frames.push(Frame::new(idx + 1));
         }
     }
 }
@@ -718,7 +842,13 @@ pub fn build_path_candidates<'a>(
     pool: &'a CertPool,
     anchors: &'a [pkix_path::TrustAnchor],
 ) -> PathCandidates<'a> {
-    PathCandidates::new(target, pool.as_slice(), anchors, &PathBuilderConfig::new())
+    PathCandidates::new(
+        target,
+        pool.as_slice(),
+        anchors,
+        &PathBuilderConfig::new(),
+        None,
+    )
 }
 
 /// Construct a [`PathCandidates`] iterator with caller-provided budget
@@ -733,7 +863,7 @@ pub fn build_path_candidates_with_config<'a>(
     anchors: &'a [pkix_path::TrustAnchor],
     config: &PathBuilderConfig,
 ) -> PathCandidates<'a> {
-    PathCandidates::new(target, pool.as_slice(), anchors, config)
+    PathCandidates::new(target, pool.as_slice(), anchors, config, None)
 }
 
 // =========================================================================
@@ -823,9 +953,11 @@ pub fn build_path_candidates_with_config<'a>(
 ///   ranking. Only the `keyIdentifier` field participates.
 ///
 /// **Anchor matching is by DN only.** When a candidate's issuer DN matches
-/// any anchor in `anchors`, path building terminates immediately with that
-/// chain — the anchor's `SubjectPublicKeyInfo` is **not** verified against
-/// what the chain expects.
+/// any anchor in `anchors`, `build_path` returns that chain — the anchor's
+/// `SubjectPublicKeyInfo` is **not** verified against what the chain
+/// expects. The iterator keeps exploring same-name pool candidates after
+/// such a match (GitHub #11), and [`build_first_valid_path`] only accepts
+/// an anchor link whose signature verifies.
 ///
 /// **Shortest-first is no longer guaranteed.** Earlier versions of this
 /// crate used iterative-deepening DFS to return the shortest topology
@@ -839,7 +971,9 @@ pub fn build_path_candidates_with_config<'a>(
 ///
 /// # Security
 ///
-/// Pool contents should be from a trusted source. The DFS frame-entry
+/// Pool contents should be from a trusted source: a crafted pool of
+/// same-name decoys can steer this topology-only search to a wrong chain
+/// first (use [`build_first_valid_path`] for untrusted pools). The search
 /// budget enforces a hard cap on search work to prevent denial-of-service
 /// via oversized or crafted pools.
 pub fn build_path(
@@ -868,7 +1002,7 @@ pub fn build_path_with_config(
     let pool_slice = pool.as_slice();
 
     // First pass at the configured max_depth.
-    let mut iter = PathCandidates::new(target, pool_slice, anchors, config);
+    let mut iter = PathCandidates::new(target, pool_slice, anchors, config, None);
     match iter.next() {
         Some(Ok(chain)) => return Ok(chain),
         Some(Err(e)) => return Err(e),
@@ -883,7 +1017,7 @@ pub fn build_path_with_config(
         max_depth: config.max_depth.saturating_add(1),
         dfs_budget: config.dfs_budget,
     };
-    let mut probe = PathCandidates::new(target, pool_slice, anchors, &probe_config);
+    let mut probe = PathCandidates::new(target, pool_slice, anchors, &probe_config, None);
     match probe.next() {
         Some(Ok(_)) => Err(Error::DepthExceeded),
         Some(Err(e)) => Err(e),
@@ -916,9 +1050,21 @@ pub fn build_path_with_config(
 /// [`pkix_path::DefaultVerifier`]) — the first DFS yield can be rejected by
 /// `validate_path` even though a SHA-256-only path exists in the same pool.
 ///
-/// `build_first_valid_path` closes this gap: it iterates
-/// [`build_path_candidates`] and tries `validate_path` per yielded chain,
-/// returning the first chain that survives both passes.
+/// `build_first_valid_path` closes this gap: it runs the candidate search
+/// with per-link signature checking — a pool certificate is only pushed
+/// onto the path if its key verifies the signature of the certificate
+/// below it, and an anchor only terminates a path if its key verifies the
+/// top certificate (RFC 4158 §3.5.1; results cached per (child, issuer)
+/// pair) — and tries `validate_path` per yielded chain, returning the
+/// first chain that survives both passes. Same-name decoys in an
+/// attacker-supplied pool (e.g. the unsigned `SignedData.certificates` of
+/// a CMS message) are therefore pruned at the first level instead of
+/// exhausting the search budget, and within each AKI/SKI tier candidates
+/// issued by an anchor-named CA are tried first.
+///
+/// If no signature-consistent chain exists, one topology-only candidate
+/// is validated so that the error is [`Error::NoValidPath`] carrying the
+/// concrete `validate_path` failure (e.g. a bad signature), as before.
 ///
 /// # Errors
 ///
@@ -989,7 +1135,7 @@ pub fn build_first_valid_path_with_config<V>(
 where
     V: pkix_path::SignatureVerifier,
 {
-    let mut iter = PathCandidates::new(target, pool.as_slice(), anchors, config);
+    let mut iter = PathCandidates::new(target, pool.as_slice(), anchors, config, Some(verifier));
     let mut tried: usize = 0;
     let mut last_error: Option<alloc::string::String> = None;
 
@@ -1019,16 +1165,46 @@ where
                         tried,
                         last_error: last,
                     }),
-                    // Zero candidates ever yielded. Distinguish
-                    // NoPathFound from DepthExceeded the same way
-                    // build_path does: probe at max_depth + 1.
+                    // Zero signature-consistent candidates. If a purely
+                    // topological chain exists, validate it so the caller
+                    // still gets `NoValidPath` with the specific
+                    // `validate_path` failure (e.g. "signature invalid at
+                    // chain index 0") instead of a bare `NoPathFound`.
                     None => {
+                        let mut topo =
+                            PathCandidates::new(target, pool.as_slice(), anchors, config, None);
+                        match topo.next() {
+                            Some(Ok(chain)) => {
+                                return match pkix_path::validate_path(
+                                    &chain, anchors, policy, verifier,
+                                ) {
+                                    // Unreachable in practice (the verified
+                                    // search would have found it), but a
+                                    // validating chain is a success.
+                                    Ok(_) => Ok(chain),
+                                    Err(e) => Err(Error::NoValidPath {
+                                        tried: 1,
+                                        last_error: alloc::format!("{e}"),
+                                    }),
+                                };
+                            }
+                            Some(Err(e)) => return Err(e),
+                            None => {}
+                        }
+                        // No topological chain either. Distinguish
+                        // NoPathFound from DepthExceeded the same way
+                        // build_path does: probe at max_depth + 1.
                         let probe_config = PathBuilderConfig {
                             max_depth: config.max_depth.saturating_add(1),
                             dfs_budget: config.dfs_budget,
                         };
-                        let mut probe =
-                            PathCandidates::new(target, pool.as_slice(), anchors, &probe_config);
+                        let mut probe = PathCandidates::new(
+                            target,
+                            pool.as_slice(),
+                            anchors,
+                            &probe_config,
+                            None,
+                        );
                         match probe.next() {
                             Some(Ok(_)) => Err(Error::DepthExceeded),
                             Some(Err(e)) => Err(e),

@@ -5,6 +5,11 @@
 //! `src/lib.rs` deliberately defer to here: HTTP method, response
 //! body capture, status code mapping, and the response-size cap.
 //!
+//! mockito listens on 127.0.0.1, which `HttpFetcher::new`'s destination
+//! policy refuses, so every networked test opts in with
+//! `allow_private_destinations()` (the policy itself is covered by
+//! `tests/review_ssrf.rs`).
+//!
 //! These tests are sync-only; they drive mockito's blocking server
 //! the same way `pkix-revocation-http/tests/integration.rs` does.
 //!
@@ -35,7 +40,7 @@ fn fetch_returns_2xx_body_verbatim() {
         .create();
 
     let url = format!("{}/intermediate.crt", server.url());
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let bytes = f.fetch(&url).expect("2xx fetch must succeed");
 
     mock.assert();
@@ -55,7 +60,7 @@ fn fetch_returns_2xx_body_with_no_content_type_header() {
         .create();
 
     let url = format!("{}/no-ct.crt", server.url());
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let bytes = f.fetch(&url).unwrap();
 
     mock.assert();
@@ -72,7 +77,7 @@ fn fetch_404_maps_to_http_status() {
     let mock = server.mock("GET", "/missing.crt").with_status(404).create();
 
     let url = format!("{}/missing.crt", server.url());
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch(&url).unwrap_err();
 
     mock.assert();
@@ -85,7 +90,7 @@ fn fetch_500_maps_to_http_status() {
     let mock = server.mock("GET", "/broken.crt").with_status(500).create();
 
     let url = format!("{}/broken.crt", server.url());
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch(&url).unwrap_err();
 
     mock.assert();
@@ -105,7 +110,7 @@ fn fetch_503_maps_to_http_status() {
         .create();
 
     let url = format!("{}/overloaded.crt", server.url());
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch(&url).unwrap_err();
 
     mock.assert();
@@ -130,7 +135,9 @@ fn fetch_rejects_oversized_body() {
         .create();
 
     let url = format!("{}/oversized.crt", server.url());
-    let f = HttpFetcher::new().with_max_response_size(CAP);
+    let f = HttpFetcher::new()
+        .allow_private_destinations()
+        .with_max_response_size(CAP);
     let err = f.fetch(&url).unwrap_err();
 
     mock.assert();
@@ -159,7 +166,9 @@ fn fetch_accepts_body_under_cap() {
         .create();
 
     let url = format!("{}/small.crt", server.url());
-    let f = HttpFetcher::new().with_max_response_size(1024);
+    let f = HttpFetcher::new()
+        .allow_private_destinations()
+        .with_max_response_size(1024);
     let bytes = f.fetch(&url).unwrap();
 
     mock.assert();
@@ -176,7 +185,7 @@ fn fetch_rejects_ldap_scheme_before_any_network_io() {
     // the URL would fail to resolve and we would get a transport
     // error, not UriUnsupported. The scheme check must short-circuit
     // synchronously.
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch("ldap://example.com/cn=ca").unwrap_err();
     match err {
         AiaError::UriUnsupported(uri) => assert_eq!(uri, "ldap://example.com/cn=ca"),
@@ -186,14 +195,14 @@ fn fetch_rejects_ldap_scheme_before_any_network_io() {
 
 #[test]
 fn fetch_rejects_ftp_scheme_before_any_network_io() {
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch("ftp://example.com/ca.crt").unwrap_err();
     assert!(matches!(err, AiaError::UriUnsupported(_)));
 }
 
 #[test]
 fn fetch_rejects_file_scheme_before_any_network_io() {
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let err = f.fetch("file:///etc/ssl/ca.crt").unwrap_err();
     assert!(matches!(err, AiaError::UriUnsupported(_)));
 }
@@ -231,7 +240,7 @@ fn batch_fetch_preserves_per_uri_order_and_results() {
     let url_c = format!("{}/c.crt", server.url());
     let uris = [url_a.as_str(), url_b.as_str(), url_c.as_str()];
 
-    let f = HttpFetcher::new();
+    let f = HttpFetcher::new().allow_private_destinations();
     let results = f.batch_fetch(&uris);
 
     mock_a.assert();

@@ -20,7 +20,8 @@
 //! Use `pkix_chain` (or [`pkix_path`] directly) when:
 //! - You are validating certs from a public CA (CA/B Forum TLS, code-signing)
 //!   that may carry extensions not in this crate's allowlist
-//! - You need `NameConstraints`, policy validation, or revocation checking
+//! - You need non-default certificate-policy inputs (initial policy set,
+//!   explicit-policy requirement) or revocation checking
 //! - You need a custom signature backend (FIPS, HSM, wolfCrypt)
 //! - You need to accept a broader set of algorithms or extension profiles
 //!
@@ -63,7 +64,10 @@
 //! # Limitations
 //!
 //! - No revocation checking (CRL / OCSP). Use `pkix-revocation` if required.
-//! - No `NameConstraints` or certificate policy validation.
+//! - `NameConstraints` and certificate-policy extensions on intermediates are
+//!   processed only by [`pkix_path`]'s RFC 5280 §6.1 algorithm with default
+//!   [`ValidationPolicy`] inputs (any policy acceptable, no explicit-policy
+//!   requirement); this crate adds no checks of its own on their content.
 //! - No cross-certificate path building (RFC 4158).
 //! - Signature backend is always `RustCrypto`; for a custom backend use `pkix_path` directly.
 

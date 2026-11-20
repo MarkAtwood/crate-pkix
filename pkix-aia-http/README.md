@@ -25,8 +25,14 @@ println!("fetched {} bytes", der_bytes.len());
 ```
 
 The default fetcher carries a 10-second timeout and a 1 MiB response
-body cap. Override via `with_max_response_size` or by injecting a
-pre-configured `ureq::Agent` via `with_agent`.
+body cap, does not follow redirects, ignores environment proxies, and
+refuses destinations that resolve to loopback, private, link-local,
+ULA, multicast or unspecified addresses (`AiaError::DestinationNotAllowed`),
+because caIssuers URIs come from not-yet-validated certificates (SSRF).
+Override the size cap via `with_max_response_size`, the destination
+filter via `allow_private_destinations`, or everything by injecting a
+pre-configured `ureq::Agent` via `with_agent` (which then owns redirect
+and destination policy).
 
 ## Design parallel: `pkix-revocation-http`
 

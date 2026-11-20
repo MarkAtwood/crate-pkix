@@ -84,7 +84,7 @@ fn aia_e2e_positive_chain_validates_after_http_fetch() {
         .with_body(INTERMEDIATE_DER)
         .create();
 
-    let http = HttpFetcher::new();
+    let http = HttpFetcher::new().allow_private_destinations();
     let fetcher = RedirectingHttpFetcher::new(
         &http,
         HashMap::from([(
@@ -126,7 +126,7 @@ fn aia_e2e_negative_404_surfaces_http_status() {
         .with_status(404)
         .create();
 
-    let http = HttpFetcher::new();
+    let http = HttpFetcher::new().allow_private_destinations();
     let fetcher = RedirectingHttpFetcher::new(
         &http,
         HashMap::from([(

@@ -43,19 +43,24 @@ let validated = validate_path(&chain, &trust_anchors, &policy, &DefaultVerifier)
 
 `build_path` implements iterative-deepening DFS per RFC 4158 §2.5. At each
 step, candidates are selected by matching the current certificate's `issuer`
-field against candidate `subject` fields. The search tries path depths 1
-through 10 intermediates, returning the shortest valid topology first.
+field against candidate `subject` fields. The search is a single
+depth-first pass of up to 10 intermediates, ranked by AKI/SKI match.
+`build_first_valid_path` additionally checks each link's signature
+before descending (so same-name decoys in an untrusted bag are pruned
+immediately) and tries anchor-issued candidates first.
 
 Cycle detection compares each candidate's OID and public key bytes against
 the certificates already in the current path, correctly handling encoding
 variants (e.g. RSA with and without explicit `NULL` parameters).
 
-Each depth round and the final depth probe start with a fresh node-visit
-budget of 10,000 to bound worst-case work against adversarial or oversized
-certificate pools.
+Each search pass starts with a fresh budget of 10,000 units (one per
+frame entered and per candidate examined) to bound worst-case work
+against adversarial or oversized certificate pools. Byte-identical pool
+certificates are considered once.
 
-Signatures are **not** verified during path building; that is the
-responsibility of the caller via `validate_path`.
+`build_path` and `build_path_candidates` do **not** verify signatures;
+that is the responsibility of the caller via `validate_path`
+(`build_first_valid_path` does both).
 
 ## Errors
 
@@ -63,7 +68,7 @@ responsibility of the caller via `validate_path`.
 |-------|---------|
 | `NoPathFound` | No topologically valid path through `pool` reaches any trust anchor |
 | `DepthExceeded` | A path exists but requires more than 10 intermediates |
-| `BudgetExceeded` | The DFS node-visit budget was exhausted; pool may be adversarially large |
+| `BudgetExceeded` | The search budget was exhausted; pool may be adversarially large |
 
 ## Standards
 

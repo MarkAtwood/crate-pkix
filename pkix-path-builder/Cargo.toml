@@ -35,6 +35,10 @@ pkix-path = { path = "../pkix-path", features = ["rsa", "p256", "std"] }
 # integration test's `impl SignatureVerifier` block can name the types.
 spki      = { workspace = true }
 signature = { workspace = true }
+# `pem` for `Certificate::load_pem_chain` in the BetterTLS fixture loaders
+# (tests/bettertls.rs, tests/build_first_valid_path.rs); without it those
+# targets only compile when another workspace member unifies the feature in.
+x509-cert = { workspace = true, features = ["pem"] }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -99,11 +99,12 @@ use alloc::vec::Vec;
 /// | Variant | When |
 /// |---------|------|
 /// | [`FetchingDisabled`](Self::FetchingDisabled) | `NoAiaFetcher` (PKIX-zkjb.4) and any fetcher that has been wired in but is intentionally off. |
-/// | [`HttpStatus`](Self::HttpStatus) | 4xx/5xx after redirects are followed; 3xx never surfaces. Carries the numeric status. |
+/// | [`HttpStatus`](Self::HttpStatus) | Any non-2xx final status. Carries the numeric status. Adapters that do not follow redirects (e.g. `pkix-aia-http`'s default) surface 3xx here. |
 /// | [`ResponseTooLarge`](Self::ResponseTooLarge) | Caller-side size cap exceeded. Carries the configured `limit` and the observed `actual` byte count. |
-/// | [`MalformedCertificate`](Self::MalformedCertificate) | Fetched bytes did not parse as a DER X.509 [`Certificate`]. Caller-provided diagnostic in the inner `String`. |
+/// | [`MalformedCertificate`](Self::MalformedCertificate) | Fetched bytes did not parse as a DER X.509 [`Certificate`] or a certs-only CMS message. Caller-provided diagnostic in the inner `String`. |
 /// | [`Timeout`](Self::Timeout) | Fetch did not complete within the adapter's configured deadline. |
 /// | [`UriUnsupported`](Self::UriUnsupported) | A `caIssuers` URI used a scheme the fetcher does not handle (e.g. `ldap://` against an HTTP-only fetcher). Carries the full offending URI. |
+/// | [`DestinationNotAllowed`](Self::DestinationNotAllowed) | The fetcher's destination policy refused the target (e.g. it resolves to a loopback / private / link-local address). Adapter diagnostic in the inner `String`. |
 /// | [`IoFailure`](Self::IoFailure) | (requires `std`) Lower-level transport error from the I/O substrate. `kind` is the `std::io::ErrorKind`; `message` is a human-readable description. |
 ///
 /// [`Certificate`]: https://docs.rs/x509-cert/latest/x509_cert/struct.Certificate.html
@@ -178,6 +179,16 @@ pub enum AiaError {
     /// (e.g. `"ldap://ca.example.com/cn=ca"`), not just the scheme.
     UriUnsupported(String),
 
+    /// The fetcher refused to contact the destination named by a
+    /// `caIssuers` URI under its destination policy (e.g. the host
+    /// resolved to a loopback, private, or link-local address).
+    ///
+    /// caIssuers URIs are read from certificates that have not been
+    /// validated yet, so a fetcher reachable by untrusted peers should
+    /// refuse internal destinations (server-side request forgery). The
+    /// inner `String` is an adapter-side diagnostic suitable for logging.
+    DestinationNotAllowed(String),
+
     /// Lower-level transport I/O failure.
     ///
     /// Requires the `std` feature: the `kind` field is
@@ -223,6 +234,9 @@ impl core::fmt::Display for AiaError {
             }
             Self::Timeout => f.write_str("AIA fetch timed out"),
             Self::UriUnsupported(uri) => write!(f, "AIA URI scheme not supported: {uri}"),
+            Self::DestinationNotAllowed(msg) => {
+                write!(f, "AIA fetch destination not allowed: {msg}")
+            }
             #[cfg(feature = "std")]
             Self::IoFailure { kind, message } => {
                 write!(f, "AIA fetch I/O failure ({kind:?}): {message}")
@@ -573,10 +587,21 @@ mod io_error_kind_serde {
 ///            Err(AiaError::FetchingDisabled));
 /// ```
 pub trait AiaFetcher {
-    /// Fetch the DER-encoded certificate at `uri`.
+    /// Fetch the certificate object at `uri`.
     ///
-    /// Returns the raw response bytes on success. Parsing them as
-    /// an X.509 certificate is the caller's job.
+    /// Returns the raw response bytes on success. Per RFC 5280
+    /// §4.2.2.1 these are either a single DER certificate or a
+    /// certs-only CMS message; parsing them is the caller's job
+    /// (`pkix-chain` accepts both).
+    ///
+    /// # Security
+    ///
+    /// `uri` comes from a certificate that has not been validated yet,
+    /// so any party able to present a certificate chooses it. Network
+    /// implementations should apply a destination policy (refuse
+    /// loopback, private and link-local targets; do not follow
+    /// redirects) and per-request timeouts; `pkix-aia-http`'s default
+    /// fetcher does both.
     ///
     /// # Errors
     ///
@@ -587,6 +612,8 @@ pub trait AiaFetcher {
     ///   PKIX-zkjb.4).
     /// - [`AiaError::UriUnsupported`] for URIs whose scheme this
     ///   fetcher does not handle.
+    /// - [`AiaError::DestinationNotAllowed`] for URIs whose target the
+    ///   fetcher's destination policy refuses.
     /// - [`AiaError::HttpStatus`], [`AiaError::Timeout`],
     ///   [`AiaError::ResponseTooLarge`], or
     ///   [`AiaError::IoFailure`] (under `std`) for transport-level
