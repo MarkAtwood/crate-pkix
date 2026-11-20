@@ -502,7 +502,12 @@ fn strip_bom(bytes: &[u8]) -> &[u8] {
 /// sign for these names" via that extension, and silently dropping it would
 /// remove the constraint at validation time.
 pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>> {
-    let bytes = strip_bom(bytes);
+    // `load_pem_chain` strips only trailing CR/LF; a trailing space or tab
+    // (after the last END line, or on it) makes it report a malformed
+    // post-encapsulation boundary. RFC 7468 §2 permits trailing whitespace
+    // and the rustdoc above promises to accept it, so trim all trailing
+    // ASCII whitespace here.
+    let bytes = strip_bom(bytes).trim_ascii_end();
     // x509-cert 0.2.x's `load_pem_chain` panics on input that is empty after
     // its internal trailing-whitespace strip (subtract-with-overflow at
     // `certificate.rs:256`). Fixed upstream in RustCrypto/formats#1965 and
