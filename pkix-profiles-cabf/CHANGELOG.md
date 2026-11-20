@@ -6,6 +6,11 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+Planned release: **0.3.0** (breaking: pkix-path 0.4, pkix-lint 0.10,
+x509-cert 0.3).
+
+No behaviour changes.
+
 ### Added
 
 - **`SmimeSponsorValidatedMultipurpose` profile** — CA/B Forum

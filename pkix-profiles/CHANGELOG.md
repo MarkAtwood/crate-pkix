@@ -6,7 +6,12 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.4.0** (breaking: pkix-path 0.4, pkix-lint 0.10,
+x509-cert 0.3).
+
+No behaviour changes. The deprecated CA/B Forum re-exports scheduled for
+removal "in 0.4.0" are still present.
+
 
 ## [1.0.0] — TBD
 

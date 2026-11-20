@@ -6,6 +6,20 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Planned release: **0.2.0** (breaking: pkix-lint 0.10).
+
+### Added
+
+- `BridgeConfig::max_output_bytes` (default `DEFAULT_MAX_OUTPUT_BYTES`,
+  64 MiB) and `BridgeError::OutputTooLarge`.
+
+### Fixed
+
+- `BridgeConfig::timeout` did not bound the call when a grandchild of a
+  zlint wrapper held the output pipes, and reader threads leaked on
+  timeout. The deadline now covers pipe EOF, the subprocess runs in its
+  own process group (Unix), and the group is killed on timeout.
+
 ### Added
 
 - Scaffold release: public type surface for the zlint subprocess

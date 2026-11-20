@@ -6,6 +6,24 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+Planned release: **0.4.0** (breaking: pkix-path 0.4, x509-cert 0.3).
+
+### Changed
+
+- `build_first_valid_path` verifies each link's signature before
+  descending (cached per child/issuer) and lets an anchor end a path
+  only if its key verifies the top certificate (RFC 4158 §3.5.1).
+  `dfs_budget` is charged per frame and per candidate examined.
+  Byte-identical pool certificates are considered once.
+
+### Fixed
+
+- 40 same-name, same-SKI decoys exhausted the budget before the real
+  intermediate was tried; 20,000 duplicates ran for over a minute.
+- Same-name pool candidates were not explored once the issuer name
+  matched an anchor, so key-rollover paths were unreachable
+  (GitHub #11).
+
 ### Added
 
 - Optional `serde` feature gating `Serialize`/`Deserialize` derives on

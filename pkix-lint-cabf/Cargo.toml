@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-lint-cabf"
 description = "Reference CA/Browser Forum lint bundles for pkix-lint (TLS BR, S/MIME BR) — not authoritative"
-version     = "0.2.0"  # 0.2 — first substantive content: cabf_tls_br module migrated from pkix-lint (PKIX-amgn.5).
+version     = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true

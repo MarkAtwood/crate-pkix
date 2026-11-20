@@ -4,6 +4,16 @@ All notable changes to this crate are documented here. Follows
 [Keep a Changelog](https://keepachangelog.com/) headings and
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Planned release: **0.2.0** (breaking: pkix-lint 0.10, pkix-zlint-bridge
+0.2).
+
+### Fixed
+
+- `all_lints` leaked a fresh copy of every lint's metadata on each call;
+  leaked records are now interned.
+
 ## [0.0.0] - 2026-05-13
 
 ### Added

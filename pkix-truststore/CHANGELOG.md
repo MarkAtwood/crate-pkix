@@ -6,7 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.2.0** (breaking: x509-cert 0.3 / der 0.8 types in
+the API).
+
+### Fixed
+
+- `from_pem` rejected input ending in spaces or tabs after the last END
+  line, contrary to its docs and RFC 7468 §2.
+
 
 ## [1.0.0] — TBD
 

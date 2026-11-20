@@ -6,6 +6,23 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+Planned release: **0.2.0** (breaking behaviour).
+
+### Changed
+
+- `HttpFetcher::new()` follows no redirects, ignores proxy environment
+  variables, and refuses loopback, private, link-local, ULA, multicast
+  and other internal destinations after DNS resolution
+  (`AiaError::DestinationNotAllowed`). `allow_private_destinations()`
+  opts out. The filter (`GuardedResolver`) uses ureq's `unversioned`
+  resolver API.
+
+### Fixed
+
+- AIA fetching was an SSRF vector: caIssuers URIs from unvalidated
+  certificates were fetched from any address, and redirects were
+  followed without re-checking.
+
 ### Added
 
 - Initial `HttpFetcher` synchronous HTTP transport implementing

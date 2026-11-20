@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-profiles-cabf"
 description = "Reference implementation of CA/Browser Forum certificate profile requirements (TLS BR, S/MIME BR, Code Signing BR) — not authoritative"
-version     = "0.2.0"
+version     = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true

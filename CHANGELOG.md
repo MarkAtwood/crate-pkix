@@ -6,6 +6,60 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Workspace: x509-cert 0.3 / RustCrypto 0.14 maintenance wave (Nov 2026)
+
+**Breaking for every crate that exposes x509-cert, der, spki or
+signature types.** The workspace moves from x509-cert 0.2, der 0.7,
+spki 0.7, signature 2 and the p256/p384 0.13, rsa 0.9, sha2 0.10 stack
+to x509-cert 0.3, der 0.8, spki 0.8, signature 3, p256/p384/p521 0.14,
+ed25519-dalek 3, rsa 0.10, sha1/sha2 0.11 and x509-ocsp 0.3.0-rc.1
+(pinned exactly; no stable 0.3 yet). The lockfile carries one copy of
+the stack; RUSTSEC-2023-0071 (rsa 0.9, GitHub #8) and RUSTSEC-2026-0387
+(crypto-bigint 0.5) are gone.
+
+- **MSRV 1.87** (was 1.73): the minimum crypto-bigint 0.7,
+  elliptic-curve 0.14, rsa 0.10 and x509-ocsp 0.3 accept. Edition stays
+  2021.
+- Workspace dependencies use `default-features = false`; `pkix-path`
+  without `std` no longer pulls `std` (GitHub #2).
+- `pkix_path::tbs_certificate_der` replaces `tbs_certificate().to_der()`
+  for signature checks: x509-cert 0.3 re-encodes validity times
+  (UTCTime before 2050), which broke signatures on certificates using
+  GeneralizedTime for such dates (PKITS 4.2.4 / 4.2.7 during the port).
+- Security and correctness fixes from a review of every crate; see the
+  per-crate CHANGELOGs (pkix-path, pkix-revocation,
+  pkix-revocation-http, pkix-chain, pkix-path-builder, pkix-aia-http,
+  pkix-identity, pkix-truststore, pkix-zlint-bridge, pkix-policy-zlint)
+  and the entries below.
+- LICENSE-APACHE and LICENSE-MIT added (GitHub #4).
+
+Planned versions: pkix-path, pkix-revocation, pkix-path-builder,
+pkix-profiles 0.4.0; pkix-chain, pkix-chain-simple 0.5.0; pkix-lint
+0.10.0; pkix-lint-cabf, pkix-profiles-cabf 0.3.0; pkix-identity,
+pkix-truststore, pkix-ct, pkix-ac, pkix-composite, pkix-revocation-http,
+pkix-aia-http, pkix-zlint-bridge, pkix-policy-zlint 0.2.0; pkix-aia
+0.1.1.
+
+#### `pkix-ct` 0.2.0
+
+- **BREAKING:** `SctVerifier::verify_embedded_scts` returns
+  `Vec<VerifiedSct>` (log ID, timestamp), at most one per log, instead
+  of a count of verified list entries. A repeated SCT, or several SCTs
+  from one log, used to count toward a "two SCTs" policy. New
+  `count_embedded_sct_logs`.
+- Readonly and retired logs from the v3 log list accept SCTs before
+  their readonly/retired time (they rejected every SCT).
+- SCT `extensions` longer than 65535 bytes return
+  `Error::SctExtensionsTooLong` instead of panicking (debug) or
+  truncating the length prefix (release).
+- Precertificate reconstruction keeps validity times as parsed.
+
+#### `pkix-chain-simple` 0.5.0, `pkix-ac` 0.2.0, `pkix-composite` 0.2.0
+
+Dependency-driven breaking bumps (pkix-path 0.4, x509-cert 0.3,
+signature 3). pkix-chain-simple's Limitations no longer claim that name
+constraints are not validated.
+
 ### Workspace: codify temporal-posture non-negotiable in AGENTS.md (PKIX-e3nl)
 
 New non-negotiable #7 in `AGENTS.md`: **current-regime only;

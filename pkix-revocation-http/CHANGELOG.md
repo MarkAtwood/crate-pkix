@@ -6,7 +6,35 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.2.0** (breaking).
+
+### Changed
+
+- **BREAKING:** x509-cert 0.3 / der 0.8 / x509-ocsp 0.3.0-rc.1 /
+  sha1, sha2 0.11; pkix-revocation 0.4. MSRV 1.87.
+- `UreqFetcher` and `ReqwestFetcher` follow at most `MAX_REDIRECTS` (10)
+  same-origin redirects; a cross-origin redirect returns
+  `FetchError::HttpStatus(3xx)`.
+- `ReqwestFetcher::new` panics if the client cannot be built instead of
+  silently using a client without a timeout; new `try_new` returns the
+  error.
+
+### Added
+
+- `build_ocsp_request_for_anchor`, `clients::ureq::MAX_REDIRECTS`,
+  `clients::reqwest::{MAX_REDIRECTS, same_origin_redirect_policy}`.
+
+### Fixed
+
+- All HTTP CRL/OCSP wrappers (sync, cached, async) returned `Ok(())`
+  from `check_revocation_against_anchor`, so a revoked certificate
+  issued by the trust anchor (normally the top intermediate) always
+  passed.
+- The cached wrappers stored responses before verifying them and never
+  refetched: one forged CRL or OCSP response was served until its
+  claimed nextUpdate. Only responses with a verified verdict and a
+  nextUpdate are cached now.
+
 
 ## [1.0.0] — TBD
 

@@ -30,6 +30,15 @@ members = [
 ]
 
 [workspace.package]
+# Nov-2026 maintenance wave (x509-cert 0.3 / der 0.8 / RustCrypto 0.14,
+# MSRV 1.87; see CHANGELOG.md): every crate that exposes x509-cert, der,
+# spki or signature types, or depends on one that does, takes a breaking
+# minor bump: pkix-path / pkix-revocation / pkix-path-builder / pkix-profiles
+# 0.4.0, pkix-chain / pkix-chain-simple 0.5.0, pkix-lint 0.10.0,
+# pkix-lint-cabf / pkix-profiles-cabf 0.3.0, pkix-identity / pkix-truststore /
+# pkix-ct / pkix-ac / pkix-composite / pkix-revocation-http / pkix-aia-http /
+# pkix-zlint-bridge / pkix-policy-zlint 0.2.0. pkix-aia 0.1.1 is additive.
+# The notes below describe earlier waves.
 # Most workspace crates are at 0.2.1 (additive: cert_is_ca helper, PathBuilderConfig,
 # stub-crate hygiene, idiom polish). Five crates with version overrides pin their
 # version explicitly per the May-2026 0.3 follow-up release wave:
@@ -110,27 +119,27 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 
 [workspace.dependencies]
 # Internal crates
-pkix-path             = { path = "pkix-path",             version = "0.3.2" }
-pkix-revocation       = { path = "pkix-revocation",       version = "0.3.3" }
-pkix-path-builder     = { path = "pkix-path-builder",     version = "0.3.2" }
-pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.1.0" }
-pkix-profiles         = { path = "pkix-profiles",         version = "0.3.1" }
-pkix-lint             = { path = "pkix-lint",             version = "0.9.1" }
-pkix-ct               = { path = "pkix-ct",               version = "0.1.1" }
-pkix-composite        = { path = "pkix-composite",        version = "0.1.0" }
-pkix-ac               = { path = "pkix-ac",               version = "0.1.0" }
-pkix-identity         = { path = "pkix-identity",         version = "0.1.0" }
-pkix-chain            = { path = "pkix-chain",            version = "0.4.1" }
-pkix-truststore       = { path = "pkix-truststore",       version = "0.1.1" }
+pkix-path             = { path = "pkix-path",             version = "0.4.0" }
+pkix-revocation       = { path = "pkix-revocation",       version = "0.4.0" }
+pkix-path-builder     = { path = "pkix-path-builder",     version = "0.4.0" }
+pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.2.0" }
+pkix-profiles         = { path = "pkix-profiles",         version = "0.4.0" }
+pkix-lint             = { path = "pkix-lint",             version = "0.10.0" }
+pkix-ct               = { path = "pkix-ct",               version = "0.2.0" }
+pkix-composite        = { path = "pkix-composite",        version = "0.2.0" }
+pkix-ac               = { path = "pkix-ac",               version = "0.2.0" }
+pkix-identity         = { path = "pkix-identity",         version = "0.2.0" }
+pkix-chain            = { path = "pkix-chain",            version = "0.5.0" }
+pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
-pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.2.0" }
-pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.2.0" }
+pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.0" }
+pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.3.0" }
 pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" }
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }
-pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.1.0" }
-pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.1.0" }
-pkix-aia                = { path = "pkix-aia",                version = "0.1.0" }
-pkix-aia-http           = { path = "pkix-aia-http",           version = "0.1.0" }
+pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.0" }
+pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.0" }
+pkix-aia                = { path = "pkix-aia",                version = "0.1.1" }
+pkix-aia-http           = { path = "pkix-aia-http",           version = "0.2.0" }
 pkix-dane               = { path = "pkix-dane",               version = "0.1.0" }
 pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.1.0" }
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }

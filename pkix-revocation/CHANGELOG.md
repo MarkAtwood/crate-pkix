@@ -6,7 +6,39 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.4.0** (breaking).
+
+### Changed
+
+- **BREAKING:** x509-cert 0.3, der 0.8, x509-ocsp 0.3.0-rc.1 (pinned
+  exactly; no stable 0.3 yet), sha1/sha2 0.11; pkix-path 0.4. MSRV 1.87.
+
+### Added
+
+- `Error::DeltaCrlAsComplete`, `Error::CrlUnsupportedCriticalExtension`,
+  `OutOfScopeReason::CrlDistributionPointIssuerMismatch`,
+  `OutOfScopeReason::CrlOnlySomeReasons`.
+
+### Fixed
+
+These all returned `Ok(())` ("not revoked") for a CRL that must not be
+used for the certificate:
+
+- a delta CRL used as the complete CRL (RFC 5280 §5.2.4);
+- a CRL, delta CRL or CRL entry with an unrecognized critical
+  extension (§5.2, §5.3; PKITS 4.4.10);
+- a delta CRL whose IssuingDistributionPoint differs from its base's
+  (§6.3.3(c));
+- a CRL that no distribution point of the certificate names, including
+  a DP with cRLIssuer (§6.3.3(b); PKITS 4.14.26);
+- a CRL with partial onlySomeReasons (PKITS 4.14.17). Combining
+  reason-partitioned CRLs is not implemented, so such CRLs now return
+  `OutOfScope(CrlOnlySomeReasons)` for a certificate they do not list.
+
+Also: nameRelativeToCRLIssuer is resolved against the DP's cRLIssuer
+(PKITS 4.14.29 now passes), and the trusted-responder advice in the
+OCSP docs is corrected. Resolves GitHub #9.
+
 
 ## [1.0.0] — TBD
 

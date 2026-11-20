@@ -6,7 +6,16 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.2.0** (breaking: x509-cert 0.3).
+
+### Fixed
+
+- An ASCII `MailboxName` matched an `otherName(SmtpUTF8Mailbox)` SAN,
+  contrary to RFC 8398 §3 and the crate docs.
+- `ServerName::ip_address` accepted a leading '+' in IPv4 octets and
+  IPv6 groups.
+- Docs: trailing-dot SANs are the same name; RFC 8398 section reference.
+
 
 ## [1.0.0] — TBD
 

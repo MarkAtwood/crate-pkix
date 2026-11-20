@@ -6,6 +6,35 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+Planned release: **0.5.0** (breaking: pkix-path 0.4, x509-cert 0.3).
+
+### Added
+
+- `AiaConfig` (`max_depth`, `max_uris_per_cert`, `max_total_fetches`,
+  `max_certs_per_response`, `deadline`) and `Verifier::with_aia_config`;
+  `Error::AiaFetchLimitExceeded`, `Error::AiaDeadlineExceeded`.
+- AIA responses may be a certs-only CMS `SignedData` (RFC 5280 §4.2.2.1).
+
+### Changed
+
+- `PathTooLong` from the supplied ordering falls back to rebuilding from
+  the certificates as an unordered bag.
+- `AiaDepthExceeded`'s Display text no longer prints the depth.
+
+### Fixed
+
+- AIA chain reassembly followed every caIssuers URI from unvalidated
+  certificates with no fetch or time limit (one crafted leaf cost 4160
+  fetches). Defaults: 2 URIs per certificate, 8 fetches, 30 s.
+- A pool of same-name decoy intermediates (for example appended to an
+  S/MIME certificate set) made a valid chain fail with
+  `PathBuild(BudgetExceeded)`.
+- OCSP responder delegation verified the responder signature over a
+  re-encoded TBS that could differ from the signed bytes.
+- Docs: `verify_tls_server` does not hardwire the verifier;
+  `verify_one` documents the bag rebuild that happens with
+  `NoAiaFetcher`.
+
 ### Fixed
 
 - **OCSP responder delegation: cryptographic binding now enforced.**

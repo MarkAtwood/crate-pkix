@@ -6,7 +6,14 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.1.1**.
+
+### Added
+
+- `AiaError::DestinationNotAllowed`.
+- `AiaFetcher::fetch` docs: both RFC 5280 response forms, and a
+  Security section.
+
 
 ## [1.0.0] — TBD
 

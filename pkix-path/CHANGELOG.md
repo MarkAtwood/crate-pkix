@@ -6,7 +6,79 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.4.0** (breaking).
+
+### Changed
+
+- **BREAKING:** moved to x509-cert 0.3, der 0.8, spki 0.8 and signature
+  3. Every public type from those crates (`Certificate`, `Name`,
+  `ObjectIdentifier`, `SubjectPublicKeyInfoOwned`, `signature::Error` in
+  `SignatureVerifier`, …) is now the new version's. MSRV is 1.87.
+- **BREAKING:** RustCrypto backends move to p256/p384 0.14, rsa 0.10 and
+  sha2 0.11; new `p521` and `ed25519` features, both part of
+  `rustcrypto`. Workspace dependencies no longer enable default
+  features, so a build without `std` does not pull `std` through
+  x509-cert (GitHub #2). On `x86_64-unknown-none`, sha2 0.11 needs
+  `RUSTFLAGS='--cfg sha2_backend="soft"'` (an LLVM error in its SHA-NI
+  backend on that soft-float target).
+- The policy tree is the RFC 9618 policy graph: at most one node per
+  (depth, policy). `PolicyTreeNode` gains `parent_policies`;
+  `ValidatedPath::valid_policy_tree` lists one node per (depth, policy).
+- `validate_path` returns `PathTooLong` when the chain is longer than
+  `2 * max_path_len + 3`, before any pairwise work.
+- ECDSA signature algorithms with parameters present are refused
+  (RFC 5758 §3.2).
+
+### Added
+
+- `tbs_certificate_der(cert)`: the TBSCertificate bytes to verify a
+  signature over. x509-cert 0.3 normalizes validity times when it
+  encodes, so `tbs_certificate().to_der()` no longer reproduces the
+  signed bytes of a certificate that uses GeneralizedTime before 2050.
+- `EcdsaP521Verifier`, `RsaPssVerifier` (RFC 4055; SHA-2 with MGF1 over
+  the same hash; rsaEncryption or id-RSASSA-PSS issuer keys),
+  `Ed25519Verifier` (RFC 8410); `DefaultVerifier` dispatches to them.
+- `MAX_AVAS_PER_RDN` (64): `names_match` treats a wider RDN as
+  non-matching.
+
+### Fixed
+
+- ECDSA verification took the curve from the signature OID, so a P-384
+  issuer key signing with ecdsa-with-SHA256 (OpenSSL's default) failed.
+  The curve now comes from the issuer's key and the digest from the OID.
+- RSA keys with absent rsaEncryption parameters and keys of 4097–8192
+  bits failed to verify.
+- Name constraints (RFC 5280 §4.2.1.10, §6.1.4(g)):
+  - a URI's host was taken from after any '@', including one in the
+    path (`https://evil.com/@good.com` passed a permitted good.com);
+  - URI SANs without an authority, or with an IP host, were accepted
+    under URI constraints;
+  - otherName SmtpUTF8Mailbox SANs ignored rfc822Name constraints, and
+    any otherName / ediPartyName / registeredID SAN ignored constraints
+    of its own form;
+  - a trailing-dot dNSName escaped excluded subtrees;
+  - an empty excluded dNSName ("exclude everything") was ignored;
+  - a quoted local part containing '@' hid an rfc822 domain;
+  - a non-IA5String subject emailAddress skipped rfc822 constraints;
+  - intersections of iPAddress, URI and rfc822 host constraints were
+    always empty, rejecting valid names.
+- Policy processing (RFC 5280 §6.1.3–§6.1.5):
+  - the user-initial-policy-set intersection skipped policies whose
+    parent was anyPolicy, accepting paths that must fail (PKITS 4.8.14
+    subpart 2 now fails as expected);
+  - `initial_policy_set` containing anyPolicy rejected valid paths
+    (GitHub #10);
+  - mappings {P->P, P->Q} produced {Q};
+  - policy mappings could grow the tree exponentially (CVE-2023-0464
+    class).
+- A certificate with two instances of one extension is rejected with
+  `MalformedCertificate` (RFC 5280 §4.2).
+- A self-issued key-rollover CA under a same-name anchor failed with
+  `NoTrustedPath` (GitHub #11).
+- id-RSASSA-PSS keys skipped `min_rsa_key_bits`.
+- Unauthenticated input could cost quadratic work before any signature
+  check (long chains, wide RDNs).
+
 
 ## [1.0.0] — TBD
 

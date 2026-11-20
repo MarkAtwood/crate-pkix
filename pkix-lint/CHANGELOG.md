@@ -6,7 +6,11 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
-_Nothing yet._
+Planned release: **0.10.0** (breaking: `Lint::check_cert` takes an
+x509-cert 0.3 `Certificate`; pkix-path 0.4).
+
+No behaviour changes.
+
 
 ## [1.0.0] — TBD
 
