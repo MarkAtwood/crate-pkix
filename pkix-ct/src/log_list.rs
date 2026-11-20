@@ -45,7 +45,10 @@ pub struct CtLog {
     /// - `Some(ts)` — the log became usable at timestamp `ts`
     ///   (milliseconds since the Unix epoch). SCTs with timestamps
     ///   before `ts` are not trustworthy even if signed by this
-    ///   log's key.
+    ///   log's key. `Some(0)` expresses "usable, start unknown" —
+    ///   `CtLogList::from_google_log_list_json` uses it for
+    ///   readonly / retired logs, whose usable timestamp the v3
+    ///   schema no longer carries.
     /// - `None` — the log has never reached the usable state. SCTs
     ///   from this log will fail the
     ///   [`usable_from_ms`, `retired_at_ms`) window check
@@ -246,9 +249,18 @@ mod google_schema {
         /// * `usable` — actively trusted; `usable_from_ms` is set.
         /// * `readonly` — no longer accepting submissions but still
         ///   trusted for existing SCTs; the readonly timestamp is
-        ///   stored as `retired_at_ms`.
+        ///   stored as `retired_at_ms` and `usable_from_ms` is
+        ///   `Some(0)`.
         /// * `retired` — no longer operated but historical SCTs remain
-        ///   valid; `retired_at_ms` is set.
+        ///   valid; `retired_at_ms` is set and `usable_from_ms` is
+        ///   `Some(0)`.
+        ///
+        /// The v3 schema records only the *current* state, so a
+        /// readonly or retired log carries no record of when it
+        /// became usable. Such a log necessarily passed through
+        /// `usable`, so its window lower bound is imported as
+        /// `Some(0)` ("unknown, unbounded below"); leaving it `None`
+        /// would make every SCT from the log fail the window check.
         /// * `qualified` — accepted into the program but pre-usable;
         ///   imported with `usable_from_ms = None`.
         /// * Logs with no `state` field are imported as-is.
@@ -274,7 +286,7 @@ mod google_schema {
                         .try_into()
                         .map_err(|_| Error::ParseError)?;
                     let key_der = BASE64.decode(&log.key).map_err(|_| Error::ParseError)?;
-                    let usable_from_ms = log
+                    let mut usable_from_ms = log
                         .state
                         .as_ref()
                         .and_then(|s| s.usable.as_ref())
@@ -290,6 +302,13 @@ mod google_schema {
                         .and_then(|s| s.retired.as_ref().or(s.readonly.as_ref()))
                         .map(|e| parse_rfc3339_to_unix_ms(&e.timestamp))
                         .transpose()?;
+                    // A readonly / retired log was usable before it
+                    // reached that state, but the schema does not
+                    // record when. Open the window's lower bound so
+                    // SCTs issued before `retired_at_ms` still verify.
+                    if retired_at_ms.is_some() && usable_from_ms.is_none() {
+                        usable_from_ms = Some(0);
+                    }
                     out.insert(CtLog {
                         log_id,
                         key_der,
@@ -498,7 +517,23 @@ mod google_schema {
             // 2025-06-01T00:00:00Z = 1748736000000 ms
             // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2025,6,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
             assert_eq!(readonly_log.retired_at_ms, Some(1_748_736_000_000));
-            assert_eq!(readonly_log.usable_from_ms, None);
+            // Lower bound is unknown (the schema carries only the
+            // current state), so the window is open below.
+            assert_eq!(readonly_log.usable_from_ms, Some(0));
+        }
+
+        #[test]
+        fn retired_log_window_open_below_closed_at_retirement() {
+            let json = synthetic_log_list_json();
+            let list = CtLogList::from_google_log_list_json(&json).unwrap();
+            let retired_log = list
+                .iter()
+                .find(|l| l.description == "retired-log")
+                .unwrap();
+            // 2025-03-01T00:00:00Z = 1740787200000 ms
+            // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2025,3,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
+            assert_eq!(retired_log.retired_at_ms, Some(1_740_787_200_000));
+            assert_eq!(retired_log.usable_from_ms, Some(0));
         }
 
         #[test]

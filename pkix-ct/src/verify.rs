@@ -116,6 +116,22 @@ fn tls_alg_to_x509_oid(hash_alg: u8, sig_alg: u8) -> Option<ObjectIdentifier> {
     }
 }
 
+/// One embedded SCT that verified, as returned by
+/// [`SctVerifier::verify_embedded_scts`].
+///
+/// Carries the identity of the log that vouched for the certificate
+/// and the time it did so, which is what CT policies (log / operator
+/// diversity, SCT age) are evaluated over. Look the log up with
+/// [`CtLogList::get`] for its key and metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct VerifiedSct {
+    /// The verifying log's `log_id` (SHA-256 of its SPKI, RFC 6962 §3.2).
+    pub log_id: [u8; 32],
+    /// The SCT's timestamp, in milliseconds since the Unix epoch.
+    pub timestamp_ms: u64,
+}
+
 /// Verify SCTs against a trusted CT log list using a pluggable
 /// [`SignatureVerifier`] for algorithm dispatch.
 ///
@@ -196,6 +212,9 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///   as a valid `SubjectPublicKeyInfo`.
     /// - [`Error::CertDerTooLong`] — the cert DER exceeds the 2^24 - 1
     ///   octet limit of the `ASN.1Cert` u24 length prefix.
+    /// - [`Error::SctExtensionsTooLong`] — `sct.extensions` exceeds the
+    ///   2^16 - 1 octet `CtExtensions` limit (only reachable for SCTs
+    ///   built through the public constructor or fields).
     /// - [`Error::InvalidSignature`] — the underlying verifier rejected
     ///   the signature.
     pub fn verify_sct_for_cert(
@@ -296,6 +315,9 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// - [`Error::CertDerTooLong`] — the reconstructed TBS exceeds the
     ///   2^24 - 1 octet limit of the RFC 6962 `TBSCertificate`
     ///   opaque-length-prefixed field.
+    /// - [`Error::SctExtensionsTooLong`] — `sct.extensions` exceeds the
+    ///   2^16 - 1 octet `CtExtensions` limit (only reachable for SCTs
+    ///   built through the public constructor or fields).
     /// - [`Error::InvalidSignature`] — the underlying verifier rejected
     ///   the signature.
     pub fn verify_sct_for_precert(
@@ -340,8 +362,9 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         Ok(log)
     }
 
-    /// Count how many SCTs embedded in `leaf_cert`'s SCT-list extension
-    /// successfully verify against this verifier's [`CtLogList`].
+    /// Verify the SCTs embedded in `leaf_cert`'s SCT-list extension
+    /// against this verifier's [`CtLogList`] and return one
+    /// [`VerifiedSct`] per distinct log that vouched for the cert.
     ///
     /// Cert-embedded SCTs are always `precert_entry` (RFC 6962 §3.1):
     /// the log signed the pre-cert before the CA glued the SCT list
@@ -354,14 +377,22 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// [`crate::sct_list_from_tls_extension`] and call
     /// [`Self::verify_sct_for_cert`] in a loop.
     ///
-    /// The returned count is the number of SCTs that fully verified
-    /// (signature OK, log known, timestamp inside the log's usable
-    /// window). SCTs that don't verify — wrong signature, unknown
-    /// log, retired log, unsupported algorithm — contribute 0 but are
-    /// NOT errors. The caller is expected to check the count against
-    /// a policy threshold (e.g., CA/Browser Forum TLS BR §3.2.2.9
-    /// requires "at least two SCTs from logs operated by two
-    /// different log operators" for publicly-trusted TLS certs).
+    /// An SCT is included only if it fully verified (signature OK,
+    /// log known, timestamp inside the log's usable window). SCTs
+    /// that don't verify — wrong signature, unknown log, retired
+    /// log, unsupported algorithm — are skipped but are NOT errors;
+    /// an empty `Vec` is a successful result.
+    ///
+    /// The result is **deduplicated by `log_id`**: at most one entry
+    /// per log, keeping the first verified SCT in list order. An SCT
+    /// list that repeats the same SCT, or carries several SCTs from
+    /// one log, therefore cannot inflate the result. CT policies
+    /// count independent logs, not list entries (e.g., CA/Browser
+    /// Forum TLS BR §3.2.2.9 and browser CT policies require SCTs
+    /// "from logs operated by two different log operators"), so the
+    /// caller applies that policy to the returned `log_id`s — mapping
+    /// them to operators from its own log-list source. For a plain
+    /// distinct-log count, use [`Self::count_embedded_sct_logs`].
     ///
     /// `issuer_cert` is the certificate whose `SubjectPublicKeyInfo`
     /// the CT logs hashed when generating `issuer_key_hash` for the
@@ -385,7 +416,7 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         &self,
         leaf_cert: &Certificate,
         issuer_cert: &Certificate,
-    ) -> Result<usize> {
+    ) -> Result<Vec<VerifiedSct>> {
         use der::Encode as _;
 
         let exts = leaf_cert
@@ -411,16 +442,46 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             .encode_to_vec(&mut issuer_der)
             .map_err(|_| Error::ParseError)?;
 
-        let mut valid = 0usize;
+        let mut verified: Vec<VerifiedSct> = Vec::new();
         for sct in &scts.0 {
+            // One entry per log: a repeated SCT, or a second SCT from
+            // a log already counted, adds no independent evidence.
+            // Checked before verifying so duplicates cost no signature
+            // verification. SCT lists are tiny (u16-bounded), so the
+            // linear scan is fine.
+            if verified.iter().any(|v| v.log_id == sct.log_id) {
+                continue;
+            }
             if self
                 .verify_sct_for_precert(sct, &leaf_der, &issuer_der)
                 .is_ok()
             {
-                valid = valid.saturating_add(1);
+                verified.push(VerifiedSct {
+                    log_id: sct.log_id,
+                    timestamp_ms: sct.timestamp_ms,
+                });
             }
         }
-        Ok(valid)
+        Ok(verified)
+    }
+
+    /// Number of distinct logs with a verified SCT embedded in
+    /// `leaf_cert` — `verify_embedded_scts(..)?.len()`.
+    ///
+    /// Convenience for callers whose policy is a plain log count.
+    /// Policies that require operator diversity need the `log_id`s
+    /// from [`Self::verify_embedded_scts`] instead.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::verify_embedded_scts`].
+    pub fn count_embedded_sct_logs(
+        &self,
+        leaf_cert: &Certificate,
+        issuer_cert: &Certificate,
+    ) -> Result<usize> {
+        self.verify_embedded_scts(leaf_cert, issuer_cert)
+            .map(|v| v.len())
     }
 
     /// Verify a Merkle inclusion proof (RFC 6962 §2.1.1 / RFC 9162 §2.1.3.2).
@@ -758,7 +819,8 @@ pub fn merkle_leaf_hash(leaf_bytes: &[u8]) -> [u8; 32] {
 /// 32-byte leaf hash that [`SctVerifier::verify_inclusion`] expects.
 ///
 /// Errors with [`Error::CertDerTooLong`] if `cert_der` exceeds the RFC
-/// 6962 §3.2 u24 length prefix.
+/// 6962 §3.2 u24 length prefix, or [`Error::SctExtensionsTooLong`] if
+/// `sct.extensions` exceeds the u16 `CtExtensions` length prefix.
 ///
 /// For `precert_entry` SCTs (the common case for SCTs embedded in
 /// final certs — RFC 6962 §3.1), use
@@ -799,7 +861,8 @@ pub fn merkle_tree_leaf_for_cert(
 /// Errors with [`Error::LeafMissingSctList`] if `leaf_cert_der` does
 /// not carry the SCT-list extension; [`Error::ParseError`] if either
 /// cert fails to parse; [`Error::CertDerTooLong`] if the re-encoded
-/// TBS exceeds the u24 length prefix.
+/// TBS exceeds the u24 length prefix; [`Error::SctExtensionsTooLong`]
+/// if `sct.extensions` exceeds the u16 `CtExtensions` length prefix.
 pub fn merkle_tree_leaf_for_precert(
     sct: &SignedCertificateTimestamp,
     leaf_cert_der: &[u8],
@@ -808,6 +871,17 @@ pub fn merkle_tree_leaf_for_precert(
     let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
     let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
     build_merkle_tree_leaf_precert_entry(sct, &issuer_key_hash, &tbs_no_sct)
+}
+
+/// Length of `sct.extensions` as the RFC 6962 §3.2 `CtExtensions`
+/// u16 length prefix (`opaque extensions<0..2^16-1>`).
+///
+/// The wire parser can never produce a longer field, but
+/// [`SignedCertificateTimestamp`] has public fields and a public
+/// constructor, so the bound is re-checked here instead of truncating
+/// the prefix with `as u16` (which would mis-frame the signed input).
+fn sct_extensions_len(sct: &SignedCertificateTimestamp) -> Result<u16> {
+    u16::try_from(sct.extensions.len()).map_err(|_| Error::SctExtensionsTooLong)
 }
 
 /// MerkleTreeLeaf builder for the x509_entry case. Shares the wire
@@ -823,7 +897,7 @@ fn build_merkle_tree_leaf_x509_entry(
     if cert_der.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
     }
-    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+    let ext_len = sct_extensions_len(sct)?;
 
     let cert_len = cert_der.len();
     let cap = 1 + 1 + 8 + 2 + 3 + cert_len + 2 + sct.extensions.len();
@@ -835,7 +909,7 @@ fn build_merkle_tree_leaf_x509_entry(
     out.push(((cert_len >> 16) & 0xFF) as u8);
     out.extend_from_slice(&(cert_len as u16).to_be_bytes());
     out.extend_from_slice(cert_der);
-    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&ext_len.to_be_bytes());
     out.extend_from_slice(&sct.extensions);
     Ok(out)
 }
@@ -851,7 +925,7 @@ fn build_merkle_tree_leaf_precert_entry(
     if tbs_no_sct.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
     }
-    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+    let ext_len = sct_extensions_len(sct)?;
 
     let tbs_len = tbs_no_sct.len();
     let cap = 1 + 1 + 8 + 2 + 32 + 3 + tbs_len + 2 + sct.extensions.len();
@@ -864,7 +938,7 @@ fn build_merkle_tree_leaf_precert_entry(
     out.push(((tbs_len >> 16) & 0xFF) as u8);
     out.extend_from_slice(&(tbs_len as u16).to_be_bytes());
     out.extend_from_slice(tbs_no_sct);
-    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&ext_len.to_be_bytes());
     out.extend_from_slice(&sct.extensions);
     Ok(out)
 }
@@ -915,10 +989,9 @@ fn build_signed_input_x509_entry(
     if cert_der.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
     }
-    // The parser already enforces u16-bounded extensions on input (the
-    // wire field's length prefix is u16). Defensively cap here to keep
-    // build_signed_input total in the unsigned-range it advertises.
-    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+    // The wire parser bounds extensions to u16, but `sct` may have been
+    // built via the public constructor / fields; check rather than trust.
+    let ext_len = sct_extensions_len(sct)?;
 
     let cert_len = cert_der.len();
     let cap = 1 + 1 + 8 + 2 + 3 + cert_len + 2 + sct.extensions.len();
@@ -931,7 +1004,7 @@ fn build_signed_input_x509_entry(
     out.push(((cert_len >> 16) & 0xFF) as u8);
     out.extend_from_slice(&(cert_len as u16).to_be_bytes());
     out.extend_from_slice(cert_der);
-    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&ext_len.to_be_bytes());
     out.extend_from_slice(&sct.extensions);
     Ok(out)
 }
@@ -959,7 +1032,7 @@ fn build_signed_input_precert_entry(
     if tbs_no_sct.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
     }
-    debug_assert!(sct.extensions.len() <= u16::MAX as usize);
+    let ext_len = sct_extensions_len(sct)?;
 
     let tbs_len = tbs_no_sct.len();
     let cap = 1 + 1 + 8 + 2 + 32 + 3 + tbs_len + 2 + sct.extensions.len();
@@ -972,7 +1045,7 @@ fn build_signed_input_precert_entry(
     out.push(((tbs_len >> 16) & 0xFF) as u8);
     out.extend_from_slice(&(tbs_len as u16).to_be_bytes());
     out.extend_from_slice(tbs_no_sct);
-    out.extend_from_slice(&(sct.extensions.len() as u16).to_be_bytes());
+    out.extend_from_slice(&ext_len.to_be_bytes());
     out.extend_from_slice(&sct.extensions);
     Ok(out)
 }

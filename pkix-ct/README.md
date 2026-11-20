@@ -67,9 +67,12 @@ let leaf = Certificate::from_der(leaf_der).map_err(|_| pkix_ct::Error::ParseErro
 let issuer = Certificate::from_der(issuer_der).map_err(|_| pkix_ct::Error::ParseError)?;
 
 let v = SctVerifier::new(logs, DefaultVerifier);
-let valid = v.verify_embedded_scts(&leaf, &issuer)?;
-// CA/Browser Forum TLS BR §3.2.2.9 requires at least two SCTs.
-assert!(valid >= 2, "cert has too few valid SCTs (got {valid})");
+// One entry per distinct log whose embedded SCT verified.
+let verified = v.verify_embedded_scts(&leaf, &issuer)?;
+// CT policies require SCTs from distinct logs / operators; map each
+// `log_id` to its operator from your log-list source to check that.
+let valid = verified.len();
+assert!(valid >= 2, "cert has too few distinct-log SCTs (got {valid})");
 # Ok(())
 # }
 ```

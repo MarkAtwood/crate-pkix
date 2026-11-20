@@ -271,8 +271,8 @@ fn rejects_unparsable_issuer() {
 
 mod embedded {
     //! Integration tests for [`SctVerifier::verify_embedded_scts`],
-    //! the loop helper that counts how many SCTs in a final cert's
-    //! SCT-list extension verify against a [`CtLogList`].
+    //! the loop helper that reports which logs' SCTs in a final
+    //! cert's SCT-list extension verify against a [`CtLogList`].
 
     use super::{precert_oracle_log_list, read_fixture, DefaultVerifier, Error, SctVerifier};
     use x509_cert::der::Decode as _;
@@ -289,10 +289,18 @@ mod embedded {
         let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
         let leaf = load_cert_der("precert-leaf-final.der");
         let issuer = load_cert_der("precert-issuer.der");
-        let count = v
+        let verified = v
             .verify_embedded_scts(&leaf, &issuer)
             .expect("verify embedded SCTs");
-        assert_eq!(count, 1, "oracle fixture has exactly one embedded SCT");
+        assert_eq!(
+            verified.len(),
+            1,
+            "oracle fixture has exactly one embedded SCT"
+        );
+        let sct = super::load_precert_oracle_sct();
+        assert_eq!(verified[0].log_id, sct.log_id);
+        assert_eq!(verified[0].timestamp_ms, sct.timestamp_ms);
+        assert_eq!(v.count_embedded_sct_logs(&leaf, &issuer), Ok(1));
     }
 
     #[test]
@@ -303,10 +311,10 @@ mod embedded {
         let v = SctVerifier::new(pkix_ct::CtLogList::new(), DefaultVerifier);
         let leaf = load_cert_der("precert-leaf-final.der");
         let issuer = load_cert_der("precert-issuer.der");
-        let count = v
+        let verified = v
             .verify_embedded_scts(&leaf, &issuer)
             .expect("returns count even when no SCTs verify");
-        assert_eq!(count, 0);
+        assert!(verified.is_empty());
     }
 
     #[test]
@@ -318,10 +326,10 @@ mod embedded {
         let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
         let leaf = load_cert_der("precert-leaf-final.der");
         let wrong_issuer = load_cert_der("cert.der"); // wrong key
-        let count = v
+        let verified = v
             .verify_embedded_scts(&leaf, &wrong_issuer)
             .expect("returns count even when issuer wrong");
-        assert_eq!(count, 0);
+        assert!(verified.is_empty());
     }
 
     #[test]
@@ -348,9 +356,9 @@ mod embedded {
         let leaf = Certificate::from_pem(&pem).unwrap();
         let issuer = load_cert_der("precert-issuer.der");
         let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
-        let count = v
+        let verified = v
             .verify_embedded_scts(&leaf, &issuer)
             .expect("retired-log SCTs return Ok(0)");
-        assert_eq!(count, 0);
+        assert!(verified.is_empty());
     }
 }

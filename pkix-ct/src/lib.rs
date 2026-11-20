@@ -60,7 +60,7 @@ pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
 pub use verify::{
     merkle_leaf_hash, merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert, MerkleAuditPath,
-    SctVerifier, SignedTreeHead,
+    SctVerifier, SignedTreeHead, VerifiedSct,
 };
 
 /// Errors returned by SCT parsing and verification.
@@ -103,6 +103,12 @@ pub enum Error {
     /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate()`)
     /// opaque-length-prefixed field.
     CertDerTooLong,
+    /// The SCT's `extensions` field exceeds the 2^16 - 1 octet limit
+    /// of the RFC 6962 §3.2 `CtExtensions` (`opaque<0..2^16-1>`) field.
+    /// The wire parser cannot produce such an SCT; this is reachable
+    /// only through [`SignedCertificateTimestamp::new`] or by setting
+    /// the public `extensions` field directly.
+    SctExtensionsTooLong,
     /// The final leaf certificate passed to
     /// [`SctVerifier::verify_sct_for_precert`] does not contain an
     /// SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2). Verifying a
@@ -154,6 +160,9 @@ impl core::fmt::Display for Error {
             }
             Self::CertDerTooLong => {
                 f.write_str("certificate DER exceeds the 2^24 - 1 octet ASN.1Cert limit")
+            }
+            Self::SctExtensionsTooLong => {
+                f.write_str("SCT extensions exceed the 2^16 - 1 octet CtExtensions limit")
             }
             Self::LeafMissingSctList => {
                 f.write_str("leaf certificate does not contain the SCT-list extension")

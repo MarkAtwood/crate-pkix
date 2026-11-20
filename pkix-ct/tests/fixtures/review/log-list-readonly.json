@@ -1,0 +1,24 @@
+{
+  "version": "review",
+  "log_list_timestamp": "2025-10-01T00:00:00Z",
+  "operators": [
+    {
+      "name": "review-operator",
+      "email": [],
+      "logs": [
+        {
+          "description": "precert-oracle (readonly)",
+          "log_id": "qi0f0d7tfLA83Fmzun+NiXgO6aX5MnMfVhApQBG8Fug=",
+          "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEg0dOKd0i+sAc+Z8ubaNOo59oTuU61iGo0LvSCdLFIc0UlNtXfQSC1owzft8qezeV6aZ14gLwwMVKOi6IyMKXfQ==",
+          "url": "https://example.invalid/ct/",
+          "mmd": 86400,
+          "state": {
+            "readonly": {
+              "timestamp": "2025-09-01T00:00:00Z"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
