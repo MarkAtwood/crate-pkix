@@ -622,7 +622,8 @@ where
     /// already in the pool are added.
     ///
     /// The slow path runs whenever the supplied ordering fails with
-    /// `ChainBroken`, `NoTrustedPath` or `SignatureInvalid`, including
+    /// `ChainBroken`, `NoTrustedPath`, `SignatureInvalid` or `PathTooLong`,
+    /// including
     /// with [`NoAiaFetcher`]: the supplied certs are then treated as an
     /// unordered bag and re-built with [`pkix_path_builder`]. If that
     /// fails and the orphaned cert has caIssuers URIs, [`NoAiaFetcher`]
@@ -1760,6 +1761,10 @@ const _: fn() = || {
 /// `SignatureInvalid { index }` is included because a wrong-but-DN-matching
 /// intermediate in the pool can be displaced by a correctly-signed
 /// alternative fetched via AIA.
+/// `PathTooLong` is included because pkix-path rejects an over-long input
+/// before looking at it; an unordered bag with extra certificates (an
+/// S/MIME `SignedData.certificates` set, for example) can still contain a
+/// valid path, which the budgeted path builder finds.
 ///
 /// All other variants (`ValidityPeriod`, `KeyUsageMissing`,
 /// `NameConstraintViolation`, `PolicyViolation`, `Der`, …) describe
@@ -1772,6 +1777,7 @@ fn is_aia_recoverable(e: &pkix_path::Error) -> bool {
         pkix_path::Error::ChainBroken { .. }
             | pkix_path::Error::NoTrustedPath
             | pkix_path::Error::SignatureInvalid { .. }
+            | pkix_path::Error::PathTooLong
     )
 }
 
