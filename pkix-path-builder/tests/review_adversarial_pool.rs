@@ -161,12 +161,10 @@ fn review_issue11_iterator_explores_same_name_pool_cert_after_anchor_match() {
 
 /// GitHub #11, signature-checked search: the anchor's key did not sign the
 /// leaf, so `[leaf]` is pruned and `[leaf, roll-ica]` is the only
-/// candidate. Accepting it end to end also needs the pkix-path half of
-/// #11 (`validate_path` currently skips a same-name anchor whose key
-/// differs from a self-issued top certificate and returns
-/// `NoTrustedPath`), which is being fixed separately.
+/// candidate. Accepting it end to end also relies on the pkix-path half
+/// of #11 (`validate_path` verifying a self-issued top certificate with
+/// a same-name anchor's key).
 #[test]
-#[ignore = "needs the pkix-path half of GitHub #11 (validate_path NoTrustedPath on self-issued top cert)"]
 fn review_issue11_build_first_valid_path_accepts_key_rollover() {
     let anchors = [TrustAnchor::from_cert(load("roll-root.der"))];
     let policy = ValidationPolicy::new(NOW_UNIX);
