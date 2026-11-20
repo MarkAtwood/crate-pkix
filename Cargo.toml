@@ -103,7 +103,7 @@ members = [
 # "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
 version      = "0.2.1"
 edition      = "2021"
-rust-version = "1.73"
+rust-version = "1.87"
 license      = "Apache-2.0 OR MIT"
 repository   = "https://github.com/MarkAtwood/crate-pkix"
 authors      = ["Mark Atwood <mark@reviewcommit.com>"]
@@ -136,21 +136,30 @@ pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.1.0" 
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
 pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
 
-# RustCrypto core
-der       = "0.7"
-spki      = "0.7"
-x509-cert = "0.2"
-signature = "2"
+# RustCrypto core.
+#
+# default-features = false on every entry: member crates opt in to the
+# features they need (`std`, `pem`, ...) so `pkix-path`'s no_std build does
+# not pull `std` transitively through a workspace default (GitHub #2).
+der       = { version = "0.8", default-features = false, features = ["alloc", "oid"] }
+spki      = { version = "0.8", default-features = false, features = ["alloc"] }
+x509-cert = { version = "0.3", default-features = false }
+signature = { version = "3",   default-features = false }
 
 # Algorithm backends (feature-gated in pkix-path)
-p256           = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8"] }
-p384           = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8"] }
-rsa            = { version = "0.9",  default-features = false }
-sha1           = { version = "0.10", default-features = false, features = ["oid"] }
-sha2           = { version = "0.10", default-features = false, features = ["oid"] }
+p256           = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8"] }
+p384           = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8"] }
+p521           = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8"] }
+rsa            = { version = "0.10", default-features = false, features = ["encoding", "pkcs1v15"] }
+ed25519-dalek  = { version = "3",    default-features = false }
+sha1           = { version = "0.11", default-features = false, features = ["oid"] }
+sha2           = { version = "0.11", default-features = false, features = ["oid"] }
 
-# Revocation (pkix-revocation)
-x509-ocsp = "0.2"
+# Revocation (pkix-revocation). x509-ocsp has no stable 0.3 release yet; the
+# 0.3 release candidate is the only line built on x509-cert 0.3 / der 0.8.
+# Pinned exactly so a later release candidate cannot change the API under a
+# published pkix-revocation; move to "0.3" once 0.3.0 is released.
+x509-ocsp = { version = "=0.3.0-rc.1", default-features = false }
 
 # IDN A-label / U-label conversion (pkix-identity).
 # default-features = false keeps idna no_std; `compiled_data` ships the
@@ -169,7 +178,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 
 # Async trait macro for the AsyncRevocationFetcher / AsyncRevocationChecker
 # traits in pkix-revocation-http. Stable-channel MSRV trivially fits within
-# the workspace's 1.73 floor; pinned at the workspace level so the
+# the workspace MSRV (1.87); pinned at the workspace level so the
 # crate-local feature flag does not drift from the version used by tests.
 # Tokio is intentionally NOT a workspace dep — it is a dev-only dep of
 # pkix-revocation-http's async integration tests, and a transitive runtime

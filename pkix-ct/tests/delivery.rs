@@ -47,7 +47,7 @@ const SCT_LIST_OID: &str = "1.3.6.1.4.1.11129.2.4.2";
 fn tls_ext_payload_from_cert(path: &str) -> Vec<u8> {
     let pem = fs::read_to_string(path).expect("read fixture");
     let cert = Certificate::from_pem(&pem).expect("parse PEM");
-    let exts = cert.tbs_certificate.extensions.as_ref().unwrap();
+    let exts = cert.tbs_certificate().extensions().unwrap();
     let ext = exts
         .iter()
         .find(|e| e.extn_id.to_string() == SCT_LIST_OID)
@@ -77,9 +77,8 @@ fn tls_extension_consistent_with_extension_value_parse() {
     let pem = fs::read_to_string(CRYPTOGRAPHY_SCTS_PEM).unwrap();
     let cert = Certificate::from_pem(&pem).unwrap();
     let ext = cert
-        .tbs_certificate
-        .extensions
-        .as_ref()
+        .tbs_certificate()
+        .extensions()
         .unwrap()
         .iter()
         .find(|e| e.extn_id.to_string() == SCT_LIST_OID)

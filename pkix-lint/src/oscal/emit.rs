@@ -1677,7 +1677,7 @@ mod tests {
         };
         use der::{Decode as _, Encode as _};
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
-        let name = cert.tbs_certificate.subject;
+        let name = cert.tbs_certificate().subject();
         let name_der = name
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
@@ -1703,7 +1703,7 @@ mod tests {
         let der_bytes = hex_decode(der_hex).expect("hex decodes");
         let parsed = x509_cert::name::Name::from_der(&der_bytes).expect("DER round-trip");
         assert!(
-            pkix_path::names_match(&name, &parsed),
+            pkix_path::names_match(name, &parsed),
             "DER round-trip must yield an equivalent Name"
         );
     }
@@ -1712,7 +1712,7 @@ mod tests {
     /// `None` on invalid input. Kept inline to avoid pulling in a hex
     /// crate dependency just for one test.
     fn hex_decode(s: &str) -> Option<Vec<u8>> {
-        if s.len() % 2 != 0 {
+        if !s.len().is_multiple_of(2) {
             return None;
         }
         let mut out = Vec::with_capacity(s.len() / 2);
@@ -1750,8 +1750,8 @@ mod tests {
         use der::{Decode as _, Encode as _};
         let cert = x509_cert::Certificate::from_der(&bytes).expect("parse fixture");
         let issuer_der = cert
-            .tbs_certificate
-            .subject
+            .tbs_certificate()
+            .subject()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::serial_range(issuer_der, vec![0x01, 0x00], vec![0x01, 0xff]);

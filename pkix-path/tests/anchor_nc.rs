@@ -20,6 +20,10 @@
 
 #![cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
 
+mod support {
+    pub mod raw_cert;
+}
+
 use der::{asn1::OctetString, Decode as _};
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
 use x509_cert::Certificate;
@@ -126,19 +130,21 @@ fn leaf_in_excluded_subtree_fails() {
 /// return `Err(der::Error)` — fail-closed behaviour.
 #[test]
 fn try_from_malformed_nc_returns_err() {
-    let mut cert = load_cert(&anchor_nc_fixture("anchor_permitted_dns.der"));
+    let cert = load_cert(&anchor_nc_fixture("anchor_permitted_dns.der"));
 
     // Replace the NC extension's value with invalid DER bytes.
-    let exts = cert
-        .tbs_certificate
-        .extensions
-        .as_mut()
-        .expect("fixture must have extensions");
-    for ext in exts.iter_mut() {
-        if ext.extn_id == OID_NAME_CONSTRAINTS {
-            ext.extn_value = OctetString::new(b"\xff\xff").expect("OctetString::new");
+    let cert = support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw
+            .tbs_certificate
+            .extensions
+            .as_mut()
+            .expect("fixture must have extensions");
+        for ext in exts.iter_mut() {
+            if ext.extn_id == OID_NAME_CONSTRAINTS {
+                ext.extn_value = OctetString::new(&b"\xff\xff"[..]).expect("OctetString::new");
+            }
         }
-    }
+    });
 
     let result = TrustAnchor::try_from(cert);
     assert!(
@@ -154,19 +160,21 @@ fn try_from_malformed_nc_returns_err() {
 /// `from_cert` silently treats parse errors as absent.
 #[test]
 fn from_cert_malformed_nc_gives_none() {
-    let mut cert = load_cert(&anchor_nc_fixture("anchor_permitted_dns.der"));
+    let cert = load_cert(&anchor_nc_fixture("anchor_permitted_dns.der"));
 
     // Replace the NC extension's value with invalid DER bytes.
-    let exts = cert
-        .tbs_certificate
-        .extensions
-        .as_mut()
-        .expect("fixture must have extensions");
-    for ext in exts.iter_mut() {
-        if ext.extn_id == OID_NAME_CONSTRAINTS {
-            ext.extn_value = OctetString::new(b"\xff\xff").expect("OctetString::new");
+    let cert = support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw
+            .tbs_certificate
+            .extensions
+            .as_mut()
+            .expect("fixture must have extensions");
+        for ext in exts.iter_mut() {
+            if ext.extn_id == OID_NAME_CONSTRAINTS {
+                ext.extn_value = OctetString::new(&b"\xff\xff"[..]).expect("OctetString::new");
+            }
         }
-    }
+    });
 
     let anchor = TrustAnchor::from_cert(cert);
     assert_eq!(

@@ -3,6 +3,10 @@
 //! Uses PKITS (NIST SP 800-89) certificate fixtures from the pkix-path crate.
 //! All tests are fully offline; no network access is performed.
 
+mod support {
+    pub mod raw_cert;
+}
+
 use der::asn1::{BitString, ObjectIdentifier, OctetString};
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
@@ -55,18 +59,19 @@ const OID_BASIC_CONSTRAINTS: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.
 /// signatures — it only walks the topology and inspects `BasicConstraints`.
 /// That makes this helper sufficient for testing the skip-not-fail
 /// behaviour of [`pkix_path_builder::build_path`] in isolation.
-fn corrupt_basic_constraints(mut cert: Certificate) -> Certificate {
-    let exts = cert
-        .tbs_certificate
-        .extensions
-        .as_mut()
-        .expect("template cert must have extensions");
-    let bc = exts
-        .iter_mut()
-        .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
-        .expect("template cert must carry BasicConstraints");
-    bc.extn_value = OctetString::new(b"\xff\xff".to_vec()).expect("OctetString::new");
-    cert
+fn corrupt_basic_constraints(cert: Certificate) -> Certificate {
+    support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw
+            .tbs_certificate
+            .extensions
+            .as_mut()
+            .expect("template cert must have extensions");
+        let bc = exts
+            .iter_mut()
+            .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
+            .expect("template cert must carry BasicConstraints");
+        bc.extn_value = OctetString::new(b"\xff\xff".to_vec()).expect("OctetString::new");
+    })
 }
 
 /// Test that `build_path` succeeds on the PKITS §4.1.1 two-cert chain and that
@@ -222,8 +227,8 @@ fn test_build_path_duplicate_cert_in_pool_pruned_by_spki() {
         .map(|c| {
             use der::Encode as _;
             let mut buf = Vec::new();
-            c.tbs_certificate
-                .subject_public_key_info
+            c.tbs_certificate()
+                .subject_public_key_info()
                 .encode_to_vec(&mut buf)
                 .unwrap();
             buf
@@ -285,19 +290,20 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
 
     let mut pool = CertPool::new();
     for i in 0..N {
-        let mut ca = template_ca.clone();
-        // Make issuer == subject: each clone will look for its own parent
-        // in the pool, finding all other clones as candidates → exponential fan-out.
-        ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
-        // Unique SPKI defeats the cycle guard so all N clones are treated as
-        // distinct DFS nodes.
-        ca.tbs_certificate
-            .subject_public_key_info
-            .subject_public_key = BitString::new(
-            0,
-            vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
-        )
-        .expect("BitString construction must succeed for valid parameters");
+        let ca = support::raw_cert::edit_cert(&template_ca, |ca| {
+            // Make issuer == subject: each clone will look for its own parent
+            // in the pool, finding all other clones as candidates → exponential fan-out.
+            ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
+            // Unique SPKI defeats the cycle guard so all N clones are treated as
+            // distinct DFS nodes.
+            ca.tbs_certificate
+                .subject_public_key_info
+                .subject_public_key = BitString::new(
+                0,
+                vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
+            )
+            .expect("BitString construction must succeed for valid parameters");
+        });
         pool.add(ca);
     }
 
@@ -322,8 +328,8 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
 fn encode_spki(cert: &Certificate) -> Vec<u8> {
     use der::Encode as _;
     let mut buf = Vec::new();
-    cert.tbs_certificate
-        .subject_public_key_info
+    cert.tbs_certificate()
+        .subject_public_key_info()
         .encode_to_vec(&mut buf)
         .expect("SubjectPublicKeyInfo must encode");
     buf
@@ -530,8 +536,8 @@ fn test_iterator_enumerates_all_topologically_valid_chains() {
         let terminal_issuer = &chain
             .last()
             .expect("yielded chain non-empty")
-            .tbs_certificate
-            .issuer;
+            .tbs_certificate()
+            .issuer();
         assert!(
             pkix_path::names_match(&anchor.subject, terminal_issuer),
             "yielded chain must terminate at the trust anchor"
@@ -617,15 +623,16 @@ fn test_iterator_budget_bounded_across_calls() {
 
     let mut pool = CertPool::new();
     for i in 0..N {
-        let mut ca = template_ca.clone();
-        ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
-        ca.tbs_certificate
-            .subject_public_key_info
-            .subject_public_key = BitString::new(
-            0,
-            vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
-        )
-        .expect("BitString construction must succeed for valid parameters");
+        let ca = support::raw_cert::edit_cert(&template_ca, |ca| {
+            ca.tbs_certificate.issuer = ca.tbs_certificate.subject.clone();
+            ca.tbs_certificate
+                .subject_public_key_info
+                .subject_public_key = BitString::new(
+                0,
+                vec![u8::try_from(i).expect("loop bound N fits in u8"); 32],
+            )
+            .expect("BitString construction must succeed for valid parameters");
+        });
         pool.add(ca);
     }
 

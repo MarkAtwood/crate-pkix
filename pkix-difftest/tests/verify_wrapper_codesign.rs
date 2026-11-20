@@ -263,14 +263,11 @@ fn run_sidecar(python: &Path, script: &Path, spec_json: &str) -> io::Result<Pyca
         .write_all(spec_json.as_bytes())?;
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!(
-                "sidecar exited {}: {}",
-                output.status.code().unwrap_or(-1),
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "sidecar exited {}: {}",
+            output.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
     }
     let v: serde_json::Value = serde_json::from_slice(&output.stdout).map_err(|e| {
         io::Error::new(

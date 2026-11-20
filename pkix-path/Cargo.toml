@@ -15,7 +15,7 @@ default   = ["rsa", "p256"]
 
 # Enable std::error::Error impl on Error type (no_std cores stay no_std without this).
 # Propagate std to all workspace crates that gate behaviour behind it.
-std = ["der/std", "spki/std", "x509-cert/std", "signature/std"]
+std = ["der/std", "spki/std", "x509-cert/std"]
 
 # Enable serde::Serialize / serde::Deserialize on the load-bearing result
 # types (ValidatedPath, ValidationPolicy, TrustAnchor, PolicyTreeNode,
@@ -25,14 +25,22 @@ std = ["der/std", "spki/std", "x509-cert/std", "signature/std"]
 serde = ["dep:serde", "dep:base64ct"]
 
 # RustCrypto algorithm backends — disable all to bring your own SignatureVerifier.
-# Currently implemented: RSA-PKCS1v15-SHA-256, RSA-PKCS1v15-SHA-384,
-# RSA-PKCS1v15-SHA-512, ECDSA-P-256-SHA-256, and ECDSA-P-384-SHA-384.
-# Ed25519 (RFC 8032) and RSA-PSS (RFC 4055) remain future work; see project
-# tracker (PKIX-gphz).
-rustcrypto = ["rsa", "p256", "p384"]
+# Implemented by `DefaultVerifier`:
+#   rsa     RSA PKCS#1 v1.5 with SHA-256/384/512, RSASSA-PSS (RFC 4055) with
+#           SHA-256/384/512 and MGF1 over the same hash
+#   p256    ECDSA on P-256
+#   p384    ECDSA on P-384
+#   p521    ECDSA on P-521
+#   ed25519 Ed25519 (RFC 8410)
+# ECDSA curves are chosen from the issuer's SubjectPublicKeyInfo, and the
+# digest from the signature algorithm (ecdsa-with-SHA256/384/512), so any
+# enabled curve verifies with any of the three digests.
+rustcrypto = ["rsa", "p256", "p384", "p521", "ed25519"]
 rsa        = ["dep:rsa", "dep:sha2"]
-p256       = ["dep:p256"]
+p256       = ["dep:p256", "dep:sha2"]
 p384       = ["dep:p384", "dep:sha2"]
+p521       = ["dep:p521", "dep:sha2"]
+ed25519    = ["dep:ed25519-dalek"]
 
 [dependencies]
 der       = { workspace = true }
@@ -43,14 +51,18 @@ signature = { workspace = true }
 # Algorithm backends (optional)
 p256 = { workspace = true, optional = true }
 p384 = { workspace = true, optional = true }
+p521 = { workspace = true, optional = true }
 rsa  = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
+ed25519-dalek = { workspace = true, optional = true }
 
 # Serde support (optional, gated behind the `serde` feature).
 serde    = { workspace = true, optional = true }
 base64ct = { workspace = true, optional = true }
 
 [dev-dependencies]
+# `derive` for the test-only certificate mirror in tests/support/raw_cert.rs.
+der        = { workspace = true, features = ["derive"] }
 # PKITS test vectors and external oracle results go here.
 # serde_json is used by the `serde` round-trip tests; run with
 # `cargo test -p pkix-path --features serde`.

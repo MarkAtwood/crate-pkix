@@ -332,8 +332,8 @@ impl Deviation {
     /// the second it reaches its end timestamp, not one second after.
     #[must_use]
     pub fn is_active_at(&self, now_unix: u64) -> bool {
-        let after_start = self.effective_start.map_or(true, |start| now_unix >= start);
-        let before_end = self.effective_end.map_or(true, |end| now_unix < end);
+        let after_start = self.effective_start.is_none_or(|start| now_unix >= start);
+        let before_end = self.effective_end.is_none_or(|end| now_unix < end);
         after_start && before_end
     }
 
@@ -512,7 +512,7 @@ impl DeviationScope {
     /// The match is computed as:
     ///
     /// ```text
-    /// cert.tbs_certificate.issuer.to_string().to_lowercase().contains(substring)
+    /// cert.tbs_certificate().issuer().to_string().to_lowercase().contains(substring)
     /// ```
     ///
     /// where `substring` is also pre-lowercased (via [`DeviationStore::add`]
@@ -590,7 +590,7 @@ impl DeviationScope {
     ///
     /// `issuer_der` is the DER encoding of the issuer Name (the value
     /// of `TBSCertificate.issuer` — equivalently
-    /// `cert.tbs_certificate.issuer.to_der().unwrap()` for callers
+    /// `cert.tbs_certificate().issuer().to_der().unwrap()` for callers
     /// holding an x509-cert `Name`). The bytes are stored verbatim and
     /// compared byte-equal during matching.
     ///
@@ -708,7 +708,7 @@ impl DeviationScope {
                 // immaterial; a caller-side cache of `(deviation_id,
                 // cert_sha256) → bool` is the recommended remedy if
                 // profiling ever shows otherwise.
-                let issuer_str = cert.tbs_certificate.issuer.to_string().to_lowercase();
+                let issuer_str = cert.tbs_certificate().issuer().to_string().to_lowercase();
                 issuer_str.contains(substring)
             }
             SCOPE_KIND_ISSUER_DN_EXACT => {
@@ -719,7 +719,7 @@ impl DeviationScope {
                 let Ok(name) = x509_cert::name::Name::from_der(der) else {
                     return false;
                 };
-                pkix_path::names_match(&name, &cert.tbs_certificate.issuer)
+                pkix_path::names_match(&name, cert.tbs_certificate().issuer())
             }
             SCOPE_KIND_SERIAL_RANGE => {
                 let Some(der) = self.get_bytes(PROP_ISSUER_DN_DER) else {
@@ -735,10 +735,10 @@ impl DeviationScope {
                 let Ok(issuer) = x509_cert::name::Name::from_der(der) else {
                     return false;
                 };
-                if !pkix_path::names_match(&issuer, &cert.tbs_certificate.issuer) {
+                if !pkix_path::names_match(&issuer, cert.tbs_certificate().issuer()) {
                     return false;
                 }
-                let serial = cert.tbs_certificate.serial_number.as_bytes();
+                let serial = cert.tbs_certificate().serial_number().as_bytes();
                 let cmp_start = serial_cmp(serial, start);
                 let cmp_end = serial_cmp(serial, end);
                 cmp_start.is_ge() && cmp_end.is_le()
@@ -1272,8 +1272,8 @@ impl DeviationRunner {
         cert_index: usize,
     ) -> DeviationRunResult {
         let issuance_unix = cert
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_before
             .to_unix_duration()
             .as_secs();
@@ -1527,7 +1527,7 @@ mod tests {
         let cert = load_cert();
         // The webpki-self-signed-365d cert has a CN we can match.
         // Get the issuer string to find what's in it.
-        let issuer = cert.tbs_certificate.issuer.to_string();
+        let issuer = cert.tbs_certificate().issuer().to_string();
         // Take the first word of the issuer for a partial match.
         let word = issuer.split_whitespace().next().unwrap_or("cert");
         // issuer_dn_contains requires a pre-lowercased substring; the match
@@ -1577,7 +1577,7 @@ mod tests {
         // External oracle: the rendered DN is the literal x509-cert
         // RFC 4514 output. Both sides of the contains() check use this
         // exact rendering.
-        let rendered = cert.tbs_certificate.issuer.to_string();
+        let rendered = cert.tbs_certificate().issuer().to_string();
         assert_eq!(
             rendered, "CN=Trust Anchor,O=Test Certificates 2011,C=US",
             "test oracle: x509-cert renders the PKITS GoodCACert issuer in CN-first RFC 4514 form"
@@ -1661,7 +1661,7 @@ mod tests {
     #[test]
     fn deviation_store_add_normalizes_issuer_dn_contains_to_lowercase() {
         let cert = load_cert();
-        let issuer = cert.tbs_certificate.issuer.to_string();
+        let issuer = cert.tbs_certificate().issuer().to_string();
         let word = issuer
             .split(|c: char| !c.is_alphanumeric())
             .find(|w| !w.is_empty())
@@ -1770,8 +1770,8 @@ mod tests {
         let cert = load_cert();
         // Use the cert's own issuer DN as the exact match — must succeed.
         let issuer_der = cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::issuer_dn_exact(issuer_der);
@@ -1797,15 +1797,15 @@ mod tests {
         .expect("fixture is valid DER");
         // Use smime cert's issuer as the scope — should not match the webpki cert.
         let other_issuer_der = other_cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::issuer_dn_exact(other_issuer_der);
         // If both certs have the same issuer DN, the test is vacuous. Check first.
         let same = pkix_path::names_match(
-            &cert.tbs_certificate.issuer,
-            &other_cert.tbs_certificate.issuer,
+            cert.tbs_certificate().issuer(),
+            other_cert.tbs_certificate().issuer(),
         );
         if !same {
             assert!(
@@ -1863,10 +1863,10 @@ mod tests {
     fn scope_serial_range_matches_cert_in_range() {
         use der::Encode as _;
         let cert = load_cert();
-        let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
+        let serial = cert.tbs_certificate().serial_number().as_bytes().to_vec();
         let issuer_der = cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         // Range is [serial, serial] — cert's own serial, must match.
@@ -1881,14 +1881,14 @@ mod tests {
     fn scope_serial_range_excludes_cert_outside_range() {
         use der::Encode as _;
         let cert = load_cert();
-        let serial = cert.tbs_certificate.serial_number.as_bytes();
+        let serial = cert.tbs_certificate().serial_number().as_bytes();
         // Range is [serial+1, serial+2] — cert's serial is below, must not match.
         // Construct a start that is definitely higher: 0xFF repeated.
         let start = vec![0xFF; serial.len() + 1]; // much larger than any fixed serial
         let end = vec![0xFF; serial.len() + 2];
         let issuer_der = cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::serial_range(issuer_der, start, end);
@@ -1906,11 +1906,11 @@ mod tests {
             "../../pkix-path/tests/fixtures/policy-checks/smime-self-signed-365d.der"
         ))
         .expect("fixture is valid DER");
-        let serial = cert.tbs_certificate.serial_number.as_bytes().to_vec();
+        let serial = cert.tbs_certificate().serial_number().as_bytes().to_vec();
         // Use the other cert's issuer — should not match cert.
         let other_issuer_der = other_cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let scope = DeviationScope::serial_range(
@@ -1919,8 +1919,8 @@ mod tests {
             vec![0xFF; serial.len() + 2],
         );
         let same_issuer = pkix_path::names_match(
-            &cert.tbs_certificate.issuer,
-            &other_cert.tbs_certificate.issuer,
+            cert.tbs_certificate().issuer(),
+            other_cert.tbs_certificate().issuer(),
         );
         if !same_issuer {
             assert!(
@@ -2010,8 +2010,8 @@ mod tests {
         );
         let cert = load_cert();
         let issuer_der = cert
-            .tbs_certificate
-            .issuer
+            .tbs_certificate()
+            .issuer()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let exact = DeviationScope::issuer_dn_exact(issuer_der.clone());

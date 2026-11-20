@@ -904,7 +904,7 @@ fn find_prop_value<'a>(props: Option<&'a [Value]>, name: &str) -> Option<&'a str
 /// just for this parser. Matches the encoder at
 /// [`super::emit`]: lowercase emit, parser accepts mixed case.
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return None;
     }
     let mut out = Vec::with_capacity(s.len() / 2);
@@ -1130,8 +1130,8 @@ mod tests {
             return;
         };
         let subject_der = cert
-            .tbs_certificate
-            .subject
+            .tbs_certificate()
+            .subject()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let mut store = DeviationStore::new();
@@ -1162,8 +1162,8 @@ mod tests {
             return;
         };
         let subject_der = cert
-            .tbs_certificate
-            .subject
+            .tbs_certificate()
+            .subject()
             .to_der()
             .expect("Name::to_der is infallible for a parsed Name");
         let mut store = DeviationStore::new();
@@ -1727,7 +1727,7 @@ mod tests {
             return;
         };
         use der::Encode as _;
-        let der = cert.tbs_certificate.subject.to_der().expect("encode");
+        let der = cert.tbs_certificate().subject().to_der().expect("encode");
         let der_hex: String = der.iter().map(|b| format!("{b:02x}")).collect();
         let mut risk = minimal_valid_risk();
         risk["subjects"] = json!([{

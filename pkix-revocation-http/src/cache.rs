@@ -356,7 +356,8 @@ struct CrlMetadata {
 /// any structural issue when it constructs a `CrlChecker`).
 #[cfg(feature = "crl")]
 fn parse_crl_metadata(der_bytes: &[u8]) -> Result<CrlMetadata, der::Error> {
-    let crl = x509_cert::crl::CertificateList::from_der(der_bytes)?;
+    let crl =
+        x509_cert::crl::CertificateList::<x509_cert::certificate::Rfc5280>::from_der(der_bytes)?;
     let tbs = &crl.tbs_cert_list;
 
     // CRLNumber lives in tbs.crl_extensions.
@@ -463,7 +464,7 @@ fn parse_ocsp_metadata(der_bytes: &[u8]) -> Result<OcspMetadata, der::Error> {
 /// keyed (matching the OCSP wrapper's single-cert semantics).
 #[cfg(feature = "ocsp")]
 fn extract_cert_id_identity(req_body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), der::Error> {
-    let req = x509_ocsp::OcspRequest::from_der(req_body)?;
+    let req = x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(req_body)?;
     let first = req
         .tbs_request
         .request_list
@@ -645,7 +646,7 @@ where
         // Issuer-DN bytes are computed once and reused for every key.
         // A non-encodable Name shouldn't happen on a successfully-parsed
         // cert; if it does, fall back to "no cache hits possible".
-        let issuer_dn_der = issuer.tbs_certificate.subject.to_der().ok();
+        let issuer_dn_der = issuer.tbs_certificate().subject().to_der().ok();
 
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
@@ -1333,7 +1334,7 @@ mod tests {
         // Independent oracle: the leaf's tbsCertificate.serialNumber
         // bytes must match. (Confirms we are pulling from the request's
         // CertID, not somewhere else.)
-        assert_eq!(serial, leaf.tbs_certificate.serial_number.as_bytes());
+        assert_eq!(serial, leaf.tbs_certificate().serial_number().as_bytes());
         // SHA-256 hash is 32 bytes.
         assert_eq!(issuer_key_hash.len(), 32);
     }
@@ -1422,7 +1423,7 @@ mod tests {
 
             // The fixture's leaf advertises exactly one CDP URL:
             // http://crl.example.com/test.crl (see crl.rs tests).
-            let issuer_dn = cert(CA).tbs_certificate.subject.to_der().unwrap();
+            let issuer_dn = cert(CA).tbs_certificate().subject().to_der().unwrap();
             let key = CrlCacheKey {
                 issuer_dn_der: issuer_dn,
                 distribution_point_uri: Some("http://crl.example.com/test.crl".to_string()),
@@ -1444,7 +1445,7 @@ mod tests {
             let inner = HttpCrlFetcher::new(fetcher, DefaultVerifier, NOW);
             let cache = InMemoryCache::new();
             // Seed cache with garbage under the key the wrapper will use.
-            let issuer_dn = cert(CA).tbs_certificate.subject.to_der().unwrap();
+            let issuer_dn = cert(CA).tbs_certificate().subject().to_der().unwrap();
             let bad_key = CrlCacheKey {
                 issuer_dn_der: issuer_dn.clone(),
                 distribution_point_uri: Some("http://crl.example.com/test.crl".to_string()),

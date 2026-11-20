@@ -88,7 +88,7 @@
 //!     fn scope(&self) -> Scope { Scope::Certificate }
 //!     fn applies_to(&self) -> SubjectKind { SubjectKind::Leaf }
 //!     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-//!         if cert.tbs_certificate.subject.to_string().is_empty() {
+//!         if cert.tbs_certificate().subject().to_string().is_empty() {
 //!             LintResult::warn("empty Subject DN")
 //!         } else {
 //!             LintResult::Pass
@@ -315,6 +315,10 @@ pub(crate) fn truncate_for_detail(s: &str) -> Cow<'_, str> {
         s.len()
     ))
 }
+
+#[cfg(test)]
+#[path = "../tests/support/raw_cert.rs"]
+pub(crate) mod raw_cert;
 
 pub mod deviation;
 #[cfg(feature = "oscal")]
@@ -1597,7 +1601,7 @@ impl LintRunner {
     ///
     /// # Evaluation modes
     ///
-    /// Pass the **issuance time** (`cert.tbs_certificate.validity.not_before`) for
+    /// Pass the **issuance time** (`cert.tbs_certificate().validity().not_before`) for
     /// audit-mode evaluation: "was this cert compliant when it was issued?"
     ///
     /// Pass the **current time** for operational-mode evaluation: "is this cert
@@ -1674,8 +1678,8 @@ impl LintRunner {
         cert_index: usize,
     ) -> Vec<Finding> {
         let issuance_unix = cert
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_before
             .to_unix_duration()
             .as_secs();
@@ -1713,7 +1717,7 @@ impl LintRunner {
     /// anchor information and cannot determine this automatically.
     ///
     /// To identify it: the anchor-issued cert is the one whose issuer DN matches a
-    /// trust anchor's subject. Check via `pkix_path::names_match(cert.tbs_certificate.issuer,
+    /// trust anchor's subject. Check via `pkix_path::names_match(cert.tbs_certificate().issuer(),
     /// anchor.subject)` for each anchor in your trust store.
     ///
     /// # Fatal behavior across certificates
@@ -2748,8 +2752,8 @@ mod tests {
         let cert = load_fixture_cert();
         // Get the expected issuance time from the cert's notBefore.
         let expected_unix = cert
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_before
             .to_unix_duration()
             .as_secs();

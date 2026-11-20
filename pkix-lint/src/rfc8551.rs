@@ -108,7 +108,7 @@ impl Lint for Rfc8551EkuEmailProtectionLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error(
                 "leaf certificate has no extensions; ExtendedKeyUsage absent",
             );

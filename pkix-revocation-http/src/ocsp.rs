@@ -287,7 +287,7 @@ mod tests {
         );
         // Sanity: emitted body must round-trip through x509-ocsp's parser.
         let body = only.body.as_ref().unwrap();
-        x509_ocsp::OcspRequest::from_der(body)
+        x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(body)
             .expect("emitted POST body must parse as OCSPRequest");
     }
 

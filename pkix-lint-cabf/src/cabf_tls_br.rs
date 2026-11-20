@@ -180,9 +180,9 @@ impl Lint for ValidityMaxLint {
         // which must not affect whether a certificate's validity period was compliant at
         // issuance.  A cert issued before 2026-03-15 under the 398-day cap remains valid
         // even when a relying party validates it after 2026-03-15 (the 200-day epoch).
-        let tbs = &cert.tbs_certificate;
-        let not_before = tbs.validity.not_before.to_unix_duration().as_secs();
-        let not_after = tbs.validity.not_after.to_unix_duration().as_secs();
+        let tbs = cert.tbs_certificate();
+        let not_before = tbs.validity().not_before.to_unix_duration().as_secs();
+        let not_after = tbs.validity().not_after.to_unix_duration().as_secs();
 
         // Structurally invalid cert: notAfter precedes notBefore.
         // No separate validity-range lint exists that catches this case, so we
@@ -261,7 +261,7 @@ impl Lint for Sha1ProhibitedLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let sig_alg = cert.signature_algorithm.oid;
+        let sig_alg = cert.signature_algorithm().oid;
         if matches!(sig_alg, SHA1_WITH_RSA | ECDSA_WITH_SHA1) {
             LintResult::error(
                 "certificate uses SHA-1 signature algorithm, prohibited by TLS BR §7.1.3",
@@ -338,7 +338,7 @@ impl Lint for RsaMinKeySizeLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let spki = &cert.tbs_certificate.subject_public_key_info;
+        let spki = cert.tbs_certificate().subject_public_key_info();
 
         // Only check RSA keys.
         if spki.algorithm.oid != RSA_ENCRYPTION {
@@ -489,7 +489,7 @@ impl Lint for SanRequiredLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error("leaf certificate has no extensions; SubjectAltName absent");
         };
 
@@ -557,7 +557,7 @@ impl Lint for EkuServerAuthLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error(
                 "leaf certificate has no extensions; ExtendedKeyUsage absent",
             );
@@ -635,7 +635,7 @@ impl Lint for BcCaFlagLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error(
                 "intermediate CA certificate has no extensions; BasicConstraints absent",
             );

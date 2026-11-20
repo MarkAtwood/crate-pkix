@@ -6,7 +6,7 @@
 //! - it pulls in a small, focused dep tree compared to `reqwest::blocking`
 //!   (which mounts a tokio runtime and the full `hyper` client just to
 //!   serve a synchronous front-end);
-//! - it fits this crate's MSRV (`1.73`).
+//! - it fits this crate's MSRV (`1.87`).
 //!
 //! HTTPS support is enabled via the `rustls` feature on `ureq`, configured
 //! at the workspace level. Consumers who need a custom TLS configuration,

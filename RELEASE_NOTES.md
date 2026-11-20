@@ -148,7 +148,8 @@ Specifically frozen:
 - The `Verifier` struct's 3-generic shape
   (`Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A:
   AiaFetcher = NoAiaFetcher>`).
-- The MSRV: Rust 1.73 (pinned via workspace `rust-version`).
+- The MSRV: Rust 1.87 (pinned via workspace `rust-version`; raised from
+  1.73 by the x509-cert 0.3 / RustCrypto 0.14 upgrade, whose crates need 1.87).
 
 Specifically *not* frozen:
 

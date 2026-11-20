@@ -24,7 +24,7 @@ ureq = { workspace = true }
 
 [dev-dependencies]
 # Mock HTTP server for the integration-test suite. MSRV 1.70,
-# comfortably within the workspace's 1.73 MSRV. mockito is sync-only,
+# comfortably within the workspace MSRV (1.87). mockito is sync-only,
 # matching this crate's sync-only scope.
 mockito = "1.7"
 

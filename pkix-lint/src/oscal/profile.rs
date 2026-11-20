@@ -1175,7 +1175,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("read fixture {}: {e}", fixture_path.display()));
         let cert = <Certificate as der::Decode>::from_der(&der).expect("decode fixture");
         assert_eq!(
-            cert.tbs_certificate.serial_number.as_bytes().len(),
+            cert.tbs_certificate().serial_number().as_bytes().len(),
             20,
             "fixture invariant: leaf-rsa2048-sha1.der has a 20-octet serial",
         );

@@ -264,7 +264,7 @@ const OID_SUBJECT_KEY_IDENTIFIER: der::asn1::ObjectIdentifier =
 fn cert_aki_key_id(cert: &Certificate) -> Option<Vec<u8>> {
     use x509_cert::ext::pkix::AuthorityKeyIdentifier;
 
-    let extns = cert.tbs_certificate.extensions.as_deref()?;
+    let extns = cert.tbs_certificate().extensions().map(|v| v.as_slice())?;
     let extn = extns
         .iter()
         .find(|e| e.extn_id == OID_AUTHORITY_KEY_IDENTIFIER)?;
@@ -290,7 +290,7 @@ fn cert_aki_key_id(cert: &Certificate) -> Option<Vec<u8>> {
 fn cert_ski_key_id(cert: &Certificate) -> Option<Vec<u8>> {
     use x509_cert::ext::pkix::SubjectKeyIdentifier;
 
-    let extns = cert.tbs_certificate.extensions.as_deref()?;
+    let extns = cert.tbs_certificate().extensions().map(|v| v.as_slice())?;
     let extn = extns
         .iter()
         .find(|e| e.extn_id == OID_SUBJECT_KEY_IDENTIFIER)?;
@@ -321,11 +321,11 @@ fn cert_ski_key_id(cert: &Certificate) -> Option<Vec<u8>> {
 /// parsing `GeneralNames` for that signal is more work than the marginal
 /// disambiguation benefit justifies. Documented as a deferred enhancement.
 fn rank_candidates(cur: &Certificate, pool: &[Certificate]) -> Vec<(u8, usize)> {
-    let cur_issuer = &cur.tbs_certificate.issuer;
+    let cur_issuer = cur.tbs_certificate().issuer();
     let target_aki_kid = cert_aki_key_id(cur);
     let mut ranked: Vec<(u8, usize)> = Vec::with_capacity(pool.len());
     for (idx, candidate) in pool.iter().enumerate() {
-        if !pkix_path::names_match(&candidate.tbs_certificate.subject, cur_issuer) {
+        if !pkix_path::names_match(candidate.tbs_certificate().subject(), cur_issuer) {
             continue;
         }
         let tier: u8 = match (
@@ -355,9 +355,9 @@ fn rank_candidates(cur: &Certificate, pool: &[Certificate]) -> Vec<(u8, usize)> 
 /// DN with different keys, and treating them as the same node would
 /// incorrectly prune valid paths.
 fn spki_already_in_path(candidate: &Certificate, path: &[Certificate]) -> bool {
-    let candidate_spki = &candidate.tbs_certificate.subject_public_key_info;
+    let candidate_spki = candidate.tbs_certificate().subject_public_key_info();
     path.iter().any(|in_path| {
-        let s = &in_path.tbs_certificate.subject_public_key_info;
+        let s = in_path.tbs_certificate().subject_public_key_info();
         s.algorithm.oid == candidate_spki.algorithm.oid
             && s.subject_public_key == candidate_spki.subject_public_key
     })
@@ -626,8 +626,8 @@ impl<'a> Iterator for PathCandidates<'a> {
                     .path
                     .last()
                     .expect("path mirrors frames; non-empty")
-                    .tbs_certificate
-                    .issuer;
+                    .tbs_certificate()
+                    .issuer();
                 let matched = self
                     .anchors
                     .iter()

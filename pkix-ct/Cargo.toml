@@ -17,7 +17,7 @@ default = []
 # parser is `no_std` + `alloc`; this feature gates only the std-only
 # trait impl plus propagates the std feature to transitive deps so they
 # can use std::io etc. when wired into a std-only consumer.
-std = ["der/std", "x509-cert/std", "signature/std", "x509-ocsp?/std", "sha2?/std"]
+std = ["der/std", "x509-cert/std", "x509-ocsp?/std"]
 
 # Enable serde::Serialize / serde::Deserialize on the public Error type.
 serde = ["dep:serde"]

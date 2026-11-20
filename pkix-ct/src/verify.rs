@@ -389,9 +389,8 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         use der::Encode as _;
 
         let exts = leaf_cert
-            .tbs_certificate
-            .extensions
-            .as_ref()
+            .tbs_certificate()
+            .extensions()
             .ok_or(Error::NoScts)?;
         let ext = exts
             .iter()
@@ -1000,11 +999,11 @@ fn build_signed_input_precert_entry(
 /// level in Python and verifying the Rust re-encoding produces
 /// identical bytes.
 fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
-    let mut cert = Certificate::from_der(leaf_cert_der).map_err(|_| Error::ParseError)?;
-    let exts = cert
-        .tbs_certificate
-        .extensions
-        .as_mut()
+    let cert = Certificate::from_der(leaf_cert_der).map_err(|_| Error::ParseError)?;
+    let mut exts = cert
+        .tbs_certificate()
+        .extensions()
+        .cloned()
         .ok_or(Error::LeafMissingSctList)?;
     let before = exts.len();
     exts.retain(|ext| ext.extn_id != OID_SCT_LIST);
@@ -1013,14 +1012,13 @@ fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
     }
     // If all extensions were removed (the SCT-list was the only one),
     // RFC 5280 §4.1.2.9 requires the [3] EXPLICIT Extensions field to
-    // be absent rather than encoded as an empty SEQUENCE. Drop the
-    // Option to match.
-    if exts.is_empty() {
-        cert.tbs_certificate.extensions = None;
-    }
-    let mut buf = Vec::new();
-    cert.tbs_certificate
-        .encode_to_vec(&mut buf)
+    // be absent rather than encoded as an empty SEQUENCE.
+    let exts = (!exts.is_empty()).then_some(exts);
+    // `encode_tbs_certificate` keeps the validity times as parsed;
+    // x509-cert 0.3's own encoder would normalize them (RFC 5280
+    // §4.1.2.5) and break the signed-entry bytes for a certificate whose
+    // CA used GeneralizedTime before 2050.
+    let buf = pkix_path::encode_tbs_certificate(cert.tbs_certificate(), exts.as_ref())
         .map_err(|_| Error::ParseError)?;
     if buf.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
@@ -1045,8 +1043,8 @@ fn issuer_key_hash_from_cert(issuer_cert_der: &[u8]) -> Result<[u8; 32]> {
     let issuer = Certificate::from_der(issuer_cert_der).map_err(|_| Error::ParseError)?;
     let mut spki_buf = Vec::new();
     issuer
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .encode_to_vec(&mut spki_buf)
         .map_err(|_| Error::ParseError)?;
     let digest = Sha256::digest(&spki_buf);

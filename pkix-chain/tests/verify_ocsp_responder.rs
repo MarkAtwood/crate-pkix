@@ -49,7 +49,7 @@ impl RevocationChecker for AlwaysRevoking {
         _issuer: &Certificate,
     ) -> pkix_revocation::Result<()> {
         Err(RevocationError::Revoked {
-            serial: cert.tbs_certificate.serial_number.clone(),
+            serial: cert.tbs_certificate().serial_number().clone(),
             reason_code: None,
         })
     }
@@ -60,7 +60,7 @@ impl RevocationChecker for AlwaysRevoking {
         _anchor: &TrustAnchor,
     ) -> pkix_revocation::Result<()> {
         Err(RevocationError::Revoked {
-            serial: cert.tbs_certificate.serial_number.clone(),
+            serial: cert.tbs_certificate().serial_number().clone(),
             reason_code: None,
         })
     }

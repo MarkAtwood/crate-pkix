@@ -90,10 +90,10 @@ der       = { workspace = true }
 
 # Multi-block PEM decoding. Already transitive via x509-cert; declared explicitly
 # here because we use `decode_vec` directly in the chain loader.
-pem-rfc7468 = "0.7"
+pem-rfc7468 = { version = "1", features = ["alloc"] }
 
 # CLI. Greenfield in this workspace — no existing crate uses clap, but every
-# RustCrypto dev-tool binary uses clap 4 derive. MSRV 1.73 covers it.
+# RustCrypto dev-tool binary uses clap 4 derive. The workspace MSRV (1.87) covers it.
 clap = { version = "4", features = ["derive"] }
 
 # Tempdir for OpenSSL oracle (one-call temp files written to disk because

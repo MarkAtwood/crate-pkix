@@ -26,6 +26,8 @@ x509-cert  = { workspace = true }
 serde      = { workspace = true, optional = true }
 
 [dev-dependencies]
+# `derive` for the test-only certificate mirror in tests/support/raw_cert.rs.
+der = { workspace = true, features = ["derive"] }
 pkix-path = { path = "../pkix-path", features = ["rsa", "p256", "std"] }
 # Used by the `AlwaysRejectVerifier` in `tests/build_first_valid_path.rs` to
 # spell out the `pkix_path::SignatureVerifier` trait's argument types. Both

@@ -55,9 +55,8 @@ const SCT_LIST_OID: &str = "1.3.6.1.4.1.11129.2.4.2";
 /// Pull the SCT-list extension value out of a cert.
 fn extract_sct_extension(cert: &Certificate) -> Vec<u8> {
     let extensions = cert
-        .tbs_certificate
-        .extensions
-        .as_ref()
+        .tbs_certificate()
+        .extensions()
         .expect("cert has no extensions");
     for ext in extensions {
         if ext.extn_id.to_string() == SCT_LIST_OID {

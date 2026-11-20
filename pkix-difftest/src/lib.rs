@@ -315,8 +315,8 @@ fn detect_leaf_first(certs: &[Certificate]) -> io::Result<bool> {
 /// the rare DN-only-equal-modulo-encoding chain — at which point the caller
 /// can pre-normalise the input or store ordering out-of-band.
 fn is_self_issued(cert: &Certificate) -> bool {
-    let subj = cert.tbs_certificate.subject.to_der();
-    let issuer = cert.tbs_certificate.issuer.to_der();
+    let subj = cert.tbs_certificate().subject().to_der();
+    let issuer = cert.tbs_certificate().issuer().to_der();
     matches!((subj, issuer), (Ok(s), Ok(i)) if s == i)
 }
 

@@ -1344,13 +1344,12 @@ fn verify_responder_is_delegated_by(
     responder: &Certificate,
     issuer: &Certificate,
 ) -> crate::Result<()> {
-    use der::Encode as _;
     use spki::der::referenced::OwnedToRef as _;
 
     // 1. Cheap DN gate.
     if !pkix_path::names_match(
-        &responder.tbs_certificate.issuer,
-        &issuer.tbs_certificate.subject,
+        responder.tbs_certificate().issuer(),
+        issuer.tbs_certificate().subject(),
     ) {
         return Err(Error::OcspDelegation {
             reason: Cow::Borrowed(
@@ -1361,27 +1360,25 @@ fn verify_responder_is_delegated_by(
     }
 
     // 2. Cryptographic binding: responder.signature must verify under
-    //    issuer.spki over responder.tbs_certificate (re-encoded to
-    //    DER). This is the spec-correct delegation check; DN equality
+    //    issuer.spki over responder.tbs_certificate (re-encoded by
+    //    `pkix_path::tbs_certificate_der`, which keeps validity times as
+    //    parsed). This is the spec-correct delegation check; DN equality
     //    alone admits a DN-twin attack in cross-signed topologies.
-    let tbs_der = responder
-        .tbs_certificate
-        .to_der()
-        .map_err(|_| Error::OcspDelegation {
-            reason: Cow::Borrowed(
-                "OCSP responder cert TBSCertificate re-encoding failed \
+    let tbs_der = pkix_path::tbs_certificate_der(responder).map_err(|_| Error::OcspDelegation {
+        reason: Cow::Borrowed(
+            "OCSP responder cert TBSCertificate re-encoding failed \
                  (cannot verify delegation signature)",
-            ),
-        })?;
+        ),
+    })?;
     DefaultVerifier
         .verify_signature(
-            responder.signature_algorithm.owned_to_ref(),
+            responder.signature_algorithm().owned_to_ref(),
             issuer
-                .tbs_certificate
-                .subject_public_key_info
+                .tbs_certificate()
+                .subject_public_key_info()
                 .owned_to_ref(),
             &tbs_der,
-            responder.signature.raw_bytes(),
+            responder.signature().raw_bytes(),
         )
         .map_err(|_| Error::OcspDelegation {
             reason: Cow::Borrowed(
@@ -1404,9 +1401,8 @@ fn has_ocsp_no_check(cert: &Certificate) -> bool {
     const OID_OCSP_NO_CHECK: der::asn1::ObjectIdentifier =
         der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1.5");
 
-    cert.tbs_certificate
-        .extensions
-        .as_ref()
+    cert.tbs_certificate()
+        .extensions()
         .is_some_and(|exts| exts.iter().any(|e| e.extn_id == OID_OCSP_NO_CHECK))
 }
 
@@ -1430,8 +1426,8 @@ struct LeafIdent<'a> {
 impl<'a> LeafIdent<'a> {
     fn of(cert: &'a Certificate) -> Self {
         Self {
-            issuer: &cert.tbs_certificate.issuer,
-            serial: &cert.tbs_certificate.serial_number,
+            issuer: cert.tbs_certificate().issuer(),
+            serial: cert.tbs_certificate().serial_number(),
         }
     }
 
@@ -1440,8 +1436,8 @@ impl<'a> LeafIdent<'a> {
         // here because both sides originate from the same parsed chain, so
         // the DER encoding is identical. This would NOT be correct for
         // cross-origin cert comparison, which requires RFC 4518 DN normalization.
-        self.serial == &cert.tbs_certificate.serial_number
-            && self.issuer == &cert.tbs_certificate.issuer
+        self.serial == cert.tbs_certificate().serial_number()
+            && self.issuer == cert.tbs_certificate().issuer()
     }
 }
 
@@ -1506,9 +1502,8 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
         der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
 
     let exts = leaf
-        .tbs_certificate
-        .extensions
-        .as_ref()
+        .tbs_certificate()
+        .extensions()
         .ok_or(Error::ProfileViolation {
             reason: Cow::Borrowed("TSA certificate has no ExtendedKeyUsage extension"),
         })?;
@@ -1581,7 +1576,7 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
     const OID_KEY_USAGE: der::asn1::ObjectIdentifier =
         der::asn1::ObjectIdentifier::new_unwrap("2.5.29.15");
 
-    let Some(exts) = leaf.tbs_certificate.extensions.as_ref() else {
+    let Some(exts) = leaf.tbs_certificate().extensions() else {
         // No extensions at all → no KeyUsage → no constraint to violate.
         return Ok(());
     };
@@ -1665,9 +1660,9 @@ fn issuer_resolvable(
     pool: &pkix_path_builder::CertPool,
     anchors: &[TrustAnchor],
 ) -> bool {
-    let target = &cert.tbs_certificate.issuer;
+    let target = cert.tbs_certificate().issuer();
     pool.iter()
-        .any(|c| pkix_path::names_match(&c.tbs_certificate.subject, target))
+        .any(|c| pkix_path::names_match(c.tbs_certificate().subject(), target))
         || anchors
             .iter()
             .any(|a| pkix_path::names_match(&a.subject, target))

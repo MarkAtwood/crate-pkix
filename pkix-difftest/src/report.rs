@@ -203,7 +203,7 @@ pub fn write_json(out: &mut impl io::Write, classified: &[Classified]) -> io::Re
     });
 
     serde_json::to_writer_pretty(&mut *out, &body)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON encode: {e}")))?;
+        .map_err(|e| io::Error::other(format!("JSON encode: {e}")))?;
     // serde_json::to_writer_pretty does not append a trailing newline.
     writeln!(out)?;
     Ok(())

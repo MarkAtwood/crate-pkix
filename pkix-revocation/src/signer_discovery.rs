@@ -109,7 +109,7 @@ pub fn discover_crl_signer<'a>(
     let crl_issuer = &crl.tbs_cert_list.issuer;
     bundle
         .iter()
-        .find(|cert| names_match(&cert.tbs_certificate.subject, crl_issuer))
+        .find(|cert| names_match(cert.tbs_certificate().subject(), crl_issuer))
 }
 
 /// Walk `bundle` from `signer` upward to a self-signed (anchor-like) cert.
@@ -150,8 +150,8 @@ pub(crate) fn reaches_self_signed(bundle: &[Certificate], signer: &Certificate) 
         // signature here — that is the caller's responsibility via
         // pkix-chain or equivalent.
         if names_match(
-            &current.tbs_certificate.subject,
-            &current.tbs_certificate.issuer,
+            current.tbs_certificate().subject(),
+            current.tbs_certificate().issuer(),
         ) {
             return true;
         }
@@ -198,9 +198,10 @@ fn find_parent<'a>(bundle: &'a [Certificate], cert: &Certificate) -> Option<&'a 
             }
         }
     }
-    let issuer = &cert.tbs_certificate.issuer;
+    let issuer = cert.tbs_certificate().issuer();
     bundle.iter().find(|candidate| {
-        !core::ptr::eq(*candidate, cert) && names_match(&candidate.tbs_certificate.subject, issuer)
+        !core::ptr::eq(*candidate, cert)
+            && names_match(candidate.tbs_certificate().subject(), issuer)
     })
 }
 
@@ -232,10 +233,9 @@ fn crl_authority_key_id(crl: &CertificateList) -> Option<OctetString> {
 /// Extract the `AuthorityKeyIdentifier.keyIdentifier` field from a certificate.
 fn cert_authority_key_id(cert: &Certificate) -> Option<OctetString> {
     let ext = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+        .tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_AUTHORITY_KEY_IDENTIFIER)?;
     let aki =
@@ -246,10 +246,9 @@ fn cert_authority_key_id(cert: &Certificate) -> Option<OctetString> {
 /// Extract the `SubjectKeyIdentifier` value from a certificate.
 fn cert_subject_key_id(cert: &Certificate) -> Option<OctetString> {
     let ext = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+        .tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_SUBJECT_KEY_IDENTIFIER)?;
     let ski =
@@ -278,7 +277,7 @@ mod tests {
     }
 
     fn load_crl(der: &[u8]) -> CertificateList {
-        CertificateList::from_der(der).expect("CRL DER parse")
+        CertificateList::<x509_cert::certificate::Rfc5280>::from_der(der).expect("CRL DER parse")
     }
 
     /// PKITS §4.5: AKI-on-CRL → SKI-on-bundle-cert walk picks the
@@ -298,8 +297,8 @@ mod tests {
         let bundle = vec![bridge.clone(), new_key_ca.clone()];
         let signer = discover_crl_signer(&bundle, &crl).expect("must locate signer");
         assert_eq!(
-            signer.tbs_certificate.subject_public_key_info,
-            new_key_ca.tbs_certificate.subject_public_key_info,
+            signer.tbs_certificate().subject_public_key_info(),
+            new_key_ca.tbs_certificate().subject_public_key_info(),
             "AKI/SKI walk should pick the NEW key cert, not the bridge",
         );
     }
@@ -314,8 +313,8 @@ mod tests {
         let bundle = vec![new_key_ca.clone(), bridge.clone()];
         let signer = discover_crl_signer(&bundle, &crl).expect("must locate signer");
         assert_eq!(
-            signer.tbs_certificate.subject_public_key_info,
-            new_key_ca.tbs_certificate.subject_public_key_info,
+            signer.tbs_certificate().subject_public_key_info(),
+            new_key_ca.tbs_certificate().subject_public_key_info(),
         );
     }
 

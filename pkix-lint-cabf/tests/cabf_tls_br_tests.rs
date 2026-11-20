@@ -409,7 +409,7 @@ fn sha1_prohibited_oid_detection_logic() {
     // Since the lint is what we are testing, we verify the OIDs parse and differ
     // from known non-SHA-1 OIDs — an independent check of OID identity.
     let cert = load_cert!("webpki-self-signed-365d.der");
-    let actual_oid = &cert.signature_algorithm.oid;
+    let actual_oid = &cert.signature_algorithm().oid;
     // webpki cert uses ecdsa-with-SHA256, not SHA-1.
     assert_ne!(
         actual_oid, &sha1_rsa,

@@ -106,7 +106,7 @@ pub fn verify_with_python(
         let stdin = child
             .stdin
             .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "could not open sidecar stdin"))?;
+            .ok_or_else(|| io::Error::other("could not open sidecar stdin"))?;
         stdin.write_all(spec.as_bytes())?;
     } // stdin dropped → closed.
 
@@ -192,8 +192,7 @@ fn build_spec_json(chain: &Chain) -> io::Result<String> {
     if !crls_b64.is_empty() {
         spec["crls"] = serde_json::json!(crls_b64);
     }
-    serde_json::to_string(&spec)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON encode: {e}")))
+    serde_json::to_string(&spec).map_err(|e| io::Error::other(format!("JSON encode: {e}")))
 }
 
 /// Standard-alphabet base64 encode (RFC 4648 §4) without line breaks. The

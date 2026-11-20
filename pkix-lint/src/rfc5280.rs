@@ -269,7 +269,7 @@ impl Lint for Rfc5280MaxSerialLengthLint {
         // encoded-content reading of RFC 5280 §4.1.2.2 "20 octets"; see the
         // `Encoded-content interpretation` section on this struct's
         // rustdoc, and the DER round-trip negative-path test below.
-        let len = cert.tbs_certificate.serial_number.as_bytes().len();
+        let len = cert.tbs_certificate().serial_number().as_bytes().len();
         let cap = self.max_octets;
         if len > cap {
             // Dynamic detail (Cow::Owned): include the actual length so
@@ -348,7 +348,7 @@ impl Lint for Rfc5280BasicConstraintsCaLeafLint {
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         // No extensions at all is fine: BasicConstraints is implicitly absent
         // and defaults to cA=FALSE per the spec.
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::Pass;
         };
 
@@ -470,7 +470,7 @@ impl Lint for Rfc5280EkuServerAuthLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error(
                 "leaf certificate has no extensions; ExtendedKeyUsage absent",
             );
@@ -578,11 +578,11 @@ impl Lint for Rfc5280SanRequiredWhenSubjectEmptyLint {
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
         // The lint is conditional on an empty Subject. Non-empty Subjects
         // are out of scope here — they Pass even if SAN is absent.
-        if !cert.tbs_certificate.subject.is_empty() {
+        if !cert.tbs_certificate().subject().is_empty() {
             return LintResult::Pass;
         }
 
-        let Some(extensions) = &cert.tbs_certificate.extensions else {
+        let Some(extensions) = cert.tbs_certificate().extensions() else {
             return LintResult::error(
                 "empty-subject certificate has no extensions; \
                  RFC 5280 §4.2.1.6 requires a critical subjectAltName",
@@ -701,8 +701,8 @@ impl Lint for Rfc5280SignatureAlgorithmMatchLint {
     }
 
     fn check_cert(&self, cert: &Certificate, _kind: SubjectKind, _now_unix: u64) -> LintResult {
-        let outer = &cert.signature_algorithm;
-        let inner = &cert.tbs_certificate.signature;
+        let outer = cert.signature_algorithm();
+        let inner = cert.tbs_certificate().signature();
         if outer == inner {
             LintResult::Pass
         } else {
@@ -781,7 +781,7 @@ mod tests {
         let lint = Rfc5280MaxSerialLengthLint::default();
         assert_eq!(lint.max_octets(), 20);
         let cert = load_cert("leaf-p256-50d-post-sc081-100d.der");
-        assert_eq!(cert.tbs_certificate.serial_number.as_bytes().len(), 20);
+        assert_eq!(cert.tbs_certificate().serial_number().as_bytes().len(), 20);
         assert_eq!(
             lint.check_cert(&cert, SubjectKind::Leaf, 0),
             LintResult::Pass
@@ -793,7 +793,7 @@ mod tests {
         // Oracle: leaf-rsa2047-365d-san-eku.der has a 3-octet serial.
         let lint = Rfc5280MaxSerialLengthLint::default();
         let cert = load_cert("leaf-rsa2047-365d-san-eku.der");
-        assert_eq!(cert.tbs_certificate.serial_number.as_bytes().len(), 3);
+        assert_eq!(cert.tbs_certificate().serial_number().as_bytes().len(), 3);
         assert_eq!(
             lint.check_cert(&cert, SubjectKind::Leaf, 0),
             LintResult::Pass
@@ -810,7 +810,7 @@ mod tests {
         lint.set_parameter("max-octets", "10")
             .expect("set_parameter ok");
         let cert = load_cert("leaf-rsa2048-sha1.der");
-        assert_eq!(cert.tbs_certificate.serial_number.as_bytes().len(), 20);
+        assert_eq!(cert.tbs_certificate().serial_number().as_bytes().len(), 20);
         match lint.check_cert(&cert, SubjectKind::Leaf, 0) {
             LintResult::Error(detail) => {
                 assert!(
@@ -833,7 +833,7 @@ mod tests {
         let mut lint = Rfc5280MaxSerialLengthLint::default();
         lint.set_parameter("max-octets", "3").expect("set ok");
         let cert = load_cert("leaf-rsa2047-365d-san-eku.der");
-        assert_eq!(cert.tbs_certificate.serial_number.as_bytes().len(), 3);
+        assert_eq!(cert.tbs_certificate().serial_number().as_bytes().len(), 3);
         assert_eq!(
             lint.check_cert(&cert, SubjectKind::Leaf, 0),
             LintResult::Pass
@@ -863,7 +863,7 @@ mod tests {
         // Hand-craft a DER INTEGER: tag=0x02, length=0x15 (21), content
         // = 0x00 (sign byte) || 0x80 0x00..0x00 (20 unsigned bytes).
         let mut serial_der: Vec<u8> = vec![0x02, 0x15, 0x00, 0x80];
-        serial_der.extend(std::iter::repeat(0x00).take(19));
+        serial_der.extend(std::iter::repeat_n(0x00, 19));
         assert_eq!(
             serial_der.len(),
             2 + 21,
@@ -885,12 +885,16 @@ mod tests {
         // Splice the synthetic serial into a real cert and re-decode
         // through the full Certificate path. The round-trip pins
         // end-to-end behavior, not just SerialNumber's surface.
-        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
-        cert.tbs_certificate.serial_number = synthetic_serial;
+        let cert = crate::raw_cert::edit_cert(&load_cert("leaf-rsa2048-365d-san-eku.der"), |c| {
+            c.tbs_certificate.serial_number = synthetic_serial;
+        });
         let cert_der = cert.to_der().expect("re-encode mutated cert");
         let decoded = <Certificate as der::Decode>::from_der(&cert_der)
             .expect("decode mutated cert through Rfc5280 profile");
-        assert_eq!(decoded.tbs_certificate.serial_number.as_bytes().len(), 21);
+        assert_eq!(
+            decoded.tbs_certificate().serial_number().as_bytes().len(),
+            21
+        );
 
         let lint = Rfc5280MaxSerialLengthLint::default();
         assert_eq!(lint.max_octets(), 20);
@@ -1210,7 +1214,7 @@ mod tests {
         let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
         let cert = load_cert("leaf-p256-365d-san-eku.der");
         assert!(
-            !cert.tbs_certificate.subject.is_empty(),
+            !cert.tbs_certificate().subject().is_empty(),
             "fixture must have a non-empty Subject for this test"
         );
         assert_eq!(
@@ -1226,7 +1230,7 @@ mod tests {
         // clause (which is conditional on an empty Subject).
         let lint = Rfc5280SanRequiredWhenSubjectEmptyLint;
         let cert = load_cert("leaf-p256-365d-no-san.der");
-        assert!(!cert.tbs_certificate.subject.is_empty());
+        assert!(!cert.tbs_certificate().subject().is_empty());
         assert_eq!(
             lint.check_cert(&cert, SubjectKind::Leaf, 0),
             LintResult::Pass
@@ -1305,24 +1309,27 @@ mod tests {
         use der::asn1::Any;
 
         let lint = Rfc5280SignatureAlgorithmMatchLint;
-        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
+        let cert = load_cert("leaf-rsa2048-365d-san-eku.der");
 
         // Fixture invariant: well-formed RSA cert has matching Some(NULL)
         // on both sides; mutate only the inner to None.
-        assert!(cert.signature_algorithm.parameters.is_some());
+        assert!(cert.signature_algorithm().parameters.is_some());
         assert_eq!(
-            cert.signature_algorithm, cert.tbs_certificate.signature,
+            cert.signature_algorithm(),
+            cert.tbs_certificate().signature(),
             "fixture must start with matching outer/inner identifiers"
         );
 
-        cert.tbs_certificate.signature.parameters = None;
+        let cert = crate::raw_cert::edit_cert(&cert, |c| {
+            c.tbs_certificate.signature.parameters = None;
+        });
         // Outer still has Some(NULL); confirm the mutation produced the
         // intended mismatch shape before invoking the lint.
         assert_eq!(
-            cert.signature_algorithm.parameters.as_ref().unwrap(),
+            cert.signature_algorithm().parameters.as_ref().unwrap(),
             &Any::null()
         );
-        assert!(cert.tbs_certificate.signature.parameters.is_none());
+        assert!(cert.tbs_certificate().signature().parameters.is_none());
 
         match lint.check_cert(&cert, SubjectKind::Any, 0) {
             LintResult::Error(detail) => {
@@ -1340,11 +1347,11 @@ mod tests {
     #[test]
     fn signature_algorithm_match_rejects_outer_absent_inner_null() {
         let lint = Rfc5280SignatureAlgorithmMatchLint;
-        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
-
-        cert.signature_algorithm.parameters = None;
+        let cert = crate::raw_cert::edit_cert(&load_cert("leaf-rsa2048-365d-san-eku.der"), |c| {
+            c.signature_algorithm.parameters = None;
+        });
         // Inner unchanged — still Some(NULL).
-        assert!(cert.tbs_certificate.signature.parameters.is_some());
+        assert!(cert.tbs_certificate().signature().parameters.is_some());
 
         match lint.check_cert(&cert, SubjectKind::Any, 0) {
             LintResult::Error(detail) => {
@@ -1364,11 +1371,11 @@ mod tests {
         use der::oid::ObjectIdentifier;
 
         let lint = Rfc5280SignatureAlgorithmMatchLint;
-        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
-
         // ecdsa-with-SHA256 OID (different from RSA fixture's sha256WithRSAEncryption).
         let ecdsa_with_sha256: ObjectIdentifier = "1.2.840.10045.4.3.2".parse().unwrap();
-        cert.tbs_certificate.signature.oid = ecdsa_with_sha256;
+        let cert = crate::raw_cert::edit_cert(&load_cert("leaf-rsa2048-365d-san-eku.der"), |c| {
+            c.tbs_certificate.signature.oid = ecdsa_with_sha256;
+        });
 
         match lint.check_cert(&cert, SubjectKind::Any, 0) {
             LintResult::Error(detail) => {
@@ -1390,8 +1397,9 @@ mod tests {
     fn algorithm_identifier_decode_preserves_option_discriminant() {
         use der::{Decode, Encode};
 
-        let mut cert = load_cert("leaf-rsa2048-365d-san-eku.der");
-        cert.signature_algorithm.parameters = None;
+        let cert = crate::raw_cert::edit_cert(&load_cert("leaf-rsa2048-365d-san-eku.der"), |c| {
+            c.signature_algorithm.parameters = None;
+        });
 
         // Re-encode (signature bytes are arbitrary from the lint's POV;
         // the lint only inspects the algorithm-identifier SEQUENCEs).
@@ -1399,7 +1407,7 @@ mod tests {
         let decoded = x509_cert::Certificate::from_der(&der_bytes).expect("decode mutated cert");
 
         assert!(
-            decoded.signature_algorithm.parameters.is_none(),
+            decoded.signature_algorithm().parameters.is_none(),
             "x509-cert decode normalized None to Some(NULL); the lint's premise is invalidated"
         );
 

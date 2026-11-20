@@ -216,7 +216,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     /// under-covers revocations. Pass it via [`CrlChecker::with_delta`] together
     /// with the matching base CRL to get correct coverage.
     pub fn new(crl_der: impl AsRef<[u8]>, now_unix: u64, verifier: V) -> crate::Result<Self> {
-        let crl = CertificateList::from_der(crl_der.as_ref())
+        let crl = CertificateList::<x509_cert::certificate::Rfc5280>::from_der(crl_der.as_ref())
             .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         Ok(Self {
             crl,
@@ -249,7 +249,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         now_unix: u64,
         verifier: V,
     ) -> crate::Result<Self> {
-        let crl = CertificateList::from_der(crl_der.as_ref())
+        let crl = CertificateList::<x509_cert::certificate::Rfc5280>::from_der(crl_der.as_ref())
             .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
         Ok(Self {
             crl,
@@ -339,7 +339,7 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         now_unix: u64,
         verifier: V,
     ) -> crate::Result<Self> {
-        let crl = CertificateList::from_der(crl_der.as_ref())
+        let crl = CertificateList::<x509_cert::certificate::Rfc5280>::from_der(crl_der.as_ref())
             .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
 
         let signer = crate::signer_discovery::discover_crl_signer(bundle, &crl)
@@ -391,10 +391,12 @@ impl<V: SignatureVerifier> CrlChecker<V> {
         verifier: V,
     ) -> crate::Result<Self> {
         // Parse both to validate structure and extract CRL numbers.
-        let base_crl = CertificateList::from_der(base_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
-        let delta_crl = CertificateList::from_der(delta_der.as_ref())
-            .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
+        let base_crl =
+            CertificateList::<x509_cert::certificate::Rfc5280>::from_der(base_der.as_ref())
+                .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
+        let delta_crl =
+            CertificateList::<x509_cert::certificate::Rfc5280>::from_der(delta_der.as_ref())
+                .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
 
         // The base CRL MUST NOT itself be a delta CRL (RFC 5280 §5.2.4: only a
         // full CRL may serve as the base).  Detect by OID presence alone — do not
@@ -500,10 +502,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         let signer_for_crlsign_check: Option<&Certificate>;
         match (&self.crl_issuer_cert, crl_declares_indirect) {
             (Some(crl_issuer), true) => {
-                signer_subject = &crl_issuer.tbs_certificate.subject;
+                signer_subject = crl_issuer.tbs_certificate().subject();
                 signer_spki = crl_issuer
-                    .tbs_certificate
-                    .subject_public_key_info
+                    .tbs_certificate()
+                    .subject_public_key_info()
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
             }
@@ -516,10 +518,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 // bypassed here. The discovered signer's SPKI is authoritative
                 // for the CRL signature verification regardless of the IDP
                 // indirectCRL flag.
-                signer_subject = &discovered.tbs_certificate.subject;
+                signer_subject = discovered.tbs_certificate().subject();
                 signer_spki = discovered
-                    .tbs_certificate
-                    .subject_public_key_info
+                    .tbs_certificate()
+                    .subject_public_key_info()
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(discovered);
             }
@@ -533,10 +535,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 return Err(Error::IndirectCrlIssuerMissing);
             }
             (None, false) => {
-                signer_subject = &issuer.tbs_certificate.subject;
+                signer_subject = issuer.tbs_certificate().subject();
                 signer_spki = issuer
-                    .tbs_certificate
-                    .subject_public_key_info
+                    .tbs_certificate()
+                    .subject_public_key_info()
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(issuer);
             }
@@ -559,8 +561,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //      as a defense-in-depth check on the caller-supplied
         //      issuer-of-cert identity.
         if !names_match(
-            &issuer.tbs_certificate.subject,
-            &cert.tbs_certificate.issuer,
+            issuer.tbs_certificate().subject(),
+            cert.tbs_certificate().issuer(),
         ) {
             return Err(Error::CrlIssuerMismatch);
         }
@@ -574,7 +576,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         // and the per-entry certificateIssuer extension (in indirect
         // CRLs) carries the actual issuer of each entry.
         if self.crl_issuer_cert.is_none()
-            && !names_match(&cert.tbs_certificate.issuer, &crl.tbs_cert_list.issuer)
+            && !names_match(cert.tbs_certificate().issuer(), &crl.tbs_cert_list.issuer)
         {
             return Err(Error::CrlIssuerMismatch);
         }
@@ -648,7 +650,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             // RFC 5280 §6.3.3(b)(1): IDP distributionPoint must match the
             // cert's CDP (cross-form `nameRelativeToCRLIssuer` ↔ `fullName`
             // resolution is performed by `dpn_to_general_names`).
-            check_idp_dp_scope(cert, idp, &cert.tbs_certificate.issuer, signer_subject)?;
+            check_idp_dp_scope(cert, idp, cert.tbs_certificate().issuer(), signer_subject)?;
         }
 
         // (6) §5.2.4 delta CRL merge: if a delta CRL is present, verify and collect
@@ -686,8 +688,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //     change the effective issuer of subsequent entries (RFC 5280 §5.3.3);
         //     entries inherit the previous extension's value, defaulting to the
         //     CRL's own issuer for the first entry.
-        let cert_issuer = &cert.tbs_certificate.issuer;
-        let cert_serial = &cert.tbs_certificate.serial_number;
+        let cert_issuer = cert.tbs_certificate().issuer();
+        let cert_serial = cert.tbs_certificate().serial_number();
         let crl_default_issuer = &crl.tbs_cert_list.issuer;
         let is_indirect = self.crl_issuer_cert.is_some();
         check_revocation_status_indirect(
@@ -746,10 +748,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         let signer_for_crlsign_check: Option<&Certificate>;
         match (&self.crl_issuer_cert, crl_declares_indirect) {
             (Some(crl_issuer), true) => {
-                signer_subject = &crl_issuer.tbs_certificate.subject;
+                signer_subject = crl_issuer.tbs_certificate().subject();
                 signer_spki = crl_issuer
-                    .tbs_certificate
-                    .subject_public_key_info
+                    .tbs_certificate()
+                    .subject_public_key_info()
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(crl_issuer);
             }
@@ -758,10 +760,10 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
                 // discovered signer is authoritative regardless of the
                 // CRL's IDP.indirectCRL flag. See the matching arm in
                 // check_revocation for the full rationale.
-                signer_subject = &discovered.tbs_certificate.subject;
+                signer_subject = discovered.tbs_certificate().subject();
                 signer_spki = discovered
-                    .tbs_certificate
-                    .subject_public_key_info
+                    .tbs_certificate()
+                    .subject_public_key_info()
                     .owned_to_ref();
                 signer_for_crlsign_check = Some(discovered);
             }
@@ -784,7 +786,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //      anchor flow regardless of indirect-vs-direct: the anchor
         //      is the cert's *issuer*, even when the CRL is signed by a
         //      separate cRLIssuer.
-        if !names_match(&cert.tbs_certificate.issuer, &anchor.subject) {
+        if !names_match(cert.tbs_certificate().issuer(), &anchor.subject) {
             return Err(Error::CrlIssuerMismatch);
         }
 
@@ -846,7 +848,7 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
             // `nameRelativeToCRLIssuer` is the cert's issuer; the CRL's IDP
             // base DN is the CRL signer's subject (anchor's subject in the
             // direct anchor flow, cRLIssuer's subject in the indirect flow).
-            check_idp_dp_scope(cert, idp, &cert.tbs_certificate.issuer, signer_subject)?;
+            check_idp_dp_scope(cert, idp, cert.tbs_certificate().issuer(), signer_subject)?;
         }
 
         // (7) Delta CRL merge.
@@ -867,8 +869,8 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
 
         // (8) Look up the cert's (issuer, serial) in delta then base entries,
         //     honoring per-entry certificateIssuer for indirect CRLs.
-        let cert_issuer = &cert.tbs_certificate.issuer;
-        let cert_serial = &cert.tbs_certificate.serial_number;
+        let cert_issuer = cert.tbs_certificate().issuer();
+        let cert_serial = cert.tbs_certificate().serial_number();
         let crl_default_issuer = &crl.tbs_cert_list.issuer;
         let is_indirect = self.crl_issuer_cert.is_some();
         check_revocation_status_indirect(
@@ -1184,10 +1186,9 @@ fn check_crl_sign(cert: &Certificate) -> crate::Result<()> {
     use x509_cert::ext::pkix::KeyUsage;
 
     let Some(ku_ext) = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+        .tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_KEY_USAGE_CRL)
     else {
@@ -1246,10 +1247,9 @@ fn cert_crl_distribution_points(
 ) -> crate::Result<Option<x509_cert::ext::pkix::CrlDistributionPoints>> {
     use x509_cert::ext::pkix::CrlDistributionPoints;
 
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
         .map(|e| {
@@ -1291,11 +1291,18 @@ fn dpn_to_general_names<'a>(
     match dpn {
         DistributionPointName::FullName(names) => Ok(Cow::Borrowed(names.as_slice())),
         DistributionPointName::NameRelativeToCRLIssuer(rdn) => {
-            // Append the RDN onto the base DN. `Name = RdnSequence(Vec<RDN>)`.
-            // Cloning here is unavoidable because the resolved DN is a new
-            // value; cert/CRL DNs are typically <10 RDNs each so this is cheap.
-            let mut full_name = base_dn.clone();
-            full_name.0.push(rdn.clone());
+            // Append the RDN onto the base DN. x509-cert 0.3 has no public
+            // `Name` constructor from an `RdnSequence`, so the extended
+            // sequence round-trips through its DER encoding (a `Name` is
+            // exactly an `RDNSequence` on the wire). DNs are typically <10
+            // RDNs each, so this is cheap.
+            use der::{Decode as _, Encode as _};
+            let mut seq: x509_cert::name::RdnSequence = base_dn.clone().into();
+            seq.push(rdn.clone());
+            let full_name = seq
+                .to_der()
+                .and_then(|der| x509_cert::name::Name::from_der(&der))
+                .map_err(|e| crate::Error::CrlParseError(crate::DerError::new(e)))?;
             Ok(Cow::Owned(vec![GeneralName::DirectoryName(full_name)]))
         }
     }

@@ -492,7 +492,7 @@ pub fn verify_simple(
 /// duplicated here; `validate_path` handles it via `check_oid_consistency`
 /// and returns `Error::Path(MalformedCertificate { index })` for that case.
 fn check_algorithm(index: usize, cert: &Certificate) -> Result<()> {
-    let oid = cert.signature_algorithm.oid;
+    let oid = cert.signature_algorithm().oid;
     if !ALLOWED_SIG_ALGS.contains(&oid) {
         return Err(Error::AlgorithmNotAllowed { index });
     }
@@ -520,7 +520,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
         CRITICAL_OK_INTERMEDIATE_EXTENSIONS
     };
 
-    let extensions = match &cert.tbs_certificate.extensions {
+    let extensions = match cert.tbs_certificate().extensions() {
         Some(exts) => exts,
         None if is_leaf => return Ok(()),
         None => return Err(Error::MissingRequiredExtension { index }),

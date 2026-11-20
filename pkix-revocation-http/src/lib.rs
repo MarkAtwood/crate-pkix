@@ -102,6 +102,10 @@
 // `crl` or `ocsp` because the trait itself is shared but the wrapper
 // structs and parsing helpers each live behind their protocol feature.
 #[cfg(any(feature = "crl", feature = "ocsp"))]
+#[cfg(test)]
+#[path = "../tests/support/raw_cert.rs"]
+pub(crate) mod raw_cert;
+
 mod cache;
 pub mod clients;
 #[cfg(feature = "crl")]

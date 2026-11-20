@@ -999,9 +999,8 @@ fn parse_ipv6(s: &str) -> Option<[u8; 16]> {
 
 fn find_san(cert: &Certificate) -> Result<SubjectAltName, IdentityError> {
     let exts = cert
-        .tbs_certificate
-        .extensions
-        .as_ref()
+        .tbs_certificate()
+        .extensions()
         .ok_or(IdentityError::MissingSan)?;
     let ext = exts
         .iter()

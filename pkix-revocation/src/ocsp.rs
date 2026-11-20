@@ -147,8 +147,8 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // not actually issue `cert`. Rejecting early prevents the downstream
         // signature and CertID hash checks from operating on the wrong identity.
         if !names_match(
-            &issuer.tbs_certificate.subject,
-            &cert.tbs_certificate.issuer,
+            issuer.tbs_certificate().subject(),
+            cert.tbs_certificate().issuer(),
         ) {
             return Err(Error::OcspIssuerCertMismatch);
         }
@@ -163,8 +163,8 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // performs the ResponderId match (step 6b in the legacy flow)
         // because for delegated responses the ResponderId must match the
         // delegate, not the issuer.
-        let issuer_subject = &issuer.tbs_certificate.subject;
-        let issuer_spki_owned = &issuer.tbs_certificate.subject_public_key_info;
+        let issuer_subject = issuer.tbs_certificate().subject();
+        let issuer_spki_owned = issuer.tbs_certificate().subject_public_key_info();
         let issuer_spki_raw = issuer_spki_owned.subject_public_key.raw_bytes();
         let signing_spki = resolve_signing_key_for_response(
             basic,
@@ -190,7 +190,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .map_err(|_| Error::OcspSignatureInvalid)?;
 
         // (7) Find the SingleResponse for this certificate (match by serial number).
-        let cert_serial = &cert.tbs_certificate.serial_number;
+        let cert_serial = cert.tbs_certificate().serial_number();
         let single = basic
             .tbs_response_data
             .responses
@@ -207,13 +207,13 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         // number issued by a *different* CA could pass serial-only matching.
         let hash_oid = &single.cert_id.hash_algorithm.oid;
         let name_der = issuer
-            .tbs_certificate
-            .subject
+            .tbs_certificate()
+            .subject()
             .to_der()
             .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
         let key_raw = issuer
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .subject_public_key
             .raw_bytes();
         let expected_name_hash = hash_certid_input(hash_oid, &name_der)?;
@@ -289,7 +289,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
         //
         // Defense-in-depth: guards against a caller passing an anchor whose SPKI
         // happens to verify the OCSP response but which did not issue `cert`.
-        if !names_match(&anchor.subject, &cert.tbs_certificate.issuer) {
+        if !names_match(&anchor.subject, cert.tbs_certificate().issuer()) {
             return Err(Error::OcspIssuerCertMismatch);
         }
 
@@ -328,7 +328,7 @@ impl<V: SignatureVerifier> RevocationChecker for OcspChecker<V> {
             .map_err(|_| Error::OcspSignatureInvalid)?;
 
         // (7) Find the SingleResponse for this certificate.
-        let cert_serial = &cert.tbs_certificate.serial_number;
+        let cert_serial = cert.tbs_certificate().serial_number();
         let single = basic
             .tbs_response_data
             .responses
@@ -515,7 +515,7 @@ fn responder_id_matches(
 fn cert_has_ocsp_signing_eku(cert: &Certificate) -> crate::Result<bool> {
     use x509_cert::ext::pkix::ExtendedKeyUsage;
 
-    let extns = match cert.tbs_certificate.extensions.as_deref() {
+    let extns = match cert.tbs_certificate().extensions().map(|v| v.as_slice()) {
         Some(e) => e,
         None => return Ok(false),
     };
@@ -558,7 +558,7 @@ fn validate_delegate_responder_cert<V: SignatureVerifier>(
     produced_at_unix: u64,
 ) -> crate::Result<()> {
     // (a) Issued by the same CA that issued the cert under check.
-    if !names_match(&delegate.tbs_certificate.issuer, issuer_subject) {
+    if !names_match(delegate.tbs_certificate().issuer(), issuer_subject) {
         return Err(Error::OcspResponderCertNotIssuedByCa);
     }
 
@@ -575,14 +575,14 @@ fn validate_delegate_responder_cert<V: SignatureVerifier>(
     //     longer authoritative when the response claims to have been
     //     generated.
     let nb = delegate
-        .tbs_certificate
-        .validity
+        .tbs_certificate()
+        .validity()
         .not_before
         .to_unix_duration()
         .as_secs();
     let na = delegate
-        .tbs_certificate
-        .validity
+        .tbs_certificate()
+        .validity()
         .not_after
         .to_unix_duration()
         .as_secs();
@@ -593,19 +593,15 @@ fn validate_delegate_responder_cert<V: SignatureVerifier>(
     // (d) Issuer's signature on the delegate cert verifies. This is a
     //     SEPARATE signature from the OCSP response signature — distinct
     //     error variant for diagnostics. The TBS bytes are re-encoded
-    //     here rather than spliced from the original DER because we only
-    //     have the parsed `Certificate` value; for the typical responder-
-    //     cert size this is microseconds.
-    let tbs_bytes = delegate
-        .tbs_certificate
-        .to_der()
-        .map_err(|e| Error::OcspParseError(crate::DerError::new(e)))?;
+    //     with `pkix_path::tbs_certificate_der`, which keeps the validity
+    //     times as parsed (x509-cert 0.3's own encoder normalizes them).
+    let tbs_bytes = pkix_path::tbs_certificate_der(delegate).map_err(Error::OcspParseError)?;
     verifier
         .verify_signature(
-            delegate.signature_algorithm.owned_to_ref(),
+            delegate.signature_algorithm().owned_to_ref(),
             issuer_spki,
             &tbs_bytes,
-            delegate.signature.raw_bytes(),
+            delegate.signature().raw_bytes(),
         )
         .map_err(|_| Error::OcspResponderCertSigInvalid)?;
 
@@ -654,10 +650,10 @@ fn resolve_signing_key_for_response<'a, V: SignatureVerifier>(
         None => &[],
     };
     for delegate in certs {
-        let d_subject = &delegate.tbs_certificate.subject;
+        let d_subject = delegate.tbs_certificate().subject();
         let d_spki_raw = delegate
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .subject_public_key
             .raw_bytes();
         if !responder_id_matches(rid, d_subject, d_spki_raw) {
@@ -678,8 +674,8 @@ fn resolve_signing_key_for_response<'a, V: SignatureVerifier>(
         )?;
 
         return Ok(delegate
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .owned_to_ref());
     }
 

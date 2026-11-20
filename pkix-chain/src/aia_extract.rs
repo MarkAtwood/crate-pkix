@@ -62,10 +62,9 @@ pub(crate) fn ca_issuers_http_uris(cert: &Certificate) -> impl Iterator<Item = S
 }
 
 fn find_extension_value<'a>(cert: &'a Certificate, oid: &ObjectIdentifier) -> Option<&'a [u8]> {
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| &e.extn_id == oid)
         .map(|e| e.extn_value.as_bytes())

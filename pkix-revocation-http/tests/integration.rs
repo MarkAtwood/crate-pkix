@@ -24,6 +24,10 @@
 
 #![cfg(all(feature = "client-ureq", feature = "crl"))]
 
+mod support {
+    pub mod raw_cert;
+}
+
 use der::{Decode, Encode};
 use pkix_path::DefaultVerifier;
 use pkix_revocation::{Error as RevError, RevocationChecker};
@@ -192,7 +196,7 @@ impl RevocationFetcher for PerUrlMock {
 /// The cert's signature is NOT re-validated by HttpCrlFetcher — only the
 /// CRL's signature is, against the issuer's SPKI — so tampering with the
 /// extension here is safe for the tests below.
-fn rewrite_cdp_to_urls(mut cert: Certificate, urls: &[&str]) -> Certificate {
+fn rewrite_cdp_to_urls(cert: Certificate, urls: &[&str]) -> Certificate {
     use der::asn1::Ia5String;
     use x509_cert::ext::pkix::name::GeneralName;
 
@@ -210,14 +214,15 @@ fn rewrite_cdp_to_urls(mut cert: Certificate, urls: &[&str]) -> Certificate {
     let cdps = CrlDistributionPoints(dps);
     let cdps_der = cdps.to_der().expect("encode synthetic CDP");
 
-    let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-    let oid = der::asn1::ObjectIdentifier::new_unwrap("2.5.29.31");
-    let cdp_ext = exts
-        .iter_mut()
-        .find(|e| e.extn_id == oid)
-        .expect("fixture has CDP");
-    cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
-    cert
+    support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+        let oid = der::asn1::ObjectIdentifier::new_unwrap("2.5.29.31");
+        let cdp_ext = exts
+            .iter_mut()
+            .find(|e| e.extn_id == oid)
+            .expect("fixture has CDP");
+        cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
+    })
 }
 
 #[test]
@@ -379,7 +384,7 @@ fn ocsp_full_integration_uses_post_with_correct_content_type() {
 }
 
 #[cfg(feature = "ocsp")]
-fn rewrite_aia_ocsp(mut cert: Certificate, url: &str) -> Certificate {
+fn rewrite_aia_ocsp(cert: Certificate, url: &str) -> Certificate {
     use der::asn1::Ia5String;
     use x509_cert::ext::pkix::{AccessDescription, AuthorityInfoAccessSyntax};
 
@@ -390,12 +395,13 @@ fn rewrite_aia_ocsp(mut cert: Certificate, url: &str) -> Certificate {
     let aia = AuthorityInfoAccessSyntax(vec![ad]);
     let aia_der = aia.to_der().expect("encode synthetic AIA");
 
-    let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-    let oid = der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1");
-    let aia_ext = exts
-        .iter_mut()
-        .find(|e| e.extn_id == oid)
-        .expect("fixture has AIA");
-    aia_ext.extn_value = der::asn1::OctetString::new(aia_der).unwrap();
-    cert
+    support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+        let oid = der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1");
+        let aia_ext = exts
+            .iter_mut()
+            .find(|e| e.extn_id == oid)
+            .expect("fixture has AIA");
+        aia_ext.extn_value = der::asn1::OctetString::new(aia_der).unwrap();
+    })
 }

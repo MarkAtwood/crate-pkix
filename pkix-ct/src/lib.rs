@@ -100,7 +100,7 @@ pub enum Error {
     /// `[usable_from_ms, retired_at_ms)` window.
     SctTimestampOutsideLogWindow,
     /// The supplied certificate DER exceeds the 2^24 - 1 octet limit of
-    /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate`)
+    /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate()`)
     /// opaque-length-prefixed field.
     CertDerTooLong,
     /// The final leaf certificate passed to

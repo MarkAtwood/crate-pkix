@@ -186,7 +186,7 @@ fn rejects_real_world_cert_with_retired_logs_as_unknown() {
     use x509_cert::Certificate;
     let pem = fs::read_to_string("tests/fixtures/cryptography-scts.pem").unwrap();
     let cert = Certificate::from_pem(&pem).unwrap();
-    let exts = cert.tbs_certificate.extensions.as_ref().unwrap();
+    let exts = cert.tbs_certificate().extensions().unwrap();
     let sct_ext = exts
         .iter()
         .find(|e| e.extn_id.to_string() == "1.3.6.1.4.1.11129.2.4.2")

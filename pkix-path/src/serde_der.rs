@@ -39,7 +39,7 @@
 //!
 //! [`serde_with`](https://docs.rs/serde_with) would express these helpers more concisely via
 //! `#[serde_as(as = "DerBase64")]`. We avoid the dependency because the
-//! workspace MSRV is 1.73 and the latest `serde_with` 3.x releases
+//! workspace MSRV is 1.87 and the latest `serde_with` 3.x releases
 //! (3.18+) require rustc 1.88. Pinning to 3.12 was a viable alternative,
 //! but a small hand-written helper module is simpler and keeps the
 //! dependency footprint smaller.

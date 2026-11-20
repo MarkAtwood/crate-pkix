@@ -202,7 +202,8 @@ mod tests {
         let (ca, leaf) = fixtures();
         for alg in [OcspHashAlg::Sha1, OcspHashAlg::Sha256] {
             let out = build_ocsp_request(&leaf, &ca, alg).unwrap();
-            x509_ocsp::OcspRequest::from_der(&out.body).expect("emitted bytes must round-trip");
+            x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(&out.body)
+                .expect("emitted bytes must round-trip");
         }
     }
 

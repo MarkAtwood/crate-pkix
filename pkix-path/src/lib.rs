@@ -10,10 +10,12 @@
 //! # Architecture
 //!
 //! Cryptographic signature verification is pluggable via [`SignatureVerifier`].
-//! The default feature set wires in `RustCrypto` backends for
-//! RSA-PKCS1v15-SHA-{256,384,512} (`rsa` feature) and
-//! ECDSA-P-256-SHA-256 (`p256` feature). The optional `p384` feature adds
-//! ECDSA-P-384-SHA-384; `rustcrypto` enables all three together.
+//! The default feature set wires in `RustCrypto` backends for RSA
+//! (PKCS#1 v1.5 and RSASSA-PSS with SHA-256/384/512; `rsa` feature) and
+//! ECDSA on P-256 (`p256` feature). The optional `p384`, `p521` and
+//! `ed25519` features add ECDSA on P-384 and P-521 and Ed25519;
+//! `rustcrypto` enables all of them. [`DefaultVerifier`] dispatches over
+//! whatever is enabled, taking the ECDSA curve from the issuer's key.
 //! For FIPS-validated crypto, implement [`SignatureVerifier`] against
 //! `wolfcrypt-rustcrypto` and disable the `rustcrypto` feature.
 //!
@@ -23,14 +25,10 @@
 //! # Limitations
 //!
 //! The following are **not** currently implemented:
-//! - **Additional signature algorithms** — Ed25519 (RFC 8032), ECDSA P-521
-//!   (RFC 5480), and RSA-PSS (RFC 4055) are not yet wired into the bundled
-//!   `RustCrypto` backends. Tracked under `PKIX-gphz`. Callers can implement
-//!   [`SignatureVerifier`] for any algorithm they need without waiting for
-//!   the bundled backends; the trait is the only algorithm-specific surface
-//!   in this crate. SHA-1 verifiers (RFC 8017, legacy) are intentionally
-//!   not shipped; deployments requiring legacy SHA-1 trust must implement
-//!   [`SignatureVerifier`] themselves.
+//! - **Legacy signature algorithms** — SHA-1 verifiers (RFC 8017, legacy)
+//!   are intentionally not shipped; deployments requiring legacy SHA-1
+//!   trust must implement [`SignatureVerifier`] themselves. RSA moduli
+//!   outside 1024–8192 bits are refused by the bundled RSA backend.
 //! - **RFC 4518 full Unicode NFKC DN normalization** — ASCII case-folding
 //!   plus insignificant-whitespace collapsing is applied. `BMPString` AVA
 //!   values are transcoded UCS-2-BE → UTF-8 and then compared via the same
@@ -93,6 +91,28 @@ use x509_cert::Certificate;
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub mod serde_der;
+
+mod verifiers;
+#[cfg(any(
+    feature = "p256",
+    feature = "p384",
+    feature = "p521",
+    feature = "rsa",
+    feature = "ed25519"
+))]
+pub use verifiers::DefaultVerifier;
+#[cfg(feature = "p256")]
+pub use verifiers::EcdsaP256Verifier;
+#[cfg(feature = "p384")]
+pub use verifiers::EcdsaP384Verifier;
+#[cfg(feature = "p521")]
+pub use verifiers::EcdsaP521Verifier;
+#[cfg(feature = "ed25519")]
+pub use verifiers::Ed25519Verifier;
+#[cfg(feature = "rsa")]
+pub use verifiers::{
+    RsaPkcs1v15Sha256Verifier, RsaPkcs1v15Sha384Verifier, RsaPkcs1v15Sha512Verifier, RsaPssVerifier,
+};
 
 /// Re-exported for use with [`TrustAnchor::name_constraints`].
 pub use x509_cert::ext::pkix::constraints::name::NameConstraints;
@@ -717,8 +737,8 @@ impl TrustAnchor {
     pub fn from_cert(cert: Certificate) -> Self {
         let name_constraints = find_cert_ext(&cert, OID_NAME_CONSTRAINTS);
         Self {
-            subject: cert.tbs_certificate.subject,
-            subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+            subject: cert.tbs_certificate().subject().clone(),
+            subject_public_key_info: cert.tbs_certificate().subject_public_key_info().clone(),
             name_constraints,
         }
     }
@@ -727,8 +747,8 @@ impl TrustAnchor {
 impl From<&Certificate> for TrustAnchor {
     fn from(cert: &Certificate) -> Self {
         Self {
-            subject: cert.tbs_certificate.subject.clone(),
-            subject_public_key_info: cert.tbs_certificate.subject_public_key_info.clone(),
+            subject: cert.tbs_certificate().subject().clone(),
+            subject_public_key_info: cert.tbs_certificate().subject_public_key_info().clone(),
             name_constraints: find_cert_ext(cert, OID_NAME_CONSTRAINTS),
         }
     }
@@ -758,8 +778,8 @@ impl TryFrom<Certificate> for TrustAnchor {
         let name_constraints =
             try_find_cert_ext(&cert, OID_NAME_CONSTRAINTS).map_err(DerError::new)?;
         Ok(Self {
-            subject: cert.tbs_certificate.subject,
-            subject_public_key_info: cert.tbs_certificate.subject_public_key_info,
+            subject: cert.tbs_certificate().subject().clone(),
+            subject_public_key_info: cert.tbs_certificate().subject_public_key_info().clone(),
             name_constraints,
         })
     }
@@ -831,10 +851,7 @@ pub enum DnAttrRule {
 /// OID equality is exact byte-for-byte comparison; no aliasing or
 /// canonicalization is performed.
 fn dn_contains_oid(subject: &x509_cert::name::Name, oid: &der::asn1::ObjectIdentifier) -> bool {
-    subject
-        .0
-        .iter()
-        .any(|rdn| rdn.0.iter().any(|ava| ava.oid == *oid))
+    subject.iter().any(|ava| ava.oid == *oid)
 }
 
 /// Evaluate a [`DnAttrRule`] against a Subject DN, returning `true` when the
@@ -1234,7 +1251,7 @@ pub struct ValidatedPath {
     /// RFC 5280 §6.1.5 names this output indirectly: a successful path
     /// validation produces the leaf's identity (subject + serial uniquely
     /// identify a certificate). This field is a convenience accessor —
-    /// callers could equivalently read `chain[0].tbs_certificate.subject`,
+    /// callers could equivalently read `chain[0].tbs_certificate().subject()`,
     /// but threading the chain to every consumer that needs the leaf's DN
     /// is awkward. The clone is owned to free the validated value from any
     /// lifetime tie to the input chain.
@@ -1441,12 +1458,12 @@ where
     //     For the common case of O(1) matching anchors this is effectively O(N).
     let last_cert = chain.last().ok_or(Error::NoTrustedPath)?;
     let is_self_issued = names_match(
-        &last_cert.tbs_certificate.issuer,
-        &last_cert.tbs_certificate.subject,
+        last_cert.tbs_certificate().issuer(),
+        last_cert.tbs_certificate().subject(),
     );
     let mut last_err = Error::NoTrustedPath;
     for (anchor_index, anchor) in anchors.iter().enumerate() {
-        if !names_match(&anchor.subject, &last_cert.tbs_certificate.issuer) {
+        if !names_match(&anchor.subject, last_cert.tbs_certificate().issuer()) {
             continue;
         }
         // For self-issued certs the cert and anchor are the same entity; their
@@ -1454,7 +1471,7 @@ where
         if is_self_issued
             && !spki_key_matches(
                 &anchor.subject_public_key_info,
-                &last_cert.tbs_certificate.subject_public_key_info,
+                last_cert.tbs_certificate().subject_public_key_info(),
             )
         {
             continue;
@@ -1467,7 +1484,7 @@ where
                 // `tbs_certificate` fields; populating them from `chain[0]`
                 // (rather than threading them out of `chain_walk`) avoids
                 // adding more entries to the walker's return tuple.
-                let leaf_tbs = &chain[0].tbs_certificate;
+                let leaf_tbs = chain[0].tbs_certificate();
                 // Convert the internal `PolicyNode` to the public
                 // `PolicyTreeNode`. The two structs are field-compatible
                 // by design; the conversion is a `.into()` per node.
@@ -1488,10 +1505,10 @@ where
                 return Ok(ValidatedPath {
                     anchor_index,
                     depth: chain.len().saturating_sub(1),
-                    leaf_subject: leaf_tbs.subject.clone(),
-                    leaf_issuer: leaf_tbs.issuer.clone(),
-                    leaf_serial: leaf_tbs.serial_number.clone(),
-                    leaf_spki: leaf_tbs.subject_public_key_info.clone(),
+                    leaf_subject: leaf_tbs.subject().clone(),
+                    leaf_issuer: leaf_tbs.issuer().clone(),
+                    leaf_serial: leaf_tbs.serial_number().clone(),
+                    leaf_spki: leaf_tbs.subject_public_key_info().clone(),
                     valid_policy_tree,
                 });
             }
@@ -1578,9 +1595,9 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
     // O(n²) over chain.len() — acceptable for chains of typical length (2–5 certs).
     for i in 0..chain.len() {
         for j in (i + 1)..chain.len() {
-            let a = &chain[i].tbs_certificate;
-            let b = &chain[j].tbs_certificate;
-            if names_match(&a.issuer, &b.issuer) && a.serial_number == b.serial_number {
+            let a = chain[i].tbs_certificate();
+            let b = chain[j].tbs_certificate();
+            if names_match(a.issuer(), b.issuer()) && a.serial_number() == b.serial_number() {
                 return Err(Error::DuplicateCertificate {
                     first: i,
                     second: j,
@@ -1602,7 +1619,7 @@ fn check_inputs(chain: &[Certificate], anchors: &[TrustAnchor]) -> Result<()> {
 /// certs from common PKI deployments.
 fn check_oid_consistency(chain: &[Certificate]) -> Result<()> {
     for (index, cert) in chain.iter().enumerate() {
-        if cert.signature_algorithm.oid != cert.tbs_certificate.signature.oid {
+        if cert.signature_algorithm().oid != cert.tbs_certificate().signature().oid {
             return Err(Error::MalformedCertificate { index });
         }
     }
@@ -1675,7 +1692,11 @@ const HANDLED_CRITICAL_OIDS: &[der::asn1::ObjectIdentifier] = &[
 
 /// RFC 5280 §6.1.3(a)(3): reject any critical extension not in the handled set.
 fn check_critical_extensions(cert: &Certificate, index: usize) -> Result<()> {
-    for ext in cert.tbs_certificate.extensions.as_deref().unwrap_or(&[]) {
+    for ext in cert
+        .tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
+    {
         if ext.critical && !HANDLED_CRITICAL_OIDS.contains(&ext.extn_id) {
             return Err(Error::UnhandledCriticalExtension { index });
         }
@@ -1895,10 +1916,9 @@ fn find_cert_ext<T: der::DecodeOwned>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
 ) -> Option<T> {
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == oid)
         .and_then(|e| T::from_der(e.extn_value.as_bytes()).ok())
@@ -1917,14 +1937,13 @@ fn find_cert_ext<T: der::DecodeOwned>(
 ///
 /// For non-critical extensions where a parse failure should be treated as
 /// absent, use [`find_cert_ext`] (fail-open) instead.
-fn try_find_cert_ext<T: der::DecodeOwned>(
+fn try_find_cert_ext<T: for<'a> der::Decode<'a, Error = der::Error>>(
     cert: &Certificate,
     oid: der::asn1::ObjectIdentifier,
 ) -> der::Result<Option<T>> {
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == oid)
         .map_or(Ok(None), |e| T::from_der(e.extn_value.as_bytes()).map(Some))
@@ -1989,8 +2008,8 @@ fn time_to_unix_secs(t: &x509_cert::time::Time) -> u64 {
 
 /// RFC 5280 §6.1.3(a)(2): check notBefore ≤ now ≤ notAfter.
 fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()> {
-    let not_before = time_to_unix_secs(&cert.tbs_certificate.validity.not_before);
-    let not_after = time_to_unix_secs(&cert.tbs_certificate.validity.not_after);
+    let not_before = time_to_unix_secs(&cert.tbs_certificate().validity().not_before);
+    let not_after = time_to_unix_secs(&cert.tbs_certificate().validity().not_after);
     if now_unix >= not_before && now_unix <= not_after {
         Ok(())
     } else {
@@ -2043,17 +2062,14 @@ fn check_validity(cert: &Certificate, now_unix: u64, index: usize) -> Result<()>
 ///   the issuer DN bytes per RFC 5280 §4.1.2.4 are unaffected.
 #[must_use]
 pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool {
-    let a_rdns = a.0.as_slice();
-    let b_rdns = b.0.as_slice();
-
-    if a_rdns.len() != b_rdns.len() {
+    if a.len() != b.len() {
         return false;
     }
+    let a_rdns = a.iter_rdn();
+    let b_rdns = b.iter_rdn();
 
-    for (a_rdn, b_rdn) in a_rdns.iter().zip(b_rdns) {
-        let a_avas = a_rdn.0.as_slice();
-        let b_avas = b_rdn.0.as_slice();
-        if a_avas.len() != b_avas.len() {
+    for (a_rdn, b_rdn) in a_rdns.zip(b_rdns) {
+        if a_rdn.len() != b_rdn.len() {
             return false;
         }
         // Bijective AVA matching: every AVA in a_rdn must match some AVA in b_rdn,
@@ -2066,16 +2082,16 @@ pub fn names_match(a: &x509_cert::name::Name, b: &x509_cert::name::Name) -> bool
         //   finds CN=Alice for each a_ava, but the reverse pass finds no match for
         //   CN=Bob → returns false (correct).
         // The reverse pass is O(n²) on AVA count; n is 1–5 in practice.
-        for a_ava in a_avas {
-            let found = b_avas.iter().any(|b_ava| {
+        for a_ava in a_rdn.iter() {
+            let found = b_rdn.iter().any(|b_ava| {
                 b_ava.oid == a_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
             });
             if !found {
                 return false;
             }
         }
-        for b_ava in b_avas {
-            let found = a_avas.iter().any(|a_ava| {
+        for b_ava in b_rdn.iter() {
+            let found = a_rdn.iter().any(|a_ava| {
                 a_ava.oid == b_ava.oid && ava_values_match(&a_ava.value, &b_ava.value)
             });
             if !found {
@@ -2109,10 +2125,9 @@ pub fn cert_is_ca(cert: &Certificate) -> core::result::Result<bool, DerError> {
     use x509_cert::ext::pkix::BasicConstraints;
 
     let Some(ext) = cert
-        .tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+        .tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_BASIC_CONSTRAINTS)
     else {
@@ -2125,8 +2140,11 @@ pub fn cert_is_ca(cert: &Certificate) -> core::result::Result<bool, DerError> {
 
 /// RFC 5280 §3.3: a certificate is self-issued if subject == issuer and neither is empty.
 fn is_self_issued_cert(cert: &Certificate) -> bool {
-    !cert.tbs_certificate.subject.is_empty()
-        && names_match(&cert.tbs_certificate.subject, &cert.tbs_certificate.issuer)
+    !cert.tbs_certificate().subject().is_empty()
+        && names_match(
+            cert.tbs_certificate().subject(),
+            cert.tbs_certificate().issuer(),
+        )
 }
 
 /// Returns `true` if `cert` is identified by its `SubjectAltName` rather than its
@@ -2139,14 +2157,13 @@ fn is_self_issued_cert(cert: &Certificate) -> bool {
 /// Returns `false` for any cert that has a non-empty Subject or a non-critical SAN.
 fn cert_has_san_identity(cert: &Certificate) -> bool {
     // Subject must be empty.
-    if !cert.tbs_certificate.subject.is_empty() {
+    if !cert.tbs_certificate().subject().is_empty() {
         return false;
     }
     // Must have a critical SubjectAltName extension.
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .any(|ext| ext.extn_id == OID_SUBJECT_ALT_NAME && ext.critical)
 }
@@ -2265,7 +2282,7 @@ fn any_to_str_bytes(a: &der::Any) -> Option<Cow<'_, [u8]>> {
 /// No `unsafe`. No new dependencies — uses only `core::char::from_u32`
 /// and `char::encode_utf8`.
 fn bmp_string_to_utf8(bytes: &[u8]) -> Option<Vec<u8>> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         // RFC 4518 §2.1 requires `BMPString` to be a sequence of Unicode
         // code points; the underlying DER encoding is UCS-2-BE which is
         // exactly two bytes per unit. An odd-length content octet string
@@ -2437,19 +2454,18 @@ const fn name_type_bit(name: &x509_cert::ext::pkix::name::GeneralName) -> NcType
 /// DN has the constraint DN as a prefix (most-general to most-specific order).
 /// E.g., constraint `{C=US, O=Test}` matches subject `{C=US, O=Test, CN=Alice}`.
 fn dn_within_subtree(subject: &x509_cert::name::Name, constraint: &x509_cert::name::Name) -> bool {
-    let c_rdns = &constraint.0;
-    let s_rdns = &subject.0;
-    if c_rdns.len() > s_rdns.len() {
+    let c_rdns = constraint.iter_rdn();
+    let s_rdns = subject.iter_rdn();
+    if constraint.len() > subject.len() {
         return false;
     }
-    c_rdns.iter().zip(s_rdns.iter()).all(|(c_rdn, s_rdn)| {
+    c_rdns.zip(s_rdns).all(|(c_rdn, s_rdn)| {
         // Each pair of RDNs must have matching attribute-value pairs.
-        if c_rdn.0.len() != s_rdn.0.len() {
+        if c_rdn.len() != s_rdn.len() {
             return false;
         }
-        c_rdn.0.iter().all(|c_ava| {
+        c_rdn.iter().all(|c_ava| {
             s_rdn
-                .0
                 .iter()
                 .any(|s_ava| c_ava.oid == s_ava.oid && ava_values_match(&c_ava.value, &s_ava.value))
         })
@@ -2612,231 +2628,10 @@ fn matches_ip_address(subject_bytes: &[u8], constraint_bytes: &[u8]) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// ECDSA P-256 SHA-256 backend (PKIX-evy)
-// ---------------------------------------------------------------------------
-
-/// OID for `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
-#[cfg(feature = "p256")]
-const OID_ECDSA_P256_SHA256: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
-
-/// ECDSA P-256 with SHA-256 signature verifier.
-///
-/// Handles OID `ecdsa-with-SHA256` (1.2.840.10045.4.3.2).
-/// Feature-gated behind `p256`.
-#[cfg(feature = "p256")]
-#[cfg_attr(docsrs, doc(cfg(feature = "p256")))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct EcdsaP256Verifier;
-
-#[cfg(feature = "p256")]
-impl SignatureVerifier for EcdsaP256Verifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        use p256::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
-
-        // Reject any OID other than ecdsa-with-SHA256.
-        if algorithm.oid != OID_ECDSA_P256_SHA256 {
-            return Err(SignatureError::new());
-        }
-
-        let vk = VerifyingKey::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
-
-        let sig = DerSignature::try_from(signature).map_err(|_| SignatureError::new())?;
-
-        vk.verify(message, &sig).map_err(|_| SignatureError::new())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// ECDSA P-384 SHA-384 backend (PKIX-gphz.2)
-// ---------------------------------------------------------------------------
-
-/// `ecdsa-with-SHA384` OID (RFC 5758 §3.2): 1.2.840.10045.4.3.3
-#[cfg(feature = "p384")]
-const OID_ECDSA_P384_SHA384: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.3");
-
-/// ECDSA P-384 with SHA-384 signature verifier.
-///
-/// Handles OID `ecdsa-with-SHA384` (1.2.840.10045.4.3.3).
-/// Feature-gated behind `p384`.
-///
-/// RFC 5758 §3.2 mandates that `AlgorithmIdentifier.parameters` MUST be
-/// absent for `ecdsa-with-SHA384`. The `p384` crate's `VerifyingKey::try_from`
-/// parses the issuer SPKI and enforces RFC 5480 §2.1.1 (named-curve only;
-/// implicit `null` parameters); algorithm-identifier parameter handling is
-/// the caller's responsibility — `pkix-path` does not currently reject a
-/// trailing-NULL parameter on the signature algorithm. This matches the
-/// existing behaviour for [`EcdsaP256Verifier`].
-#[cfg(feature = "p384")]
-#[cfg_attr(docsrs, doc(cfg(feature = "p384")))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct EcdsaP384Verifier;
-
-#[cfg(feature = "p384")]
-impl SignatureVerifier for EcdsaP384Verifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        use p384::ecdsa::{signature::Verifier as _, DerSignature, VerifyingKey};
-
-        // Reject any OID other than ecdsa-with-SHA384.
-        if algorithm.oid != OID_ECDSA_P384_SHA384 {
-            return Err(SignatureError::new());
-        }
-
-        let vk = VerifyingKey::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
-
-        let sig = DerSignature::try_from(signature).map_err(|_| SignatureError::new())?;
-
-        vk.verify(message, &sig).map_err(|_| SignatureError::new())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// RSA PKCS#1 v1.5 SHA-256 / SHA-384 / SHA-512 backend (PKIX-gmv, PKIX-gphz.4)
-// ---------------------------------------------------------------------------
-
-/// OID for `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
-#[cfg(feature = "rsa")]
-const OID_SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
-
-/// OID for `sha384WithRSAEncryption` (1.2.840.113549.1.1.12).
-#[cfg(feature = "rsa")]
-const OID_SHA384_WITH_RSA: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
-
-/// OID for `sha512WithRSAEncryption` (1.2.840.113549.1.1.13).
-#[cfg(feature = "rsa")]
-const OID_SHA512_WITH_RSA: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
-
-/// RSA with PKCS#1 v1.5 padding and SHA-256 signature verifier.
-///
-/// Handles OID `sha256WithRSAEncryption` (1.2.840.113549.1.1.11).
-/// Feature-gated behind `rsa`.
-#[cfg(feature = "rsa")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct RsaPkcs1v15Sha256Verifier;
-
-#[cfg(feature = "rsa")]
-impl SignatureVerifier for RsaPkcs1v15Sha256Verifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        use rsa::pkcs1v15::{Signature, VerifyingKey};
-        use rsa::signature::Verifier as _;
-        use sha2::Sha256;
-
-        // Reject any OID other than sha256WithRSAEncryption.
-        if algorithm.oid != OID_SHA256_WITH_RSA {
-            return Err(SignatureError::new());
-        }
-
-        let vk =
-            VerifyingKey::<Sha256>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
-
-        let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
-
-        vk.verify(message, &sig).map_err(|_| SignatureError::new())
-    }
-}
-
-/// RSA with PKCS#1 v1.5 padding and SHA-384 signature verifier.
-///
-/// Handles OID `sha384WithRSAEncryption` (1.2.840.113549.1.1.12).
-/// Feature-gated behind `rsa` (same gate as the SHA-256 variant — the
-/// `sha2` and `rsa` crates already expose `Sha384` and the corresponding
-/// `VerifyingKey<Sha384>` impl without further opt-in).
-#[cfg(feature = "rsa")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct RsaPkcs1v15Sha384Verifier;
-
-#[cfg(feature = "rsa")]
-impl SignatureVerifier for RsaPkcs1v15Sha384Verifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        use rsa::pkcs1v15::{Signature, VerifyingKey};
-        use rsa::signature::Verifier as _;
-        use sha2::Sha384;
-
-        if algorithm.oid != OID_SHA384_WITH_RSA {
-            return Err(SignatureError::new());
-        }
-
-        let vk =
-            VerifyingKey::<Sha384>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
-
-        let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
-
-        vk.verify(message, &sig).map_err(|_| SignatureError::new())
-    }
-}
-
-/// RSA with PKCS#1 v1.5 padding and SHA-512 signature verifier.
-///
-/// Handles OID `sha512WithRSAEncryption` (1.2.840.113549.1.1.13).
-/// Feature-gated behind `rsa`.
-#[cfg(feature = "rsa")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rsa")))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct RsaPkcs1v15Sha512Verifier;
-
-#[cfg(feature = "rsa")]
-impl SignatureVerifier for RsaPkcs1v15Sha512Verifier {
-    fn verify_signature(
-        &self,
-        algorithm: spki::AlgorithmIdentifierRef<'_>,
-        issuer_spki: spki::SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        use rsa::pkcs1v15::{Signature, VerifyingKey};
-        use rsa::signature::Verifier as _;
-        use sha2::Sha512;
-
-        if algorithm.oid != OID_SHA512_WITH_RSA {
-            return Err(SignatureError::new());
-        }
-
-        let vk =
-            VerifyingKey::<Sha512>::try_from(issuer_spki).map_err(|_| SignatureError::new())?;
-
-        let sig = Signature::try_from(signature).map_err(|_| SignatureError::new())?;
-
-        vk.verify(message, &sig).map_err(|_| SignatureError::new())
-    }
-}
-
-// ---------------------------------------------------------------------------
 // RSA key size helper (PKIX-ken.1.5)
 // ---------------------------------------------------------------------------
 
-/// rsaEncryption OID: 1.2.840.113549.1.1.1 (RFC 3279 §2.3.1)
-const OID_RSA_ENCRYPTION: der::asn1::ObjectIdentifier =
-    der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.1");
+use verifiers::OID_RSA_ENCRYPTION;
 
 /// Decode the RSA modulus from an SPKI and return its bit length.
 ///
@@ -2881,7 +2676,7 @@ fn rsa_public_key_bits(spki: &spki::SubjectPublicKeyInfoOwned) -> Option<u32> {
             let modulus_len = modulus.as_bytes().len();
             // Consume the publicExponent TLV so the nested reader has no trailing data.
             let _ = r.tlv_bytes()?;
-            Ok(modulus_len)
+            Ok::<_, der::Error>(modulus_len)
         })
         .ok()?;
 
@@ -3015,7 +2810,7 @@ fn enforce_signature_alg_allowlist(
 ) -> Result<()> {
     if let Some(allowed) = &policy.allowed_signature_algs {
         // O(n) over a typically 2–6 element list; acceptable for the common case.
-        if !allowed.contains(&cert.signature_algorithm.oid) {
+        if !allowed.contains(&cert.signature_algorithm().oid) {
             return Err(Error::AlgorithmNotAllowed { index });
         }
     }
@@ -3033,14 +2828,14 @@ fn enforce_signature_alg_allowlist(
 fn check_max_validity(cert: &Certificate, policy: &ValidationPolicy, index: usize) -> Result<()> {
     if let Some(max_secs) = policy.max_validity_secs {
         let not_before = cert
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_before
             .to_unix_duration()
             .as_secs();
         let not_after = cert
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_after
             .to_unix_duration()
             .as_secs();
@@ -3060,7 +2855,7 @@ fn check_max_validity(cert: &Certificate, policy: &ValidationPolicy, index: usiz
 fn check_min_rsa_bits(cert: &Certificate, policy: &ValidationPolicy, index: usize) -> Result<()> {
     if let Some(min_bits) = policy.min_rsa_key_bits {
         if let Some(actual_bits) =
-            rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info)
+            rsa_public_key_bits(cert.tbs_certificate().subject_public_key_info())
         {
             if actual_bits < min_bits {
                 return Err(Error::KeyTooSmall { index });
@@ -3093,11 +2888,96 @@ fn check_issuer_linkage(
     index: usize,
 ) -> Result<()> {
     if !working_issuer_is_san_identity
-        && !names_match(working_issuer_name, &cert.tbs_certificate.issuer)
+        && !names_match(working_issuer_name, cert.tbs_certificate().issuer())
     {
         return Err(Error::ChainBroken { index });
     }
     Ok(())
+}
+
+/// Returns the DER encoding of `cert`'s `TBSCertificate`: the bytes its
+/// issuer signed.
+///
+/// Use this, not `cert.tbs_certificate().to_der()`, to verify a
+/// certificate signature. x509-cert 0.3 re-encodes the validity times of a
+/// `Certificate` under the RFC 5280 profile (dates before 2050 become
+/// `UTCTime`), so a certificate whose issuer used `GeneralizedTime` for such a
+/// date would no longer match its signature. This function keeps each time
+/// in the form it was parsed from; every other field is re-encoded as DER,
+/// which reproduces the original bytes for any DER-encoded certificate.
+///
+/// # Errors
+///
+/// Returns [`DerError`] if a field cannot be encoded.
+pub fn tbs_certificate_der(cert: &Certificate) -> core::result::Result<Vec<u8>, DerError> {
+    encode_tbs_certificate(cert.tbs_certificate(), cert.tbs_certificate().extensions())
+        .map_err(DerError::new)
+}
+
+/// Encodes `tbs` with `extensions` in place of its own extensions and with
+/// its validity times as parsed (see [`tbs_certificate_der`]).
+///
+/// `pkix-ct` uses the `extensions` override to rebuild a precertificate's
+/// TBS without the SCT list (RFC 6962 §3.2).
+#[doc(hidden)]
+pub fn encode_tbs_certificate(
+    tbs: &x509_cert::TbsCertificate,
+    extensions: Option<&x509_cert::ext::Extensions>,
+) -> der::Result<Vec<u8>> {
+    use der::asn1::ContextSpecificRef;
+    use der::{Encode as _, Header, Length, Tag, TagMode, TagNumber};
+
+    fn push_sequence(out: &mut Vec<u8>, body: &[u8]) -> der::Result<()> {
+        Header::new(Tag::Sequence, Length::try_from(body.len())?).encode_to_vec(out)?;
+        out.extend_from_slice(body);
+        Ok(())
+    }
+
+    let mut body = Vec::new();
+    if tbs.version() != x509_cert::certificate::Version::V1 {
+        ContextSpecificRef {
+            tag_number: TagNumber(0),
+            tag_mode: TagMode::Explicit,
+            value: &tbs.version(),
+        }
+        .encode_to_vec(&mut body)?;
+    }
+    tbs.serial_number().encode_to_vec(&mut body)?;
+    tbs.signature().encode_to_vec(&mut body)?;
+    tbs.issuer().encode_to_vec(&mut body)?;
+    let mut validity = Vec::new();
+    tbs.validity().not_before.encode_to_vec(&mut validity)?;
+    tbs.validity().not_after.encode_to_vec(&mut validity)?;
+    push_sequence(&mut body, &validity)?;
+    tbs.subject().encode_to_vec(&mut body)?;
+    tbs.subject_public_key_info().encode_to_vec(&mut body)?;
+    if let Some(id) = tbs.issuer_unique_id() {
+        ContextSpecificRef {
+            tag_number: TagNumber(1),
+            tag_mode: TagMode::Implicit,
+            value: id,
+        }
+        .encode_to_vec(&mut body)?;
+    }
+    if let Some(id) = tbs.subject_unique_id() {
+        ContextSpecificRef {
+            tag_number: TagNumber(2),
+            tag_mode: TagMode::Implicit,
+            value: id,
+        }
+        .encode_to_vec(&mut body)?;
+    }
+    if let Some(exts) = extensions {
+        ContextSpecificRef {
+            tag_number: TagNumber(3),
+            tag_mode: TagMode::Explicit,
+            value: exts,
+        }
+        .encode_to_vec(&mut body)?;
+    }
+    let mut out = Vec::with_capacity(body.len() + 6);
+    push_sequence(&mut out, &body)?;
+    Ok(out)
 }
 
 /// RFC 5280 §6.1.3(a)(1) — cryptographic signature verification.
@@ -3121,22 +3001,17 @@ fn verify_cert_signature<V: SignatureVerifier>(
     verifier: &V,
     index: usize,
 ) -> Result<()> {
-    use der::Encode;
     use spki::der::referenced::OwnedToRef as _;
-    let tbs_bytes_owned = {
-        let mut buf = Vec::new();
-        cert.tbs_certificate
-            .encode_to_vec(&mut buf)
+    let tbs_bytes_owned =
+        encode_tbs_certificate(cert.tbs_certificate(), cert.tbs_certificate().extensions())
             .map_err(|e| Error::Der(DerError::new(e)))?;
-        buf
-    };
     let tbs_bytes: &[u8] = &tbs_bytes_owned;
     verifier
         .verify_signature(
-            cert.signature_algorithm.owned_to_ref(),
+            cert.signature_algorithm().owned_to_ref(),
             working_spki.owned_to_ref(),
             tbs_bytes,
-            cert.signature.raw_bytes(),
+            cert.signature().raw_bytes(),
         )
         .map_err(|_| Error::SignatureInvalid { index })?;
     Ok(())
@@ -3479,7 +3354,7 @@ fn chain_walk<V: SignatureVerifier>(
         //       and vacuity rules.
         if i == 0 {
             if let Some(dn_rule) = &policy.required_leaf_subject_dn_attrs {
-                if !evaluate_dn_attr_rule(&cert.tbs_certificate.subject, dn_rule) {
+                if !evaluate_dn_attr_rule(cert.tbs_certificate().subject(), dn_rule) {
                     return Err(Error::SubjectDnAttrRuleUnmet);
                 }
             }
@@ -3807,8 +3682,8 @@ fn chain_walk<V: SignatureVerifier>(
         }
 
         // Update state for next iteration.
-        state.working_spki = &cert.tbs_certificate.subject_public_key_info;
-        state.working_issuer_name = &cert.tbs_certificate.subject;
+        state.working_spki = cert.tbs_certificate().subject_public_key_info();
+        state.working_issuer_name = cert.tbs_certificate().subject();
         // Determine whether the cert we just processed presents itself via SAN
         // identity (empty Subject + critical SAN). This affects the chain-linkage
         // check for the certificate immediately below it in the next iteration.
@@ -4130,8 +4005,8 @@ fn check_name_constraints(
 ) -> crate::Result<()> {
     use x509_cert::ext::pkix::name::GeneralName;
 
-    let subject = &cert.tbs_certificate.subject;
-    let subject_is_empty = subject.0.is_empty();
+    let subject = cert.tbs_certificate().subject();
+    let subject_is_empty = subject.is_empty();
 
     // Dispatch the subject DN and the SAN entries against `subtrees` in the
     // requested mode. See `check_subject_dn_against_subtrees` and
@@ -4200,8 +4075,8 @@ fn check_name_constraints(
         let permitted_rfc822: Option<&[x509_cert::ext::pkix::constraints::name::GeneralSubtree]> =
             permitted_rfc822_storage.as_deref();
 
-        for rdn in &subject.0 {
-            for ava in rdn.0.iter() {
+        for rdn in subject.iter_rdn() {
+            for ava in rdn.iter() {
                 if ava.oid != OID_EMAIL_ADDRESS {
                     continue;
                 }
@@ -4234,82 +4109,6 @@ fn check_name_constraints(
     }
 
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// DefaultVerifier — OID-dispatching RustCrypto backend (PKIX-8wg)
-// ---------------------------------------------------------------------------
-
-/// A [`SignatureVerifier`] that dispatches to available `RustCrypto` backends by OID.
-///
-/// This is the recommended out-of-the-box verifier for applications that use
-/// the default `RustCrypto` feature set. It supports:
-///
-/// - `ecdsa-with-SHA256` (1.2.840.10045.4.3.2) — via the `p256` feature
-/// - `ecdsa-with-SHA384` (1.2.840.10045.4.3.3) — via the `p384` feature
-/// - `sha256WithRSAEncryption` (1.2.840.113549.1.1.11) — via the `rsa` feature
-/// - `sha384WithRSAEncryption` (1.2.840.113549.1.1.12) — via the `rsa` feature
-/// - `sha512WithRSAEncryption` (1.2.840.113549.1.1.13) — via the `rsa` feature
-///
-/// Any OID not in the above set returns `Err(signature::Error::new())`.
-///
-/// To support additional algorithms, implement [`SignatureVerifier`] directly
-/// and dispatch your own OID table.
-#[cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(any(feature = "p256", feature = "p384", feature = "rsa")))
-)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct DefaultVerifier;
-
-#[cfg(any(feature = "p256", feature = "p384", feature = "rsa"))]
-impl SignatureVerifier for DefaultVerifier {
-    fn verify_signature(
-        &self,
-        algorithm: AlgorithmIdentifierRef<'_>,
-        issuer_spki: SubjectPublicKeyInfoRef<'_>,
-        message: &[u8],
-        signature: &[u8],
-    ) -> core::result::Result<(), SignatureError> {
-        let oid = algorithm.oid;
-        #[cfg(feature = "p256")]
-        if oid == OID_ECDSA_P256_SHA256 {
-            return EcdsaP256Verifier.verify_signature(algorithm, issuer_spki, message, signature);
-        }
-        #[cfg(feature = "p384")]
-        if oid == OID_ECDSA_P384_SHA384 {
-            return EcdsaP384Verifier.verify_signature(algorithm, issuer_spki, message, signature);
-        }
-        #[cfg(feature = "rsa")]
-        if oid == OID_SHA256_WITH_RSA {
-            return RsaPkcs1v15Sha256Verifier.verify_signature(
-                algorithm,
-                issuer_spki,
-                message,
-                signature,
-            );
-        }
-        #[cfg(feature = "rsa")]
-        if oid == OID_SHA384_WITH_RSA {
-            return RsaPkcs1v15Sha384Verifier.verify_signature(
-                algorithm,
-                issuer_spki,
-                message,
-                signature,
-            );
-        }
-        #[cfg(feature = "rsa")]
-        if oid == OID_SHA512_WITH_RSA {
-            return RsaPkcs1v15Sha512Verifier.verify_signature(
-                algorithm,
-                issuer_spki,
-                message,
-                signature,
-            );
-        }
-        Err(SignatureError::new())
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -4351,17 +4150,20 @@ mod tests_ecdsa_p256 {
         let der = include_bytes!("../tests/fixtures/ec-p256-sha256.der");
         let cert = Certificate::from_der(der).expect("parse cert");
 
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
 
         // Self-signed cert: signer SPKI is the cert's own SPKI.
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         let verifier = EcdsaP256Verifier;
         assert!(
             verifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     sig_bytes,
@@ -4392,16 +4194,19 @@ mod tests_ecdsa_p384 {
         use spki::der::referenced::OwnedToRef as _;
         let cert = Certificate::from_der(FIXTURE).expect("parse cert");
 
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
 
         // Self-signed cert: signer SPKI is the cert's own SPKI.
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         let verifier = EcdsaP384Verifier;
         verifier
             .verify_signature(
-                cert.signature_algorithm.owned_to_ref(),
+                cert.signature_algorithm().owned_to_ref(),
                 spki_ref,
                 &tbs_der,
                 sig_bytes,
@@ -4418,8 +4223,8 @@ mod tests_ecdsa_p384 {
         use spki::der::referenced::OwnedToRef as _;
         let cert = Certificate::from_der(FIXTURE).expect("parse cert");
 
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature().raw_bytes().to_vec();
         // Tamper a byte well inside the DER signature (any byte after the
         // initial SEQUENCE header). The DerSignature decoder rejects most
         // structural corruption with try_from, which is also a valid
@@ -4427,13 +4232,16 @@ mod tests_ecdsa_p384 {
         let mid = sig_bytes.len() / 2;
         sig_bytes[mid] ^= 0x01;
 
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         let verifier = EcdsaP384Verifier;
         assert!(
             verifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     &sig_bytes,
@@ -4445,16 +4253,19 @@ mod tests_ecdsa_p384 {
 
     #[test]
     fn wrong_oid_rejected() {
-        // Verifier MUST reject OIDs other than ecdsa-with-SHA384, even if
-        // the SPKI and signature would otherwise verify. We synthesise an
-        // AlgorithmIdentifier with ecdsa-with-SHA256's OID and expect the
-        // verifier to short-circuit before any crypto runs.
+        // The fixture was signed with SHA-384. Relabelling it as
+        // ecdsa-with-SHA256 makes the verifier hash with SHA-256 (the
+        // digest comes from the OID, the curve from the key), so the
+        // signature must not verify.
         use der::Encode as _;
         use spki::der::referenced::OwnedToRef as _;
         let cert = Certificate::from_der(FIXTURE).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         let wrong_alg = spki::AlgorithmIdentifierRef {
             oid: der::asn1::ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2"), // ecdsa-with-SHA256
@@ -4465,7 +4276,7 @@ mod tests_ecdsa_p384 {
             verifier
                 .verify_signature(wrong_alg, spki_ref, &tbs_der, sig_bytes)
                 .is_err(),
-            "verifier must reject OIDs other than ecdsa-with-SHA384"
+            "a SHA-384 signature must not verify as ecdsa-with-SHA256"
         );
     }
 
@@ -4477,13 +4288,16 @@ mod tests_ecdsa_p384 {
         use der::Encode as _;
         use spki::der::referenced::OwnedToRef as _;
         let cert = Certificate::from_der(FIXTURE).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         DefaultVerifier
             .verify_signature(
-                cert.signature_algorithm.owned_to_ref(),
+                cert.signature_algorithm().owned_to_ref(),
                 spki_ref,
                 &tbs_der,
                 sig_bytes,
@@ -4506,17 +4320,20 @@ mod tests_rsa {
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
         let cert = Certificate::from_der(der).expect("parse cert");
 
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
 
         // Self-signed cert: signer SPKI is the cert's own SPKI.
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         let verifier = RsaPkcs1v15Sha256Verifier;
         assert!(
             verifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     sig_bytes,
@@ -4537,13 +4354,16 @@ mod tests_rsa {
         use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
         let cert = Certificate::from_der(der).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         RsaPkcs1v15Sha384Verifier
             .verify_signature(
-                cert.signature_algorithm.owned_to_ref(),
+                cert.signature_algorithm().owned_to_ref(),
                 spki_ref,
                 &tbs_der,
                 sig_bytes,
@@ -4558,16 +4378,19 @@ mod tests_rsa {
         use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
         let cert = Certificate::from_der(der).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature().raw_bytes().to_vec();
         let mid = sig_bytes.len() / 2;
         sig_bytes[mid] ^= 0x01;
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         assert!(
             RsaPkcs1v15Sha384Verifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     &sig_bytes,
@@ -4584,13 +4407,16 @@ mod tests_rsa {
         use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der");
         let cert = Certificate::from_der(der).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         RsaPkcs1v15Sha512Verifier
             .verify_signature(
-                cert.signature_algorithm.owned_to_ref(),
+                cert.signature_algorithm().owned_to_ref(),
                 spki_ref,
                 &tbs_der,
                 sig_bytes,
@@ -4605,16 +4431,19 @@ mod tests_rsa {
         use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der");
         let cert = Certificate::from_der(der).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let mut sig_bytes = cert.signature.raw_bytes().to_vec();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let mut sig_bytes = cert.signature().raw_bytes().to_vec();
         let mid = sig_bytes.len() / 2;
         sig_bytes[mid] ^= 0x01;
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         assert!(
             RsaPkcs1v15Sha512Verifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     &sig_bytes,
@@ -4632,12 +4461,15 @@ mod tests_rsa {
         use spki::der::referenced::OwnedToRef as _;
         let der = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha384.der");
         let cert = Certificate::from_der(der).expect("parse cert");
-        let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-        let sig_bytes = cert.signature.raw_bytes();
-        let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+        let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+        let sig_bytes = cert.signature().raw_bytes();
+        let spki_ref = cert
+            .tbs_certificate()
+            .subject_public_key_info()
+            .owned_to_ref();
 
         // SHA-512 verifier must refuse the SHA-384 OID.
-        let sha384_alg = cert.signature_algorithm.owned_to_ref();
+        let sha384_alg = cert.signature_algorithm().owned_to_ref();
         assert!(RsaPkcs1v15Sha512Verifier
             .verify_signature(sha384_alg, spki_ref.clone(), &tbs_der, sig_bytes)
             .is_err());
@@ -4658,12 +4490,15 @@ mod tests_rsa {
             &include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha512.der")[..],
         ] {
             let cert = Certificate::from_der(fixture).expect("parse cert");
-            let tbs_der = cert.tbs_certificate.to_der().expect("encode tbs");
-            let sig_bytes = cert.signature.raw_bytes();
-            let spki_ref = cert.tbs_certificate.subject_public_key_info.owned_to_ref();
+            let tbs_der = cert.tbs_certificate().to_der().expect("encode tbs");
+            let sig_bytes = cert.signature().raw_bytes();
+            let spki_ref = cert
+                .tbs_certificate()
+                .subject_public_key_info()
+                .owned_to_ref();
             DefaultVerifier
                 .verify_signature(
-                    cert.signature_algorithm.owned_to_ref(),
+                    cert.signature_algorithm().owned_to_ref(),
                     spki_ref,
                     &tbs_der,
                     sig_bytes,
@@ -4683,7 +4518,7 @@ mod tests_rsa {
     fn spki_key_matches_ignores_null_vs_absent_params() {
         let der_bytes = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
         let cert = Certificate::from_der(der_bytes).expect("parse cert");
-        let cert_spki = &cert.tbs_certificate.subject_public_key_info;
+        let cert_spki = cert.tbs_certificate().subject_public_key_info();
 
         // Same OID and key bytes, but parameters: None instead of Some(NULL).
         let spki_no_params: spki::SubjectPublicKeyInfoOwned = spki::SubjectPublicKeyInfoOwned {
@@ -4723,13 +4558,13 @@ mod tests_rsa {
 
         let der_bytes = include_bytes!("../tests/fixtures/rsa-pkcs1v15-sha256.der");
         let cert = Certificate::from_der(der_bytes).expect("parse cert");
-        let cert_spki = &cert.tbs_certificate.subject_public_key_info;
+        let cert_spki = cert.tbs_certificate().subject_public_key_info();
 
         // Construct an anchor from the same cert but with parameters: None.
         // Simulates a trust store that was populated from a source omitting the
         // explicit NULL — a common DER encoding variation for rsaEncryption.
         let anchor = TrustAnchor::new(
-            cert.tbs_certificate.subject.clone(),
+            cert.tbs_certificate().subject().clone(),
             spki::SubjectPublicKeyInfoOwned {
                 algorithm: spki::AlgorithmIdentifier {
                     oid: cert_spki.algorithm.oid,
@@ -5111,20 +4946,23 @@ mod tests_validate_path {
         // The four §6.1.5 leaf-intrinsic outputs must match the
         // independently-parsed leaf's corresponding tbs_certificate fields.
         assert_eq!(
-            result.leaf_subject, oracle_leaf.tbs_certificate.subject,
-            "ValidatedPath.leaf_subject must equal chain[0].tbs_certificate.subject"
+            &result.leaf_subject,
+            oracle_leaf.tbs_certificate().subject(),
+            "ValidatedPath.leaf_subject must equal chain[0].tbs_certificate().subject()"
         );
         assert_eq!(
-            result.leaf_issuer, oracle_leaf.tbs_certificate.issuer,
-            "ValidatedPath.leaf_issuer must equal chain[0].tbs_certificate.issuer"
+            &result.leaf_issuer,
+            oracle_leaf.tbs_certificate().issuer(),
+            "ValidatedPath.leaf_issuer must equal chain[0].tbs_certificate().issuer()"
         );
         assert_eq!(
-            result.leaf_serial, oracle_leaf.tbs_certificate.serial_number,
-            "ValidatedPath.leaf_serial must equal chain[0].tbs_certificate.serial_number"
+            &result.leaf_serial,
+            oracle_leaf.tbs_certificate().serial_number(),
+            "ValidatedPath.leaf_serial must equal chain[0].tbs_certificate().serial_number()"
         );
         assert_eq!(
-            result.leaf_spki, oracle_leaf.tbs_certificate.subject_public_key_info,
-            "ValidatedPath.leaf_spki must equal chain[0].tbs_certificate.subject_public_key_info"
+            &result.leaf_spki, oracle_leaf.tbs_certificate().subject_public_key_info(),
+            "ValidatedPath.leaf_spki must equal chain[0].tbs_certificate().subject_public_key_info()"
         );
 
         // Sanity: leaf_subject != leaf_issuer for a real (non-self-signed)
@@ -5153,12 +4991,15 @@ mod tests_validate_path {
         let result = validate_path(&[cert], &anchors, &policy_at(GRY_NOW), &EcdsaP256Verifier)
             .expect("1-cert self-signed chain must validate");
 
-        assert_eq!(result.leaf_subject, oracle.tbs_certificate.subject);
-        assert_eq!(result.leaf_issuer, oracle.tbs_certificate.issuer);
-        assert_eq!(result.leaf_serial, oracle.tbs_certificate.serial_number);
+        assert_eq!(&result.leaf_subject, oracle.tbs_certificate().subject());
+        assert_eq!(&result.leaf_issuer, oracle.tbs_certificate().issuer());
         assert_eq!(
-            result.leaf_spki,
-            oracle.tbs_certificate.subject_public_key_info
+            &result.leaf_serial,
+            oracle.tbs_certificate().serial_number()
+        );
+        assert_eq!(
+            &result.leaf_spki,
+            oracle.tbs_certificate().subject_public_key_info()
         );
         // Self-signed: subject == issuer by definition.
         assert_eq!(
@@ -5309,7 +5150,8 @@ mod tests_validate_path {
         leaf_der[second..second + 8].copy_from_slice(oid_sha384);
         let leaf = Certificate::from_der(&leaf_der).expect("patched DER must parse");
         assert_ne!(
-            leaf.signature_algorithm, leaf.tbs_certificate.signature,
+            leaf.signature_algorithm(),
+            leaf.tbs_certificate().signature(),
             "outer/inner OIDs must differ after patch"
         );
         let int_cert = load(include_bytes!("../tests/fixtures/vxf-int.der"));
@@ -5426,8 +5268,8 @@ mod tests_validate_path {
                 .expect("parse RSA cert");
         // Forged anchor: P-256 cert's subject name + RSA cert's SPKI.
         let forged = TrustAnchor::new(
-            p256.tbs_certificate.subject.clone(),
-            rsa.tbs_certificate.subject_public_key_info,
+            p256.tbs_certificate().subject().clone(),
+            rsa.tbs_certificate().subject_public_key_info().clone(),
         );
         let anchors = [forged];
         assert!(
@@ -6172,7 +6014,7 @@ mod tests_dn_attr_rule {
 
     #[test]
     fn dn_contains_oid_empty_subject_matches_nothing() {
-        let subject = x509_cert::name::RdnSequence(Vec::new());
+        let subject = x509_cert::name::Name::default();
         assert!(!dn_contains_oid(&subject, &OID_CN));
     }
 
@@ -6263,7 +6105,7 @@ mod tests_dn_attr_rule {
     /// (the universal quantifier over an empty set is true).
     #[test]
     fn rule_allof_empty_accepts_everything() {
-        let empty = x509_cert::name::RdnSequence(Vec::new());
+        let empty = x509_cert::name::Name::default();
         let cn_only = dn("CN=test");
         let rule = DnAttrRule::AllOf(Vec::new());
         assert!(evaluate_dn_attr_rule(&empty, &rule));
@@ -6274,7 +6116,7 @@ mod tests_dn_attr_rule {
     /// (the existential quantifier over an empty set is false).
     #[test]
     fn rule_anyof_empty_rejects_everything() {
-        let empty = x509_cert::name::RdnSequence(Vec::new());
+        let empty = x509_cert::name::Name::default();
         let cn_only = dn("CN=test");
         let rule = DnAttrRule::AnyOf(Vec::new());
         assert!(!evaluate_dn_attr_rule(&empty, &rule));
@@ -6469,7 +6311,7 @@ mod tests_policy_fields_rsa {
         let cert = load(include_bytes!(
             "../tests/fixtures/policy-checks/leaf-rsa2048-365d-san-eku.der"
         ));
-        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        let result = rsa_public_key_bits(cert.tbs_certificate().subject_public_key_info());
         assert_eq!(
             result,
             Some(2048),
@@ -6485,7 +6327,7 @@ mod tests_policy_fields_rsa {
         let cert = load(include_bytes!(
             "../tests/fixtures/policy-checks/leaf-rsa1024-365d-san-eku.der"
         ));
-        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        let result = rsa_public_key_bits(cert.tbs_certificate().subject_public_key_info());
         assert_eq!(
             result,
             Some(1024),
@@ -6500,7 +6342,7 @@ mod tests_policy_fields_rsa {
         let cert = load(include_bytes!(
             "../tests/fixtures/policy-checks/leaf-p256-365d-san-eku.der"
         ));
-        let result = rsa_public_key_bits(&cert.tbs_certificate.subject_public_key_info);
+        let result = rsa_public_key_bits(cert.tbs_certificate().subject_public_key_info());
         assert_eq!(
             result, None,
             "EC key must return None from rsa_public_key_bits (not RSA)"

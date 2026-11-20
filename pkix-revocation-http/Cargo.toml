@@ -53,8 +53,8 @@ ureq = { workspace = true, optional = true }
 # Async trait machinery (PKIX-a1yc.10). Pulled in by the `async` feature.
 # The trait macro generates code that boxes returned futures as
 # `Pin<Box<dyn Future + Send + 'async_trait>>`; that allocation cost is
-# accepted as the price of object-safe async traits at MSRV 1.73 (native
-# `async fn` in traits is stable but is 1.75+).
+# accepted as the price of object-safe async traits (native
+# `async fn` in traits is not object-safe).
 async-trait = { workspace = true, optional = true }
 
 # Reference async HTTP client (PKIX-a1yc.10). See `clients::reqwest`
@@ -63,11 +63,14 @@ async-trait = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 
 [dev-dependencies]
+# `derive` for the test-only certificate mirror in tests/support/raw_cert.rs.
+der = { workspace = true, features = ["derive"] }
+spki = { workspace = true }
 # DefaultVerifier (rsa + p256 OID dispatch) is needed by the CrlChecker
 # / OcspChecker delegation tests. std needed for std::error::Error.
 pkix-path = { workspace = true, features = ["rsa", "p256", "std"] }
 # Mock HTTP server for the integration-test suite (PKIX-a1yc.9). MSRV
-# 1.70, comfortably within the workspace's 1.73 MSRV.
+# 1.70, comfortably within the workspace MSRV (1.87).
 mockito = "1.7"
 
 # Async runtime + async mock server, dev-only (PKIX-a1yc.10). Tokio is

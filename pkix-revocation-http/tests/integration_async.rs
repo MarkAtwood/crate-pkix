@@ -28,6 +28,10 @@
 
 #![cfg(all(feature = "client-reqwest-async", feature = "crl"))]
 
+mod support {
+    pub mod raw_cert;
+}
+
 use async_trait::async_trait;
 use der::{Decode, Encode};
 use pkix_path::DefaultVerifier;
@@ -216,7 +220,7 @@ impl AsyncRevocationFetcher for PerUrlMock {
 
 /// Replace the CDP extension on a parsed cert. Direct port of the sync
 /// helper — same DER manipulation.
-fn rewrite_cdp_to_urls(mut cert: Certificate, urls: &[&str]) -> Certificate {
+fn rewrite_cdp_to_urls(cert: Certificate, urls: &[&str]) -> Certificate {
     use der::asn1::Ia5String;
 
     let mut dps: Vec<DistributionPoint> = Vec::with_capacity(urls.len());
@@ -233,14 +237,15 @@ fn rewrite_cdp_to_urls(mut cert: Certificate, urls: &[&str]) -> Certificate {
     let cdps = CrlDistributionPoints(dps);
     let cdps_der = cdps.to_der().expect("encode synthetic CDP");
 
-    let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-    let oid = der::asn1::ObjectIdentifier::new_unwrap("2.5.29.31");
-    let cdp_ext = exts
-        .iter_mut()
-        .find(|e| e.extn_id == oid)
-        .expect("fixture has CDP");
-    cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
-    cert
+    support::raw_cert::edit_cert(&cert, |raw| {
+        let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+        let oid = der::asn1::ObjectIdentifier::new_unwrap("2.5.29.31");
+        let cdp_ext = exts
+            .iter_mut()
+            .find(|e| e.extn_id == oid)
+            .expect("fixture has CDP");
+        cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
+    })
 }
 
 #[tokio::test]

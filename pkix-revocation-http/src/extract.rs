@@ -171,10 +171,9 @@ fn find_extension_value<'a>(
     cert: &'a Certificate,
     oid: &der::asn1::ObjectIdentifier,
 ) -> Option<&'a [u8]> {
-    cert.tbs_certificate
-        .extensions
-        .as_deref()
-        .unwrap_or(&[])
+    cert.tbs_certificate()
+        .extensions()
+        .map_or(&[][..], |v| v.as_slice())
         .iter()
         .find(|e| &e.extn_id == oid)
         .map(|e| e.extn_value.as_bytes())
@@ -273,13 +272,13 @@ mod tests {
         // DistributionPointName::NameRelativeToCRLIssuer variant. Build a
         // CrlDistributionPoints DER blob programmatically and overwrite a
         // known-good fixture's CDP extension value with it. The function
-        // under test reads cert.tbs_certificate.extensions, so writing the
+        // under test reads cert.tbs_certificate().extensions(), so writing the
         // tweaked extension into the parsed structure is enough.
         //
         // Independent oracle: hand-derived from RFC 5280 §4.2.1.13 ASN.1.
         // We assemble exactly one DistributionPoint with a single
         // RelativeDistinguishedName containing CN=ignored.
-        use der::{asn1::SetOfVec, Encode};
+        use der::Encode;
         use x509_cert::{
             attr::AttributeTypeAndValue, ext::pkix::crl::dp::DistributionPoint,
             name::RelativeDistinguishedName,
@@ -291,9 +290,7 @@ mod tests {
             oid: cn_oid,
             value: der::Any::encode_from(&cn_value).unwrap(),
         };
-        let mut set = SetOfVec::<AttributeTypeAndValue>::new();
-        set.insert(ava).unwrap();
-        let rdn = RelativeDistinguishedName(set);
+        let rdn = RelativeDistinguishedName::try_from(vec![ava]).unwrap();
 
         let dp = DistributionPoint {
             distribution_point: Some(DistributionPointName::NameRelativeToCRLIssuer(rdn)),
@@ -303,17 +300,27 @@ mod tests {
         let cdps = CrlDistributionPoints(vec![dp]);
         let cdps_der = cdps.to_der().expect("encode cdps");
 
-        let mut cert = parse_cert(FIXTURE_HTTP);
-        let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-        let cdp_ext = exts
-            .iter_mut()
-            .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
-            .expect("fixture has CDP");
-        cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
+        let cert = parse_cert(FIXTURE_HTTP);
+        let cert = crate::raw_cert::edit_cert(&cert, |raw| {
+            let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+            let cdp_ext = exts
+                .iter_mut()
+                .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
+                .expect("fixture has CDP");
+            cdp_ext.extn_value = der::asn1::OctetString::new(cdps_der).unwrap();
+        });
 
         // Sanity: the extension value still re-decodes as
         // CrlDistributionPoints (so the test is exercising the
         // NameRelativeToCRLIssuer branch, not a parse failure).
+        let cdp_ext = cert
+            .tbs_certificate()
+            .extensions()
+            .and_then(|exts| {
+                exts.iter()
+                    .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
+            })
+            .expect("edited cert has CDP");
         let reparsed = CrlDistributionPoints::from_der(cdp_ext.extn_value.as_bytes())
             .expect("synthesised CDP must round-trip");
         assert!(
@@ -340,16 +347,18 @@ mod tests {
         // parsed structure and overwrite the extension bytes.
         use der::Encode;
 
-        let mut cert = parse_cert(FIXTURE_HTTP);
-        let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-        let cdp = exts
-            .iter_mut()
-            .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
-            .expect("fixture has CDP");
-        // Overwrite with bytes that are not valid CrlDistributionPoints.
-        // 0x30 0x01 0xFF is "SEQUENCE of length 1 containing one byte 0xFF",
-        // which cannot decode as a SEQUENCE OF DistributionPoint.
-        cdp.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
+        let cert = parse_cert(FIXTURE_HTTP);
+        let cert = crate::raw_cert::edit_cert(&cert, |raw| {
+            let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+            let cdp = exts
+                .iter_mut()
+                .find(|e| e.extn_id == OID_CRL_DISTRIBUTION_POINTS)
+                .expect("fixture has CDP");
+            // Overwrite with bytes that are not valid CrlDistributionPoints.
+            // 0x30 0x01 0xFF is "SEQUENCE of length 1 containing one byte 0xFF",
+            // which cannot decode as a SEQUENCE OF DistributionPoint.
+            cdp.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
+        });
 
         // Round-trip through DER so the parsed structure matches what
         // extract_cdp_http_urls would receive. We don't actually need to
@@ -406,13 +415,15 @@ mod tests {
 
     #[test]
     fn aia_returns_err_on_malformed_der() {
-        let mut cert = parse_cert(FIXTURE_HTTP);
-        let exts = cert.tbs_certificate.extensions.as_mut().unwrap();
-        let aia_ext = exts
-            .iter_mut()
-            .find(|e| e.extn_id == OID_AUTHORITY_INFO_ACCESS)
-            .expect("fixture has AIA");
-        aia_ext.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
+        let cert = parse_cert(FIXTURE_HTTP);
+        let cert = crate::raw_cert::edit_cert(&cert, |raw| {
+            let exts = raw.tbs_certificate.extensions.as_mut().unwrap();
+            let aia_ext = exts
+                .iter_mut()
+                .find(|e| e.extn_id == OID_AUTHORITY_INFO_ACCESS)
+                .expect("fixture has AIA");
+            aia_ext.extn_value = der::asn1::OctetString::new(&[0x30, 0x01, 0xff][..]).unwrap();
+        });
 
         let err = extract_aia_http_urls(&cert).unwrap_err();
         match err {
