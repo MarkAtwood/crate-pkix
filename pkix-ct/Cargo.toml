@@ -42,6 +42,11 @@ log-list-json = ["log-list", "serde", "dep:serde_json", "dep:base64"]
 pkix-path = { workspace = true }
 der        = { workspace = true }
 x509-cert  = { workspace = true }
+
+# SubjectPublicKeyInfo and AlgorithmIdentifier, for verifying Google's
+# detached signature over the CT log list. x509-cert re-exports these but
+# naming the crate directly keeps the dependency visible.
+spki       = { workspace = true }
 x509-ocsp  = { workspace = true, optional = true }
 sha2       = { workspace = true, optional = true }
 serde      = { workspace = true, optional = true }
@@ -53,6 +58,12 @@ base64     = { version = "0.22", default-features = false, features = ["alloc"],
 # `pem` enabled provides Certificate::from_pem. The crate itself does not
 # depend on PEM parsing.
 x509-cert = { workspace = true, features = ["pem", "std"] }
+
+# DefaultVerifier, for checking Google's RSA/SHA-256 signature over the CT
+# log list in tests/log_list_signature.rs. The crate itself takes any
+# SignatureVerifier the caller supplies and ships no implementation, so this
+# is dev-only: pkix-ct has no opinion about which crypto backend verifies.
+pkix-path = { workspace = true, features = ["rustcrypto"] }
 
 [package.metadata.docs.rs]
 all-features = true

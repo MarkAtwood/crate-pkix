@@ -270,6 +270,21 @@ mod google_schema {
         /// Returns [`Error::ParseError`] on JSON syntax errors,
         /// invalid base64 in `log_id` or `key`, malformed timestamps,
         /// or a `log_id` ⇔ `key` mismatch.
+        ///
+        /// # This does not check Google's signature
+        ///
+        /// Google publishes `log_list.sig` alongside the list, and nothing
+        /// here looks at it. The bytes are parsed on trust.
+        ///
+        /// That is the right function for a list you reviewed and committed
+        /// yourself, or for one that reached you over a channel you already
+        /// trust. For a list that was **fetched** — which is the normal case,
+        /// since logs are added and retired continuously and deployments
+        /// refetch on the order of weeks — use
+        /// [`from_google_log_list_json_verified`](Self::from_google_log_list_json_verified)
+        /// instead. A substituted list cannot forge an SCT for a log already
+        /// in it, because a `log_id` is SHA-256 over the log's SPKI; what it
+        /// can do is add a log the attacker controls, whose SCTs then verify.
         pub fn from_google_log_list_json(json: &str) -> Result<Self> {
             let parsed: LogListJson = serde_json::from_str(json).map_err(|_| Error::ParseError)?;
             let mut out = Self::new();
@@ -321,6 +336,108 @@ mod google_schema {
             }
             Ok(out)
         }
+
+        /// Verifies Google's detached signature over `json`, then parses it.
+        ///
+        /// Google publishes the log list as three artifacts under
+        /// `https://www.gstatic.com/ct/log_list/v3/`:
+        ///
+        /// | File | What it is |
+        /// |--|--|
+        /// | `log_list.json` | the list, passed here as `json` |
+        /// | `log_list.sig` | a detached signature over those exact bytes |
+        /// | `log_list_pubkey.pem` | the key that signs it |
+        ///
+        /// [`from_google_log_list_json`](Self::from_google_log_list_json)
+        /// parses the first and ignores the other two. Prefer this function
+        /// wherever the list was fetched rather than reviewed by hand.
+        ///
+        /// # Why this matters more than it looks
+        ///
+        /// A `log_id` is SHA-256 over the log's SPKI, which
+        /// [`CtLogList`] checks. So a substituted list **cannot** forge an
+        /// SCT for a log already in it. What a substituted list can do is
+        /// **add a log the attacker controls**, after which SCTs from that
+        /// log verify — which defeats the point of requiring SCTs at all.
+        ///
+        /// Unlike a DNSSEC root key, this list is not a long-lived constant:
+        /// logs are added, frozen and retired continuously, so a deployment
+        /// refetches on the order of weeks. Every one of those fetches is a
+        /// chance to be handed a different list, which is why the signature
+        /// is worth checking on each one rather than once at review time.
+        ///
+        /// # The key is yours to supply
+        ///
+        /// `signing_key_spki` is DER `SubjectPublicKeyInfo` — what
+        /// `openssl pkey -pubin -outform DER` emits from the published PEM.
+        /// This crate ships no key, for the same reason it ships no log
+        /// list and `pkix-path` ships no root certificates: the trust
+        /// decision is the caller's. Google's log-list signing key rotates
+        /// far more rarely than the list it signs, so pinning it as data on
+        /// your side is practical in a way pinning the list is not.
+        ///
+        /// # The algorithm is fixed, deliberately
+        ///
+        /// Verification is RSA PKCS#1 v1.5 with SHA-256, which is what
+        /// Google signs with, and it is not a parameter. Letting a caller
+        /// choose would let anything able to influence that choice downgrade
+        /// the check; a change on Google's side is a format change that
+        /// should require a visible code change here.
+        ///
+        /// # Errors
+        ///
+        /// - [`Error::InvalidSignature`] if the signature does not verify
+        ///   over `json`, if `signing_key_spki` does not parse, or if the
+        ///   verifier cannot handle an RSA/SHA-256 signature. These are one
+        ///   variant on purpose: to a caller they all mean "do not trust
+        ///   this list", and distinguishing them would invite treating some
+        ///   as recoverable.
+        /// - [`Error::ParseError`] if `json` is not UTF-8, or whatever
+        ///   [`from_google_log_list_json`](Self::from_google_log_list_json)
+        ///   reports once the signature has been accepted.
+        ///
+        /// Note the order: nothing is parsed until the signature verifies,
+        /// so malformed JSON from an unverified source is reported as a
+        /// signature failure rather than a parse failure.
+        pub fn from_google_log_list_json_verified<V>(
+            json: &[u8],
+            detached_signature: &[u8],
+            signing_key_spki: &[u8],
+            verifier: &V,
+        ) -> Result<Self>
+        where
+            V: pkix_path::SignatureVerifier,
+        {
+            use der::{Decode as _, Encode as _};
+
+            /// `sha256WithRSAEncryption` (RFC 4055 §5).
+            const SHA256_WITH_RSA: der::asn1::ObjectIdentifier =
+                der::asn1::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+
+            let spki = spki::SubjectPublicKeyInfoRef::from_der(signing_key_spki)
+                .map_err(|_| Error::InvalidSignature)?;
+
+            // RFC 4055 §5: the parameters field MUST be present and NULL for
+            // this OID. Encoding it explicitly rather than passing None keeps
+            // the AlgorithmIdentifier the same shape a certificate carries.
+            let null = der::asn1::Null
+                .to_der()
+                .map_err(|_| Error::InvalidSignature)?;
+            let algorithm = spki::AlgorithmIdentifierRef {
+                oid: SHA256_WITH_RSA,
+                parameters: Some(
+                    der::asn1::AnyRef::from_der(&null).map_err(|_| Error::InvalidSignature)?,
+                ),
+            };
+
+            verifier
+                .verify_signature(algorithm, spki, json, detached_signature)
+                .map_err(|_| Error::InvalidSignature)?;
+
+            let text = core::str::from_utf8(json).map_err(|_| Error::ParseError)?;
+            Self::from_google_log_list_json(text)
+        }
+
     }
 
     /// Convert an RFC 3339 / ISO 8601 timestamp to milliseconds since

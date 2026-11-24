@@ -127,6 +127,59 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### `pkix-ct`: verify Google's signature over the CT log list
+
+`CtLogList::from_google_log_list_json` parsed Google's `log_list.json` on
+trust. Google publishes a detached `log_list.sig` and the key that signs
+it, and neither was looked at.
+
+**`CtLogList::from_google_log_list_json_verified`** checks the signature
+before parsing anything. RSA PKCS#1 v1.5 with SHA-256, which is what
+Google signs with, confirmed against the published artifacts with
+`openssl dgst` before any code was written. The algorithm is fixed
+rather than a parameter: letting a caller choose would let anything able
+to influence that choice downgrade the check.
+
+Verification goes through the caller's
+[`SignatureVerifier`](pkix_path::SignatureVerifier), and the signing key
+is a caller-supplied DER `SubjectPublicKeyInfo`. The crate ships no key,
+for the same reason it ships no log list and `pkix-path` ships no root
+certificates. Google's log-list signing key rotates far more rarely than
+the list it signs, so pinning the key is practical where pinning the
+list is not — the inverse of `pkix-dnssec-anchor`, where the anchor
+itself is the long-lived artifact.
+
+### Why this is not cosmetic
+
+A `log_id` is SHA-256 over the log's SPKI, which `CtLogList` already
+checks, so a substituted list **cannot** forge an SCT for a log already
+in it. What it can do is **add a log the attacker controls**, after which
+SCTs from that log verify — which defeats the point of requiring SCTs.
+
+Unlike a DNSSEC root key, the list is not a long-lived constant: logs
+are added, frozen and retired continuously, so a deployment refetches on
+the order of weeks and every fetch was previously unauthenticated.
+
+`from_google_log_list_json` is unchanged and still exported — a list you
+reviewed and committed yourself needs no signature check. Its
+documentation now says plainly that it checks nothing and points at the
+verifying constructor.
+
+### Testing
+
+Eight tests against the **real published artifacts**, committed with
+refresh instructions in `tests/fixtures/REFRESH.md`. Using Google's
+genuine list and signature rather than a synthetic pair is the point:
+the test asserts this crate agrees with what Google actually signs. The
+negative cases cover a byte flipped at three positions, an edit that
+leaves valid JSON, a modified key, malformed keys and signatures, and
+that nothing is parsed before the signature verifies.
+
+The tests do not go stale as the list rotates — they assert the
+signature verifies and that tampering is caught, neither of which
+depends on the list being current.
+
+
 ### Workspace: `pkix-aia` and `pkix-identity` are unconditionally `no_std`
 
 Follow-on from the `core::error::Error` change. Moving the `Error` impls
