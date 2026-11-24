@@ -22,6 +22,16 @@ fn repeated_all_lints_reuses_leaked_metadata() {
     .unwrap();
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
+    // NOTE: writing an executable and then spawning it is safe here only
+    // because this file contains exactly one test, so no other thread can be
+    // forking while this write's file descriptor is open. On Linux a forked
+    // child inherits that descriptor and `execve` then fails with ETXTBSY
+    // ("Text file busy"), which is what made
+    // pkix-zlint-bridge/tests/review_timeout.rs flaky until its writes were
+    // moved into a single LazyLock that completes before any test spawns.
+    // Adding a second test to this file reintroduces that race; do the same
+    // thing there if you do.
+
     let mut cfg = BridgeConfig::default();
     cfg.zlint_path = script;
     let bridge = Arc::new(ZlintBridge::new(cfg).unwrap());
