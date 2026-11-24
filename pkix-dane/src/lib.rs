@@ -106,6 +106,10 @@ use alloc::vec::Vec;
 pub mod name;
 pub mod record;
 pub mod selector;
+
+#[cfg(feature = "smtp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smtp")))]
+pub mod smtp;
 mod verify;
 
 pub use name::{TlsaName, TlsaProtocol};

@@ -127,6 +127,67 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### SMTP DANE (RFC 7672 §3.2): name checks
+
+The first of three pieces of RFC 7672 support. This is the certificate-facing
+half — the reference identifier set and the matching rule — with no DNS
+lookups, no MX resolution and no TLSA matching, which belong elsewhere.
+
+**Research first, and it overturned the plan.** The design on file claimed
+RFC 7672 *requires* SMTP clients to ignore PKIX-TA(0) and PKIX-EE(1), making a
+shared code path with the HTTPS entry point a policy violation. §3.1.3 says
+something weaker: servers SHOULD NOT publish them for port 25, and client
+treatment is **undefined**, with a MAY to treat them as unusable. Honouring
+them would have been permitted. The separate entry point is still right, but
+on the other two differences rather than that one.
+
+- **`pkix_identity::verify_dns_name_with_cn_fallback`** implements §3.2.3:
+  only DNS-IDs are matched when the certificate presents any, and the
+  `commonName` is consulted only when it presents none.
+
+  This is the behaviour `verify_dns_name` deliberately refuses, because
+  RFC 6125 §6.4.4 deprecated it for the Web PKI. Both are right for their
+  protocol: RFC 7672 is standards-track and current, and keeps CN fallback
+  for MTA-to-MTA SMTP, where certificates are frequently old and
+  self-managed and there is no user to prompt. It is a separate function
+  rather than a flag so no caller acquires it by default, and the Web PKI
+  path cannot be loosened by passing an argument.
+
+  One implementation of the wildcard rule, not two: a second would be a
+  divergence hazard, and wildcard bugs are security bugs.
+
+- **`pkix_dane::smtp`** (new `smtp` feature) holds `SmtpIdentities`, the
+  §3.2.2 reference identifier **set**, and `verify_smtp_name`.
+
+  The set is what a single-hostname API cannot express. Its membership
+  depends on how the TLSA base domain was reached, so there is a constructor
+  per case rather than a bag of names: `secure_mx` carries the base domain
+  plus the original next-hop domain and its CNAME expansion, `non_mx` adds
+  the original next-hop only when the base domain is its expansion, and
+  `insecure_mx` carries the MX hostname **alone**.
+
+  That last exclusion is the security property, and it is tested as a pair:
+  the same certificate naming the same next-hop domain is accepted after a
+  secure MX lookup and rejected after insecure MX redirection. An attacker
+  who can tamper with an unsigned MX RRset chooses the MX hostname, so a
+  certificate matching the next-hop domain proves nothing about reaching the
+  intended destination — and accepting it would let the delivery be logged as
+  secure delivery to a domain that was never authenticated, which §2.2.1
+  forbids in as many words.
+
+  `verify_smtp_name` takes the usage rather than assuming a check is wanted,
+  because §3.2.1 makes skipping it a MUST NOT for DANE-EE(3) rather than an
+  optimization. It reports *which* identifier matched, because §2.2.1 requires
+  logs to distinguish secure delivery to the intended next-hop from
+  authentication via an insecurely determined MX host, and a boolean cannot.
+
+Still to come, recorded with the research that bears on them: the
+DNSSEC-validated MX lookup (§2.2.1 requires MX preference order to take
+precedence over channel security, and §2.2.2 requires A/AAAA queries *before*
+TLSA lookups to avoid known-broken nameservers), and the entry point that
+drives them. §2.1.1 also folds "indeterminate" into "insecure" for this
+profile, which the SMTP path must honour.
+
 ### New crate: `pkix-ct-google` — Google's CT log-list signing key as data
 
 `pkix-ct` can verify Google's detached signature over the CT log list, but

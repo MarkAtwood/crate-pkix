@@ -27,6 +27,12 @@ default = []
 # caching them is an expected deployment pattern.
 serde = ["dep:serde"]
 
+# `smtp` adds the RFC 7672 SMTP DANE name checks (§3.2). Gated because it
+# pulls in pkix-identity, which an HTTPS-only consumer has no use for, and
+# because RFC 7672's CN-ID fallback is a behaviour no caller should acquire
+# without asking for it.
+smtp = ["dep:pkix-identity"]
+
 [dependencies]
 # TrustAnchor, synthesized by the DANE-TA usage (2) and returned from
 # verify_dane_ta. Dependency direction is chain -> dane -> path, mirroring
@@ -48,6 +54,11 @@ sha2 = { workspace = true }
 
 # Optional serde derives. Activated only by the `serde` feature.
 serde = { workspace = true, optional = true }
+
+# RFC 7672 §3.2.3 name matching for the `smtp` feature. pkix-identity owns
+# name matching in this workspace; a second wildcard implementation here
+# would be a divergence hazard, and wildcard bugs are security bugs.
+pkix-identity = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Round-trip tests use serde_json as the human-readable JSON oracle,
