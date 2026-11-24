@@ -1,5 +1,10 @@
 [workspace]
-resolver = "2"
+# Resolver 3 is MSRV-aware: it prefers dependency versions compatible with
+# `rust-version` instead of always taking the newest. Resolver 2 ignores
+# rust-version entirely, which is how uuid 1.29 (requiring 1.89) ended up in
+# the tree under a declared MSRV of 1.88 — a violation a consumer on the
+# declared minimum would hit and nobody here would. See PKIX-z2g4.
+resolver = "3"
 members = [
     "pkix-path",
     "pkix-revocation",
