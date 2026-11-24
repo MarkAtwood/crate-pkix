@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-uin7",
+  "title": "Make the repository typos-clean so the CI gate can cover all of it",
+  "description": "## What\n\nquality-gates.yml runs typos over five crates by name (pkix-dane, pkix-dane-resolver, pkix-dnssec-anchor, pkix-aia-http, pkix-chain) rather than over the repository, because the repository is not typos-clean. There were 43 findings when last counted across the whole tree.\n\n## Why it matters\n\nThe workflow carries a comment saying a gate permitted to fail is not a gate. A path list that has to be extended by hand every time a crate is cleaned is the kind of thing that silently stops tracking reality -- the same failure mode as the stale MSRV comment that prompted PKIX-z2g4 in the first place.\n\n## Known cases\n\nAGENTS.md line 103 has \"non-clonable\", which typos wants as \"non-cloneable\". That one is in normative text the maintainer wrote, inside non-negotiable #6, so it is a wording decision rather than a typo fix -- either accept the correction or add it to a typos allowlist with a note. A .typos.toml does not currently exist.\n\nSeveral findings are likely in the same category: domain vocabulary typos does not know. The useful outcome is a short allowlist plus genuine fixes, not blanket suppression.\n\n## Acceptance\n\n[ ] typos passes over the whole repository\n[ ] Domain vocabulary that typos misreads is in a committed .typos.toml with a comment, not suppressed inline case by case\n[ ] The path list removed from quality-gates.yml so the gate covers everything",
+  "status": "open",
+  "priority": 4,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T21:43:42.850064526Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T21:43:42.850064526Z"
+}

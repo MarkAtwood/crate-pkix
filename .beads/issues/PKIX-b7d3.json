@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-b7d3",
+  "title": "Decide whether to move the workspace to edition 2024",
+  "description": "## What\n\nThe workspace is on edition 2021. Edition 2024 has been available since Rust 1.85 and the MSRV is now 1.88, so the constraint that kept it out is gone.\n\n## What it would unlock\n\n- let chains: `if let Some(a) = x \u0026\u0026 let Some(b) = y`. These are edition-2024-only, not merely 1.88-only. This workspace has a lot of nested if-let over optional certificate extensions, so it is the change most likely to improve real code here.\n- RPIT lifetime capture rules change, which matters if native AFIT is adopted (PKIX-5hoi).\n- unsafe_op_in_unsafe_fn becomes deny-by-default. Nearly every crate here is forbid(unsafe_code) already, so this only touches pkix-truststore-pkcs11 if and when its FFI lands.\n\n## Why it is a decision and not a chore\n\nEdition 2024 changes semantics, not just syntax:\n\n- Temporary lifetimes in tail expressions shorten, which can change when a lock guard or a borrow is dropped. That is a behaviour change in code that compiles either way.\n- `gen` becomes a reserved keyword.\n- Changes to match ergonomics around reference patterns.\n\nFor a security library the tail-expression-scope change deserves a deliberate look rather than being taken as a side effect of wanting let chains. cargo fix --edition handles the mechanical part and will not flag a behavioural difference it cannot see.\n\n## Also weigh\n\nAn edition bump is visible in published metadata and is the kind of thing a downstream consumer notices. It is not breaking -- editions are per-crate -- but it should land as its own change rather than riding along with a feature.\n\n## Acceptance\n\n[ ] Decided for or against, with the reason recorded\n[ ] If for: cargo fix --edition per crate, then a read of every tail expression that produces a guard or a borrow\n[ ] If for: let chains adopted where they actually simplify existing nested if-let, not mechanically everywhere\n[ ] If against: the reason recorded so the question is not reopened every MSRV bump",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "decision",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T21:35:36.36873097Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T21:35:36.36873097Z"
+}
