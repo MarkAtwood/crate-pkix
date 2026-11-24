@@ -1,0 +1,35 @@
+[package]
+name        = "pkix-dnssec-anchor"
+description = "IANA DNS root zone trust anchors as inert data — no validation, no network, no filesystem, no dependencies"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+keywords    = ["dnssec", "dns", "dane", "trust-anchor", "pki"]
+categories  = ["cryptography", "no-std"]
+
+# The committed IANA artifacts are the provenance record for a release: a
+# consumer can re-verify the signature over the anchors offline without
+# trusting that gen.sh ran honestly. Shipping them in the published crate
+# is the whole point, so they are included explicitly.
+include = [
+    "src/**/*.rs",
+    "iana/root-anchors.xml",
+    "iana/root-anchors.p7s",
+    "iana/icannbundle.pem",
+    "gen.sh",
+    "gen.py",
+    "CHANGELOG.md",
+    "README.md",
+]
+
+[dependencies]
+# None, deliberately. This crate is data plus two small date helpers. A
+# dependency here would be a dependency on the trust path of every DNSSEC
+# consumer in the workspace, bought for nothing.
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

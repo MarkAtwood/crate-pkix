@@ -25,6 +25,7 @@ members = [
     "pkix-aia-http",
     "pkix-dane",
     "pkix-dane-resolver",
+    "pkix-dnssec-anchor",
     "pkix-pkilint-bridge",
     "pkix-policy-pkilint",
 ]
@@ -112,7 +113,7 @@ members = [
 # "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
 version      = "0.2.1"
 edition      = "2021"
-rust-version = "1.87"
+rust-version = "1.88"
 license      = "Apache-2.0 OR MIT"
 repository   = "https://github.com/MarkAtwood/crate-pkix"
 authors      = ["Mark Atwood <mark@reviewcommit.com>"]
@@ -142,6 +143,7 @@ pkix-aia                = { path = "pkix-aia",                version = "0.1.1" 
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.2.0" }
 pkix-dane               = { path = "pkix-dane",               version = "0.2.0" }
 pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.1.0" }
+pkix-dnssec-anchor      = { path = "pkix-dnssec-anchor",      version = "0.1.0" }
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
 pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
 
@@ -187,7 +189,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 
 # Async trait macro for the AsyncRevocationFetcher / AsyncRevocationChecker
 # traits in pkix-revocation-http. Stable-channel MSRV trivially fits within
-# the workspace MSRV (1.87); pinned at the workspace level so the
+# the workspace MSRV (1.88); pinned at the workspace level so the
 # crate-local feature flag does not drift from the version used by tests.
 # Tokio is intentionally NOT a workspace dep — it is a dev-only dep of
 # pkix-revocation-http's async integration tests, and a transitive runtime
