@@ -12,6 +12,45 @@
 //! `log-list-json` feature; other sources (Apple, browser-specific
 //! lists, a private monitoring list) can be ingested by constructing
 //! `CtLog` values and calling [`CtLogList::insert`] directly.
+//!
+//! # Google's log list carries an acceptable-use policy
+//!
+//! Google's lists are the obvious source and this module parses their
+//! schema, but Chrome's CT team restricts what they may be used for.
+//! Verbatim, from Chrome's log-list documentation:
+//!
+//! > Google Chrome makes its CT log lists available for the purposes of
+//! > certificate submitters (such as certification authorities) and CT
+//! > monitors and auditors wishing to remain compatible with, or
+//! > investigate the contents of, the CT and WebPKI ecosystems. Chrome's
+//! > CT log lists may not be used to facilitate CT enforcement in TLS
+//! > clients other than Chrome without explicit written permission from
+//! > Chrome's CT team.
+//!
+//! So parsing these lists is squarely within the stated purposes for a
+//! monitor, an auditor or a certificate submitter. Enforcing CT against
+//! them in a non-Chrome TLS client is not, absent that permission — and
+//! `pkix-path` makes this workspace a plausible home for exactly such a
+//! client, which is why the policy is quoted here rather than left to be
+//! discovered.
+//!
+//! This crate provides the mechanism and does not police the use. It takes
+//! no dependency on Google's list: a private, vendor-specific or
+//! permission-covered list goes in through [`CtLogList::insert`] or the
+//! schema parser, and nothing privileges one source over another.
+//!
+//! # Not every published list is signed
+//!
+//! Google publishes `log_list.json`, a detached `log_list.sig`, and the
+//! signing key, so a fetched list can be authenticated — see
+//! [`CtLogList::from_google_log_list_json_verified`].
+//!
+//! Apple's list, at `https://valid.apple.com/ct/log_list/current_log_list.json`,
+//! is **not** signed: there is no detached signature published alongside it
+//! and no signature field within it. A consumer ingesting it is trusting
+//! HTTPS to Apple and nothing further. That is a materially weaker position
+//! than the Google path offers, and worth knowing before treating the two
+//! as interchangeable sources.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -375,6 +414,22 @@ mod google_schema {
         /// decision is the caller's. Google's log-list signing key rotates
         /// far more rarely than the list it signs, so pinning it as data on
         /// your side is practical in a way pinning the list is not.
+        ///
+        /// There is a second reason, which is that supplying the key is an
+        /// act. Google's acceptable-use policy restricts CT enforcement
+        /// against its lists in non-Chrome TLS clients (see this module's
+        /// documentation), so whether that policy is satisfied is a question
+        /// about the deployment, not about this function. A caller who pins
+        /// the key has answered it; a shipped key would have answered it for
+        /// them.
+        ///
+        /// Note also that Google publishes no out-of-band verification of
+        /// the key itself — no fingerprint in a signed artifact, no copy in
+        /// an independently distributed source tree. Its authenticity rests
+        /// on HTTPS to `gstatic.com`, which is to say on the Web PKI that
+        /// Certificate Transparency exists to police. The strongest check
+        /// available is that a candidate key verifies Google's currently
+        /// published list, which is worth doing when pinning one.
         ///
         /// # The algorithm is fixed, deliberately
         ///

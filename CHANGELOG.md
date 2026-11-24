@@ -127,6 +127,40 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### `pkix-ct`: document Google's acceptable-use policy, and Apple's lack of a signature
+
+Two facts a consumer of this module needs that it did not state.
+
+- **Google's CT log lists carry an acceptable-use policy.** Chrome's CT
+  documentation makes the lists available for certificate submitters such
+  as certification authorities, and for CT monitors and auditors, and says
+  they "may not be used to facilitate CT enforcement in TLS clients other
+  than Chrome without explicit written permission from Chrome's CT team."
+
+  Parsing them is squarely within the stated purposes for a monitor, an
+  auditor or a submitter. Enforcing CT against them in a non-Chrome TLS
+  client is not, absent that permission — and `pkix-path` makes this
+  workspace a plausible home for exactly such a client, so the policy is
+  now quoted in the module documentation rather than left to be
+  discovered. The crate provides the mechanism and does not police the
+  use, but a consumer should know which side of the line they are on.
+
+- **Apple's log list is not signed.** There is no detached signature
+  published alongside `current_log_list.json` and no signature field
+  within it, so a consumer ingesting it is trusting HTTPS to Apple and
+  nothing further. The module previously listed Apple alongside Google as
+  an alternative source without distinguishing them, which — now that a
+  verified constructor exists for Google's list — invited the inference
+  that the alternatives were comparably authenticated.
+
+Also records on `from_google_log_list_json_verified` that Google publishes
+no out-of-band verification of the signing key itself: no fingerprint in a
+signed artifact, no copy in an independently distributed source tree. Its
+authenticity rests on HTTPS to `gstatic.com`, which is to say on the Web
+PKI that Certificate Transparency exists to police. The strongest check
+available is that a candidate key verifies Google's currently published
+list.
+
 ### Workspace: bare-metal `no_std` builds verified and gated
 
 `pkix-dane`'s `no_std` claim had only ever been checked at source level —
