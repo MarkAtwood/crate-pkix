@@ -6,6 +6,47 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentation
+
+- **New "Security considerations" section**, placed before the API
+  details rather than among the limitations. This crate applies no
+  destination policy, and revocation URLs are not configuration: a
+  `CRLDistributionPoints` or `AuthorityInfoAccess` extension is read from
+  a certificate whose signature has not been checked, so whoever presents
+  a certificate chooses the URLs this process fetches. A certificate
+  carrying `http://169.254.169.254/latest/meta-data/` will have it
+  fetched by default.
+
+  The section separates what *is* guaranteed — HTTP/HTTPS schemes only,
+  same-origin redirects only, bounded bodies, a 30-second default
+  timeout — from what is not, since those bound what an attacker can do
+  *through* a fetch rather than *where* a fetch goes. It then says where
+  to enforce a policy, and notes that filtering by hostname before
+  connecting is weaker than filtering at DNS resolution, because a name
+  can resolve publicly when checked and to loopback when connected.
+
+- **The asymmetry with `pkix-aia-http` is now named in both crates.**
+  That crate fetches equally untrusted URLs for chain building and
+  *refuses* non-public destinations by default. Both choices are
+  deliberate — it owns its transport and so can own a policy, while this
+  crate's transport is a caller-supplied trait — but the combination is a
+  trap, and `pkix-aia-http`'s own docs describe the two crates as
+  intentionally mirroring each other, which is precisely where the wrong
+  assumption forms. The warning is therefore in that section too, not
+  only here.
+
+- The README carries the same warning, since that is what crates.io
+  shows.
+
+### Fixed
+
+- The README said **"Status: planned (not yet implemented)"** for a crate
+  at 0.2.0 with two reference HTTP clients, a sync and an async fetcher
+  family, a pluggable cache, and 135 tests. Corrected, along with the
+  future-tense section heading that went with it. A reader who believes
+  the crate is unbuilt will not act on a security warning in it.
+
+
 Planned release: **0.2.0** (breaking).
 
 ### Changed

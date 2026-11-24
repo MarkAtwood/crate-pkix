@@ -2,9 +2,36 @@
 
 Online CRL and OCSP fetching for `pkix-revocation`.
 
-**Status: planned (not yet implemented).**
+**Status: implemented, unpublished.** CRL and OCSP fetching, a sync and an
+async fetcher family, two reference HTTP clients (`ureq`, `reqwest`), and a
+pluggable cache, behind the feature flags described below.
 
-## What this will do
+## Security: this crate applies no destination policy
+
+Revocation URLs are not configuration. A `CRLDistributionPoints` or
+`AuthorityInfoAccess` extension is a field of the certificate being
+validated, read before that certificate's signature has been checked — so
+whoever presents a certificate chooses the URLs this process fetches. A
+certificate carrying `http://169.254.169.254/latest/meta-data/` will have it
+fetched, by default, without complaint.
+
+What is guaranteed: HTTP and HTTPS schemes only, same-origin redirects only
+(so a URL you vet cannot be redirected past your vetting), bounded response
+bodies, and a 30-second default timeout. Those bound what an attacker can do
+*through* a fetch, not *where* a fetch goes.
+
+What you must do: enforce a destination policy in your `RevocationFetcher` /
+`AsyncRevocationFetcher`, or vet the URL before calling. Prefer filtering at
+DNS resolution — a hostname check before connecting can be defeated by a name
+that resolves publicly when checked and to loopback when connected.
+
+**Note the asymmetry with `pkix-aia-http`,** which fetches equally untrusted
+URLs for chain building but *does* refuse non-public destinations by default.
+The two crates ship opposite defaults for the same threat. Do not carry an
+assumption from one to the other.
+
+
+## What this does
 
 [`pkix-revocation`] requires the caller to supply pre-fetched DER bytes for
 CRL and OCSP checking. This crate extends it with automatic fetching from

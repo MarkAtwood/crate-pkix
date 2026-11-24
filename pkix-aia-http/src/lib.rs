@@ -40,6 +40,17 @@
 //! fetchers via the `with_agent` builders, sharing connection
 //! pools.
 //!
+//! **The mirroring stops at destination policy, and that is the one place
+//! it matters.** This crate refuses non-public destinations by default (see
+//! "Destination policy (SSRF)" below); `pkix-revocation-http` applies no
+//! destination policy at all, leaving it to the caller's fetcher. Both
+//! choices are deliberate — this crate owns its transport and so can own a
+//! policy, while that crate's transport is a caller-supplied trait — but a
+//! reader who has absorbed how similar the two crates are is exactly the
+//! reader who will assume the defaults match. They do not. See that crate's
+//! "Security considerations" section before fetching CRLs or OCSP
+//! server-side.
+//!
 //! The split into a separate crate per use case
 //! (`pkix-revocation-http` for CRL / OCSP, `pkix-aia-http` for AIA)
 //! follows the workspace's one-callback-per-crate convention. The

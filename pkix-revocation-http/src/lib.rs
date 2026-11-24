@@ -42,6 +42,77 @@
 //! async HTTP backend (hyper, isahc-async, custom) implement
 //! [`AsyncRevocationFetcher`] themselves and pay no reqwest cost.
 //!
+//! # Security considerations
+//!
+//! **This crate applies no destination policy. Read this before using it
+//! server-side.**
+//!
+//! Revocation URLs are not configuration. A `CRLDistributionPoints` or
+//! `AuthorityInfoAccess` extension is a field of the certificate being
+//! validated, and that certificate's signature has not been checked at the
+//! point its URLs are read. So whoever presents a certificate chooses the
+//! URLs this process fetches.
+//!
+//! A certificate carrying `http://169.254.169.254/latest/meta-data/` or
+//! `http://10.0.0.1/` in its CDP or AIA extension will therefore have those
+//! fetched, by default, with no complaint. On a cloud instance the first of
+//! those is the instance-metadata service and may return credentials; on a
+//! corporate network the second probes hosts the attacker cannot otherwise
+//! reach. This is server-side request forgery, with the certificate as the
+//! attacker's input.
+//!
+//! ## What this crate does guarantee
+//!
+//! - **HTTP and HTTPS only.** URI extraction drops every other
+//!   scheme, case-insensitively, so `file://`, `ldap://` and `gopher://`
+//!   URIs in a certificate are never fetched.
+//! - **Same-origin redirects only.** The reference clients override their
+//!   libraries' defaults to refuse a redirect that changes scheme, host or
+//!   port — `reqwest`'s own default follows up to ten redirects to any
+//!   origin. A URL a caller has vetted therefore cannot be redirected past
+//!   that vetting; a cross-origin redirect surfaces as
+//!   [`FetchError::HttpStatus`] with the 3xx code. Tested on both clients,
+//!   asserting the redirect target was never contacted.
+//! - **Bounded responses and a 30-second default timeout**, so a hostile
+//!   endpoint cannot exhaust memory or hang a validation indefinitely.
+//!
+//! Those bound what an attacker can do *through* a fetch. They do not bound
+//! *where* a fetch goes.
+//!
+//! ## What you must do
+//!
+//! Decide which destinations are acceptable, and enforce it. Two places work:
+//!
+//! 1. **In your [`RevocationFetcher`] or [`AsyncRevocationFetcher`]**, which
+//!    is the seam this crate leaves open for exactly this purpose. Refuse the
+//!    request before it reaches the transport.
+//! 2. **Before calling**, by vetting the URL yourself. The same-origin
+//!    redirect guarantee above is what makes this sound rather than
+//!    theatre — a vetted origin stays vetted.
+//!
+//! Filtering by hostname before connecting is weaker than it looks: a name
+//! can resolve to a public address when you check it and a loopback address
+//! when the connection is made. Filtering at DNS resolution, so the decision
+//! applies to the addresses actually connected to, closes that window.
+//!
+//! ## Why this differs from `pkix-aia-http`, which looks like a sibling
+//!
+//! `pkix-aia-http` fetches `caIssuers` URIs from the same unvalidated
+//! certificates, for the same chain-building purpose — and it **refuses
+//! non-public destinations by default**, at DNS resolution time, with an
+//! opt-in escape hatch.
+//!
+//! The two crates therefore ship opposite defaults for the same threat. That
+//! is deliberate on each side: `pkix-aia-http` owns its transport and so can
+//! own a policy, while this crate's transport is a caller-supplied trait and
+//! a policy baked in here would be one the caller cannot see or override.
+//! Both positions are defensible; the combination is a trap.
+//!
+//! **Do not carry an assumption from one crate to the other.** If you learnt
+//! that AIA fetching is SSRF-safe out of the box, revocation fetching is not.
+//!
+//! Tracked as PKIX-rm8.57.
+//!
 //! # Spec references
 //!
 //! - RFC 5280 §4.2.1.13 — `CRLDistributionPoints` extension
@@ -90,13 +161,12 @@
 //!   over `moka`, Redis, or any backing store they prefer.
 //! - **No CDP / AIA URI filtering.** This crate fetches whichever URI is
 //!   in the certificate's [`CRLDistributionPoints`] or
-//!   [`AuthorityInfoAccess`] extension. Restrictions on which hosts /
-//!   schemes are acceptable for revocation fetches (e.g., enforcing
-//!   HTTPS or blocking private-network URIs) are a deployment-policy
-//!   decision and stay outside this crate. The reference clients
-//!   (`clients::ureq::UreqFetcher`, `clients::reqwest::ReqwestFetcher`)
-//!   only follow same-origin redirects by default, so a vetted URL cannot
-//!   be redirected to a different host behind the caller's back.
+//!   [`AuthorityInfoAccess`] extension. Which hosts and schemes are
+//!   acceptable is a deployment-policy decision and stays outside this
+//!   crate, because the transport is caller-supplied and a policy baked in
+//!   here would be one the caller could neither see nor override. **See
+//!   "Security considerations" above** — this is the limitation most likely
+//!   to matter, and it differs from `pkix-aia-http`'s default.
 //!
 //! [`CRLDistributionPoints`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13
 //! [`AuthorityInfoAccess`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1
