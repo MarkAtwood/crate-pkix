@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-l5ti",
+  "title": "pkix-aia-http: shipped docs reference PKIX-zkjb.5.1, a bead that was never filed",
+  "description": "## What\n\nThree places in pkix-aia-http point readers at tracking bead PKIX-zkjb.5.1:\n\n- pkix-aia-http/src/lib.rs:117-119 — 'is filed as PKIX-zkjb.5.1, deferred until consumer demand surfaces'\n- pkix-aia-http/Cargo.toml:21 — 'Async variant is filed as PKIX-zkjb.5.1 when demand surfaces.'\n\n`bd show PKIX-zkjb.5.1` returns nothing. PKIX-zkjb itself is CLOSED with close reason 'all steps complete', so the parent is done and the child was never created. The async AIA variant was not deferred — it was dropped on the floor, with shipped crate documentation asserting it is tracked.\n\npkix-aia-http is published, so this dangling reference is live on docs.rs: a reader who wants the async story is directed to an identifier that does not resolve.\n\n## Why it is its own bead\n\nThe actual async work is PKIX-j72x. This doc defect should be fixable independently of whether j72x ever lands, since the wrong claim is shipped today either way.\n\n## Fix\n\nEither point the text at PKIX-j72x, or drop the bead reference and state the limitation plainly. Also re-check the 'deferred until consumer demand surfaces' wording against AGENTS.md's 'Project phase and decision framing', which rejects that frame by name (see PKIX-j72x for detail).\n\n## Also worth a sweep\n\nMemory keys referenced in closed beads do not resolve either: PKIX-a1yc.10's close reason cites 'bd memory pkix-a1yc-10-architectural-decision-option-c-asyncrevocation' and PKIX-j32w cites 'Memory pkix-dane-architecture-2026-05-12', but `bd memories` reports 'No memories stored.' Design rationale that beads claim is captured in memory is not actually retrievable. That is a larger problem than this doc reference and may deserve its own bead.\n\n## Acceptance\n\n[ ] No source or manifest comment in pkix-aia-http references a nonexistent bead\n[ ] Grep the workspace for other bead references that do not resolve",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T17:14:13.242593043Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T17:14:13.242593043Z"
+}

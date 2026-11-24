@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-2qh7",
+  "title": "pkix-dane: confirm the no_std dependency tree on a bare-metal target",
+  "description": "## What\n\npkix-dane claims no_std. Source-level no_std IS verified: building with default features puts #![no_std] in force, and a probe referencing std:: fails to compile while the same probe compiles under --features std.\n\nNOT verified: that the dependency tree resolves and builds for an actual bare-metal target. The environment where pkix-dane was written could not install one — rustup lives in /usr/local/rustup and 'rustup target add thumbv7em-none-eabi' fails with 'error opening file for download: cleaning up cached downloads: No such file or directory (os error 2)'.\n\n## Why it is expected to pass\n\npkix-dane's non-optional dependencies are pkix-path, x509-cert, der and sha2, all pinned default-features = false at the workspace level. Per commit 5a3ed995, pkix-path already builds for riscv64gc-unknown-none-elf and thumbv7em-none-eabi on exactly that stack. So this is confirmation, not expected discovery.\n\n## Note from that commit worth carrying\n\nx86_64-unknown-none needs RUSTFLAGS='--cfg sha2_backend=\"soft\"' because of an LLVM error in sha2 0.11's SHA-NI backend on that soft-float target. pkix-dane depends on sha2 directly (matching types 1 and 2 are SHA-256 and SHA-512), so it inherits that constraint. Worth checking whether pkix-dane's docs should mention it — pkix-path's apparently do not.\n\n## How\n\n    rustup target add thumbv7em-none-eabi riscv64gc-unknown-none-elf\n    cargo build -p pkix-dane --target thumbv7em-none-eabi\n    cargo build -p pkix-dane --target riscv64gc-unknown-none-elf\n    # and, with the soft backend:\n    RUSTFLAGS='--cfg sha2_backend=\"soft\"' cargo build -p pkix-dane --target x86_64-unknown-none\n\nA minute's work for anyone with a writable rustup.\n\n## Acceptance\n\n[ ] pkix-dane builds for thumbv7em-none-eabi and riscv64gc-unknown-none-elf\n[ ] Any target-specific RUSTFLAGS requirement is documented in the crate or its README",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T17:54:23.187081538Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T17:54:23.187081538Z"
+}
