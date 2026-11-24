@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-dane-resolver"
-description = "DNSSEC-validating resolver for DANE TLSA records — std-only companion to pkix-dane"
-version     = "0.1.0"
+description = "DNSSEC-validating resolver for DANE TLSA records — async-only companion to pkix-dane"
+version     = "0.2.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -11,8 +11,36 @@ keywords    = ["x509", "dane", "tlsa", "dnssec", "pki"]
 categories  = ["cryptography"]
 
 [dependencies]
-# pkix-dane + DNS resolver + DNSSEC validation deps added when real
-# impl is wired.
+# TLSA types, TlsaName, TlsaResponse, DnssecStatus and DaneError. The sync
+# TlsaResolver trait lives there too; this crate does not implement it. See
+# the crate docs for why there is no sync reference resolver.
+pkix-dane = { workspace = true, features = ["std"] }
+
+# RootAnchor, the interchange type for caller-supplied trust anchors. A
+# normal dependency because it appears in this crate's public signatures,
+# not because any anchor is shipped by default: `new` requires the caller to
+# pass anchors, and `RootAnchor::new` builds one for a private DNSSEC root.
+# The crate is pure data with no dependencies of its own, so the coupling
+# costs nothing.
+pkix-dnssec-anchor = { workspace = true }
+
+# Validating DNS. `dnssec-ring` is the feature that makes this a validator.
+hickory-resolver = { workspace = true }
+hickory-proto    = { workspace = true }
+
+# Async trait family, matching pkix-revocation-http. Native AFIT is available
+# at MSRV 1.88 but switching idiom is a workspace-wide change, not something a
+# new crate should fork unilaterally.
+async-trait = { workspace = true }
+
+# join_all for the concurrent batch_resolve default impl. The sync trait's
+# equivalent can only loop; concurrency is the point of the async family.
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+# The async tests drive futures with a current-thread runtime. tokio is
+# deliberately NOT a normal dependency: consumers bring their own runtime.
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 
 [package.metadata.docs.rs]
 all-features = true

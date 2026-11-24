@@ -142,7 +142,7 @@ pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.0" 
 pkix-aia                = { path = "pkix-aia",                version = "0.1.1" }
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.2.0" }
 pkix-dane               = { path = "pkix-dane",               version = "0.2.0" }
-pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.1.0" }
+pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.2.0" }
 pkix-dnssec-anchor      = { path = "pkix-dnssec-anchor",      version = "0.1.0" }
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
 pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
@@ -197,6 +197,15 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # runtime). Hoisting tokio to the workspace would force every member crate
 # to think about an async runtime they do not use.
 async-trait = "0.1"
+
+# DNS stack for pkix-dane-resolver. 0.26 is the current line; every 0.26.x
+# release requires Rust 1.88, which is why the workspace MSRV moved there.
+# `dnssec-ring` is what makes this a validating resolver rather than a
+# transport: pkix-dane's TlsaResolver contract requires validating
+# signatures ourselves, since an upstream resolver's AD bit is a claim by a
+# host on the network path rather than proof of anything.
+hickory-resolver = { version = "0.26", default-features = false, features = ["system-config", "tokio", "dnssec-ring"] }
+hickory-proto    = { version = "0.26", default-features = false, features = ["dnssec-ring"] }
 
 # Serialization (used by pkix-lint serde feature and by the
 # `serde` feature on the load-bearing result types in pkix-path,

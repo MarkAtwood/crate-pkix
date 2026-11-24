@@ -6,6 +6,37 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-dane-resolver` 0.2.0: DNSSEC-validating TLSA resolution
+
+Was a 0.1.0 namespace reservation. Now resolves TLSA records and
+validates the DNSSEC chain over them, returning the `TlsaResponse` that
+`pkix-dane`'s matching functions consume. Built on `hickory-resolver`
+0.26, which is why the workspace MSRV moved to 1.88.
+
+- **Async only.** Hickory is async, and a synchronous facade would have
+  to either call `block_on` — which panics from inside a Tokio runtime —
+  or hide a background runtime thread behind a blocking-looking
+  signature. The sync path instead takes records as data: `pkix-dane`'s
+  matchers are pure functions over `(certificate, TlsaResponse)`, so
+  resolution and verification were always separable.
+- **The caller supplies the trust anchor**; none ships here, and a
+  resolver built without one is refused rather than silently never
+  validating. IANA's are in the new `pkix-dnssec-anchor`.
+- **Validation is local.** An upstream resolver's `AD` bit is a claim by
+  a host on the network path, so signatures are verified here. The
+  upstream needs no DNSSEC capability, only to pass `RRSIG` / `DNSKEY` /
+  `DS` through unmangled — which `systemd-resolved`'s stub resolver
+  notably does not, the case `PKIX_DANE_RESOLVER` exists for.
+- **The weakest proof in an answer wins**, `Bogus` weakest of all, so one
+  injected unvalidated record cannot get an RRset treated as secure.
+
+Not yet: a TTL cache (the trait admits a wrapper; none ships), signed
+negative answers reported as authenticated denial rather than
+indeterminate, and the MX-derived lookup SMTP-DANE needs.
+
+Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
+
+
 ### Workspace: MSRV 1.88
 
 Raised from 1.87 for `hickory-resolver` 0.26, which `pkix-dane-resolver`
