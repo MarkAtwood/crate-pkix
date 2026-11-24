@@ -6,6 +6,67 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+Planned release: **0.3.0**.
+
+### Added
+
+Async fetcher family, behind two new off-by-default features.
+
+- `async` — `AsyncAiaFetcher`, the async analogue of
+  `pkix_aia::AiaFetcher`; `NoAsyncAiaFetcher`; and `SyncAsAsync`, a
+  bridge for a sync fetcher that genuinely does no I/O. The traits live
+  here, not in the `no_std` `pkix-aia` core, so that crate takes on no
+  async machinery — the same Option C placement `pkix-revocation-http`
+  uses.
+- `client-reqwest-async` — `AsyncHttpFetcher`, the `reqwest`-backed
+  reference implementation, plus `GuardedAsyncResolver`. Separate from
+  `async` so a consumer on hyper or isahc implements the trait without
+  reqwest in their graph.
+- `AsyncAiaFetcher::batch_fetch` runs requests **concurrently** by
+  default, where the sync trait's default loops. AIA chain reassembly
+  can have several candidate URIs per certificate, and that difference
+  is the reason the async family is worth having.
+
+### Fixed
+
+- The `PKIX-zkjb.5.1` tracking reference in `src/lib.rs`, `Cargo.toml`
+  and `README.md` pointed at a bead that was never filed, so a reader
+  following it found nothing. Removed along with the "deferred until
+  consumer demand surfaces" framing, which the workspace's own
+  decision-framing rules reject.
+
+### Security
+
+**The async fetcher's first implementation had an SSRF hole, found by
+its own tests before release.** `GuardedAsyncResolver` filters
+non-public addresses at DNS resolution, mirroring the sync
+`GuardedResolver` — but `reqwest` does not consult a custom resolver
+when the URI host is an IP **literal**, because there is nothing to
+resolve. So `http://127.0.0.1/`, `http://10.0.0.1/` and
+`http://169.254.169.254/` reached the connector untouched while
+`http://localhost/` was correctly refused.
+
+`AsyncHttpFetcher::fetch` now checks a literal host before issuing the
+request. Checking a literal up front is sound where checking a *name*
+would not be: a literal cannot change between check and connect, so
+there is no rebinding window, while names still go through the resolver
+where the filter applies to the addresses actually connected to.
+
+The lesson is general: a second implementation of a security policy is
+where the policy diverges, and documenting parity is not evidence of it.
+`tests/async_ssrf.rs` mirrors `tests/review_ssrf.rs` case for case for
+that reason.
+
+### Parity with the sync fetcher
+
+`AsyncHttpFetcher` matches `HttpFetcher` on everything that bears on
+safety: destination policy at resolution time plus the literal check,
+redirects not followed, a per-request timeout, a hard response-size cap
+enforced while streaming rather than after buffering, and non-HTTP
+schemes reported as `UriUnsupported` before any I/O.
+
+
+
 Planned release: **0.2.0** (breaking behaviour).
 
 ### Changed

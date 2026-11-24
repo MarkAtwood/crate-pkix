@@ -114,10 +114,11 @@
 //!
 //! ## # Limitations
 //!
-//! - Synchronous only. An async parallel (mirroring
-//!   `pkix-revocation-http`'s `AsyncHttpCrlFetcher` /
-//!   `AsyncHttpOcspFetcher`) is filed as PKIX-zkjb.5.1, deferred
-//!   until consumer demand surfaces.
+//! - No LDAP transport, see below. For the async story, see the
+//!   `async` and `client-reqwest-async` features: `AsyncAiaFetcher` is
+//!   the async analogue of `AiaFetcher`, and `AsyncHttpFetcher` the
+//!   `reqwest`-backed reference implementation. Both are off by
+//!   default, so a synchronous consumer pays nothing for them.
 //! - No LDAP transport. RFC 5280 §4.2.2.1 permits any URI scheme in
 //!   AIA `accessLocation` `GeneralName`s; in practice HTTP and HTTPS
 //!   dominate. An `ldap://` fetcher could ship as a sibling
@@ -127,7 +128,20 @@
 //!   when you construct one [`HttpFetcher`] and keep it) reuses
 //!   connections; per-request tuning is not exposed.
 //!
-//! Tracked as PKIX-zkjb.5 in the project beads.
+
+// Async trait family. Gated so a sync-only consumer pays no async-trait
+// machinery; the async traits deliberately live here rather than in the
+// no_std `pkix-aia` core. See the module's own documentation.
+#[cfg(feature = "async")]
+mod async_fetcher;
+
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+pub use async_fetcher::{AsyncAiaFetcher, NoAsyncAiaFetcher, SyncAsAsync};
+
+#[cfg(feature = "client-reqwest-async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-reqwest-async")))]
+pub use async_fetcher::{AsyncHttpFetcher, GuardedAsyncResolver};
 
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -316,7 +330,7 @@ impl AiaFetcher for HttpFetcher {
 
 /// Return `true` when `uri` begins with `http://` or `https://`,
 /// case-insensitively (RFC 3986 §3.1: scheme is case-insensitive).
-fn is_http_scheme(uri: &str) -> bool {
+pub(crate) fn is_http_scheme(uri: &str) -> bool {
     let lower = uri.split_once(':').map(|(scheme, _)| scheme);
     matches!(lower, Some(s) if s.eq_ignore_ascii_case("http") || s.eq_ignore_ascii_case("https"))
 }
@@ -403,7 +417,7 @@ impl std::fmt::Display for RefusedDestination {
 
 impl std::error::Error for RefusedDestination {}
 
-fn is_public(addr: &SocketAddr) -> bool {
+pub(crate) fn is_public(addr: &SocketAddr) -> bool {
     match addr.ip() {
         IpAddr::V4(v4) => is_public_v4(v4),
         IpAddr::V6(v6) => is_public_v6(v6),

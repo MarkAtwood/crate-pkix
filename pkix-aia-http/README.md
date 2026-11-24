@@ -63,9 +63,11 @@ Non-HTTP URI schemes (`ldap://`, `ftp://`, `file://`, …) return
 
 ## Limitations
 
-- Synchronous only. An async parallel (mirroring
-  `pkix-revocation-http`'s `AsyncHttpCrlFetcher`) is filed as
-  PKIX-zkjb.5.1, deferred until consumer demand surfaces.
+- The async family is off by default. `AsyncAiaFetcher` ships behind
+  the `async` feature and the `reqwest`-backed `AsyncHttpFetcher`
+  behind `client-reqwest-async`, so a synchronous consumer pays
+  nothing for either. Its `batch_fetch` runs requests concurrently,
+  unlike the sync default, which loops.
 - No LDAP transport. Could ship as a sibling `pkix-aia-ldap` crate
   if demand surfaces.
 - No retry, no backoff, no caching. These are caller-side concerns

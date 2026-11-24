@@ -1480,10 +1480,14 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia-http"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "async-trait",
+ "futures-util",
  "mockito",
  "pkix-aia",
+ "reqwest",
+ "tokio",
  "ureq",
 ]
 

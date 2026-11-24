@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-aia-http"
 description = "Synchronous HTTP fetcher for pkix-aia (RFC 5280 §4.2.2.1 caIssuers URIs)"
-version               = "0.2.0"
+version               = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -10,23 +10,57 @@ authors.workspace     = true
 keywords    = ["x509", "certificate", "aia", "pki", "rfc5280"]
 categories  = ["cryptography"]
 
+[features]
+default = []
+
+# `async` ships the AsyncAiaFetcher trait family. Gated so a sync-only
+# consumer pays no async-trait machinery, matching how
+# pkix-revocation-http gates its own async family.
+async = ["dep:async-trait", "dep:futures-util"]
+
+# The reqwest-backed reference async fetcher. Separate from `async` so a
+# consumer on a different async HTTP client (hyper, isahc) implements
+# AsyncAiaFetcher themselves without reqwest in their dependency graph.
+client-reqwest-async = ["async", "dep:reqwest", "dep:tokio"]
+
 [dependencies]
 # pkix-aia ships the AiaFetcher trait + AiaError type this crate
 # implements. The `std` feature is required because every transport
 # path on real fetchers can surface an io::Error variant.
 pkix-aia = { workspace = true, features = ["std"] }
 
-# Reference HTTP transport. Same pinning rationale as
+# Reference sync HTTP transport. Same pinning rationale as
 # pkix-revocation-http: ureq for the minimal pure-Rust sync footprint,
-# rustls for HTTPS. Async variant is filed as PKIX-zkjb.5.1 when
-# demand surfaces.
+# rustls for HTTPS.
 ureq = { workspace = true }
+
+# Async trait family, behind the `async` feature. Native AFIT is
+# available at the workspace MSRV but switching idiom is a
+# workspace-wide change, not one a single crate should make alone.
+async-trait = { workspace = true, optional = true }
+
+# try_join_all for the concurrent async batch_fetch. The sync default
+# impl can only loop; concurrency is what the async family is for.
+futures-util = { version = "0.3", default-features = false, features = ["alloc"], optional = true }
+
+# Reference async HTTP transport, behind `client-reqwest-async`.
+reqwest = { workspace = true, optional = true }
+
+# `net` for tokio::net::lookup_host. The guarded async resolver needs an
+# ASYNC name lookup: std's ToSocketAddrs blocks, and calling it inside an
+# async fn is the executor-blocking defect filed against
+# pkix-revocation-http as PKIX-cr8.1. reqwest's async client already
+# requires a tokio runtime, so this adds no new runtime requirement.
+tokio = { version = "1", default-features = false, features = ["net"], optional = true }
 
 [dev-dependencies]
 # Mock HTTP server for the integration-test suite. MSRV 1.70,
 # comfortably within the workspace MSRV (1.87). mockito is sync-only,
 # matching this crate's sync-only scope.
 mockito = "1.7"
+
+# The async tests drive futures and need a runtime of their own.
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 
 [package.metadata.docs.rs]
 all-features = true

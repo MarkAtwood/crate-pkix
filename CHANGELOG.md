@@ -6,6 +6,36 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-aia-http` 0.3.0: async fetcher family
+
+`AsyncAiaFetcher` behind a new `async` feature, with a `reqwest`-backed
+`AsyncHttpFetcher` behind `client-reqwest-async`. Both off by default.
+The traits live in `pkix-aia-http`, not in the `no_std` `pkix-aia` core,
+following the Option C placement `pkix-revocation-http` adopted. Needed
+by `pkix-chain`'s async verify path: an async entry point that awaited
+TLSA resolution and then called a *synchronous* AIA fetcher would block
+the executor, which is the defect already open against
+`pkix-revocation-http`.
+
+`batch_fetch` runs concurrently by default, where the sync trait's
+default loops — the reason the async family is worth having, since AIA
+reassembly can have several candidate URIs per certificate.
+
+**Security:** the first implementation had an SSRF hole, caught by its
+own tests before release. `reqwest` does not consult a custom DNS
+resolver when the URI host is an IP literal, so the resolution-time
+destination filter — correct for names, and mirroring the sync
+fetcher — was bypassed entirely by `http://169.254.169.254/` and
+friends. A literal-host check now runs before the request; it is sound
+where a pre-request check on a *name* would not be, since a literal
+cannot change between check and connect.
+
+Also removes the `PKIX-zkjb.5.1` references from the crate's docs,
+manifest and README: they pointed at a bead that was never filed.
+
+Planned version: `pkix-aia-http` 0.3.0. Nothing is published.
+
+
 ### `pkix-dane-resolver` 0.2.0: DNSSEC-validating TLSA resolution
 
 Was a 0.1.0 namespace reservation. Now resolves TLSA records and
