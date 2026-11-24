@@ -233,7 +233,7 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
 - CRL Distribution Points fetching — caller supplies the CRL DER directly today
-- DANE / TLSA (RFC 6698 + 7671) — `pkix-dane` and `pkix-dane-resolver` planned but not yet shipped
+- DANE / TLSA DNS resolution — `pkix-dane` ships TLSA parsing and all four usage matchers; `pkix-dane-resolver` (DNSSEC resolution) and the `pkix-chain` integration are not yet shipped
 - Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
 - RFC 5755 attribute certificate validation (`pkix-ac`, stub only)
 - OS-native trust store loading (`pkix-truststore-system`, stub only)
@@ -297,7 +297,7 @@ layer underneath. Here is what is shipping and what is next.
 
 | Crate | What | Status |
 |-------|------|--------|
-| `pkix-dane` | DANE / TLSA (RFC 6698 + 7671) | name reserved |
+| `pkix-dane` | DANE / TLSA (RFC 6698 + 7218 + 7671) matching | **shipped** (0.2.0) |
 | `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | name reserved |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |

@@ -6,6 +6,39 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-dane` 0.2.0: TLSA parsing and the four DANE usages
+
+`pkix-dane` was a 0.1.0 namespace reservation with no public API. It now
+ships DANE TLSA record parsing and per-usage matching per RFC 6698,
+RFC 7218 (mnemonics) and RFC 7671 (operational rules), for all four
+certificate usages: PKIX-TA, PKIX-EE, DANE-TA and DANE-EE.
+
+No DNS. The `TlsaResolver` trait is the seam, with the zero-cost
+`NoTlsaResolver` default; DNSSEC-validating resolution remains the
+unshipped sibling `pkix-dane-resolver`, and so does the `pkix-chain`
+integration.
+
+- Matching hashes the certificate **as the peer presented it**, never a
+  re-encoding. `x509-cert` 0.3 normalizes a pre-2050 `GeneralizedTime`
+  validity date to `UTCTime`, the same behavior that required
+  `pkix_path::tbs_certificate_der` for signature checks — but that
+  function covers only the `tbsCertificate`, and TLSA selector 0 needs
+  the whole certificate. `PresentedCert` carries the received octets.
+- Resolution returns a `TlsaResponse` pairing records with the
+  `DnssecStatus` they arrived under, so the four DNSSEC outcomes stay
+  distinguishable: `Secure`, `Insecure`, `Indeterminate` and `Bogus`.
+  Only `Bogus` forbids PKIX fallback, since treating a broken signature
+  as "no DANE" would let an attacker strip DANE by corrupting the answer.
+- `DnssecStatus` is checked before matching, and the verify functions
+  take a `TlsaResponse` rather than a bare record slice so the check
+  cannot be bypassed.
+- Unusable records are skipped rather than fatal, per RFC 7671: a record
+  set may carry a usage this client does not implement alongside one it
+  does.
+
+Planned version: `pkix-dane` 0.2.0. Nothing is published.
+
+
 ### Workspace: x509-cert 0.3 / RustCrypto 0.14 maintenance wave (Nov 2026)
 
 **Breaking for every crate that exposes x509-cert, der, spki or
