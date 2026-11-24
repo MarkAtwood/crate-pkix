@@ -61,7 +61,7 @@ sha2 = { workspace = true }
 
 [[test]]
 name              = "round_trip"
-required-features = ["serde", "std"]
+required-features = ["serde"]
 
 [package.metadata.docs.rs]
 all-features = true
