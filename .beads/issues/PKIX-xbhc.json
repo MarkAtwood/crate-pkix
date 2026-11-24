@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-xbhc",
+  "title": "pkix-revocation-http: check the async destination policy for the IP-literal bypass",
+  "description": "## Why\n\nPKIX-j72x found an SSRF hole in pkix-aia-http's new async fetcher: reqwest does not consult a custom DNS resolver when the URI host is an IP literal, so a resolution-time destination filter is bypassed entirely by http://169.254.169.254/ and similar, while http://localhost/ is correctly refused.\n\npkix-revocation-http's async family uses the same reqwest reference backend (src/clients/reqwest.rs, behind client-reqwest-async). If it applies any destination policy at resolution time, it has the same gap.\n\n## What to check\n\n1. Does the reqwest async backend in pkix-revocation-http apply a destination policy at all? AsyncRevocationFetcher is a caller-supplied trait, so the crate may deliberately leave the policy to the consumer -- in which case there is nothing to fix, but it should be documented as explicitly as pkix-aia's AiaFetcher documents it.\n2. If it does apply one, test it against IP literals: loopback, RFC 1918, and 169.254.169.254.\n3. The threat model differs from AIA and is worth stating. CRL and OCSP URLs also come from a certificate that has not been validated yet, so the same reasoning applies: whoever presents the certificate chooses the URL this process fetches.\n\n## Note on the sync side\n\npkix-aia-http's SYNC fetcher does not have the bug -- ureq routes literals through its resolver, so GuardedResolver sees them. Do not assume the same of whatever sync path pkix-revocation-http uses; verify it.\n\n## Acceptance\n\n[ ] Determined whether pkix-revocation-http's async backend applies a destination policy\n[ ] If it does: IP literals are covered, with tests mirroring pkix-aia-http/tests/async_ssrf.rs\n[ ] If it does not: the omission is documented at the trait boundary, so a consumer knows the policy is theirs to supply",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T20:53:27.905650294Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T20:53:27.905650294Z"
+}
