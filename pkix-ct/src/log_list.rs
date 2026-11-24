@@ -437,7 +437,6 @@ mod google_schema {
             let text = core::str::from_utf8(json).map_err(|_| Error::ParseError)?;
             Self::from_google_log_list_json(text)
         }
-
     }
 
     /// Convert an RFC 3339 / ISO 8601 timestamp to milliseconds since
