@@ -34,20 +34,21 @@ use pkix_path_builder::CertPool;
 use x509_cert::Certificate;
 
 use crate::{aia_extract, aia_response, orphans_on_paths, AiaConfig, Error};
+use pkix_path::ValidatedPath;
 
 /// What the reassembly loop should do next.
 #[derive(Debug)]
-pub(crate) enum AiaStep {
+pub enum BuildStep {
     /// A complete chain was built; stop.
     Built(Vec<Certificate>),
-    /// Fetch these URIs, then call [`AiaBuilder::absorb`] with the results.
+    /// Fetch these URIs, then call [`ChainBuilder::absorb`] with the results.
     Fetch(Vec<String>),
     /// Reassembly cannot continue.
     Failed(Error),
 }
 
 /// Mutable progress of one reassembly.
-pub(crate) struct AiaBuildState {
+pub struct ChainBuildState {
     pool: CertPool,
     /// Every URI visited, so each is fetched at most once across the whole
     /// reassembly rather than once per iteration.
@@ -62,9 +63,9 @@ pub(crate) struct AiaBuildState {
     iteration: usize,
 }
 
-impl AiaBuildState {
+impl ChainBuildState {
     /// Seeds the state with the caller-supplied chain.
-    pub(crate) fn new(supplied_chain: &[Certificate], config: &AiaConfig) -> Self {
+    pub fn new(supplied_chain: &[Certificate], config: &AiaConfig) -> Self {
         Self {
             pool: supplied_chain.iter().cloned().collect(),
             tried_uris: HashSet::new(),
@@ -81,35 +82,41 @@ impl AiaBuildState {
 /// Borrows what the bookkeeping needs and nothing else: notably not the
 /// fetcher and not the revocation checker, which is what lets one copy serve
 /// both the sync and async paths.
-pub(crate) struct AiaBuilder<'a, V: SignatureVerifier> {
-    pub(crate) anchors: &'a [TrustAnchor],
-    pub(crate) sig_verifier: &'a V,
-    pub(crate) policy: &'a ValidationPolicy,
-    pub(crate) config: &'a AiaConfig,
+pub struct ChainBuilder<'a, V: SignatureVerifier> {
+    /// Trust anchors the reassembled chain must reach.
+    pub anchors: &'a [TrustAnchor],
+    /// Signature verification backend, used while building to reject links
+    /// that do not actually verify.
+    pub sig_verifier: &'a V,
+    /// Validation policy the path builder applies to candidate paths.
+    pub policy: &'a ValidationPolicy,
+    /// The bounds on fetching: per-certificate URI cap, total fetch cap,
+    /// per-response certificate cap, depth and deadline.
+    pub config: &'a AiaConfig,
 }
 
-impl<V: SignatureVerifier> AiaBuilder<'_, V> {
+impl<V: SignatureVerifier> ChainBuilder<'_, V> {
     /// Advances the reassembly to its next decision point.
     ///
-    /// Returns [`AiaStep::Fetch`] when the caller must perform I/O; the caller
+    /// Returns [`BuildStep::Fetch`] when the caller must perform I/O; the caller
     /// then hands the results to [`absorb`](Self::absorb) and calls this
     /// again.
-    pub(crate) fn next_step(&self, state: &mut AiaBuildState, leaf: &Certificate) -> AiaStep {
+    pub fn next_step(&self, state: &mut ChainBuildState, leaf: &Certificate) -> BuildStep {
         // Past the depth cap: give the path builder one last attempt with the
         // fully-augmented pool before declaring depth exceeded. The final
         // iteration fetched certificates that the loop would otherwise never
         // try.
         if state.iteration >= self.config.max_depth {
             return match self.try_build(leaf, &state.pool) {
-                Ok(Some(built)) => AiaStep::Built(built),
-                Ok(None) | Err(_) => AiaStep::Failed(Error::AiaDepthExceeded),
+                Ok(Some(built)) => BuildStep::Built(built),
+                Ok(None) | Err(_) => BuildStep::Failed(Error::AiaDepthExceeded),
             };
         }
 
         match self.try_build(leaf, &state.pool) {
-            Ok(Some(built)) => return AiaStep::Built(built),
+            Ok(Some(built)) => return BuildStep::Built(built),
             Ok(None) => {}
-            Err(e) => return AiaStep::Failed(e),
+            Err(e) => return BuildStep::Failed(e),
         }
 
         // Collect caIssuers URIs from certificates on candidate paths whose
@@ -132,14 +139,14 @@ impl<V: SignatureVerifier> AiaBuilder<'_, V> {
 
         if new_uris.is_empty() {
             if over_limit {
-                return AiaStep::Failed(Error::AiaFetchLimitExceeded {
+                return BuildStep::Failed(Error::AiaFetchLimitExceeded {
                     limit: self.config.max_total_fetches,
                 });
             }
             // The path builder found nothing and there are no URIs left to
             // try. A previous fetch failure is the more informative signal;
             // otherwise the honest answer is that no path can be completed.
-            return AiaStep::Failed(state.last_aia_error.clone().map_or(
+            return BuildStep::Failed(state.last_aia_error.clone().map_or(
                 Error::PathBuild(pkix_path_builder::Error::NoPathFound),
                 Error::Aia,
             ));
@@ -150,12 +157,12 @@ impl<V: SignatureVerifier> AiaBuilder<'_, V> {
             .deadline
             .is_some_and(|d| state.started.elapsed() >= d)
         {
-            return AiaStep::Failed(Error::AiaDeadlineExceeded);
+            return BuildStep::Failed(Error::AiaDeadlineExceeded);
         }
 
         state.fetches_left -= new_uris.len();
         state.iteration += 1;
-        AiaStep::Fetch(new_uris)
+        BuildStep::Fetch(new_uris)
     }
 
     /// Folds fetch results into the pool.
@@ -167,9 +174,9 @@ impl<V: SignatureVerifier> AiaBuilder<'_, V> {
     ///
     /// Returns `Some(error)` when the reassembly must stop: nothing usable
     /// arrived, so another iteration would repeat itself.
-    pub(crate) fn absorb(
+    pub fn absorb(
         &self,
-        state: &mut AiaBuildState,
+        state: &mut ChainBuildState,
         results: Vec<Result<Vec<u8>, AiaError>>,
         requested: usize,
     ) -> Option<Error> {
@@ -225,6 +232,154 @@ impl<V: SignatureVerifier> AiaBuilder<'_, V> {
                 pkix_path_builder::build_path(leaf, pool, self.anchors)?,
             )),
             Err(e) => Err(Error::PathBuild(e)),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Revocation, without owning the I/O either
+// ---------------------------------------------------------------------------
+
+/// One revocation check a caller must perform.
+///
+/// Produced by [`revocation_targets`]. The two variants exist because the
+/// certificate at the top of a validated chain was issued by the trust anchor
+/// rather than by another certificate in the chain, and
+/// [`RevocationChecker`](pkix_revocation::RevocationChecker) has a separate
+/// method for that case.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub enum RevocationTarget<'a> {
+    /// Check `cert` against the certificate that issued it.
+    Issuer {
+        /// The certificate whose revocation status is in question.
+        cert: &'a Certificate,
+        /// Its issuer, the next certificate up the validated chain.
+        issuer: &'a Certificate,
+    },
+
+    /// Check `cert`, which the trust anchor issued directly.
+    ///
+    /// Corresponds to
+    /// [`RevocationChecker::check_revocation_against_anchor`](pkix_revocation::RevocationChecker::check_revocation_against_anchor).
+    /// Note the security caveat recorded on that method: its default
+    /// implementation returns `Ok(())`, so a checker that does not override it
+    /// silently skips this certificate. A caller driving the checks itself
+    /// does not inherit that default, and so does not inherit the footgun —
+    /// this target is in the list and must be dealt with.
+    Anchor {
+        /// The certificate whose revocation status is in question.
+        cert: &'a Certificate,
+        /// The anchor that issued it.
+        anchor: &'a TrustAnchor,
+    },
+}
+
+/// The revocation checks a validated chain calls for.
+///
+/// Returned in chain order, leaf first. The caller performs them however it
+/// likes — sequentially, concurrently, against a cache — and accepts the chain
+/// only if every one reports not-revoked.
+///
+/// # Why this is a list rather than a callback
+///
+/// The synchronous
+/// [`RevocationChecker`](pkix_revocation::RevocationChecker) seam checks one
+/// certificate at a time and the orchestration loops over them, so an
+/// implementation cannot overlap the fetches even when it has several
+/// independent OCSP endpoints to ask. Handing the caller the whole list lets
+/// it issue them together, which is the practical reason an async consumer
+/// wants this surface and not merely an awaitable version of the old one.
+///
+/// # Panics
+///
+/// Panics if `validated.anchor_index` is out of bounds for `anchors`. That
+/// index comes from a [`ValidatedPath`] this crate produced against these same
+/// anchors, so reaching it means a `ValidatedPath` was paired with a different
+/// anchor set than it was validated against — a caller error that cannot be
+/// represented in the return type without making every correct call handle an
+/// impossible case.
+#[must_use]
+pub fn revocation_targets<'a>(
+    chain: &'a [Certificate],
+    anchors: &'a [TrustAnchor],
+    validated: &ValidatedPath,
+) -> Vec<RevocationTarget<'a>> {
+    let anchor = &anchors[validated.anchor_index];
+    chain
+        .iter()
+        .enumerate()
+        .map(|(i, cert)| {
+            if i + 1 < chain.len() {
+                RevocationTarget::Issuer {
+                    cert,
+                    issuer: &chain[i + 1],
+                }
+            } else {
+                RevocationTarget::Anchor { cert, anchor }
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Convenience driver for callers who are synchronous anyway
+// ---------------------------------------------------------------------------
+
+impl<V: SignatureVerifier> ChainBuilder<'_, V> {
+    /// Drives reassembly to completion, calling `fetch` for each round.
+    ///
+    /// The whole loop in one call, for a caller whose I/O is synchronous. An
+    /// asynchronous caller writes the loop instead — a closure cannot return a
+    /// future that borrows without boxing it, and a boxed future per round is
+    /// a worse trade than ten lines at the call site:
+    ///
+    /// ```ignore
+    /// let mut state = ChainBuildState::new(&chain, &config);
+    /// let built = loop {
+    ///     match builder.next_step(&mut state, leaf) {
+    ///         BuildStep::Built(c) => break c,
+    ///         BuildStep::Failed(e) => return Err(e),
+    ///         BuildStep::Fetch(uris) => {
+    ///             let results = my_async_client.get_all(&uris).await;
+    ///             if let Some(e) = builder.absorb(&mut state, results, uris.len()) {
+    ///                 return Err(e);
+    ///             }
+    ///         }
+    ///     }
+    /// };
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Whatever reassembly failed with: [`Error::AiaDepthExceeded`],
+    /// [`Error::AiaFetchLimitExceeded`], [`Error::AiaDeadlineExceeded`],
+    /// [`Error::Aia`] or [`Error::PathBuild`].
+    pub fn build_with<F>(
+        &self,
+        supplied_chain: &[Certificate],
+        mut fetch: F,
+    ) -> crate::Result<Vec<Certificate>>
+    where
+        F: FnMut(&[&str]) -> Vec<Result<Vec<u8>, AiaError>>,
+    {
+        let leaf = supplied_chain
+            .first()
+            .ok_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound))?;
+        let mut state = ChainBuildState::new(supplied_chain, self.config);
+
+        loop {
+            match self.next_step(&mut state, leaf) {
+                BuildStep::Built(built) => return Ok(built),
+                BuildStep::Failed(e) => return Err(e),
+                BuildStep::Fetch(uris) => {
+                    let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
+                    let results = fetch(&refs);
+                    if let Some(e) = self.absorb(&mut state, results, uris.len()) {
+                        return Err(e);
+                    }
+                }
+            }
         }
     }
 }

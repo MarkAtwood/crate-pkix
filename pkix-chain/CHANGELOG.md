@@ -6,6 +6,75 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Added — the sans-I/O verify surface
+
+`pub mod sans_io`: the I/O-free core of chain verification, which a caller
+drives itself.
+
+- `ChainBuilder`, `ChainBuildState`, `BuildStep` — AIA reassembly as a
+  state machine. `next_step` returns `Built`, `Fetch(uris)` or `Failed`;
+  the caller fetches however it likes and folds the results back with
+  `absorb`. `build_with` drives the whole loop for a caller whose I/O is
+  synchronous.
+- `revocation_targets` and `RevocationTarget` — the revocation checks a
+  validated chain calls for, as a list. The caller can issue them
+  concurrently, which the per-certificate `RevocationChecker` seam cannot.
+- `Verifier::chain_builder` — the sans-I/O builder a configured verifier
+  describes.
+
+### Why this replaces the planned async twin
+
+The decision recorded under `PKIX-j32w.3` was to grow an async twin of
+the DANE-relevant verify entry points. Implementing it surfaced two
+problems that decision had not anticipated.
+
+First, `verify_tls_server` performs no validation itself: it reaches
+`Verifier::verify_one`, which calls `build_with_aia` and
+`run_revocation_checks`. An async path that is async all the way down —
+which it must be, or it blocks the executor on revocation and AIA I/O —
+therefore needed an async `Verifier` duplicating this crate's whole
+orchestration layer. `build_with_aia` is where the AIA bounds live, and
+two copies of a *bound* drifting is a security regression rather than a
+maintenance annoyance.
+
+Second, the async traits live in the std HTTP adapters, so being generic
+over them would have meant `pkix-chain` depending on **two HTTP client
+crates** — ureq and reqwest, and transitively tokio — purely to name two
+traits. That is backwards for an orchestrator.
+
+Sans-I/O avoids both. `pkix-chain` gains no `async` feature, no
+`async-trait`, and no HTTP dependency; there is one copy of the bounds,
+and it serves every runtime rather than the one an async twin would have
+picked. The question of where the async traits should live dissolves
+rather than getting answered — the same move the epic records for
+`PKIX-apmt`.
+
+A pre-fetch-everything design was considered first and does not work:
+the AIA fetch targets depend on the previous round's results, so a
+caller cannot know what to fetch in advance without reimplementing the
+caps, the deduplication and the deadline.
+
+### Changed
+
+- `build_with_aia` now delegates to `sans_io::ChainBuilder::build_with`,
+  so there is exactly one reassembly loop rather than one per path.
+- `run_revocation_checks` now takes its work from
+  `sans_io::revocation_targets`, so the sync path and a caller driving
+  the checks itself cannot disagree about which certificates need
+  checking.
+
+Neither is a behaviour change; the existing AIA tests pass unchanged.
+
+### Testing
+
+`tests/sans_io.rs` drives reassembly from a `tokio` task with no async
+trait, no `async-trait` and no HTTP client involved, which is the
+property the design exists for. It also asserts the fetch cap, the depth
+cap and the once-per-URI rule hold on this path and not only through the
+convenience wrapper — a caller driving the loop must inherit the bounds,
+not be trusted to reimplement them.
+
+
 ### Added
 
 DANE composition, behind a new default-on `dane` feature.

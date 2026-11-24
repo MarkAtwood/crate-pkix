@@ -94,6 +94,11 @@ serde_json = { workspace = true }
 # here — the runtime crate has no reason to bind to a specific HTTP
 # transport.
 pkix-aia-http = { workspace = true }
+
+# tests/sans_io.rs drives the sans-I/O surface from an async task, to show
+# that an async consumer needs no async trait from this crate. tokio is
+# dev-only: pkix-chain itself knows nothing about runtimes.
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 mockito       = "1.7"
 
 [[test]]

@@ -149,9 +149,9 @@ pub const AIA_MAX_DEPTH: usize = 5;
 // DANE composition. Gated on `dane`, which is default-on: the gate pulls
 // only the no_std pkix-dane crate, so the API surface costs a consumer
 // nothing until they also enable `dane-resolver`.
-// I/O-free core of AIA chain reassembly, shared by the sync and async
-// verify paths so the AIA bounds exist in exactly one place.
-mod aia_build;
+// I/O-free core of chain verification. Public: it is how a caller on any
+// runtime drives verification while owning every fetch itself.
+pub mod sans_io;
 
 #[cfg(feature = "dane")]
 #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
@@ -717,15 +717,21 @@ where
         chain: &[Certificate],
         validated: &ValidatedPath,
     ) -> crate::Result<()> {
-        for (i, cert) in chain.iter().enumerate() {
-            if i + 1 < chain.len() {
-                self.rev_checker.check_revocation(cert, &chain[i + 1])?;
-            } else {
-                // Last cert: issued directly by the trust anchor. CrlChecker
-                // / OcspChecker override this; NoRevocation inherits the
+        // What to check comes from `sans_io::revocation_targets`, so the sync
+        // path and a caller driving the checks itself cannot disagree about
+        // which certificates need checking.
+        for target in crate::sans_io::revocation_targets(chain, self.anchors, validated) {
+            match target {
+                crate::sans_io::RevocationTarget::Issuer { cert, issuer } => {
+                    self.rev_checker.check_revocation(cert, issuer)?;
+                }
+                // Issued directly by the trust anchor. CrlChecker and
+                // OcspChecker override this; NoRevocation inherits the
                 // default Ok(()) skip.
-                self.rev_checker
-                    .check_revocation_against_anchor(cert, &self.anchors[validated.anchor_index])?;
+                crate::sans_io::RevocationTarget::Anchor { cert, anchor } => {
+                    self.rev_checker
+                        .check_revocation_against_anchor(cert, anchor)?;
+                }
             }
         }
         Ok(())
@@ -755,38 +761,27 @@ where
     /// - only CA certificates that are not already pooled are added from a
     ///   response, at most [`AiaConfig::max_certs_per_response`] of them.
     ///
-    /// All of that bookkeeping lives in [`crate::aia_build`], shared with the
+    /// All of that bookkeeping lives in [`crate::sans_io`], shared with the
     /// async verify path so each bound exists in exactly one place; two
     /// copies of a cap drifting would be a security regression rather than a
     /// maintenance annoyance. What remains here is the loop that performs the
     /// fetches.
     fn build_with_aia(&self, supplied_chain: &[Certificate]) -> crate::Result<Vec<Certificate>> {
-        use crate::aia_build::{AiaBuildState, AiaBuilder, AiaStep};
+        self.chain_builder()
+            .build_with(supplied_chain, |uris| self.aia.batch_fetch(uris))
+    }
 
-        let leaf = supplied_chain
-            .first()
-            .ok_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound))?;
-
-        let builder = AiaBuilder {
+    /// The sans-I/O builder this verifier's configuration describes.
+    ///
+    /// Exposed so a caller holding a `Verifier` can drive reassembly on its
+    /// own runtime rather than through the synchronous `aia` callback.
+    #[must_use]
+    pub fn chain_builder(&self) -> crate::sans_io::ChainBuilder<'_, V> {
+        crate::sans_io::ChainBuilder {
             anchors: self.anchors,
             sig_verifier: self.sig_verifier,
             policy: self.policy,
             config: &self.aia_config,
-        };
-        let mut state = AiaBuildState::new(supplied_chain, &self.aia_config);
-
-        loop {
-            match builder.next_step(&mut state, leaf) {
-                AiaStep::Built(built) => return Ok(built),
-                AiaStep::Failed(e) => return Err(e),
-                AiaStep::Fetch(uris) => {
-                    let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
-                    let results = self.aia.batch_fetch(&refs);
-                    if let Some(e) = builder.absorb(&mut state, results, uris.len()) {
-                        return Err(e);
-                    }
-                }
-            }
         }
     }
 
