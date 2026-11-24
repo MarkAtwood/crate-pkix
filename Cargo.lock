@@ -1271,6 +1271,14 @@ dependencies = [
 [[package]]
 name = "pkix-dane"
 version = "0.1.0"
+dependencies = [
+ "der",
+ "pkix-path",
+ "serde",
+ "serde_json",
+ "sha2",
+ "x509-cert",
+]
 
 [[package]]
 name = "pkix-dane-resolver"

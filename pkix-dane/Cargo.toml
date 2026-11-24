@@ -8,11 +8,59 @@ license.workspace     = true
 repository.workspace  = true
 authors.workspace     = true
 keywords    = ["x509", "dane", "tlsa", "certificate", "pki"]
-categories  = ["cryptography"]
+categories  = ["cryptography", "no-std"]
+
+[features]
+default = []
+
+# `std` enables the `std::error::Error` impl on `DaneError`. Nothing in
+# this crate needs `std` otherwise: TLSA matching is pure computation
+# over caller-supplied bytes. The DNSSEC-validating resolver that does
+# need `std` is the sibling `pkix-dane-resolver` crate (PKIX-j32w.2).
+std = []
+
+# `serde` derives `Serialize`/`Deserialize` on the public result and
+# record types. Per AGENTS.md non-negotiable #6, load-bearing public
+# types SHOULD support serde behind a feature flag so cross-process and
+# persistent caches can keep them — TLSA records carry DNS TTLs, so
+# caching them is an expected deployment pattern.
+serde = ["dep:serde"]
 
 [dependencies]
-# x509-cert + TLSA record parsing + match logic added when real
-# impl is wired.
+# TrustAnchor, synthesized by the DANE-TA usage (2) and returned from
+# verify_dane_ta. Dependency direction is chain -> dane -> path, mirroring
+# chain -> revocation -> path. pkix-path is no_std, so this costs nothing
+# against non-negotiable #1.
+pkix-path = { workspace = true }
+
+# Certificate / SubjectPublicKeyInfo access for selector extraction
+# (RFC 6698 §2.1.2).
+x509-cert = { workspace = true }
+
+# DER encoding of the SubjectPublicKeyInfo for selector 1. See the
+# `selector` module for why the full-certificate path (selector 0)
+# deliberately does NOT re-encode.
+der = { workspace = true }
+
+# SHA-256 and SHA-512 for matching types 1 and 2 (RFC 6698 §2.1.3).
+sha2 = { workspace = true }
+
+# Optional serde derives. Activated only by the `serde` feature.
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Round-trip tests use serde_json as the human-readable JSON oracle,
+# matching pkix-aia's convention.
+serde_json = { workspace = true }
+
+# byte_exactness.rs computes the digest a to_der()-based implementation
+# would have produced, to assert it does NOT match. sha2 is already a
+# normal dependency; naming it here documents the test's own use of it.
+sha2 = { workspace = true }
+
+[[test]]
+name              = "round_trip"
+required-features = ["serde", "std"]
 
 [package.metadata.docs.rs]
 all-features = true
