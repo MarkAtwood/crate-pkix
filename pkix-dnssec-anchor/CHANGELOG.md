@@ -54,7 +54,39 @@ dependencies, no network access and no filesystem access.
   the field, since zero is not a meaningful `DNSKEY` flag value and
   `is_key_signing_key` returning `false` there means "unstated".
 
+### Keeping the anchors current
+
+A release of this crate is a snapshot of IANA's anchor set, and it goes
+stale on IANA's schedule. The failure is quiet: a consumer with a stale
+set stops getting DANE, reported as "DNSSEC could not be established"
+rather than as anything being wrong.
+
+- **`gen.sh --check`** fetches IANA's anchors, verifies the signature, and
+  reports drift against the committed set without writing anything. It
+  compares the fields that matter — id, key tag, algorithm, digest type,
+  digest, validity — rather than whole files, because IANA reformats and
+  rewrites the `TrustAnchor` id without changing any anchor, and a byte
+  comparison would cry wolf on that. It exits 2 rather than 1 when the
+  signature fails to verify: that is not a key roll, and wants
+  investigating rather than regenerating.
+
+  It lives in `gen.sh` rather than a separate script so the IANA URLs and
+  the signature verification exist in one place. A checker that drifted
+  from the generator would be worse than no checker.
+
+- **`.github/workflows/iana-anchors.yml`** runs it monthly, and on any
+  pull request touching this crate so a regeneration is checked against
+  IANA in the same change that performs it. Monthly rather than weekly: a
+  root KSK roll is announced well in advance and has happened once since
+  2010, and a job that runs more often than the thing it watches teaches
+  people to ignore it. Separate from `quality-gates.yml` so an unrelated
+  pull request does not fail because a third party published something.
+
+- A **README**, which this crate previously lacked, covering the same
+  ground for a reader on crates.io.
+
 ### Testing
+
 
 18 tests. Two are provenance checks rather than unit tests: one re-runs
 IANA's signature verification against the committed artifacts, and one

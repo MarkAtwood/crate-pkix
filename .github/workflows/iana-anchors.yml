@@ -1,0 +1,107 @@
+# Watches IANA for a DNSSEC root key-signing-key roll.
+#
+# Tracks PKIX-4bxy.
+#
+# Why this is its own workflow
+#
+# `pkix-dnssec-anchor` ships IANA's root trust anchors as compiled-in data,
+# so a release of that crate is a snapshot. When IANA publishes or withdraws
+# a key-signing key, the crate goes stale — and the failure mode is quiet:
+# under the opportunistic DANE policy a consumer with a stale anchor set
+# simply stops getting DANE, reporting that DNSSEC could not be established
+# rather than that anything is wrong.
+#
+# Nothing in a push or a pull request can detect that, because nothing in
+# this repository changed. The drift is external, so the check has to be on
+# a clock.
+#
+# Scope decisions
+#
+# - Monthly, not weekly or daily. A root KSK roll is announced well in
+#   advance and has happened once since 2010; the last was KSK-2017 and a
+#   third key was published in 2024. Monthly detection is ample for an event
+#   on that cadence, and a job that runs more often than the thing it watches
+#   mostly teaches people to ignore it.
+#
+# - Separate from quality-gates.yml, which runs on push and pull request.
+#   Mixing an external-drift check into those would make an unrelated pull
+#   request fail because a third party published something, which is both
+#   confusing and unactionable by whoever opened it.
+#
+# - The check lives in `pkix-dnssec-anchor/gen.sh --check`, the same script
+#   that generates the anchors, so the IANA URLs and the signature
+#   verification exist in exactly one place. A checker that drifted from the
+#   generator would be worse than no checker.
+#
+# - It verifies IANA's detached signature before comparing, and exits 2
+#   rather than 1 if that verification fails. A bad signature is not a key
+#   roll: it means the fetch was tampered with or ICANN's signing
+#   certificate changed, and either wants investigating rather than
+#   regenerating.
+
+name: iana-anchors
+
+on:
+  schedule:
+    # 06:00 UTC on the first of each month. The specific time matters only
+    # in that it is off the hour-boundary rush on GitHub's scheduler.
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+  # Also on changes to the anchor crate itself, so a regeneration is checked
+  # against IANA in the same pull request that performs it.
+  pull_request:
+    paths:
+      - "pkix-dnssec-anchor/**"
+
+concurrency:
+  group: iana-anchors-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: committed anchors match IANA
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show what is committed
+        # In the log so a failure can be read without checking out the repo.
+        run: |
+          echo "committed anchor set:"
+          sed -n 's/.*<KeyTag>\([0-9]*\)<\/KeyTag>.*/  key tag \1/p' \
+            pkix-dnssec-anchor/iana/root-anchors.xml
+
+      - name: Check for drift against IANA
+        run: ./pkix-dnssec-anchor/gen.sh --check
+
+      - name: Explain a failure
+        # Only when the previous step failed. The script already prints the
+        # diff and what to do; this adds the part a reader needs that the
+        # script cannot know — that the fix is a release, and that it is a
+        # release of this crate alone.
+        if: failure()
+        run: |
+          cat <<'EOF'
+          The committed DNSSEC root anchors no longer match IANA's published set.
+
+          If a key-signing key was published or withdrawn:
+
+            cd pkix-dnssec-anchor
+            ./gen.sh                              # fetch, verify, regenerate
+            cargo test -p pkix-dnssec-anchor      # provenance tests included
+            # then release pkix-dnssec-anchor
+
+          Consumers pick the new anchors up with `cargo update`. They do not
+          need a pkix-dane-resolver release, and pkix-dane-resolver does not
+          need a change — the anchors live in their own crate precisely so a
+          key roll is a data update rather than a code release.
+
+          Until a release happens, a consumer who needs the new key can pass
+          it directly: RootAnchor::new(key_tag, algorithm, digest_type,
+          digest) with the with_* builders. See that type's documentation.
+
+          If the script exited 2 rather than 1, IANA's signature did not
+          verify. That is not a key roll. Investigate before regenerating.
+          EOF
+          exit 1

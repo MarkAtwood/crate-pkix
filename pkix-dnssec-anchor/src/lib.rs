@@ -67,12 +67,38 @@
 //!
 //! ## Staleness is the one real hazard
 //!
-//! These are compiled-in constants, so a release of this crate is a snapshot.
-//! If IANA rolls the KSK and a consumer does not update, validation begins
-//! failing — and under an opportunistic DANE policy it fails *quietly*, by
-//! reporting that DNSSEC could not be established. Consumers who need to be
-//! exact about expiry should filter [`ALL`] through
-//! [`RootAnchor::is_valid_at`] rather than trusting [`CURRENT`] to be fresh.
+//! These are compiled-in constants, so a release of this crate is a snapshot,
+//! and it goes stale on IANA's schedule rather than this workspace's.
+//!
+//! **The failure is quiet.** If IANA rolls the key-signing key and a consumer
+//! does not update, DNSSEC validation stops succeeding — and under an
+//! opportunistic DANE policy that is reported as "DNSSEC could not be
+//! established" rather than as anything being wrong. A deployment can lose
+//! DANE without noticing.
+//!
+//! Three things guard against that:
+//!
+//! 1. **A scheduled CI check.** `.github/workflows/iana-anchors.yml` runs
+//!    `gen.sh --check` monthly: it fetches IANA's anchors, verifies their
+//!    signature, and fails with a diff if the committed set no longer
+//!    matches. This is the only guard that does not depend on a human
+//!    remembering, which is why it exists.
+//! 2. **Auditable source.** Every anchor in [`generated`] carries its IANA
+//!    `KeyDigest` id, key tag and validity dates, so staleness is visible by
+//!    reading the file rather than by comparison with an external source.
+//! 3. **A caller-side escape hatch.** A consumer needing a new key before a
+//!    release builds one with [`RootAnchor::new`] and passes it directly.
+//!    Nothing here privileges the shipped anchors over a caller-supplied one.
+//!
+//! A consumer that must be exact about expiry should filter [`ALL`] through
+//! [`RootAnchor::is_valid_at`] against the current time rather than trusting
+//! [`CURRENT`], which is a snapshot and does not know about a withdrawal that
+//! happened after generation.
+//!
+//! On the maintainer's side: a roll means `./gen.sh`,
+//! `cargo test -p pkix-dnssec-anchor`, and a release of **this crate alone**.
+//! `pkix-dane-resolver` needs no change, which is the whole reason the
+//! anchors live here.
 //!
 //! ## Supplying your own anchor
 //!
