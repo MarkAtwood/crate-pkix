@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-og4p",
+  "title": "pkix-zlint-bridge: review_timeout.rs is flaky with \"Text file busy\"",
+  "description": "## What\n\npkix-zlint-bridge/tests/review_timeout.rs fails intermittently with SubprocessFailed { exit_code: None, stderr: \"Text file busy (os error 26)\" } instead of the expected result.\n\nObserved twice in consecutive full-workspace runs on 2026-11-24, with a DIFFERENT test failing each time:\n\n- timeout_kills_grandchildren expected a timeout, got Text file busy\n- stdout_over_cap_is_output_too_large expected OutputTooLarge { limit: 65536 }, got Text file busy\n\nRunning the file on its own passed three times in a row, which is consistent with a race rather than a deterministic break.\n\n## Likely cause\n\nETXTBSY on exec means the file being executed is still open for writing somewhere. These tests write a stub executable and then run it; if the File handle has not been dropped (or the write not flushed and closed) before the spawn, Linux refuses the exec. A full-workspace run makes it likelier because the machine is busier and the interleaving changes.\n\nThe fix is normally to close the handle explicitly before spawning -- drop the File, or write to a temporary path and rename -- rather than relying on the handle going out of scope at the end of a statement.\n\n## Why P2\n\nThe quality-gates CI workflow added under PKIX-z2g4 runs cargo test --workspace --all-features. A test that fails one run in two will make CI red on unrelated changes, and a gate that cries wolf is one people learn to re-run rather than read. This was not noticed before because nothing ran the suite automatically.\n\n## Not caused by recent work\n\nreview_timeout.rs and pkix-zlint-bridge were untouched by the changes in flight when this surfaced (verified with git diff --name-only). The flake is pre-existing and was simply never exercised by CI.\n\n## Acceptance\n\n[ ] The executable is closed before being spawned, so ETXTBSY cannot occur\n[ ] The file passes repeated full-workspace runs -- at least ten, since one run in two is the observed rate\n[ ] Any other test in the workspace that writes-then-execs is checked for the same pattern",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T22:12:21.179796573Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T22:12:21.179796573Z"
+}
