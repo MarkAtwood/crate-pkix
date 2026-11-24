@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-m5fj",
+  "title": "pkix-revocation: claim the no-std category it already satisfies",
+  "description": "## What\n\npkix-revocation builds for thumbv7em-none-eabi, riscv64gc-unknown-none-elf and x86_64-unknown-none (verified under PKIX-2qh7), but its Cargo.toml categories are [\"cryptography\"] with no \"no-std\". So its crates.io metadata understates what it supports, and it is not covered by the no-std CI job, which derives its crate list from that category.\n\n## Why it was not just changed\n\nAdding the category opts the crate into that gate. That is a commitment: from then on a dependency change that pulls std into pkix-revocation fails CI rather than passing quietly. It is the right commitment if the crate is meant to be usable on bare metal, and it should be made deliberately rather than as a side effect of a verification pass that happened to notice it.\n\n## Decide\n\nIs pkix-revocation intended to be bare-metal usable? It is plausible either way. Its crl and ocsp features both depend on std, so the bare-metal surface is the default no-feature build — revocation checking with caller-supplied DER and no protocol parsing. Whether that is a configuration anyone wants on an embedded target is the question.\n\nIf yes: add \"no-std\" to categories, and it joins the gate automatically.\nIf no: nothing to do, but worth a line in the crate docs saying the no-feature build happens to be no_std-clean without that being a supported guarantee, so nobody is surprised either way.\n\n## Acceptance\n\n[ ] Decided and recorded\n[ ] If claimed, the category added and the crate confirmed green in the no-std CI job",
+  "status": "open",
+  "priority": 4,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-24T22:46:15.105200979Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T22:46:15.105200979Z"
+}
