@@ -127,6 +127,71 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### SMTP DANE (RFC 7672 §2.1, §2.2): the MX lookup
+
+`pkix_dane::smtp_lookup` — discovery as a sans-IO state machine, behind the
+same `smtp` feature. `MxResolution::next_step` names the lookup to perform,
+`absorb` takes the answer, and `resolve_with` drives the loop for a caller
+with a synchronous resolver.
+
+Sans-IO because the decisions are pure functions of DNS answers: which MX to
+try next, whether an RRset is trustworthy, whether a TLSA query is worth
+making. So the policy lives in `no_std` and the lookups stay with whoever
+has a resolver — the split `pkix_chain::sans_io` already established. It also
+means the surprising requirements below are testable without a resolver,
+scripted answer by answer.
+
+**Two MUSTs a straightforward implementation violates**, and both are tested
+against the plausible wrong behaviour rather than the happy path:
+
+- **MX preference outranks channel security** (§2.2.1). "an MX hostname with
+  a worse (numerically higher) MX preference that has TLSA records MUST NOT
+  preempt an MX hostname with a better (numerically lower) preference that
+  has no TLSA records... prevention of delivery loops by obeying MX
+  preferences MUST take precedence over channel security considerations."
+
+  Preferring the host that offers DANE is a conformance bug, and a tempting
+  one. Hosts are tried strictly in preference order, and the test gives the
+  backup MX the TLSA records and the primary none, then asserts the primary
+  is offered first *without* DANE. Confirmed to bite: reversing the sort in
+  the implementation fails that test and two others.
+
+- **Address lookups precede TLSA lookups** (§2.2.2). "the SMTP client MUST
+  perform any A and/or AAAA queries for the destination before attempting to
+  locate the associated TLSA records." Not an optimization: load-balancing
+  nameservers at some large providers answer TLSA with SERVFAIL or NOTIMP
+  rather than an insecure negative reply, so a client querying TLSA first
+  would strand that mail. With an insecure address answer the TLSA query is
+  **not issued at all**, which is the part that protects against those
+  nameservers — a query that is never sent cannot fail.
+
+Also implemented, with the reasoning in the rustdoc:
+
+- `RrsetTrust` collapses `Indeterminate` into `Insecure` at the boundary, per
+  §2.1.1 ("DNS records that would be classified 'indeterminate'... are simply
+  classified as 'insecure'", and "All 'insecure' RRsets MUST be handled
+  identically"), so no decision site has to remember to.
+- A failed **TLSA** lookup makes that server unreachable (§2.2.1), the one
+  place a failed lookup disqualifies a reachable host. Failing open would let
+  anyone able to drop TLSA responses downgrade every connection.
+- Insecure MX plus mandatory DANE delays delivery; an insecure CNAME *leading
+  to* a signed MX RRset still counts as insecure, which §2.2.1 says in as
+  many words and which a naive "last answer wins" reading would miss.
+- `dane_despite_insecure_mx` serves §2.2.1's hosting-provider case — unsigned
+  customer zone, signed provider zone — and narrows the reference identity to
+  the MX hostname alone, which is tested.
+- Bogus is evidence of tampering, so it delays rather than being read as "no
+  records".
+- `DeliveryTarget::mx_was_secure` and `next_hop` exist for §2.2.1's logging
+  constraint: "Any successful authentication via an insecurely determined MX
+  host MUST NOT be misrepresented in the mail logs as secure delivery to the
+  intended next-hop domain."
+
+Equal MX preferences keep input order rather than being randomized, so the
+machine stays deterministic and testable; RFC 5321 §5.1 randomization is the
+caller's to apply by shuffling first, and §2.2.1 explicitly does not oblige
+an MTA to prefer the more secure of two equal-preference hosts.
+
 ### SMTP DANE (RFC 7672 §3.2): name checks
 
 The first of three pieces of RFC 7672 support. This is the certificate-facing

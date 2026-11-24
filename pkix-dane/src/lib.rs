@@ -110,6 +110,10 @@ pub mod selector;
 #[cfg(feature = "smtp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smtp")))]
 pub mod smtp;
+
+#[cfg(feature = "smtp")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smtp")))]
+pub mod smtp_lookup;
 mod verify;
 
 pub use name::{TlsaName, TlsaProtocol};
