@@ -149,6 +149,10 @@ pub const AIA_MAX_DEPTH: usize = 5;
 // DANE composition. Gated on `dane`, which is default-on: the gate pulls
 // only the no_std pkix-dane crate, so the API surface costs a consumer
 // nothing until they also enable `dane-resolver`.
+// I/O-free core of AIA chain reassembly, shared by the sync and async
+// verify paths so the AIA bounds exist in exactly one place.
+mod aia_build;
+
 #[cfg(feature = "dane")]
 #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
 pub mod dane;
@@ -750,135 +754,39 @@ where
     /// - the [`AiaConfig::deadline`] is checked before every fetch round;
     /// - only CA certificates that are not already pooled are added from a
     ///   response, at most [`AiaConfig::max_certs_per_response`] of them.
+    ///
+    /// All of that bookkeeping lives in [`crate::aia_build`], shared with the
+    /// async verify path so each bound exists in exactly one place; two
+    /// copies of a cap drifting would be a security regression rather than a
+    /// maintenance annoyance. What remains here is the loop that performs the
+    /// fetches.
     fn build_with_aia(&self, supplied_chain: &[Certificate]) -> crate::Result<Vec<Certificate>> {
-        use pkix_path_builder::CertPool;
-        use std::collections::HashSet;
+        use crate::aia_build::{AiaBuildState, AiaBuilder, AiaStep};
 
         let leaf = supplied_chain
             .first()
             .ok_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound))?;
 
-        let cfg = &self.aia_config;
-        let started = std::time::Instant::now();
-        let mut pool: CertPool = supplied_chain.iter().cloned().collect();
-        let mut tried_uris: HashSet<String> = HashSet::new();
-        let mut fetches_left = cfg.max_total_fetches;
-        let mut last_aia_error: Option<pkix_aia::AiaError> = None;
+        let builder = AiaBuilder {
+            anchors: self.anchors,
+            sig_verifier: self.sig_verifier,
+            policy: self.policy,
+            config: &self.aia_config,
+        };
+        let mut state = AiaBuildState::new(supplied_chain, &self.aia_config);
 
-        for _iteration in 0..cfg.max_depth {
-            if let Some(built) = self.try_build(leaf, &pool)? {
-                return Ok(built);
-            }
-
-            // Collect caIssuers URIs from the certs on potential paths
-            // whose issuer is still missing. Visit each URI at most once
-            // across the whole loop.
-            let mut new_uris: Vec<String> = Vec::new();
-            let mut over_limit = false;
-            for cert in orphans_on_paths(leaf, &pool, self.anchors, self.sig_verifier) {
-                for uri in aia_extract::ca_issuers_http_uris(cert).take(cfg.max_uris_per_cert) {
-                    if tried_uris.contains(&uri) {
-                        continue;
+        loop {
+            match builder.next_step(&mut state, leaf) {
+                AiaStep::Built(built) => return Ok(built),
+                AiaStep::Failed(e) => return Err(e),
+                AiaStep::Fetch(uris) => {
+                    let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
+                    let results = self.aia.batch_fetch(&refs);
+                    if let Some(e) = builder.absorb(&mut state, results, uris.len()) {
+                        return Err(e);
                     }
-                    if new_uris.len() == fetches_left {
-                        over_limit = true;
-                        break;
-                    }
-                    tried_uris.insert(uri.clone());
-                    new_uris.push(uri);
                 }
             }
-
-            if new_uris.is_empty() {
-                if over_limit {
-                    return Err(Error::AiaFetchLimitExceeded {
-                        limit: cfg.max_total_fetches,
-                    });
-                }
-                // Path-builder said NoPathFound, no caIssuers URIs to try.
-                // Surface the last AIA error if we've seen one; otherwise
-                // the honest signal is "path builder cannot complete".
-                return Err(last_aia_error
-                    .map(Error::Aia)
-                    .unwrap_or(Error::PathBuild(pkix_path_builder::Error::NoPathFound)));
-            }
-
-            if cfg.deadline.is_some_and(|d| started.elapsed() >= d) {
-                return Err(Error::AiaDeadlineExceeded);
-            }
-
-            fetches_left -= new_uris.len();
-            let uri_refs: Vec<&str> = new_uris.iter().map(String::as_str).collect();
-            let results = self.aia.batch_fetch(&uri_refs);
-
-            let mut added_any = false;
-            for result in results.into_iter().take(new_uris.len()) {
-                let parsed = result.and_then(|bytes| {
-                    aia_response::parse_ca_issuers_response(&bytes, cfg.max_certs_per_response)
-                });
-                match parsed {
-                    Ok(certs) => {
-                        for cert in certs {
-                            // Only CA certs can be issuers; certs already
-                            // pooled add nothing but search work.
-                            let is_ca = pkix_path::cert_is_ca(&cert).unwrap_or(false);
-                            if is_ca && !pool.iter().any(|c| *c == cert) {
-                                pool.add(cert);
-                                added_any = true;
-                            }
-                        }
-                    }
-                    Err(e) => last_aia_error = Some(e),
-                }
-            }
-
-            if !added_any {
-                // Nothing usable arrived in this iteration; the next
-                // iteration would do nothing. Surface the AIA error.
-                return Err(Error::Aia(
-                    last_aia_error.unwrap_or(pkix_aia::AiaError::FetchingDisabled),
-                ));
-            }
-        }
-
-        // The last iteration fetched new certs into the pool but the loop
-        // exited before trying them. Give the path-builder one final shot
-        // with the fully-augmented pool before declaring depth-exceeded.
-        match self.try_build(leaf, &pool) {
-            Ok(Some(built)) => Ok(built),
-            Ok(None) | Err(_) => Err(Error::AiaDepthExceeded),
-        }
-    }
-
-    /// One path-building attempt over `pool`.
-    ///
-    /// `Ok(Some(chain))` is a chain for [`Self::verify_one`] to validate:
-    /// either one that already validated, or — when every topologically
-    /// valid candidate failed `validate_path` — the topology-only chain,
-    /// so that `verify_one`'s own `validate_path` produces a structured
-    /// [`Error::Path`] rather than the builder's
-    /// `PathBuild(NoValidPath { last_error: String })` (PKIX-sqek.1).
-    /// `Ok(None)` means the pool lacks an intermediate (AIA may help).
-    /// `DepthExceeded` / `BudgetExceeded` cannot be repaired by adding
-    /// candidate certs and are returned as errors.
-    fn try_build(
-        &self,
-        leaf: &Certificate,
-        pool: &pkix_path_builder::CertPool,
-    ) -> crate::Result<Option<Vec<Certificate>>> {
-        match pkix_path_builder::build_first_valid_path(
-            leaf,
-            pool,
-            self.anchors,
-            self.policy,
-            self.sig_verifier,
-        ) {
-            Ok(built) => Ok(Some(built)),
-            Err(pkix_path_builder::Error::NoPathFound) => Ok(None),
-            Err(pkix_path_builder::Error::NoValidPath { .. }) => Ok(Some(
-                pkix_path_builder::build_path(leaf, pool, self.anchors)?,
-            )),
-            Err(e) => Err(Error::PathBuild(e)),
         }
     }
 
