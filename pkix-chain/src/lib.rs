@@ -146,6 +146,17 @@ mod aia_response;
 /// This is the default for [`AiaConfig::max_depth`].
 pub const AIA_MAX_DEPTH: usize = 5;
 
+// DANE composition. Gated on `dane`, which is default-on: the gate pulls
+// only the no_std pkix-dane crate, so the API surface costs a consumer
+// nothing until they also enable `dane-resolver`.
+#[cfg(feature = "dane")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
+pub mod dane;
+
+#[cfg(feature = "dane")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
+pub use dane::{verify_tls_server_dane, DaneConfig, DaneFailurePolicy, TlsAuthorization};
+
 /// Limits on AIA `caIssuers` chain reassembly in [`Verifier::verify_one`].
 ///
 /// caIssuers URIs are read from certificates that have not been validated
@@ -291,6 +302,17 @@ pub enum Error {
     /// builder iterates URIs in caller-supplied order and only the
     /// final blocker determines the outcome.
     Aia(pkix_aia::AiaError),
+    /// DANE verification failed.
+    ///
+    /// Either DANE was required and could not be satisfied — a `Bogus`
+    /// DNSSEC status, which fails under every policy, or an
+    /// undeterminable one under a strict policy — or usable TLSA records
+    /// existed and the certificate matched none of them. The latter is
+    /// the genuine DANE authentication failure: the domain stated which
+    /// certificate it uses and this is not it.
+    #[cfg(feature = "dane")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
+    Dane(pkix_dane::DaneError),
     /// Path reassembly via [`pkix_path_builder`] failed.
     ///
     /// Surfaced when the caller-supplied chain plus any AIA-fetched
@@ -329,6 +351,8 @@ impl core::fmt::Display for Error {
             Self::ProfileViolation { reason } => write!(f, "profile violation: {reason}"),
             Self::OcspDelegation { reason } => write!(f, "ocsp responder delegation: {reason}"),
             Self::Aia(e) => write!(f, "aia fetch: {e}"),
+            #[cfg(feature = "dane")]
+            Self::Dane(e) => write!(f, "dane: {e}"),
             Self::PathBuild(e) => write!(f, "path build: {e}"),
             Self::AiaDepthExceeded => write!(f, "aia fetch recursion cap reached"),
             Self::AiaFetchLimitExceeded { limit } => {
@@ -346,6 +370,8 @@ impl std::error::Error for Error {
             Self::Revocation(e) => Some(e),
             Self::Identity(e) => Some(e),
             Self::Aia(e) => Some(e),
+            #[cfg(feature = "dane")]
+            Self::Dane(e) => Some(e),
             Self::PathBuild(e) => Some(e),
             Self::ProfileViolation { .. }
             | Self::OcspDelegation { .. }

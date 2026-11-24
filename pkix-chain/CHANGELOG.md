@@ -6,6 +6,82 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [Unreleased]
 
+### Added
+
+DANE composition, behind a new default-on `dane` feature.
+
+- `verify_tls_server_dane` — `verify_tls_server` with a domain's TLSA
+  records taken into account, covering all four usages.
+- `TlsAuthorization` — how a certificate came to be accepted: `Pkix`,
+  `PkixConstrained`, `DaneTrustAnchor`, or `DaneEndEntity`.
+- `DaneFailurePolicy` (`Opportunistic` by default, or `Strict`) and
+  `DaneConfig`, including `DaneConfig::disabled()` as the call-site
+  override for pure PKIX in a DANE-enabled binary.
+- `Error::Dane`.
+
+### Features
+
+- `dane` is **default-on** and pulls only `pkix-dane`: `no_std`, no I/O,
+  no network. The DANE-aware API is therefore present for everyone.
+- `dane-resolver` is **off** by default and pulls the DNS stack.
+  Separating "DANE by default" from "DNS by default" is deliberate: with
+  an opportunistic policy an offline caller would not break, but it
+  would pay a failed lookup on *every* verification, which a batch audit
+  feels as hours. Offline consumers need no `--no-default-features` to
+  avoid that.
+
+### Design notes
+
+- **A separate entry point, not a new parameter.** DANE does not merely
+  add a check: usage 2 replaces the trust anchor and usage 3 skips path
+  validation entirely.
+- **`TlsAuthorization` rather than `ValidatedPath`.** Usage 3 validates
+  no path, so there is none to return. Synthesizing one with a
+  meaningless `anchor_index` and `depth` would hide exactly the
+  distinction a caller needs in order to log, or to apply policy to,
+  DANE-authorized connections.
+- **Usages are tried strongest-first** — DANE-EE, DANE-TA, PKIX-EE,
+  PKIX-TA. RFC 7671 §4.1 makes any match sufficient and prescribes no
+  order; strongest-first means a domain publishing usage 3 gets usage-3
+  semantics rather than an outcome that depends on the client's trust
+  store.
+- **A DANE-TA anchor replaces the caller's trust store for that
+  validation**, rather than joining it. Merging would implement "DANE-TA
+  or any CA", which is weaker than either.
+- **`Bogus` fails under every policy** and is not reachable by
+  configuration. A knob that let a broken signature fall back to PKIX
+  would let an attacker switch DANE off for any domain by corrupting the
+  DNS answer.
+- **`chain_der` must be the received bytes.** TLSA matching is
+  byte-exact and `x509-cert` 0.3 normalizes a pre-2050
+  `GeneralizedTime` validity date on re-encode, so re-deriving the bytes
+  from the parsed chain would silently fail to match a correctly
+  published record. A misaligned `chain_der` is reported rather than
+  silently matching fewer certificates.
+
+### Not yet: the async twin
+
+An async `verify_tls_server_dane` is **not** in this release, and the
+reason is worth recording because it is larger than it looks. To be
+async all the way down — which it must be, or it would block the
+executor on revocation and AIA I/O, the defect already open against
+`pkix-revocation-http` — it needs an async `Verifier`, because
+`verify_tls_server` reaches `Verifier::verify_one`, which calls
+`build_with_aia` (~99 lines) and `run_revocation_checks`. That is
+duplicating this crate's orchestration layer in async, not adding a
+wrapper. Tracked separately.
+
+### Testing
+
+`tests/dane_e2e.rs` runs the composition against PKITS §4.1.1
+certificates. Those carry no `dNSName` SAN, which makes one property
+easy to demonstrate rather than merely assert: DANE-EE authorizes them
+while pure PKIX rejects them on the identical inputs, so the name-check
+bypass RFC 7671 §5.1 requires is shown to be real. The fall-through
+cases assert the failure came from the PKIX half, which is what proves
+the fall-through happened at all.
+
+
 Planned release: **0.5.0** (breaking: pkix-path 0.4, x509-cert 0.3).
 
 ### Added

@@ -6,6 +6,38 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-chain` 0.6.0: DANE composition
+
+`verify_tls_server_dane` composes PKIX validation with a domain's TLSA
+records across all four usages, behind a new **default-on** `dane`
+feature that pulls only the `no_std`, I/O-free `pkix-dane`. The DNS
+stack stays behind `dane-resolver`, off by default.
+
+It is a separate entry point rather than a parameter on
+`verify_tls_server` because DANE does not merely add a check: usage 2
+replaces the trust anchor and usage 3 skips path validation outright.
+For the same reason it returns `TlsAuthorization` rather than
+`ValidatedPath` — usage 3 validates no path, and inventing one with a
+meaningless `anchor_index` would hide the distinction a caller needs to
+log or apply policy to a DANE-authorized connection.
+
+`DaneFailurePolicy` is `Opportunistic` by default with `Strict`
+available, and a `Bogus` DNSSEC status fails under both — not
+configurable, since a knob there would let an attacker switch DANE off
+for any domain by corrupting the DNS answer. `DaneConfig::disabled()` is
+the call-site override for pure PKIX in a DANE-enabled binary.
+
+**The async twin is not in this release.** To be async all the way down,
+which it must be or it blocks the executor on revocation and AIA I/O, it
+needs an async `Verifier`: `verify_tls_server` reaches
+`Verifier::verify_one`, which calls `build_with_aia` and
+`run_revocation_checks`. That is duplicating this crate's orchestration
+layer in async rather than adding a wrapper, and it is tracked
+separately.
+
+Planned version: `pkix-chain` 0.6.0. Nothing is published.
+
+
 ### `pkix-aia-http` 0.3.0: async fetcher family
 
 `AsyncAiaFetcher` behind a new `async` feature, with a `reqwest`-backed
