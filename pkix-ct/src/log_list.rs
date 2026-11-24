@@ -15,29 +15,33 @@
 //!
 //! # Google's log list carries an acceptable-use policy
 //!
-//! Google's lists are the obvious source and this module parses their
-//! schema, but Chrome's CT team restricts what they may be used for.
-//! Verbatim, from Chrome's log-list documentation:
+//! Chrome's log-list documentation offers the lists for certificate
+//! submitters such as certification authorities and for CT monitors and
+//! auditors, and says they "may not be used to facilitate CT enforcement in
+//! TLS clients other than Chrome without explicit written permission from
+//! Chrome's CT team."
 //!
-//! > Google Chrome makes its CT log lists available for the purposes of
-//! > certificate submitters (such as certification authorities) and CT
-//! > monitors and auditors wishing to remain compatible with, or
-//! > investigate the contents of, the CT and WebPKI ecosystems. Chrome's
-//! > CT log lists may not be used to facilitate CT enforcement in TLS
-//! > clients other than Chrome without explicit written permission from
-//! > Chrome's CT team.
+//! Quoted so a consumer knows it exists. It is Google's policy statement, not
+//! a licence term on this crate, and it binds nothing here: an
+//! acceptable-use policy draws its force from a service agreement accepted as
+//! a condition of access, and fetching an unauthenticated public URL accepts
+//! nothing. This crate supplies the mechanism, states the fact, and leaves
+//! the judgement to the operator, who is better placed to make it.
 //!
-//! So parsing these lists is squarely within the stated purposes for a
-//! monitor, an auditor or a certificate submitter. Enforcing CT against
-//! them in a non-Chrome TLS client is not, absent that permission — and
-//! `pkix-path` makes this workspace a plausible home for exactly such a
-//! client, which is why the policy is quoted here rather than left to be
-//! discovered.
+//! The warning inside the policy is worth more than its framing, though, and
+//! applies whoever has permission. **A client that pins Google's log list
+//! inherits Chrome's inclusion and retirement decisions on Chrome's
+//! schedule.** Holding a stale copy means either rejecting good certificates
+//! whose log is newer than the list, or believing CT is being enforced while
+//! checking against a set that no longer describes the ecosystem. Neither
+//! announces itself, which is why
+//! [`from_google_log_list_json_verified`](CtLogList::from_google_log_list_json_verified)
+//! exists: a list cheap to re-fetch and verify is a list that can be kept
+//! current, and pinning a snapshot is the thing to avoid.
 //!
-//! This crate provides the mechanism and does not police the use. It takes
-//! no dependency on Google's list: a private, vendor-specific or
-//! permission-covered list goes in through [`CtLogList::insert`] or the
-//! schema parser, and nothing privileges one source over another.
+//! Nothing here depends on Google's list. A private, vendor-specific or
+//! self-operated list goes in through [`CtLogList::insert`] or the schema
+//! parser, and no source is privileged over another.
 //!
 //! # Not every published list is signed
 //!
@@ -415,15 +419,12 @@ mod google_schema {
         /// far more rarely than the list it signs, so pinning it as data on
         /// your side is practical in a way pinning the list is not.
         ///
-        /// There is a second reason, which is that supplying the key is an
-        /// act. Google's acceptable-use policy restricts CT enforcement
-        /// against its lists in non-Chrome TLS clients (see this module's
-        /// documentation), so whether that policy is satisfied is a question
-        /// about the deployment, not about this function. A caller who pins
-        /// the key has answered it; a shipped key would have answered it for
-        /// them.
+        /// [`pkix-ct-google`](https://docs.rs/pkix-ct-google) ships Google's
+        /// current key as data for callers who would otherwise go and fetch
+        /// it, with a generator that cross-checks it against Google's
+        /// published list and a scheduled check for rotation.
         ///
-        /// Note also that Google publishes no out-of-band verification of
+        /// Note that Google publishes no out-of-band verification of
         /// the key itself — no fingerprint in a signed artifact, no copy in
         /// an independently distributed source tree. Its authenticity rests
         /// on HTTPS to `gstatic.com`, which is to say on the Web PKI that

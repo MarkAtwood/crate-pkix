@@ -127,6 +127,60 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### New crate: `pkix-ct-google` — Google's CT log-list signing key as data
+
+`pkix-ct` can verify Google's detached signature over the CT log list, but
+ships no key, so every consumer had to go and fetch one. This crate is that
+key, with its provenance, and nothing else: no validation, no network, no
+filesystem, no dependencies.
+
+**Shipping the key is not shipping the policy.** The log *list* encodes which
+logs Google's program has decided to trust and changes weekly; the *key* says
+only who signed. Nothing here commits a consumer to Google's inclusion
+criteria — only to being able to tell whether a list they fetched is the one
+Google published. That distinction is why the key can live in a crate while
+the list cannot.
+
+- **Provenance is weaker than `pkix-dnssec-anchor`'s, and says so.** IANA
+  signs its anchor file; Google neither signs this key nor publishes any
+  out-of-band copy of it — no fingerprint in a signed artifact, no copy in an
+  independently distributed source tree. Chrome does not even use this path,
+  receiving log lists through the component updater's PKI Metadata component.
+  The chain therefore ends at HTTPS to `gstatic.com`, which is to say in the
+  Web PKI that Certificate Transparency exists to police. That circularity is
+  inherent to bootstrapping CT from the network.
+
+- **`gen.sh` cross-checks instead.** It fetches the key, the log list and
+  Google's signature over that list, then verifies the signature *using the
+  fetched key* and fails closed. A key that verifies Google's current list is
+  Google's current signing key, or all three were substituted together — which
+  rules out a stale key, a truncated fetch, a wrong file at the URL, and a key
+  from another Google program. The crate's tests re-run the same check against
+  the committed sample, making it a property of every release rather than of
+  the day the key was captured.
+
+- **Rotation is watched.** `./gen.sh --check` reports drift without writing,
+  and `external-anchors.yml` (renamed from `iana-anchors.yml`, now one job per
+  publisher) runs it on a schedule. Exit 2 rather than 1 distinguishes "the
+  key does not verify Google's list" from "the key changed": Google publishes
+  key and list together, so a rotation leaves them consistent and an
+  inconsistency means a bad fetch, not a roll.
+
+- **Google's acceptable-use policy is recorded, not enforced.** It offers the
+  lists for certificate submitters, monitors and auditors and restricts CT
+  enforcement in non-Chrome TLS clients. It is Google's policy statement, not
+  a licence term on these bytes: an acceptable-use policy draws its force from
+  a service agreement accepted as a condition of access, and fetching an
+  unauthenticated public URL accepts nothing. The crate states the fact and
+  leaves the judgement to the operator.
+
+  The *warning* inside it is kept, because it holds whoever has permission: a
+  client pinning Chrome's log list inherits Chrome's inclusion and retirement
+  decisions on Chrome's schedule, so a stale copy means either rejecting good
+  certificates or believing CT is enforced against a set that no longer
+  describes the ecosystem. That argues for refreshing the list, which is
+  exactly what being able to verify a signature makes safe.
+
 ### `pkix-ct`: document Google's acceptable-use policy, and Apple's lack of a signature
 
 Two facts a consumer of this module needs that it did not state.
@@ -137,13 +191,18 @@ Two facts a consumer of this module needs that it did not state.
   they "may not be used to facilitate CT enforcement in TLS clients other
   than Chrome without explicit written permission from Chrome's CT team."
 
-  Parsing them is squarely within the stated purposes for a monitor, an
-  auditor or a submitter. Enforcing CT against them in a non-Chrome TLS
-  client is not, absent that permission — and `pkix-path` makes this
-  workspace a plausible home for exactly such a client, so the policy is
-  now quoted in the module documentation rather than left to be
-  discovered. The crate provides the mechanism and does not police the
-  use, but a consumer should know which side of the line they are on.
+  It is Google's policy statement rather than a licence term, and it binds
+  nothing in this workspace: an acceptable-use policy draws its force from a
+  service agreement accepted as a condition of access, and fetching an
+  unauthenticated public URL accepts nothing. It is quoted in the module
+  documentation because a consumer should know it exists, with the judgement
+  left to the operator.
+
+  The warning inside it is kept on its merits, since it holds whoever has
+  permission: a client pinning Google's list inherits Chrome's inclusion and
+  retirement decisions on Chrome's schedule, and a stale copy means either
+  rejecting good certificates or believing CT is enforced against a set that
+  no longer describes the ecosystem.
 
 - **Apple's log list is not signed.** There is no detached signature
   published alongside `current_log_list.json` and no signature field

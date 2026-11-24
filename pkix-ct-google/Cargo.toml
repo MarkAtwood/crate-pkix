@@ -1,0 +1,44 @@
+[package]
+name        = "pkix-ct-google"
+description = "Google's Certificate Transparency log-list signing key as inert data — no validation, no network, no filesystem, no dependencies"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["certificate-transparency", "ct", "sct", "log-list", "pki"]
+categories  = ["cryptography", "no-std"]
+
+# The committed Google artifacts are the provenance record for a release. A
+# consumer can re-run the cross-check offline — does this key verify the list
+# Google published when it was captured? — without trusting that gen.sh ran
+# honestly. Shipping them is the point, so they are included explicitly.
+include = [
+    "src/**/*.rs",
+    "google/log_list_pubkey.pem",
+    "google/log_list_pubkey.der",
+    "google/sample-log_list.json",
+    "google/sample-log_list.sig",
+    "gen.sh",
+    "CHANGELOG.md",
+    "README.md",
+]
+
+[dependencies]
+# None, deliberately. This crate is one public key and its provenance. A
+# dependency here would be a dependency on the trust path of every CT
+# consumer that uses it, bought for nothing.
+
+[dev-dependencies]
+# The crate's own tests re-run the cross-check that gen.sh performs: that the
+# shipped key verifies the committed sample list. That is the strongest
+# available statement about this key, so it belongs in the test suite and not
+# only in the generator.
+pkix-ct   = { workspace = true, features = ["log-list-json"] }
+pkix-path = { workspace = true }
+sha2      = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

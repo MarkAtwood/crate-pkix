@@ -17,6 +17,7 @@ members = [
     "pkix-lint",
     "pkix-lint-cabf",
     "pkix-ct",
+    "pkix-ct-google",
     "pkix-composite",
     "pkix-ac",
     "pkix-identity",
@@ -132,6 +133,7 @@ pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.2.0" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.4.0" }
 pkix-lint             = { path = "pkix-lint",             version = "0.10.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.2.0" }
+pkix-ct-google        = { path = "pkix-ct-google",        version = "0.1.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.2.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.2.0" }
 pkix-identity         = { path = "pkix-identity",         version = "0.2.0" }

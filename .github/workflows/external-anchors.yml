@@ -1,4 +1,8 @@
-# Watches IANA for a DNSSEC root key-signing-key roll.
+# Watches external publishers for trust-anchor rotation.
+#
+# One job per publisher. These are the artifacts this workspace ships as data
+# and therefore snapshots: IANA's DNSSEC root anchors, and Google's CT
+# log-list signing key.
 #
 # Tracks PKIX-4bxy.
 #
@@ -39,7 +43,7 @@
 #   certificate changed, and either wants investigating rather than
 #   regenerating.
 
-name: iana-anchors
+name: external-anchors
 
 on:
   schedule:
@@ -52,13 +56,14 @@ on:
   pull_request:
     paths:
       - "pkix-dnssec-anchor/**"
+      - "pkix-ct-google/**"
 
 concurrency:
-  group: iana-anchors-${{ github.workflow }}-${{ github.ref }}
+  group: external-anchors-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  drift:
+  iana-dnssec:
     name: committed anchors match IANA
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -103,5 +108,49 @@ jobs:
 
           If the script exited 2 rather than 1, IANA's signature did not
           verify. That is not a key roll. Investigate before regenerating.
+          EOF
+          exit 1
+
+  google-ct:
+    name: committed CT signing key matches Google
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show what is committed
+        run: |
+          echo "committed key:"
+          echo "  sha256 $(openssl dgst -sha256 -hex \
+            < pkix-ct-google/google/log_list_pubkey.der | sed 's/.*= *//')"
+
+      - name: Check for drift against Google
+        run: ./pkix-ct-google/gen.sh --check
+
+      - name: Explain a failure
+        # The script prints the digests and the regeneration steps. This adds
+        # what it cannot know: which exit code meant what, and that the fix is
+        # a release of one crate.
+        if: failure()
+        run: |
+          cat <<'EOF'
+          The committed CT log-list signing key no longer matches Google's.
+
+          If Google rotated the key:
+
+            cd pkix-ct-google
+            ./gen.sh                          # fetch, cross-verify, regenerate
+            cargo test -p pkix-ct-google      # re-runs the cross-check
+            # then release pkix-ct-google
+
+          Consumers pick the new key up with `cargo update`. They need no
+          pkix-ct release, and pkix-ct needs no change — the key lives in its
+          own crate precisely so a rotation is a data update.
+
+          If the script exited 2 rather than 1, the fetched key did not verify
+          Google's own published log list. That is NOT a rotation: Google
+          publishes the key and the list together, so a rotation leaves them
+          consistent. It means a bad, stale, or tampered fetch. Investigate
+          before regenerating.
           EOF
           exit 1

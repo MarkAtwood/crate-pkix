@@ -1549,6 +1549,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-ct-google"
+version = "0.1.0"
+dependencies = [
+ "pkix-ct",
+ "pkix-path",
+ "sha2",
+]
+
+[[package]]
 name = "pkix-dane"
 version = "0.2.0"
 dependencies = [
