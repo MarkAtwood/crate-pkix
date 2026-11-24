@@ -143,7 +143,7 @@ type GeneralSubtrees = x509_cert::ext::pkix::constraints::name::GeneralSubtrees;
 /// not itself carry a textual message — its `Display` is derived from
 /// `der::ErrorKind` — round-trip is **lossy**: a deserialized `DerError`
 /// preserves the original `Display` output verbatim but its
-/// [`std::error::Error::source`] is `None` because the original
+/// [`core::error::Error::source`] is `None` because the original
 /// `der::Error` value cannot be reconstructed from a free-form string.
 /// This trade is acceptable for diagnostic error types; the success type
 /// (`ValidatedPath`) round-trips losslessly because all its fields are
@@ -156,10 +156,10 @@ pub struct DerError {
     ///
     /// Populated by [`DerError::new`] from a real `der::Error`. `None`
     /// only when the `DerError` was reconstructed from serialized form;
-    /// in that case [`std::error::Error::source`] returns `None` and the
+    /// in that case [`core::error::Error::source`] returns `None` and the
     /// Display message is taken from the preserved [`Self::message`].
     ///
-    /// Under `no_std` builds the `std::error::Error::source` impl is
+    /// Under `no_std` builds the `core::error::Error::source` impl is
     /// not available, so this field is only read for its `Debug`
     /// representation; `#[allow(dead_code)]` silences the lint in
     /// that configuration.
@@ -199,7 +199,7 @@ impl DerError {
     /// Construct a `DerError` from a real `der::Error`.
     ///
     /// The original `der::Error` is preserved internally so
-    /// [`std::error::Error::source`] returns it; the rendered
+    /// [`core::error::Error::source`] returns it; the rendered
     /// `Display` message is cached so the diagnostic survives serde
     /// round-trips. See the type-level rustdoc for the round-trip
     /// fidelity contract.
@@ -238,10 +238,9 @@ impl core::fmt::Display for DerError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for DerError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.inner.as_ref().map(|e| e as &dyn std::error::Error)
+impl core::error::Error for DerError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        self.inner.as_ref().map(|e| e as &dyn core::error::Error)
     }
 }
 
@@ -576,9 +575,8 @@ impl core::fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::Der(e) => Some(e),
             Self::SignatureInvalid { .. }

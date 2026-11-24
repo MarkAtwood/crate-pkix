@@ -127,6 +127,40 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### Workspace: error types implement `Error` without `std`
+
+`core::error::Error` stabilized in Rust 1.81, below the workspace MSRV of
+1.88. Every error type here now implements it unconditionally, so a
+`no_std` consumer gets `source()` chains and `&dyn Error` coercion that
+were previously behind a feature for no reason but the Rust version.
+
+- `pkix-dane`: **the `std` feature is gone.** It did nothing but gate the
+  `Error` impl — its own manifest comment said so. The crate is now
+  plainly `#![no_std]`. `pkix-dane-resolver` and `pkix-chain` no longer
+  request `features = ["std"]` from it.
+- `pkix-path`: `Error` and `DerError` implement `core::error::Error`
+  unconditionally, including their `source()` chains. The `std` feature
+  stays — it forwards to `der/std`, `spki/std` and `x509-cert/std`,
+  which is a separate job.
+- `pkix-revocation`: same, and its `source()` returns `pkix_path::DerError`
+  which is now unconditional too. `std` stays; it forwards, and `crl` and
+  `ocsp` depend on it.
+- `pkix-aia`: `Error` impl unconditional. `std` stays, and its only
+  remaining job is gating the `IoFailure` variant, whose
+  `kind: std::io::ErrorKind` field has no `core` equivalent.
+- `pkix-identity`: `Error` impl unconditional, **and the three
+  `From<IpAddr>` conversions are no longer `std`-gated** — they now use
+  `core::net` (Rust 1.77), which holds the same types `std::net`
+  re-exports. A `no_std` consumer could not previously build a
+  `ServerName` from an IP address type at all.
+
+`pkix-dane` and `pkix-aia` assert the property at compile time alongside
+their other invariants, so a future `cfg` cannot quietly take it back.
+
+Verified: every core crate still builds with `--no-default-features`, the
+workspace checks on the declared MSRV, and the full suite passes.
+
+
 ### Workspace: MSRV-aware resolver, and CI that enforces the gates
 
 **The declared MSRV was being violated and nothing noticed.** Checking the

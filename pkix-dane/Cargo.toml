@@ -13,11 +13,12 @@ categories  = ["cryptography", "no-std"]
 [features]
 default = []
 
-# `std` enables the `std::error::Error` impl on `DaneError`. Nothing in
-# this crate needs `std` otherwise: TLSA matching is pure computation
-# over caller-supplied bytes. The DNSSEC-validating resolver that does
-# need `std` is the sibling `pkix-dane-resolver` crate (PKIX-j32w.2).
-std = []
+# No `std` feature. It existed only to gate the `std::error::Error` impl
+# on `DaneError`; `core::error::Error` (Rust 1.81, below the workspace
+# MSRV) lets that be unconditional, so a `no_std` consumer gets it too.
+# Nothing else here needs `std`: TLSA matching is pure computation over
+# caller-supplied bytes. The DNSSEC-validating resolver that does need
+# `std` is the sibling `pkix-dane-resolver` crate.
 
 # `serde` derives `Serialize`/`Deserialize` on the public result and
 # record types. Per AGENTS.md non-negotiable #6, load-bearing public

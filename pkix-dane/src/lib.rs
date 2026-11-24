@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
@@ -67,8 +67,10 @@
 //!
 //! ## `no_std` and feature flags
 //!
-//! The default build is `no_std + alloc`. `std` adds the
-//! [`std::error::Error`] impl on [`DaneError`]. `serde` derives
+//! The build is `no_std + alloc`; there is no `std` feature. [`DaneError`]
+//! implements [`core::error::Error`] unconditionally, which `core` gained in
+//! Rust 1.81 — below the workspace MSRV, so no feature is needed to offer it.
+//! `serde` derives
 //! `Serialize`/`Deserialize` on the record, response and error types, so
 //! TLSA data can be cached across processes — records carry DNS TTLs, which
 //! makes caching an expected deployment pattern (AGENTS.md non-negotiable #6).
@@ -520,9 +522,7 @@ impl core::fmt::Display for DaneError {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl std::error::Error for DaneError {}
+impl core::error::Error for DaneError {}
 
 // ---------------------------------------------------------------------------
 // Non-negotiable #6 compile-time assertions
@@ -546,6 +546,12 @@ const _: fn() = || {
     _assert_cache_friendly::<TlsaResponse>();
     _assert_cache_friendly::<TlsaRecord>();
     _assert_cache_friendly::<TlsaName>();
+
+    // DaneError implements core::error::Error with no feature enabled. This
+    // is the property that let the `std` feature be deleted; asserting it
+    // here means a future cfg could not quietly take it away again.
+    fn _assert_error<E: core::error::Error>() {}
+    _assert_error::<DaneError>();
     _assert_cache_friendly::<TrustAnchorSource>();
     _assert_send_sync::<TrustAnchorSource>();
 };

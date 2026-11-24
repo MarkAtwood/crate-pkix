@@ -329,36 +329,30 @@ impl core::fmt::Display for ServerName<'_> {
     }
 }
 
-/// Construct a `ServerName` from an [`Ipv4Addr`](std::net::Ipv4Addr).
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl From<std::net::Ipv4Addr> for ServerName<'static> {
-    fn from(addr: std::net::Ipv4Addr) -> Self {
+/// Construct a `ServerName` from an [`Ipv4Addr`](core::net::Ipv4Addr).
+impl From<core::net::Ipv4Addr> for ServerName<'static> {
+    fn from(addr: core::net::Ipv4Addr) -> Self {
         ServerName {
             repr: ServerNameRepr::Ip(IpRepr::V4(addr.octets())),
         }
     }
 }
 
-/// Construct a `ServerName` from an [`Ipv6Addr`](std::net::Ipv6Addr).
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl From<std::net::Ipv6Addr> for ServerName<'static> {
-    fn from(addr: std::net::Ipv6Addr) -> Self {
+/// Construct a `ServerName` from an [`Ipv6Addr`](core::net::Ipv6Addr).
+impl From<core::net::Ipv6Addr> for ServerName<'static> {
+    fn from(addr: core::net::Ipv6Addr) -> Self {
         ServerName {
             repr: ServerNameRepr::Ip(IpRepr::V6(addr.octets())),
         }
     }
 }
 
-/// Construct a `ServerName` from an [`IpAddr`](std::net::IpAddr).
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl From<std::net::IpAddr> for ServerName<'static> {
-    fn from(addr: std::net::IpAddr) -> Self {
+/// Construct a `ServerName` from an [`IpAddr`](core::net::IpAddr).
+impl From<core::net::IpAddr> for ServerName<'static> {
+    fn from(addr: core::net::IpAddr) -> Self {
         match addr {
-            std::net::IpAddr::V4(v4) => v4.into(),
-            std::net::IpAddr::V6(v6) => v6.into(),
+            core::net::IpAddr::V4(v4) => v4.into(),
+            core::net::IpAddr::V6(v6) => v6.into(),
         }
     }
 }
@@ -589,8 +583,7 @@ impl core::fmt::Display for IdentityError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for IdentityError {}
+impl core::error::Error for IdentityError {}
 
 /// Verify that `cert` authorizes `name` per RFC 6125 §6.4.
 ///

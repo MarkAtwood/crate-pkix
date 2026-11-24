@@ -14,7 +14,7 @@ categories  = ["cryptography"]
 # TLSA types, TlsaName, TlsaResponse, DnssecStatus and DaneError. The sync
 # TlsaResolver trait lives there too; this crate does not implement it. See
 # the crate docs for why there is no sync reference resolver.
-pkix-dane = { workspace = true, features = ["std"] }
+pkix-dane = { workspace = true }
 
 # RootAnchor, the interchange type for caller-supplied trust anchors. A
 # normal dependency because it appears in this crate's public signatures,

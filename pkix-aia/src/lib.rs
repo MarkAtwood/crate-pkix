@@ -245,9 +245,7 @@ impl core::fmt::Display for AiaError {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl std::error::Error for AiaError {}
+impl core::error::Error for AiaError {}
 
 // ---------------------------------------------------------------------------
 // io::ErrorKind serde label round-trip
@@ -723,6 +721,11 @@ impl AiaFetcher for NoAiaFetcher {
 const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<AiaError>();
+
+    // Unconditional via core::error::Error. The `std` feature still gates
+    // the IoFailure variant, but no longer the Error impl.
+    fn _assert_error<E: core::error::Error>() {}
+    _assert_error::<AiaError>();
     _assert_send_sync::<NoAiaFetcher>();
 };
 

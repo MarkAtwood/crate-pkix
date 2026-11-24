@@ -648,9 +648,8 @@ const fn crl_reason_name(r: CrlReason) -> &'static str {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::CrlParseError(e) | Self::OcspParseError(e) => Some(e),
             _ => None,

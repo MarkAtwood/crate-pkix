@@ -63,9 +63,9 @@ pkix-aia          = { workspace = true, features = ["std"] }
 # TLSA record types and per-usage matching, behind the default-on `dane`
 # feature. no_std with no I/O, which is what makes that default
 # affordable.
-# `std` for the std::error::Error impl on DaneError, which Error::Dane
-# needs to expose through source(). The feature adds no dependencies.
-pkix-dane         = { workspace = true, optional = true, features = ["std"] }
+# DaneError implements core::error::Error unconditionally, so Error::Dane
+# can expose it through source() with no feature needed.
+pkix-dane         = { workspace = true, optional = true }
 
 # DNSSEC-validating resolution, behind `dane-resolver`. Pulls the DNS
 # stack, which is why it is not default-on.

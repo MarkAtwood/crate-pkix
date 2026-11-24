@@ -49,7 +49,10 @@ TLSA record types, matching, and all four certificate usages
   (`_443._tcp.host`) with DNS label and length validation. Placed in
   this `no_std` crate rather than the resolver because it is pure string
   work with no I/O, and a caller supplying their own resolver needs it.
-- Features: `std` (adds the `std::error::Error` impl) and `serde`.
+- Feature: `serde`. There is no `std` feature: `DaneError` implements
+  `core::error::Error` unconditionally (Rust 1.81, below the workspace
+  MSRV), and nothing else in the crate needs `std` — TLSA matching is
+  pure computation over caller-supplied bytes.
 
 ### Design notes
 
