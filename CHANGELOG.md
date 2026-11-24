@@ -127,6 +127,49 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### Workspace: bare-metal `no_std` builds verified and gated
+
+`pkix-dane`'s `no_std` claim had only ever been checked at source level —
+that `#![no_std]` was in force and `std::` was unreachable. Whether the
+dependency tree actually resolves and compiles for a bare-metal target was
+unverified, because the environment it was written in could not install
+one.
+
+Now verified, and not only for `pkix-dane`. **All eight crates carrying the
+`no-std` category build for `thumbv7em-none-eabi`,
+`riscv64gc-unknown-none-elf` and `x86_64-unknown-none`**: `pkix-ac`,
+`pkix-aia`, `pkix-composite`, `pkix-dane`, `pkix-dnssec-anchor`,
+`pkix-identity`, `pkix-path`, `pkix-path-builder`.
+
+- **A new `no-std` CI job** derives that crate list from the `no-std`
+  category in each manifest rather than hardcoding it, so adding the
+  category opts a crate into the gate and a crate that cannot hold the
+  claim fails there rather than in someone's firmware build. This is the
+  same class of silent drift the MSRV job was added for: nothing in a
+  normal push would otherwise notice a dependency acquiring a `std`
+  requirement.
+
+- **`x86_64-unknown-none` needs `RUSTFLAGS='--cfg sha2_backend="soft"'`.**
+  Confirmed necessary and sufficient rather than carried over from the
+  earlier note: without it `sha2` 0.11's x86 SIMD backend fails with
+  `rustc-LLVM ERROR: Do not know how to split the result of this
+  operator!` on that soft-float target. Documented in `pkix-dane`'s
+  crate-level docs, where a consumer will meet it, and applied as its own
+  CI step so a future `sha2` release fixing it is noticed by that step
+  passing without the flag.
+
+### Findings
+
+- `pkix-lint` and `pkix-profiles` do **not** build for bare metal, and
+  correctly do not claim the `no-std` category — neither declares
+  `#![no_std]` and `pkix-lint` uses `std::borrow::Cow` directly. Nothing
+  is misrepresented; the metadata was accurate and the test confirmed it.
+- `pkix-revocation` builds for all three bare-metal targets but does not
+  carry the `no-std` category, so its metadata understates what it
+  supports. Not changed here — adding the category opts it into the new
+  gate, which is a commitment worth making deliberately rather than as a
+  side effect of this check.
+
 ### `pkix-ct`: verify Google's signature over the CT log list
 
 `CtLogList::from_google_log_list_json` parsed Google's `log_list.json` on

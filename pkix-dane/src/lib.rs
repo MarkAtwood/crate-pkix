@@ -77,6 +77,26 @@
 //!
 //! All public result types are `Clone + Debug + PartialEq + Eq` and
 //! `Send + Sync`, asserted at the bottom of this module.
+//!
+//! ## Bare-metal targets
+//!
+//! Verified to build for `thumbv7em-none-eabi` and
+//! `riscv64gc-unknown-none-elf`, and checked on every push by the
+//! `no-std` CI job rather than left to drift.
+//!
+//! `x86_64-unknown-none` additionally needs the soft SHA-2 backend:
+//!
+//! ```text
+//! RUSTFLAGS='--cfg sha2_backend="soft"' cargo build -p pkix-dane \
+//!     --target x86_64-unknown-none
+//! ```
+//!
+//! Without it `sha2` 0.11's x86 SIMD backend fails to compile on that
+//! soft-float target with `rustc-LLVM ERROR: Do not know how to split the
+//! result of this operator!`. The constraint is `sha2`'s rather than this
+//! crate's — `pkix-path` inherits it too — but it surfaces here because
+//! matching types 1 and 2 are SHA-256 and SHA-512, so this crate depends on
+//! `sha2` directly.
 
 extern crate alloc;
 

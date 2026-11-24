@@ -221,3 +221,64 @@ jobs:
         # pkix-aia-http's async/client-reqwest-async pair are exactly this
         # shape.
         run: cargo hack check --workspace --feature-powerset --depth 2
+
+  no-std:
+    name: bare-metal targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with bare-metal targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi, riscv64gc-unknown-none-elf, x86_64-unknown-none
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build every no-std crate for bare metal
+        # The crate list is derived from the `no-std` category in each
+        # manifest, so adding the category to a crate opts it into this gate
+        # and a crate that cannot hold the claim fails here rather than in
+        # someone's firmware build. Verified against all three targets when
+        # this job was written (PKIX-2qh7).
+        #
+        # Checking the library only: a bare-metal *binary* needs a global
+        # allocator, which is the consumer's to provide, so `cargo build -p`
+        # on the library is the right scope.
+        run: |
+          set -euo pipefail
+          crates="$(
+            for m in pkix-*/Cargo.toml; do
+              grep -q '"no-std"' "$m" && basename "$(dirname "$m")"
+            done
+          )"
+          echo "no-std crates: $(echo "$crates" | tr '\n' ' ')"
+          for target in thumbv7em-none-eabi riscv64gc-unknown-none-elf; do
+            for crate in $crates; do
+              echo "::group::$crate on $target"
+              cargo build -p "$crate" --target "$target"
+              echo "::endgroup::"
+            done
+          done
+
+      - name: Build for x86_64-unknown-none
+        # Needs the soft SHA-2 backend. sha2 0.11's x86 SIMD backend hits
+        # "rustc-LLVM ERROR: Do not know how to split the result of this
+        # operator!" on this soft-float target; the flag was confirmed
+        # necessary and sufficient when this job was written. Separated from
+        # the loop above so the flag applies only where it is needed and a
+        # future sha2 release fixing it is noticed by this step starting to
+        # pass without it.
+        env:
+          RUSTFLAGS: --cfg sha2_backend="soft"
+        run: |
+          set -euo pipefail
+          for m in pkix-*/Cargo.toml; do
+            grep -q '"no-std"' "$m" || continue
+            crate="$(basename "$(dirname "$m")")"
+            echo "::group::$crate on x86_64-unknown-none"
+            cargo build -p "$crate" --target x86_64-unknown-none
+            echo "::endgroup::"
+          done
