@@ -2248,6 +2248,19 @@ fn any_to_str_bytes(a: &der::Any) -> Option<DirStringBytes<'_>> {
         Tag::Utf8String | Tag::PrintableString | Tag::Ia5String | Tag::VisibleString => {
             Some(DirStringBytes::Plain(a.value().iter()))
         }
+        // `clippy::chunks_exact_to_as_chunks` would have this be
+        // `as_chunks::<2>().0.iter()`. Declined: this iterator is stored in
+        // `DirStringBytes::Bmp`, so the change rewrites that variant's field
+        // type from `ChunksExact<'_, u8>` to `slice::Iter<'_, [u8; 2]>` and
+        // the `Iterator` impl that transcodes UCS-2 through it. That is a
+        // real edit to DN-comparison code for a style preference, and
+        // `bmp_is_well_formed` has already established the length is even,
+        // which is the correctness property `as_chunks` would make visible
+        // in the type.
+        #[expect(
+            clippy::chunks_exact_to_as_chunks,
+            reason = "see the comment above; the iterator type is part of DirStringBytes"
+        )]
         Tag::BmpString if bmp_is_well_formed(a.value()) => Some(DirStringBytes::Bmp {
             units: a.value().chunks_exact(2),
             buf: [0; 4],
@@ -2266,10 +2279,8 @@ fn any_to_str_bytes(a: &der::Any) -> Option<DirStringBytes<'_>> {
 /// forbidden in `BMPString` by definition — `BMP` = Basic Multilingual
 /// Plane, U+0000..=U+FFFF).
 fn bmp_is_well_formed(bytes: &[u8]) -> bool {
-    bytes.len().is_multiple_of(2)
-        && bytes
-            .chunks_exact(2)
-            .all(|u| !(0xD8..=0xDF).contains(&u[0]))
+    let (units, rest) = bytes.as_chunks::<2>();
+    rest.is_empty() && units.iter().all(|u| !(0xD8..=0xDF).contains(&u[0]))
 }
 
 /// UTF-8 byte stream over a `DirectoryString` value (see [`any_to_str_bytes`]).

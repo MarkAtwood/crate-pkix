@@ -161,6 +161,17 @@ pub mod dane;
 #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
 pub use dane::{verify_tls_server_dane, DaneConfig, DaneFailurePolicy, TlsAuthorization};
 
+/// DNSSEC-validating TLSA resolution, re-exported under the
+/// `dane-resolver` feature.
+///
+/// Re-exported rather than left as a dependency a consumer adds separately,
+/// so that enabling `dane-resolver` is sufficient to obtain a resolver and
+/// the version this crate was built against cannot drift from the one the
+/// consumer picks.
+#[cfg(feature = "dane-resolver")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dane-resolver")))]
+pub use pkix_dane_resolver as dane_resolver;
+
 /// Limits on AIA `caIssuers` chain reassembly in [`Verifier::verify_one`].
 ///
 /// caIssuers URIs are read from certificates that have not been validated
