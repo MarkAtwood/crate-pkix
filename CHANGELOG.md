@@ -6,6 +6,34 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### `pkix-chain` 0.6.0: sans-I/O verify surface, replacing the planned async twin
+
+`pub mod sans_io` exposes the I/O-free core of chain verification. A
+caller drives it and performs every fetch itself: `ChainBuilder` returns
+`Built`, `Fetch(uris)` or `Failed`, and `revocation_targets` hands back
+the checks a validated chain calls for as a list the caller can issue
+concurrently.
+
+This supersedes the async twin decided under `PKIX-j32w.3`, which was
+settled before two costs were visible. `verify_tls_server` performs no
+validation itself — it reaches `Verifier::verify_one`, which calls
+`build_with_aia` and `run_revocation_checks` — so an async path that is
+async all the way down needed an async `Verifier` duplicating the whole
+orchestration layer, and `build_with_aia` is where the AIA bounds live.
+Separately, the async traits live in the std HTTP adapters, so being
+generic over them would have made `pkix-chain` depend on ureq *and*
+reqwest *and* tokio purely to name two traits.
+
+Sans-I/O avoids both: no `async` feature, no `async-trait`, no HTTP
+dependency, one copy of the bounds, and it serves any runtime. The
+question of where the async traits belong dissolves rather than being
+answered.
+
+`build_with_aia` and `run_revocation_checks` now delegate to the shared
+core, so there is one reassembly loop and one definition of what
+revocation must check. Neither is a behaviour change.
+
+
 ### `pkix-chain` 0.6.0: DANE composition
 
 `verify_tls_server_dane` composes PKIX validation with a domain's TLSA
