@@ -611,6 +611,10 @@ impl core::error::Error for IdentityError {}
 /// performed. A certificate that carries identity only in its CN is
 /// rejected with [`IdentityError::MissingSan`].
 ///
+/// SMTP DANE is the one exception, because RFC 7672 §3.2.3 still requires
+/// CN fallback for MTA-to-MTA delivery. That rule lives in
+/// [`verify_dns_name_with_cn_fallback`] and is never reached from here.
+///
 /// # Errors
 ///
 /// - [`IdentityError::MissingSan`] — the certificate has no SAN
@@ -642,6 +646,138 @@ pub fn verify_dns_name(cert: &Certificate, name: &ServerName<'_>) -> Result<(), 
         }
     }
     Err(IdentityError::NoMatchingSan)
+}
+
+/// Verify that `cert` authorizes `name`, considering the Subject DN
+/// `commonName` when — and only when — the certificate presents no DNS-ID.
+///
+/// This is RFC 7672 §3.2.3 matching, for SMTP DANE. **It is not for the Web
+/// PKI**, where [`verify_dns_name`] is correct and CN fallback is deprecated.
+///
+/// # Why this exists when `verify_dns_name` refuses CN fallback
+///
+/// The two rules are both right, for different protocols. RFC 6125 §6.4.4
+/// deprecated CN fallback for application-service identity generally, and
+/// [`verify_dns_name`] implements that. RFC 7672 §3.2.3 — standards-track,
+/// and current — keeps it for MTA-to-MTA SMTP:
+///
+/// > if the server certificate contains a Subject Alternative Name extension
+/// > with at least one DNS-ID, then only the DNS-IDs are matched against the
+/// > client's reference identifiers. The CN-ID is only considered when no
+/// > DNS-IDs are present.
+///
+/// The reason is deployment, not principle: SMTP server certificates are
+/// frequently old, self-managed and self-signed, and MTA-to-MTA delivery has
+/// no user to prompt and no agreed CA set. A DANE-authenticated connection to
+/// a server whose certificate carries its name only in the CN is still
+/// authenticated — the TLSA record is what establishes trust — so refusing it
+/// would reject working, secure configurations.
+///
+/// Exposed as a separate function rather than a flag on [`verify_dns_name`]
+/// so that no caller gets CN fallback by default or by accident, and so the
+/// Web PKI path cannot be loosened by passing an argument.
+///
+/// # Matching
+///
+/// - **DNS-ID present** (any `dNSName` entry in the SAN): identical to
+///   [`verify_dns_name`]. The CN is not consulted, even if the DNS-IDs all
+///   fail to match.
+/// - **No DNS-ID**: every `commonName` attribute in the subject DN is tried,
+///   with the same wildcard rule — a single leftmost `*` label matching
+///   exactly one label, which is what RFC 7672 §3.2.3 requires by default.
+///   A DN may carry more than one CN; any match suffices.
+/// - **IP-literal targets** delegate to [`verify_dns_name`] unchanged. RFC
+///   7672's reference identifiers are domain names, so the CN-ID rule has
+///   nothing to say about them.
+///
+/// A `commonName` whose value is not a `PrintableString`, `UTF8String` or
+/// `IA5String` is skipped rather than treated as an error: the other
+/// `DirectoryString` choices cannot carry a hostname that would match.
+///
+/// # Errors
+///
+/// - [`IdentityError::MissingSan`] — the certificate presents no identity at
+///   all: no SAN DNS-ID and no usable `commonName`.
+/// - [`IdentityError::MalformedSan`] — a SAN extension is present but cannot
+///   be parsed.
+/// - [`IdentityError::NoMatchingSan`] — an identity was presented, as DNS-IDs
+///   or as a CN, but none matched `name`. The variant does not distinguish
+///   which form was tried: to a caller both mean the server is not the one
+///   named, and RFC 7672's logging requirements turn on whether the lookup
+///   was secure rather than on which identifier form failed.
+pub fn verify_dns_name_with_cn_fallback(
+    cert: &Certificate,
+    name: &ServerName<'_>,
+) -> Result<(), IdentityError> {
+    // IP literals: nothing in RFC 7672 §3.2.3 concerns them.
+    let ServerNameRepr::Dns(target) = &name.repr else {
+        return verify_dns_name(cert, name);
+    };
+
+    // A missing SAN is not an error here, unlike in verify_dns_name: it is
+    // precisely the case the CN-ID rule exists for. A malformed one still is,
+    // because we cannot then say whether a DNS-ID was present, and guessing
+    // would decide between two different matching rules on corrupt input.
+    let presents_dns_id = match find_san(cert) {
+        Ok(san) => san
+            .0
+            .iter()
+            .any(|entry| matches!(entry, GeneralName::DnsName(_))),
+        Err(IdentityError::MissingSan) => false,
+        Err(other) => return Err(other),
+    };
+
+    if presents_dns_id {
+        // RFC 7672 §3.2.3: "only the DNS-IDs are matched". Delegating keeps
+        // one implementation of the DNS-ID path rather than a second that
+        // could drift from it.
+        return verify_dns_name(cert, name);
+    }
+
+    // Name::iter flattens across RelativeDistinguishedNames, which is what we
+    // want: a multi-valued RDN carrying a commonName is unusual but legal, and
+    // RFC 7672 §3.2.3 does not care how the attribute is grouped.
+    let mut saw_a_common_name = false;
+    for ava in cert.tbs_certificate().subject().iter() {
+        if ava.oid != OID_COMMON_NAME {
+            continue;
+        }
+        let Some(cn) = directory_string_as_str(&ava.value) else {
+            continue;
+        };
+        saw_a_common_name = true;
+        if matches_dns_san(cn, target.as_ref()) {
+            return Ok(());
+        }
+    }
+
+    if saw_a_common_name {
+        Err(IdentityError::NoMatchingSan)
+    } else {
+        Err(IdentityError::MissingSan)
+    }
+}
+
+/// `id-at-commonName`, RFC 4519 §2.3.
+const OID_COMMON_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.4.3");
+
+/// The `DirectoryString` choices that can carry a hostname, as `&str`.
+///
+/// `TeletexString`, `UniversalString` and `BMPString` are the remaining
+/// choices; none can hold a hostname that `matches_dns_san` would accept, so
+/// returning `None` for them loses nothing and keeps this free of encoding
+/// conversions.
+fn directory_string_as_str(value: &der::Any) -> Option<&str> {
+    if let Ok(s) = value.decode_as::<der::asn1::PrintableStringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    if let Ok(s) = value.decode_as::<der::asn1::Utf8StringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    if let Ok(s) = value.decode_as::<der::asn1::Ia5StringRef<'_>>() {
+        return Some(s.as_str());
+    }
+    None
 }
 
 /// Verify that `cert` authorizes `mailbox` per RFC 5280 §4.2.1.6 and

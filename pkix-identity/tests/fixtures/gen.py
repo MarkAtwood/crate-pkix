@@ -49,8 +49,18 @@ NOT_AFTER = datetime.datetime(2050, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 def build_leaf(sans, *, common_name="leaf", omit_san=False):
+    """Build a self-signed leaf.
+
+    `common_name=None` produces a subject with no commonName attribute at
+    all, which RFC 7672 §3.2.3 matching needs: a certificate presenting no
+    DNS-ID *and* no CN presents no identity, and must be distinguishable
+    from one whose CN simply fails to match.
+    """
     key = ec.generate_private_key(ec.SECP256R1())
-    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    if common_name is None:
+        subject = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Org")])
+    else:
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
     builder = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -98,6 +108,27 @@ fixtures = {
     "san-missing.der": build_leaf([], omit_san=True),
     # CN-only cert (no SAN). Identity in CN should NOT be honored.
     "cn-only.der": build_leaf([], omit_san=True),
+
+    # ----- RFC 7672 §3.2.3 CN-ID fixtures (SMTP DANE, PKIX-rgc6) -----
+    # No SAN, CN holds a hostname. The CN-ID rule applies.
+    "cn-hostname.der": build_leaf([], omit_san=True, common_name="mx.example.com"),
+    # No SAN, CN holds a leftmost wildcard. RFC 7672 §3.2.3: "Wildcards are
+    # valid in either DNS-IDs or the CN-ID when applicable."
+    "cn-wildcard.der": build_leaf([], omit_san=True, common_name="*.example.com"),
+    # SAN carries a DNS-ID *and* the CN names a different host. RFC 7672
+    # §3.2.3: when a DNS-ID is present, "only the DNS-IDs are matched" — so
+    # the CN must be ignored even though it would otherwise match.
+    "san-dns-plus-cn.der": build_leaf(
+        [x509.DNSName("www.example.com")], common_name="mx.example.com"
+    ),
+    # SAN present but carries no DNS-ID (IP only), CN holds a hostname. The
+    # CN-ID rule turns on the absence of a DNS-ID, not the absence of a SAN.
+    "san-ip-plus-cn.der": build_leaf(
+        [x509.IPAddress(ipaddress.IPv4Address("192.0.2.9"))],
+        common_name="mx.example.com",
+    ),
+    # Neither a SAN nor a CN: no presented identity at all.
+    "no-san-no-cn.der": build_leaf([], omit_san=True, common_name=None),
 
     # ----- Mailbox SAN fixtures (PKIX-fmtv.12.1) -----
     # Plain rfc822Name.
