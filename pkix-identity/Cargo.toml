@@ -12,7 +12,11 @@ categories  = ["cryptography", "no-std"]
 
 [features]
 default = []
-std     = ["x509-cert/std", "idna/std"]
+# No `std` feature. After the Error impl moved to core::error::Error and the
+# From<IpAddr> conversions to core::net, nothing in this crate was gated on
+# it — the feature only forwarded `x509-cert/std` and `idna/std`, which a
+# consumer who wants them can enable directly. One fewer knob, and the crate
+# is now unconditionally no_std.
 
 # Enable serde::Serialize / serde::Deserialize on the IdentityError type
 # so it survives caching/transport when used inside pkix-chain::Error

@@ -27,7 +27,7 @@ client-reqwest-async = ["async", "dep:reqwest", "dep:tokio"]
 # pkix-aia ships the AiaFetcher trait + AiaError type this crate
 # implements. The `std` feature is required because every transport
 # path on real fetchers can surface an io::Error variant.
-pkix-aia = { workspace = true, features = ["std"] }
+pkix-aia = { workspace = true }
 
 # Reference sync HTTP transport. Same pinning rationale as
 # pkix-revocation-http: ureq for the minimal pure-Rust sync footprint,

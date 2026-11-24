@@ -46,7 +46,7 @@ serde = [
 [dependencies]
 pkix-path       = { workspace = true, features = ["std"] }
 pkix-revocation = { workspace = true, features = ["std"] }
-pkix-identity   = { workspace = true, features = ["std"] }
+pkix-identity   = { workspace = true }
 pkix-profiles   = { workspace = true }
 serde           = { workspace = true, optional = true }
 # pkix-aia ships the AiaFetcher trait that `Verifier` is generic over
@@ -58,7 +58,7 @@ serde           = { workspace = true, optional = true }
 # `AiaError::FetchingDisabled`, preserving the historical "caller
 # supplies the full chain" semantics. Real HTTP fetching lives in
 # `pkix-aia-http`.
-pkix-aia          = { workspace = true, features = ["std"] }
+pkix-aia          = { workspace = true }
 
 # TLSA record types and per-usage matching, behind the default-on `dane`
 # feature. no_std with no I/O, which is what makes that default

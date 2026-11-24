@@ -254,10 +254,9 @@ mod reqwest_backend {
             if let Some(resolver) = resolver {
                 builder = builder.dns_resolver(resolver);
             }
-            let client = builder.build().map_err(|e| AiaError::IoFailure {
-                kind: std::io::ErrorKind::Other,
-                message: e.to_string(),
-            })?;
+            let client = builder
+                .build()
+                .map_err(|e| AiaError::IoFailure(e.to_string()))?;
             Ok(Self {
                 client,
                 max_response_size: DEFAULT_MAX_RESPONSE_SIZE,
@@ -283,10 +282,7 @@ mod reqwest_backend {
                 .timeout(timeout)
                 .dns_resolver(Arc::new(GuardedAsyncResolver))
                 .build()
-                .map_err(|e| AiaError::IoFailure {
-                    kind: std::io::ErrorKind::Other,
-                    message: e.to_string(),
-                })?;
+                .map_err(|e| AiaError::IoFailure(e.to_string()))?;
             Ok(Self {
                 client,
                 max_response_size: self.max_response_size,
@@ -397,10 +393,7 @@ mod reqwest_backend {
             }
             source = err.source();
         }
-        AiaError::IoFailure {
-            kind: std::io::ErrorKind::Other,
-            message: e.to_string(),
-        }
+        AiaError::IoFailure(e.to_string())
     }
 }
 

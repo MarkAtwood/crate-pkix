@@ -127,6 +127,46 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### Workspace: `pkix-aia` and `pkix-identity` are unconditionally `no_std`
+
+Follow-on from the `core::error::Error` change. Moving the `Error` impls
+out from behind `std` left two crates whose `std` feature no longer
+earned its place; `pkix-path` (19 `cfg(std)` sites) and
+`pkix-revocation` (4) keep theirs, because theirs gate real
+functionality.
+
+- **`pkix-aia`: the `std` feature is gone.** Its eight remaining
+  `cfg(std)` sites all served one thing — `AiaError::IoFailure`'s
+  `kind: std::io::ErrorKind` field. `IoFailure` is now
+  `IoFailure(String)`, matching `MalformedCertificate(String)` and
+  `DestinationNotAllowed(String)` in the same enum.
+
+  The field bought very little: of the five places `pkix-aia-http`
+  constructed it, **four passed `ErrorKind::Other`** and the fifth had a
+  real kind already being rendered into the message. Nothing in the
+  workspace matched on it. Removing it also deleted a **170-line serde
+  helper** that existed only because `io::ErrorKind` is
+  `#[non_exhaustive]` and does not derive `Serialize`, so round-tripping
+  it needed a hand-written label table. The adapter site that had a real
+  kind now folds it into the message, so no information is lost.
+
+- **`pkix-identity`: the `std` feature is gone.** After the `Error` impl
+  moved to `core::error::Error` and the `From<IpAddr>` conversions to
+  `core::net`, its only remaining `cfg(std)` site was the `no_std`
+  attribute itself — the feature merely forwarded `x509-cert/std` and
+  `idna/std`, which a consumer wanting them can enable directly.
+
+Both crates now build with no features at all. `pkix-aia-http` and
+`pkix-chain` no longer request a `std` feature from either.
+
+This is breaking for anyone matching `AiaError::IoFailure { kind, .. }`
+or enabling those `std` features. `pkix-aia` is published at 0.1.1 and
+`pkix-identity` at 0.2.0, both pre-1.0, where semver makes breaking
+changes the mechanism for getting the design right rather than a cost to
+avoid — and a `std` type in the public API of a `no_std`-first crate is
+exactly the kind of thing to fix before 1.0 rather than after.
+
+
 ### Workspace: error types implement `Error` without `std`
 
 `core::error::Error` stabilized in Rust 1.81, below the workspace MSRV of

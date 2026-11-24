@@ -312,10 +312,11 @@ impl AiaFetcher for HttpFetcher {
         let read_count = (&mut reader)
             .take((limit as u64).saturating_add(1))
             .read_to_end(&mut bytes)
-            .map_err(|e| AiaError::IoFailure {
-                kind: e.kind(),
-                message: e.to_string(),
-            })?;
+            // The io::ErrorKind goes into the message rather than its own
+            // field: it is log material, and a field that four of five
+            // construction sites filled with `Other` was not something a
+            // caller could act on. See AiaError::IoFailure.
+            .map_err(|e| AiaError::IoFailure(format!("{:?}: {e}", e.kind())))?;
 
         if read_count > limit {
             return Err(AiaError::ResponseTooLarge {
@@ -355,10 +356,7 @@ fn map_ureq_err(e: ureq::Error) -> AiaError {
     match e {
         ureq::Error::StatusCode(code) => AiaError::HttpStatus(code),
         ureq::Error::Timeout(_) => AiaError::Timeout,
-        other => AiaError::IoFailure {
-            kind: std::io::ErrorKind::Other,
-            message: other.to_string(),
-        },
+        other => AiaError::IoFailure(other.to_string()),
     }
 }
 

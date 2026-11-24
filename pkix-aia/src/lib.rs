@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
@@ -37,19 +37,18 @@
 //!
 //! ## `no_std` and feature flags
 //!
-//! The default build is `no_std + alloc`. Enabling the `std` feature
-//! unlocks the [`AiaError::IoFailure`] variant (whose
-//! `kind: std::io::ErrorKind` field requires `std::io`) and the
-//! `std::error::Error` impl. Enabling `serde` derives
-//! `serde::Serialize` / `serde::Deserialize` on [`AiaError`]; with
-//! both `std + serde` the `IoFailure` variant round-trips its
-//! `kind` field through a crate-private label helper.
+//! The build is `no_std + alloc`; there is no `std` feature. [`AiaError`]
+//! implements [`core::error::Error`] unconditionally, and every variant is
+//! `core`-only — the variant that previously needed `std` carried a
+//! `std::io::ErrorKind` that has since been folded into its message, for
+//! the reasons recorded on [`AiaError::IoFailure`]. Enabling `serde`
+//! derives `serde::Serialize` / `serde::Deserialize` on [`AiaError`].
 //!
 //! Per AGENTS.md non-negotiable #6, [`AiaError`] is
 //! `Clone + Debug + PartialEq + Eq + Send + Sync` (compile-time
 //! asserted) and is `#[non_exhaustive]`. No embedded `std::io::Error`
 //! handle (it is not `Clone + Eq + Serialize`); the variant uses the
-//! `IoFailure { kind, message }` shape mandated by PKIX-2l0v.1 D3.
+
 //!
 //! ## Status
 //!
@@ -87,10 +86,9 @@ use alloc::vec::Vec;
 /// - `Send + Sync` — auto-derived; compile-time asserted at the
 ///   bottom of this module.
 /// - No embedded `std::io::Error`. Transport-level I/O failures
-///   surface through the [`AiaError::IoFailure`] variant whose
-///   `kind: std::io::ErrorKind` plus owned `message: String`
-///   capture the relevant information in a `Clone + Eq + Serialize`
-///   shape.
+///   surface through the [`AiaError::IoFailure`] variant, whose owned
+///   `String` captures the relevant information in a
+///   `Clone + Eq + Serialize` shape.
 /// - `#[non_exhaustive]`.
 /// - Behind the `serde` feature: `Serialize + Deserialize`.
 ///
@@ -105,7 +103,7 @@ use alloc::vec::Vec;
 /// | [`Timeout`](Self::Timeout) | Fetch did not complete within the adapter's configured deadline. |
 /// | [`UriUnsupported`](Self::UriUnsupported) | A `caIssuers` URI used a scheme the fetcher does not handle (e.g. `ldap://` against an HTTP-only fetcher). Carries the full offending URI. |
 /// | [`DestinationNotAllowed`](Self::DestinationNotAllowed) | The fetcher's destination policy refused the target (e.g. it resolves to a loopback / private / link-local address). Adapter diagnostic in the inner `String`. |
-/// | [`IoFailure`](Self::IoFailure) | (requires `std`) Lower-level transport error from the I/O substrate. `kind` is the `std::io::ErrorKind`; `message` is a human-readable description. |
+/// | [`IoFailure`](Self::IoFailure) | Lower-level transport error from the I/O substrate. Carries a human-readable diagnostic. |
 ///
 /// [`Certificate`]: https://docs.rs/x509-cert/latest/x509_cert/struct.Certificate.html
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -191,29 +189,29 @@ pub enum AiaError {
 
     /// Lower-level transport I/O failure.
     ///
-    /// Requires the `std` feature: the `kind` field is
-    /// [`std::io::ErrorKind`], which is part of `std::io`. Real
-    /// network-fetching adapters (e.g. `pkix-aia-http`, planned)
-    /// all require `std` anyway, so `no_std` consumers — which can
-    /// only meaningfully use `NoAiaFetcher` — never see this
-    /// variant.
+    /// Carries a free-form diagnostic for logs.
     ///
-    /// The shape is `{ kind, message }` rather than
-    /// `std::io::Error` directly: `std::io::Error` is not
-    /// `Clone + PartialEq + Eq + Serialize`, which would block
-    /// AGENTS.md non-negotiable #6. The `os_error` numeric code is
-    /// not preserved; in practice the `kind` plus a free-form
-    /// human-readable `message` carries the same diagnostic value
-    /// for log consumers.
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    IoFailure {
-        /// I/O error category from `std::io`.
-        #[cfg_attr(feature = "serde", serde(with = "io_error_kind_serde"))]
-        kind: std::io::ErrorKind,
-        /// Free-form human-readable description; suitable for logs.
-        message: String,
-    },
+    /// # Why there is no error-kind field
+    ///
+    /// This variant previously carried a `kind: std::io::ErrorKind`
+    /// alongside the message. That field was the only reason this `no_std`
+    /// crate had a `std` feature at all, and the only reason it shipped a
+    /// 170-line serde helper — `io::ErrorKind` does not derive `Serialize`
+    /// upstream, and is `#[non_exhaustive]`, so round-tripping it needed a
+    /// hand-written label table.
+    ///
+    /// It bought very little. Of the five places `pkix-aia-http` built this
+    /// variant, four passed `ErrorKind::Other` — no information — and the
+    /// fifth had a real kind that was already being rendered into the
+    /// message. Nothing in the workspace matched on it. A field that is
+    /// `Other` four times in five is not something a caller can act on, and
+    /// this enum already carries two other diagnostics as plain strings:
+    /// [`MalformedCertificate`](Self::MalformedCertificate) and
+    /// [`DestinationNotAllowed`](Self::DestinationNotAllowed).
+    ///
+    /// An adapter holding a real error kind should render it into the
+    /// message, which is where it was headed anyway.
+    IoFailure(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -237,214 +235,14 @@ impl core::fmt::Display for AiaError {
             Self::DestinationNotAllowed(msg) => {
                 write!(f, "AIA fetch destination not allowed: {msg}")
             }
-            #[cfg(feature = "std")]
-            Self::IoFailure { kind, message } => {
-                write!(f, "AIA fetch I/O failure ({kind:?}): {message}")
+            Self::IoFailure(diagnostic) => {
+                write!(f, "AIA fetch I/O failure: {diagnostic}")
             }
         }
     }
 }
 
 impl core::error::Error for AiaError {}
-
-// ---------------------------------------------------------------------------
-// io::ErrorKind serde label round-trip
-// ---------------------------------------------------------------------------
-
-/// `serde` round-trip helper for [`std::io::ErrorKind`].
-///
-/// Serializes as a string label (e.g. `"NotFound"`, `"TimedOut"`)
-/// drawn from the variant name via `Debug`. `ErrorKind`'s `Debug`
-/// impl emits the variant name as a bare identifier (`NotFound`,
-/// `HostUnreachable`, etc.) and is stable across stdlib releases.
-///
-/// Deserializes by matching the label against a static table of
-/// variants known at compile time; unknown labels resolve to
-/// `std::io::ErrorKind::Other`, which matches the way the standard
-/// library treats unrecognized OS-level errors.
-///
-/// `std::io::ErrorKind` is `#[non_exhaustive]` upstream. The
-/// serializer uses `Debug` formatting, so it automatically
-/// preserves the variant name for any `ErrorKind` variant the
-/// consumer's compiler knows about — including variants stabilized
-/// after the workspace MSRV (1.73). The deserializer's explicit
-/// table covers variants stable through 1.73; its `_ => Other`
-/// fallback handles forward-compat for newer variants whose labels
-/// appear in serialized data but whose enum constructors are
-/// unavailable at the MSRV floor.
-// NOTE: This module is duplicated in pkix-truststore.
-// Keep them in sync until a shared crate is extracted.
-#[cfg(all(feature = "std", feature = "serde"))]
-mod io_error_kind_serde {
-    use serde::{Deserialize, Deserializer, Serializer};
-    use std::io::ErrorKind;
-
-    pub(super) fn serialize<S>(kind: &ErrorKind, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use alloc::format;
-        // `ErrorKind`'s `Debug` impl emits the variant name as a bare
-        // identifier (e.g. "NotFound", "HostUnreachable"). This is
-        // stable across stdlib releases — variant names do not change —
-        // and it covers every variant the consumer's compiler knows
-        // about, including those added after the workspace MSRV.
-        let label = format!("{kind:?}");
-        serializer.serialize_str(&label)
-    }
-
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<ErrorKind, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = <&str>::deserialize(deserializer)?;
-        Ok(kind_for(s))
-    }
-
-    /// Map a label back to an `ErrorKind`.
-    ///
-    /// Unknown labels resolve to `ErrorKind::Other`. This mirrors the
-    /// standard library's behavior when classifying OS errors it does
-    /// not recognize.
-    fn kind_for(label: &str) -> ErrorKind {
-        match label {
-            "NotFound" => ErrorKind::NotFound,
-            "PermissionDenied" => ErrorKind::PermissionDenied,
-            "ConnectionRefused" => ErrorKind::ConnectionRefused,
-            "ConnectionReset" => ErrorKind::ConnectionReset,
-            "ConnectionAborted" => ErrorKind::ConnectionAborted,
-            "NotConnected" => ErrorKind::NotConnected,
-            "AddrInUse" => ErrorKind::AddrInUse,
-            "AddrNotAvailable" => ErrorKind::AddrNotAvailable,
-            "BrokenPipe" => ErrorKind::BrokenPipe,
-            "AlreadyExists" => ErrorKind::AlreadyExists,
-            "WouldBlock" => ErrorKind::WouldBlock,
-            "InvalidInput" => ErrorKind::InvalidInput,
-            "InvalidData" => ErrorKind::InvalidData,
-            "TimedOut" => ErrorKind::TimedOut,
-            "WriteZero" => ErrorKind::WriteZero,
-            "Interrupted" => ErrorKind::Interrupted,
-            "Unsupported" => ErrorKind::Unsupported,
-            "UnexpectedEof" => ErrorKind::UnexpectedEof,
-            "OutOfMemory" => ErrorKind::OutOfMemory,
-            _ => ErrorKind::Other,
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use alloc::format;
-
-        /// Verify that `Debug` formatting produces the expected label
-        /// for every variant stable through Rust 1.73 (the workspace
-        /// MSRV), and that `kind_for` maps each label back to the
-        /// original variant. This is the serialize/deserialize
-        /// round-trip contract.
-        #[test]
-        fn debug_label_round_trip_covers_msrv_variants() {
-            let cases: &[(ErrorKind, &str)] = &[
-                (ErrorKind::NotFound, "NotFound"),
-                (ErrorKind::PermissionDenied, "PermissionDenied"),
-                (ErrorKind::ConnectionRefused, "ConnectionRefused"),
-                (ErrorKind::ConnectionReset, "ConnectionReset"),
-                (ErrorKind::ConnectionAborted, "ConnectionAborted"),
-                (ErrorKind::NotConnected, "NotConnected"),
-                (ErrorKind::AddrInUse, "AddrInUse"),
-                (ErrorKind::AddrNotAvailable, "AddrNotAvailable"),
-                (ErrorKind::BrokenPipe, "BrokenPipe"),
-                (ErrorKind::AlreadyExists, "AlreadyExists"),
-                (ErrorKind::WouldBlock, "WouldBlock"),
-                (ErrorKind::InvalidInput, "InvalidInput"),
-                (ErrorKind::InvalidData, "InvalidData"),
-                (ErrorKind::TimedOut, "TimedOut"),
-                (ErrorKind::WriteZero, "WriteZero"),
-                (ErrorKind::Interrupted, "Interrupted"),
-                (ErrorKind::Unsupported, "Unsupported"),
-                (ErrorKind::UnexpectedEof, "UnexpectedEof"),
-                (ErrorKind::OutOfMemory, "OutOfMemory"),
-                (ErrorKind::Other, "Other"),
-            ];
-            for (kind, expected_label) in cases {
-                // Serialize side: Debug formatting must produce the
-                // expected label.
-                let debug_label = format!("{kind:?}");
-                assert_eq!(debug_label, *expected_label, "Debug format for {kind:?}");
-                // Deserialize side: kind_for must recover the
-                // original variant.
-                assert_eq!(
-                    kind_for(expected_label),
-                    *kind,
-                    "kind_for({expected_label:?})"
-                );
-            }
-        }
-
-        #[test]
-        fn unknown_label_resolves_to_other() {
-            // Forward-compat contract: any label we do not recognize
-            // resolves to `ErrorKind::Other`. The deserializer must
-            // not reject the input, otherwise upgrading stdlib
-            // versions (which can rename variants in `Debug`) would
-            // brick existing on-disk caches.
-            assert_eq!(kind_for("DefinitelyNotAVariant"), ErrorKind::Other);
-            assert_eq!(kind_for(""), ErrorKind::Other);
-            // Whitespace handling: we do not trim. Callers feeding
-            // mangled labels are out of contract; we still resolve
-            // to Other rather than panic.
-            assert_eq!(kind_for(" NotFound "), ErrorKind::Other);
-        }
-
-        /// Verify that post-MSRV variants (stabilized in 1.74+ via
-        /// `io_error_more`) serialize with their real variant name
-        /// through Debug formatting, not as "Other". This is the
-        /// core bug this fix addresses.
-        #[test]
-        fn post_msrv_variants_serialize_with_real_name() {
-            // These variants are available on the test compiler
-            // (1.95+) but not at the MSRV floor. The serialize path
-            // uses Debug formatting, so they get their real names.
-            // The deserialize path maps them to Other (graceful
-            // degradation), which is acceptable — the important
-            // thing is that the serialized form preserves the actual
-            // variant name on disk.
-            let post_msrv: &[(ErrorKind, &str)] = &[
-                (ErrorKind::HostUnreachable, "HostUnreachable"),
-                (ErrorKind::NetworkUnreachable, "NetworkUnreachable"),
-                (ErrorKind::NetworkDown, "NetworkDown"),
-                (ErrorKind::NotADirectory, "NotADirectory"),
-                (ErrorKind::IsADirectory, "IsADirectory"),
-                (ErrorKind::DirectoryNotEmpty, "DirectoryNotEmpty"),
-                (ErrorKind::ReadOnlyFilesystem, "ReadOnlyFilesystem"),
-                (ErrorKind::StaleNetworkFileHandle, "StaleNetworkFileHandle"),
-                (ErrorKind::StorageFull, "StorageFull"),
-                (ErrorKind::NotSeekable, "NotSeekable"),
-                (ErrorKind::FileTooLarge, "FileTooLarge"),
-                (ErrorKind::ResourceBusy, "ResourceBusy"),
-                (ErrorKind::ExecutableFileBusy, "ExecutableFileBusy"),
-                (ErrorKind::Deadlock, "Deadlock"),
-                (ErrorKind::CrossesDevices, "CrossesDevices"),
-                (ErrorKind::TooManyLinks, "TooManyLinks"),
-                (ErrorKind::InvalidFilename, "InvalidFilename"),
-                (ErrorKind::ArgumentListTooLong, "ArgumentListTooLong"),
-            ];
-            for (kind, expected_label) in post_msrv {
-                let debug_label = format!("{kind:?}");
-                assert_eq!(
-                    debug_label, *expected_label,
-                    "Debug format for post-MSRV {kind:?}"
-                );
-                // Deserialize falls back to Other — these labels are
-                // not in the kind_for table (MSRV constraint).
-                assert_eq!(
-                    kind_for(expected_label),
-                    ErrorKind::Other,
-                    "kind_for({expected_label:?}) should gracefully degrade to Other"
-                );
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // AiaFetcher trait
@@ -614,7 +412,7 @@ pub trait AiaFetcher {
     ///   fetcher's destination policy refuses.
     /// - [`AiaError::HttpStatus`], [`AiaError::Timeout`],
     ///   [`AiaError::ResponseTooLarge`], or
-    ///   [`AiaError::IoFailure`] (under `std`) for transport-level
+    ///   [`AiaError::IoFailure`] for transport-level
     ///   issues.
     /// - [`AiaError::MalformedCertificate`] if the adapter
     ///   pre-parsed the response and the bytes do not look like a
@@ -736,8 +534,6 @@ const _: fn() = || {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "std")]
-    use alloc::format;
     use alloc::string::ToString;
 
     #[test]
@@ -790,19 +586,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "std")]
     fn display_io_failure() {
-        let e = AiaError::IoFailure {
-            kind: std::io::ErrorKind::ConnectionRefused,
-            message: "connection refused by 10.0.0.1:443".into(),
-        };
-        // Use `{kind:?}` in the impl, so the rendered label is the
-        // Debug spelling of the variant. Pin the exact format so a
-        // stdlib change to ErrorKind::Debug surfaces here, not in
-        // downstream log scrapers.
+        let e = AiaError::IoFailure("connection refused by 10.0.0.1:443".into());
         assert_eq!(
-            format!("{e}"),
-            "AIA fetch I/O failure (ConnectionRefused): connection refused by 10.0.0.1:443",
+            e.to_string(),
+            "AIA fetch I/O failure: connection refused by 10.0.0.1:443"
         );
     }
 
@@ -841,23 +629,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "std")]
     fn io_failure_clone_and_eq() {
-        let a = AiaError::IoFailure {
-            kind: std::io::ErrorKind::TimedOut,
-            message: "deadline exceeded".into(),
-        };
+        let a = AiaError::IoFailure("deadline exceeded".into());
         assert_eq!(a, a.clone());
-        let b = AiaError::IoFailure {
-            kind: std::io::ErrorKind::TimedOut,
-            message: "different message".into(),
-        };
+        let b = AiaError::IoFailure("different message".into());
         assert_ne!(a, b);
-        let c = AiaError::IoFailure {
-            kind: std::io::ErrorKind::NotFound,
-            message: "deadline exceeded".into(),
-        };
-        assert_ne!(a, c);
     }
 
     // -----------------------------------------------------------------------

@@ -13,13 +13,10 @@ categories  = ["cryptography", "no-std"]
 [features]
 default = []
 
-# `std` enables `std::error::Error` impl on `AiaError` and unlocks the
-# `AiaError::IoFailure` variant whose `kind: std::io::ErrorKind` field is
-# only meaningful under `std`. Real network-fetching adapters
-# (`pkix-aia-http`, future) require `std` anyway, so `no_std` callers
-# (e.g. consumers of `NoAiaFetcher` that never construct a transport
-# error) are unaffected.
-std = []
+# No `std` feature. `core::error::Error` (Rust 1.81, below the workspace
+# MSRV) makes the Error impl unconditional, and the one variant that
+# needed `std` — IoFailure, for a `std::io::ErrorKind` field — now carries
+# a plain diagnostic string instead. See that variant's rustdoc.
 
 # `serde` enables `Serialize`/`Deserialize` derives on `AiaError`.
 # When combined with `std`, the `IoFailure` variant round-trips its
@@ -40,7 +37,7 @@ serde_json = { workspace = true }
 
 [[test]]
 name              = "round_trip"
-required-features = ["serde", "std"]
+required-features = ["serde"]
 
 [package.metadata.docs.rs]
 all-features = true

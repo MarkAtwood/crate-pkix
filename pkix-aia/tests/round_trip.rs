@@ -14,8 +14,6 @@
 //! stability of result-type serializations) and by AGENTS.md
 //! non-negotiable #6 (cache-friendly result types support serde).
 
-use std::io::ErrorKind;
-
 use pkix_aia::AiaError;
 
 /// Helper: serialize → deserialize → compare equal. Returns the
@@ -77,87 +75,43 @@ fn round_trip_uri_unsupported() {
 }
 
 #[test]
-fn round_trip_io_failure_connection_refused() {
-    let error = AiaError::IoFailure {
-        kind: ErrorKind::ConnectionRefused,
-        message: "connection refused by 10.0.0.1:443".into(),
-    };
-    let json = round_trip(&error);
-    assert_eq!(
-        json,
-        r#"{"IoFailure":{"kind":"ConnectionRefused","message":"connection refused by 10.0.0.1:443"}}"#,
-    );
+fn round_trip_io_failure() {
+    // IoFailure carries one diagnostic string. It previously carried a
+    // `kind: std::io::ErrorKind` too, which needed a bespoke serde helper
+    // because ErrorKind does not derive Serialize upstream; folding the kind
+    // into the message removed that helper and the crate's std feature with
+    // it. See AiaError::IoFailure.
+    for message in [
+        "connection refused by 10.0.0.1:443",
+        "deadline exceeded after 30s",
+        "DNS lookup failed: NXDOMAIN",
+        // The one adapter site that had a real io::ErrorKind renders it into
+        // the message, so this is the shape that now reaches a log.
+        "ConnectionRefused: connection refused",
+    ] {
+        let error = AiaError::IoFailure(message.into());
+        let json = round_trip(&error);
+        assert_eq!(json, format!(r#"{{"IoFailure":"{message}"}}"#));
+    }
 }
 
+/// The ErrorKind label helper this test used to guard is gone along with
+/// the field it served. What remains worth asserting is that the variant's
+/// wire form is a bare string, so there is no bespoke representation left to
+/// break.
 #[test]
-fn round_trip_io_failure_timed_out() {
-    let error = AiaError::IoFailure {
-        kind: ErrorKind::TimedOut,
-        message: "deadline exceeded after 30s".into(),
-    };
-    let json = round_trip(&error);
-    assert_eq!(
-        json,
-        r#"{"IoFailure":{"kind":"TimedOut","message":"deadline exceeded after 30s"}}"#,
-    );
-}
-
-#[test]
-fn round_trip_io_failure_not_found() {
-    let error = AiaError::IoFailure {
-        kind: ErrorKind::NotFound,
-        message: "DNS lookup failed: NXDOMAIN".into(),
-    };
-    let json = round_trip(&error);
-    assert_eq!(
-        json,
-        r#"{"IoFailure":{"kind":"NotFound","message":"DNS lookup failed: NXDOMAIN"}}"#,
-    );
-}
-
-#[test]
-fn round_trip_io_failure_other() {
-    let error = AiaError::IoFailure {
-        kind: ErrorKind::Other,
-        message: "unspecified error".into(),
-    };
-    let json = round_trip(&error);
-    assert_eq!(
-        json,
-        r#"{"IoFailure":{"kind":"Other","message":"unspecified error"}}"#,
-    );
-}
-
-/// Forward-compat contract for the io::ErrorKind label helper:
-/// unknown labels deserialize to `Other`. Existing on-disk caches
-/// produced by a future stdlib version (e.g. with a renamed variant
-/// or a brand-new variant) MUST remain readable.
-#[test]
-fn unknown_io_error_kind_label_deserializes_as_other() {
-    let json =
-        r#"{"IoFailure":{"kind":"DefinitelyNotAVariant","message":"future stdlib variant"}}"#;
+fn io_failure_wire_form_is_a_bare_string() {
+    let json = r#"{"IoFailure":"anything at all"}"#;
     let parsed: AiaError = serde_json::from_str(json).expect("deserialize");
-    assert_eq!(
-        parsed,
-        AiaError::IoFailure {
-            kind: ErrorKind::Other,
-            message: "future stdlib variant".into(),
-        },
-    );
+    assert_eq!(parsed, AiaError::IoFailure("anything at all".into()));
 }
 
 /// Bytewise stability: two equal `AiaError` values produce equal
 /// JSON. This is the property cache-key replay relies on.
 #[test]
 fn equal_errors_produce_equal_json() {
-    let a = AiaError::IoFailure {
-        kind: ErrorKind::ConnectionRefused,
-        message: "host unreachable".into(),
-    };
-    let b = AiaError::IoFailure {
-        kind: ErrorKind::ConnectionRefused,
-        message: "host unreachable".into(),
-    };
+    let a = AiaError::IoFailure("host unreachable".into());
+    let b = AiaError::IoFailure("host unreachable".into());
     assert_eq!(a, b);
     assert_eq!(
         serde_json::to_string(&a).expect("a"),
