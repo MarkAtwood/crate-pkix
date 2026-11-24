@@ -6,6 +6,27 @@ follows [Keep a Changelog](https://keepachangelog.com/) headings and
 
 ## [unreleased]
 
+### Workspace: MSRV 1.88
+
+Raised from 1.87 for `hickory-resolver` 0.26, which `pkix-dane-resolver`
+is built on. Every 0.26.x release of that crate declares
+`rust-version = "1.88"`; the 0.25 line is still at 1.71.1.
+
+The alternatives were pinning `hickory-resolver` 0.25 — which leaves a
+DNS parser of uncertain maintenance status inside a security library —
+or a per-crate `rust-version` override on `pkix-dane-resolver` alone.
+The workspace-wide bump was chosen so there stays exactly one MSRV to
+reason about.
+
+The cost is accepted knowingly: every crate inherits 1.88, `pkix-path`
+included, even though it is `no_std` and targets embedded platforms that
+will never compile a DNS resolver, and even though the `dane-resolver`
+feature that needs hickory is off by default.
+
+Note that nothing currently enforces the MSRV. The only CI workflow is
+the differential-test harness, whose comment still names 1.73.
+
+
 ### `pkix-dane` 0.2.0: TLSA parsing and the four DANE usages
 
 `pkix-dane` was a 0.1.0 namespace reservation with no public API. It now
