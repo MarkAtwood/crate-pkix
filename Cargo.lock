@@ -1509,6 +1509,7 @@ dependencies = [
  "serde",
  "serde_json",
  "spki",
+ "tokio",
  "x509-cert",
 ]
 
