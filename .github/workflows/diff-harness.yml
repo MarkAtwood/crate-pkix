@@ -25,8 +25,11 @@
 #   itself, that belongs in a separate `cargo test` workflow (out of scope
 #   for this bead — see AGENTS.md "Scope and Style").
 #
-# - Stable Rust toolchain only. MSRV 1.73 enforcement is a separate concern
-#   and would go in a sibling workflow.
+# - Stable Rust toolchain only. MSRV enforcement lives in the sibling
+#   quality-gates.yml workflow, which reads the declared version from
+#   Cargo.toml rather than naming one here. This comment previously named
+#   "MSRV 1.73" and was two bumps stale by the time anyone read it, which is
+#   itself the argument for not duplicating the number (PKIX-z2g4).
 #
 # - No caching of cargo or pip. The bead explicitly lists "pyca venv caching
 #   tuning" as out of scope (a follow-up if CI run time becomes a problem).

@@ -127,6 +127,54 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### Workspace: MSRV-aware resolver, and CI that enforces the gates
+
+**The declared MSRV was being violated and nothing noticed.** Checking the
+workspace against its own `rust-version` for the first time failed:
+`uuid` 1.29 — reached through `moka` and `hickory-resolver` from
+`pkix-dane-resolver` — requires rustc 1.89 while the workspace declares
+1.88. A consumer on the declared minimum could not build `pkix-chain`
+with `dane-resolver` enabled. Nobody developing here could have seen it,
+because current stable compiles it fine.
+
+- **`resolver = "3"`** (was `"2"`). Resolver 3 is MSRV-aware: it prefers
+  dependency versions compatible with `rust-version` instead of always
+  taking the newest. Resolver 2 ignores `rust-version` entirely, which is
+  how the violation arose. Re-resolving picked `uuid` 1.26 on its own,
+  annotating the newer release as requiring 1.89 — so a consumer
+  resolving fresh gets a working tree too, which a lockfile pin would not
+  have given them.
+
+- **`.github/workflows/quality-gates.yml`** — fmt, clippy, rustdoc,
+  typos, the test suite, the declared MSRV, and the `--depth 2` feature
+  matrix. Before this the only workflow was the differential-test
+  harness; every gate above was run by hand, by whoever remembered. The
+  MSRV job reads the version from `Cargo.toml` rather than naming one,
+  because the comment this bead was filed to correct was itself a
+  duplicated version number gone stale.
+
+- The lint job **pins its toolchain** rather than tracking stable.
+  Several crates opt into `clippy::pedantic`; with `-D warnings` and a
+  floating `stable`, a new pedantic lint would turn CI red every few Rust
+  releases for reasons unrelated to any change, which is how a gate gets
+  switched off. Two such findings arrived during this work and are fixed
+  below.
+
+### Fixed
+
+- `pkix-path`: `bmp_is_well_formed` uses `as_chunks::<2>()`. The
+  companion site in `any_to_str_bytes` keeps `chunks_exact` under an
+  `#[expect]` with a reason — the iterator is stored in
+  `DirStringBytes::Bmp`, so converting it would rewrite that variant's
+  field type and the `Iterator` impl that transcodes UCS-2 through it,
+  which is a real edit to DN-comparison code for a style preference.
+- `pkix-difftest`: `base64_encode` uses `as_chunks::<3>()`.
+- `pkix-chain` re-exports `pkix-dane-resolver` as `dane_resolver` under
+  the `dane-resolver` feature. It was previously an optional dependency
+  that no code referenced, so enabling the feature pulled the DNS stack
+  without giving the consumer access to it.
+
+
 ### Workspace: MSRV 1.88
 
 Raised from 1.87 for `hickory-resolver` 0.26, which `pkix-dane-resolver`

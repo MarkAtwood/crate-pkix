@@ -1,0 +1,223 @@
+# Quality gates for the whole workspace.
+#
+# Tracks PKIX-z2g4.
+#
+# Why this workflow exists
+#
+# Before it, the only CI was diff-harness.yml, which runs the differential
+# test harness and nothing else. fmt, clippy, rustdoc, typos, the test
+# suite, the feature matrix and the MSRV were all run by hand, by whoever
+# remembered. diff-harness.yml's own comment said "MSRV 1.73 enforcement is
+# a separate concern and would go in a sibling workflow" — this is that
+# sibling, and that comment was two MSRV bumps stale by the time it was
+# written here.
+#
+# The MSRV job is not hypothetical insurance. When it was first run against
+# the declared MSRV it failed: uuid 1.29 (via moka <- hickory-resolver <-
+# pkix-dane-resolver) requires rustc 1.89 while the workspace declared 1.88.
+# Nobody could have noticed locally, because a developer on current stable
+# compiles it fine. The fix was `resolver = "3"`, which is MSRV-aware and
+# picks a compatible uuid on its own; this job is what keeps it fixed.
+#
+# Scope decisions
+#
+# - The MSRV is READ FROM Cargo.toml, not written here. A duplicated version
+#   number is the same class of staleness as the comment this workflow was
+#   filed to correct.
+#
+# - `cargo check`, not `cargo build`, for the MSRV job. It only has to prove
+#   the workspace compiles on the declared minimum; the test job on stable
+#   proves it works.
+#
+# - `--locked` on the MSRV job. Dependency resolution is part of what is
+#   being checked, so the committed lockfile is the subject rather than an
+#   inconvenience to be refreshed away.
+#
+# - ubuntu-latest only. Nothing here is platform-sensitive: these are lint,
+#   doc and compile checks. Platform coverage for pkix-path belongs in its
+#   own workflow if it is ever wanted, same reasoning as diff-harness.yml.
+#
+# - The lint job pins its toolchain instead of tracking stable. pkix-path
+#   and others opt into `clippy::pedantic`, and new pedantic lints land every
+#   few Rust releases — with `-D warnings` and a floating `stable` the build
+#   would go red every six weeks for reasons unrelated to any change, which
+#   is how a gate gets switched off. Pinning makes lint results reproducible
+#   and the churn deliberate. Bump LINT_TOOLCHAIN on purpose, fix whatever
+#   the new clippy finds in the same change. Two findings arrived this way
+#   already: `clippy::chunks_exact_to_as_chunks` in pkix-path and
+#   pkix-difftest, flagged by a clippy newer than the one the code was
+#   written against.
+#
+#   The test, MSRV and feature jobs are not pinned: they compile rather than
+#   lint, so a new compiler breaking them is a signal worth having promptly.
+#
+# - typos and cargo-hack are installed from a release binary rather than
+#   built from source; building either from source costs more than every
+#   other job in this workflow combined.
+#
+# - The feature matrix uses `cargo hack --depth 2`, matching what the
+#   workspace has been checking by hand. Depth 2 rather than the full
+#   powerset because the powerset of this many features is not worth the
+#   runner minutes; depth 2 catches the overwhelming majority of real
+#   feature-combination breakage, which is two features interacting.
+
+name: quality-gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A lint run for a superseded commit is wasted minutes; these jobs are
+# deterministic and read-only.
+concurrency:
+  group: quality-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Pinned deliberately; see the scope note above. Not "stable".
+  LINT_TOOLCHAIN: "1.100"
+  # A warning that is not an error is a warning nobody fixes.
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  lint:
+    name: fmt, clippy, rustdoc, typos
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned lint toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.LINT_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        # --all-targets covers tests, examples and benches, where a lint
+        # regression is as unwelcome as in the library.
+        run: cargo clippy --workspace --all-targets --all-features
+
+      - name: cargo doc
+        # RUSTDOCFLAGS=-D warnings is set workflow-wide, so a broken intra-doc
+        # link fails here. --no-deps because a warning in a dependency's docs
+        # is not ours to fix.
+        run: cargo doc --workspace --all-features --no-deps
+
+      - name: Install typos
+        uses: taiki-e/install-action@v2
+        with:
+          tool: typos-cli
+
+      - name: typos
+        # The repository is not yet typos-clean as a whole, so this checks the
+        # crates that are. Remove the path list once the rest is cleaned up —
+        # tracked separately; a gate that is allowed to fail is not a gate.
+        run: |
+          typos \
+            pkix-dane \
+            pkix-dane-resolver \
+            pkix-dnssec-anchor \
+            pkix-aia-http \
+            pkix-chain
+
+  test:
+    name: test (stable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test
+        # --all-features so the DANE, serde, async and client features are
+        # exercised. Some tests reach the network and skip with a printed
+        # reason when it is unavailable; --nocapture keeps those reasons in
+        # the log, so a silent skip is visible rather than looking like a
+        # pass.
+        run: cargo test --workspace --all-features -- --nocapture
+
+  msrv:
+    name: MSRV (from Cargo.toml)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the declared MSRV
+        id: msrv
+        # Read rather than hardcode. The version lives in exactly one place
+        # and this job follows it; see the scope note at the top.
+        run: |
+          set -euo pipefail
+          version="$(
+            sed -n 's/^rust-version[[:space:]]*=[[:space:]]*"\([0-9.]*\)".*/\1/p' \
+              Cargo.toml | head -n 1
+          )"
+          if [ -z "$version" ]; then
+            echo "could not read rust-version from Cargo.toml" >&2
+            exit 1
+          fi
+          echo "declared MSRV: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install the declared MSRV toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check on the declared MSRV
+        # --locked because dependency resolution is part of what is being
+        # checked: the failure this job was written for was a transitive
+        # dependency that required a newer compiler than the workspace
+        # declares. RUSTFLAGS=-D warnings is deliberately NOT applied here —
+        # an older compiler emits warnings current stable does not, and
+        # failing on those would make the MSRV job a lint job for a compiler
+        # nobody develops on.
+        env:
+          RUSTFLAGS: ""
+        run: cargo check --workspace --all-features --locked
+
+  features:
+    name: feature combinations
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      - name: cargo hack check --depth 2
+        # Catches a crate that only compiles when two features happen to be
+        # on together — the classic being a cfg-gated item used from code
+        # behind a different feature. pkix-dane's std/serde pair and
+        # pkix-aia-http's async/client-reqwest-async pair are exactly this
+        # shape.
+        run: cargo hack check --workspace --feature-powerset --depth 2
