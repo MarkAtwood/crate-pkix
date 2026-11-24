@@ -2,18 +2,20 @@
   "id": "PKIX-rm8.57",
   "title": "revocation-http: no URI filtering for SSRF",
   "description": "pkix-revocation-http fetches whatever URIs appear in certificate CDP and AIA extensions (extract.rs). The crate's own rustdoc (lib.rs line 93-96) explicitly documents this as out-of-scope: 'No CDP / AIA URI filtering. This crate fetches whichever URI is in the certificate's CRLDistributionPoints or AuthorityInfoAccess extension. Restrictions on which hosts / schemes are acceptable for revocation fetches (e.g., enforcing HTTPS or blocking private-network URIs) are a deployment-policy decision and stay outside this crate.'\n\nWhat goes wrong (integrity/availability): A certificate with http://169.254.169.254/... or http://10.0.0.1/... in its AIA/CDP extensions could probe internal networks via SSRF when the library is used in a server-side context. The library correctly filters to http/https schemes only (no file://, ldap://, etc.) but does not filter by destination IP or hostname.\n\nThis is documented and intentional -- the delegation to the RevocationFetcher trait is the right architecture. But callers may not realize they need to implement host filtering in their RevocationFetcher. A 'Security Considerations' section in the crate rustdoc would help.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-revocation-http/src/lib.rs (documented at lines 93-96)",
+  "notes": "2026-11-24: independently reproduced while checking whether the IP-literal bypass found in pkix-aia-http (PKIX-j72x) also affected this crate. It does not -- there is no destination filter here to bypass -- and the same-origin redirect mitigation that makes the no-policy decision coherent is real and tested on both the ureq and reqwest paths, six tests, with the cross-origin cases asserting the internal server was never contacted. See PKIX-xbhc for that detail.\n\nNEW ARGUMENT FOR THIS BEAD'S RECOMMENDED FIX. This bead predates pkix-aia-http's own destination policy and its async family, both of which now exist. So the workspace currently ships two crates with OPPOSITE defaults for the same threat, both fetching URLs from a certificate whose signature has not been checked yet:\n\n- pkix-aia-http: default-deny non-public destinations, applied at DNS resolution time, with an opt-in escape hatch and a dedicated SSRF test suite\n- pkix-revocation-http: no destination policy at all, caller vets\n\nNeither is wrong on its own terms. But a consumer who learns AIA fetching is SSRF-safe by default may reasonably carry that assumption to revocation fetching, and nothing in either crate warns them. The Security Considerations section this bead asks for should therefore name the contrast with pkix-aia-http explicitly, not just describe this crate in isolation -- the inconsistency is the part a reader is most likely to get wrong.",
   "status": "open",
   "priority": 1,
   "issue_type": "bug",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T16:26:34Z",
-  "updated_at": "2026-06-15T17:07:35Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-24T22:06:10.511484813Z",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-rm8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T09:26:33Z"
+      "type": "",
+      "created_at": "2026-06-15T09:26:33Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
