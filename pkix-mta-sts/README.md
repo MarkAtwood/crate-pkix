@@ -94,9 +94,13 @@ client and a cache. They belong in an adapter, which does not exist yet.
 reporter needs — it is true for `testing` failures, which is the distinction
 that mode exists to create — but this crate emits no reports.
 
-**Policy caching.** §3.2's `max_age` and §5.1's control flow are a caching
-protocol; `is_live_at` is the predicate, and the storage is the caller's.
-Enable the `serde` feature to persist a parsed policy.
+**Persistent policy storage.** `PolicyStore` is the trait, and
+`InMemoryPolicyStore` (feature `std`) is a complete in-process
+implementation — it survives the life of the process, which covers a
+long-running MTA, but not a restart. Since MTA-STS's protection comes from
+holding a policy across the moment an attacker shows up, a process that
+restarts often wants something durable; implement the trait over whatever the
+deployment already has. Enable `serde` to persist a `CachedPolicy`.
 
 ## Known deviations from the grammar
 

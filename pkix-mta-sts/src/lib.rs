@@ -68,12 +68,28 @@
 
 extern crate alloc;
 
+// `#![no_std]` does not link std, so the `std` feature must ask for it
+// explicitly. Only `InMemoryPolicyStore` uses it; every rule in this crate
+// stays no_std.
+#[cfg(feature = "std")]
+extern crate std;
+
 pub mod discovery;
+pub mod store;
 
 pub use discovery::{
     plan, policy_host, policy_to_apply, policy_url, txt_name, CachedPolicy, DiscoveryPlan,
     StsTxtRecord, TxtError,
 };
+
+pub use store::{
+    in_backoff, newer_policy_published, note_failed_fetch, plan_with_store, record_fetched_policy,
+    DiscoveryConfig, PolicyStore,
+};
+
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+pub use store::InMemoryPolicyStore;
 
 use alloc::string::String;
 use alloc::vec::Vec;

@@ -56,13 +56,17 @@ following CNAMEs. A sender already has a resolver; this crate does not bring a
 second one. `pkix_mta_sts::txt_name` builds the name and
 `StsTxtRecord::select` applies §3.1's record selection to whatever comes back.
 
-**The cache.** `pkix_mta_sts::plan` and `policy_to_apply` hold the §3.3 and
-§5.1 rules, and the storage is the caller's — no filesystem, no OS dependency.
+**Persistent cache storage.** `pkix_mta_sts::PolicyStore` is the trait and
+`InMemoryPolicyStore` the in-process implementation; a durable one is the
+caller's, because the workspace depends on no filesystem or OS.
 
-Which matters more than it sounds: the cache *is* MTA-STS's security
-mechanism. First contact is trust-on-first-use, so everything the mechanism
-protects comes from having cached a policy before an attacker arrived. A
-fetcher without the cache rules is not a shortcut to MTA-STS.
+Use `fetch_and_record` rather than `fetch` when you have a store. Every fetch
+must be followed by one of two bookkeeping steps — store the policy, or
+record the failure for §3.3's backoff — and omitting the second **fails
+silently**: the sender keeps retrying a failing policy host on every delivery
+attempt, which is exactly the cascading failure against resource-constrained
+recipients §3.3 asks senders to avoid, and nothing looks broken from the
+sender's side.
 
 **Certificate validation is the HTTP client's.** Both backends validate
 against their configured Web PKI roots. A sender needing a specific trust

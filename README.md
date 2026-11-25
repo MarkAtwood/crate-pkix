@@ -233,9 +233,13 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
 - CRL Distribution Points fetching — caller supplies the CRL DER directly today
-- MTA-STS TXT lookup — `pkix-mta-sts-http` fetches the policy and
-  `pkix-mta-sts` holds the §3.1 record selection and the cache rules, but the
-  `_mta-sts` DNS query itself is the caller's; a sender already has a resolver
+- MTA-STS TXT lookup — everything else ships, including the policy cache
+  and §3.3's fetch backoff, but the `_mta-sts` DNS query itself is the
+  caller's; a sender already has a resolver, and §3.1 requires CNAME following
+- MTA-STS durable policy storage — `PolicyStore` is the trait and
+  `InMemoryPolicyStore` a complete in-process implementation; a store that
+  survives a restart is the caller's, since the workspace depends on no
+  filesystem
 - TLSRPT (RFC 8460) failure reporting — `PolicyOutcome::is_validation_failure`
   is the hook a reporter needs, but no reporter ships
 - Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
@@ -282,8 +286,8 @@ layer underneath. Here is what is shipping and what is next.
 - **DANE / TLSA** matching for all four usages, with a DNSSEC-validating
   resolver and SMTP-DANE delivery (RFC 7672) end to end (`pkix-dane`,
   `pkix-dane-resolver`, `pkix-chain`)
-- **MTA-STS** (RFC 8461) policy parsing, MX matching and the policy cache
-  rules (`pkix-mta-sts`, `no_std`), with HTTPS policy fetching
+- **MTA-STS** (RFC 8461) policy parsing, MX matching, the policy cache and
+  §3.3's fetch backoff (`pkix-mta-sts`, `no_std`), with HTTPS policy fetching
   (`pkix-mta-sts-http`) — the CA-rooted alternative to DANE for SMTP, which
   deploys where DNSSEC does not
 - **Destination policy for outbound fetches** — non-public addresses refused

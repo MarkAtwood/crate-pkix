@@ -21,6 +21,10 @@ default = []
 # rather than an afterthought.
 serde = ["dep:serde"]
 
+# `InMemoryPolicyStore`, a complete in-process `PolicyStore`. Needs std for
+# `RwLock` and `HashMap`; the trait and every rule stay no_std.
+std = []
+
 [dependencies]
 # RFC 8461 §4.1 requires MX matching "identical to the rules given in
 # [RFC6125], with the restriction that the wildcard character '*' may only be

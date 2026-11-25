@@ -33,6 +33,8 @@ reqwest = { workspace = true, optional = true }
 tokio   = { version = "1", default-features = false, features = ["net"], optional = true }
 
 [dev-dependencies]
+# InMemoryPolicyStore, to test fetch_and_record without storage.
+pkix-mta-sts = { workspace = true, features = ["std"] }
 tokio = { version = "1", default-features = false, features = ["macros", "rt", "net"] }
 
 [package.metadata.docs.rs]

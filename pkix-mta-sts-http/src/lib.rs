@@ -297,3 +297,91 @@ pub fn policy_request_url(policy_domain: &str) -> String {
 pub const fn well_known_path() -> &'static str {
     WELL_KNOWN_PATH
 }
+
+// ---------------------------------------------------------------------------
+// Fetch and record, in one call
+// ---------------------------------------------------------------------------
+
+/// Fetch a policy and record the outcome in `store`, whichever way it went.
+///
+/// Every fetch must be followed by one of two bookkeeping steps: store the
+/// policy, or record the failure for §3.3's backoff. Leaving that to the
+/// caller makes the second one easy to omit, and omitting it disables the
+/// backoff **silently** — the sender keeps retrying a failing policy host
+/// every delivery attempt, which is precisely the "cascading failures"
+/// against "resource-constrained recipients" that §3.3 asks senders to
+/// avoid. Nothing would look broken from the sender's side.
+///
+/// So this does both. `policy_id` is the id from the `_mta-sts` TXT record
+/// the fetch is for; it keys both the stored policy and the failure record,
+/// because §3.3's limit is per version id.
+///
+/// # Errors
+///
+/// Whatever [`PolicyFetcher::fetch`] reports, after recording it. §3.3 has a
+/// sender continue as though the domain has no MTA-STS policy unless a live
+/// cached one exists, which is [`pkix_mta_sts::policy_to_apply`].
+#[cfg(feature = "client-ureq")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-ureq")))]
+pub fn fetch_and_record<S>(
+    fetcher: &PolicyFetcher,
+    store: &S,
+    policy_domain: &str,
+    policy_id: &str,
+    now_unix: u64,
+) -> Result<pkix_mta_sts::StsPolicy, FetchError>
+where
+    S: pkix_mta_sts::PolicyStore + ?Sized,
+{
+    match fetcher.fetch(policy_domain) {
+        Ok(policy) => {
+            pkix_mta_sts::record_fetched_policy(
+                store,
+                policy_domain,
+                policy.clone(),
+                policy_id,
+                now_unix,
+            );
+            Ok(policy)
+        }
+        Err(e) => {
+            pkix_mta_sts::note_failed_fetch(store, policy_domain, policy_id, now_unix);
+            Err(e)
+        }
+    }
+}
+
+/// [`fetch_and_record`] for the asynchronous fetcher.
+///
+/// # Errors
+///
+/// As [`fetch_and_record`].
+#[cfg(feature = "client-reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client-reqwest")))]
+pub async fn fetch_and_record_async<S>(
+    fetcher: &AsyncPolicyFetcher,
+    store: &S,
+    policy_domain: &str,
+    policy_id: &str,
+    now_unix: u64,
+) -> Result<pkix_mta_sts::StsPolicy, FetchError>
+where
+    S: pkix_mta_sts::PolicyStore + ?Sized,
+{
+    match fetcher.fetch(policy_domain).await {
+        Ok(policy) => {
+            pkix_mta_sts::record_fetched_policy(
+                store,
+                policy_domain,
+                policy.clone(),
+                policy_id,
+                now_unix,
+            );
+            Ok(policy)
+        }
+        Err(e) => {
+            pkix_mta_sts::note_failed_fetch(store, policy_domain, policy_id, now_unix);
+            Err(e)
+        }
+    }
+}
