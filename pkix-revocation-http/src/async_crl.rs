@@ -42,19 +42,21 @@ where
             return Ok(());
         }
 
+        // Sampled once for the whole check, so every candidate URL in
+        // one check is judged against the same instant.
+        let now_unix = self.clock.now_unix();
+
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
             let req = FetchRequest::get(url);
             match self.fetcher.fetch(&req).await {
-                Ok(resp) => {
-                    match CrlChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
-                        Ok(checker) => return verdict(&checker),
-                        Err(e) => {
-                            failures.push(format!("{url}: CRL parse: {e}"));
-                            continue;
-                        }
+                Ok(resp) => match CrlChecker::new(&resp.bytes, now_unix, self.verifier.clone()) {
+                    Ok(checker) => return verdict(&checker),
+                    Err(e) => {
+                        failures.push(format!("{url}: CRL parse: {e}"));
+                        continue;
                     }
-                }
+                },
                 Err(e) => {
                     failures.push(format!("{url}: {e}"));
                     continue;

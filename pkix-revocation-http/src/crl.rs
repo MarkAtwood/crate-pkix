@@ -72,6 +72,10 @@ where
         // Step 3 — Try each URL in document order. Record per-URL
         // failures for the RevocationFetchFailed payload if every URL
         // fails to yield a constructible CrlChecker.
+        // Sampled once for the whole check, so every candidate URL in
+        // one check is judged against the same instant.
+        let now_unix = self.clock.now_unix();
+
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
             let req = FetchRequest::get(url);
@@ -84,7 +88,7 @@ where
                     // succeeds, the checker's verdict is
                     // returned IMMEDIATELY — see module docs for why we
                     // do not retry on e.g. CrlExpired.
-                    match CrlChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
+                    match CrlChecker::new(&resp.bytes, now_unix, self.verifier.clone()) {
                         Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: CRL parse: {e}"));

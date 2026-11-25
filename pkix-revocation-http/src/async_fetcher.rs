@@ -162,22 +162,56 @@ pub trait AsyncRevocationChecker: Send + Sync {
 pub struct AsyncHttpCrlFetcher<F, V> {
     pub(crate) fetcher: F,
     pub(crate) verifier: V,
-    pub(crate) now_unix: u64,
+    pub(crate) clock: crate::time::Clock,
 }
 
 #[cfg(feature = "crl")]
 impl<F, V> AsyncHttpCrlFetcher<F, V> {
-    /// Create a new `AsyncHttpCrlFetcher`.
+    /// Create a new `AsyncHttpCrlFetcher` pinned to one instant.
     ///
     /// - `fetcher`  — async HTTP transport implementation
     /// - `verifier` — signature verifier passed to each on-demand
     ///   [`pkix_revocation::CrlChecker`]
-    /// - `now_unix` — current time as seconds since the Unix epoch
+    /// - `now_unix` — the instant every check is judged against, as
+    ///   seconds since the Unix epoch
+    ///
+    /// # Lifetime of `now_unix`
+    ///
+    /// Fixed for the life of the fetcher, which matters more here than
+    /// on the sync side: an async fetcher is almost always built once
+    /// and shared by a server for the life of the process, so this
+    /// constructor would freeze freshness at startup. Use
+    /// [`with_system_clock`](Self::with_system_clock) unless the fixed
+    /// instant is what you want, as it is in tests.
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
         Self {
             fetcher,
             verifier,
-            now_unix,
+            clock: crate::time::Clock::Fixed(now_unix),
+        }
+    }
+
+    /// Create a new `AsyncHttpCrlFetcher` that reads the system clock
+    /// once per revocation check.
+    pub const fn with_system_clock(fetcher: F, verifier: V) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::System,
+        }
+    }
+
+    /// Create a new `AsyncHttpCrlFetcher` driven by a caller-supplied
+    /// clock. See [`crate::TimeSource`].
+    pub fn with_time_source(
+        fetcher: F,
+        verifier: V,
+        source: std::sync::Arc<dyn crate::TimeSource>,
+    ) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::Custom(source),
         }
     }
 }
@@ -195,27 +229,62 @@ impl<F, V> AsyncHttpCrlFetcher<F, V> {
 pub struct AsyncHttpOcspFetcher<F, V> {
     pub(crate) fetcher: F,
     pub(crate) verifier: V,
-    pub(crate) now_unix: u64,
+    pub(crate) clock: crate::time::Clock,
     pub(crate) hash_alg: OcspHashAlg,
 }
 
 #[cfg(feature = "ocsp")]
 impl<F, V> AsyncHttpOcspFetcher<F, V> {
-    /// Create a new `AsyncHttpOcspFetcher`.
+    /// Create a new `AsyncHttpOcspFetcher` pinned to one instant.
     ///
     /// - `fetcher`  — async HTTP transport implementation
     /// - `verifier` — signature verifier passed to each on-demand
     ///   [`pkix_revocation::OcspChecker`]
-    /// - `now_unix` — current time as seconds since the Unix epoch
+    /// - `now_unix` — the instant every check is judged against, as
+    ///   seconds since the Unix epoch
     ///
     /// The `CertID.hashAlgorithm` defaults to [`OcspHashAlg::Sha256`];
     /// override via [`AsyncHttpOcspFetcher::with_hash_alg`].
+    ///
+    /// # Lifetime of `now_unix`
+    ///
+    /// Fixed for the life of the fetcher; see
+    /// [`AsyncHttpCrlFetcher::new`] for why that is usually wrong for a
+    /// long-lived async fetcher.
     #[must_use]
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
         Self {
             fetcher,
             verifier,
-            now_unix,
+            clock: crate::time::Clock::Fixed(now_unix),
+            hash_alg: OcspHashAlg::Sha256,
+        }
+    }
+
+    /// Create a new `AsyncHttpOcspFetcher` that reads the system clock
+    /// once per revocation check.
+    #[must_use]
+    pub const fn with_system_clock(fetcher: F, verifier: V) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::System,
+            hash_alg: OcspHashAlg::Sha256,
+        }
+    }
+
+    /// Create a new `AsyncHttpOcspFetcher` driven by a caller-supplied
+    /// clock. See [`crate::TimeSource`].
+    #[must_use]
+    pub fn with_time_source(
+        fetcher: F,
+        verifier: V,
+        source: std::sync::Arc<dyn crate::TimeSource>,
+    ) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::Custom(source),
             hash_alg: OcspHashAlg::Sha256,
         }
     }

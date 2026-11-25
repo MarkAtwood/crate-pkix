@@ -1106,7 +1106,13 @@ where
         // A non-encodable Name shouldn't happen on a successfully-parsed
         // cert; if it does, fall back to "no cache hits possible".
         let issuer_dn_der = issuer_subject.to_der().ok();
-        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
+
+        // Sampled once for the whole check, not per URL: a clock read
+        // between two candidate distribution points could straddle a
+        // nextUpdate boundary and judge two CRLs in the same check
+        // against different instants.
+        let now_unix = self.inner.clock.now_unix();
+        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(now_unix);
 
         let mut failures: Vec<String> = Vec::with_capacity(urls.len());
         for url in &urls {
@@ -1120,11 +1126,7 @@ where
                 .and_then(|k| self.cache.get_crl(k))
                 .filter(|e| is_live(e.next_update(), now))
             {
-                match CrlChecker::new(
-                    cached.bytes(),
-                    self.inner.now_unix,
-                    self.inner.verifier.clone(),
-                ) {
+                match CrlChecker::new(cached.bytes(), now_unix, self.inner.verifier.clone()) {
                     Ok(checker) => {
                         let cached_verdict = verdict(&checker);
                         if is_determinative(&cached_verdict) {
@@ -1155,11 +1157,7 @@ where
                 Ok(resp) => {
                     // Step 4 — Try to build a CrlChecker. If parse fails,
                     // fall through to next URL exactly as HttpCrlFetcher does.
-                    match CrlChecker::new(
-                        &resp.bytes,
-                        self.inner.now_unix,
-                        self.inner.verifier.clone(),
-                    ) {
+                    match CrlChecker::new(&resp.bytes, now_unix, self.inner.verifier.clone()) {
                         Ok(checker) => {
                             let fetched_verdict = verdict(&checker);
                             // Cache only CRLs that produced a verified
@@ -1339,7 +1337,9 @@ where
         // perfectly good request body was in hand.
         let cert_serial = &req_bytes.cert_serial;
         let issuer_key_hash = &req_bytes.issuer_key_hash;
-        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
+        // Sampled once for the whole check; see the CRL twin.
+        let now_unix = self.inner.clock.now_unix();
+        let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(now_unix);
 
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
         for url in &aia.ocsp {
@@ -1354,11 +1354,7 @@ where
                 .get_ocsp(&key)
                 .filter(|e| is_live(e.next_update(), now))
             {
-                match OcspChecker::new(
-                    cached.bytes(),
-                    self.inner.now_unix,
-                    self.inner.verifier.clone(),
-                ) {
+                match OcspChecker::new(cached.bytes(), now_unix, self.inner.verifier.clone()) {
                     Ok(checker) => {
                         let cached_verdict = verdict(&checker);
                         if is_determinative(&cached_verdict) {
@@ -1378,24 +1374,22 @@ where
 
             let req = FetchRequest::post(url, &req_bytes.body, crate::OCSP_REQUEST_CT);
             match self.inner.fetcher.fetch(&req) {
-                Ok(resp) => match OcspChecker::new(
-                    &resp.bytes,
-                    self.inner.now_unix,
-                    self.inner.verifier.clone(),
-                ) {
-                    Ok(checker) => {
-                        let fetched_verdict = verdict(&checker);
-                        // Cache only verified responses; see type docs.
-                        if is_determinative(&fetched_verdict) {
-                            self.maybe_populate_cache(&resp, key);
+                Ok(resp) => {
+                    match OcspChecker::new(&resp.bytes, now_unix, self.inner.verifier.clone()) {
+                        Ok(checker) => {
+                            let fetched_verdict = verdict(&checker);
+                            // Cache only verified responses; see type docs.
+                            if is_determinative(&fetched_verdict) {
+                                self.maybe_populate_cache(&resp, key);
+                            }
+                            return fetched_verdict;
                         }
-                        return fetched_verdict;
+                        Err(e) => {
+                            failures.push(format!("{url}: OCSP parse: {e}"));
+                            continue;
+                        }
                     }
-                    Err(e) => {
-                        failures.push(format!("{url}: OCSP parse: {e}"));
-                        continue;
-                    }
-                },
+                }
                 Err(e) => {
                     failures.push(format!("{url}: {e}"));
                     continue;

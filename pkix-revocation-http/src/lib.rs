@@ -187,10 +187,15 @@ pub mod clients;
 #[cfg(feature = "crl")]
 mod crl;
 mod extract;
+// Gated for the same reason `cache` is: with no protocol feature there are
+// no fetchers to hold a clock, so `Clock` and its accessor are dead and
+// `-D warnings` rejects them.
 #[cfg(feature = "ocsp")]
 mod ocsp;
 #[cfg(feature = "ocsp")]
 mod ocsp_request;
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+mod time;
 
 // Async trait family (PKIX-a1yc.10). Gated on the `async` feature so the
 // default build profile is unchanged. Sub-impls reuse the per-protocol
@@ -225,6 +230,9 @@ pub use cache::{
     CachedCrl, CachedOcspResponse, CrlCacheKey, InMemoryCache, OcspCacheKey, RevocationCache,
 };
 pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "crl", feature = "ocsp"))))]
+pub use time::{SystemClock, TimeSource};
 
 /// `Content-Type` for an OCSP request body, per RFC 6960 §A.1.
 #[cfg(feature = "ocsp")]
@@ -403,7 +411,7 @@ impl std::error::Error for FetchError {
     }
 }
 
-/// Will implement [`pkix_revocation::RevocationChecker`] once fetching is wired up.
+/// [`pkix_revocation::RevocationChecker`] driven by HTTP CRL fetches.
 ///
 /// Reads `CRLDistributionPoints` from each certificate, fetches the
 /// CRL via the provided [`RevocationFetcher`], and delegates to
@@ -416,42 +424,87 @@ impl std::error::Error for FetchError {
 ///
 /// See [RFC 5280 §4.2.1.13](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.13).
 ///
-/// # Status
+/// # Choosing a constructor
 ///
-/// The struct holds its fields; the [`pkix_revocation::RevocationChecker`]
-/// impl lands with PKIX-a1yc.5.
+/// [`new`](Self::new) pins the fetcher to one instant and
+/// [`with_system_clock`](Self::with_system_clock) reads the clock per
+/// check. Pick the second for a fetcher that outlives a single
+/// validation; see [`new`](Self::new) for what the first one freezes.
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 #[derive(Clone, Debug)]
 pub struct HttpCrlFetcher<F, V> {
     pub(crate) fetcher: F,
     pub(crate) verifier: V,
-    pub(crate) now_unix: u64,
+    pub(crate) clock: crate::time::Clock,
 }
 
 #[cfg(feature = "crl")]
 impl<F, V> HttpCrlFetcher<F, V> {
-    /// Create a new `HttpCrlFetcher`.
+    /// Create a new `HttpCrlFetcher` pinned to one instant.
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `verifier`  — signature verifier passed to each on-demand
     ///   [`pkix_revocation::CrlChecker`]
-    /// - `now_unix`  — current time as seconds since the Unix epoch
+    /// - `now_unix`  — the instant every check is judged against, as
+    ///   seconds since the Unix epoch
+    ///
+    /// # Lifetime of `now_unix`
+    ///
+    /// `now_unix` is fixed for the life of the fetcher. That is correct
+    /// for a fetcher built per validation, and for reproducible tests,
+    /// but a fetcher built once and kept — the usual server shape —
+    /// will judge CRL freshness against this instant forever, accepting
+    /// CRLs that expired long ago. Use
+    /// [`with_system_clock`](Self::with_system_clock) for a long-lived
+    /// fetcher.
     ///
     /// The `SignatureVerifier` and `RevocationFetcher` trait bounds are
-    /// applied at the [`pkix_revocation::RevocationChecker`] impl site
-    /// (PKIX-a1yc.5), matching the bound-placement style of
+    /// applied at the [`pkix_revocation::RevocationChecker`] impl site,
+    /// matching the bound-placement style of
     /// [`pkix_revocation::CrlChecker`].
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
         Self {
             fetcher,
             verifier,
-            now_unix,
+            clock: crate::time::Clock::Fixed(now_unix),
+        }
+    }
+
+    /// Create a new `HttpCrlFetcher` that reads the system clock once
+    /// per revocation check.
+    ///
+    /// The right constructor for a fetcher held for the life of a
+    /// process. Each check asks the clock, so a CRL that expires while
+    /// the fetcher is alive is seen to expire.
+    pub const fn with_system_clock(fetcher: F, verifier: V) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::System,
+        }
+    }
+
+    /// Create a new `HttpCrlFetcher` driven by a caller-supplied clock.
+    ///
+    /// For a consumer that already owns a clock — one slewed to a
+    /// trusted time service, a coarse clock updated on a timer, or a
+    /// test clock advanced by hand. Consulted once per revocation
+    /// check; see [`TimeSource`].
+    pub fn with_time_source(
+        fetcher: F,
+        verifier: V,
+        source: std::sync::Arc<dyn TimeSource>,
+    ) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::Custom(source),
         }
     }
 }
 
-/// Will implement [`pkix_revocation::RevocationChecker`] once fetching is wired up.
+/// [`pkix_revocation::RevocationChecker`] driven by HTTP OCSP requests.
 ///
 /// Reads `AuthorityInfoAccess` from each certificate, sends a DER-encoded
 /// OCSP request via the provided [`RevocationFetcher`] (HTTP `POST` with
@@ -462,37 +515,78 @@ impl<F, V> HttpCrlFetcher<F, V> {
 /// See [RFC 5280 §4.2.2.1](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1)
 /// and [RFC 6960](https://www.rfc-editor.org/rfc/rfc6960).
 ///
-/// # Status
+/// # Choosing a constructor
 ///
-/// The struct holds its fields; the [`pkix_revocation::RevocationChecker`]
-/// impl lands with PKIX-a1yc.6.
+/// As [`HttpCrlFetcher`]: [`new`](Self::new) pins one instant,
+/// [`with_system_clock`](Self::with_system_clock) reads the clock per
+/// check.
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[derive(Clone, Debug)]
 pub struct HttpOcspFetcher<F, V> {
     pub(crate) fetcher: F,
     pub(crate) verifier: V,
-    pub(crate) now_unix: u64,
+    pub(crate) clock: crate::time::Clock,
     pub(crate) hash_alg: OcspHashAlg,
 }
 
 #[cfg(feature = "ocsp")]
 impl<F, V> HttpOcspFetcher<F, V> {
-    /// Create a new `HttpOcspFetcher`.
+    /// Create a new `HttpOcspFetcher` pinned to one instant.
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `verifier`  — signature verifier passed to each on-demand
     ///   [`pkix_revocation::OcspChecker`]
-    /// - `now_unix`  — current time as seconds since the Unix epoch
+    /// - `now_unix`  — the instant every check is judged against, as
+    ///   seconds since the Unix epoch
     ///
     /// The `CertID.hashAlgorithm` defaults to [`OcspHashAlg::Sha256`];
     /// override via [`HttpOcspFetcher::with_hash_alg`].
+    ///
+    /// # Lifetime of `now_unix`
+    ///
+    /// Fixed for the life of the fetcher; see
+    /// [`HttpCrlFetcher::new`] for why that matters and
+    /// [`with_system_clock`](Self::with_system_clock) for the
+    /// long-lived alternative.
     #[must_use]
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
         Self {
             fetcher,
             verifier,
-            now_unix,
+            clock: crate::time::Clock::Fixed(now_unix),
+            hash_alg: OcspHashAlg::Sha256,
+        }
+    }
+
+    /// Create a new `HttpOcspFetcher` that reads the system clock once
+    /// per revocation check.
+    ///
+    /// The right constructor for a fetcher held for the life of a
+    /// process.
+    #[must_use]
+    pub const fn with_system_clock(fetcher: F, verifier: V) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::System,
+            hash_alg: OcspHashAlg::Sha256,
+        }
+    }
+
+    /// Create a new `HttpOcspFetcher` driven by a caller-supplied clock.
+    ///
+    /// See [`TimeSource`].
+    #[must_use]
+    pub fn with_time_source(
+        fetcher: F,
+        verifier: V,
+        source: std::sync::Arc<dyn TimeSource>,
+    ) -> Self {
+        Self {
+            fetcher,
+            verifier,
+            clock: crate::time::Clock::Custom(source),
             hash_alg: OcspHashAlg::Sha256,
         }
     }

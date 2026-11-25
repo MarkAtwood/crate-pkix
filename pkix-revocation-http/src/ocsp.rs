@@ -80,6 +80,10 @@ where
         }
 
         // Step 3 — POST to each URL in document order.
+        // Sampled once for the whole check, so every candidate URL in
+        // one check is judged against the same instant.
+        let now_unix = self.clock.now_unix();
+
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
         for url in &aia.ocsp {
             let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
@@ -89,7 +93,7 @@ where
                     // OcspChecker; on parse failure, fall through to
                     // the next URL. On construction success the
                     // checker's verdict is returned immediately.
-                    match OcspChecker::new(&resp.bytes, self.now_unix, self.verifier.clone()) {
+                    match OcspChecker::new(&resp.bytes, now_unix, self.verifier.clone()) {
                         Ok(checker) => return verdict(&checker),
                         Err(e) => {
                             failures.push(format!("{url}: OCSP parse: {e}"));
