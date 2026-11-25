@@ -2,7 +2,7 @@
 
 Online CRL and OCSP fetching for `pkix-revocation`.
 
-**Status: implemented, unpublished.** CRL and OCSP fetching, a sync and an
+**Status: published, 0.2.0 on crates.io.** CRL and OCSP fetching, a sync and an
 async fetcher family, two reference HTTP clients (`ureq`, `reqwest`), and a
 pluggable cache, behind the feature flags described below.
 
