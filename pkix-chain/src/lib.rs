@@ -1093,11 +1093,26 @@ where
 /// Subject Alternative Name entry (`rfc822Name` or `otherName(SmtpUTF8Mailbox)`)
 /// matching `mailbox`.
 ///
-/// The signer-vs-recipient distinction is encoded in the caller-supplied
-/// [`Profile`]'s `ValidationPolicy`: signer profiles require KeyUsage
-/// `digitalSignature`, recipient profiles require `keyEncipherment`. The
-/// wrapper body is byte-identical to [`verify_smime_recipient`]; the
-/// distinct function name lets callers communicate intent at the call site.
+/// **The signer-vs-recipient distinction is not enforced.** This wrapper's
+/// body is byte-identical to [`verify_smime_recipient`]; the distinct name
+/// lets callers record intent at the call site and nothing more. Passing a
+/// recipient-only certificate here, or a signer-only certificate there,
+/// returns the same answer either way.
+///
+/// This paragraph used to say the distinction was "encoded in the
+/// caller-supplied `Profile`'s `ValidationPolicy`: signer profiles require
+/// KeyUsage `digitalSignature`, recipient profiles require
+/// `keyEncipherment`". No profile does that, and more to the point none
+/// could: [`pkix_path::ValidationPolicy`] has no field for a required leaf
+/// `KeyUsage`. Its `enforce_key_usage` governs `keyCertSign` on
+/// intermediates per RFC 5280 §6.1.4(n), and leaf key usage is not checked
+/// anywhere in `pkix-path`.
+///
+/// So a caller who needs RFC 8551 §4.4.2 key-usage separation must check
+/// the leaf's `KeyUsage` themselves after this returns. Note that the
+/// recipient side is not a single bit: RSA key transport needs
+/// `keyEncipherment` while ECDH needs `keyAgreement`, so a check that
+/// demands `keyEncipherment` alone rejects every ECDH recipient.
 ///
 /// # Arguments
 ///
@@ -1152,11 +1167,13 @@ where
 /// Verify a certificate chain for S/MIME recipient use.
 ///
 /// Identical mechanics to [`verify_smime_signer`]; see that function's
-/// rustdoc for arguments, ordering, and errors. The two wrappers differ
-/// only in name so callers can communicate signer-vs-recipient intent at
-/// the call site. The key-usage distinction (`digitalSignature` for signer,
-/// `keyEncipherment` for recipient) is encoded in the caller-supplied
-/// [`Profile`].
+/// rustdoc for arguments, ordering, and errors.
+///
+/// **The two wrappers differ only in name.** The bodies are
+/// byte-identical, and no key-usage distinction is applied — see
+/// [`verify_smime_signer`] for why `ValidationPolicy` cannot currently
+/// express one, and what a caller needing RFC 8551 §4.4.2 separation has
+/// to do instead.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_smime_recipient<V, P, R, A>(
     chain: &[Certificate],
