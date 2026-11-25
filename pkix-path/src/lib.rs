@@ -2,6 +2,27 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
+// Documentation links to `DefaultVerifier`, which needs at least one
+// signature backend enabled. With none of them the item does not exist,
+// so the link cannot resolve and `cargo doc` on a consumer's own
+// feature selection reports an error.
+//
+// Allowing the lint only where it cannot tell a gated item from a
+// mistake loses no signal: a mistyped link is broken with every feature
+// enabled too, and the all-features doc build is what the quality gate
+// runs under RUSTDOCFLAGS=-D warnings. Demoting the links to code spans
+// instead would cost every docs.rs reader a working link, to spare a
+// configuration nobody publishes documentation from.
+#![cfg_attr(
+    not(any(
+        feature = "p256",
+        feature = "p384",
+        feature = "p521",
+        feature = "rsa",
+        feature = "ed25519"
+    )),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 //! RFC 5280 X.509 certificate path validation — pure Rust, `no_std`.
 //!
 //! Implements certificate path building and validation per

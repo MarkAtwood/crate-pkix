@@ -1,6 +1,38 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
+// This crate's documentation is written for the whole crate, and most of
+// what it describes is behind a feature. The narrative below names
+// HttpCrlFetcher, the async trait family, the cache types and the
+// reference clients, all of which are gated; under a narrower feature
+// selection those items do not exist and the links to them cannot
+// resolve. `cargo doc --no-default-features` reported 33 such errors.
+//
+// The alternatives were both worse. Demoting the links to plain code
+// spans would cost every reader on docs.rs -- which builds with
+// all-features -- a working link, to spare a configuration nobody
+// publishes documentation from. Making the prose itself conditional
+// means rewriting about forty lines of `//!` into
+// `#![cfg_attr(feature = "...", doc = "...")]`, with the escaping that
+// implies, and leaves the crate docs painful to edit thereafter.
+//
+// So the lint is allowed only where it cannot distinguish a gated item
+// from a mistake, and stays denied where it can. That loses no signal: a
+// genuinely mistyped link is broken with every feature enabled too, and
+// the all-features doc build is what the quality gate runs under
+// RUSTDOCFLAGS=-D warnings.
+//
+// `async` is absent from the list deliberately -- `client-reqwest-async`
+// enables it, so requiring that one covers it.
+#![cfg_attr(
+    not(all(
+        feature = "crl",
+        feature = "ocsp",
+        feature = "client-ureq",
+        feature = "client-reqwest-async"
+    )),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 
 //! Online CRL and OCSP fetching for [`pkix_revocation`].
 //!
@@ -394,8 +426,9 @@ impl From<der::Error> for ExtractError {
 /// method indicates whether to perform a `GET` (for CRL fetches) or a
 /// `POST` carrying a DER-encoded OCSP request (per RFC 6960 §A.1).
 ///
-/// The trait is intentionally synchronous. An async analogue is tracked
-/// under PKIX-a1yc.10.
+/// The trait is intentionally synchronous, so that a consumer with no
+/// async runtime pays for none. [`AsyncRevocationFetcher`] is the async
+/// analogue, behind the `async` feature.
 pub trait RevocationFetcher {
     /// Issue an HTTP request and return the response.
     ///
