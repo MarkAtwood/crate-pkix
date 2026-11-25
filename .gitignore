@@ -29,3 +29,7 @@ __pycache__/
 # stores in the repo; durable insights belong in `bd remember` instead.
 # Listed here so accidental `git add .` does not commit it.
 /MINDSTATE.md
+
+# Personal Claude Code overrides (machine-specific paths, local permissions).
+# The team-wide config is .claude/settings.json, which is committed.
+.claude/settings.local.json
