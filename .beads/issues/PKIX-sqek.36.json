@@ -1,29 +1,25 @@
 {
-  "compaction_level": 0,
-  "content_hash": "fa2db6e4835ed8dede1adf8dd52ba32ba6ddca0311454f5d557147ef4ef99a66",
+  "id": "PKIX-sqek.36",
+  "title": "Trait bounds repeated on Verifier struct definition violate Rust API guideline C-STRUCT-BOUNDS",
+  "description": "pkix-chain/src/lib.rs:426 declares:\n\n```rust\npub struct Verifier\u003c'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher\u003e {\n    anchors: \u0026'a [TrustAnchor],\n    sig_verifier: \u0026'a V,\n    rev_checker: \u0026'a R,\n    policy: \u0026'a ValidationPolicy,\n    aia: \u0026'a A,\n}\n```\n\nThe trait bounds `V: SignatureVerifier`, `R: RevocationChecker`, `A: AiaFetcher` are then repeated verbatim on both impl blocks (lines 434-438, 459-462).\n\nThe Rust API Guidelines explicitly recommend against this pattern under [C-STRUCT-BOUNDS](https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bound):\n\n\u003e Generic type parameters of data structures should not be bound by traits unless the bound is required by the type definition itself.\n\nThe bounds on `Verifier` are required by the impl methods that call trait methods on the borrowed values, NOT by the struct itself — the struct could hold `\u0026V: ?Sized` for any `V` and still store it. Storing references to anchors/verifiers/policy does not require any of the trait bounds.\n\nThe idiomatic shape is:\n\n```rust\npub struct Verifier\u003c'a, V, R, A = NoAiaFetcher\u003e {\n    anchors: \u0026'a [TrustAnchor],\n    sig_verifier: \u0026'a V,\n    rev_checker: \u0026'a R,\n    policy: \u0026'a ValidationPolicy,\n    aia: \u0026'a A,\n}\n\nimpl\u003c'a, V, R, A\u003e Verifier\u003c'a, V, R, A\u003e\nwhere\n    V: SignatureVerifier,\n    R: RevocationChecker,\n    A: AiaFetcher,\n{\n    // ...methods that need the bounds...\n}\n```\n\nWhat goes wrong if it stays:\n\n1. **Constructor flexibility is artificially constrained.** A caller cannot construct a `Verifier` value at all without satisfying all three bounds, even though the verifier doesn't *use* the bounds until `verify_one` is called. With bounds on impls only, this restriction lifts to the call site where it belongs.\n\n2. **Maintenance burden.** When a new trait method is added to `SignatureVerifier` requiring an additional bound (e.g. `+ Send` for parallel `verify_batch`), the bound must be added in three places (struct + 2 impls) instead of one. Bound drift between the three sites is a real compile-time failure mode.\n\n3. **Reads as \"this struct fundamentally requires these traits\"** to the reader. It doesn't — only the methods do.\n\nThis is one of the most-cited Rust API guideline violations and the fix is mechanical.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T18:17:51Z",
   "created_by": "Mark Atwood",
-  "description": "pkix-chain/src/lib.rs:426 declares:\n\n```rust\npub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    sig_verifier: &'a V,\n    rev_checker: &'a R,\n    policy: &'a ValidationPolicy,\n    aia: &'a A,\n}\n```\n\nThe trait bounds `V: SignatureVerifier`, `R: RevocationChecker`, `A: AiaFetcher` are then repeated verbatim on both impl blocks (lines 434-438, 459-462).\n\nThe Rust API Guidelines explicitly recommend against this pattern under [C-STRUCT-BOUNDS](https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bound):\n\n> Generic type parameters of data structures should not be bound by traits unless the bound is required by the type definition itself.\n\nThe bounds on `Verifier` are required by the impl methods that call trait methods on the borrowed values, NOT by the struct itself \u2014 the struct could hold `&V: ?Sized` for any `V` and still store it. Storing references to anchors/verifiers/policy does not require any of the trait bounds.\n\nThe idiomatic shape is:\n\n```rust\npub struct Verifier<'a, V, R, A = NoAiaFetcher> {\n    anchors: &'a [TrustAnchor],\n    sig_verifier: &'a V,\n    rev_checker: &'a R,\n    policy: &'a ValidationPolicy,\n    aia: &'a A,\n}\n\nimpl<'a, V, R, A> Verifier<'a, V, R, A>\nwhere\n    V: SignatureVerifier,\n    R: RevocationChecker,\n    A: AiaFetcher,\n{\n    // ...methods that need the bounds...\n}\n```\n\nWhat goes wrong if it stays:\n\n1. **Constructor flexibility is artificially constrained.** A caller cannot construct a `Verifier` value at all without satisfying all three bounds, even though the verifier doesn't *use* the bounds until `verify_one` is called. With bounds on impls only, this restriction lifts to the call site where it belongs.\n\n2. **Maintenance burden.** When a new trait method is added to `SignatureVerifier` requiring an additional bound (e.g. `+ Send` for parallel `verify_batch`), the bound must be added in three places (struct + 2 impls) instead of one. Bound drift between the three sites is a real compile-time failure mode.\n\n3. **Reads as \"this struct fundamentally requires these traits\"** to the reader. It doesn't \u2014 only the methods do.\n\nThis is one of the most-cited Rust API guideline violations and the fix is mechanical.",
-  "ephemeral": 0,
-  "id": "PKIX-sqek.36",
-  "is_template": 0,
-  "issue_type": "task",
+  "updated_at": "2026-11-25T20:47:41.411246172Z",
+  "closed_at": "2026-11-25T20:47:41.411246172Z",
+  "close_reason": "Fixed. Verifier is now declared as pub struct Verifier\u003c'a, V, R, A = NoAiaFetcher\u003e.\n\nThe bead was correct and the case is the textbook one for C-STRUCT-BOUNDS: every field is a shared reference (\u0026'a V, \u0026'a R, \u0026'a A, \u0026'a [TrustAnchor], \u0026'a ValidationPolicy) plus a Copy AiaConfig, so none of the three traits affects the data representation. Both inherent impls already declared the bounds in their own where clauses, so nothing moved -- the struct-level copies were pure duplication.\n\nNot a breaking change: relaxing a bound only widens what can be named, and callers could never have constructed a non-conforming Verifier anyway since new() requires the traits.\n\nClone, Copy and Debug dropped the bounds entirely rather than restating them. None needed them: Debug prints the anchor count, policy and config, and copying a bundle of shared references is free whatever they point at.\n\nSide benefit worth noting: this made the existing compile-time assertion strictly stronger. It previously instantiated Verifier over a type implementing the three traits and nothing else -- the most the struct bounds permitted -- and now uses a type implementing NOTHING. One assertion now guards both properties: reinstating a struct bound fails to compile, and replacing the hand-written Clone/Copy with a #[derive] fails too (a derive would add V: Copy bounds the struct does not need, holding \u0026V rather than V).\n\nVerified by mutation: reinstating V: SignatureVerifier on the struct fails the build at the Clone impl with \"the trait bound `V: SignatureVerifier` is not satisfied\".\n\nAlso removed the capability traits from _verifier_is_send_sync, which only ever needed Sync (\u0026T is Send exactly when T is Sync).\n\nRelated and still open: PKIX-sqek.19, on whether the three named generics should become a single trust-domain seam. That is an API-shape question and is untouched here -- this change only removes redundancy, it does not alter the parameter list.\n\nGates green: fmt, clippy, rustdoc, 2345 tests.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 1,
-  "status": "open",
-  "timeout_ns": 0,
-  "title": "Trait bounds repeated on Verifier struct definition violate Rust API guideline C-STRUCT-BOUNDS",
-  "updated_at": "2026-05-14T18:17:51Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-sqek",
+      "type": "parent-child",
       "created_at": "2026-05-14T11:17:51Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-sqek",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }

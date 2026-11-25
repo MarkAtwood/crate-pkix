@@ -523,6 +523,21 @@ def main():
     )
     write_der("host-exact-foo.der", leaf_host_exact)
 
+    # Same SAN as host-exact-foo, but EKU codeSigning instead of serverAuth.
+    #
+    # This exists so a rejection can be attributed to the EKU alone. The SAN
+    # requirement is satisfied and the dNSName matches the target, so the
+    # only thing a serverAuth-requiring profile can object to is the EKU.
+    # Reusing a non-serverAuth fixture without a SAN would not do: it fails
+    # the SAN check first, which proves nothing about EKU enforcement.
+    leaf_host_codesigning_eku = build_leaf(
+        root_key, root_cert,
+        sans=[x509.DNSName("foo.example.com")],
+        serial=103,
+        eku=[x509.ExtendedKeyUsageOID.CODE_SIGNING],
+    )
+    write_der("host-exact-foo-codesigning-eku.der", leaf_host_codesigning_eku)
+
     # RFC 6125 §6.4.2 leftmost wildcard: SAN DNS=*.example.com.
     leaf_host_wildcard = build_leaf(
         root_key, root_cert,

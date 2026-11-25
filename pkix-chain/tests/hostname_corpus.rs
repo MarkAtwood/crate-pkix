@@ -413,6 +413,68 @@ fn basictls_profile_exact_match() {
     );
 }
 
+/// The negative half: a matching DNS SAN is not enough without
+/// `id-kp-serverAuth`.
+///
+/// `basictls_profile_exact_match` above is positive-only, so it would pass
+/// just as well if the EKU requirement were not enforced at all — the
+/// fixture satisfies every check, so nothing distinguishes "the profile was
+/// applied" from "the profile was ignored". This case supplies the
+/// distinction.
+///
+/// The fixture is deliberately `host-exact-foo-codesigning-eku.der`: same
+/// SAN as `host-exact-foo.der` and the same target name, so the SAN
+/// requirement is met and identity binding succeeds, and EKU codeSigning
+/// instead of serverAuth. The rejection is therefore attributable to the
+/// EKU alone. The other non-serverAuth fixtures (`leaf-codesigning.der`,
+/// `leaf-timestamping.der`, `leaf-ocsp-responder.der`) carry no SAN at all,
+/// so they fail the SAN check first and would prove nothing here.
+///
+/// The corpus itself runs under `Rfc5280Profile`, which enforces no EKU, so
+/// without this pair nothing in the suite confirmed that
+/// `verify_tls_server` composes EKU enforcement with SAN matching.
+#[test]
+fn basictls_profile_rejects_a_matching_san_without_serverauth() {
+    let leaf = load_fixture("host-exact-foo-codesigning-eku.der");
+    let chain = [leaf];
+    let name = ServerName::dns_name("foo.example.com").unwrap();
+    let anchors = anchors();
+
+    // Control: under Rfc5280Profile, which requires no EKU, this very
+    // certificate and target validate. So the rejection below is the
+    // profile's doing and not a defect in the fixture.
+    let permissive = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &Rfc5280Profile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    );
+    assert!(
+        permissive.is_ok(),
+        "the fixture must be valid under a profile that requires no EKU; got {permissive:?}"
+    );
+
+    let result = verify_tls_server(
+        &chain,
+        &anchors,
+        &name,
+        &BasicTlsProfile,
+        NOW,
+        &DefaultVerifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    );
+    assert!(
+        result.is_err(),
+        "BasicTlsProfile requires id-kp-serverAuth; a codeSigning leaf with a \
+         matching DNS SAN must still be rejected, but it was accepted"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // ServerName::dns_name parser — bead-listed edge cases that the
 // constructor rejects before the wrapper is ever invoked.
