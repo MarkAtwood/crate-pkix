@@ -127,6 +127,81 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### SMTP DANE: the entry point
+
+`pkix_chain::verify_smtp_server_dane` completes RFC 7672 support: it takes a
+`DeliveryTarget` from discovery plus the chain the server presented, and
+reports what DANE concluded.
+
+**It reports; it does not decide.** Every outcome is `Ok`, including
+authentication failure, and there is no failure-policy parameter. An MTA has
+to be able to tag a message, route it to a different queue, defer it, bounce
+it or deliver it anyway on the strength of a DANE failure — and it cannot do
+any of that if the failure is indistinguishable from a malformed call. So the
+verdict is an input to the MTA's decision rather than a substitute for it.
+
+`SmtpDaneVerdict` has three cases, and the distinction between the last two
+is the point of the type:
+
+| Verdict | Meaning |
+|---|---|
+| `Authenticated` | the server proved it holds a key the domain published |
+| `NotApplicable` | the domain published nothing usable; DANE had nothing to say |
+| `Failed` | the domain published usable records and the server did **not** match |
+
+`NotApplicable` is an ordinary pre-DANE connection. `Failed` means the server
+presented a certificate the domain's own DNS contradicts. Collapsing them
+would let a log claim an authenticated channel for a cleartext delivery, or
+treat active interception as a quiet absence of DANE.
+
+`rfc7672_permits_delivery()` is §3.2's MUST NOT as a predicate — false only
+for `Failed` — so a conforming MTA is one line away and a non-conforming one
+has to visibly ignore it. `is_authenticated()` is the narrower question, true
+only for `Authenticated`, because the two are different and a log line needs
+the second.
+
+The documentation states why the RFC forbids delivering on failure, since
+that is the thing worth knowing before overriding it: a DANE failure where
+usable secure records exist means either the server is misconfigured **or the
+connection is being intercepted**, and the sending client cannot tell which.
+It also notes that delivering-with-the-failure-recorded is coherent for
+deployments the RFC was not written for — a staged rollout measuring DANE
+before enforcing it, in the manner of DMARC `p=none`.
+
+`SmtpDaneFailure` separates four operational problems rather than collapsing
+them, because an MTA reporting to a postmaster wants to say which: no record
+matched, the chain did not reach the anchor the record names, the chain
+matched but failed the §3.2.2 name check, or the domain published only PKIX
+usages.
+
+- **No trust-store parameter.** DANE-EE(3) validates no path; DANE-TA(2)
+  validates to the anchor its own record supplies and to that anchor *alone*,
+  since merging it with a caller's store would implement "DANE-TA or any CA",
+  weaker than either; and PKIX-TA(0)/PKIX-EE(1), the usages that would consult
+  a store, are unusable here per §3.1.3. No path reads caller anchors, so the
+  signature does not accept them.
+
+- **§6 completed in discovery.** "With mandatory DANE TLS, when no usable TLSA
+  records are found, message delivery is delayed." Previously `mandatory` was
+  enforced only at the MX step; a server that published nothing usable was
+  still offered for unauthenticated delivery, which defeated the policy. Now a
+  host without usable records is passed over, the next in preference order is
+  tried, and only when none has any is delivery delayed — with
+  `MandatoryDaneWithoutUsableTlsa` distinguishing it from the insecure-MX case,
+  since the remedies differ.
+
+### Finding: a Web PKI profile rejects RFC 7672's intended deployments
+
+`BasicTlsProfile` sets `require_subject_alt_name`, correctly for the Web PKI.
+RFC 7672 §3.2.3 consults the `commonName` precisely because MTA certificates
+often carry their name only there — so that profile rejects those
+certificates during **path validation**, before any name check runs, and the
+symptom is the unhelpful `Failed(PathValidationFailed(Path(MissingSan)))`.
+
+Documented on the function, affecting DANE-TA(2) only. The workspace ships no
+SMTP profile yet; filed separately, because a caller reaching for the obvious
+profile gets a silent incompatibility.
+
 ### SMTP DANE (RFC 7672 §2.1, §2.2): the MX lookup
 
 `pkix_dane::smtp_lookup` — discovery as a sans-IO state machine, behind the

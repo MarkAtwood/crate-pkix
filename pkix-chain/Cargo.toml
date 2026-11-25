@@ -23,7 +23,12 @@ categories  = ["cryptography"]
 # are untouched and, importantly, need no --no-default-features to stay
 # that way.
 default     = ["pkix-path/default", "dane"]
-dane        = ["dep:pkix-dane"]
+# `pkix-dane/smtp` comes with it: the RFC 7672 name checks and discovery
+# live there, and pkix-chain already depends on pkix-identity for
+# ServerName, so this adds no dependency. RFC 7672's CN-ID fallback stays
+# behind its own function in pkix-identity, so nothing acquires it by
+# enabling this.
+dane        = ["dep:pkix-dane", "pkix-dane/smtp"]
 dane-resolver = ["dane", "dep:pkix-dane-resolver"]
 rustcrypto  = ["pkix-path/rustcrypto"]
 crl         = ["pkix-revocation/crl"]

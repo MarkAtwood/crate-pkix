@@ -159,7 +159,15 @@ pub mod dane;
 
 #[cfg(feature = "dane")]
 #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
+pub mod smtp;
+
+#[cfg(feature = "dane")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
 pub use dane::{verify_tls_server_dane, DaneConfig, DaneFailurePolicy, TlsAuthorization};
+
+#[cfg(feature = "dane")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
+pub use smtp::{verify_smtp_server_dane, SmtpDaneFailure, SmtpDaneVerdict};
 
 /// DNSSEC-validating TLSA resolution, re-exported under the
 /// `dane-resolver` feature.
