@@ -212,6 +212,30 @@ impl PartialEq for DerError {
 }
 impl Eq for DerError {}
 
+/// Hashes `message`, the one field [`PartialEq`] compares.
+///
+/// That correspondence is the whole argument for correctness: `Hash`
+/// requires that equal values hash equally, and since equality here is
+/// defined solely by `message`, hashing solely `message` cannot violate
+/// it. Hashing `inner` as well would break the contract, because
+/// `inner` is dropped on a serde round-trip while equality is preserved
+/// — two equal values would then hash differently.
+///
+/// Written out rather than derived for that reason: a derive would
+/// include `inner`.
+///
+/// This exists so [`Error`] can derive `Hash`. `Der(DerError)` was the
+/// only variant standing in the way, which in turn is why
+/// `pkix_path_builder::Error::NoValidPath` stores its inner error as a
+/// rendered `String` — the builder's own enum derives `Hash` and could
+/// not hold a non-`Hash` field. That storage choice is now a semver
+/// question rather than a technical obstacle.
+impl core::hash::Hash for DerError {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.message.hash(state);
+    }
+}
+
 // Internal: use a Box<str> so the struct is `Clone` cheaply and we keep
 // the heap allocation small. A type alias keeps the `#[cfg(not(feature
 // = "std"))]` use-statements in the rest of the file unchanged. Defined
@@ -307,7 +331,7 @@ const _: () = {
 };
 
 /// Errors returned by path validation.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum Error {

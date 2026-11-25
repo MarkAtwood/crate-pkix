@@ -168,6 +168,42 @@ fn error_der_round_trips_preserving_display() {
     assert_eq!(format!("{back}"), original_display);
 }
 
+/// `Hash` agrees with `Eq` across the serde round trip.
+///
+/// `Error` derives `Hash`, which requires that equal values hash equally.
+/// The test above establishes that a `Der(DerError)` and its deserialized
+/// copy *are* equal, and the round trip drops `DerError::inner` — it cannot
+/// be reconstructed from the rendered message. So the two sides differ in
+/// `inner` while comparing equal, and anything that hashes `inner` breaks
+/// the contract.
+///
+/// That is why `DerError`'s `Hash` is written by hand over `message` alone,
+/// matching its hand-written `PartialEq`. A `#[derive(Hash)]` on `DerError`
+/// would include `inner` and fail here: `Some(der::Error)` on one side,
+/// `None` on the other.
+#[test]
+fn error_der_hash_agrees_with_eq_across_the_round_trip() {
+    use std::hash::{Hash as _, Hasher as _};
+
+    fn hash_of(e: &Error) -> u64 {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        e.hash(&mut h);
+        h.finish()
+    }
+
+    let synthetic: Error = der::Error::new(der::ErrorKind::Failed, der::Length::ZERO).into();
+    let json = serde_json::to_string(&synthetic).expect("error serializes");
+    let back: Error = serde_json::from_str(&json).expect("error deserializes");
+
+    assert_eq!(synthetic, back, "precondition: the round trip preserves Eq");
+    assert_eq!(
+        hash_of(&synthetic),
+        hash_of(&back),
+        "equal values must hash equally; hashing DerError::inner would break this \
+         because deserialize cannot reconstruct it"
+    );
+}
+
 /// Unit-variant `Error` round-trips. Sanity check that the most common
 /// error shape (no payload, or `{ index: usize }`) serializes cleanly.
 #[test]
