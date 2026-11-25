@@ -1489,6 +1489,102 @@ fn general_names_intersect(
 /// if no DP passes (1), or
 /// [`CrlIdpDistributionPointMismatch`](crate::OutOfScopeReason::CrlIdpDistributionPointMismatch)
 /// if some DP passes (1) but none passes (2).
+/// Whether `crl_der` is a CRL that `cert`'s distribution points name.
+///
+/// This is RFC 5280 §6.3.3(b) **selection**: given a certificate and a
+/// candidate CRL, does the certificate's `cRLDistributionPoints` extension
+/// point at this CRL? It is the question a caller must answer before checking
+/// revocation status, and the question that distinguishes "the right CRL said
+/// nothing about this certificate" from "some CRL said nothing".
+///
+/// # The rules
+///
+/// A CRL applies when both hold:
+///
+/// 1. **Issuer.** For a direct CRL, the certificate's issuer is the CRL's
+///    issuer (RFC 5280 §6.3.3(b)(1)). For an indirect CRL — one whose
+///    `IssuingDistributionPoint` sets `indirectCRL` — the issuer may differ,
+///    and instead one of a distribution point's `cRLIssuer` `directoryName`s
+///    must equal the CRL issuer.
+/// 2. **Name**, only when the CRL's IDP names a distribution point. The
+///    certificate's `distributionPoint` names — or, where that field is
+///    absent, its `cRLIssuer` names — must intersect the IDP's.
+///    `nameRelativeToCRLIssuer` is resolved against the CRL issuer on both
+///    sides.
+///
+/// | cert `cRLDistributionPoints` | outcome |
+/// |---|---|
+/// | absent  | rule 1 only; rule 2 cannot be satisfied, so an IDP that names a distribution point excludes the CRL |
+/// | present | at least one distribution point must satisfy both rules |
+///
+/// Certificates without the extension are not an edge case — the whole NIST
+/// PKITS corpus is built that way, supplying CRLs out of band — so rule 1
+/// carries the weight there.
+///
+/// This shares its implementation with `check_revocation`: both are entry
+/// points onto one predicate, not two copies of it.
+///
+/// # Why this is public
+///
+/// Anything choosing *which* CRL to fetch, cache or apply needs it, and a
+/// second implementation would be a divergence hazard on security-relevant
+/// matching — the DP rules cover indirect CRLs and `nameRelativeToCRLIssuer`
+/// resolution, which are not obvious to restate correctly.
+///
+/// A differential test harness is the motivating caller: feeding every CRL to
+/// every certificate and accepting whichever combination validates is not
+/// RFC 5280's procedure, and it cannot distinguish a chain with no applicable
+/// CRL from one whose CRL happens to be signed by somebody in the bundle.
+///
+/// # What this does NOT do
+///
+/// Selection only. It does not verify the CRL's signature, check its
+/// validity window, apply `onlyContainsUserCerts` / `onlyContainsCACerts` /
+/// `onlySomeReasons` scope flags, or look the certificate up in the revoked
+/// list. `Ok(())` means "this CRL is addressed to this certificate", nothing
+/// more; use [`CrlChecker`] for the rest.
+///
+/// # Errors
+///
+/// - [`Error::CrlParseError`] if `crl_der` is not a decodable
+///   `CertificateList`, or the certificate's `cRLDistributionPoints` is
+///   present but malformed.
+/// - [`Error::OutOfScope`] with
+///   [`CrlDistributionPointIssuerMismatch`](crate::OutOfScopeReason::CrlDistributionPointIssuerMismatch)
+///   when no distribution point names this CRL's issuer, or
+///   [`CrlIdpDistributionPointMismatch`](crate::OutOfScopeReason::CrlIdpDistributionPointMismatch)
+///   when one does but the names do not intersect the CRL's
+///   `IssuingDistributionPoint`.
+///
+/// - [`Error::CrlIssuerMismatch`] when a direct CRL's issuer is not the
+///   certificate's issuer.
+pub fn crl_applies_to(cert: &Certificate, crl_der: &[u8]) -> crate::Result<()> {
+    let crl = CertificateList::from_der(crl_der)
+        .map_err(|e| Error::CrlParseError(crate::DerError::new(e)))?;
+    let idp = parse_issuing_dp(&crl)?;
+    let crl_issuer = &crl.tbs_cert_list.issuer;
+
+    // RFC 5280 §6.3.3(b)(1): for a DIRECT CRL the certificate's issuer must be
+    // the CRL's issuer. Only an indirect CRL may come from elsewhere, and only
+    // then because a distribution point named it — which check_dp_scope
+    // verifies below.
+    //
+    // This check is here rather than left to check_dp_scope because that
+    // function covers the distribution-point half of §6.3.3(b) alone, and a
+    // certificate with no cRLDistributionPoints extension passes it almost
+    // unconditionally. Certificates without that extension are not an edge
+    // case: the whole NIST PKITS corpus is built that way, supplying CRLs out
+    // of band. Without the issuer constraint this predicate would accept any
+    // validly-formed CRL for such a certificate, which is the opposite of
+    // what a caller asking "does this CRL apply" needs.
+    let indirect = idp.as_ref().is_some_and(|i| i.indirect_crl);
+    if !indirect && !names_match(crl_issuer, cert.tbs_certificate().issuer()) {
+        return Err(Error::CrlIssuerMismatch);
+    }
+
+    check_dp_scope(cert, idp.as_ref(), crl_issuer)
+}
+
 fn check_dp_scope(
     cert: &Certificate,
     idp: Option<&x509_cert::ext::pkix::crl::IssuingDistributionPoint>,
