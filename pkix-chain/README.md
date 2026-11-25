@@ -32,7 +32,7 @@ let result = verify_chain_default(&chain, &anchors, &policy, &NoRevocation)?;
 ```rust
 use pkix_chain::{verify_chain_default, CrlChecker, DefaultVerifier};
 
-let checker = CrlChecker::new(crl_der, unix_now(), DefaultVerifier);
+let checker = CrlChecker::new(crl_der, unix_now(), DefaultVerifier)?;
 let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
 ```
 
@@ -50,7 +50,7 @@ let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
 ```rust
 use pkix_chain::{verify_chain_default, OcspChecker, DefaultVerifier};
 
-let checker = OcspChecker::new(ocsp_response_der, unix_now(), DefaultVerifier);
+let checker = OcspChecker::new(ocsp_response_der, unix_now(), DefaultVerifier)?;
 let result = verify_chain_default(&chain, &anchors, &policy, &checker)?;
 ```
 
@@ -71,7 +71,7 @@ in a single call. The caller pre-parses the target hostname with
 [`Profile`] that supplies the `ValidationPolicy`.
 
 ```rust
-use pkix_chain::{verify_tls_server, NoRevocation, ServerName};
+use pkix_chain::{verify_tls_server, DefaultVerifier, NoAiaFetcher, NoRevocation, ServerName};
 use pkix_profiles::BasicTlsProfile;
 
 let name = ServerName::dns_name("www.example.com")?;
@@ -81,7 +81,9 @@ let result = verify_tls_server(
     &name,
     &BasicTlsProfile,
     unix_now(),
+    &DefaultVerifier,
     &NoRevocation,
+    &NoAiaFetcher,
 )?;
 ```
 
@@ -101,7 +103,9 @@ discipline at the call site rather than introducing an `Identity` enum
 (PKIX-fmtv.11.2.1).
 
 ```rust
-use pkix_chain::{verify_tls_client_dns, NoRevocation, ServerName};
+use pkix_chain::{
+    verify_tls_client_dns, DefaultVerifier, NoAiaFetcher, NoRevocation, ServerName,
+};
 use pkix_profiles::Rfc5280Profile;
 
 let name = ServerName::dns_name("client.example.com")?;
@@ -111,7 +115,9 @@ let result = verify_tls_client_dns(
     Some(&name),
     &Rfc5280Profile,
     unix_now(),
+    &DefaultVerifier,
     &NoRevocation,
+    &NoAiaFetcher,
 )?;
 ```
 
@@ -127,7 +133,9 @@ the signer-vs-recipient distinction is encoded in the caller-supplied
 `Profile`'s KeyUsage requirement (`digitalSignature` vs `keyEncipherment`).
 
 ```rust
-use pkix_chain::{verify_smime_signer, MailboxName, NoRevocation};
+use pkix_chain::{
+    verify_smime_signer, DefaultVerifier, MailboxName, NoAiaFetcher, NoRevocation,
+};
 use pkix_profiles::BasicSmimeProfile;
 
 let mailbox = MailboxName::parse("alice@example.com")?;
@@ -137,7 +145,9 @@ let result = verify_smime_signer(
     &mailbox,
     &BasicSmimeProfile,
     unix_now(),
+    &DefaultVerifier,
     &NoRevocation,
+    &NoAiaFetcher,
 )?;
 ```
 
@@ -149,7 +159,7 @@ carry no caller-supplied identity target (no hostname, no mailbox), so
 the wrapper does not perform identity binding.
 
 ```rust
-use pkix_chain::{verify_code_signer, NoRevocation};
+use pkix_chain::{verify_code_signer, DefaultVerifier, NoAiaFetcher, NoRevocation};
 use pkix_profiles::BasicCodeSigningProfile;
 
 let result = verify_code_signer(
@@ -157,7 +167,9 @@ let result = verify_code_signer(
     &anchors,
     &BasicCodeSigningProfile,
     unix_now(),
+    &DefaultVerifier,
     &NoRevocation,
+    &NoAiaFetcher,
 )?;
 ```
 
@@ -168,7 +180,7 @@ post-validation rule: the TSA leaf's `ExtendedKeyUsage` extension must
 be marked critical and contain only `id-kp-timeStamping`.
 
 ```rust
-use pkix_chain::{verify_time_stamper, NoRevocation};
+use pkix_chain::{verify_time_stamper, DefaultVerifier, NoAiaFetcher, NoRevocation};
 use pkix_profiles::BasicTimeStampingProfile;
 
 let result = verify_time_stamper(
@@ -176,7 +188,9 @@ let result = verify_time_stamper(
     &anchors,
     &BasicTimeStampingProfile,
     unix_now(),
+    &DefaultVerifier,
     &NoRevocation,
+    &NoAiaFetcher,
 )?;
 ```
 
