@@ -1053,6 +1053,16 @@ where
         // returns on the first determinative verdict, so this only bites
         // when they are failing -- which is exactly the case where an
         // uncapped walk costs (URLs listed) x (per-request timeout).
+        //
+        // Note the cap truncates before the cache lookup, not just before
+        // the fetch, so a cached entry for a URL past the cap is not
+        // consulted. That is sound because an entry can only be here if
+        // this wrapper fetched it, and that fetch was itself inside the
+        // cap at the same position. The one way it costs anything: if a
+        // CA reorders its distribution points between certificates, an
+        // entry cached when a URL sat inside the cap becomes unreachable
+        // once it sits outside, and that URL is refetched. A wasted
+        // request, not a wrong answer.
         let budget = self.inner.max_urls;
         let attempted = urls.len().min(budget);
         let mut failures: Vec<String> = Vec::with_capacity(attempted);
