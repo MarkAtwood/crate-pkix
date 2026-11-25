@@ -635,3 +635,61 @@ fn review_aia_max_depth_counts_hops_resolved() {
         );
     }
 }
+
+/// With no fetcher to recover from it, a wrong-key intermediate that
+/// completes the topology is reported as the path builder's own
+/// `NoValidPath`, carrying the typed signature failure.
+///
+/// This is the terminal half of
+/// `review_aia_displaces_a_wrong_key_intermediate_that_chains_to_the_anchor`
+/// above: same fixtures, but `NoAiaFetcher`, so nothing can displace the
+/// bad intermediate and the build has to explain itself.
+///
+/// It used to answer differently. The driver dropped `NoValidPath`'s
+/// payload, rebuilt a chain with topology-only `build_path`, and handed
+/// that back for the caller to re-validate — so the error described
+/// whatever that second, signature-blind search happened to return. Since
+/// `build_first_valid_path` prunes candidates by signature and
+/// `build_path` does not, the two could disagree about which chain failed.
+/// Now the failure from the attempt that actually ran is propagated, and
+/// `last_error` is a `pkix_path::Error` the caller can match on rather
+/// than a rendered string.
+#[test]
+fn a_wrong_key_intermediate_reports_the_typed_validation_failure() {
+    let anchors = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    // `max_uris_per_cert = 0` so no caIssuers URI is ever collected: AIA
+    // cannot contribute, and the build has to answer from the pool it has.
+    //
+    // Getting there needs care, because two other reports outrank this one
+    // and both are right to. `NoAiaFetcher` fails the fetch, and an
+    // attempted-and-failed fetch is the more informative signal, so that
+    // yields Aia(FetchingDisabled). A fetcher that succeeds but returns a
+    // certificate already in the pool adds nothing, and `absorb` reports
+    // that as Aia too. Only when no URI is tried at all does the path
+    // builder's own verdict become the most informative thing known.
+    let mut cfg = AiaConfig::new();
+    cfg.max_uris_per_cert = 0;
+
+    let f = MapFetcher::new(HashMap::new());
+    let err = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .with_aia_config(cfg)
+        .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")])
+        .expect_err("the wrong-key intermediate cannot validate and AIA cannot help");
+    assert_eq!(f.count(), 0, "no URI should have been tried");
+
+    match err {
+        Error::PathBuild(pkix_path_builder::Error::NoValidPath {
+            tried, last_error, ..
+        }) => {
+            assert!(tried >= 1, "at least one candidate was tried, got {tried}");
+            assert!(
+                matches!(last_error, pkix_path::Error::SignatureInvalid { .. }),
+                "the intermediate's key did not sign the leaf, so the cause should be \
+                 SignatureInvalid; got {last_error:?}"
+            );
+        }
+        other => panic!("expected PathBuild(NoValidPath {{ .. }}), got {other:?}"),
+    }
+}

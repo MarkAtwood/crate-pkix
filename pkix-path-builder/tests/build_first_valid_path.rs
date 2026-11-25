@@ -177,9 +177,14 @@ fn pkits_no_valid_path_when_verifier_rejects_everything() {
                 "NoValidPath.tried must be >= 1 (got {tried}); zero-yield exhaustion \
                  should surface as NoPathFound instead"
             );
+            // The field used to be a String and this could only assert it
+            // was non-empty, which any message would satisfy. Now that it
+            // carries the error, the test can say what went wrong: the
+            // verifier rejects every signature, so the failure must be a
+            // signature failure and not, say, an expiry or a name mismatch.
             assert!(
-                !last_error.is_empty(),
-                "NoValidPath.last_error should carry the pkix_path::Error Display rendering"
+                matches!(last_error, pkix_path::Error::SignatureInvalid { .. }),
+                "AlwaysRejectVerifier must surface as SignatureInvalid, got {last_error:?}"
             );
         }
         other => panic!("expected NoValidPath, got {other:?}"),

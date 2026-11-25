@@ -17,7 +17,11 @@ std     = ["der/std", "x509-cert/std"]
 # convention: typed inner errors so consumers can programmatically
 # distinguish "no chain built" from "candidate chain rejected by
 # validate_path". Pulled in by `pkix-chain/serde` (PKIX-zkjb.7).
-serde = ["dep:serde"]
+# `pkix-path/serde` because Error::NoValidPath now carries a
+# `pkix_path::Error`, whose Serialize/Deserialize impls live behind that
+# crate's own serde feature. Without it, enabling serde here fails to
+# compile rather than silently dropping the field.
+serde = ["dep:serde", "pkix-path/serde"]
 
 [dependencies]
 pkix-path = { workspace = true }

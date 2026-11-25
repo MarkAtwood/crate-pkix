@@ -48,7 +48,16 @@ enum PoolVerdict {
     /// pool holds a certificate whose subject DN matches the issuer a
     /// child names but whose key did not sign it, so a fetch may still
     /// supply the one that did.
-    OnlyUnvalidated,
+    ///
+    /// Carries the path builder's own failure. It used to carry nothing:
+    /// `NoValidPath`'s payload was dropped with `{ .. }` and the code
+    /// recovered a diagnostic by rebuilding the chain with topology-only
+    /// `build_path` and letting the caller re-validate it. That was a
+    /// workaround for `last_error` being a rendered `String`, and it
+    /// could report a different chain's failure, because
+    /// `build_first_valid_path` prunes candidates by signature and
+    /// `build_path` does not.
+    OnlyUnvalidated(pkix_path_builder::Error),
     /// No candidate chain at all — an issuer is missing outright.
     Nothing,
 }
@@ -126,12 +135,10 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         if state.iteration >= self.config.max_depth {
             return match self.try_build(leaf, &state.pool) {
                 Ok(PoolVerdict::Validated(built)) => BuildStep::Built(built),
-                // At the cap, a pool that only fails validation is still
-                // worth assembling: the caller learns what is wrong with
-                // the certificates rather than that we ran out of fetches.
-                Ok(PoolVerdict::OnlyUnvalidated) => self
-                    .assemble_unvalidated(leaf, &state.pool)
-                    .map_or(BuildStep::Failed(Error::AiaDepthExceeded), BuildStep::Built),
+                // At the cap, a pool that only fails validation still
+                // tells the caller more than "we ran out of fetches", so
+                // report why the certificates were rejected.
+                Ok(PoolVerdict::OnlyUnvalidated(e)) => BuildStep::Failed(Error::PathBuild(e)),
                 Ok(PoolVerdict::Nothing) | Err(_) => BuildStep::Failed(Error::AiaDepthExceeded),
             };
         }
@@ -183,11 +190,8 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
             // Nothing left to fetch. If the pool does hold a complete
             // candidate and it merely fails to validate, hand it over so
             // the caller sees the real defect instead of "no path found".
-            if matches!(verdict, PoolVerdict::OnlyUnvalidated) {
-                return match self.assemble_unvalidated(leaf, &state.pool) {
-                    Ok(built) => BuildStep::Built(built),
-                    Err(e) => BuildStep::Failed(e),
-                };
+            if let PoolVerdict::OnlyUnvalidated(e) = verdict {
+                return BuildStep::Failed(Error::PathBuild(e));
             }
             // The path builder found nothing and there are no URIs left to
             // try. A previous fetch failure is the more informative signal;
@@ -316,25 +320,11 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         ) {
             Ok(built) => Ok(PoolVerdict::Validated(built)),
             Err(pkix_path_builder::Error::NoPathFound) => Ok(PoolVerdict::Nothing),
-            Err(pkix_path_builder::Error::NoValidPath { .. }) => Ok(PoolVerdict::OnlyUnvalidated),
+            Err(e @ pkix_path_builder::Error::NoValidPath { .. }) => {
+                Ok(PoolVerdict::OnlyUnvalidated(e))
+            }
             Err(e) => Err(Error::PathBuild(e)),
         }
-    }
-
-    /// Assembles the best topology-only chain from `pool`.
-    ///
-    /// Used when the pool cannot produce a validating chain and there is
-    /// nothing left to fetch. Handing the caller a chain it will reject
-    /// gets the concrete `validate_path` failure in front of them — "bad
-    /// signature at index 0" — instead of a bare "no path found", which
-    /// says nothing about what is wrong with the certificates they
-    /// supplied.
-    fn assemble_unvalidated(
-        &self,
-        leaf: &Certificate,
-        pool: &CertPool,
-    ) -> crate::Result<Vec<Certificate>> {
-        pkix_path_builder::build_path(leaf, pool, self.anchors).map_err(Error::PathBuild)
     }
 }
 

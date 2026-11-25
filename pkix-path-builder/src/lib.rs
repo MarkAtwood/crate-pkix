@@ -190,22 +190,24 @@ pub enum Error {
     /// `>= 1` for this variant (zero-yield exhaustion is reported as
     /// [`Error::NoPathFound`] instead, matching [`build_path`]'s contract).
     ///
-    /// `last_error` is the [`pkix_path::Error::Display`] rendering of the
-    /// last candidate's validation failure. It is carried as a `String`
-    /// rather than a `pkix_path::Error` so [`Error`] retains its `Hash`
-    /// derive (the upstream error enum does not implement `Hash`). Callers
-    /// that need to programmatically match on the inner error should iterate
-    /// [`build_path_candidates`] directly and call [`pkix_path::validate_path`]
-    /// per candidate themselves.
+    /// `last_error` is the last candidate's validation failure, so a
+    /// caller can match on it.
+    ///
+    /// It used to be a `String` — the `Display` rendering — because
+    /// [`Error`] derives `Hash` and [`pkix_path::Error`] did not implement
+    /// it. The advice that went with it was to iterate
+    /// [`build_path_candidates`] and call [`pkix_path::validate_path`]
+    /// per candidate yourself, which is a lot to ask for a failure reason.
+    /// `pkix_path::Error` implements `Hash` now, so the field carries the
+    /// error.
     ///
     /// [`SignatureVerifier`]: pkix_path::SignatureVerifier
-    /// [`pkix_path::Error::Display`]: pkix_path::Error
     #[non_exhaustive]
     NoValidPath {
         /// Number of candidate chains that were tried and rejected.
         tried: usize,
-        /// `Display` rendering of the last [`pkix_path::Error`] observed.
-        last_error: alloc::string::String,
+        /// The last [`pkix_path::Error`] observed.
+        last_error: pkix_path::Error,
     },
 }
 
@@ -228,7 +230,18 @@ impl core::fmt::Display for Error {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    /// Exposes the inner validation failure of [`Error::NoValidPath`].
+    ///
+    /// Only possible now that the field holds the error rather than its
+    /// rendering; a `String` has no cause to return.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NoValidPath { last_error, .. } => Some(last_error),
+            _ => None,
+        }
+    }
+}
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -1142,7 +1155,7 @@ where
 {
     let mut iter = PathCandidates::new(target, pool.as_slice(), anchors, config, Some(verifier));
     let mut tried: usize = 0;
-    let mut last_error: Option<alloc::string::String> = None;
+    let mut last_error: Option<pkix_path::Error> = None;
 
     loop {
         match iter.next() {
@@ -1151,7 +1164,7 @@ where
                     Ok(_) => return Ok(chain),
                     Err(e) => {
                         tried += 1;
-                        last_error = Some(alloc::format!("{e}"));
+                        last_error = Some(e);
                         // Continue to the next candidate.
                     }
                 }
@@ -1189,7 +1202,7 @@ where
                                     Ok(_) => Ok(chain),
                                     Err(e) => Err(Error::NoValidPath {
                                         tried: 1,
-                                        last_error: alloc::format!("{e}"),
+                                        last_error: e,
                                     }),
                                 };
                             }
