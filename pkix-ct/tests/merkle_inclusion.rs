@@ -491,3 +491,62 @@ mod sth {
         panic!("target leaf {target_m} not found in fixture");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Inclusion proofs without an SctVerifier
+// ---------------------------------------------------------------------------
+
+/// `verify_inclusion_proof` checks the same proofs with no verifier at all.
+///
+/// The `empty_verifier()` helper at the top of this file is the workaround
+/// that motivated exposing this: the check is hash-only, so every caller
+/// who wanted it had to invent an `SctVerifier` with an empty `CtLogList`
+/// and a `SignatureVerifier` that is never consulted. This crate's own
+/// tests did it, which is the clearest evidence it was the wrong shape —
+/// a CT monitor with a captured STH wanting to check proofs in a loop
+/// faced the same tax.
+///
+/// Asserted against the same fixtures and the same expectations as
+/// `every_leaf_verifies`, so this is the identical check reached the
+/// direct way rather than a weaker one.
+#[test]
+fn every_leaf_verifies_without_a_verifier() {
+    for n in [7_u32, 11] {
+        let fx = load_fixture(n);
+        for (idx, leaf_bytes, audit) in &fx.proofs {
+            let leaf_hash = pkix_ct::merkle_leaf_hash(leaf_bytes);
+            let proof = MerkleAuditPath::new(*idx, fx.tree_size, audit.clone());
+            pkix_ct::verify_inclusion_proof(&leaf_hash, &proof, &fx.root)
+                .unwrap_or_else(|e| panic!("free-function verify N={n} m={idx}: {e:?}"));
+        }
+    }
+}
+
+/// The free function and the method agree, including on rejection.
+///
+/// A tampered root must fail identically either way; otherwise the
+/// delegation would be a second implementation rather than the same one.
+#[test]
+fn the_free_function_and_the_method_agree() {
+    let fx = load_fixture(7);
+    let v = empty_verifier();
+    let (idx, leaf_bytes, audit) = &fx.proofs[0];
+    let leaf_hash = pkix_ct::merkle_leaf_hash(leaf_bytes);
+    let proof = MerkleAuditPath::new(*idx, fx.tree_size, audit.clone());
+
+    assert_eq!(
+        pkix_ct::verify_inclusion_proof(&leaf_hash, &proof, &fx.root),
+        v.verify_inclusion(&leaf_hash, &proof, &fx.root),
+        "the good case must agree"
+    );
+
+    let mut bad_root = fx.root;
+    bad_root[0] ^= 0xff;
+    let direct = pkix_ct::verify_inclusion_proof(&leaf_hash, &proof, &bad_root);
+    assert_eq!(direct, Err(Error::MerkleProofInvalid));
+    assert_eq!(
+        direct,
+        v.verify_inclusion(&leaf_hash, &proof, &bad_root),
+        "the rejection must agree too"
+    );
+}

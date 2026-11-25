@@ -513,18 +513,23 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///   hash, the leaf hash, the leaf index, the tree size, or the
     ///   expected root) all surface as this variant.
     ///
-    /// This method does not use `self.logs` or `self.verifier` — it
-    /// is hash-only. Placed on `SctVerifier` for API discoverability
-    /// (callers verifying SCTs are the same ones who will want to
-    /// verify inclusion proofs) and to match the RFC 6962 §2 family
-    /// of "log behavior" operations grouped together.
+    /// This method does not use `self.logs` or `self.verifier` — it is
+    /// hash-only, and is kept here for discoverability: callers
+    /// verifying SCTs are the same ones who will want inclusion proofs,
+    /// and RFC 6962 §2 groups the "log behavior" operations together.
+    ///
+    /// It delegates to [`verify_inclusion_proof`], which takes no
+    /// verifier. Prefer that function when inclusion proofs are all you
+    /// need — a CT monitor with a captured STH should not have to build
+    /// an `SctVerifier` whose log list and signature verifier are never
+    /// consulted.
     pub fn verify_inclusion(
         &self,
         leaf_hash: &[u8; 32],
         proof: &MerkleAuditPath,
         root_hash: &[u8; 32],
     ) -> Result<()> {
-        verify_inclusion_inner(leaf_hash, proof, root_hash)
+        verify_inclusion_proof(leaf_hash, proof, root_hash)
     }
 
     /// Verify a Signed Tree Head's signature against the log's
@@ -708,7 +713,38 @@ impl MerkleAuditPath {
 /// Trillian, etc.) — chosen over the recursive RFC 6962 §2.1.1
 /// statement because the iterative form avoids stack allocations and
 /// terminates exactly when the audit path is exhausted.
-fn verify_inclusion_inner(
+/// Verify a Merkle audit path against an expected root hash
+/// (RFC 6962 §2.1).
+///
+/// Hash-only: no log list, no signature verifier, no certificate. A CT
+/// monitor holding an STH it has already verified can check proofs in a
+/// loop with nothing else.
+///
+/// The same check is available as
+/// [`SctVerifier::verify_inclusion`](SctVerifier::verify_inclusion) for
+/// callers who already hold a verifier. That method delegates here; it
+/// exists for discoverability, since callers verifying SCTs are usually
+/// the ones who will want inclusion proofs too. This function exists
+/// because requiring an `SctVerifier` — which means inventing a
+/// [`CtLogList`](crate::CtLogList) and a
+/// [`SignatureVerifier`](pkix_path::SignatureVerifier) that are never
+/// consulted — is a steep price for a hash comparison.
+///
+/// It sits alongside [`merkle_leaf_hash`] and
+/// [`merkle_tree_leaf_for_cert`], which are free functions for the same
+/// reason: computing a leaf hash needs no verifier either.
+///
+/// # Errors
+///
+/// - [`Error::MerkleProofMalformed`] — `tree_size` is 0, or the audit
+///   path is longer than the maximum height for the tree size
+///   (`ceil(log2(tree_size))` hashes), indicating a buggy proof source
+///   or a tampered proof.
+/// - [`Error::MerkleProofInvalid`] — `leaf_index >= tree_size`, or the
+///   reconstructed root does not match `expected_root`. A single changed
+///   byte anywhere — an audit-path hash, the leaf hash, the index, the
+///   tree size, the expected root — surfaces as this variant.
+pub fn verify_inclusion_proof(
     leaf_hash: &[u8; 32],
     proof: &MerkleAuditPath,
     expected_root: &[u8; 32],
