@@ -134,10 +134,10 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 [workspace.dependencies]
 # Internal crates
 pkix-path             = { path = "pkix-path",             version = "0.4.0" }
-pkix-revocation       = { path = "pkix-revocation",       version = "0.4.0" }
-pkix-path-builder     = { path = "pkix-path-builder",     version = "0.4.0" }
-pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.2.0" }
-pkix-profiles         = { path = "pkix-profiles",         version = "0.4.0" }
+pkix-revocation       = { path = "pkix-revocation",       version = "0.5.0" }
+pkix-path-builder     = { path = "pkix-path-builder",     version = "0.5.0" }
+pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.0" }
+pkix-profiles         = { path = "pkix-profiles",         version = "0.5.0" }
 pkix-lint             = { path = "pkix-lint",             version = "0.10.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.2.0" }
 pkix-ct-google        = { path = "pkix-ct-google",        version = "0.1.0" }
@@ -147,9 +147,9 @@ pkix-identity         = { path = "pkix-identity",         version = "0.2.0" }
 pkix-mta-sts          = { path = "pkix-mta-sts",          version = "0.1.0" }
 pkix-mta-sts-http     = { path = "pkix-mta-sts-http",     version = "0.1.0" }
 pkix-mta-sts-resolver = { path = "pkix-mta-sts-resolver", version = "0.1.0" }
-pkix-tlsrpt           = { path = "pkix-tlsrpt",           version = "0.1.0" }
+pkix-tlsrpt           = { path = "pkix-tlsrpt",           version = "0.2.0" }
 pkix-net-guard        = { path = "pkix-net-guard",        version = "0.1.0" }
-pkix-chain            = { path = "pkix-chain",            version = "0.6.0" }
+pkix-chain            = { path = "pkix-chain",            version = "0.7.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
 pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.0" }

@@ -58,9 +58,10 @@ The CA/Browser Forum-specific profiles (`WebPkiProfile`, `SmimeProfile`,
 (`sc081_validity_cap`), and the CA/B Forum allowed-algorithm tables moved
 to the sibling [`pkix-profiles-cabf`] crate in `pkix-profiles 0.3.0`.
 
-Deprecated re-exports remain in `pkix-profiles 0.3.x` so existing imports
-continue to compile (with a deprecation warning). The re-exports drop in
-`pkix-profiles 0.4.0`.
+The deprecated re-exports that kept those importable from here have been
+removed. This file previously said they would drop in `pkix-profiles
+0.4.0`; 0.4.0 shipped with them intact, which is why no version is named
+for anything still to come.
 
 Migration path: add `pkix-profiles-cabf` to your `Cargo.toml` and update
 imports:

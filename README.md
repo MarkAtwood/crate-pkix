@@ -325,7 +325,7 @@ layer underneath. Here is what is shipping and what is next.
 | `pkix-mta-sts-http` | MTA-STS HTTPS policy fetching (RFC 8461 §3.3) | **shipped** (0.1.0) |
 | `pkix-mta-sts-resolver` | MTA-STS `_mta-sts` TXT lookup (RFC 8461 §3.1) | **shipped** (0.1.0) |
 | `pkix-net-guard` | Destination policy for outbound HTTP fetches | **shipped** (0.1.0) |
-| `pkix-tlsrpt` | TLSRPT (RFC 8460) records, report schema, classification | **shipped** (0.1.0) |
+| `pkix-tlsrpt` | TLSRPT (RFC 8460) records, report schema, classification | **shipped** (0.2.0) |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |
 | `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |
