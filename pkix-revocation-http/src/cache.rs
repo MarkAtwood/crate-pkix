@@ -19,8 +19,11 @@
 //!   `Arc<CachedOcspResponse>` so callers see the freshness metadata
 //!   alongside the bytes without re-parsing.
 //! - [`InMemoryCache`] is a reference impl backed by `RwLock<HashMap<...>>`.
-//!   Unbounded — consumers needing eviction bring a `moka` or `redis`-backed
-//!   `RevocationCache` impl.
+//!   Nothing is evicted automatically; it reclaims on demand via
+//!   [`InMemoryCache::prune_expired`] and reports its size via
+//!   [`InMemoryCache::len`]. Consumers wanting a hard ceiling (LRU, LFU,
+//!   a byte budget) bring a `moka` or `redis`-backed `RevocationCache`
+//!   impl.
 //! - [`CrlCacheKey`] keys by `(issuer_dn_der, distribution_point_uri)`:
 //!   both are known a-priori to the wrapper from the cert's issuer field
 //!   and the CRL DP URI it is about to fetch. `CRLNumber` is freshness
@@ -361,10 +364,35 @@ pub trait RevocationCache: Send + Sync {
 
 /// `HashMap`-backed reference [`RevocationCache`].
 ///
-/// Unbounded — entries accumulate until explicitly invalidated or the
-/// cache is dropped. Consumers needing LRU / LFU / size eviction supply
-/// their own `RevocationCache` impl backed by a bounded store (e.g.
-/// `moka`).
+/// # Growth and reclamation
+///
+/// Nothing is evicted automatically: this type spawns no threads,
+/// registers no timers, and reads no clock, so there is nothing to run
+/// an eviction pass. Entries persist until
+/// [`prune_expired`](Self::prune_expired), [`clear`](Self::clear) or
+/// `invalidate_*` removes them, or the cache is dropped.
+///
+/// A long-running process therefore accumulates entries. The usual
+/// driver is not an attack but time: a validator that sees many issuers
+/// and distribution points over weeks keeps every expired CRL and
+/// response it ever cached, each holding its DER bytes alive. Call
+/// `prune_expired` from whatever maintenance tick the consumer already
+/// has, and export [`len`](Self::len) as a gauge — a count that only
+/// climbs is the signal that nothing is calling it.
+///
+/// What bounds the key space is worth stating plainly, because it is
+/// better than it looks: the wrappers store an entry only after a
+/// *determinative* verdict, which means the CRL or OCSP response was
+/// signature-verified against the issuer or anchor. An attacker cannot
+/// insert an entry by presenting arbitrary bytes or arbitrary
+/// certificates; they would need a genuinely verifiable revocation
+/// source per entry. Growth is bounded by what real CAs and responders
+/// will sign, not by what a peer can send.
+///
+/// Consumers wanting a hard ceiling — LRU, LFU, or a byte budget —
+/// supply their own [`RevocationCache`] backed by a bounded store such
+/// as `moka`. The trait is the extension point precisely so that this
+/// reference implementation can stay simple.
 ///
 /// Internal locking is `RwLock`, not `DashMap`, to avoid the extra
 /// dependency in the reference impl. Read paths take the read lock;
@@ -453,6 +481,124 @@ impl InMemoryCache {
         }
         guard.insert(key, Arc::new(new_entry));
         true
+    }
+
+    /// Drop every entry whose `nextUpdate` has passed at `now`, returning
+    /// how many were removed.
+    ///
+    /// Entries with no `nextUpdate` are kept: this cache treats a missing
+    /// `nextUpdate` as "never expires until invalidated", so pruning them
+    /// here would contradict [`RevocationCache::get_crl`]'s contract. In
+    /// practice the wrappers never store such an entry — a CRL or OCSP
+    /// response without `nextUpdate` can never be served, because the
+    /// checkers treat it as stale — so this is a statement about
+    /// entries a consumer inserted directly.
+    ///
+    /// # Why the caller supplies `now`
+    ///
+    /// For the same reason `get_crl` does no freshness filtering: this
+    /// crate's authoritative time is the caller's `now_unix`, not the
+    /// wall clock. A cache that read `SystemTime::now()` to decide what
+    /// to evict could discard entries the validator still considers
+    /// live, or keep ones it considers expired. Pass the same clock the
+    /// fetchers use.
+    ///
+    /// # Scheduling
+    ///
+    /// Deliberately not automatic. This cache spawns no threads and
+    /// registers no timers, so there is nothing to call it; a consumer
+    /// calls it from whatever maintenance tick it already has. Two
+    /// separate write locks are taken, one per map, so a prune does not
+    /// block readers of the other map.
+    ///
+    /// ```
+    /// # use std::time::{Duration, SystemTime};
+    /// # use pkix_revocation_http::{CachedCrl, CrlCacheKey, InMemoryCache, RevocationCache};
+    /// let cache = InMemoryCache::new();
+    /// let key = CrlCacheKey {
+    ///     issuer_dn_der: vec![1, 2, 3],
+    ///     distribution_point_uri: None,
+    /// };
+    /// let expires_at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+    /// cache.put_crl(
+    ///     key.clone(),
+    ///     CachedCrl::new(None, SystemTime::UNIX_EPOCH, Some(expires_at), vec![0xaa]),
+    /// );
+    ///
+    /// // A minute before it expires, nothing is reclaimed.
+    /// assert_eq!(cache.prune_expired(expires_at - Duration::from_secs(60)), 0);
+    /// assert_eq!(cache.len(), 1);
+    ///
+    /// // A minute after, the entry goes.
+    /// assert_eq!(cache.prune_expired(expires_at + Duration::from_secs(60)), 1);
+    /// assert!(cache.is_empty());
+    /// ```
+    pub fn prune_expired(&self, now: SystemTime) -> usize {
+        let mut removed = 0;
+        {
+            let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
+            let before = guard.len();
+            guard.retain(|_, e| is_live(e.next_update(), now));
+            removed += before - guard.len();
+        }
+        {
+            let mut guard = self.ocsp.write().unwrap_or_else(PoisonError::into_inner);
+            let before = guard.len();
+            guard.retain(|_, e| is_live(e.next_update(), now));
+            removed += before - guard.len();
+        }
+        removed
+    }
+
+    /// Number of cached CRLs.
+    ///
+    /// Counts entries, fresh or expired, since nothing evicts on its own.
+    /// Useful as a gauge to export: a count that only ever climbs is the
+    /// signal that [`Self::prune_expired`] is not being called.
+    #[must_use]
+    pub fn crl_len(&self) -> usize {
+        self.crl
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
+    /// Number of cached OCSP responses. See [`Self::crl_len`].
+    #[must_use]
+    pub fn ocsp_len(&self) -> usize {
+        self.ocsp
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
+    /// Total number of cached entries across both maps.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.crl_len() + self.ocsp_len()
+    }
+
+    /// Whether the cache holds no entries at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Drop every entry, expired or not.
+    ///
+    /// For a consumer that would rather rebuild the cache than reason
+    /// about its contents — after a trust-store change, say, or a
+    /// configuration reload that could alter which verdicts are
+    /// determinative.
+    pub fn clear(&self) {
+        self.crl
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+        self.ocsp
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
     }
 }
 

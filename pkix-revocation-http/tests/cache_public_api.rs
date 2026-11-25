@@ -27,12 +27,17 @@ use pkix_revocation_http::{
 /// representation that is NOT `CachedCrl`, so it can only be written if
 /// the public API exposes enough to take an entry apart and put it back
 /// together. It deliberately does not import anything private.
+/// `(crl_number, this_update_secs, next_update_secs, der)` — a CRL entry
+/// as flat values, the way an external store would hold it.
+type FlatCrl = (Option<Vec<u8>>, u64, Option<u64>, Vec<u8>);
+
+/// `(produced_at_secs, this_update_secs, next_update_secs, der)`.
+type FlatOcsp = (u64, u64, Option<u64>, Vec<u8>);
+
 #[derive(Default)]
 struct FlatStore {
-    /// `(crl_number, this_update_secs, next_update_secs, der)`
-    crl: Mutex<HashMap<String, (Option<Vec<u8>>, u64, Option<u64>, Vec<u8>)>>,
-    /// `(produced_at_secs, this_update_secs, next_update_secs, der)`
-    ocsp: Mutex<HashMap<String, (u64, u64, Option<u64>, Vec<u8>)>>,
+    crl: Mutex<HashMap<String, FlatCrl>>,
+    ocsp: Mutex<HashMap<String, FlatOcsp>>,
 }
 
 fn secs(t: SystemTime) -> u64 {
@@ -269,4 +274,139 @@ fn an_out_of_crate_store_works_behind_a_trait_object() {
         store.get_crl(&crl_key()).expect("stored entry").bytes(),
         &[0x42]
     );
+}
+
+// ---------------------------------------------------------------------------
+// Reclamation
+// ---------------------------------------------------------------------------
+
+/// `prune_expired` reclaims exactly the entries the wrappers would
+/// refuse to serve, and leaves the rest.
+///
+/// The boundary matters: an entry whose `nextUpdate` equals `now` is
+/// expired (`is_live` is strictly-after), so it must go. One a second
+/// later must stay. Getting this backwards would either discard live
+/// entries — turning every validation into a refetch — or retain dead
+/// ones forever, which is the growth this method exists to stop.
+#[test]
+fn prune_expired_reclaims_exactly_the_entries_that_can_no_longer_be_served() {
+    let cache = InMemoryCache::new();
+    let now = at(10_000);
+
+    let mk = |uri: &str| CrlCacheKey {
+        issuer_dn_der: vec![1],
+        distribution_point_uri: Some(uri.to_string()),
+    };
+
+    // Expired well before now.
+    cache.put_crl(
+        mk("stale"),
+        CachedCrl::new(None, at(1), Some(at(9_000)), vec![0x01]),
+    );
+    // Expires exactly at now: `is_live` is strictly-after, so expired.
+    cache.put_crl(
+        mk("boundary"),
+        CachedCrl::new(None, at(1), Some(now), vec![0x02]),
+    );
+    // One second of life left.
+    cache.put_crl(
+        mk("live"),
+        CachedCrl::new(None, at(1), Some(at(10_001)), vec![0x03]),
+    );
+    // No nextUpdate: kept, per the documented "never expires until
+    // invalidated" reading.
+    cache.put_crl(mk("eternal"), CachedCrl::new(None, at(1), None, vec![0x04]));
+
+    cache.put_ocsp(
+        ocsp_key(),
+        CachedOcspResponse::new(at(1), at(1), Some(at(9_999)), vec![0x05]),
+    );
+
+    assert_eq!(cache.len(), 5, "fixture should hold five entries");
+    assert_eq!(cache.crl_len(), 4);
+    assert_eq!(cache.ocsp_len(), 1);
+
+    // Two expired CRLs plus the expired OCSP response.
+    assert_eq!(cache.prune_expired(now), 3);
+
+    assert!(cache.get_crl(&mk("stale")).is_none());
+    assert!(
+        cache.get_crl(&mk("boundary")).is_none(),
+        "nextUpdate == now is expired, matching is_live's strictly-after test"
+    );
+    assert!(cache.get_crl(&mk("live")).is_some());
+    assert!(
+        cache.get_crl(&mk("eternal")).is_some(),
+        "an entry with no nextUpdate must survive a prune"
+    );
+    assert!(cache.get_ocsp(&ocsp_key()).is_none());
+
+    assert_eq!(cache.crl_len(), 2);
+    assert_eq!(cache.ocsp_len(), 0);
+}
+
+/// Pruning an empty cache, or one with nothing expired, reclaims nothing
+/// and is safe to call on a tick.
+#[test]
+fn prune_expired_is_a_no_op_when_nothing_has_expired() {
+    let cache = InMemoryCache::new();
+    assert_eq!(cache.prune_expired(at(10_000)), 0);
+    assert!(cache.is_empty());
+
+    cache.put_crl(
+        crl_key(),
+        CachedCrl::new(None, at(1), Some(at(99_999)), vec![0x01]),
+    );
+    assert_eq!(cache.prune_expired(at(10_000)), 0);
+    assert_eq!(cache.len(), 1);
+    // Idempotent.
+    assert_eq!(cache.prune_expired(at(10_000)), 0);
+    assert_eq!(cache.len(), 1);
+}
+
+/// `clear` drops live entries too — that is the difference from
+/// `prune_expired`.
+#[test]
+fn clear_drops_live_entries_as_well_as_expired_ones() {
+    let cache = InMemoryCache::new();
+    cache.put_crl(
+        crl_key(),
+        CachedCrl::new(None, at(1), Some(at(99_999)), vec![0x01]),
+    );
+    cache.put_ocsp(
+        ocsp_key(),
+        CachedOcspResponse::new(at(1), at(1), Some(at(99_999)), vec![0x02]),
+    );
+    assert_eq!(cache.len(), 2);
+    assert_eq!(
+        cache.prune_expired(at(10_000)),
+        0,
+        "both entries are live, so a prune must leave them"
+    );
+
+    cache.clear();
+    assert!(cache.is_empty());
+    assert!(cache.get_crl(&crl_key()).is_none());
+    assert!(cache.get_ocsp(&ocsp_key()).is_none());
+}
+
+/// An empty cache reports itself empty, and stops doing so after one
+/// insert. `is_empty` has to agree with `len` or a consumer gating a
+/// maintenance pass on it would skip the pass.
+#[test]
+fn len_and_is_empty_agree() {
+    let cache = InMemoryCache::new();
+    assert_eq!(cache.len(), 0);
+    assert!(cache.is_empty());
+
+    cache.put_ocsp(
+        ocsp_key(),
+        CachedOcspResponse::new(at(1), at(1), None, vec![0x01]),
+    );
+    assert_eq!(cache.len(), 1);
+    assert!(!cache.is_empty());
+
+    cache.invalidate_ocsp(&ocsp_key());
+    assert_eq!(cache.len(), 0);
+    assert!(cache.is_empty());
 }
