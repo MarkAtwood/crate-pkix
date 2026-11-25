@@ -795,6 +795,50 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
+      "name": "4.14.18 Valid onlySomeReasons Test18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.14.19 Valid onlySomeReasons Test19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
       "name": "4.14.22 Valid IDP with indirectCRL Test22",
       "verdicts": [
         {
@@ -1852,50 +1896,6 @@
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "4.14.17 Invalid onlySomeReasons Test17",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.18 Valid onlySomeReasons Test18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.19 Valid onlySomeReasons Test19",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -5615,50 +5615,6 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.14.18 Valid onlySomeReasons Test18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.19 Valid onlySomeReasons Test19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
       "name": "4.15.5 Valid delta-CRL Test5",
       "verdicts": [
         {
@@ -5814,9 +5770,9 @@
   "summary": {
     "Agreement": 61,
     "DiagnosticDivergence": 67,
-    "LooserThanWild": 60,
+    "LooserThanWild": 62,
     "OracleDivergence": 0,
-    "StricterThanWild": 59,
+    "StricterThanWild": 57,
     "total": 247
   }
 }

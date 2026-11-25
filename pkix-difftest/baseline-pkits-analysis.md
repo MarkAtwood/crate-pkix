@@ -50,14 +50,19 @@ bead OR a written-out justification".
 
 | Class | Count | % | previous |
 |---|---:|---:|---:|
-| LooserThanWild       | 60  | 24.3% | 43 |
-| StricterThanWild     | 59  | 23.9% | 77 |
+| LooserThanWild       | 62  | 25.1% | 60 |
+| StricterThanWild     | 57  | 23.1% | 59 |
 | OracleDivergence     | 0   | 0.0%  | 0  |
 | DiagnosticDivergence | 67  | 27.1% | 67 |
-| Agreement            | 61  | 24.7% | 60 |
+| Agreement            | 61  | 24.7% | 61 |
 | **Total**            | **247** | | 247 |
 
-Ground-truth disagreements: **46 → 35 → 17** across two regenerations.
+Ground-truth disagreements: **46 → 35 → 17 → 15** across three regenerations.
+
+The last step closed the `onlySomeReasons` gap: `pkix-revocation` now
+combines reason-partitioned CRLs per RFC 5280 §6.3.3, so 4.14.18 and 4.14.19
+agree with NIST while 4.14.17 — whose two partitions cover only four of eight
+reasons — still correctly fails.
 
 ### Second regeneration: CRL selection and signer discovery
 
@@ -132,9 +137,8 @@ Three changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
 
 ### What still disagrees
 
-Seventeen chains. Two are the documented `onlySomeReasons` reason-partitioning
-gap in `pkix-revocation`; the rest predate this work and are catalogued per
-bucket below.
+Fifteen chains, all predating this work and catalogued per bucket below. The
+`onlySomeReasons` gap that accounted for two of them is closed.
 
 ### Reading this baseline
 
