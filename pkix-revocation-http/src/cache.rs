@@ -431,6 +431,29 @@ impl InMemoryCache {
         guard.insert(key, Arc::new(new_entry));
         true
     }
+
+    /// Atomically insert an OCSP response only if it does not replace
+    /// fresher status with staler status.
+    ///
+    /// The OCSP twin of [`Self::put_crl_if_not_rollback`]: a single write
+    /// lock covers the compare and the insert, so a concurrent writer
+    /// cannot slip a newer response in between them. Returns `true` if
+    /// inserted, `false` if suppressed as staler.
+    #[cfg(feature = "ocsp")]
+    pub(crate) fn put_ocsp_if_not_staler(
+        &self,
+        key: OcspCacheKey,
+        new_entry: CachedOcspResponse,
+    ) -> bool {
+        let mut guard = self.ocsp.write().unwrap_or_else(PoisonError::into_inner);
+        if let Some(existing) = guard.get(&key) {
+            if is_staler_ocsp(Some(existing.as_ref()), new_entry.this_update()) {
+                return false;
+            }
+        }
+        guard.insert(key, Arc::new(new_entry));
+        true
+    }
 }
 
 impl fmt::Debug for InMemoryCache {
@@ -678,6 +701,41 @@ fn crl_number_gt(incoming: &[u8], stored: &[u8]) -> bool {
     a > b
 }
 
+/// Decide whether a newly-fetched OCSP response carries staler status
+/// than the currently-cached entry.
+///
+/// Returns `true` (drop the incoming entry) iff there is a prior cached
+/// entry whose `SingleResponse.thisUpdate` is strictly later than the
+/// incoming one's. Equal `thisUpdate` values are not staler, so a
+/// re-signed copy of equally fresh status still replaces the entry.
+///
+/// # Why `thisUpdate` and not `producedAt`
+///
+/// RFC 6960 §4.2.2.1 defines `thisUpdate` as the time at which the
+/// status being indicated is known to have been correct, and `producedAt`
+/// as the time the response was signed. Only the former measures the
+/// freshness of the *status*: a responder may re-sign an old snapshot,
+/// giving a new `producedAt` over an unchanged `thisUpdate`. Comparing
+/// `producedAt` would let that re-signed stale snapshot displace a
+/// genuinely newer answer.
+///
+/// # Why this matters
+///
+/// Revocation is monotone — a certificate that has been revoked does not
+/// become un-revoked. Without this guard, a cached `revoked` response
+/// could be overwritten by an older `good` one that is still inside its
+/// own `nextUpdate` window, and every later cache hit would report the
+/// certificate as good. That happens without an attacker: two threads
+/// validating the same certificate at once can have their responses land
+/// in the opposite order to the one they were fetched in.
+#[cfg(feature = "ocsp")]
+fn is_staler_ocsp(prior: Option<&CachedOcspResponse>, incoming_this_update: SystemTime) -> bool {
+    match prior {
+        Some(p) => p.this_update() > incoming_this_update,
+        None => false,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // CrlAtomicPut — crate-private rollback-guarded insert
 // ---------------------------------------------------------------------------
@@ -721,6 +779,54 @@ impl CrlAtomicPut for dyn RevocationCache {
             return false;
         }
         self.put_crl(key, new_entry);
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OcspAtomicPut — crate-private staleness-guarded insert
+// ---------------------------------------------------------------------------
+
+/// Crate-private extension: staleness-guarded OCSP insert.
+///
+/// The OCSP mirror of [`CrlAtomicPut`]. [`InMemoryCache`] overrides this
+/// to hold one write lock across the compare and the insert; other
+/// implementations fall back to a non-atomic get-then-put, which still
+/// rejects an ordinary staler response and only loses the race against a
+/// concurrent writer.
+#[cfg(feature = "ocsp")]
+pub(crate) trait OcspAtomicPut {
+    /// Insert `new_entry` under `key` unless it would replace fresher
+    /// status with staler status. Returns `true` if inserted.
+    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool;
+}
+
+/// Atomic path — single write lock covers check + insert.
+#[cfg(feature = "ocsp")]
+impl OcspAtomicPut for InMemoryCache {
+    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
+        self.put_ocsp_if_not_staler(key, new_entry)
+    }
+}
+
+/// Delegate through `Arc<T>` so `Arc<InMemoryCache>` gets the atomic path.
+#[cfg(feature = "ocsp")]
+impl<T: OcspAtomicPut + ?Sized> OcspAtomicPut for Arc<T> {
+    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
+        (**self).put_ocsp_guarded(key, new_entry)
+    }
+}
+
+/// Fallback for trait-object caches (`Arc<dyn RevocationCache>`): uses the
+/// non-atomic get-then-put path, since the wrapper cannot see the
+/// implementation's own locking.
+#[cfg(feature = "ocsp")]
+impl OcspAtomicPut for dyn RevocationCache {
+    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
+        if is_staler_ocsp(self.get_ocsp(&key).as_deref(), new_entry.this_update()) {
+            return false;
+        }
+        self.put_ocsp(key, new_entry);
         true
     }
 }
@@ -994,6 +1100,13 @@ where
 ///    verdict was determinative (so its signature, responder and
 ///    freshness were verified) and its `SingleResponse` has a
 ///    `nextUpdate`.
+/// 5. **Staleness rejection:** if a cached entry exists for this key
+///    whose `SingleResponse.thisUpdate` is later than the fetched one's,
+///    the new entry is not stored. Revocation is monotone, so letting an
+///    older `good` response displace a cached `revoked` one would make
+///    every subsequent cache hit report a revoked certificate as good.
+///    The verdict of the fetched response is still returned. See
+///    [`is_staler_ocsp`].
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[derive(Clone, Debug)]
@@ -1011,11 +1124,12 @@ impl<F, V, C> CachedHttpOcspFetcher<F, V, C> {
 }
 
 #[cfg(feature = "ocsp")]
+#[allow(private_bounds)] // OcspAtomicPut is intentionally crate-private
 impl<F, V, C> RevocationChecker for CachedHttpOcspFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache,
+    C: RevocationCache + OcspAtomicPut,
 {
     fn check_revocation(
         &self,
@@ -1047,11 +1161,12 @@ where
 }
 
 #[cfg(feature = "ocsp")]
+#[allow(private_bounds)] // OcspAtomicPut is intentionally crate-private
 impl<F, V, C> CachedHttpOcspFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache,
+    C: RevocationCache + OcspAtomicPut,
 {
     /// Cached POST loop shared by both [`RevocationChecker`] methods.
     fn fetch_and_check(
@@ -1155,6 +1270,11 @@ where
     /// response and store it under `key`. Responses without `nextUpdate`
     /// are not stored (`OcspChecker` treats them as stale). Best-effort;
     /// silent on metadata parse failure.
+    ///
+    /// The staleness check and the insert are performed atomically via
+    /// [`OcspAtomicPut::put_ocsp_guarded`], so a response carrying older
+    /// status cannot displace a newer one — see [`is_staler_ocsp`] for
+    /// why that matters even without an attacker.
     fn maybe_populate_cache(&self, resp: &FetchResponse, key: OcspCacheKey) {
         let Ok(meta) = parse_ocsp_metadata(&resp.bytes) else {
             return;
@@ -1162,7 +1282,7 @@ where
         if meta.next_update.is_none() {
             return;
         }
-        self.cache.put_ocsp(
+        self.cache.put_ocsp_guarded(
             key,
             CachedOcspResponse::new(
                 meta.produced_at,
@@ -2155,6 +2275,176 @@ mod tests {
         // Reverse: prior 0xff, incoming 0x0100 — not a rollback.
         let prior2 = entry_with_crl_number(Some(vec![0xff]));
         assert!(!is_rollback(Some(&prior2), Some(&[0x01, 0x00])));
+    }
+
+    // -----------------------------------------------------------------
+    // OCSP staleness decision (pure-function)
+    // -----------------------------------------------------------------
+
+    #[cfg(feature = "ocsp")]
+    fn ocsp_entry_at(this_update_secs: u64) -> CachedOcspResponse {
+        CachedOcspResponse::new(
+            SystemTime::UNIX_EPOCH,
+            SystemTime::UNIX_EPOCH + Duration::from_secs(this_update_secs),
+            None,
+            Vec::new(),
+        )
+    }
+
+    #[cfg(feature = "ocsp")]
+    fn at_secs(secs: u64) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn is_staler_ocsp_false_when_no_prior_entry() {
+        assert!(!is_staler_ocsp(None, at_secs(1000)));
+    }
+
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn is_staler_ocsp_false_when_incoming_is_newer() {
+        let prior = ocsp_entry_at(1000);
+        assert!(!is_staler_ocsp(Some(&prior), at_secs(2000)));
+    }
+
+    /// Equal `thisUpdate` is not staler: a re-signed copy of equally
+    /// fresh status may replace the entry.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn is_staler_ocsp_false_when_incoming_equals_prior() {
+        let prior = ocsp_entry_at(1000);
+        assert!(!is_staler_ocsp(Some(&prior), at_secs(1000)));
+    }
+
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn is_staler_ocsp_true_when_incoming_is_older() {
+        let prior = ocsp_entry_at(2000);
+        assert!(is_staler_ocsp(Some(&prior), at_secs(1000)));
+    }
+
+    /// `producedAt` must not be the comparator. A responder re-signing an
+    /// old snapshot produces a later `producedAt` over an unchanged
+    /// `thisUpdate`; if that counted as fresher it could displace a
+    /// genuinely newer answer.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn is_staler_ocsp_ignores_produced_at() {
+        // Prior: status from t=2000, signed at t=2000.
+        let prior = CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, Vec::new());
+        // Incoming: status from t=1000 but signed much later, at t=9000.
+        // The late signature does not make the status fresh.
+        assert!(
+            is_staler_ocsp(Some(&prior), at_secs(1000)),
+            "a late producedAt must not launder stale thisUpdate status"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // OCSP staleness-guarded insert
+    // -----------------------------------------------------------------
+
+    #[cfg(feature = "ocsp")]
+    fn staleness_key() -> OcspCacheKey {
+        OcspCacheKey {
+            cert_serial: vec![0x01],
+            issuer_key_hash: vec![0xaa; 32],
+            responder_url: "http://ocsp.example/".to_string(),
+        }
+    }
+
+    /// The case the guard exists for: a cached `revoked` answer must not
+    /// be displaced by an older `good` one.
+    ///
+    /// Revocation is monotone, so the older answer cannot be the correct
+    /// one. Before the guard, `put_ocsp` overwrote unconditionally and
+    /// every later cache hit reported the revoked certificate as good.
+    /// Two threads validating the same certificate at once are enough to
+    /// land the responses in the opposite order to the fetch order — no
+    /// attacker required.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn an_older_response_does_not_displace_a_newer_cached_one() {
+        let cache = InMemoryCache::new();
+        let key = staleness_key();
+
+        // Cache the newer answer first (status known correct at t=2000).
+        assert!(cache.put_ocsp_if_not_staler(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"revoked".to_vec()),
+        ));
+
+        // An older answer arrives (status known correct at t=1000).
+        assert!(
+            !cache.put_ocsp_if_not_staler(
+                key.clone(),
+                CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"good".to_vec()),
+            ),
+            "an older response must be reported as suppressed"
+        );
+
+        assert_eq!(
+            cache.get_ocsp(&key).expect("entry present").bytes(),
+            b"revoked",
+            "the newer cached response must survive the older arrival"
+        );
+    }
+
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn a_newer_response_replaces_an_older_cached_one() {
+        let cache = InMemoryCache::new();
+        let key = staleness_key();
+        cache.put_ocsp(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"old".to_vec()),
+        );
+        assert!(cache.put_ocsp_if_not_staler(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"new".to_vec()),
+        ));
+        assert_eq!(cache.get_ocsp(&key).expect("entry present").bytes(), b"new");
+    }
+
+    /// The trait-object fallback has no visibility into another
+    /// implementation's locking, so it does the compare and the put
+    /// separately — but it must still reject an ordinary staler
+    /// response rather than overwriting.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn the_trait_object_fallback_also_rejects_a_staler_response() {
+        let cache: Arc<dyn RevocationCache> = Arc::new(InMemoryCache::new());
+        let key = staleness_key();
+        cache.put_ocsp(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"revoked".to_vec()),
+        );
+        assert!(!cache.put_ocsp_guarded(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"good".to_vec()),
+        ));
+        assert_eq!(
+            cache.get_ocsp(&key).expect("entry present").bytes(),
+            b"revoked"
+        );
+    }
+
+    /// A first insert under an unused key is never staler.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn a_first_insert_is_not_staler() {
+        let cache = InMemoryCache::new();
+        let key = staleness_key();
+        assert!(cache.put_ocsp_if_not_staler(
+            key.clone(),
+            CachedOcspResponse::new(at_secs(1), at_secs(1), None, b"first".to_vec()),
+        ));
+        assert_eq!(
+            cache.get_ocsp(&key).expect("entry present").bytes(),
+            b"first"
+        );
     }
 }
 
