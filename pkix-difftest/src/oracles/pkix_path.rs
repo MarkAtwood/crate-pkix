@@ -31,7 +31,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use der::Decode;
 use pkix_path::{validate_path, DefaultVerifier, TrustAnchor, ValidationPolicy};
-use pkix_revocation::{CrlChecker, Error as RevError, RevocationChecker as _};
+use pkix_revocation::{crl_applies_to, CrlChecker, Error as RevError, RevocationChecker as _};
 use x509_cert::crl::CertificateList;
 use x509_cert::Certificate;
 
@@ -89,6 +89,7 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
     // splicing rather than expect-ing keeps the function panic-free even if
     // a future refactor weakens the precondition check.
     let last = certs.len() - 1;
+    let anchor_cert = certs[last].clone();
     let anchors = [TrustAnchor::from_cert(certs[last].clone())];
     let validation_chain: Vec<Certificate> = certs.into_iter().take(last).collect();
 
@@ -116,7 +117,10 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 
     // Path is valid. If the chain ships CRLs, run revocation per cert.
     if !chain.crls.is_empty() {
-        if let Some(rev_reason) = check_revocation(&validation_chain, &anchors[0], &chain.crls, now)
+        let mut bundle = validation_chain.clone();
+        bundle.push(anchor_cert.clone());
+        if let Some(rev_reason) =
+            check_revocation(&validation_chain, &anchors[0], &bundle, &chain.crls, now)
         {
             return Ok(Verdict::Fail { reason: rev_reason });
         }
@@ -239,14 +243,60 @@ fn build_checkers(crls: &[Vec<u8>], now_unix: u64) -> Vec<CrlChecker<DefaultVeri
 fn check_revocation(
     chain: &[Certificate],
     anchor: &TrustAnchor,
+    bundle: &[Certificate],
     crls: &[Vec<u8>],
     now_unix: u64,
 ) -> Option<String> {
-    // Built once for the whole chain, with deltas paired to their bases.
-    let checkers = build_checkers(crls, now_unix);
-
     for (i, cert) in chain.iter().enumerate() {
         let issuer_cert: Option<&Certificate> = chain.get(i + 1);
+
+        // RFC 5280 §6.3.3(b): consider only CRLs this certificate points at.
+        // Checkers are built per certificate because applicability is a
+        // property of the (certificate, CRL) pair, not of the CRL alone.
+        //
+        // Without this the oracle asked whether ANY CRL it held produced a
+        // verdict, which is not the RFC's procedure and cannot distinguish a
+        // chain with no applicable CRL from one whose CRL merely happens to be
+        // validly signed by somebody present. Several PKITS negative vectors
+        // are built on exactly that difference.
+        let applicable: Vec<Vec<u8>> = crls
+            .iter()
+            .filter(|c| crl_applies_to(cert, c).is_ok())
+            .cloned()
+            .collect();
+        let mut checkers = build_checkers(&applicable, now_unix);
+
+        // Among the CRLs this certificate points at, find which bundle
+        // certificate actually signed each one. This is the key-rollover and
+        // "separate CRL signing key" case: one CA holding several
+        // certificates, signing its CRL with one while having issued this
+        // certificate from another, so the signature-chain issuer is the
+        // wrong signer to hand over.
+        //
+        // Safe only because of the filter above. Discovery answers "who signed
+        // this CRL", not "is this the right CRL" — offered the whole CRL set it
+        // will happily authenticate a CRL the certificate never pointed at,
+        // which is how an earlier attempt broke Invalid Wrong CRL and friends.
+        //
+        // new_with_signer_discovery is self-validating beyond that: it enforces
+        // cRLSign per §6.3.3(f) and requires the discovered signer to chain to
+        // a self-signed certificate.
+        checkers.extend(
+            applicable
+                .iter()
+                .filter(|c| !is_delta_crl(c))
+                .filter_map(|crl| {
+                    CrlChecker::new_with_signer_discovery(
+                        crl.clone(),
+                        bundle,
+                        cert,
+                        now_unix,
+                        DefaultVerifier,
+                    )
+                    .ok()
+                }),
+        );
+
         // Did any CRL actually reach a verdict about this certificate?
         let mut cleared_by_some_crl = false;
         for checker in &checkers {
@@ -281,10 +331,10 @@ fn check_revocation(
             // the fail-open this function used to have.
             return Some(format!(
                 "pkix-path revocation: revocation status of cert at chain index {i} \
-                 is undetermined — none of the {} checker(s) built from {} supplied \
-                 CRL(s) applied to it",
+                 is undetermined — none of the {} checker(s) built from the {} \
+                 applicable CRL(s) produced a verdict",
                 checkers.len(),
-                crls.len()
+                applicable.len()
             ));
         }
     }
