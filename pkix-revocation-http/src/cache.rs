@@ -75,6 +75,17 @@ const OID_CRL_NUMBER: der::asn1::ObjectIdentifier =
 // ---------------------------------------------------------------------------
 // Keys
 // ---------------------------------------------------------------------------
+//
+// The key types keep public fields where the value types ([`CachedCrl`],
+// [`CachedOcspResponse`]) do not. That asymmetry is deliberate: a key IS
+// its fields, and an out-of-process `RevocationCache` implementation has
+// to read them to build whatever its backing store uses for a key — a
+// Redis key string, a SQL tuple, a filesystem path. Hiding them behind
+// accessors would buy no representation freedom (the fields are the
+// identity tuple, and changing them is a breaking change whether they
+// are public or not) and would make every external-store implementation
+// clumsier. A value, by contrast, is an opaque blob plus metadata the
+// wrapper derived from it, and is only meaningful as a set.
 
 /// Cache key for a CRL.
 ///
@@ -134,18 +145,85 @@ pub struct OcspCacheKey {
 /// `next_update == None` as "never cache" or "cache for a bounded
 /// fallback TTL". The reference [`InMemoryCache`] treats it as "never
 /// expires until invalidated".
+/// # Field privacy
+///
+/// The fields are private and reached through accessors. The cached
+/// bytes are a DER blob plus the three freshness values the wrapper
+/// derived from it, and the four are only meaningful together: a
+/// `next_update` that did not come from these `bytes` would make the
+/// wrapper serve a CRL it believes is live when it is not. Keeping them
+/// private means the only way to build a `CachedCrl` is
+/// [`CachedCrl::new`], and leaves this crate free to change how the
+/// metadata is stored (a packed epoch-seconds representation, say, or a
+/// parsed `CRLNumber` integer) without a breaking change.
+///
+/// `RevocationCache` implementors need both halves and have them:
+/// [`CachedCrl::new`] to reconstruct an entry loaded from an external
+/// store, and the accessors to write one out.
 #[derive(Clone, Debug)]
 pub struct CachedCrl {
-    /// `CRLNumber` extension value if present.
+    crl_number: Option<Vec<u8>>,
+    this_update: SystemTime,
+    next_update: Option<SystemTime>,
+    bytes: Vec<u8>,
+}
+
+impl CachedCrl {
+    /// Assemble a cache entry from DER bytes and the freshness metadata
+    /// taken from them.
     ///
-    /// Monotonicity comparator — RFC 5280 §5.2.3.
-    pub crl_number: Option<Vec<u8>>,
+    /// - `crl_number` — the RFC 5280 §5.2.3 `CRLNumber` extension value as
+    ///   canonical unsigned big-endian bytes, or `None` if the CRL omits
+    ///   the extension. This is the monotonicity comparator; an entry
+    ///   stored without it cannot be protected from rollback.
+    /// - `this_update` — `tbsCertList.thisUpdate`.
+    /// - `next_update` — `tbsCertList.nextUpdate`, or `None` if omitted.
+    /// - `bytes` — the raw DER-encoded `CertificateList`.
+    ///
+    /// The metadata is not re-derived from `bytes`, so a
+    /// [`RevocationCache`] implementor restoring an entry from an
+    /// external store must write back the values it read out of the same
+    /// entry, not values from elsewhere.
+    #[must_use]
+    pub const fn new(
+        crl_number: Option<Vec<u8>>,
+        this_update: SystemTime,
+        next_update: Option<SystemTime>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        Self {
+            crl_number,
+            this_update,
+            next_update,
+            bytes,
+        }
+    }
+
+    /// The `CRLNumber` extension value, if the CRL carried one.
+    ///
+    /// Canonical unsigned big-endian bytes — RFC 5280 §5.2.3.
+    #[must_use]
+    pub fn crl_number(&self) -> Option<&[u8]> {
+        self.crl_number.as_deref()
+    }
+
     /// `tbsCertList.thisUpdate`.
-    pub this_update: SystemTime,
-    /// `tbsCertList.nextUpdate` — `None` if omitted.
-    pub next_update: Option<SystemTime>,
-    /// Raw DER-encoded `CertificateList`.
-    pub bytes: Vec<u8>,
+    #[must_use]
+    pub const fn this_update(&self) -> SystemTime {
+        self.this_update
+    }
+
+    /// `tbsCertList.nextUpdate` — `None` if the CRL omits it.
+    #[must_use]
+    pub const fn next_update(&self) -> Option<SystemTime> {
+        self.next_update
+    }
+
+    /// The raw DER-encoded `CertificateList`.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 /// Cached OCSP response bytes plus freshness metadata.
@@ -157,16 +235,71 @@ pub struct CachedCrl {
 /// As with [`CachedCrl`], `next_update == None` is unusual (RFC 6960
 /// §4.2.2.1 RECOMMENDS its presence); the reference cache keeps such
 /// entries until invalidated.
+/// # Field privacy
+///
+/// Private for the same reason as [`CachedCrl`]'s: the bytes and the
+/// three timestamps derived from them are only meaningful as a set.
+/// Build one with [`CachedOcspResponse::new`] and read it through the
+/// accessors.
 #[derive(Clone, Debug)]
 pub struct CachedOcspResponse {
-    /// `BasicOcspResponse.tbsResponseData.producedAt`.
-    pub produced_at: SystemTime,
-    /// `SingleResponse.thisUpdate`.
-    pub this_update: SystemTime,
-    /// `SingleResponse.nextUpdate` — `None` if omitted.
-    pub next_update: Option<SystemTime>,
-    /// Raw DER-encoded outer `OcspResponse`.
-    pub bytes: Vec<u8>,
+    produced_at: SystemTime,
+    this_update: SystemTime,
+    next_update: Option<SystemTime>,
+    bytes: Vec<u8>,
+}
+
+impl CachedOcspResponse {
+    /// Assemble a cache entry from DER bytes and the freshness metadata
+    /// taken from them.
+    ///
+    /// - `produced_at` — `BasicOcspResponse.tbsResponseData.producedAt`.
+    /// - `this_update` — the `SingleResponse.thisUpdate` for the queried
+    ///   certificate. This is the staleness comparator; see
+    ///   [`CachedHttpOcspFetcher`] for how it is used to reject a
+    ///   response that would replace fresher status with older status.
+    /// - `next_update` — `SingleResponse.nextUpdate`, or `None`.
+    /// - `bytes` — the raw DER-encoded outer `OcspResponse`.
+    #[must_use]
+    pub const fn new(
+        produced_at: SystemTime,
+        this_update: SystemTime,
+        next_update: Option<SystemTime>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        Self {
+            produced_at,
+            this_update,
+            next_update,
+            bytes,
+        }
+    }
+
+    /// `BasicOcspResponse.tbsResponseData.producedAt` — when the
+    /// responder signed this response.
+    #[must_use]
+    pub const fn produced_at(&self) -> SystemTime {
+        self.produced_at
+    }
+
+    /// `SingleResponse.thisUpdate` — the time the status it carries was
+    /// known to be correct.
+    #[must_use]
+    pub const fn this_update(&self) -> SystemTime {
+        self.this_update
+    }
+
+    /// `SingleResponse.nextUpdate` — `None` if the response omits it.
+    #[must_use]
+    pub const fn next_update(&self) -> Option<SystemTime> {
+        self.next_update
+    }
+
+    /// The raw DER-encoded outer `OcspResponse`.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +424,7 @@ impl InMemoryCache {
         // rollback" to every caller.
         let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
         if let Some(existing) = guard.get(&key) {
-            if is_rollback(Some(existing.as_ref()), new_entry.crl_number.as_deref()) {
+            if is_rollback(Some(existing.as_ref()), new_entry.crl_number()) {
                 return false;
             }
         }
@@ -521,7 +654,7 @@ fn parse_ocsp_metadata(der_bytes: &[u8]) -> Result<OcspMetadata, der::Error> {
 #[cfg(feature = "crl")]
 fn is_rollback(prior: Option<&CachedCrl>, incoming: Option<&[u8]>) -> bool {
     match (prior, incoming) {
-        (Some(p), Some(inc)) => match p.crl_number.as_deref() {
+        (Some(p), Some(inc)) => match p.crl_number() {
             Some(prior_num) => crl_number_gt(prior_num, inc),
             None => false,
         },
@@ -584,10 +717,7 @@ impl<T: CrlAtomicPut + ?Sized> CrlAtomicPut for Arc<T> {
 #[cfg(feature = "crl")]
 impl CrlAtomicPut for dyn RevocationCache {
     fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        if is_rollback(
-            self.get_crl(&key).as_deref(),
-            new_entry.crl_number.as_deref(),
-        ) {
+        if is_rollback(self.get_crl(&key).as_deref(), new_entry.crl_number()) {
             return false;
         }
         self.put_crl(key, new_entry);
@@ -736,10 +866,10 @@ where
             if let Some(cached) = key
                 .as_ref()
                 .and_then(|k| self.cache.get_crl(k))
-                .filter(|e| is_live(e.next_update, now))
+                .filter(|e| is_live(e.next_update(), now))
             {
                 match CrlChecker::new(
-                    cached.bytes.as_slice(),
+                    cached.bytes(),
                     self.inner.now_unix,
                     self.inner.verifier.clone(),
                 ) {
@@ -833,12 +963,12 @@ where
 
         self.cache.put_crl_guarded(
             key,
-            CachedCrl {
-                crl_number: meta.crl_number,
-                this_update: meta.this_update,
-                next_update: meta.next_update,
-                bytes: resp.bytes.clone(),
-            },
+            CachedCrl::new(
+                meta.crl_number,
+                meta.this_update,
+                meta.next_update,
+                resp.bytes.clone(),
+            ),
         );
     }
 }
@@ -961,10 +1091,10 @@ where
             if let Some(cached) = self
                 .cache
                 .get_ocsp(&key)
-                .filter(|e| is_live(e.next_update, now))
+                .filter(|e| is_live(e.next_update(), now))
             {
                 match OcspChecker::new(
-                    cached.bytes.as_slice(),
+                    cached.bytes(),
                     self.inner.now_unix,
                     self.inner.verifier.clone(),
                 ) {
@@ -1034,12 +1164,12 @@ where
         }
         self.cache.put_ocsp(
             key,
-            CachedOcspResponse {
-                produced_at: meta.produced_at,
-                this_update: meta.this_update,
-                next_update: meta.next_update,
-                bytes: resp.bytes.clone(),
-            },
+            CachedOcspResponse::new(
+                meta.produced_at,
+                meta.this_update,
+                meta.next_update,
+                resp.bytes.clone(),
+            ),
         );
     }
 }
