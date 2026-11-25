@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-29bc",
+  "title": "pkix-revocation-http: cargo doc --no-default-features has 24 broken intra-doc links",
+  "description": "RUSTDOCFLAGS='-D warnings' cargo doc -p pkix-revocation-http --no-default-features --no-deps fails with 24 unresolved intra-doc links. The crate-level module documentation and several item docs link to types that only exist behind the crl, ocsp, async or client-* features -- HttpCrlFetcher, HttpOcspFetcher, CachedHttpCrlFetcher, InMemoryCache, RevocationCache, AsyncRevocationFetcher, clients::reqwest::ReqwestFetcher, and the bare 'ureq' / 'reqwest' crate links among them.\n\nNot a CI risk today: quality-gates runs cargo doc only with --all-features, and docs.rs is configured with all-features in [package.metadata.docs.rs], so the rendered documentation is correct. It shows up only for a consumer who builds docs for their own feature selection.\n\nMeasured at 24 on 1ac1606d (before the PKIX-cr8 work) and 24 after, so nothing in that epic added to it -- DEFAULT_MAX_URLS_PER_CHECK was gated on any(crl, ocsp) specifically to keep it from becoming the 25th.\n\nFix is mechanical: either gate the doc text alongside the items it references, or wrap the feature-conditional links so they degrade to plain code spans. Worth doing in one pass rather than piecemeal.\n\nSibling crates likely have the same condition; worth checking pkix-aia-http and pkix-chain while in there.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-25T16:10:25.752609868Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T16:10:25.752609868Z"
+}
