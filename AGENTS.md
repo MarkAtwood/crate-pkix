@@ -202,6 +202,17 @@ and `pkix-difftest/baseline-limbo-analysis.md` for current state.
 - Test vector / expected-result sources: NIST PKITS (binary fixtures committed), x509-limbo (curated JSON manifest, fetched into `~/GIT/x509-limbo` on demand), per-RFC test vectors.
 - PKITS binary fixtures committed to the repo; tests are fully offline.
 
+## Commit messages: no tool attribution
+
+Never add `Assisted-by`, `Co-Authored-By`, `Generated with`, or any other
+trailer naming a model or tool. Not optional, not configurable, not "nobody
+is penalized either way". No commit in this repository has ever carried one
+and none ever will.
+
+The commit message records what the patch does and why. Who or what typed it
+is not part of that, and a trailer claiming assistance establishes nothing a
+reviewer can use.
+
 ## Changelogs: don't
 
 **Do not write `CHANGELOG.md` entries as part of ordinary work.** The git

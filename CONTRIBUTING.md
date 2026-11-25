@@ -18,8 +18,11 @@ it must be correct, and it must be tested.
   behavior the code doesn't have is a bug, not a contribution.
 - **Volume is not value.** Bulk-generated PRs and drive-by "cleanup" churn
   may be closed in bulk.
-- **Disclosure is optional.** If you want to credit the tool, add a commit
-  trailer such as `Assisted-by: <tool/model>`. Nobody is penalized either way.
+- **No tool-attribution trailers.** Do not add `Assisted-by`,
+  `Co-Authored-By`, or any other trailer naming a model or tool. No commit in
+  this repository has ever carried one. What matters is whether you can
+  explain and stand behind the change, which the first rule above already
+  covers; a trailer does not establish that and is not a substitute for it.
 
 ## Developer Certificate of Origin
 
