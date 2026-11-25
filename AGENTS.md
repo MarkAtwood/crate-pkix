@@ -202,6 +202,35 @@ and `pkix-difftest/baseline-limbo-analysis.md` for current state.
 - Test vector / expected-result sources: NIST PKITS (binary fixtures committed), x509-limbo (curated JSON manifest, fetched into `~/GIT/x509-limbo` on demand), per-RFC test vectors.
 - PKITS binary fixtures committed to the repo; tests are fully offline.
 
+## Changelogs: don't
+
+**Do not write `CHANGELOG.md` entries as part of ordinary work.** The git
+history is the record. A commit message that explains its patch, with the
+reasoning a maintainer needs in two years, is the one place that belongs.
+
+This was never an instruction — agents generated it unprompted, every commit,
+and then restated the same prose in the commit message. The result is a
+2700-line root changelog that says what `git log` already says, in the same
+voice, maintained twice.
+
+Concretely:
+
+- A code change touches `CHANGELOG.md` **only** if a human asked it to.
+- Put the root cause, the invariant, the design choice and the inherited
+  constraint in the commit message. Do not also put them in a changelog.
+- Do not create a `CHANGELOG.md` for a new crate.
+- If you catch yourself writing a release narrative for a version that has not
+  been released, stop. Write it when it ships, if at all.
+
+The narrow case where a changelog earns its place: **a hand-written note about
+breaking changes, at release time**, for the consumers of a published crate.
+Most crates here are published on crates.io, so that case is real — what was
+deleted was not that. It was maintainer-voice prose restating the commit it
+came from, written per-commit and read by nobody.
+
+Same rule, stated as a smell: if the commit message and the changelog entry
+would say the same thing, the changelog entry is the one to drop.
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
