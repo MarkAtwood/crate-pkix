@@ -1,29 +1,27 @@
 {
-  "compaction_level": 0,
-  "content_hash": "95f5b7983951c5749912d1019c55673d494e59e9d111a9d7aa7a468c8c4b1f7a",
+  "id": "PKIX-f1j4.13",
+  "title": "Every cache check on hit clones the verifier — V: Clone bound forces unnecessary allocation for verifiers carrying state",
+  "description": "src/cache.rs:592, 617, 774, 791 (and matching sync sites in crl.rs:85 / ocsp.rs:88): `CrlChecker::new(cached.bytes.as_slice(), self.inner.now_unix, self.inner.verifier.clone())`. The V: SignatureVerifier + Clone bound is propagated through the wrapper.\n\nFor verifiers that are zero-cost copies (DefaultVerifier, unit structs), this is free. For verifiers that carry state (a verifier wrapping a hardware key handle, or an Arc\u003cdyn Verifier\u003e), the clone is a refcount bump per check_revocation call. Not a real bottleneck.\n\nBut the design choice forces V: Clone on every consumer. A verifier that is naturally not Clone (e.g. holds an \u0026mut to a hardware token) can't be used. Mitigations: (a) take \u0026V in CrlChecker::new (changes pkix-revocation API; pre-1.0 fine), (b) accept Arc\u003cdyn SignatureVerifier\u003e as the canonical shape (breaks generic monomorphization, also fine), or (c) leave as-is and add a docstring note that Clone is required.\n\nOut-of-scope for this crate to change pkix-revocation's CrlChecker::new signature; in-scope to note the implication and decide whether to push the change up to pkix-revocation as part of the 1.0 wave.",
+  "status": "closed",
+  "priority": 2,
+  "issue_type": "task",
+  "assignee": "Mark Atwood",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T18:58:19Z",
   "created_by": "Mark Atwood",
-  "description": "src/cache.rs:592, 617, 774, 791 (and matching sync sites in crl.rs:85 / ocsp.rs:88): `CrlChecker::new(cached.bytes.as_slice(), self.inner.now_unix, self.inner.verifier.clone())`. The V: SignatureVerifier + Clone bound is propagated through the wrapper.\n\nFor verifiers that are zero-cost copies (DefaultVerifier, unit structs), this is free. For verifiers that carry state (a verifier wrapping a hardware key handle, or an Arc<dyn Verifier>), the clone is a refcount bump per check_revocation call. Not a real bottleneck.\n\nBut the design choice forces V: Clone on every consumer. A verifier that is naturally not Clone (e.g. holds an &mut to a hardware token) can't be used. Mitigations: (a) take &V in CrlChecker::new (changes pkix-revocation API; pre-1.0 fine), (b) accept Arc<dyn SignatureVerifier> as the canonical shape (breaks generic monomorphization, also fine), or (c) leave as-is and add a docstring note that Clone is required.\n\nOut-of-scope for this crate to change pkix-revocation's CrlChecker::new signature; in-scope to note the implication and decide whether to push the change up to pkix-revocation as part of the 1.0 wave.",
-  "ephemeral": 0,
-  "id": "PKIX-f1j4.13",
-  "is_template": 0,
-  "issue_type": "task",
+  "updated_at": "2026-11-25T16:27:50.934538775Z",
+  "started_at": "2026-11-25T16:18:34.515728569Z",
+  "closed_at": "2026-11-25T16:27:50.934538775Z",
+  "close_reason": "Fixed properly, without any of the three options the bead listed.\n\nThe bead offered (a) change CrlChecker::new to take \u0026V (breaking, adds a lifetime to a public type across the workspace), (b) make Arc the canonical shape (breaking), or (c) leave it and add a docstring note. It also scoped itself to 'note the implication and decide whether to push the change up'.\n\nThere was a fourth option, additive and non-breaking: CrlChecker owns V but every internal use is \u0026self.verifier, so the bound is satisfied by any type that is both SignatureVerifier and Clone -- and a shared reference is Copy. pkix-path now forwards SignatureVerifier through \u0026T (unconditional) and Arc\u003cT\u003e (gated on std). A verifier owning a hardware token handle or an open session is passed as \u0026verifier for a scoped validation, or Arc\u003cverifier\u003e for a fetcher with no borrow to hold. No signature changed anywhere.\n\nThe Arc impl is gated on std deliberately: Arc needs alloc::sync, which requires atomic CAS, and pkix-path advertises no_std. Implementing it unconditionally would break a future thumbv6m target silently; the three bare-metal targets in CI happen to have atomics, which is not a reason to depend on it.\n\nAlso promoted pkix-path's private 'use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef}' to a re-export, found while writing the test: both appear in verify_signature's signature, so implementing the trait requires naming them, and they were reachable only by reading pkix-path's source and taking a direct spki dependency. No new coupling -- they were already public API by virtue of being in the signature.\n\ntests/non_clone_verifier.rs is mostly a compile-time assertion: its verifier deliberately omits Clone, so the file stops building if either forwarding impl is removed, and it counts calls to confirm the forwarding reaches the real impl rather than a default. Commits ef1fd31a, a829edc8.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 2,
-  "status": "open",
-  "timeout_ns": 0,
-  "title": "Every cache check on hit clones the verifier \u2014 V: Clone bound forces unnecessary allocation for verifiers carrying state",
-  "updated_at": "2026-05-14T18:58:19Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-f1j4",
+      "type": "parent-child",
       "created_at": "2026-05-14T11:58:19Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-f1j4",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }
