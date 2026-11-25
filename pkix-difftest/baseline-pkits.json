@@ -421,28 +421,6 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
-      "name": "4.11.7 Valid Self-Issued inhibitPolicyMapping Test7",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
       "name": "4.12.2 Valid inhibitAnyPolicy Test2",
       "verdicts": [
         {
@@ -509,7 +487,7 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
-      "name": "4.12.7 Valid Self-Issued inhibitAnyPolicy Test7",
+      "name": "4.13.1 Valid DN nameConstraints Test1",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -523,7 +501,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.54: certificate contains unaccounted-for critical extensions",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
           "verdict": "fail"
         }
       ]
@@ -531,7 +509,7 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
-      "name": "4.12.9 Valid Self-Issued inhibitAnyPolicy Test9",
+      "name": "4.13.11 Valid DN nameConstraints Test11",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -545,7 +523,73 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.13.14 Valid DN nameConstraints Test14",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.13.18 Valid DN nameConstraints Test18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.13.27 Valid DN and RFC822 nameConstraints Test27",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
           "verdict": "fail"
         }
       ]
@@ -597,6 +641,28 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
+      "name": "4.13.4 Valid DN nameConstraints Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
       "name": "4.13.5 Valid DN nameConstraints Test5",
       "verdicts": [
         {
@@ -611,183 +677,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: unsupported name constraint",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.11 Invalid onlyContainsUserCerts CRL Test11",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.12 Invalid onlyContainsCACerts CRL Test12",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.14 Invalid onlyContainsAttributeCerts Test14",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.17 Invalid onlySomeReasons Test17",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.18 Valid onlySomeReasons Test18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.19 Valid onlySomeReasons Test19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.22 Valid IDP with indirectCRL Test22",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.23 Invalid IDP with indirectCRL Test23",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
           "verdict": "fail"
         }
       ]
@@ -795,7 +685,7 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
-      "name": "4.14.24 Valid IDP with indirectCRL Test24",
+      "name": "4.13.6 Valid DN nameConstraints Test6",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -804,20 +694,20 @@
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
+          "reason": null,
+          "verdict": "pass"
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
         }
       ]
     },
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
-      "name": "4.14.25 Valid IDP with indirectCRL Test25",
+      "name": "4.15.7 Valid delta-CRL Test7",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -826,299 +716,13 @@
         },
         {
           "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
+          "reason": null,
+          "verdict": "pass"
         },
         {
           "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.26 Invalid IDP with indirectCRL Test26",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
+          "reason": "pyca: certificate 0x6 revoked by CRL",
           "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.27 Invalid cRLIssuer Test27",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.28 Valid cRLIssuer Test28",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.29 Valid cRLIssuer Test29",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.3 Invalid distributionPoint Test3",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.30 Valid cRLIssuer Test30",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.31 Invalid cRLIssuer Test31",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.32 Invalid cRLIssuer Test32",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.14.33 Valid cRLIssuer Test33",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.34 Invalid cRLIssuer Test34",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0xb revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.35 Invalid cRLIssuer Test35",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.8 Invalid distributionPoint Test8",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.9 Invalid distributionPoint Test9",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -1256,380 +860,6 @@
     },
     {
       "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.1 Missing CRL Test1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.10 Invalid Unknown CRL Extension Test10",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unhandled critical CRL extension",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.11 Invalid Old CRL nextUpdate Test11",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL has expired",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.12 Invalid pre2000 CRL nextUpdate Test12",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL has expired",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.4.19 Valid Separate Certificate and CRL Keys Test19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.20 Invalid Separate Certificate and CRL Keys Test20",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x2 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.21 Invalid Separate Certificate and CRL Keys Test21",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.4 Invalid Bad CRL Signature Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL signature failure",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.5 Invalid Bad CRL Issuer Name Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.6 Invalid Wrong CRL Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.2 Invalid Basic Self-Issued Old With New Test2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x3 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.5.4 Valid Basic Self-Issued New With Old Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.5 Invalid Basic Self-Issued New With Old Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x4 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.5.6 Valid Basic Self-Issued CRL Signing Key Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.7 Invalid Basic Self-Issued CRL Signing Key Test7",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x3 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.6.15 Valid Self-Issued pathLenConstraint Test15",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.6.17 Valid Self-Issued pathLenConstraint Test17",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
       "ground_truth_agreement": true,
       "name": "4.6.4 Valid basicConstraints Not Critical Test4",
       "verdicts": [
@@ -1647,50 +877,6 @@
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.19: Certificate extension has incorrect criticality",
           "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.7.4 Invalid keyUsage Critical cRLSign False Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "key usage does not include CRL signing",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.7.5 Invalid keyUsage Not Critical cRLSign False Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "key usage does not include CRL signing",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
         }
       ]
     },
@@ -1761,35 +947,13 @@
       ]
     },
     {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.9.6 Valid Self-Issued requireExplicitPolicy Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.36: certificate contains unaccounted-for critical extensions",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
       "name": "4.1.4 Valid DSA Signatures Test4",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 0",
+          "reason": "signature not verified at chain index 0: unsupported signature algorithm",
           "verdict": "fail"
         },
         {
@@ -2070,6 +1234,28 @@
     },
     {
       "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.11.7 Valid Self-Issued inhibitPolicyMapping Test7",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "4.11.8 Invalid Self-Issued inhibitPolicyMapping Test8",
       "verdicts": [
@@ -2224,6 +1410,28 @@
     },
     {
       "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.12.7 Valid Self-Issued inhibitAnyPolicy Test7",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.54: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "4.12.8 Invalid Self-Issued inhibitAnyPolicy Test8",
       "verdicts": [
@@ -2246,17 +1454,61 @@
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": true,
-      "name": "4.13.10 Invalid DN nameConstraints Test10",
+      "ground_truth_agreement": false,
+      "name": "4.12.9 Valid Self-Issued inhibitAnyPolicy Test9",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.13.19 Valid Self-Issued DN nameConstraints Test19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.14.11 Invalid onlyContainsUserCerts CRL Test11",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
           "verdict": "fail"
         },
         {
@@ -2269,16 +1521,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.12 Invalid DN nameConstraints Test12",
+      "name": "4.14.12 Invalid onlyContainsCACerts CRL Test12",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "different CRL scope",
           "verdict": "fail"
         },
         {
@@ -2291,16 +1543,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.13 Invalid DN nameConstraints Test13",
+      "name": "4.14.14 Invalid onlyContainsAttributeCerts Test14",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "different CRL scope",
           "verdict": "fail"
         },
         {
@@ -2313,16 +1565,126 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.15 Invalid DN nameConstraints Test15",
+      "name": "4.14.17 Invalid onlySomeReasons Test17",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.18 Valid onlySomeReasons Test18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.19 Valid onlySomeReasons Test19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.22 Valid IDP with indirectCRL Test22",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.24 Valid IDP with indirectCRL Test24",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.25 Valid IDP with indirectCRL Test25",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2335,16 +1697,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.16 Invalid DN nameConstraints Test16",
+      "name": "4.14.26 Invalid IDP with indirectCRL Test26",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2357,16 +1719,60 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.17 Invalid DN nameConstraints Test17",
+      "name": "4.14.27 Invalid cRLIssuer Test27",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.28 Valid cRLIssuer Test28",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.29 Valid cRLIssuer Test29",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
           "verdict": "fail"
         },
         {
@@ -2379,16 +1785,38 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.2 Invalid DN nameConstraints Test2",
+      "name": "4.14.3 Invalid distributionPoint Test3",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.30 Valid cRLIssuer Test30",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2401,16 +1829,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.20 Invalid Self-Issued DN nameConstraints Test20",
+      "name": "4.14.31 Invalid cRLIssuer Test31",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2423,16 +1851,38 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.29 Invalid DN and RFC822 nameConstraints Test29",
+      "name": "4.14.32 Invalid cRLIssuer Test32",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "permitted subtree violation",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.33 Valid cRLIssuer Test33",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2445,16 +1895,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.7 Invalid DN nameConstraints Test7",
+      "name": "4.14.35 Invalid cRLIssuer Test35",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
         },
         {
@@ -2467,16 +1917,16 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.8 Invalid DN nameConstraints Test8",
+      "name": "4.14.8 Invalid distributionPoint Test8",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "different CRL scope",
           "verdict": "fail"
         },
         {
@@ -2489,17 +1939,61 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": true,
-      "name": "4.13.9 Invalid DN nameConstraints Test9",
+      "name": "4.14.9 Invalid distributionPoint Test9",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "name constraints violated at certificate index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": "excluded subtree violation",
+          "reason": "different CRL scope",
           "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.15.1 Invalid deltaCRLIndicator No Base Test1",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 1 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.15.10 Invalid delta-CRL Test10",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
         },
         {
           "oracle": "pyca",
@@ -2554,12 +2048,210 @@
     },
     {
       "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.15.7 Valid delta-CRL Test7",
+      "ground_truth_agreement": true,
+      "name": "4.4.1 Missing CRL Test1",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 06 is revoked (reason removeFromCRL)",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 1 checker(s) built from 1 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.10 Invalid Unknown CRL Extension Test10",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unhandled critical CRL extension",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.11 Invalid Old CRL nextUpdate Test11",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "CRL has expired",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.12 Invalid pre2000 CRL nextUpdate Test12",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "CRL has expired",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.4.19 Valid Separate Certificate and CRL Keys Test19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.21 Invalid Separate Certificate and CRL Keys Test21",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.4 Invalid Bad CRL Signature Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "CRL signature failure",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.5 Invalid Bad CRL Issuer Name Test5",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.4.6 Invalid Wrong CRL Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.5.1 Valid Basic Self-Issued Old With New Test1",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
@@ -2569,8 +2261,140 @@
         },
         {
           "oracle": "pyca",
-          "reason": "pyca: certificate 0x6 revoked by CRL",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.5.4 Valid Basic Self-Issued New With Old Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.5.6 Valid Basic Self-Issued CRL Signing Key Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.6.15 Valid Self-Issued pathLenConstraint Test15",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.6.17 Valid Self-Issued pathLenConstraint Test17",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.7.4 Invalid keyUsage Critical cRLSign False Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "key usage does not include CRL signing",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": true,
+      "name": "4.7.5 Invalid keyUsage Not Critical cRLSign False Test5",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "key usage does not include CRL signing",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -2752,6 +2576,28 @@
     },
     {
       "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.9.6 Valid Self-Issued requireExplicitPolicy Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.36: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
       "ground_truth_agreement": true,
       "name": "4.9.7 Invalid Self-Issued requireExplicitPolicy Test7",
       "verdicts": [
@@ -2845,7 +2691,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 0",
+          "reason": "signature not verified at chain index 0: unsupported signature algorithm",
           "verdict": "fail"
         },
         {
@@ -2856,6 +2702,182 @@
         {
           "oracle": "pyca",
           "reason": "VerificationError: validation failed: candidates exhausted: Forbidden public key algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Dsa(DssParams { p: BigUint { data: [0, 223, 229, 17, 62, 218, 233, 182, 110, 16, 214, 234, 157, 226, 157, 58, 176, 71, 189, 68, 0, 199, 86, 200, 204, 110, 208, 51, 132, 86, 71, 53, 61, 246, 84, 200, 227, 194, 173, 187, 186, 117, 243, 47, 51, 12, 166, 249, 49, 236, 103, 227, 229, 153, 109, 252, 41, 110, 170, 87, 136, 114, 52, 226, 142, 0, 144, 224, 163, 172, 100, 142, 192, 246, 60, 29, 143, 180, 200, 74, 72, 48, 94, 127, 170, 156, 118, 38, 11, 219, 19, 115, 51, 131, 151, 192, 197, 179, 230, 55, 245, 62, 255, 21, 13, 212, 161, 46, 186, 49, 248, 171, 135, 216, 11, 204, 119, 152, 66, 110, 172, 147, 152, 194, 189, 46, 123, 52, 11] }, q: BigUint { data: [0, 207, 6, 4, 216, 255, 139, 235, 0, 233, 246, 92, 7, 150, 115, 253, 150, 101, 58, 47, 7] }, g: BigUint { data: [0, 204, 225, 124, 176, 206, 146, 95, 99, 236, 56, 187, 68, 186, 221, 146, 52, 182, 94, 190, 101, 123, 216, 113, 119, 4, 157, 236, 102, 124, 59, 4, 206, 182, 243, 82, 254, 15, 146, 85, 2, 239, 78, 18, 171, 93, 154, 46, 47, 110, 86, 243, 112, 236, 106, 237, 155, 34, 184, 168, 19, 203, 12, 156, 22, 234, 193, 10, 142, 33, 38, 68, 165, 12, 249, 160, 236, 98, 224, 112, 49, 204, 104, 245, 11, 133, 164, 74, 27, 110, 121, 244, 193, 249, 54, 90, 56, 111, 78, 239, 132, 83, 223, 103, 253, 204, 247, 89, 98, 143, 156, 156, 205, 16, 143, 92, 164, 15, 156, 183, 7, 236, 96, 243, 190, 175, 126, 57, 152] } }) }",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.10 Invalid DN nameConstraints Test10",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.12 Invalid DN nameConstraints Test12",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "permitted subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.13 Invalid DN nameConstraints Test13",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "permitted subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.15 Invalid DN nameConstraints Test15",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.16 Invalid DN nameConstraints Test16",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.17 Invalid DN nameConstraints Test17",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.2 Invalid DN nameConstraints Test2",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "permitted subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.20 Invalid Self-Issued DN nameConstraints Test20",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "permitted subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
           "verdict": "fail"
         }
       ]
@@ -2951,6 +2973,28 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
+      "name": "4.13.29 Invalid DN and RFC822 nameConstraints Test29",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "permitted subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
       "name": "4.13.3 Invalid DN nameConstraints Test3",
       "verdicts": [
         {
@@ -2965,7 +3009,7 @@
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: unsupported name constraint",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
           "verdict": "fail"
         }
       ]
@@ -3083,6 +3127,72 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
+      "name": "4.13.7 Invalid DN nameConstraints Test7",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.8 Invalid DN nameConstraints Test8",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.13.9 Invalid DN nameConstraints Test9",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "name constraints violated at certificate index 0",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "excluded subtree violation",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
       "name": "4.14.15 Invalid onlySomeReasons Test15",
       "verdicts": [
         {
@@ -3186,6 +3296,50 @@
         {
           "oracle": "pyca",
           "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.23 Invalid IDP with indirectCRL Test23",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.14.34 Invalid cRLIssuer Test34",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0xb revoked by CRL",
           "verdict": "fail"
         }
       ]
@@ -3523,6 +3677,28 @@
     {
       "class": "DiagnosticDivergence",
       "ground_truth_agreement": true,
+      "name": "4.4.20 Invalid Separate Certificate and CRL Keys Test20",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x2 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
       "name": "4.4.3 Invalid Revoked EE Test3",
       "verdicts": [
         {
@@ -3549,7 +3725,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
@@ -3571,7 +3747,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 01 is revoked (reason keyCompromise)",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
@@ -3582,6 +3758,72 @@
         {
           "oracle": "pyca",
           "reason": "pyca: certificate 0x1 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.5.2 Invalid Basic Self-Issued Old With New Test2",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "certificate revoked",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x3 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.5.5 Invalid Basic Self-Issued New With Old Test5",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x4 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "DiagnosticDivergence",
+      "ground_truth_agreement": true,
+      "name": "4.5.7 Invalid Basic Self-Issued CRL Signing Key Test7",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x3 revoked by CRL",
           "verdict": "fail"
         }
       ]
@@ -3897,116 +4139,6 @@
     {
       "class": "Agreement",
       "ground_truth_agreement": true,
-      "name": "4.13.1 Valid DN nameConstraints Test1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.11 Valid DN nameConstraints Test11",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.14 Valid DN nameConstraints Test14",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.18 Valid DN nameConstraints Test18",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.19 Valid Self-Issued DN nameConstraints Test19",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
       "name": "4.13.21 Valid RFC822 nameConstraints Test21",
       "verdicts": [
         {
@@ -4073,28 +4205,6 @@
     {
       "class": "Agreement",
       "ground_truth_agreement": true,
-      "name": "4.13.27 Valid DN and RFC822 nameConstraints Test27",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
       "name": "4.13.30 Valid DNS nameConstraints Test30",
       "verdicts": [
         {
@@ -4118,50 +4228,6 @@
       "class": "Agreement",
       "ground_truth_agreement": true,
       "name": "4.13.32 Valid DNS nameConstraints Test32",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.4 Valid DN nameConstraints Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.13.6 Valid DN nameConstraints Test6",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -4294,50 +4360,6 @@
       "class": "Agreement",
       "ground_truth_agreement": true,
       "name": "4.14.7 Valid distributionPoint Test7",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": false,
-      "name": "4.15.1 Invalid deltaCRLIndicator No Base Test1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": false,
-      "name": "4.15.10 Invalid delta-CRL Test10",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -4624,28 +4646,6 @@
       "class": "Agreement",
       "ground_truth_agreement": true,
       "name": "4.4.7 Valid Two CRLs Test7",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": true,
-      "name": "4.5.1 Valid Basic Self-Issued Old With New Test1",
       "verdicts": [
         {
           "oracle": "pkix-path",
@@ -5591,612 +5591,128 @@
       ]
     },
     {
-      "class": "LooserThanWild",
+      "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.14.11 Invalid onlyContainsUserCerts CRL Test11",
+      "name": "4.1.4 Valid DSA Signatures Test4",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
+          "reason": "signature not verified at chain index 0: unsupported signature algorithm",
           "verdict": "fail"
         },
         {
-          "oracle": "pyca",
+          "oracle": "openssl",
           "reason": null,
           "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden public key algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Dsa(DssParams { p: BigUint { data: [0, 223, 229, 17, 62, 218, 233, 182, 110, 16, 214, 234, 157, 226, 157, 58, 176, 71, 189, 68, 0, 199, 86, 200, 204, 110, 208, 51, 132, 86, 71, 53, 61, 246, 84, 200, 227, 194, 173, 187, 186, 117, 243, 47, 51, 12, 166, 249, 49, 236, 103, 227, 229, 153, 109, 252, 41, 110, 170, 87, 136, 114, 52, 226, 142, 0, 144, 224, 163, 172, 100, 142, 192, 246, 60, 29, 143, 180, 200, 74, 72, 48, 94, 127, 170, 156, 118, 38, 11, 219, 19, 115, 51, 131, 151, 192, 197, 179, 230, 55, 245, 62, 255, 21, 13, 212, 161, 46, 186, 49, 248, 171, 135, 216, 11, 204, 119, 152, 66, 110, 172, 147, 152, 194, 189, 46, 123, 52, 11] }, q: BigUint { data: [0, 207, 6, 4, 216, 255, 139, 235, 0, 233, 246, 92, 7, 150, 115, 253, 150, 101, 58, 47, 7] }, g: BigUint { data: [0, 204, 225, 124, 176, 206, 146, 95, 99, 236, 56, 187, 68, 186, 221, 146, 52, 182, 94, 190, 101, 123, 216, 113, 119, 4, 157, 236, 102, 124, 59, 4, 206, 182, 243, 82, 254, 15, 146, 85, 2, 239, 78, 18, 171, 93, 154, 46, 47, 110, 86, 243, 112, 236, 106, 237, 155, 34, 184, 168, 19, 203, 12, 156, 22, 234, 193, 10, 142, 33, 38, 68, 165, 12, 249, 160, 236, 98, 224, 112, 49, 204, 104, 245, 11, 133, 164, 74, 27, 110, 121, 244, 193, 249, 54, 90, 56, 111, 78, 239, 132, 83, 223, 103, 253, 204, 247, 89, 98, 143, 156, 156, 205, 16, 143, 92, 164, 15, 156, 183, 7, 236, 96, 243, 190, 175, 126, 57, 152] } }) }",
+          "verdict": "fail"
         }
       ]
     },
     {
-      "class": "LooserThanWild",
+      "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.14.12 Invalid onlyContainsCACerts CRL Test12",
+      "name": "4.11.7 Valid Self-Issued inhibitPolicyMapping Test7",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
-          "oracle": "pyca",
+          "oracle": "openssl",
           "reason": null,
           "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
         }
       ]
     },
     {
-      "class": "LooserThanWild",
+      "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.14.14 Invalid onlyContainsAttributeCerts Test14",
+      "name": "4.12.7 Valid Self-Issued inhibitAnyPolicy Test7",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
-          "oracle": "pyca",
+          "oracle": "openssl",
           "reason": null,
           "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.54: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
         }
       ]
     },
     {
-      "class": "LooserThanWild",
+      "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.14.17 Invalid onlySomeReasons Test17",
+      "name": "4.12.9 Valid Self-Issued inhibitAnyPolicy Test9",
       "verdicts": [
         {
           "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
           "reason": null,
           "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.13.19 Valid Self-Issued DN nameConstraints Test19",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: fatal error: critical nameConstraints extension contains an unsupported directoryName constraint",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.18 Valid onlySomeReasons Test18",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
         },
         {
           "oracle": "openssl",
           "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.23 Invalid IDP with indirectCRL Test23",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x2 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.26 Invalid IDP with indirectCRL Test26",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.27 Invalid cRLIssuer Test27",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.3 Invalid distributionPoint Test3",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.31 Invalid cRLIssuer Test31",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.32 Invalid cRLIssuer Test32",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.34 Invalid cRLIssuer Test34",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0xb revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.35 Invalid cRLIssuer Test35",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.8 Invalid distributionPoint Test8",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.14.9 Invalid distributionPoint Test9",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.1 Missing CRL Test1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.10 Invalid Unknown CRL Extension Test10",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unhandled critical CRL extension",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.11 Invalid Old CRL nextUpdate Test11",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL has expired",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.12 Invalid pre2000 CRL nextUpdate Test12",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL has expired",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.20 Invalid Separate Certificate and CRL Keys Test20",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x2 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.21 Invalid Separate Certificate and CRL Keys Test21",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.4 Invalid Bad CRL Signature Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "CRL signature failure",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.5 Invalid Bad CRL Issuer Name Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.4.6 Invalid Wrong CRL Test6",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "unable to get certificate CRL",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.2 Invalid Basic Self-Issued Old With New Test2",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "certificate revoked",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x3 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.5 Invalid Basic Self-Issued New With Old Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x4 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.5.7 Invalid Basic Self-Issued CRL Signing Key Test7",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "different CRL scope",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x3 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.7.4 Invalid keyUsage Critical cRLSign False Test4",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "key usage does not include CRL signing",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "pyca",
-          "reason": null,
-          "verdict": "pass"
-        }
-      ]
-    },
-    {
-      "class": "LooserThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.7.5 Invalid keyUsage Not Critical cRLSign False Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": "key usage does not include CRL signing",
           "verdict": "fail"
         },
         {
@@ -6209,22 +5725,176 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.1.4 Valid DSA Signatures Test4",
+      "name": "4.14.19 Valid onlySomeReasons Test19",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "signature invalid at chain index 0",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
         },
         {
           "oracle": "pyca",
-          "reason": "VerificationError: validation failed: candidates exhausted: Forbidden public key algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Dsa(DssParams { p: BigUint { data: [0, 223, 229, 17, 62, 218, 233, 182, 110, 16, 214, 234, 157, 226, 157, 58, 176, 71, 189, 68, 0, 199, 86, 200, 204, 110, 208, 51, 132, 86, 71, 53, 61, 246, 84, 200, 227, 194, 173, 187, 186, 117, 243, 47, 51, 12, 166, 249, 49, 236, 103, 227, 229, 153, 109, 252, 41, 110, 170, 87, 136, 114, 52, 226, 142, 0, 144, 224, 163, 172, 100, 142, 192, 246, 60, 29, 143, 180, 200, 74, 72, 48, 94, 127, 170, 156, 118, 38, 11, 219, 19, 115, 51, 131, 151, 192, 197, 179, 230, 55, 245, 62, 255, 21, 13, 212, 161, 46, 186, 49, 248, 171, 135, 216, 11, 204, 119, 152, 66, 110, 172, 147, 152, 194, 189, 46, 123, 52, 11] }, q: BigUint { data: [0, 207, 6, 4, 216, 255, 139, 235, 0, 233, 246, 92, 7, 150, 115, 253, 150, 101, 58, 47, 7] }, g: BigUint { data: [0, 204, 225, 124, 176, 206, 146, 95, 99, 236, 56, 187, 68, 186, 221, 146, 52, 182, 94, 190, 101, 123, 216, 113, 119, 4, 157, 236, 102, 124, 59, 4, 206, 182, 243, 82, 254, 15, 146, 85, 2, 239, 78, 18, 171, 93, 154, 46, 47, 110, 86, 243, 112, 236, 106, 237, 155, 34, 184, 168, 19, 203, 12, 156, 22, 234, 193, 10, 142, 33, 38, 68, 165, 12, 249, 160, 236, 98, 224, 112, 49, 204, 104, 245, 11, 133, 164, 74, 27, 110, 121, 244, 193, 249, 54, 90, 56, 111, 78, 239, 132, 83, 223, 103, 253, 204, 247, 89, 98, 143, 156, 156, 205, 16, 143, 92, 164, 15, 156, 183, 7, 236, 96, 243, 190, 175, 126, 57, 152] } }) }",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.22 Valid IDP with indirectCRL Test22",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.24 Valid IDP with indirectCRL Test24",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.25 Valid IDP with indirectCRL Test25",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.28 Valid cRLIssuer Test28",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.29 Valid cRLIssuer Test29",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.30 Valid cRLIssuer Test30",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.14.33 Valid cRLIssuer Test33",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "unable to get certificate CRL",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
         }
       ]
     },
@@ -6253,39 +5923,17 @@
     {
       "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.15.7 Valid delta-CRL Test7",
+      "name": "4.4.19 Valid Separate Certificate and CRL Keys Test19",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 06 is revoked (reason removeFromCRL)",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
           "verdict": "fail"
         },
         {
           "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x6 revoked by CRL",
+          "reason": "unable to get certificate CRL",
           "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "Agreement",
-      "ground_truth_agreement": false,
-      "name": "4.15.1 Invalid deltaCRLIndicator No Base Test1",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
         },
         {
           "oracle": "pyca",
@@ -6295,14 +5943,14 @@
       ]
     },
     {
-      "class": "Agreement",
+      "class": "StricterThanWild",
       "ground_truth_agreement": false,
-      "name": "4.15.10 Invalid delta-CRL Test10",
+      "name": "4.5.1 Valid Basic Self-Issued Old With New Test1",
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": null,
-          "verdict": "pass"
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
         },
         {
           "oracle": "openssl",
@@ -6313,6 +5961,116 @@
           "oracle": "pyca",
           "reason": null,
           "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.5.4 Valid Basic Self-Issued New With Old Test4",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.5.6 Valid Basic Self-Issued CRL Signing Key Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": "different CRL scope",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "pyca",
+          "reason": null,
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.6.15 Valid Self-Issued pathLenConstraint Test15",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.6.17 Valid Self-Issued pathLenConstraint Test17",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: signature does not match",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "StricterThanWild",
+      "ground_truth_agreement": false,
+      "name": "4.9.6 Valid Self-Issued requireExplicitPolicy Test6",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": "pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 2 checker(s) built from 2 supplied CRL(s) applied to it",
+          "verdict": "fail"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.36: certificate contains unaccounted-for critical extensions",
+          "verdict": "fail"
         }
       ]
     },
@@ -6450,11 +6208,11 @@
     }
   ],
   "summary": {
-    "Agreement": 71,
-    "DiagnosticDivergence": 49,
-    "LooserThanWild": 81,
+    "Agreement": 60,
+    "DiagnosticDivergence": 67,
+    "LooserThanWild": 43,
     "OracleDivergence": 0,
-    "StricterThanWild": 46,
+    "StricterThanWild": 77,
     "total": 247
   }
 }

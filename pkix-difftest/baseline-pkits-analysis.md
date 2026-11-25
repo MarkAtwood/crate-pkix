@@ -18,7 +18,13 @@ bead OR a written-out justification".
 * Tool: `pkix-difftest` HEAD of branch (commit visible via `git log -1`).
 * Corpus: NIST PKITS shipped under `pkix-path/tests/pkits/` (249 vectors).
 * Oracles: `pkix-path` (default features), system `openssl` 3.0.13,
-  `pyca/cryptography` 48.0.0.
+  `pyca/cryptography` 50.0.2.
+
+  **pyca moved 48.0.0 → 50.0.2 at this regeneration and that is most of the
+  drift below.** 50.x rejects 20 chains that 48.x passed, chiefly on
+  unaccounted-for critical extensions. The job installs whatever
+  `setup-venv.sh` resolves rather than a pinned version, so this will happen
+  again; pinning it is tracked separately.
 * `pkix-path` invocation: `ValidationPolicy::new(now)` (permissive — no
   required SAN/EKU/algorithm/key-size strictures). **Revocation enabled
   when `Chain.crls` is non-empty (PKIX-emf1.2).**
@@ -42,14 +48,78 @@ bead OR a written-out justification".
 
 ## Summary
 
-| Class | Count | % |
-|---|---:|---:|
-| LooserThanWild       | 81  | 32.8% |
-| StricterThanWild     | 46  | 18.6% |
-| OracleDivergence     | 0   | 0.0%  |
-| DiagnosticDivergence | 49  | 19.8% |
-| Agreement            | 71  | 28.7% |
-| **Total**            | **247** | |
+| Class | Count | % | previous |
+|---|---:|---:|---:|
+| LooserThanWild       | 43  | 17.4% | 81 |
+| StricterThanWild     | 77  | 31.2% | 46 |
+| OracleDivergence     | 0   | 0.0%  | 0  |
+| DiagnosticDivergence | 67  | 27.1% | 49 |
+| Agreement            | 60  | 24.3% | 71 |
+| **Total**            | **247** | | 247 |
+
+Ground-truth disagreements fell **46 → 35**. `LooserThanWild` — this oracle
+accepting what another rejects, the worst class — roughly halved.
+
+### What moved, and why
+
+Three changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
+
+1. **The adapter no longer fails open on undetermined revocation.** It used to
+   treat every outcome except `Revoked` as "no negative determination", which
+   reported a clean bill of health when *no* CRL applied to a certificate at
+   all. It now fails when nothing could be applied, matching
+   `pkix_chain::verify_chain`, which propagates every revocation error and has
+   no soft-fail mode.
+
+   This surfaced after `pkix-revocation` began correctly refusing CRLs with
+   unrecognized critical extensions (RFC 5280 §5.2/§5.3). Those CRLs had been
+   applied and reported `Revoked`; once refused, the fail-open let three
+   chains NIST classes **invalid** pass — 4.4.8, 4.4.9 and 4.15.4.
+
+2. **Delta CRLs are paired with their bases.** The adapter built one checker
+   per CRL and never called `CrlChecker::with_delta`, so a delta was always
+   refused as `DeltaCrlAsComplete` and a certificate revoked *only* in a delta
+   was never seen as revoked. That is 4.15.4 exactly: serial 3,
+   `KeyCompromise`, listed only in `deltaCRLCA1deltaCRL`.
+
+   Worth recording: the **previous baseline had 4.15.4 failing for the wrong
+   reason.** Before the standalone-delta check existed, the delta was accepted
+   as a complete CRL and found the revocation — the precise behaviour that
+   commit closed as a vulnerability. A baseline can encode a vulnerability as
+   an expectation.
+
+3. **pyca 48.0.0 → 50.0.2**, as above.
+
+### The 20 valid chains this baseline records as failing
+
+`StricterThanWild` rose because closing the fail-open exposed CRL forms the
+adapter cannot express. Classified individually:
+
+| cause | chains | fix belongs in |
+|---|---:|---|
+| CRL signed by another of the CA's keys (key rollover, separate CRL key) | ~9 | the adapter |
+| indirect CRL via `cRLIssuer` | ~7 | the adapter |
+| `onlySomeReasons` reason partitioning | 2 | `pkix-revocation` |
+| unclassified (4.5.4, 4.5.6) | 2 | unknown |
+
+Eighteen are adapter gaps: `pkix-revocation` already has
+`new_with_signer_discovery` and `new_with_crl_issuer`, and the adapter calls
+neither. A brute-force sweep over candidate signers was tried and **rejected**
+— it cleared 18 of these and broke 18 negative tests doing it, because
+enumerating candidates asks "does any certificate make some CRL usable"
+instead of "is this CRL usable per the certificate's distribution point", and
+vectors like *Bad CRL Signature* and *cRLSign False* exist precisely because
+no valid relationship exists. A correct version reads
+`CRLDistributionPoints` and selects from it.
+
+Only the two `onlySomeReasons` chains are a genuine library gap, documented
+when reason-partitioned combining was declared unimplemented.
+
+### Reading this baseline
+
+`ground_truth_disagreements` is compared by **chain name**, not just by count,
+so a newly-disagreeing chain shows up as a diff even if the totals happen to
+match. The 35 recorded here are expected; a 36th is a regression.
 
 Two PKITS chains are excluded from classification (harness errors):
 
