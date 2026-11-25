@@ -56,6 +56,14 @@ impl core::fmt::Debug for HickoryTlsaResolver {
 }
 
 impl HickoryTlsaResolver {
+    /// The underlying hickory resolver, for lookups other than TLSA.
+    ///
+    /// Crate-private: exposing hickory's types in this crate's public API
+    /// would make a hickory major version a breaking change here.
+    pub(crate) fn inner(&self) -> &TokioResolver {
+        &self.inner
+    }
+
     /// Builds a resolver that validates against `anchors`.
     ///
     /// Upstream servers come from [`upstream_from_environment`]: the
@@ -202,7 +210,7 @@ where
 ///
 /// The two enumerations are the four RFC 4035 outcomes, so this is a
 /// renaming rather than an interpretation.
-const fn proof_to_status(proof: Proof) -> DnssecStatus {
+pub(crate) const fn proof_to_status(proof: Proof) -> DnssecStatus {
     match proof {
         Proof::Secure => DnssecStatus::Secure,
         Proof::Insecure => DnssecStatus::Insecure,
@@ -220,7 +228,7 @@ const fn proof_to_status(proof: Proof) -> DnssecStatus {
 /// Bogus is weakest deliberately: it is the only status that forbids falling
 /// back to PKIX, so a set containing one bogus record must be reported bogus
 /// rather than merely unvalidated.
-const fn weaker(a: DnssecStatus, b: DnssecStatus) -> DnssecStatus {
+pub(crate) const fn weaker(a: DnssecStatus, b: DnssecStatus) -> DnssecStatus {
     const fn rank(status: DnssecStatus) -> u8 {
         match status {
             DnssecStatus::Bogus => 0,

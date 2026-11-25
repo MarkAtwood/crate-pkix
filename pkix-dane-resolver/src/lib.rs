@@ -84,10 +84,14 @@ use async_trait::async_trait;
 use pkix_dane::{DaneError, TlsaName, TlsaResponse};
 
 pub mod config;
+
 mod hickory;
+/// Async SMTP DANE discovery (RFC 7672 §2.2).
+pub mod smtp;
 
 pub use config::{upstream_from_environment, UpstreamConfig};
 pub use hickory::HickoryTlsaResolver;
+pub use smtp::{AsyncSmtpDiscovery, SmtpDiscovery, SmtpDiscoveryStep};
 
 // Re-exported so a consumer need not depend on pkix-dane directly just to
 // name the types this crate returns.

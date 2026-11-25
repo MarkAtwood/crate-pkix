@@ -127,6 +127,74 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### SMTP DANE: the async driver
+
+`pkix_dane_resolver::SmtpDiscovery` performs the lookups the state machine
+asks for. The division is complete: `pkix-dane` decides, `pkix-dane-resolver`
+fetches.
+
+**The caller owns the loop.** `next_target()` advances discovery until it has
+something to report — a target, a delay, or exhaustion — and calling it again
+after a target offers the next MX host in preference order, which is how an
+MTA retries after a failed delivery attempt. No callback: a delivery attempt
+is itself async and borrows the caller's connection state, and handing
+`pkix-dane`'s synchronous `resolve_with` an async closure is not possible.
+
+`AsyncSmtpDiscovery` has three methods — MX, addresses, TLSA — each returning
+an `MxAnswer` rather than a `Result`, because "the lookup failed" is one of
+the answers the state machine interprets: §2.2.1 makes a failed TLSA lookup
+mean the server is unreachable, which is a verdict rather than an error.
+Implemented for `HickoryTlsaResolver`, with blanket impls for `&D` and
+`Arc<D>` so a shared resolver need not be cloned.
+
+Ordering is not the driver's responsibility. §2.2.2's address-before-TLSA rule
+and §2.2.1's preference order are enforced by the state machine, which asks
+for one lookup at a time — so a driver cannot get them wrong by answering
+what it was asked. That is the payoff for the sans-IO split.
+
+Verified live against real zones, with `PKIX_DANE_RESOLVER=9.9.9.9`:
+
+- `freebsd.org` → `mx1.freebsd.org`, one usable DANE-EE(3) record,
+  `mx_secure=true`: MX lookup, address lookup, TLSA lookup and DNSSEC
+  validation against IANA's anchors, all against a zone nobody here controls.
+- `huque.com` → `mail.huque.com`, usages `[3, 1, 3]`.
+
+Live tests skip with a printed reason rather than failing, following
+`resolve.rs`; the usual cause is `systemd-resolved`'s stub stripping DNSSEC
+records rather than absent network.
+
+### Fixed: a set of only PKIX usages is not DANE
+
+Found by the `huque.com` live test failing on a wrong assumption. That zone
+publishes **PKIX-EE(1) alongside DANE-EE(3)**, which exposed a real contract
+problem rather than just a bad test.
+
+`TlsaRecord::is_usable` asks whether a record parses and carries an assigned
+usage — not whether this profile can authenticate with it. So usage-0 and
+usage-1 records survived discovery's filter and made `dane_records()` report
+`Some`, claiming DANE applied when nothing present could authenticate.
+
+Now `dane_records()` and `identities()` require a DANE-EE(3) or DANE-TA(2)
+record, and under mandatory DANE a PKIX-only set delays per §6 instead of
+being offered. The records are still **carried** in `tlsa_response()`,
+deliberately: the entry point needs them to report "the domain published only
+PKIX usages" distinctly from "the domain published nothing", which is a
+misconfiguration worth telling a postmaster about.
+
+### Finding: `debian.org`'s TLSA RRset does not validate under hickory
+
+`debian.org` was the first choice for the live test and is not used. Its
+`_25._tcp.mailly.debian.org` RRset comes back `Indeterminate` with records
+present, while `mail.huque.com`, `mx1.freebsd.org` and
+`good.dane.huque.com` all come back `Secure` through the same resolver and
+anchors. The zone has a DS record (`40756 8 2`, RSA/SHA-256) and the upstream
+sets `AD`.
+
+Pre-existing and not introduced here: `AsyncTlsaResolver::resolve` reports
+the same, so it is a property of the resolver or the zone rather than of the
+new driver. Filed separately, because a real domain that silently fails to
+validate is worth understanding before anyone relies on DANE for it.
+
 ### SMTP DANE: the entry point
 
 `pkix_chain::verify_smtp_server_dane` completes RFC 7672 support: it takes a
