@@ -14,23 +14,40 @@
 #
 # The diff harness emits a JSON report with three top-level keys:
 #   - "summary":                 per-verdict-class counts (e.g. Agreement: 71)
-#   - "ground_truth_disagreements": int, # of chains where the worst-classified
-#                                  verdict disagrees with the corpus
-#                                  expected_result (limbo only; null on PKITS)
+#   - "ground_truth_disagreements": ARRAY of per-chain detail, each entry
+#                                  carrying name, class, and every oracle's
+#                                  verdict AND reason string
 #   - "classified":              per-chain detail with full reason strings
 #
-# We deliberately do NOT diff "classified" verbatim. Oracle reason strings vary
-# between OpenSSL versions (e.g. "unable to get local issuer certificate" wording
-# tweaks across 3.0.x → 3.2.x) and pyca/cryptography releases. A reason-string
-# change flips chains between Agreement and DiagnosticDivergence without any
-# pkix-path behaviour change, which is exactly the kind of false positive the
-# bead text warns about.
+# Oracle reason strings are not stable. They vary between OpenSSL versions
+# (e.g. "unable to get local issuer certificate" wording tweaks across
+# 3.0.x -> 3.2.x) and pyca/cryptography releases, and this job runs against
+# whatever those are on ubuntu-latest. A reason-string change must not be able
+# to fail this gate, because it says nothing about pkix-path.
 #
-# Instead we diff:
-#   - "summary"                    — verdict-class count drifts are real signal
-#   - "ground_truth_disagreements" — semantic correctness drifts are real signal
+# Two places leaked reason-string sensitivity in and had to be closed:
 #
-# Any other report-shape divergence is a tooling concern, not a regression.
+# 1. The Agreement / DiagnosticDivergence split. DiagnosticDivergence means
+#    every oracle agreed on pass/fail and differed only on the reason, so a
+#    reason-string change moves a chain between those two buckets with no
+#    verdict changing. They are therefore summed into one "VerdictsAgreed"
+#    count, and the distinction is no longer gated. (This is what left the job
+#    red from 2026-11-16: eight chains drifted Agreement -> DiagnosticDivergence
+#    with every verdict identical.)
+#
+# 2. "ground_truth_disagreements" embeds the reason strings directly. The old
+#    filter diffed it whole, which contradicted the stated policy right above
+#    it. Reasons are now stripped; oracle + verdict + name + class survive.
+#
+# What this gate still catches, which is the signal worth having:
+#   - LooserThanWild   — pkix-path accepts what an oracle rejects
+#   - StricterThanWild — pkix-path rejects what an oracle accepts
+#   - OracleDivergence — the oracles disagree with each other
+#   - total            — chains appearing or vanishing from the corpus
+#   - which chains disagree with corpus ground truth, and how they voted
+#
+# What it no longer catches, deliberately: a change in how an oracle words a
+# failure. Use `pkix-difftest report` locally for that.
 #
 # Exit codes:
 #   0  — summary + gt_disagreements match the committed baseline
@@ -97,7 +114,29 @@ BASELINE_FILTERED="$(mktemp -t pkix-difftest-baseline.XXXXXX.json)"
 FRESH_FILTERED="$(mktemp -t pkix-difftest-fresh-filtered.XXXXXX.json)"
 trap 'rm -f "$FRESH_JSON" "$BASELINE_FILTERED" "$FRESH_FILTERED"' EXIT
 
-JQ_FILTER='{summary, ground_truth_disagreements}'
+# Verdict classes, with the two reason-text-sensitive buckets merged, and
+# ground-truth disagreements with reason strings stripped. Arrays are sorted so
+# element order cannot fail the gate either.
+JQ_FILTER='
+{
+  verdict_classes: {
+    VerdictsAgreed:   ((.summary.Agreement // 0) + (.summary.DiagnosticDivergence // 0)),
+    LooserThanWild:   (.summary.LooserThanWild   // 0),
+    StricterThanWild: (.summary.StricterThanWild // 0),
+    OracleDivergence: (.summary.OracleDivergence // 0),
+    total:            (.summary.total            // 0)
+  },
+  ground_truth_disagreements:
+    [ (.ground_truth_disagreements // [])[]
+      | {
+          name,
+          class: (if .class == "DiagnosticDivergence" then "VerdictsAgreed"
+                  elif .class == "Agreement"          then "VerdictsAgreed"
+                  else .class end),
+          verdicts: [ .verdicts[] | {oracle, verdict} ] | sort_by(.oracle)
+        }
+    ] | sort_by(.name)
+}'
 jq -S "$JQ_FILTER" "$BASELINE_JSON" > "$BASELINE_FILTERED"
 jq -S "$JQ_FILTER" "$FRESH_JSON"    > "$FRESH_FILTERED"
 
