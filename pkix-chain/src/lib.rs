@@ -1714,6 +1714,26 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
 const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<Error>();
+    _assert_send_sync::<ValidatedPath>();
+
+    // `Verifier` is public surface and `verify_batch` invites callers to
+    // fan chains out across threads, so it has to be `Send + Sync` too.
+    //
+    // Stated generically rather than for a concrete instantiation because
+    // the obvious one to name, `Verifier<DefaultVerifier, ..>`, exists only
+    // when a signature backend feature is on; this holds for every
+    // conforming parameter set and compiles in every configuration. The
+    // bound is `Sync` and not `Send` on each parameter because the struct
+    // holds `&'a V` rather than `V`, and `&T` is `Send` exactly when `T`
+    // is `Sync`.
+    fn _verifier_is_send_sync<'a, V, R, A>()
+    where
+        V: SignatureVerifier + Sync + 'a,
+        R: RevocationChecker + Sync + 'a,
+        A: AiaFetcher + Sync + 'a,
+    {
+        _assert_send_sync::<Verifier<'a, V, R, A>>();
+    }
 };
 
 /// `pkix_path::Error` variants that may be repairable by adding more
