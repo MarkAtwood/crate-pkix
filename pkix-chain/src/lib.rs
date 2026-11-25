@@ -108,20 +108,44 @@
 //!   of scope for this crate and live in `pkix-ac`, `pkix-ct`, and
 //!   `pkix-dane` respectively.
 
-pub use pkix_aia::{self, AiaError, AiaFetcher, NoAiaFetcher};
-pub use pkix_identity::{self, IdentityError, MailboxName, ServerName};
+// Upstream vocabulary, re-exported by name.
+//
+// This crate shares `pkix-path`'s types rather than wrapping them: every
+// public entry point here takes a `TrustAnchor`, a `ValidationPolicy` and
+// a `Profile`, so a caller holds those types whether or not this module
+// re-exports them. Naming them is a convenience, and a deliberate,
+// enumerable commitment.
+//
+// The lists used to include `self` — `pub use pkix_path::{self, ...}` —
+// which republished each upstream crate's *entire* surface under
+// `pkix_chain::`. That is a different and much larger promise: a caller
+// could reach `pkix_chain::pkix_revocation::ocsp::OcspResponse`, so any
+// rename anywhere in an upstream crate became a breaking change here,
+// including to types this crate never consumes. The commitment is now
+// what is written below and nothing more. A caller who wants the whole
+// of an upstream crate should depend on it directly, which is honest
+// about what they are coupling to.
+//
+// The three upstream error types are aliased because `Error` is taken
+// three times over, and by this crate's own `Error` as well.
+// `pkix-chain-simple` already names `pkix_path::Error as PathError` for
+// the same reason.
+pub use pkix_aia::{AiaError, AiaFetcher, NoAiaFetcher};
+pub use pkix_identity::{IdentityError, MailboxName, ServerName};
 pub use pkix_path::{
-    self, DefaultVerifier, Profile, SignatureVerifier, TrustAnchor, ValidatedPath,
+    DefaultVerifier, Error as PathError, Profile, SignatureVerifier, TrustAnchor, ValidatedPath,
     ValidationPolicy, VerificationError, VerificationErrorKind,
 };
-pub use pkix_path_builder;
+pub use pkix_path_builder::{CertPool, Error as PathBuildError};
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use pkix_revocation::CrlChecker;
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 pub use pkix_revocation::OcspChecker;
-pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
+pub use pkix_revocation::{
+    Error as RevocationError, NoRevocation, Result as RevocationResult, RevocationChecker,
+};
 
 use x509_cert::Certificate;
 

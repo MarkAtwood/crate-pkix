@@ -297,13 +297,13 @@ impl pkix_chain::SignatureVerifier for RefusesAfterFirst {
         spki: spki::SubjectPublicKeyInfoRef<'_>,
         tbs: &[u8],
         sig: &[u8],
-    ) -> Result<(), pkix_chain::pkix_path::VerificationError> {
+    ) -> Result<(), pkix_chain::VerificationError> {
         let n = self.0.get();
         self.0.set(n + 1);
         if n == 0 {
             return DefaultVerifier.verify_signature(alg, spki, tbs, sig);
         }
-        Err(pkix_chain::pkix_path::VerificationError::invalid_signature())
+        Err(pkix_chain::VerificationError::invalid_signature())
     }
 }
 
