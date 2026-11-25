@@ -34,8 +34,13 @@
 //! reported." A timeout therefore classifies as a fetch error if a caller
 //! asks, but a caller is free to drop it instead, and should.
 
+// Both are used only by the feature-gated classifiers below, so with no
+// classification feature enabled they would be unused imports — which the
+// bare-metal gate builds with `-D warnings` and rejects.
+#[cfg(any(feature = "mta-sts-http", feature = "dane"))]
 use alloc::string::ToString;
 
+#[cfg(any(feature = "mta-sts", feature = "mta-sts-http", feature = "dane"))]
 use crate::ResultType;
 
 // ---------------------------------------------------------------------------

@@ -380,7 +380,11 @@ fn map_ureq_err(e: ureq::Error) -> AiaError {
 // Re-exported here so this crate's public API is unchanged.
 
 pub use pkix_net_guard::GuardedResolver;
-use pkix_net_guard::{is_public, RefusedDestination};
+use pkix_net_guard::RefusedDestination;
+// Used by the reqwest-backed resolver in async_fetcher.rs, which is behind a
+// feature; importing it unconditionally is an unused import without that.
+#[cfg(feature = "client-reqwest-async")]
+pub(crate) use pkix_net_guard::is_public;
 
 // ---------------------------------------------------------------------------
 // Send + Sync invariant (AGENTS.md non-negotiable #6 / PKIX-2l0v.2)
