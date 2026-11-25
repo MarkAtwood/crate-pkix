@@ -209,17 +209,51 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
     ///
     /// `results` is what the fetcher returned for the URIs
     /// [`next_step`](Self::next_step) handed over; `requested` is how many
-    /// there were, so a fetcher that returns extra entries cannot inflate the
-    /// work done.
+    /// there were.
     ///
     /// Returns `Some(error)` when the reassembly must stop: nothing usable
     /// arrived, so another iteration would repeat itself.
+    ///
+    /// # If the fetcher returns the wrong number of results
+    ///
+    /// [`AiaFetcher::batch_fetch`](pkix_aia::AiaFetcher::batch_fetch)
+    /// promises one result per URI, index-aligned, but it is an overridable
+    /// trait method and nothing can make a consumer's implementation keep
+    /// that promise.
+    ///
+    /// Either direction is a bug worth knowing about, so any mismatch trips
+    /// a `debug_assert`. Too few results is the lossy case: the unanswered
+    /// URIs are already in the tried set, so they are never requested again
+    /// and the chain can fail to build where a correct fetcher would have
+    /// completed it. Too many matters because the promise is *index*
+    /// alignment — a fetcher returning the wrong count has lost track of
+    /// which result belongs to which URI, and the entries that are absorbed
+    /// may be answers to URIs other than the ones they are taken for.
+    ///
+    /// Release builds continue regardless: extra entries are ignored, so an
+    /// implementation cannot inflate the work this does, and missing ones
+    /// count as URIs that produced nothing, with the reassembly stopping on
+    /// an error rather than looping if nothing usable arrived.
+    ///
+    /// It is deliberately not a hard assertion. The condition is a bug in
+    /// the consumer's own fetcher, and turning it into a panic would take
+    /// down path validation in production for a fault that degrades
+    /// gracefully; a reachable panic inside certificate verification is a
+    /// denial-of-service vector in its own right.
     pub fn absorb(
         &self,
         state: &mut ChainBuildState,
         results: Vec<Result<Vec<u8>, AiaError>>,
         requested: usize,
     ) -> Option<Error> {
+        debug_assert_eq!(
+            results.len(),
+            requested,
+            "AiaFetcher::batch_fetch must return exactly one result per URI, \
+             index-aligned; returning {} for {requested} URIs drops or \
+             invents results",
+            results.len(),
+        );
         let mut added_any = false;
         for result in results.into_iter().take(requested) {
             let parsed = result.and_then(|bytes| {

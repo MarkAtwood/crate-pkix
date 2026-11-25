@@ -283,3 +283,81 @@ fn an_empty_chain_is_rejected() {
         "an empty chain should be a path-build failure, got {result:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// AiaFetcher::batch_fetch contract violations
+// ---------------------------------------------------------------------------
+
+/// A fetcher returning fewer results than it was given URIs is a bug in the
+/// consumer's own code, and `absorb` surfaces it during development.
+///
+/// `batch_fetch` promises one index-aligned result per URI, but it is an
+/// overridable trait method, so nothing enforces that promise. Before, the
+/// results were zipped against the URI list, which silently truncated to the
+/// shorter of the two: the unanswered URIs were already in the tried set, so
+/// they were never requested again and their absence never reported. The
+/// chain could fail to build where a correct fetcher would have completed it,
+/// with nothing to point at the cause.
+///
+/// The release-mode behaviour is deliberately still graceful — missing
+/// entries count as URIs that produced nothing — so this asserts the
+/// development-mode signal, which is the part that was missing. `cargo test`
+/// builds with debug assertions on, so the mismatch panics here.
+#[test]
+#[should_panic(expected = "must return exactly one result per URI")]
+fn absorb_flags_a_fetcher_that_returns_too_few_results() {
+    let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
+    let policy = policy();
+    let config = AiaConfig::default();
+    let b = builder(&anchors, &policy, &config);
+
+    let chain = [load(VALID_EE_DER)];
+    let leaf = &chain[0];
+    let mut state = ChainBuildState::new(&chain, &config);
+
+    match b.next_step(&mut state, leaf) {
+        BuildStep::Fetch(uris) => {
+            assert!(
+                !uris.is_empty(),
+                "the leaf should have asked for its issuer"
+            );
+            // Honour none of them while claiming to have been asked for all.
+            let _ = b.absorb(&mut state, Vec::new(), uris.len());
+        }
+        other => panic!("expected a Fetch step, got {other:?}"),
+    }
+}
+
+/// Too many results is flagged as well, because the promise is *index*
+/// alignment: a fetcher that has lost track of the count has lost track of
+/// which answer belongs to which URI, and the entries that do get absorbed
+/// may be answers to URIs other than the ones they are taken for.
+///
+/// Release builds still ignore the extras rather than absorbing them, so an
+/// implementation cannot inflate the work done; that half is not directly
+/// covered here because `cargo test` builds with debug assertions on.
+#[test]
+#[should_panic(expected = "must return exactly one result per URI")]
+fn absorb_flags_a_fetcher_that_returns_too_many_results() {
+    let anchors = [TrustAnchor::from_cert(load(TRUST_ANCHOR_DER))];
+    let policy = policy();
+    let config = AiaConfig::default();
+    let b = builder(&anchors, &policy, &config);
+
+    let chain = [load(VALID_EE_DER)];
+    let leaf = &chain[0];
+    let mut state = ChainBuildState::new(&chain, &config);
+
+    match b.next_step(&mut state, leaf) {
+        BuildStep::Fetch(uris) => {
+            let requested = uris.len();
+            let mut results: Vec<Result<Vec<u8>, AiaError>> =
+                uris.iter().map(|_| Ok(GOOD_CA_DER.to_vec())).collect();
+            for _ in 0..32 {
+                results.push(Ok(GOOD_CA_DER.to_vec()));
+            }
+            let _ = b.absorb(&mut state, results, requested);
+        }
+        other => panic!("expected a Fetch step, got {other:?}"),
+    }
+}

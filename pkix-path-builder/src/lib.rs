@@ -50,10 +50,15 @@
 //!   signature chain walk, name constraints, policy machinery, revocation)
 //!   lives in `pkix-path` and `pkix-revocation`. This crate's job ends
 //!   when it returns an ordered candidate chain.
-//! - **Known residual divergence.** A single bettertls path-building
-//!   corner case (`pathbuilding::tc60`) is documented as a known
-//!   divergence; closing it is a 1.0 release blocker tracked under
-//!   `PKIX-lwr9.4`. See `pkix-difftest/baseline-limbo-analysis.md`.
+//! - **No known residual divergence.** The bettertls path-building corner
+//!   case `pathbuilding::tc60`, which this crate used to reject where
+//!   other implementations accepted, is resolved: it agrees with all
+//!   three oracles in the committed limbo baseline. The fix was
+//!   [`build_first_valid_path`], which iterates candidates and validates
+//!   each rather than validating one topologically-chosen chain — see
+//!   `pkix-difftest/baseline-limbo-analysis.md` and the
+//!   `tc60_build_first_valid_path_succeeds_where_build_path_fails`
+//!   regression test.
 
 extern crate alloc;
 
