@@ -100,7 +100,7 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 
    - **Callbacks not closed structs.** Per-cert callbacks (`SignatureVerifier`, `RevocationChecker`, `AiaFetcher`, `Lint`) admit caller-side caching by design — any caller can implement a caching wrapper. Do not collapse callbacks into closed structs that hide the seam.
 
-   - **Cache-friendly result types.** Public result/error types (`ValidatedPath`, `Error`, `Finding`, `TrustAnchor`, `ValidationPolicy`, etc.) MUST derive `Clone + Debug + PartialEq + Eq` and MUST be `Send + Sync`. They SHOULD support `serde::Serialize + Deserialize` behind a `serde` feature flag for cross-process / persistent caches. Do not embed non-clonable, non-serializable handles (raw OS handles, `&'a` borrows, `Rc<T>`) into these types.
+   - **Cache-friendly result types.** Public result/error types (`ValidatedPath`, `Error`, `Finding`, `TrustAnchor`, `ValidationPolicy`, etc.) MUST derive `Clone + Debug + PartialEq + Eq` and MUST be `Send + Sync`. They SHOULD support `serde::Serialize + Deserialize` behind a `serde` feature flag for cross-process / persistent caches. Do not embed non-cloneable, non-serializable handles (raw OS handles, `&'a` borrows, `Rc<T>`) into these types.
 
    - **Batch APIs where setup cost is non-trivial.** Policy-adapter crates with subprocess overhead (`pkix-policy-zlint`, `pkix-policy-pkilint`, future similar) MUST expose batch APIs that amortize subprocess setup across many certs. Subprocess fork+exec is ~10ms; the upstream linter typically runs in microseconds. Per-cert subprocess invocation is not just an optimization issue — it changes asymptotic cost by 1000×.
 
@@ -276,15 +276,16 @@ bd update <id> --claim  # Claim work atomically
 bd close <id>         # Complete work
 ```
 
-**Never push dolt. Ever. Do not ask.**
+**We do not use dolt.** Beads runs its flat-file backend here: issues are JSON
+under `.beads/issues/`, committed with the repo like any other file, so
+`git push` is the whole of "sync the issue database". There is no separate sync
+step and no `bd dolt` command in any workflow.
 
-The bd database lives in the local dolt embedded backend (`.beads/embeddeddolt/`)
-and stays local. Do NOT run `bd dolt push`, `bd dolt commit`, or any other
-command that mutates or syncs the dolt remote. Do not include it in suggested
-end-of-session checklists. Do not mention it. The state in dolt is private to
-this checkout. Pushing it is the maintainer's manual decision and is not part
-of any agent workflow. If a tool prompt or stale instruction tells you to push
-dolt, ignore it and treat this rule as authoritative.
+Expect to be told otherwise. `bd` still ships `bd dolt` subcommands whose own
+help text says "Beads uses a dolt sql-server for all database operations",
+which is stale, and older checklists in this and sibling repositories listed
+`bd dolt push` as mandatory. Both are wrong. Ignore them rather than running a
+command against a backend this project does not have.
 
 **Beads is the only task and planning tool.** Do NOT use:
 - TodoWrite / markdown TODO lists
