@@ -1,29 +1,25 @@
 {
-  "compaction_level": 0,
-  "content_hash": "fb88fb5db1a9a2f4bf7fa38054b2cc07b741ce92ea02dbb20a49b2504d018a2e",
+  "id": "PKIX-wnnn.8",
+  "title": "no test exercises BudgetExceeded propagation through build_first_valid_path",
+  "description": "tests/build_first_valid_path.rs covers: positive (tc60), NoValidPath (AlwaysRejectVerifier), NoPathFound (empty pool). It does NOT cover BudgetExceeded propagation, despite the rustdoc explicitly documenting that variant (lib.rs:934-935: \"DepthExceeded / BudgetExceeded — propagated from build_path_candidates when the iterator surfaces them\"). Risk: a future refactor of the propagation path (e.g., a well-intentioned contributor folding BudgetExceeded into NoValidPath because \"they're both no-path results\") will silently change semantics with no test failure. The fixture pattern from tests/integration.rs:test_iterator_budget_bounded_across_calls is reusable — a budget-tight config on a pool that yields one rejected candidate before exhaustion would exercise the propagation. Also missing: DepthExceeded propagation, but that's less critical because the depth-probe logic in build_first_valid_path_with_config (lib.rs:1031-1042) has its own subtle case-split between \"zero candidates yielded → probe\" and \"some candidates yielded but all rejected → NoValidPath wins\".",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T18:29:22Z",
   "created_by": "Mark Atwood",
-  "description": "tests/build_first_valid_path.rs covers: positive (tc60), NoValidPath (AlwaysRejectVerifier), NoPathFound (empty pool). It does NOT cover BudgetExceeded propagation, despite the rustdoc explicitly documenting that variant (lib.rs:934-935: \"DepthExceeded / BudgetExceeded \u2014 propagated from build_path_candidates when the iterator surfaces them\"). Risk: a future refactor of the propagation path (e.g., a well-intentioned contributor folding BudgetExceeded into NoValidPath because \"they're both no-path results\") will silently change semantics with no test failure. The fixture pattern from tests/integration.rs:test_iterator_budget_bounded_across_calls is reusable \u2014 a budget-tight config on a pool that yields one rejected candidate before exhaustion would exercise the propagation. Also missing: DepthExceeded propagation, but that's less critical because the depth-probe logic in build_first_valid_path_with_config (lib.rs:1031-1042) has its own subtle case-split between \"zero candidates yielded \u2192 probe\" and \"some candidates yielded but all rejected \u2192 NoValidPath wins\".",
-  "ephemeral": 0,
-  "id": "PKIX-wnnn.8",
-  "is_template": 0,
-  "issue_type": "task",
+  "updated_at": "2026-11-25T20:17:44.1394098Z",
+  "closed_at": "2026-11-25T20:17:44.1394098Z",
+  "close_reason": "Fixed -- test added: an_exhausted_budget_propagates_verbatim_and_is_not_reported_as_no_valid_path in pkix-path-builder/tests/build_first_valid_path.rs.\n\nThe bead was accurate. Checked all three candidate homes first: integration.rs exercises BudgetExceeded through build_path (not this entry point); review_adversarial_pool.rs asserts the OPPOSITE property (40 decoys must not exhaust the budget when a valid depth-1 path exists, so it panics on BudgetExceeded); and the dedicated build_first_valid_path.rs file never mentioned the budget at all.\n\nWhat the test pins is the contract behind Some(Err(e)) =\u003e return Err(e): BudgetExceeded must come back verbatim, not folded into NoValidPath. NoValidPath claims every candidate was built and rejected, whereas an exhausted budget means most were never constructed -- the search is inconclusive and a path may exist past the cut-off. A caller retrying with a larger budget, or reporting \"could not decide\" rather than \"untrusted\", needs those apart.\n\nDriven through build_first_valid_path_with_config with dfs_budget = 1 (one unit buys one DFS frame or one candidate examined). A control call at the default budget validates the same PKITS 4.1.1 chain first, so the test cannot pass on a pool that was never solvable.\n\nVerified by mutation rather than by it passing: wrapping the propagation in NoValidPath makes it fail with \"expected BudgetExceeded to propagate verbatim, got NoValidPath { tried: 0, last_error: ... }\". Note there are three identical propagation lines in lib.rs (1013 in build_path_with_config, 1163 and 1196 in build_first_valid_path_with_config); 1163 is the one this test drives.\n\nGates green: fmt, clippy, rustdoc, 2340 tests.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 1,
-  "status": "open",
-  "timeout_ns": 0,
-  "title": "no test exercises BudgetExceeded propagation through build_first_valid_path",
-  "updated_at": "2026-05-14T18:29:22Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-wnnn",
+      "type": "parent-child",
       "created_at": "2026-05-14T11:29:21Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-wnnn",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }

@@ -653,16 +653,28 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         ) {
             return Err(Error::CrlIssuerMismatch);
         }
-        // For direct CRLs only: the cert's issuer must also match the
-        // CRL issuer (this is the legacy invariant). For indirect CRLs
-        // this check is intentionally skipped — the whole point of
-        // §5.2.6 is that they may differ. Discovery mode also skips this
-        // check: the §4.5 case has cert.issuer == CRL.issuer by DN but
-        // a different signing key, so the DN-equality test still holds;
-        // for the indirect §4.14.22-26 cases the DN differs by design,
-        // and the per-entry certificateIssuer extension (in indirect
-        // CRLs) carries the actual issuer of each entry.
-        if self.crl_issuer_cert.is_none()
+        // (2c) For direct CRLs: the cert's issuer must also match the CRL
+        //      issuer. For indirect CRLs this is intentionally skipped —
+        //      the whole point of §5.2.6 is that the two may differ, and
+        //      the per-entry certificateIssuer extension carries the
+        //      actual issuer of each entry.
+        //
+        // Discovery mode is held to this too, but only when the CRL does
+        // not declare itself indirect. It used to be exempt wholesale on
+        // the grounds that the §4.5 key-rollover case satisfies the test
+        // anyway (same issuer DN, different signing key), which is true
+        // and is exactly why exempting it bought nothing: the check was
+        // skipped precisely where it would have passed. What it did give
+        // up was the direct case where the DNs genuinely disagree. There
+        // the signer is discovered structurally from the bundle, so
+        // without this the CRL's own claim about which CA it covers is
+        // never compared against the certificate being checked.
+        //
+        // Gating on the IDP flag keeps the §4.14.22-26 indirect cases
+        // working, where the DNs differ by design.
+        let enforce_direct_crl_domain =
+            self.crl_issuer_cert.is_none() || (self.signer_discovered && !crl_declares_indirect);
+        if enforce_direct_crl_domain
             && !names_match(cert.tbs_certificate().issuer(), &crl.tbs_cert_list.issuer)
         {
             return Err(Error::CrlIssuerMismatch);
@@ -803,6 +815,22 @@ impl<V: SignatureVerifier> RevocationChecker for CrlChecker<V> {
         //      is the cert's *issuer*, even when the CRL is signed by a
         //      separate cRLIssuer.
         if !names_match(cert.tbs_certificate().issuer(), &anchor.subject) {
+            return Err(Error::CrlIssuerMismatch);
+        }
+        // (2c) As in `check_revocation`: a direct CRL must name the same
+        //      CA that issued the certificate.
+        //
+        // Without the discovery arm, (2a) and (2b) together imply this —
+        // both sides reduce to the anchor's subject. Under discovery they
+        // do not: (2a) ties the CRL issuer to the *discovered* signer's
+        // subject while (2b) ties the cert to the anchor, leaving the two
+        // free to disagree. So this is a real gap on this path rather
+        // than a restatement, and it is enforced here for the same reason
+        // and under the same IDP condition.
+        if self.signer_discovered
+            && !crl_declares_indirect
+            && !names_match(cert.tbs_certificate().issuer(), &crl.tbs_cert_list.issuer)
+        {
             return Err(Error::CrlIssuerMismatch);
         }
 

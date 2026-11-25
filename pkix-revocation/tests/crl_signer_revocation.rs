@@ -200,3 +200,78 @@ fn discovery_can_be_run_standalone_to_pre_filter() {
         "a caller can identify and reject the signer before building a checker"
     );
 }
+
+// ---------------------------------------------------------------------------
+// A direct CRL must name the CA that issued the certificate
+// ---------------------------------------------------------------------------
+
+/// Discovery mode must not accept a direct CRL issued by a different CA than
+/// the one that issued the certificate.
+///
+/// This is the hole the `(2c)` check closes. The earlier code enforced
+/// `cert.issuer == CRL.issuer` only when no signer certificate was supplied
+/// at all, so discovery mode skipped it outright. The other two name checks
+/// do not cover the gap:
+///
+/// - `(2a)` ties the CRL's issuer to the *discovered signer's* subject, so it
+///   is satisfied by construction whenever discovery works at all.
+/// - `(2b)` ties the `issuer` argument to `cert.issuer`, which says nothing
+///   about the CRL.
+///
+/// Between them the certificate and the CRL are never compared, so a CRL from
+/// an unrelated CA could decide an unrelated certificate's revocation status
+/// as long as its own signer was present in the bundle. Here the certificate
+/// is issued by `GoodCA` while the CRL comes from the Trust Anchor Root, both
+/// legitimate and both correctly signed — only the pairing is wrong.
+#[test]
+fn discovery_rejects_a_direct_crl_from_a_different_ca_than_the_certs_issuer() {
+    let ee = cert("ValidCertificatePathTest1EE");
+    let good_ca = cert("GoodCACert");
+    let anchor = cert("TrustAnchorRootCertificate");
+
+    // The CRL belongs to the Trust Anchor Root, not to GoodCA.
+    let foreign_crl = crl("TrustAnchorRootCRL");
+
+    // Bundle holds the CRL's real signer, so discovery succeeds and the
+    // rejection cannot be blamed on a failed lookup.
+    let bundle = [anchor.clone(), good_ca.clone()];
+    let checker =
+        CrlChecker::new_with_signer_discovery(&foreign_crl, &bundle, &ee, NOW, DefaultVerifier)
+            .expect("the CRL's signer is in the bundle, so discovery must succeed");
+    assert!(
+        checker.crl_signer().is_some(),
+        "the signer must have been discovered for this test to mean anything"
+    );
+
+    // `good_ca` is the EE's real issuer, so check (2b) passes and the
+    // failure can only come from the certificate-to-CRL comparison.
+    let err = checker
+        .check_revocation(&ee, &good_ca)
+        .expect_err("a GoodCA-issued certificate must not be judged by the anchor's CRL");
+    assert!(
+        matches!(err, pkix_revocation::Error::CrlIssuerMismatch),
+        "expected CrlIssuerMismatch, got {err:?}"
+    );
+}
+
+/// The matching positive case: discovery still accepts a direct CRL that does
+/// name the certificate's issuer.
+///
+/// Without this, the test above would also pass if `(2c)` rejected every
+/// discovered direct CRL.
+#[test]
+fn discovery_accepts_a_direct_crl_from_the_certs_own_issuer() {
+    let ee = cert("ValidCertificatePathTest1EE");
+    let good_ca = cert("GoodCACert");
+    let anchor = cert("TrustAnchorRootCertificate");
+
+    let own_crl = crl("GoodCACRL");
+    let bundle = [anchor, good_ca.clone()];
+    let checker =
+        CrlChecker::new_with_signer_discovery(&own_crl, &bundle, &ee, NOW, DefaultVerifier)
+            .expect("GoodCA is in the bundle");
+
+    checker
+        .check_revocation(&ee, &good_ca)
+        .expect("a valid EE against its own issuer's CRL must pass");
+}
