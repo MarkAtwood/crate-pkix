@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-g5l7",
+  "title": "pkix-profiles: an SMTP MTA profile, because BasicTlsProfile silently breaks SMTP DANE",
+  "description": "## The trap\n\nverify_smtp_server_dane takes a Profile for DANE-TA(2) path validation. The obvious choice, BasicTlsProfile, sets require_subject_alt_name. That is correct for the Web PKI and wrong for MTA-to-MTA SMTP.\n\nRFC 7672 section 3.2.3 consults the commonName when a certificate presents no DNS-ID, precisely because MTA certificates frequently carry their name only there. A SAN-requiring profile rejects those certificates during PATH VALIDATION, before any name check runs.\n\nThe symptom is unhelpfully indirect: Failed(PathValidationFailed(Path(MissingSan))) on a server whose certificate RFC 7672 accepts without reservation. Someone debugging that has no obvious reason to suspect the profile.\n\n## Why this is worth a crate change rather than only documentation\n\nIt is documented on verify_smtp_server_dane now, which helps whoever reads the rustdoc. But the failure mode is that a caller reaches for the obvious profile and gets a silent incompatibility with the deployments the feature exists to serve. A shipped profile makes the right choice the easy one.\n\n## What it should assert\n\nNeeds deciding rather than guessing:\n\n- require_subject_alt_name: FALSE. This is the whole point.\n- EKU: RFC 7672 does not require id-kp-serverAuth. Many MTA certificates carry it, some do not. Requiring it would reject working RFC 7672 deployments, so probably not required -- but worth confirming against what MTAs actually publish.\n- Validity dates: DANE-EE(3) skips path validation entirely so dates do not arise. DANE-TA(2) validates a path, so dates apply. RFC 7671 section 5.2 should be read before deciding whether DANE-TA relaxes anything; it was not read during PKIX-rgc6.\n- Key sizes and signature algorithms: no reason to differ from the TLS profile.\n\n## Acceptance\n\n[ ] RFC 7671 section 5.2 read and its bearing on DANE-TA date and name checks recorded\n[ ] A profile added to pkix-profiles with require_subject_alt_name false, and the EKU question decided with a reason\n[ ] verify_smtp_server_dane rustdoc points at it instead of warning about BasicTlsProfile\n[ ] pkix-chain/tests/smtp_dane_e2e.rs uses it instead of its locally-defined MtaProfile",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-25T00:28:11.178244315Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T00:28:11.178244315Z"
+}
