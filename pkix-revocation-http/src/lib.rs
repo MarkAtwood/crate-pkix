@@ -234,6 +234,76 @@ pub use extract::{extract_aia_http_urls, extract_cdp_http_urls, AiaUrls};
 #[cfg_attr(docsrs, doc(cfg(any(feature = "crl", feature = "ocsp"))))]
 pub use time::{SystemClock, TimeSource};
 
+/// Default cap on how many of a certificate's revocation URLs one check
+/// will try.
+///
+/// A certificate's `cRLDistributionPoints` and `authorityInfoAccess`
+/// extensions can list any number of URLs, and a revocation check walks
+/// them in order until one yields a determinative verdict. Without a cap,
+/// the time one check can take is (URLs listed) × (per-request timeout),
+/// and that check runs inside `pkix_chain::verify_chain` with no way for
+/// the caller to bound it. A certificate advertising 500 dead
+/// distribution points against a 10-second timeout stalls a single path
+/// validation for well over an hour.
+///
+/// The cap only bites when URLs are *failing*: the loop returns on the
+/// first determinative verdict, so a certificate whose first
+/// distribution point answers is unaffected no matter how many more it
+/// lists.
+///
+/// # Why eight
+///
+/// Eight is four times the largest count observed in a census of 773
+/// certificates — the workspace's test corpora (734, including a host
+/// trust store) plus the full chains served by twelve major sites across
+/// the major commercial CAs (39). The maximum in both samples was two
+/// HTTP `cRLDistributionPoints` URLs and one HTTP OCSP responder URL;
+/// the overwhelming majority carried one of each. Eight therefore leaves
+/// room for a CA publishing the same CRL under several hostnames for
+/// redundancy, several times over, while still bounding the worst case.
+///
+/// Raise or lower it per fetcher with
+/// [`HttpCrlFetcher::with_max_urls_per_check`] and its siblings.
+///
+/// Gated on a protocol feature because without one there is no fetcher
+/// to cap.
+///
+/// # What this does not bound
+///
+/// Wall-clock latency. The cap bounds the *number* of attempts, not how
+/// long any one of them takes; a single hung request is the transport's
+/// timeout to enforce, and the reference clients configure one. An
+/// overall deadline for a whole check would bound the accumulation
+/// directly, but it cannot interrupt a request already in flight, so it
+/// complements a cap rather than replacing it. Not implemented.
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "crl", feature = "ocsp"))))]
+pub const DEFAULT_MAX_URLS_PER_CHECK: usize = 8;
+
+/// Build the "every URL failed" error shared by all six check paths.
+///
+/// `advertised` is how many URLs the certificate listed and `attempted`
+/// how many the cap allowed. When those differ the message says so:
+/// otherwise an operator reads "all 8 URL(s) failed" for a certificate
+/// that listed 500 and concludes the certificate advertises eight.
+#[cfg(any(feature = "crl", feature = "ocsp"))]
+pub(crate) fn all_urls_failed(
+    attempted: usize,
+    advertised: usize,
+    failures: &[String],
+) -> pkix_revocation::Error {
+    let description = if attempted == advertised {
+        format!("all {advertised} URL(s) failed: {}", failures.join("; "))
+    } else {
+        format!(
+            "all {attempted} of {advertised} URL(s) failed (capped at \
+             {attempted} per check; raise with with_max_urls_per_check): {}",
+            failures.join("; ")
+        )
+    };
+    pkix_revocation::Error::RevocationFetchFailed { description }
+}
+
 /// `Content-Type` for an OCSP request body, per RFC 6960 §A.1.
 #[cfg(feature = "ocsp")]
 pub(crate) const OCSP_REQUEST_CT: &str = "application/ocsp-request";
@@ -437,6 +507,7 @@ pub struct HttpCrlFetcher<F, V> {
     pub(crate) fetcher: F,
     pub(crate) verifier: V,
     pub(crate) clock: crate::time::Clock,
+    pub(crate) max_urls: usize,
 }
 
 #[cfg(feature = "crl")]
@@ -468,6 +539,7 @@ impl<F, V> HttpCrlFetcher<F, V> {
             fetcher,
             verifier,
             clock: crate::time::Clock::Fixed(now_unix),
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
     }
 
@@ -482,6 +554,7 @@ impl<F, V> HttpCrlFetcher<F, V> {
             fetcher,
             verifier,
             clock: crate::time::Clock::System,
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
     }
 
@@ -500,7 +573,29 @@ impl<F, V> HttpCrlFetcher<F, V> {
             fetcher,
             verifier,
             clock: crate::time::Clock::Custom(source),
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
+    }
+
+    /// Cap how many of the certificate's revocation URLs one check will
+    /// try, overriding [`crate::DEFAULT_MAX_URLS_PER_CHECK`].
+    ///
+    /// URLs are tried in the order the certificate lists them and the
+    /// check returns on the first determinative verdict, so this only
+    /// bites when URLs are failing. See the constant for why the default
+    /// is what it is, and for what the cap does not bound.
+    ///
+    /// `0` attempts no URL at all, so any certificate advertising a
+    /// distribution point yields
+    /// [`pkix_revocation::Error::RevocationFetchFailed`]. That is not
+    /// clamped to `1`: quietly doing something other than what the
+    /// caller asked for is worse than doing the useless thing they did
+    /// ask for. To skip revocation entirely use
+    /// [`pkix_revocation::NoRevocation`].
+    #[must_use]
+    pub const fn with_max_urls_per_check(mut self, max: usize) -> Self {
+        self.max_urls = max;
+        self
     }
 }
 
@@ -528,6 +623,7 @@ pub struct HttpOcspFetcher<F, V> {
     pub(crate) verifier: V,
     pub(crate) clock: crate::time::Clock,
     pub(crate) hash_alg: OcspHashAlg,
+    pub(crate) max_urls: usize,
 }
 
 #[cfg(feature = "ocsp")]
@@ -556,6 +652,7 @@ impl<F, V> HttpOcspFetcher<F, V> {
             verifier,
             clock: crate::time::Clock::Fixed(now_unix),
             hash_alg: OcspHashAlg::Sha256,
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
     }
 
@@ -571,6 +668,7 @@ impl<F, V> HttpOcspFetcher<F, V> {
             verifier,
             clock: crate::time::Clock::System,
             hash_alg: OcspHashAlg::Sha256,
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
     }
 
@@ -588,6 +686,7 @@ impl<F, V> HttpOcspFetcher<F, V> {
             verifier,
             clock: crate::time::Clock::Custom(source),
             hash_alg: OcspHashAlg::Sha256,
+            max_urls: crate::DEFAULT_MAX_URLS_PER_CHECK,
         }
     }
 
@@ -600,6 +699,17 @@ impl<F, V> HttpOcspFetcher<F, V> {
     #[must_use]
     pub const fn with_hash_alg(mut self, alg: OcspHashAlg) -> Self {
         self.hash_alg = alg;
+        self
+    }
+
+    /// Cap how many of the certificate's OCSP responder URLs one check
+    /// will try, overriding [`crate::DEFAULT_MAX_URLS_PER_CHECK`].
+    ///
+    /// See [`crate::HttpCrlFetcher::with_max_urls_per_check`] for the
+    /// semantics, including what `0` means.
+    #[must_use]
+    pub const fn with_max_urls_per_check(mut self, max: usize) -> Self {
+        self.max_urls = max;
         self
     }
 }

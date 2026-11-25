@@ -76,8 +76,14 @@ where
         // one check is judged against the same instant.
         let now_unix = self.clock.now_unix();
 
-        let mut failures: Vec<String> = Vec::with_capacity(urls.len());
-        for url in &urls {
+        // Cap the walk. URLs are tried in listed order and the loop
+        // returns on the first determinative verdict, so this only bites
+        // when they are failing -- which is exactly the case where an
+        // uncapped walk costs (URLs listed) x (per-request timeout).
+        let budget = self.max_urls;
+        let attempted = urls.len().min(budget);
+        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        for url in urls.iter().take(budget) {
             let req = FetchRequest::get(url);
             match self.fetcher.fetch(&req) {
                 Ok(resp) => {
@@ -104,9 +110,7 @@ where
         }
 
         // Step 4 — Every URL failed. Surface a structured description.
-        Err(RevError::RevocationFetchFailed {
-            description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
-        })
+        Err(crate::all_urls_failed(attempted, urls.len(), &failures))
     }
 }
 

@@ -1049,8 +1049,14 @@ where
         let now_unix = self.inner.clock.now_unix();
         let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(now_unix);
 
-        let mut failures: Vec<String> = Vec::with_capacity(urls.len());
-        for url in &urls {
+        // Cap the walk. URLs are tried in listed order and the loop
+        // returns on the first determinative verdict, so this only bites
+        // when they are failing -- which is exactly the case where an
+        // uncapped walk costs (URLs listed) x (per-request timeout).
+        let budget = self.inner.max_urls;
+        let attempted = urls.len().min(budget);
+        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        for url in urls.iter().take(budget) {
             // Step 2 — Cache lookup.
             let key = issuer_dn_der.as_ref().map(|der| CrlCacheKey {
                 issuer_dn_der: der.clone(),
@@ -1116,9 +1122,7 @@ where
             }
         }
 
-        Err(RevError::RevocationFetchFailed {
-            description: format!("all {} URL(s) failed: {}", urls.len(), failures.join("; ")),
-        })
+        Err(crate::all_urls_failed(attempted, urls.len(), &failures))
     }
 
     /// Parse freshness metadata out of a fetched, **already verified** CRL
@@ -1275,8 +1279,11 @@ where
         let now_unix = self.inner.clock.now_unix();
         let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(now_unix);
 
-        let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
-        for url in &aia.ocsp {
+        // Cap the walk; see the CRL twin.
+        let budget = self.inner.max_urls;
+        let attempted = aia.ocsp.len().min(budget);
+        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        for url in aia.ocsp.iter().take(budget) {
             let key = OcspCacheKey {
                 cert_serial: cert_serial.clone(),
                 issuer_key_hash: issuer_key_hash.clone(),
@@ -1331,13 +1338,7 @@ where
             }
         }
 
-        Err(RevError::RevocationFetchFailed {
-            description: format!(
-                "all {} URL(s) failed: {}",
-                aia.ocsp.len(),
-                failures.join("; ")
-            ),
-        })
+        Err(crate::all_urls_failed(attempted, aia.ocsp.len(), &failures))
     }
 
     /// Parse freshness metadata out of a fetched, **already verified** OCSP

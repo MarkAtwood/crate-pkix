@@ -50,8 +50,11 @@ where
         // one check is judged against the same instant.
         let now_unix = self.clock.now_unix();
 
-        let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
-        for url in &aia.ocsp {
+        // Cap the walk; see the CRL twin.
+        let budget = self.max_urls;
+        let attempted = aia.ocsp.len().min(budget);
+        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        for url in aia.ocsp.iter().take(budget) {
             let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
             match self.fetcher.fetch(&req).await {
                 Ok(resp) => match OcspChecker::new(&resp.bytes, now_unix, self.verifier.clone()) {
@@ -68,13 +71,7 @@ where
             }
         }
 
-        Err(RevError::RevocationFetchFailed {
-            description: format!(
-                "all {} URL(s) failed: {}",
-                aia.ocsp.len(),
-                failures.join("; ")
-            ),
-        })
+        Err(crate::all_urls_failed(attempted, aia.ocsp.len(), &failures))
     }
 }
 
