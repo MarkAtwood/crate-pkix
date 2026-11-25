@@ -11,12 +11,12 @@
 //! directly from IETF RFCs without overlaying any individual industry-forum
 //! interpretation.
 //!
-//! CA/Browser Forum-specific profiles ([`WebPkiProfile`], [`SmimeProfile`],
-//! [`CodeSigningProfile`]) and the SC-081 phased validity helper have moved to
-//! the sibling [`pkix-profiles-cabf`] crate as of `pkix-profiles 0.3.0`.
-//! Deprecated re-exports are kept here for one minor cycle so existing imports
-//! continue to compile (with a deprecation warning); the re-exports are
-//! scheduled to drop in `pkix-profiles 0.4.0`.
+//! CA/Browser Forum-specific profiles (`WebPkiProfile`, `SmimeProfile`,
+//! `CodeSigningProfile`) and the SC-081 phased validity helper live in the
+//! sibling [`pkix-profiles-cabf`] crate; they moved there in
+//! `pkix-profiles 0.3.0`. Deprecated aliases kept them importable from here
+//! for two releases and have now been removed, so import them from
+//! `pkix-profiles-cabf` directly.
 //!
 //! Third-party crates (`pkix-fpki`, `pkix-etsi`, etc.) implement
 //! [`pkix_path::Profile`] directly against `pkix-path` and do not need to
@@ -80,18 +80,13 @@
 //!   `PolicyMappings`, `PolicyConstraints`, `InhibitAnyPolicy`) beyond
 //!   what `pkix-path` already does — these profiles add caller-friendly
 //!   structural overlays on top of that core algorithm.
-//! - **Deprecated re-exports are still here.** `WebPkiProfile`,
-//!   `SmimeProfile`, `CodeSigningProfile`, `web_pki_policy`,
-//!   `smime_policy`, `code_signing_policy` and `sc081_validity_cap`
-//!   moved to `pkix-profiles-cabf` in 0.3.0 and remain available here as
-//!   deprecated aliases.
-//!
-//!   They will be removed in some future breaking release; this crate
-//!   does not say which, because the last attempt to name one was wrong.
-//!   This entry used to promise they would drop in 0.4.0, and 0.4.0
-//!   shipped with them intact. Until they go the aliases keep working
-//!   and emit a deprecation warning, so code written against 0.3.x still
-//!   compiles — but migrate to `pkix-profiles-cabf`, because they will go.
+//! - **CA/B Forum content lives in `pkix-profiles-cabf`.**
+//!   `WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`,
+//!   `web_pki_policy`, `smime_policy`, `code_signing_policy` and
+//!   `sc081_validity_cap` moved there in 0.3.0. Deprecated aliases kept
+//!   them importable from here for two releases; they are now gone.
+//!   Import them from `pkix-profiles-cabf`.
+
 //! - **No site-local extension.** Site-local policy is the caller's
 //!   responsibility; either implement [`pkix_path::Profile`] directly or
 //!   wrap a bundled profile and overlay site-specific rules.
@@ -106,60 +101,6 @@
 //! [`pkix-profiles-cabf`]: https://docs.rs/pkix-profiles-cabf
 
 pub use pkix_path::{Profile, ValidationPolicy};
-
-// ---------------------------------------------------------------------------
-// Deprecated re-exports — CA/B Forum content moved to pkix-profiles-cabf
-// in the 0.3.0 release. Drops in 0.4.0.
-// ---------------------------------------------------------------------------
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::WebPkiProfile` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::WebPkiProfile;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::SmimeProfile` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::SmimeProfile;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::CodeSigningProfile` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::CodeSigningProfile;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::web_pki_policy` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::web_pki_policy;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::smime_policy` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::smime_policy;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::code_signing_policy` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::code_signing_policy;
-
-#[deprecated(
-    since = "0.3.0",
-    note = "moved to pkix-profiles-cabf; import `pkix_profiles_cabf::sc081_validity_cap` instead. \
-            This re-export drops in pkix-profiles 0.4.0."
-)]
-pub use pkix_profiles_cabf::sc081_validity_cap;
 
 use der::asn1::ObjectIdentifier;
 
@@ -1225,39 +1166,6 @@ mod tests {
                 Err(pkix_path::Error::MissingRfc822San)
             ),
             "cert with dNSName-only SAN must fail basic_smime_policy with MissingRfc822San"
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // Deprecated re-exports: confirm they still resolve to the new crate.
-    //
-    // The re-exports are scheduled to drop in pkix-profiles 0.4.0; these tests
-    // exist to catch accidental removal before that release, and to confirm
-    // the deprecated symbols are still callable (with #[allow(deprecated)]).
-    // -----------------------------------------------------------------------
-
-    #[test]
-    #[allow(deprecated)]
-    fn deprecated_reexports_resolve_to_cabf_crate() {
-        // sc081_validity_cap from pkix-profiles must equal the one from
-        // pkix-profiles-cabf (same symbol via re-export).
-        assert_eq!(
-            crate::sc081_validity_cap(1_773_532_800),
-            pkix_profiles_cabf::sc081_validity_cap(1_773_532_800),
-            "deprecated re-export must resolve to pkix-profiles-cabf"
-        );
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn deprecated_profile_reexports_have_same_ids() {
-        // Compare via Profile trait without any name collision.
-        let tls_via_old: crate::WebPkiProfile = crate::WebPkiProfile;
-        let tls_via_new: pkix_profiles_cabf::WebPkiProfile = pkix_profiles_cabf::WebPkiProfile;
-        assert_eq!(
-            tls_via_old.id(),
-            tls_via_new.id(),
-            "deprecated WebPkiProfile re-export must resolve to pkix-profiles-cabf"
         );
     }
 

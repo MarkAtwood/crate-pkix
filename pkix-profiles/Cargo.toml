@@ -19,18 +19,6 @@ pkix-path = { workspace = true }
 # (PKIX-9vnx.9.2), and the check_shape() convenience the per-profile
 # shape-check aliases delegate to.
 pkix-lint = { workspace = true }
-# Used solely for the deprecated re-exports, which moved to
-# pkix-profiles-cabf in 0.3.0: WebPkiProfile, SmimeProfile,
-# CodeSigningProfile, web_pki_policy, smime_policy, code_signing_policy and
-# sc081_validity_cap. Seven items, not the four this comment used to list.
-#
-# This said "Drops in 0.4.0". It did not: 0.4.0 shipped with the re-exports
-# intact, so the dependency outlived its own deadline. Naming another
-# version would just repeat that mistake -- the re-exports and this
-# dependency go together in a future breaking release, whichever one that
-# turns out to be. Nothing inside this workspace imports the deprecated
-# paths, so the removal is external-facing only.
-pkix-profiles-cabf = { workspace = true }
 # x509-cert's `Certificate` is the per-cert input type for the shape-check
 # convenience aliases (`check_basic_tls_shape`, `check_basic_smime_shape`).
 # Already a transitive dep via pkix-path; declared directly so the alias
