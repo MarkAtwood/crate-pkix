@@ -580,6 +580,22 @@ pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetche
     aia_config: AiaConfig,
 }
 
+/// `Verifier` is a bundle of borrows plus a `Copy` config, so copying one
+/// is free and cannot fail.
+///
+/// Written out rather than derived on purpose. `#[derive(Clone, Copy)]`
+/// on a generic struct adds `V: Clone`/`V: Copy` bounds, which would be
+/// wrong here: the struct holds `&V`, not `V`, and a shared reference is
+/// `Copy` whatever it points at. Deriving would have denied `Copy` to
+/// every verifier that is not itself `Copy`, for no reason.
+impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> Clone for Verifier<'_, V, R, A> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> Copy for Verifier<'_, V, R, A> {}
+
 impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> core::fmt::Debug
     for Verifier<'_, V, R, A>
 {
@@ -1715,6 +1731,42 @@ const _: fn() = || {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<Error>();
     _assert_send_sync::<ValidatedPath>();
+
+    // `Verifier` is `Copy` for EVERY conforming parameter set, including
+    // verifiers, checkers and fetchers that are not themselves `Copy` or
+    // `Clone`. That is the property a `#[derive]` would have silently
+    // taken away, by adding `V: Copy` bounds the struct does not need —
+    // it holds `&V`. `NonCopy` below implements the three traits and
+    // nothing else, so this stops compiling if anyone "tidies" the
+    // hand-written impls into a derive.
+    struct NonCopy;
+    impl SignatureVerifier for NonCopy {
+        fn verify_signature(
+            &self,
+            _: spki::AlgorithmIdentifierRef<'_>,
+            _: spki::SubjectPublicKeyInfoRef<'_>,
+            _: &[u8],
+            _: &[u8],
+        ) -> core::result::Result<(), pkix_path::VerificationError> {
+            unreachable!("compile-time assertion only")
+        }
+    }
+    impl RevocationChecker for NonCopy {
+        fn check_revocation(
+            &self,
+            _: &Certificate,
+            _: &Certificate,
+        ) -> pkix_revocation::Result<()> {
+            unreachable!("compile-time assertion only")
+        }
+    }
+    impl AiaFetcher for NonCopy {
+        fn fetch(&self, _: &str) -> core::result::Result<Vec<u8>, pkix_aia::AiaError> {
+            unreachable!("compile-time assertion only")
+        }
+    }
+    fn _assert_copy<T: Copy>() {}
+    _assert_copy::<Verifier<'static, NonCopy, NonCopy, NonCopy>>();
 
     // `Verifier` is public surface and `verify_batch` invites callers to
     // fan chains out across threads, so it has to be `Send + Sync` too.

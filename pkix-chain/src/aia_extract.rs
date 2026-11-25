@@ -75,14 +75,17 @@ fn is_http_scheme(uri: &str) -> bool {
     // `push_if_http_uri`. Treats only `http:` and `https:` as fetchable —
     // anything else (ldap:, ftp:, file:, …) is dropped on the floor before
     // we'd hand it to a fetcher.
-    let lower_prefix = |p: &str| {
-        uri.len() > p.len()
-            && uri.as_bytes()[..p.len()]
-                .iter()
-                .map(|b| b.to_ascii_lowercase())
-                .eq(p.bytes())
+    // `eq_ignore_ascii_case` is the comparison this needs; the previous
+    // hand-rolled `map(to_ascii_lowercase).eq(..)` did the same work with
+    // more to read and one more place for an off-by-one to hide.
+    //
+    // The length test stays strictly greater: a URI that is only the
+    // scheme, `"http://"` with nothing after it, names no resource.
+    let scheme_is = |prefix: &str| {
+        uri.len() > prefix.len()
+            && uri.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
     };
-    lower_prefix("http://") || lower_prefix("https://")
+    scheme_is("http://") || scheme_is("https://")
 }
 
 #[cfg(test)]
