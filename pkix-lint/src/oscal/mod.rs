@@ -33,6 +33,37 @@
 //! This module is gated behind the `oscal` cargo feature, which pulls in
 //! `serde_json` as a real dependency. The core lint engine stays
 //! dep-light when consumers do not need OSCAL output.
+//!
+//! # The `serde_json` version pin
+//!
+//! The functions here take and return [`serde_json::Value`], which pins
+//! `serde_json`'s major version into this module's public API. A
+//! `serde_json 2.0` would be a breaking change for `oscal`-feature
+//! consumers.
+//!
+//! That is deliberate rather than incidental. This module's job is to
+//! produce and consume OSCAL *JSON documents*; a JSON DOM at that
+//! boundary is the format, not an implementation detail leaking out. The
+//! alternative — modelling OSCAL Assessment Results, Catalog and Profile
+//! as Rust types that implement `Serialize` — would remove the pin, and
+//! would also mean carrying a hand-written partial transcription of three
+//! NIST schemas that can drift from them. For a module the crate docs
+//! above describe as "available, not privileged", and which is behind a
+//! non-default feature, that is the wrong trade today.
+//!
+//! What is worth avoiding is the version *mismatch* this would otherwise
+//! cause: a caller naming `serde_json::Value` from their own dependency
+//! can end up with a type that does not unify with ours. Use
+//! [`Value`], re-exported here, and the types are
+//! the same by construction.
+
+/// `serde_json`'s JSON DOM, re-exported so callers of this module cannot
+/// end up with a `Value` from a different `serde_json` than the one
+/// `pkix-lint` was built against.
+///
+/// See the module docs on the version pin for why the boundary is a DOM
+/// at all.
+pub use serde_json::Value;
 
 pub mod catalog;
 pub mod emit;
