@@ -125,14 +125,42 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 }
 
 /// Walk the chain leaf-to-anchor, trying each supplied CRL against each
-/// cert. Return `Some(reason)` on the first revoked outcome; `None` when
-/// no CRL reports any cert revoked.
+/// cert. Return `Some(reason)` when a certificate is revoked **or** when its
+/// revocation status cannot be determined; `None` only when every certificate
+/// was cleared by some CRL.
 ///
 /// Iteration order is determined first by chain position (leaf first, anchor
 /// last) and second by CRL order in `crls`. Within a single cert, the first
-/// CRL that reports `Revoked` wins. CRLs that don't apply (issuer mismatch,
-/// scope, signature, parse) are ignored — this matches the "soft per-CRL"
-/// policy documented at the module level.
+/// CRL that reports `Revoked` wins.
+///
+/// # Per-CRL soft, per-certificate hard
+///
+/// A single CRL that does not apply to a certificate — issuer mismatch,
+/// scope, signature failure, parse error, or a CRL rendered unusable by an
+/// unrecognized critical extension (RFC 5280 §5.2 / §5.3) — carries no
+/// determination, so the next CRL is tried. That part is unchanged and is
+/// necessary: PKITS chains ship several CRLs of which only some apply.
+///
+/// What changed is the case where *no* CRL applies to a certificate. That
+/// used to be reported as "not revoked", which is a fail-open: it claims a
+/// clean bill of health from zero evidence. It now fails.
+///
+/// This mattered once `pkix-revocation` began correctly refusing CRLs with
+/// unrecognized critical extensions. Those CRLs had previously been applied
+/// and reported `Revoked`; afterwards they were refused, every error was
+/// ignored, and three PKITS chains that NIST classes **invalid** started
+/// passing — 4.15.4, 4.4.8 and 4.4.9. The library was right and this oracle
+/// was modelling a validator nobody would ship.
+///
+/// It now matches what `pkix_chain::verify_chain` does, which propagates
+/// every revocation error with `?` and has no soft-fail mode. The difference
+/// is only that this oracle is handed a pool of CRLs and so tries them all
+/// before concluding, where `verify_chain` holds one checker and fails on
+/// first error.
+///
+/// Callers with no CRLs at all are unaffected: the caller skips this function
+/// entirely when `chain.crls` is empty, which preserves the no-revocation
+/// behaviour for the bulk of the corpus.
 fn check_revocation(
     chain: &[Certificate],
     anchor: &TrustAnchor,
@@ -141,6 +169,8 @@ fn check_revocation(
 ) -> Option<String> {
     for (i, cert) in chain.iter().enumerate() {
         let issuer_cert: Option<&Certificate> = chain.get(i + 1);
+        // Did any CRL actually reach a verdict about this certificate?
+        let mut cleared_by_some_crl = false;
         for crl_der in crls {
             // Parse the CRL once per cert/CRL pair. This is wasteful — the
             // CrlChecker re-parses on every construction — but keeps the
@@ -157,18 +187,34 @@ fn check_revocation(
                 // Last cert in validation_chain is issued by the anchor.
                 checker.check_revocation_against_anchor(cert, anchor)
             };
-            // Only the Revoked case flips the verdict. Every other outcome —
-            // including Ok (CRL applied, cert not on list) and Err (CRL did
-            // not apply: mismatch / scope / parse / signature failure) — is
-            // treated as "this CRL has no negative determination, try the
-            // next". Importantly we do NOT stop on Ok: a later CRL may still
-            // revoke this cert. The diff classifier treats divergence in
-            // CRL-coverage policy as its own signal.
-            if let Err(e @ RevError::Revoked { .. }) = result {
-                return Some(format!(
-                    "pkix-path revocation: cert at chain index {i} revoked by CRL: {e}"
-                ));
+            match result {
+                // This CRL applied and did not list the cert. Record that the
+                // status is known, but keep going: a later CRL may still
+                // revoke it, and stopping here would make the verdict depend
+                // on CRL order.
+                Ok(()) => cleared_by_some_crl = true,
+
+                Err(e @ RevError::Revoked { .. }) => {
+                    return Some(format!(
+                        "pkix-path revocation: cert at chain index {i} revoked by CRL: {e}"
+                    ));
+                }
+
+                // This CRL carries no determination about this certificate.
+                // Try the next one; if none applies, the loop below fails.
+                Err(_) => {}
             }
+        }
+
+        if !cleared_by_some_crl {
+            // No supplied CRL could be applied to this certificate, so its
+            // revocation status is unknown. Reporting "not revoked" here is
+            // the fail-open this function used to have.
+            return Some(format!(
+                "pkix-path revocation: revocation status of cert at chain index {i} \
+                 is undetermined — none of the {} supplied CRL(s) applied to it",
+                crls.len()
+            ));
         }
     }
     None
