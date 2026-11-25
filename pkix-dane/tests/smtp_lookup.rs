@@ -889,3 +889,118 @@ fn unreachable_hosts_under_mandatory_dane_are_not_a_tlsa_delay() {
         "no host published anything; none was reachable either"
     );
 }
+
+// ---------------------------------------------------------------------------
+// §3.1.3: a set of only PKIX usages is not DANE
+// ---------------------------------------------------------------------------
+
+/// A PKIX-EE(1) record is usable as a record and useless as SMTP
+/// authentication.
+///
+/// `TlsaRecord::is_usable` is about whether the record parses and carries an
+/// assigned usage, not about whether this profile can authenticate with it.
+/// So a usage-1 record survives discovery's filter — deliberately, because
+/// the entry point reports "the domain published only PKIX usages" distinctly
+/// from "the domain published nothing", and needs to see them to do it.
+///
+/// What must not happen is `dane_records` claiming DANE applies.
+#[test]
+fn a_set_of_only_pkix_usages_does_not_count_as_dane() {
+    let pkix_ee = TlsaRecord::new(
+        TlsaUsage::PkixEe,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Sha256,
+        vec![0x22; 32],
+    );
+    assert!(pkix_ee.is_usable(), "usage 1 is an assigned usage");
+
+    let mut resolution = MxResolution::relay("relay.internal", SmtpDaneConfig::new());
+    resolution.absorb(MxAnswer::Addresses {
+        status: DnssecStatus::Secure,
+        found: true,
+    });
+    resolution.absorb(MxAnswer::Tlsa {
+        status: DnssecStatus::Secure,
+        records: vec![pkix_ee],
+    });
+    let MxStep::Deliver(target) = resolution.next_step() else {
+        panic!("expected a delivery target");
+    };
+
+    assert!(
+        target.dane_records().is_none(),
+        "PKIX usages cannot authenticate an SMTP connection (§3.1.3)"
+    );
+    assert!(target.identities().is_none(), "no DANE means no name check");
+    assert!(
+        target.tlsa_response().is_some(),
+        "the records are still carried, so the entry point can report that \
+         only PKIX usages were published"
+    );
+}
+
+/// A mixed set authenticates on its DANE records and carries the rest.
+///
+/// This is `huque.com`'s real publication: PKIX-EE(1) alongside DANE-EE(3).
+#[test]
+fn a_mixed_set_applies_dane_and_still_carries_the_pkix_record() {
+    let pkix_ee = TlsaRecord::new(
+        TlsaUsage::PkixEe,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Sha256,
+        vec![0x22; 32],
+    );
+
+    let mut resolution = MxResolution::relay("relay.internal", SmtpDaneConfig::new());
+    resolution.absorb(MxAnswer::Addresses {
+        status: DnssecStatus::Secure,
+        found: true,
+    });
+    resolution.absorb(MxAnswer::Tlsa {
+        status: DnssecStatus::Secure,
+        records: vec![tlsa(), pkix_ee, tlsa()],
+    });
+    let MxStep::Deliver(target) = resolution.next_step() else {
+        panic!("expected a delivery target");
+    };
+
+    let records = target
+        .dane_records()
+        .expect("DANE-EE records are present, so DANE applies");
+    assert_eq!(records.len(), 3, "every usable record is carried");
+    assert!(target.identities().is_some());
+}
+
+/// Under mandatory DANE, a PKIX-only set delays: nothing there can
+/// authenticate, which is §6's condition.
+#[test]
+fn mandatory_dane_delays_on_a_pkix_only_set() {
+    let pkix_ta = TlsaRecord::new(
+        TlsaUsage::PkixTa,
+        TlsaSelector::Spki,
+        TlsaMatchingType::Sha256,
+        vec![0x33; 32],
+    );
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (script, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![MxRecord::new(10, "mx.example.net")],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Secure,
+                found: true,
+            },
+            MxStep::LookupTlsa { .. } => MxAnswer::Tlsa {
+                status: DnssecStatus::Secure,
+                records: vec![pkix_ta.clone()],
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+
+    assert_eq!(delay, Some(DelayReason::MandatoryDaneWithoutUsableTlsa));
+    assert!(script.targets.is_empty());
+}

@@ -45,7 +45,7 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use crate::record::TlsaRecord;
+use crate::record::{TlsaRecord, TlsaUsage};
 use crate::smtp::SmtpIdentities;
 use crate::{DnssecStatus, TlsaResponse};
 
@@ -292,6 +292,21 @@ impl DeliveryTarget {
         &self.host
     }
 
+    /// Whether any record carries a usage this profile can authenticate with.
+    ///
+    /// DANE-EE(3) and DANE-TA(2) only. A domain publishing nothing but
+    /// PKIX-TA(0) / PKIX-EE(1) has published records that cannot authenticate
+    /// an SMTP connection — RFC 7672 §3.1.3 — so DANE does not apply even
+    /// though the TLSA RRset is non-empty.
+    ///
+    /// Observed in the wild: `huque.com` publishes PKIX-EE(1) alongside
+    /// DANE-EE(3) for its mail host, so a set mixing them is not hypothetical.
+    fn has_authenticating_usage(&self) -> bool {
+        self.tlsa
+            .iter()
+            .any(|r| matches!(r.usage(), TlsaUsage::DaneEe | TlsaUsage::DaneTa))
+    }
+
     /// Whether DANE authentication applies, and with which records.
     ///
     /// `Some` means at least one usable "secure" TLSA record was found, and
@@ -311,10 +326,10 @@ impl DeliveryTarget {
     /// authenticate against.
     #[must_use]
     pub fn dane_records(&self) -> Option<&[TlsaRecord]> {
-        if self.tlsa.is_empty() {
-            None
-        } else {
+        if self.has_authenticating_usage() {
             Some(&self.tlsa)
+        } else {
+            None
         }
     }
 
@@ -327,7 +342,7 @@ impl DeliveryTarget {
     /// alone. See [`SmtpDaneConfig::dane_despite_insecure_mx`].
     #[must_use]
     pub fn identities(&self) -> Option<SmtpIdentities<'_>> {
-        if self.tlsa.is_empty() {
+        if !self.has_authenticating_usage() {
             return None;
         }
         if !self.came_from_mx {
@@ -356,8 +371,10 @@ impl DeliveryTarget {
     /// insecure ones inapplicable and they are dropped during discovery
     /// rather than carried forward with a weaker label.
     ///
-    /// `None` when DANE does not apply, matching
-    /// [`dane_records`](Self::dane_records).
+    /// Unlike [`dane_records`](Self::dane_records) this includes records whose
+    /// usage this profile cannot authenticate with, so a caller can tell
+    /// "the domain published only PKIX usages" from "the domain published
+    /// nothing". `None` only when no usable record was found at all.
     #[must_use]
     pub fn tlsa_response(&self) -> Option<TlsaResponse> {
         if self.tlsa.is_empty() {
@@ -730,7 +747,7 @@ impl MxResolution {
                     // Insecure or bogus TLSA records authenticate nothing.
                     self.current_tlsa = Vec::new();
                 }
-                if self.config.mandatory && self.current_tlsa.is_empty() {
+                if self.config.mandatory && !self.current_has_authenticating_usage() {
                     // §6: nothing to authenticate with, so this server cannot
                     // be used. Try the next in preference order; only when
                     // none has usable records is delivery delayed.
@@ -760,6 +777,14 @@ impl MxResolution {
             // Mismatched answer: ignored. See the method docs.
             _ => {}
         }
+    }
+
+    /// Whether the current host's records include a usage we can authenticate
+    /// with. See `DeliveryTarget::has_authenticating_usage`.
+    fn current_has_authenticating_usage(&self) -> bool {
+        self.current_tlsa
+            .iter()
+            .any(|r| matches!(r.usage(), TlsaUsage::DaneEe | TlsaUsage::DaneTa))
     }
 
     /// Move to the next MX host, in preference order.
