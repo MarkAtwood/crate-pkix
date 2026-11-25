@@ -47,7 +47,7 @@ use alloc::vec::Vec;
 
 use crate::record::TlsaRecord;
 use crate::smtp::SmtpIdentities;
-use crate::DnssecStatus;
+use crate::{DnssecStatus, TlsaResponse};
 
 /// Whether an RRset is usable as authenticated data, per RFC 7672 §2.1.1.
 ///
@@ -256,6 +256,21 @@ pub enum DelayReason {
 
     /// CNAME expansion exceeded [`SmtpDaneConfig::max_cname_depth`].
     CnameLoop,
+
+    /// DANE is mandatory for this destination and no server offered usable
+    /// "secure" TLSA records (RFC 7672 §6).
+    ///
+    /// > With mandatory DANE TLS, when no usable TLSA records are found,
+    /// > message delivery is delayed. Thus, mail is only sent when an
+    /// > authenticated TLS channel is established to the remote SMTP server.
+    ///
+    /// Distinct from [`MandatoryDaneWithInsecureMx`](Self::MandatoryDaneWithInsecureMx):
+    /// there the MX hostnames themselves could not be trusted, whereas here
+    /// they could and the servers simply publish nothing usable. The
+    /// remedies differ — the first is the receiving domain's DNSSEC, the
+    /// second its TLSA records — and §6 warns that an administrator running
+    /// mandatory DANE has to watch for exactly these.
+    MandatoryDaneWithoutUsableTlsa,
 }
 
 /// Where a delivery attempt should go, and how to authenticate it.
@@ -331,6 +346,24 @@ impl DeliveryTarget {
             ))
         } else {
             Some(SmtpIdentities::insecure_mx(&self.base_domain))
+        }
+    }
+
+    /// The TLSA records as a [`TlsaResponse`], for the verify functions.
+    ///
+    /// The status is always [`DnssecStatus::Secure`]: records reach a
+    /// `DeliveryTarget` only through a "secure" answer, because §2.2.1 makes
+    /// insecure ones inapplicable and they are dropped during discovery
+    /// rather than carried forward with a weaker label.
+    ///
+    /// `None` when DANE does not apply, matching
+    /// [`dane_records`](Self::dane_records).
+    #[must_use]
+    pub fn tlsa_response(&self) -> Option<TlsaResponse> {
+        if self.tlsa.is_empty() {
+            None
+        } else {
+            Some(TlsaResponse::new(self.tlsa.clone(), DnssecStatus::Secure))
         }
     }
 
@@ -459,6 +492,14 @@ pub struct MxResolution {
     current_tlsa: Vec<TlsaRecord>,
     /// A terminal verdict, once reached.
     terminal: Option<DelayReason>,
+    /// Whether some host was passed over because mandatory DANE found no
+    /// usable TLSA records for it. Decides the delay reason on exhaustion.
+    skipped_for_want_of_tlsa: bool,
+    /// Whether any host was ever offered as a delivery target. A host passed
+    /// over for want of usable records is only §6's delay when no host was
+    /// deliverable at all; one that was offered and declined by the driver is
+    /// the driver's business.
+    offered_any: bool,
     done: bool,
 }
 
@@ -480,6 +521,8 @@ impl MxResolution {
             skip_tlsa_for_host: false,
             current_tlsa: Vec::new(),
             terminal: None,
+            skipped_for_want_of_tlsa: false,
+            offered_any: false,
             done: false,
         }
     }
@@ -510,6 +553,14 @@ impl MxResolution {
     pub fn next_step(&self) -> MxStep {
         if let Some(reason) = self.terminal {
             return MxStep::Delay(reason);
+        }
+        // §6: mandatory DANE delays rather than reporting a dead end when the
+        // reason every host was passed over is that none published usable
+        // TLSA records. The distinction matters to the sending MTA: this is a
+        // retryable condition at the receiving domain, not an exhausted list
+        // of servers.
+        if self.done && self.skipped_for_want_of_tlsa && !self.offered_any {
+            return MxStep::Delay(DelayReason::MandatoryDaneWithoutUsableTlsa);
         }
         match self.awaiting {
             Awaiting::Mx => MxStep::LookupMx {
@@ -640,11 +691,18 @@ impl MxResolution {
                 // here: no TLSA lookup. The destination is still reachable,
                 // so this is not a delay.
                 self.skip_tlsa_for_host = trust != RrsetTrust::Secure;
-                self.awaiting = if self.skip_tlsa_for_host {
-                    Awaiting::Nothing
+                if self.skip_tlsa_for_host {
+                    if self.config.mandatory {
+                        // No TLSA query will be made, so no usable records can
+                        // be found for this host. §6 again.
+                        self.skipped_for_want_of_tlsa = true;
+                        self.advance_host();
+                    } else {
+                        self.awaiting = Awaiting::Nothing;
+                    }
                 } else {
-                    Awaiting::Tlsa
-                };
+                    self.awaiting = Awaiting::Tlsa;
+                }
             }
 
             (Awaiting::Addresses, MxAnswer::LookupFailed) => {
@@ -672,7 +730,15 @@ impl MxResolution {
                     // Insecure or bogus TLSA records authenticate nothing.
                     self.current_tlsa = Vec::new();
                 }
-                self.awaiting = Awaiting::Nothing;
+                if self.config.mandatory && self.current_tlsa.is_empty() {
+                    // §6: nothing to authenticate with, so this server cannot
+                    // be used. Try the next in preference order; only when
+                    // none has usable records is delivery delayed.
+                    self.skipped_for_want_of_tlsa = true;
+                    self.advance_host();
+                } else {
+                    self.awaiting = Awaiting::Nothing;
+                }
             }
 
             (Awaiting::Tlsa, MxAnswer::LookupFailed) => {
@@ -684,7 +750,12 @@ impl MxResolution {
             }
 
             // ---- A delivery target was offered and the driver came back ----
-            (Awaiting::Nothing, _) => self.advance_host(),
+            (Awaiting::Nothing, _) => {
+                if self.host_index < self.hosts.len() {
+                    self.offered_any = true;
+                }
+                self.advance_host();
+            }
 
             // Mismatched answer: ignored. See the method docs.
             _ => {}

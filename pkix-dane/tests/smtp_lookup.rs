@@ -730,3 +730,162 @@ fn exhausting_every_host_is_reported_distinctly_from_a_delay() {
     );
     assert_eq!(outcome, Err(None), "no hosts left is not a delay reason");
 }
+
+// ---------------------------------------------------------------------------
+// §6: mandatory DANE delays when no usable TLSA records are found
+// ---------------------------------------------------------------------------
+
+/// > With mandatory DANE TLS, when no usable TLSA records are found, message
+/// > delivery is delayed.
+///
+/// The MX RRset is secure here, so the hostnames are trustworthy — the server
+/// simply publishes nothing usable. Offering it for unauthenticated delivery
+/// would defeat the policy entirely.
+#[test]
+fn mandatory_dane_delays_when_a_server_publishes_no_usable_records() {
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (script, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![MxRecord::new(10, "bare.example.net")],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Secure,
+                found: true,
+            },
+            MxStep::LookupTlsa { .. } => MxAnswer::Tlsa {
+                status: DnssecStatus::Secure,
+                records: vec![],
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+
+    assert_eq!(delay, Some(DelayReason::MandatoryDaneWithoutUsableTlsa));
+    assert!(
+        script.targets.is_empty(),
+        "no unauthenticated delivery may be offered under mandatory DANE"
+    );
+}
+
+/// A host without usable records is passed over, not fatal: the next host in
+/// preference order may still publish some.
+#[test]
+fn mandatory_dane_tries_the_next_host_before_delaying() {
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (script, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![
+                    MxRecord::new(10, "bare.example.net"),
+                    MxRecord::new(20, "dane.example.net"),
+                ],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Secure,
+                found: true,
+            },
+            MxStep::LookupTlsa { base_domain } => MxAnswer::Tlsa {
+                status: DnssecStatus::Secure,
+                records: if base_domain == "dane.example.net" {
+                    vec![tlsa()]
+                } else {
+                    vec![]
+                },
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+
+    assert_eq!(delay, None, "a later host had usable records");
+    assert_eq!(
+        script.targets,
+        vec![("dane.example.net".to_string(), true)],
+        "the host without records is passed over, the one with them is offered"
+    );
+}
+
+/// §2.2.2's suppressed TLSA query also counts as "no usable records found".
+///
+/// No TLSA query is issued at all when the address answer is insecure, so
+/// under mandatory DANE the host cannot be used — and the absence of a query
+/// must not be mistaken for an absence of policy.
+#[test]
+fn mandatory_dane_delays_when_the_tlsa_query_was_suppressed() {
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (script, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![MxRecord::new(10, "unsigned.example.net")],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Insecure,
+                found: true,
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+
+    assert!(!script.log.iter().any(|s| s.starts_with("tlsa:")));
+    assert_eq!(delay, Some(DelayReason::MandatoryDaneWithoutUsableTlsa));
+    assert!(script.targets.is_empty());
+}
+
+/// Insecure TLSA records are not usable records, so mandatory DANE delays.
+#[test]
+fn mandatory_dane_delays_on_insecure_tlsa_records() {
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (_, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![MxRecord::new(10, "mx.example.net")],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Secure,
+                found: true,
+            },
+            MxStep::LookupTlsa { .. } => MxAnswer::Tlsa {
+                status: DnssecStatus::Insecure,
+                records: vec![tlsa()],
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+    assert_eq!(delay, Some(DelayReason::MandatoryDaneWithoutUsableTlsa));
+}
+
+/// Exhausting hosts for *unreachability* under mandatory policy is still
+/// plain exhaustion, not §6's delay.
+///
+/// The two have different remedies, so conflating them would mislead whoever
+/// reads the log.
+#[test]
+fn unreachable_hosts_under_mandatory_dane_are_not_a_tlsa_delay() {
+    let config = SmtpDaneConfig::new().with_mandatory(true);
+    let (_, delay) = Script::run(
+        MxResolution::new("example.com", config),
+        |step| match step {
+            MxStep::LookupMx { .. } => MxAnswer::Mx {
+                status: DnssecStatus::Secure,
+                records: vec![MxRecord::new(10, "gone.example.net")],
+            },
+            MxStep::LookupAddresses { .. } => MxAnswer::Addresses {
+                status: DnssecStatus::Secure,
+                found: false,
+            },
+            _ => MxAnswer::LookupFailed,
+        },
+    );
+    assert_eq!(
+        delay, None,
+        "no host published anything; none was reachable either"
+    );
+}
