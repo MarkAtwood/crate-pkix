@@ -1508,6 +1508,7 @@ dependencies = [
  "pkix-path-builder",
  "pkix-profiles",
  "pkix-revocation",
+ "pkix-truststore",
  "serde",
  "serde_json",
  "spki",

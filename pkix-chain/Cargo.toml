@@ -97,6 +97,10 @@ spki              = { workspace = true }
 x509-cert         = { workspace = true }
 
 [dev-dependencies]
+# Ad-hoc probe only (examples/real_world_probe.rs): loads the platform CA
+# bundle so a real TLS chain can be validated end to end. Not a dependency
+# of the library.
+pkix-truststore = { workspace = true }
 # Used by tests/serde_round_trip.rs (gated by required-features).
 serde      = { workspace = true }
 serde_json = { workspace = true }
@@ -120,3 +124,10 @@ required-features = ["serde"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+# Ad-hoc probe: validates real TLS chains against the host CA bundle.
+# Needs a signature backend, so it is gated rather than built by a bare
+# `cargo build --all-targets`.
+[[example]]
+name = "real_world_probe"
+required-features = ["rustcrypto"]
