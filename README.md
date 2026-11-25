@@ -233,7 +233,11 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
 - CRL Distribution Points fetching — caller supplies the CRL DER directly today
-- DANE / TLSA DNS resolution — `pkix-dane` ships TLSA parsing and all four usage matchers; `pkix-dane-resolver` (DNSSEC resolution) and the `pkix-chain` integration are not yet shipped
+- MTA-STS policy discovery — `pkix-mta-sts` parses a policy and matches MX
+  hosts; the `_mta-sts` TXT lookup, the HTTPS policy fetch and the policy
+  cache need an adapter that does not exist yet
+- TLSRPT (RFC 8460) failure reporting — `PolicyOutcome::is_validation_failure`
+  is the hook a reporter needs, but no reporter ships
 - Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
 - RFC 5755 attribute certificate validation (`pkix-ac`, stub only)
 - OS-native trust store loading (`pkix-truststore-system`, stub only)
@@ -275,6 +279,12 @@ layer underneath. Here is what is shipping and what is next.
 - **Profile framework** with RFC-baseline and CA/B Forum reference
   profiles (`pkix-profiles`, `pkix-profiles-cabf`)
 - **Certificate Transparency** SCT parsing and verification (`pkix-ct`)
+- **DANE / TLSA** matching for all four usages, with a DNSSEC-validating
+  resolver and SMTP-DANE delivery (RFC 7672) end to end (`pkix-dane`,
+  `pkix-dane-resolver`, `pkix-chain`)
+- **MTA-STS** (RFC 8461) policy parsing and MX matching (`pkix-mta-sts`,
+  `no_std`) — the CA-rooted alternative to DANE for SMTP, which deploys
+  where DNSSEC does not
 - **AIA chain reassembly** — automatic intermediate fetching via
   `id-ad-caIssuers` (`pkix-aia`, `pkix-aia-http`)
 - **External lint adapters** — zlint and pkilint integration via
@@ -298,7 +308,9 @@ layer underneath. Here is what is shipping and what is next.
 | Crate | What | Status |
 |-------|------|--------|
 | `pkix-dane` | DANE / TLSA (RFC 6698 + 7218 + 7671) matching | **shipped** (0.2.0) |
-| `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | name reserved |
+| `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | **shipped** (0.2.0) |
+| `pkix-mta-sts` | MTA-STS (RFC 8461) policy parsing and MX matching | **shipped** (0.1.0) |
+| MTA-STS discovery | `_mta-sts` TXT lookup + HTTPS policy fetch and cache | not yet shipped |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |
 | `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |

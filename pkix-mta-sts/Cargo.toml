@@ -1,0 +1,36 @@
+[package]
+name        = "pkix-mta-sts"
+description = "MTA-STS (RFC 8461) policy parsing and MX matching — no DNS, no HTTP, caller supplies the policy text"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["smtp", "mta-sts", "email", "tls", "pki"]
+categories  = ["cryptography", "no-std"]
+readme      = "README.md"
+
+[features]
+default = []
+
+# `serde` derives Serialize/Deserialize on the policy types. Per AGENTS.md
+# non-negotiable #6, load-bearing public types support serde behind a flag so
+# a cache can keep them — and an MTA-STS policy is cached for up to a year by
+# design (RFC 8461 §3.2 max_age), so persisting one is the expected pattern
+# rather than an afterthought.
+serde = ["dep:serde"]
+
+[dependencies]
+# RFC 8461 §4.1 requires MX matching "identical to the rules given in
+# [RFC6125], with the restriction that the wildcard character '*' may only be
+# used to match the entire left-most label". pkix-identity owns that rule;
+# restating it here would be a divergence hazard on security-relevant
+# matching, and a wildcard bug is a security bug.
+pkix-identity = { workspace = true }
+
+serde = { workspace = true, optional = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

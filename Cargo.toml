@@ -15,6 +15,7 @@ members = [
     "pkix-profiles",
     "pkix-profiles-cabf",
     "pkix-lint",
+    "pkix-mta-sts",
     "pkix-lint-cabf",
     "pkix-ct",
     "pkix-ct-google",
@@ -137,6 +138,7 @@ pkix-ct-google        = { path = "pkix-ct-google",        version = "0.1.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.2.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.2.0" }
 pkix-identity         = { path = "pkix-identity",         version = "0.2.0" }
+pkix-mta-sts          = { path = "pkix-mta-sts",          version = "0.1.0" }
 pkix-chain            = { path = "pkix-chain",            version = "0.6.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):

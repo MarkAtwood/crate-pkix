@@ -1646,6 +1646,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-mta-sts"
+version = "0.1.0"
+dependencies = [
+ "pkix-identity",
+ "serde",
+]
+
+[[package]]
 name = "pkix-path"
 version = "0.4.0"
 dependencies = [

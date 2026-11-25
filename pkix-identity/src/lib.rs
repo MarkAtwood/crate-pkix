@@ -965,6 +965,43 @@ fn validate_ascii_label(label: &[u8]) -> Result<(), IdentityError> {
 // DNS SAN matching (RFC 6125 §6.4.3)
 // ---------------------------------------------------------------------------
 
+/// Whether `pattern` matches `name` under RFC 6125 §6.4 DNS-ID rules.
+///
+/// `pattern` may carry a single wildcard as its entire left-most label, which
+/// matches exactly one label: `*.example.com` matches `mail.example.com` but
+/// not `example.com` or `a.b.example.com`. Comparison is ASCII
+/// case-insensitive, and a trailing dot on the pattern is ignored.
+///
+/// Wildcards anywhere but the left-most label are not honoured, nor are
+/// partial-label wildcards like `mail*.example.com`. A pattern whose wildcard
+/// suffix has no further label separator — `*.com` — is refused, matching the
+/// browsers' refusal to honour public-suffix-shaped wildcards. Full Public
+/// Suffix List enforcement is out of scope; see the crate documentation.
+///
+/// # When to use this instead of [`verify_dns_name`]
+///
+/// [`verify_dns_name`] is the right entry point for binding a certificate to
+/// an identity: it walks the SAN and applies these rules to each `dNSName`.
+/// This function is the rule alone, for the cases where the patterns are not
+/// in a certificate at all.
+///
+/// RFC 8461 §4.1 is the motivating one. An MTA-STS policy lists allowed MX
+/// patterns as text, and requires "matching... identical to the rules given in
+/// RFC 6125, with the restriction that the wildcard character '*' may only be
+/// used to match the entire left-most label" — which is this function
+/// exactly. Exposing it keeps one wildcard implementation in the workspace;
+/// a second would be a divergence hazard, and a wildcard bug is a security
+/// bug.
+///
+/// # Arguments
+///
+/// Order matters and is easy to reverse: `pattern` is the one that may contain
+/// a wildcard, `name` is the concrete host being tested.
+#[must_use]
+pub fn dns_name_matches_pattern(pattern: &str, name: &str) -> bool {
+    matches_dns_san(pattern, name)
+}
+
 /// Returns true if `san_entry` (the value of a DNS-typed SAN entry on a
 /// certificate) matches `target` (the already-normalized reference
 /// identity).
