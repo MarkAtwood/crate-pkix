@@ -135,7 +135,8 @@ jobs:
             pkix-mta-sts-resolver \
             pkix-net-guard \
             pkix-revocation-http \
-            pkix-tlsrpt
+            pkix-tlsrpt \
+            pkix-truststore-system
 
   test:
     name: test (stable)

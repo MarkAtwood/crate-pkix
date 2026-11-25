@@ -1,6 +1,6 @@
 [package]
 name        = "pkix-truststore-system"
-description = "OS-native trust store adapter for pkix-truststore (macOS, Windows, iOS, Android) — stub"
+description = "Load trust anchors from the OS trust store for pkix-truststore — PEM bundles and certificate directories, no FFI"
 version     = "0.1.0"
 edition.workspace     = true
 rust-version.workspace = true
@@ -10,9 +10,47 @@ authors.workspace     = true
 keywords    = ["x509", "certificate", "truststore", "pki", "system"]
 categories  = ["cryptography"]
 
+[features]
+default = []
+
+# Propagate serde to pkix-truststore so Error and the re-exported
+# IoFailure gain the derives, and so Source / LoadReport can be cached or
+# logged structurally alongside them.
+serde = ["dep:serde", "pkix-truststore/serde"]
+
 [dependencies]
-# pkix-truststore + platform deps (security-framework, wincert-store, JNI) added
-# when real adapters are wired (PKIX-8h87).
+# The conversion target. This crate's whole job is finding bytes and
+# handing them here; it reimplements no PEM or DER handling, and it
+# re-exports IoFailure rather than declaring a second incompatible one
+# (PKIX-tit4.5).
+pkix-truststore = { workspace = true }
+
+# `std` on top of the workspace's no_std-friendly default, because
+# Source carries PathBuf and serde only implements PathBuf under std.
+# This crate is std-only by nature — it reads the filesystem.
+serde = { workspace = true, optional = true, features = ["derive", "std"] }
+
+# ---------------------------------------------------------------------------
+# Platform backends
+# ---------------------------------------------------------------------------
+#
+# Declared per target rather than behind a feature, so a Linux build never
+# compiles, downloads or audits them, and a macOS build gets the Keychain
+# reader without the consumer opting in. That is what makes one crate the
+# right shape here instead of one crate per OS: the cost of a platform you
+# do not target is already zero.
+#
+# UNVERIFIED: neither backend has been compiled. See the `unverified`
+# section of the crate documentation.
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+# Safe wrapper over Security.framework; keeps this crate free of `unsafe`.
+security-framework = "3.7"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Safe wrapper over CryptoAPI's certificate stores. Chosen over raw
+# windows-sys bindings for the same reason: no `unsafe` here.
+schannel = "0.1.30"
 
 [package.metadata.docs.rs]
 all-features = true
