@@ -2,18 +2,21 @@
   "id": "PKIX-4ca.1",
   "title": "Cache freshness uses SystemTime::now() while validator uses now_unix",
   "description": "pkix-revocation-http/src/cache.rs lines 661 and 846 use SystemTime::now() inside .filter(|e| is_live(e.next_update, SystemTime::now())) while the validator uses a caller-supplied now_unix. The cache and validator can disagree on whether a CRL/OCSP response is fresh. Old ID: PKIX-f1j4.1",
-  "status": "open",
+  "status": "closed",
   "priority": 0,
   "issue_type": "bug",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T17:52:03Z",
-  "updated_at": "2026-06-15T17:52:03Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T04:01:55.550645315Z",
+  "closed_at": "2026-11-25T04:01:55.550645315Z",
+  "close_reason": "ALREADY FIXED, NOW GUARDED. Closed 2026-11-25.\n\n## The bug was real and is gone\n\nThe bead cites pkix-revocation-http/src/cache.rs lines 661 and 846 using SystemTime::now() inside .filter(|e| is_live(e.next_update, SystemTime::now())).\n\nNo production code does that any more. Both surviving call sites, now at lines 714 and 941, read:\n\n    let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);\n    ...\n    .filter(|e| is_live(e.next_update, now))\n\nSo freshness is judged against the caller's now_unix, the same authoritative instant the validator uses. Every remaining SystemTime::now() in the crate is in test code.\n\nFixed by 0ec06881 \"fix(pkix-revocation-http): check anchor-issued certs, cache only verified responses\" -- as a side effect of that work rather than as a deliberate close of this bead, which is why the bead stayed open five months after the defect was gone.\n\nThe RevocationCache trait documents the avoidance in its own rustdoc: get_crl / get_ocsp return entries WITHOUT freshness filtering, because \"this avoids a time-source mismatch between the cache (which would use SystemTime::now()) and the validator (which uses a caller-supplied now_unix epoch timestamp).\"\n\n## But nothing stopped it coming back\n\nThat was the real gap, and the reason this close has code attached rather than just a note. A P0 sat open for five months while already fixed, and the fix had no regression test. Either half of that is bad; together they mean nobody could tell the difference between fixed and unfixed without reading the source.\n\nTwo tests added to cache.rs.\n\nfreshness_is_judged_against_now_unix_not_the_wall_clock is the discriminating one. It seeds a cache entry expiring one hour after the pinned NOW of 2026-06-01: in the FUTURE for the validator, months in the PAST by wall clock. A correct cache serves it with no network fetch; a cache reading the wall clock calls it stale and refetches, so the fetch counter becomes 1 and the test fails. The direction is durable because wall clock only ever moves further past a fixed NOW.\n\na_cache_entry_stale_at_now_unix_is_refetched asserts the converse. It does NOT discriminate on its own -- a wall-clock cache reaches the same verdict -- and is kept so the first test cannot be satisfied by a cache that never expires anything at all.\n\n## Verified the guard fires\n\nReintroduced the exact bug the bead describes at both call sites. The discriminating test FAILED, the non-discriminating one passed, and both passed again on restore. A guard only ever observed passing has not been tested.\n\n## Why this was P0, stated for the record\n\nA disagreement between the cache's clock and the validator's lands on precisely the deployments that pin time on purpose: offline validation, replaying an archived chain, and any audit expected to reproduce a verdict. Those are the cases where a wall-clock read silently serves data the validator would have rejected, and they are also the cases nobody exercises by accident.\n\n## Acceptance\n\n[x] No production path judges cache freshness by wall clock\n[x] Both call sites confirmed to derive their instant from self.inner.now_unix\n[x] Regression test added that fails if SystemTime::now() returns\n[x] Guard verified by reintroducing the bug rather than assumed",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-4ca",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:52:03Z"
+      "type": "",
+      "created_at": "2026-06-15T10:52:03Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
