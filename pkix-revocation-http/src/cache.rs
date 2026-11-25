@@ -1535,6 +1535,106 @@ mod tests {
             assert_eq!(got.bytes, CRL_EMPTY);
         }
 
+        /// Freshness must be judged against the caller's `now_unix`, never the
+        /// wall clock.
+        ///
+        /// The cache and the validator have to agree about whether a response
+        /// is still fresh. If the cache consulted `SystemTime::now()` while
+        /// the validator used a caller-supplied instant, the two could
+        /// disagree — and the consequences land on exactly the deployments
+        /// that pin time deliberately: offline validation, replaying an
+        /// archived chain, and any reproducible audit.
+        ///
+        /// This entry expires one hour after `NOW` (2026-06-01), which is in
+        /// the **past** by wall clock and in the **future** by `now_unix`. A
+        /// cache judging freshness correctly serves it; one reading the wall
+        /// clock calls it stale and refetches, so `seen` becomes 1 and this
+        /// test fails.
+        ///
+        /// The direction is durable: wall clock only moves further past `NOW`.
+        #[test]
+        fn freshness_is_judged_against_now_unix_not_the_wall_clock() {
+            let fetcher = CountingFetcher {
+                crl_bytes: CRL_EMPTY.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpCrlFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+
+            let issuer_dn = cert(CA).tbs_certificate().subject().to_der().unwrap();
+            let key = CrlCacheKey {
+                issuer_dn_der: issuer_dn,
+                distribution_point_uri: Some("http://crl.example.com/test.crl".to_string()),
+            };
+            cache.put_crl(
+                key,
+                CachedCrl {
+                    crl_number: None,
+                    this_update: SystemTime::UNIX_EPOCH,
+                    // One hour after the pinned NOW: future for the validator,
+                    // long past for the wall clock.
+                    next_update: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NOW + 3600)),
+                    bytes: CRL_EMPTY.to_vec(),
+                },
+            );
+
+            let cached = CachedHttpCrlFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("the cached CRL is live at now_unix and must be usable");
+
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                0,
+                "a cache entry live at the caller's now_unix must be served \
+                 without a network fetch; a non-zero count means freshness was \
+                 judged against the wall clock"
+            );
+        }
+
+        /// The converse, with `now_unix` set past the entry's expiry.
+        ///
+        /// `next_update` is one hour *before* `NOW`, so the entry is stale for
+        /// the validator. A cache reading the wall clock would reach the same
+        /// verdict here, so this does not discriminate on its own — it is kept
+        /// because without it the test above could be satisfied by a cache
+        /// that never expires anything at all.
+        #[test]
+        fn a_cache_entry_stale_at_now_unix_is_refetched() {
+            let fetcher = CountingFetcher {
+                crl_bytes: CRL_EMPTY.to_vec(),
+                seen: RefCell::new(0),
+            };
+            let inner = HttpCrlFetcher::new(fetcher, DefaultVerifier, NOW);
+            let cache = InMemoryCache::new();
+
+            let issuer_dn = cert(CA).tbs_certificate().subject().to_der().unwrap();
+            let key = CrlCacheKey {
+                issuer_dn_der: issuer_dn,
+                distribution_point_uri: Some("http://crl.example.com/test.crl".to_string()),
+            };
+            cache.put_crl(
+                key,
+                CachedCrl {
+                    crl_number: None,
+                    this_update: SystemTime::UNIX_EPOCH,
+                    next_update: Some(SystemTime::UNIX_EPOCH + Duration::from_secs(NOW - 3600)),
+                    bytes: CRL_EMPTY.to_vec(),
+                },
+            );
+
+            let cached = CachedHttpCrlFetcher::new(inner, cache);
+            cached
+                .check_revocation(&cert(LEAF_GOOD), &cert(CA))
+                .expect("must succeed after refetching");
+
+            assert_eq!(
+                *cached.inner.fetcher.seen.borrow(),
+                1,
+                "a cache entry stale at the caller's now_unix must be refetched"
+            );
+        }
+
         #[test]
         fn corrupt_cached_entry_falls_through_to_network_fetch() {
             // If the cache returns bytes that don't parse as a CRL, the
