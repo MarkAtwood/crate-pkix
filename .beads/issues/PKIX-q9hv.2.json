@@ -1,30 +1,26 @@
 {
+  "id": "PKIX-q9hv.2",
+  "title": "is_aia_recoverable advertises SignatureInvalid but build_with_aia cannot recover it",
+  "description": "pkix-chain/src/lib.rs:1559-1566 `is_aia_recoverable` matches `SignatureInvalid` as 'repairable by adding more candidate intermediates,' driving the slow path on a wrong-key intermediate. But `build_with_aia` (line 585-681) only retries on `pkix_path_builder::Error::NoPathFound` (line 606); `NoValidPath{tried, ...}` (line 609-617) returns immediately as `Error::PathBuild(NoValidPath{...})`. When the supplied chain has a wrong-but-DN-matching intermediate, `build_first_valid_path` tries the bad cert (tried \u003e= 1, last_error=SignatureInvalid), returns `NoValidPath`, and the slow path bails. Trigger: caller passes [leaf, wrong_intermediate] with an AIA URI on the leaf that would supply the correct intermediate; the verifier returns `PathBuild(NoValidPath{...})` without ever invoking AiaFetcher.batch_fetch. Two observable defects: (1) the original `Path(SignatureInvalid)` error is degraded to a less-specific PathBuild variant, and (2) the AIA seam never gets a chance to fix the situation. Either narrow `is_aia_recoverable` to exclude `SignatureInvalid` (and let the original Path error surface), or have build_with_aia also retry on `NoValidPath` and add AIA-fetched alternatives to the pool. The latter is what the rustdoc at lines 1543-1558 promises.",
+  "status": "closed",
+  "priority": 0,
+  "issue_type": "bug",
   "assignee": "Mark Atwood",
-  "compaction_level": 0,
-  "content_hash": "8fe648feb8b6cea499c704ae5e336e9d064f0528c6e2a9b77a3b7af86e4af979",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T14:36:15Z",
   "created_by": "Mark Atwood",
-  "description": "pkix-chain/src/lib.rs:1559-1566 `is_aia_recoverable` matches `SignatureInvalid` as 'repairable by adding more candidate intermediates,' driving the slow path on a wrong-key intermediate. But `build_with_aia` (line 585-681) only retries on `pkix_path_builder::Error::NoPathFound` (line 606); `NoValidPath{tried, ...}` (line 609-617) returns immediately as `Error::PathBuild(NoValidPath{...})`. When the supplied chain has a wrong-but-DN-matching intermediate, `build_first_valid_path` tries the bad cert (tried >= 1, last_error=SignatureInvalid), returns `NoValidPath`, and the slow path bails. Trigger: caller passes [leaf, wrong_intermediate] with an AIA URI on the leaf that would supply the correct intermediate; the verifier returns `PathBuild(NoValidPath{...})` without ever invoking AiaFetcher.batch_fetch. Two observable defects: (1) the original `Path(SignatureInvalid)` error is degraded to a less-specific PathBuild variant, and (2) the AIA seam never gets a chance to fix the situation. Either narrow `is_aia_recoverable` to exclude `SignatureInvalid` (and let the original Path error surface), or have build_with_aia also retry on `NoValidPath` and add AIA-fetched alternatives to the pool. The latter is what the rustdoc at lines 1543-1558 promises.",
-  "ephemeral": 0,
-  "id": "PKIX-q9hv.2",
-  "is_template": 0,
-  "issue_type": "bug",
+  "updated_at": "2026-11-25T17:36:52.930999891Z",
+  "closed_at": "2026-11-25T17:36:52.930999891Z",
+  "close_reason": "Fixed. The bead was half stale and half exactly right, and the right half needed new fixtures to reproduce.\n\nSTALE HALF -- defect (1), the error degradation. The sans_io refactor since May already addressed it: a complete-but-invalid candidate is assembled with build_path and handed back, so the caller's validate_path reports Path(SignatureInvalid) rather than the PathBuild(NoValidPath) the bead described.\n\nREAL HALF -- defect (2), the AIA seam never running. Confirmed by reproduction, with an empty fetch log. try_build mapped NoValidPath to Ok(Some(assembled chain)), so next_step returned Built before collecting a single caIssuers URI.\n\nThe line numbers in the bead no longer apply and the diagnosis had moved: it is not build_with_aia's retry condition (that code is gone) but try_build/next_step in sans_io.rs.\n\nWhat the bead did not note, and what made this worth fixing rather than narrowing is_aia_recoverable: only ONE SHAPE of wrong intermediate was broken. A self-issued impostor gives no topological path to the anchor, so the builder reports NoPathFound, which already routed into a fetch and already worked. The broken shape was the one issued BY THE ANCHOR, which completes topology and fails only on signature -- and that is the likelier shape in practice, since a stale intermediate from the wrong CA generation is issued by the same root. So the same misconfiguration got recovery or immediate failure depending on who signed the bad cert.\n\nFix: try_build returns a three-way PoolVerdict so the loop distinguishes 'nothing to build' from 'built something that does not validate', and both fall through to the fetch. A complete-but-invalid candidate is only assembled and returned once there is nothing left to fetch, preserving the concrete-error behaviour. orphans_on_paths already tested signed_by rather than DN equality, so the machinery was capable; only the short-circuit blocked it.\n\nTwo consequences, documented on is_aia_recoverable: a genuinely corrupt signature now spends fetches before failing (bounded by AiaConfig -- tested: zero budget makes zero requests, budget of one completes the repair), and with no usable fetcher the root-signed shape now reports Error::Aia where it reported Error::Path(SignatureInvalid), matching what the self-issued shape already did.\n\nTests: reproduction + 2 shape controls + cross-shape consistency + budget bound, all in review_aia.rs; the reproduction fails on the prior code. New fixtures via gen-novalidpath.sh, kept separate from gen.sh so this case does not churn 70 unrelated files. 2321 workspace tests green. Commit 8f2feb8c.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 0,
-  "status": "in_progress",
-  "timeout_ns": 0,
-  "title": "is_aia_recoverable advertises SignatureInvalid but build_with_aia cannot recover it",
-  "updated_at": "2026-05-14T15:23:13Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-q9hv",
+      "type": "parent-child",
       "created_at": "2026-05-14T07:36:14Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-q9hv",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }

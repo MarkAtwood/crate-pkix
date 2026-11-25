@@ -2,18 +2,21 @@
   "id": "PKIX-4ca.3",
   "title": "is_aia_recoverable includes SignatureInvalid: verify design intent",
   "description": "is_aia_recoverable includes pkix_path::Error::SignatureInvalid. The doc explains: a wrong-but-DN-matching intermediate can be displaced by a correctly-signed alternative via AIA. Verify this actually works in practice or remove it. Old ID: PKIX-q9hv.2",
-  "status": "open",
+  "status": "closed",
   "priority": 2,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T17:52:17Z",
-  "updated_at": "2026-06-15T17:52:17Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T17:36:53.44814532Z",
+  "closed_at": "2026-11-25T17:36:53.44814532Z",
+  "close_reason": "Duplicate of PKIX-q9hv.2, which this bead's own text names as its origin ('Old ID: PKIX-q9hv.2'). Both are now closed by commit 8f2feb8c.\n\nWorth recording why this pair mattered beyond the duplication: the re-filing was entered at P2 while the original sat at P0, and the re-filing lost the analysis. This bead said only 'Verify this actually works in practice or remove it'; the original carried the file and line numbers, the trigger, the two observable defects and two candidate fixes. The detailed reading was in the copy nominally superseded, and the priority signal on the board was two levels off.\n\nThe answer to 'does it actually work in practice' turned out to be: for one shape of wrong intermediate yes, for the other no -- and the broken one is the likelier shape. So 'remove it' would have been the wrong resolution; the capability was worth having and nearly worked. See PKIX-q9hv.2 for the full reasoning.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-4ca",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:52:17Z"
+      "type": "",
+      "created_at": "2026-06-15T10:52:17Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
