@@ -210,7 +210,23 @@ fn find_parent<'a>(bundle: &'a [Certificate], cert: &Certificate) -> Option<&'a 
                 }
             }
         }
+        // AKI present but nothing in the bundle carries the matching SKI.
+        // Do not fall back to a DN match, for the same reason
+        // `discover_crl_signer` does not: a bundle holding the right DN
+        // with the wrong key would otherwise be walked straight through,
+        // which is precisely what AKI exists to prevent.
+        //
+        // This path needs the strictness more than discovery does, not
+        // less. A wrong pick in `discover_crl_signer` fails loudly at the
+        // CRL signature check; a wrong pick here only makes
+        // `reaches_self_signed` answer `true` for a signer that does not
+        // actually reach an anchor, with no signature check behind it to
+        // catch the mistake. The two functions used to apply opposite
+        // policies to the same input shape.
+        return None;
     }
+
+    // No AKI to constrain the walk: issuer-DN match is all there is.
     let issuer = cert.tbs_certificate().issuer();
     bundle.iter().find(|candidate| {
         !core::ptr::eq(*candidate, cert)
@@ -374,5 +390,72 @@ mod tests {
         let root = load_cert(&pkits_cert("TrustAnchorRootCertificate"));
         let bundle = vec![signer.clone(), root.clone()];
         assert!(reaches_self_signed(&bundle, &signer));
+    }
+
+    /// `find_parent` must not walk through a same-DN, wrong-key certificate
+    /// when the child's AKI names a key that is not in the bundle.
+    ///
+    /// `discover_crl_signer` has always refused that fallback, on the
+    /// grounds that "a bundle that has the right DN but the wrong key would
+    /// otherwise hijack discovery". `find_parent` used to do the opposite
+    /// on the same input shape, and it is the path that needs the
+    /// strictness more: a wrong pick in discovery fails loudly at the CRL
+    /// signature check, while a wrong pick here only makes
+    /// `reaches_self_signed` answer `true` for a signer that reaches no
+    /// anchor, with nothing behind it to catch the mistake.
+    ///
+    /// The PKITS rollover pair is the shape exactly.
+    /// `BasicSelfIssuedNewKeyOldWithNewCACert` is DN-self-issued — issuer
+    /// DN equals subject DN — and its AKI names
+    /// `BasicSelfIssuedNewKeyCACert`'s SKI, which is a different key under
+    /// the same name. So a bundle holding only a copy of the bridge is a
+    /// perfect DN match carrying the wrong key.
+    #[test]
+    fn find_parent_refuses_a_same_dn_wrong_key_candidate() {
+        let bridge = load_cert(&pkits_cert("BasicSelfIssuedNewKeyOldWithNewCACert"));
+        let new_key_ca = load_cert(&pkits_cert("BasicSelfIssuedNewKeyCACert"));
+
+        // Premise: the bridge's AKI names the new-key cert, not itself.
+        let aki = cert_authority_key_id(&bridge).expect("bridge carries an AKI");
+        let bridge_ski = cert_subject_key_id(&bridge).expect("bridge carries an SKI");
+        let ca_ski = cert_subject_key_id(&new_key_ca).expect("CA carries an SKI");
+        assert_eq!(aki.as_bytes(), ca_ski.as_bytes());
+        assert_ne!(aki.as_bytes(), bridge_ski.as_bytes());
+
+        // A distinct copy of the bridge: same subject DN as the issuer the
+        // bridge names, wrong key. `ptr::eq` does not skip it.
+        let impostor = vec![bridge.clone()];
+        assert!(
+            find_parent(&impostor, &bridge).is_none(),
+            "AKI named a key absent from the bundle, so the DN match must \
+             not be accepted as the parent"
+        );
+
+        // Control: with the certificate the AKI actually names, the walk
+        // succeeds and picks that one rather than the DN twin.
+        let bundle = vec![bridge.clone(), new_key_ca.clone()];
+        let parent = find_parent(&bundle, &bridge).expect("the named key is present");
+        assert_eq!(
+            cert_subject_key_id(parent).expect("parent SKI").as_bytes(),
+            ca_ski.as_bytes(),
+            "the AKI/SKI match must win over the same-DN twin"
+        );
+    }
+
+    /// A child with no AKI at all still falls back to the issuer-DN match,
+    /// since there is nothing to constrain the walk with. Tightening the
+    /// AKI-present case must not have closed this one.
+    #[test]
+    fn find_parent_still_uses_dn_when_the_child_has_no_aki() {
+        let root = load_cert(&pkits_cert("TrustAnchorRootCertificate"));
+        // The root is self-issued by DN, so it is its own DN parent; a
+        // distinct copy in the bundle is the DN match.
+        if cert_authority_key_id(&root).is_none() {
+            let bundle = vec![root.clone()];
+            assert!(
+                find_parent(&bundle, &root).is_some(),
+                "with no AKI the DN fallback is all there is"
+            );
+        }
     }
 }
