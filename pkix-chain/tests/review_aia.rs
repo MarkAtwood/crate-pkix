@@ -503,3 +503,135 @@ fn review_the_fetch_budget_bounds_the_wrong_key_route() {
         .expect("one fetch is all this repair needs");
     assert_eq!(g.count(), 1);
 }
+
+// ---------------------------------------------------------------------------
+// AIA depth cap boundary (PKIX-4ca.2 / PKIX-q9hv.1)
+// ---------------------------------------------------------------------------
+
+/// Serves the deep chain: every hop's issuer, by URI.
+fn deep_fetcher() -> MapFetcher {
+    MapFetcher::new(HashMap::from([
+        (
+            "http://aia.test/deep-i1.der".to_owned(),
+            bytes("tests/fixtures/review", "deep-i1.der"),
+        ),
+        (
+            "http://aia.test/deep-i2.der".to_owned(),
+            bytes("tests/fixtures/review", "deep-i2.der"),
+        ),
+        (
+            "http://aia.test/deep-i3.der".to_owned(),
+            bytes("tests/fixtures/review", "deep-i3.der"),
+        ),
+        (
+            "http://aia.test/deep-i4.der".to_owned(),
+            bytes("tests/fixtures/review", "deep-i4.der"),
+        ),
+        (
+            "http://aia.test/deep-i5.der".to_owned(),
+            bytes("tests/fixtures/review", "deep-i5.der"),
+        ),
+    ]))
+}
+
+/// The certificates fetched in the *last* round must be consulted.
+///
+/// `AIA_MAX_DEPTH` is 5 and the reassembly loop performs 5 fetch rounds.
+/// The loop used to add the fifth round's certificates to the pool and
+/// then exit without ever asking the path builder again, so a chain that
+/// needed all five was reported `AiaDepthExceeded` even though the
+/// certificate completing it was already in hand — the last fetch was
+/// wasted, and `AIA_MAX_DEPTH = 5` effectively meant four hops resolved.
+///
+/// `deep-leaf.der` needs exactly five sequential fetches: each hop's
+/// issuer is discoverable only from the caIssuers URI of the certificate
+/// below it. So this validates only if a build attempt runs after the
+/// fifth fetch.
+///
+/// The decisive assertion is that `Deep I5` appears in the result. It
+/// arrives in the final round, so its presence means that round was used
+/// rather than merely paid for.
+#[test]
+fn review_aia_depth_cap_consults_the_final_fetch() {
+    let anchors = [TrustAnchor::from_cert(load("deep-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = deep_fetcher();
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("deep-leaf.der")]);
+
+    assert!(
+        r.is_ok(),
+        "a chain needing all {} fetch rounds must still validate; got {r:?} \
+         after fetching {:?}",
+        AiaConfig::new().max_depth,
+        f.fetched()
+    );
+
+    assert_eq!(
+        f.count(),
+        5,
+        "five sequential hops take five fetches, no more and no fewer: {:?}",
+        f.fetched()
+    );
+    assert!(
+        f.fetched()
+            .contains(&"http://aia.test/deep-i5.der".to_owned()),
+        "the top intermediate is only reachable in the final round: {:?}",
+        f.fetched()
+    );
+}
+
+/// One hop short of the cap must fail, so the test above is measuring the
+/// boundary rather than a chain that was always going to fit.
+///
+/// With four rounds the fifth intermediate is never fetched, so no build
+/// attempt can complete the chain however many times it runs.
+#[test]
+fn review_aia_depth_cap_one_hop_short_fails() {
+    let anchors = [TrustAnchor::from_cert(load("deep-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = deep_fetcher();
+    let mut cfg = AiaConfig::new();
+    cfg.max_depth = 4;
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .with_aia_config(cfg)
+        .verify_one(&[load("deep-leaf.der")]);
+
+    assert!(
+        matches!(r, Err(Error::AiaDepthExceeded)),
+        "four rounds cannot resolve five hops; expected AiaDepthExceeded, \
+         got {r:?} after fetching {:?}",
+        f.fetched()
+    );
+}
+
+/// `AiaConfig::max_depth` counts hops resolved, which is what its
+/// documentation claims. Raising the cap by one resolves one more hop.
+///
+/// This pins the off-by-one in both directions: a cap of N resolves a
+/// chain needing N fetches and not one needing N + 1. Were the final
+/// build attempt removed, the first of these would fail; were an extra
+/// round allowed, the second would pass.
+#[test]
+fn review_aia_max_depth_counts_hops_resolved() {
+    let anchors = [TrustAnchor::from_cert(load("deep-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    for (cap, expect_ok) in [(3usize, false), (4, false), (5, true), (6, true)] {
+        let f = deep_fetcher();
+        let mut cfg = AiaConfig::new();
+        cfg.max_depth = cap;
+        let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+            .with_aia_config(cfg)
+            .verify_one(&[load("deep-leaf.der")]);
+        assert_eq!(
+            r.is_ok(),
+            expect_ok,
+            "max_depth = {cap} on a 5-hop chain: expected ok={expect_ok}, \
+             got {r:?} after {} fetches",
+            f.count()
+        );
+    }
+}

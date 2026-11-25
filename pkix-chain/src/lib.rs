@@ -129,19 +129,33 @@ use x509_cert::Certificate;
 mod aia_extract;
 mod aia_response;
 
-/// Maximum number of AIA-fetch iterations performed during chain reassembly.
+/// Maximum number of AIA-fetch rounds performed during chain reassembly.
 ///
-/// Each iteration calls [`AiaFetcher::batch_fetch`] on the caIssuers URIs of
+/// Each round calls [`AiaFetcher::batch_fetch`] on the caIssuers URIs of
 /// the certificates whose issuers are missing from the working cert pool,
 /// then re-runs [`pkix_path_builder::build_first_valid_path`]. Without a cap,
 /// a fetched intermediate that itself references a missing issuer (etc.)
 /// would loop indefinitely. The cap stops the loop and surfaces
 /// [`Error::AiaDepthExceeded`].
 ///
-/// Five matches the bead-stated default for `PKIX-zkjb.7` and is generous
-/// for real-world PKIs (cross-signed roots add at most one intermediate
-/// hop beyond the operating CA's own intermediate; intermediate-of-an-
-/// intermediate-of-an-intermediate is exceedingly rare).
+/// # What the number counts
+///
+/// Hops resolved, not rounds paid for. A chain whose every intermediate is
+/// discoverable only from the caIssuers URI of the certificate below it
+/// needs one round per intermediate, and a cap of `N` resolves exactly `N`
+/// of them: the reassembly loop makes one more build attempt after its
+/// last fetch, so the certificates that round brought in are consulted
+/// rather than fetched and discarded. A chain needing `N + 1` fails with
+/// [`Error::AiaDepthExceeded`]. Both ends of that boundary are tested.
+///
+/// # Why five
+///
+/// It is generous for real-world PKIs. A cross-signed root adds at most
+/// one hop beyond the operating CA's own intermediate, so two or three is
+/// the realistic maximum; an intermediate-of-an-intermediate-of-an-
+/// intermediate is already unusual. Five leaves room for an unusual
+/// hierarchy without letting a certificate chain of attacker-chosen depth
+/// drive unbounded fetching.
 ///
 /// This is the default for [`AiaConfig::max_depth`].
 pub const AIA_MAX_DEPTH: usize = 5;
