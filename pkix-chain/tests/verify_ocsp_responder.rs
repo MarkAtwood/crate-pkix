@@ -280,3 +280,78 @@ fn verify_ocsp_responder_without_nocheck_honors_revoking_oracle() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The delegation binding uses the caller's verifier, not a hardcoded one
+// ---------------------------------------------------------------------------
+
+/// A verifier that accepts the chain but refuses the delegation signature.
+///
+/// It counts calls and rejects only after the first, which is enough to tell
+/// the two signature checks apart: `verify_chain` runs first and must be
+/// allowed to succeed, so the single-certificate chain's one verification is
+/// permitted, and the delegation binding that follows is refused. A verifier
+/// that refused everything would fail inside `verify_chain` and prove
+/// nothing about which verifier the binding used.
+struct RefusesAfterFirst(std::cell::Cell<usize>);
+
+impl pkix_chain::SignatureVerifier for RefusesAfterFirst {
+    fn verify_signature(
+        &self,
+        alg: spki::AlgorithmIdentifierRef<'_>,
+        spki: spki::SubjectPublicKeyInfoRef<'_>,
+        tbs: &[u8],
+        sig: &[u8],
+    ) -> Result<(), pkix_chain::pkix_path::VerificationError> {
+        let n = self.0.get();
+        self.0.set(n + 1);
+        if n == 0 {
+            return DefaultVerifier.verify_signature(alg, spki, tbs, sig);
+        }
+        Err(pkix_chain::pkix_path::VerificationError::invalid_signature())
+    }
+}
+
+/// The RFC 6960 §4.2.2.2 delegation binding must honour the caller's
+/// verifier.
+///
+/// The binding was checked with a hardcoded `DefaultVerifier` while
+/// `verify_ocsp_responder` passed the caller's verifier to `verify_chain`
+/// one line earlier. A caller whose verifier is *stricter* than
+/// `DefaultVerifier` therefore had that policy bypassed on the one check
+/// that stands between them and a DN-twin responder — the attack the
+/// binding exists to stop.
+///
+/// This is the same fixture as `verify_ocsp_responder_ok`, so the only
+/// difference is which verifier is supplied. With the hardcoded verifier
+/// it returns `Ok`; the caller's refusal must be respected instead.
+#[test]
+fn the_delegation_binding_honours_the_callers_verifier() {
+    let leaf = load_fixture("leaf-ocsp-responder.der");
+    let root = load_fixture("root.der");
+    let anchors = [TrustAnchor::from_cert(root.clone())];
+    let chain = [leaf];
+
+    let verifier = RefusesAfterFirst(std::cell::Cell::new(0));
+    let err = verify_ocsp_responder(
+        &chain,
+        &anchors,
+        &root,
+        &BasicOcspResponderProfile,
+        NOW,
+        &verifier,
+        &NoRevocation,
+        &NoAiaFetcher,
+    )
+    .expect_err("the caller's verifier refused the delegation signature");
+
+    assert!(
+        matches!(err, Error::OcspDelegation { .. }),
+        "expected OcspDelegation from the refused binding, got {err:?}"
+    );
+    assert!(
+        verifier.0.get() >= 2,
+        "the binding must consult the caller's verifier; it was called {} time(s)",
+        verifier.0.get()
+    );
+}

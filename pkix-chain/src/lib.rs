@@ -1416,7 +1416,7 @@ where
     let policy = profile.policy(now_unix);
     let validated = verify_chain(chain, anchors, &policy, verifier, &shim, aia)?;
 
-    verify_responder_is_delegated_by(&chain[0], issuer)?;
+    verify_responder_is_delegated_by(&chain[0], issuer, verifier)?;
 
     Ok(validated)
 }
@@ -1447,15 +1447,28 @@ where
 /// responder speaks for issuer X" answer when in fact it speaks for
 /// issuer-DN-twin Y.
 ///
-/// The signature verifier is [`DefaultVerifier`], matching the rest
-/// of [`verify_ocsp_responder`]. If `issuer`'s SPKI uses an algorithm
-/// not covered by [`DefaultVerifier`], the binding check surfaces as
-/// [`Error::OcspDelegation`] — callers needing custom algorithms must
-/// drop down to [`verify_chain`] and replicate the delegation check
-/// against their own verifier.
-fn verify_responder_is_delegated_by(
+/// The binding is checked with the caller's own `verifier`, the same
+/// one [`verify_ocsp_responder`] hands to [`verify_chain`]. It used to
+/// be [`DefaultVerifier`] regardless, justified in this comment as
+/// "matching the rest of `verify_ocsp_responder`" — which was exactly
+/// backwards, since the rest of that function has always used the
+/// caller's verifier.
+///
+/// The divergence mattered in both directions. A verifier stricter
+/// than [`DefaultVerifier`] — one refusing an algorithm by policy —
+/// had its policy silently bypassed on the single check standing
+/// between the caller and the DN-twin attack described above, which
+/// is the worse direction. A verifier supporting an algorithm
+/// [`DefaultVerifier`] does not would see a valid responder rejected
+/// with [`Error::OcspDelegation`] even though the same key verified
+/// the whole chain a line earlier.
+///
+/// If `issuer`'s SPKI uses an algorithm the supplied verifier does not
+/// cover, the binding check still surfaces as [`Error::OcspDelegation`].
+fn verify_responder_is_delegated_by<V: SignatureVerifier>(
     responder: &Certificate,
     issuer: &Certificate,
+    verifier: &V,
 ) -> crate::Result<()> {
     use spki::der::referenced::OwnedToRef as _;
 
@@ -1483,7 +1496,7 @@ fn verify_responder_is_delegated_by(
                  (cannot verify delegation signature)",
         ),
     })?;
-    DefaultVerifier
+    verifier
         .verify_signature(
             responder.signature_algorithm().owned_to_ref(),
             issuer
