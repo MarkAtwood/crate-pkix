@@ -277,6 +277,88 @@ impl pkix_lint::LintProfile for BasicTlsProfile {
     }
 }
 
+/// MTA-to-MTA SMTP server-certificate profile for DANE (RFC 7672).
+///
+/// Plain RFC 5280 path validation and nothing else: **no SAN requirement and
+/// no EKU requirement**. Both omissions are deliberate, and using
+/// [`BasicTlsProfile`] here instead silently rejects the deployments RFC 7672
+/// exists to serve.
+///
+/// Intended for `pkix_chain::verify_smtp_server_dane`, where it governs
+/// DANE-TA(2) path validation. DANE-EE(3) validates no path, so no profile
+/// applies to it — RFC 7671 §5.1 bases "peer identity matching and validity
+/// period enforcement" solely on the TLSA RRset.
+///
+/// # Why no SAN requirement
+///
+/// RFC 7672 §3.2.3 matches DNS-IDs when the certificate presents any and
+/// consults the Subject DN `commonName` when it presents none, because
+/// MTA-to-MTA certificates frequently carry their name only there. A profile
+/// requiring a SAN rejects such a certificate during **path validation**,
+/// before any name check runs, reporting `MissingSan` — which gives a
+/// debugger no reason to suspect the profile.
+///
+/// # Why no EKU requirement
+///
+/// RFC 7672 imposes none. More concretely, `required_leaf_eku` is not
+/// satisfied by an *absent* EKU extension — a certificate with no EKU at all
+/// fails it — and self-managed MTA certificates commonly have none. RFC 5280
+/// §4.2.1.12 treats an absent EKU as unrestricted, so requiring
+/// `id-kp-serverAuth` here would be stricter than RFC 5280 itself while
+/// rejecting exactly the self-managed certificates DANE makes usable.
+///
+/// A deployment that knows its peers all publish `serverAuth` can add the
+/// requirement to the returned policy. It is not the default because the
+/// default has to work for the general case.
+///
+/// # What is *not* relaxed
+///
+/// Validity dates and name checks both apply for DANE-TA(2). RFC 7671 §5.2
+/// grants no relaxation — it states that "the server certificates will need
+/// to have names that match one of the client's reference identifiers", and
+/// §5.2.3 expects a chain that "has not expired... provided the rest of the
+/// chain passes validation, including leaf certificate name checks". Only
+/// DANE-EE(3) relaxes those, and it does so by skipping path validation
+/// rather than by loosening a policy.
+///
+/// # Scope
+///
+/// MTA-to-MTA SMTP, normally port 25. RFC 7672 §3.1.3 puts MUA-to-MSA
+/// submission on ports 587 and 465 out of scope, and this profile makes no
+/// claim about them.
+///
+/// **Not** a CA/B Forum profile: no validity caps, no key-size floors, no
+/// signature-algorithm whitelist.
+///
+/// The free-function alias [`basic_smtp_mta_policy`] is equivalent to
+/// `BasicSmtpMtaProfile.policy(now_unix)`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct BasicSmtpMtaProfile;
+
+impl Profile for BasicSmtpMtaProfile {
+    fn id(&self) -> &'static str {
+        // Reverse-domain style: standards body + spec scope, as elsewhere here.
+        "ietf.smtp-mta-dane"
+    }
+
+    fn version(&self) -> &'static str {
+        // RFC 5280 path validation, with RFC 7672 / RFC 7671 governing what is
+        // deliberately not constrained.
+        "RFC 5280 + RFC 7672 + RFC 7671"
+    }
+
+    fn policy(&self, now_unix: u64) -> ValidationPolicy {
+        // Deliberately bare. require_subject_alt_name and required_leaf_eku
+        // both default to off, and the reasons they stay off are in this
+        // type's documentation rather than restated here.
+        ValidationPolicy::new(now_unix)
+    }
+
+    fn policy_oids(&self) -> &[ObjectIdentifier] {
+        &[]
+    }
+}
+
 /// Basic TLS client-certificate profile (RFC 5280 + clientAuth EKU).
 ///
 /// The minimum structural constraint that any TLS client-authentication
@@ -563,6 +645,16 @@ pub fn basic_tls_policy(now_unix: u64) -> ValidationPolicy {
     BasicTlsProfile.policy(now_unix)
 }
 
+/// [`ValidationPolicy`] for MTA-to-MTA SMTP DANE, equivalent to
+/// `BasicSmtpMtaProfile.policy(now_unix)`.
+///
+/// Plain RFC 5280: no SAN requirement, no EKU requirement. See
+/// [`BasicSmtpMtaProfile`] for why both are omitted.
+#[must_use]
+pub fn basic_smtp_mta_policy(now_unix: u64) -> ValidationPolicy {
+    BasicSmtpMtaProfile.policy(now_unix)
+}
+
 /// Return a [`ValidationPolicy`] for basic TLS client-certificate validation
 /// (RFC 5280 + `id-kp-clientAuth` EKU).
 ///
@@ -799,6 +891,7 @@ mod tests {
         assert_eq!(BasicCodeSigningProfile.id(), "ietf.code-signing-basic");
         assert_eq!(BasicTimeStampingProfile.id(), "ietf.time-stamping-basic");
         assert_eq!(BasicOcspResponderProfile.id(), "ietf.ocsp-responder-basic");
+        assert_eq!(BasicSmtpMtaProfile.id(), "ietf.smtp-mta-dane");
     }
 
     #[test]
@@ -1158,6 +1251,148 @@ mod tests {
             tls_via_old.id(),
             tls_via_new.id(),
             "deprecated WebPkiProfile re-export must resolve to pkix-profiles-cabf"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // BasicSmtpMtaProfile (RFC 7672 SMTP DANE)
+    // -----------------------------------------------------------------------
+
+    /// The two constraints that distinguish this profile are both *absences*,
+    /// so they are asserted directly: a later edit adding either would break
+    /// SMTP DANE in a way no other test here would catch.
+    #[test]
+    fn basic_smtp_mta_policy_requires_neither_san_nor_eku() {
+        let p = basic_smtp_mta_policy(NOW);
+        assert!(
+            !p.require_subject_alt_name,
+            "RFC 7672 §3.2.3 consults the commonName when no DNS-ID is present, \
+             so requiring a SAN rejects certificates the RFC accepts"
+        );
+        assert!(
+            p.required_leaf_eku.is_none(),
+            "an absent EKU does not satisfy required_leaf_eku, and self-managed \
+             MTA certificates commonly have none"
+        );
+        assert_eq!(p.current_time_unix, NOW);
+    }
+
+    #[test]
+    fn basic_smtp_mta_policy_matches_the_profile_impl() {
+        assert_eq!(basic_smtp_mta_policy(NOW), BasicSmtpMtaProfile.policy(NOW));
+    }
+
+    /// The behavioural difference, not just the policy fields: a leaf with no
+    /// SAN validates under this profile and is rejected by `BasicTlsProfile`.
+    ///
+    /// This is the case RFC 7672 §3.2.3 exists for, and the one that made
+    /// `verify_smtp_server_dane` report `PathValidationFailed(MissingSan)` for
+    /// a perfectly acceptable MTA certificate.
+    #[test]
+    fn a_leaf_without_a_san_passes_here_and_fails_the_tls_profile() {
+        let leaf = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/leaf-p256-365d-no-san.der"
+        ));
+        let int = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let root = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(root)];
+        let chain = [leaf, int];
+
+        pkix_path::validate_path(
+            &chain,
+            &anchors,
+            &basic_smtp_mta_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect("a CN-only MTA certificate must validate under the SMTP profile");
+
+        assert!(
+            matches!(
+                pkix_path::validate_path(
+                    &chain,
+                    &anchors,
+                    &basic_tls_policy(NOW),
+                    &EcdsaP256Verifier
+                ),
+                Err(pkix_path::Error::MissingSan)
+            ),
+            "BasicTlsProfile must still require a SAN — the contrast is the point"
+        );
+    }
+
+    /// Likewise for a missing EKU, which `required_leaf_eku` does not treat as
+    /// unrestricted even though RFC 5280 §4.2.1.12 does.
+    #[test]
+    fn a_leaf_without_an_eku_passes_here_and_fails_the_tls_profile() {
+        let leaf = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/leaf-p256-365d-no-eku.der"
+        ));
+        let int = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let root = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(root)];
+        let chain = [leaf, int];
+
+        pkix_path::validate_path(
+            &chain,
+            &anchors,
+            &basic_smtp_mta_policy(NOW),
+            &EcdsaP256Verifier,
+        )
+        .expect("an EKU-less MTA certificate must validate under the SMTP profile");
+
+        assert!(
+            matches!(
+                pkix_path::validate_path(
+                    &chain,
+                    &anchors,
+                    &basic_tls_policy(NOW),
+                    &EcdsaP256Verifier
+                ),
+                Err(pkix_path::Error::MissingEku)
+            ),
+            "an absent EKU fails BasicTlsProfile, which is why this profile omits \
+             the requirement rather than relying on RFC 5280's unrestricted reading"
+        );
+    }
+
+    /// Dates are **not** relaxed. RFC 7671 §5.2 grants DANE-TA(2) no
+    /// relaxation — §5.2.3 expects a chain that "has not expired" — and only
+    /// DANE-EE(3) skips validity enforcement, which it does by validating no
+    /// path at all rather than by loosening a policy.
+    #[test]
+    fn validity_dates_are_still_enforced() {
+        let leaf = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/leaf-p256-365d-no-san.der"
+        ));
+        let int = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/int-p256.der"
+        ));
+        let root = load(include_bytes!(
+            "../../pkix-path/tests/fixtures/policy-checks/root-p256.der"
+        ));
+        let anchors = [TrustAnchor::from_cert(root)];
+        let chain = [leaf, int];
+
+        // 2040-01-01, long after every fixture's notAfter.
+        let far_future = 2_208_988_800_u64;
+        assert!(
+            pkix_path::validate_path(
+                &chain,
+                &anchors,
+                &basic_smtp_mta_policy(far_future),
+                &EcdsaP256Verifier
+            )
+            .is_err(),
+            "an expired chain must not validate: RFC 7671 §5.2 relaxes nothing \
+             about dates for DANE-TA(2)"
         );
     }
 }

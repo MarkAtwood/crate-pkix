@@ -127,6 +127,54 @@ indeterminate, and the MX-derived lookup SMTP-DANE needs.
 Planned version: `pkix-dane-resolver` 0.2.0. Nothing is published.
 
 
+### New profile: `BasicSmtpMtaProfile` for SMTP DANE
+
+`pkix_profiles::BasicSmtpMtaProfile` (and the `basic_smtp_mta_policy` alias)
+is plain RFC 5280 with **no SubjectAltName requirement and no EKU
+requirement**. Both omissions are the point, and `BasicTlsProfile` — the
+obvious choice — silently rejects the deployments RFC 7672 exists to serve.
+
+- **No SAN requirement.** RFC 7672 §3.2.3 consults the Subject DN
+  `commonName` when a certificate presents no DNS-ID, because MTA-to-MTA
+  certificates frequently carry their name only there. A SAN-requiring
+  profile rejects such a certificate during *path validation*, before any
+  name check runs, surfacing as
+  `Failed(PathValidationFailed(Path(MissingSan)))` on a certificate RFC 7672
+  accepts without reservation.
+
+- **No EKU requirement**, decided rather than assumed. `required_leaf_eku` is
+  not satisfied by an *absent* EKU extension — pkix-path's own test pins
+  `Some([serverAuth])` with no EKU as `MissingEku` — and self-managed MTA
+  certificates commonly have none. RFC 5280 §4.2.1.12 treats an absent EKU as
+  unrestricted, so requiring `id-kp-serverAuth` would be stricter than
+  RFC 5280 itself while rejecting exactly the certificates DANE makes usable.
+  A deployment that knows its peers all publish `serverAuth` can add the
+  requirement to the returned policy.
+
+- **Nothing else is relaxed.** Validity dates and name checks both apply for
+  DANE-TA(2). RFC 7671 §5.2 grants no relaxation — it states that "the server
+  certificates will need to have names that match one of the client's
+  reference identifiers", and §5.2.3 expects a chain that "has not
+  expired... including leaf certificate name checks". Only DANE-EE(3) skips
+  those, and it does so by validating no path at all rather than by loosening
+  a policy. That distinction was the open question when the profile was filed,
+  and it is now answered from the RFC rather than guessed.
+
+Tested behaviourally rather than by asserting policy fields: a leaf with no
+SAN and a leaf with no EKU each validate under this profile and are rejected
+by `BasicTlsProfile` with `MissingSan` and `MissingEku` respectively, so the
+contrast is what the tests assert. A separate test confirms an expired chain
+still fails, since the easy mistake in a deliberately-permissive profile is
+to relax one thing too many.
+
+`verify_smtp_server_dane`'s documentation now points at the profile instead of
+warning about the wrong one, and `pkix-chain`'s SMTP end-to-end tests use it
+in place of the locally-defined stand-in they previously needed.
+
+Scope: MTA-to-MTA SMTP, normally port 25. RFC 7672 §3.1.3 puts MUA-to-MSA
+submission on 587 and 465 out of scope, and the profile makes no claim about
+them.
+
 ### SMTP DANE: the async driver
 
 `pkix_dane_resolver::SmtpDiscovery` performs the lookups the state machine

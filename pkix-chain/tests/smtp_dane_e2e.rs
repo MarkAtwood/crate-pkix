@@ -28,35 +28,8 @@ use pkix_chain::{
 use pkix_dane::record::{TlsaMatchingType, TlsaRecord, TlsaSelector, TlsaUsage};
 use pkix_dane::smtp_lookup::{DeliveryTarget, MxAnswer, MxResolution, MxStep, SmtpDaneConfig};
 use pkix_dane::DnssecStatus;
-use pkix_path::{Profile, ValidationPolicy};
+use pkix_profiles::BasicSmtpMtaProfile;
 use x509_cert::Certificate;
-
-/// A profile for MTA-to-MTA SMTP: no SubjectAltName requirement.
-///
-/// `BasicTlsProfile` sets `require_subject_alt_name`, which is right for the
-/// Web PKI and wrong here — RFC 7672 §3.2.3 accommodates certificates naming
-/// the host only in the `commonName`, and requiring a SAN rejects them during
-/// path validation before the name check is reached.
-///
-/// Defined in the test rather than imported because the workspace ships no
-/// SMTP profile yet; that is filed separately.
-struct MtaProfile;
-
-impl Profile for MtaProfile {
-    fn id(&self) -> &'static str {
-        "test-mta"
-    }
-    fn version(&self) -> &'static str {
-        "0"
-    }
-    fn policy(&self, now_unix: u64) -> ValidationPolicy {
-        // require_subject_alt_name defaults to false, which is the point.
-        ValidationPolicy::new(now_unix)
-    }
-    fn policy_oids(&self) -> &[x509_cert::der::asn1::ObjectIdentifier] {
-        &[]
-    }
-}
 
 const PKITS_NOW: u64 = 1_577_836_800;
 
@@ -108,7 +81,7 @@ fn verify(
         target,
         chain,
         chain_der,
-        &MtaProfile,
+        &BasicSmtpMtaProfile,
         PKITS_NOW,
         &DefaultVerifier,
         &NoRevocation,
@@ -355,7 +328,7 @@ fn verify_at(
         target,
         chain,
         chain_der,
-        &MtaProfile,
+        &BasicSmtpMtaProfile,
         now_unix,
         &DefaultVerifier,
         &NoRevocation,

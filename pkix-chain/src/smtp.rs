@@ -170,24 +170,30 @@ pub enum SmtpDaneFailure {
 /// **not** re-encoded, since RFC 6698 §2.1.2 matching digests the octets on
 /// the wire and a round trip through a DER encoder can change them.
 ///
-/// # The profile must not require a SubjectAltName
+/// # Use `BasicSmtpMtaProfile`, not a TLS profile
 ///
-/// RFC 7672 §3.2.3 consults the `commonName` when a certificate presents no
-/// DNS-ID, because MTA certificates frequently carry their name only there.
-/// A profile that sets [`ValidationPolicy::require_subject_alt_name`] —
-/// `BasicTlsProfile` does, correctly, for the Web PKI — therefore rejects
-/// exactly the deployments this profile exists to accommodate, and does so
-/// during path validation before any name check runs.
+/// Pass [`pkix_profiles::BasicSmtpMtaProfile`], which is plain RFC 5280 with
+/// no SubjectAltName requirement and no EKU requirement.
 ///
-/// The symptom is unhelpfully indirect:
-/// `Failed(PathValidationFailed(Path(MissingSan)))` on a server whose
-/// certificate is perfectly acceptable to RFC 7672. So pass a profile whose
-/// policy leaves `require_subject_alt_name` at its default of `false`.
+/// `BasicTlsProfile` is the wrong choice and fails in a way that points
+/// nowhere near the profile. It requires a SAN, correctly for the Web PKI;
+/// RFC 7672 §3.2.3 consults the Subject DN `commonName` precisely because
+/// MTA-to-MTA certificates frequently carry their name only there. Such a
+/// certificate is rejected during **path validation**, before any name check
+/// runs, and surfaces as `Failed(PathValidationFailed(Path(MissingSan)))` on a
+/// server whose certificate RFC 7672 accepts without reservation. It also
+/// requires `id-kp-serverAuth`, which an EKU-less self-managed certificate
+/// does not satisfy.
 ///
-/// This affects DANE-TA(2) only. DANE-EE(3) validates no path and so is
-/// unaffected by the profile entirely.
+/// This affects DANE-TA(2) only. DANE-EE(3) validates no path, so the profile
+/// is never consulted for it.
 ///
-/// [`ValidationPolicy::require_subject_alt_name`]: pkix_path::ValidationPolicy::require_subject_alt_name
+/// What the profile does **not** relax: validity dates and name checks both
+/// apply for DANE-TA(2). RFC 7671 §5.2 grants no relaxation, and §5.2.3
+/// expects a chain that "has not expired... including leaf certificate name
+/// checks". Only DANE-EE(3) skips those, by validating no path at all.
+///
+/// [`pkix_profiles::BasicSmtpMtaProfile`]: https://docs.rs/pkix-profiles
 ///
 /// # There is no trust-store parameter, deliberately
 ///
