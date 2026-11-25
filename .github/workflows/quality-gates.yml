@@ -134,6 +134,7 @@ jobs:
             pkix-mta-sts-http \
             pkix-mta-sts-resolver \
             pkix-net-guard \
+            pkix-revocation-http \
             pkix-tlsrpt
 
   test:

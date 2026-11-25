@@ -356,6 +356,61 @@ pub trait RevocationCache: Send + Sync {
     ///
     /// Idempotent — calling on an absent key is a no-op.
     fn invalidate_ocsp(&self, key: &OcspCacheKey);
+
+    /// Insert `entry` under `key` unless it would roll back a
+    /// newer-numbered CRL already cached there. Returns `true` if
+    /// inserted, `false` if suppressed as a rollback.
+    ///
+    /// This is the method the CRL wrapper calls; it never calls
+    /// [`put_crl`](Self::put_crl) directly. RFC 5280 §5.2.3 makes
+    /// `CRLNumber` monotonic per series, so a refresh that goes
+    /// backwards is a misconfigured responder serving a stale snapshot,
+    /// or an attack.
+    ///
+    /// # Overriding
+    ///
+    /// The default reads with `get_crl` and then writes with `put_crl`,
+    /// which is correct against an ordinary stale refresh but loses the
+    /// race against a concurrent writer that inserts a newer CRL
+    /// between the two calls. Override it when the backing store can do
+    /// the compare and the write as one operation — under a single lock,
+    /// in a transaction, or with a compare-and-set — as
+    /// [`InMemoryCache`] does.
+    #[cfg(feature = "crl")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
+    fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
+        if is_rollback(self.get_crl(&key).as_deref(), entry.crl_number()) {
+            return false;
+        }
+        self.put_crl(key, entry);
+        true
+    }
+
+    /// Insert `entry` under `key` unless it would replace fresher status
+    /// with staler status. Returns `true` if inserted, `false` if
+    /// suppressed as staler.
+    ///
+    /// This is the method the OCSP wrapper calls; it never calls
+    /// [`put_ocsp`](Self::put_ocsp) directly. Revocation is monotone, so
+    /// an older `good` response displacing a cached `revoked` one is
+    /// always wrong, and two threads validating the same certificate at
+    /// once are enough to land responses in the opposite order to the
+    /// one they were fetched in — no attacker required.
+    ///
+    /// # Overriding
+    ///
+    /// As [`put_crl_unless_rollback`](Self::put_crl_unless_rollback):
+    /// the default is a non-atomic get-then-put. Override it when the
+    /// store can compare and write atomically.
+    #[cfg(feature = "ocsp")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
+    fn put_ocsp_unless_staler(&self, key: OcspCacheKey, entry: CachedOcspResponse) -> bool {
+        if is_staler_ocsp(self.get_ocsp(&key).as_deref(), entry.this_update()) {
+            return false;
+        }
+        self.put_ocsp(key, entry);
+        true
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -430,57 +485,6 @@ impl InMemoryCache {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Atomically insert a CRL only if it does not roll back the existing
-    /// entry.
-    ///
-    /// Acquires a single write lock on the CRL map and, under that lock,
-    /// checks whether the existing entry's `CRLNumber` is strictly greater
-    /// than `new_entry`'s. If so the insert is suppressed (the cache
-    /// retains the newer CRL) and `false` is returned. Otherwise the new
-    /// entry is inserted and `true` is returned.
-    ///
-    /// This eliminates the TOCTOU race in a separate `get_crl` / `put_crl`
-    /// sequence where another thread could insert a newer CRL between the
-    /// two calls.
-    #[cfg(feature = "crl")]
-    pub(crate) fn put_crl_if_not_rollback(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        // A poisoned lock is recovered rather than reported: see the
-        // type-level "Lock poisoning" notes. Returning `false` here
-        // would be a lie, because `false` means "suppressed as a
-        // rollback" to every caller.
-        let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
-        if let Some(existing) = guard.get(&key) {
-            if is_rollback(Some(existing.as_ref()), new_entry.crl_number()) {
-                return false;
-            }
-        }
-        guard.insert(key, Arc::new(new_entry));
-        true
-    }
-
-    /// Atomically insert an OCSP response only if it does not replace
-    /// fresher status with staler status.
-    ///
-    /// The OCSP twin of [`Self::put_crl_if_not_rollback`]: a single write
-    /// lock covers the compare and the insert, so a concurrent writer
-    /// cannot slip a newer response in between them. Returns `true` if
-    /// inserted, `false` if suppressed as staler.
-    #[cfg(feature = "ocsp")]
-    pub(crate) fn put_ocsp_if_not_staler(
-        &self,
-        key: OcspCacheKey,
-        new_entry: CachedOcspResponse,
-    ) -> bool {
-        let mut guard = self.ocsp.write().unwrap_or_else(PoisonError::into_inner);
-        if let Some(existing) = guard.get(&key) {
-            if is_staler_ocsp(Some(existing.as_ref()), new_entry.this_update()) {
-                return false;
-            }
-        }
-        guard.insert(key, Arc::new(new_entry));
-        true
     }
 
     /// Drop every entry whose `nextUpdate` has passed at `now`, returning
@@ -636,6 +640,34 @@ fn is_live(next_update: Option<SystemTime>, now: SystemTime) -> bool {
 /// [`InMemoryCache`] type-level "Lock poisoning" notes for why that is
 /// sound and why the alternatives are worse.
 impl RevocationCache for InMemoryCache {
+    /// Overridden so the compare and the insert happen under one write
+    /// lock, closing the race the default get-then-put leaves open.
+    #[cfg(feature = "crl")]
+    fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
+        let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
+        if let Some(existing) = guard.get(&key) {
+            if is_rollback(Some(existing.as_ref()), entry.crl_number()) {
+                return false;
+            }
+        }
+        guard.insert(key, Arc::new(entry));
+        true
+    }
+
+    /// Overridden for the same reason as
+    /// [`put_crl_unless_rollback`](Self::put_crl_unless_rollback).
+    #[cfg(feature = "ocsp")]
+    fn put_ocsp_unless_staler(&self, key: OcspCacheKey, entry: CachedOcspResponse) -> bool {
+        let mut guard = self.ocsp.write().unwrap_or_else(PoisonError::into_inner);
+        if let Some(existing) = guard.get(&key) {
+            if is_staler_ocsp(Some(existing.as_ref()), entry.this_update()) {
+                return false;
+            }
+        }
+        guard.insert(key, Arc::new(entry));
+        true
+    }
+
     fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>> {
         self.crl
             .read()
@@ -883,101 +915,6 @@ fn is_staler_ocsp(prior: Option<&CachedOcspResponse>, incoming_this_update: Syst
 }
 
 // ---------------------------------------------------------------------------
-// CrlAtomicPut — crate-private rollback-guarded insert
-// ---------------------------------------------------------------------------
-
-/// Crate-private extension: rollback-guarded CRL insert.
-///
-/// [`InMemoryCache`] overrides this to hold a single write lock across the
-/// get-compare-put sequence, eliminating the TOCTOU race in the separate
-/// `get_crl` / `put_crl` path. Other implementations fall back to the
-/// non-atomic get-then-put (identical to the pre-fix behaviour).
-#[cfg(feature = "crl")]
-pub(crate) trait CrlAtomicPut {
-    /// Insert `new_entry` under `key` unless it would roll back a
-    /// newer-numbered CRL already present. Returns `true` if inserted.
-    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool;
-}
-
-/// Atomic path — single write lock covers check + insert.
-#[cfg(feature = "crl")]
-impl CrlAtomicPut for InMemoryCache {
-    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        self.put_crl_if_not_rollback(key, new_entry)
-    }
-}
-
-/// Delegate through `Arc<T>` so `Arc<InMemoryCache>` gets the atomic path.
-#[cfg(feature = "crl")]
-impl<T: CrlAtomicPut + ?Sized> CrlAtomicPut for Arc<T> {
-    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        (**self).put_crl_guarded(key, new_entry)
-    }
-}
-
-/// Fallback for trait-object caches (`Arc<dyn RevocationCache>`): uses the
-/// non-atomic get-then-put path. This preserves the pre-fix behaviour for
-/// caches whose internal locking is not visible to the wrapper.
-#[cfg(feature = "crl")]
-impl CrlAtomicPut for dyn RevocationCache {
-    fn put_crl_guarded(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        if is_rollback(self.get_crl(&key).as_deref(), new_entry.crl_number()) {
-            return false;
-        }
-        self.put_crl(key, new_entry);
-        true
-    }
-}
-
-// ---------------------------------------------------------------------------
-// OcspAtomicPut — crate-private staleness-guarded insert
-// ---------------------------------------------------------------------------
-
-/// Crate-private extension: staleness-guarded OCSP insert.
-///
-/// The OCSP mirror of [`CrlAtomicPut`]. [`InMemoryCache`] overrides this
-/// to hold one write lock across the compare and the insert; other
-/// implementations fall back to a non-atomic get-then-put, which still
-/// rejects an ordinary staler response and only loses the race against a
-/// concurrent writer.
-#[cfg(feature = "ocsp")]
-pub(crate) trait OcspAtomicPut {
-    /// Insert `new_entry` under `key` unless it would replace fresher
-    /// status with staler status. Returns `true` if inserted.
-    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool;
-}
-
-/// Atomic path — single write lock covers check + insert.
-#[cfg(feature = "ocsp")]
-impl OcspAtomicPut for InMemoryCache {
-    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
-        self.put_ocsp_if_not_staler(key, new_entry)
-    }
-}
-
-/// Delegate through `Arc<T>` so `Arc<InMemoryCache>` gets the atomic path.
-#[cfg(feature = "ocsp")]
-impl<T: OcspAtomicPut + ?Sized> OcspAtomicPut for Arc<T> {
-    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
-        (**self).put_ocsp_guarded(key, new_entry)
-    }
-}
-
-/// Fallback for trait-object caches (`Arc<dyn RevocationCache>`): uses the
-/// non-atomic get-then-put path, since the wrapper cannot see the
-/// implementation's own locking.
-#[cfg(feature = "ocsp")]
-impl OcspAtomicPut for dyn RevocationCache {
-    fn put_ocsp_guarded(&self, key: OcspCacheKey, new_entry: CachedOcspResponse) -> bool {
-        if is_staler_ocsp(self.get_ocsp(&key).as_deref(), new_entry.this_update()) {
-            return false;
-        }
-        self.put_ocsp(key, new_entry);
-        true
-    }
-}
-
-// ---------------------------------------------------------------------------
 // CachedHttpCrlFetcher
 // ---------------------------------------------------------------------------
 
@@ -1044,12 +981,11 @@ fn is_determinative(verdict: &pkix_revocation::Result<()>) -> bool {
 }
 
 #[cfg(feature = "crl")]
-#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
 impl<F, V, C> RevocationChecker for CachedHttpCrlFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache + CrlAtomicPut,
+    C: RevocationCache,
 {
     fn check_revocation(
         &self,
@@ -1075,12 +1011,11 @@ where
 }
 
 #[cfg(feature = "crl")]
-#[allow(private_bounds)] // CrlAtomicPut is intentionally crate-private
 impl<F, V, C> CachedHttpCrlFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache + CrlAtomicPut,
+    C: RevocationCache,
 {
     /// Cached fetch loop shared by both [`RevocationChecker`] methods.
     /// `issuer_subject` keys the cache; `verdict` runs the issuer- or
@@ -1192,9 +1127,10 @@ where
     /// without `nextUpdate` (it could never be served: `CrlChecker` treats
     /// a missing `nextUpdate` as expired).
     ///
-    /// The rollback check and insert are performed atomically via
-    /// [`CrlAtomicPut::put_crl_guarded`], which eliminates the TOCTOU
-    /// race between a separate `get_crl` / `put_crl` pair.
+    /// Goes through [`RevocationCache::put_crl_unless_rollback`] rather
+    /// than `put_crl`, so the rollback check and the insert are one
+    /// operation for any cache that overrides it — eliminating the
+    /// TOCTOU race in a separate `get_crl` / `put_crl` pair.
     ///
     /// Best-effort: any parse failure here is silent (the response is
     /// already known to be a valid CRL — `CrlChecker::new` accepted it —
@@ -1211,7 +1147,7 @@ where
             return;
         }
 
-        self.cache.put_crl_guarded(
+        self.cache.put_crl_unless_rollback(
             key,
             CachedCrl::new(
                 meta.crl_number,
@@ -1250,7 +1186,7 @@ where
 ///    older `good` response displace a cached `revoked` one would make
 ///    every subsequent cache hit report a revoked certificate as good.
 ///    The verdict of the fetched response is still returned. See
-///    [`is_staler_ocsp`].
+///    [`RevocationCache::put_ocsp_unless_staler`].
 #[cfg(feature = "ocsp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ocsp")))]
 #[derive(Clone, Debug)]
@@ -1268,12 +1204,11 @@ impl<F, V, C> CachedHttpOcspFetcher<F, V, C> {
 }
 
 #[cfg(feature = "ocsp")]
-#[allow(private_bounds)] // OcspAtomicPut is intentionally crate-private
 impl<F, V, C> RevocationChecker for CachedHttpOcspFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache + OcspAtomicPut,
+    C: RevocationCache,
 {
     fn check_revocation(
         &self,
@@ -1305,12 +1240,11 @@ where
 }
 
 #[cfg(feature = "ocsp")]
-#[allow(private_bounds)] // OcspAtomicPut is intentionally crate-private
 impl<F, V, C> CachedHttpOcspFetcher<F, V, C>
 where
     F: RevocationFetcher,
     V: SignatureVerifier + Clone,
-    C: RevocationCache + OcspAtomicPut,
+    C: RevocationCache,
 {
     /// Cached POST loop shared by both [`RevocationChecker`] methods.
     fn fetch_and_check(
@@ -1411,10 +1345,9 @@ where
     /// are not stored (`OcspChecker` treats them as stale). Best-effort;
     /// silent on metadata parse failure.
     ///
-    /// The staleness check and the insert are performed atomically via
-    /// [`OcspAtomicPut::put_ocsp_guarded`], so a response carrying older
-    /// status cannot displace a newer one — see [`is_staler_ocsp`] for
-    /// why that matters even without an attacker.
+    /// Goes through [`RevocationCache::put_ocsp_unless_staler`] rather
+    /// than `put_ocsp`, so a response carrying older status cannot
+    /// displace a newer one.
     fn maybe_populate_cache(&self, resp: &FetchResponse, key: OcspCacheKey) {
         let Ok(meta) = parse_ocsp_metadata(&resp.bytes) else {
             return;
@@ -1422,7 +1355,7 @@ where
         if meta.next_update.is_none() {
             return;
         }
-        self.cache.put_ocsp_guarded(
+        self.cache.put_ocsp_unless_staler(
             key,
             CachedOcspResponse::new(
                 meta.produced_at,
@@ -1462,6 +1395,23 @@ impl<T: RevocationCache + ?Sized> RevocationCache for Arc<T> {
     }
     fn invalidate_ocsp(&self, key: &OcspCacheKey) {
         (**self).invalidate_ocsp(key)
+    }
+
+    // The guarded inserts must be forwarded too, not left to the trait
+    // defaults. Omitting them compiles and behaves almost correctly,
+    // which is what makes it dangerous: `Arc<InMemoryCache>` and
+    // `Arc<dyn RevocationCache>` would silently fall back to the
+    // non-atomic get-then-put and lose the single-lock guarantee the
+    // inner cache overrides them to provide — and `Arc<dyn
+    // RevocationCache>` is the pattern these wrappers document for
+    // sharing one store between the CRL and OCSP fetchers.
+    #[cfg(feature = "crl")]
+    fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
+        (**self).put_crl_unless_rollback(key, entry)
+    }
+    #[cfg(feature = "ocsp")]
+    fn put_ocsp_unless_staler(&self, key: OcspCacheKey, entry: CachedOcspResponse) -> bool {
+        (**self).put_ocsp_unless_staler(key, entry)
     }
 }
 
@@ -1937,7 +1887,7 @@ mod tests {
             distribution_point_uri: None,
         };
         assert!(
-            cache.put_crl_if_not_rollback(
+            cache.put_crl_unless_rollback(
                 key.clone(),
                 CachedCrl {
                     crl_number: Some(vec![1]),
@@ -2511,14 +2461,14 @@ mod tests {
         let key = staleness_key();
 
         // Cache the newer answer first (status known correct at t=2000).
-        assert!(cache.put_ocsp_if_not_staler(
+        assert!(cache.put_ocsp_unless_staler(
             key.clone(),
             CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"revoked".to_vec()),
         ));
 
         // An older answer arrives (status known correct at t=1000).
         assert!(
-            !cache.put_ocsp_if_not_staler(
+            !cache.put_ocsp_unless_staler(
                 key.clone(),
                 CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"good".to_vec()),
             ),
@@ -2541,17 +2491,16 @@ mod tests {
             key.clone(),
             CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"old".to_vec()),
         );
-        assert!(cache.put_ocsp_if_not_staler(
+        assert!(cache.put_ocsp_unless_staler(
             key.clone(),
             CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"new".to_vec()),
         ));
         assert_eq!(cache.get_ocsp(&key).expect("entry present").bytes(), b"new");
     }
 
-    /// The trait-object fallback has no visibility into another
-    /// implementation's locking, so it does the compare and the put
-    /// separately — but it must still reject an ordinary staler
-    /// response rather than overwriting.
+    /// Behind `Arc<dyn RevocationCache>` the call dispatches
+    /// dynamically, so it must still reject an ordinary staler
+    /// response.
     #[cfg(feature = "ocsp")]
     #[test]
     fn the_trait_object_fallback_also_rejects_a_staler_response() {
@@ -2561,7 +2510,7 @@ mod tests {
             key.clone(),
             CachedOcspResponse::new(at_secs(2000), at_secs(2000), None, b"revoked".to_vec()),
         );
-        assert!(!cache.put_ocsp_guarded(
+        assert!(!cache.put_ocsp_unless_staler(
             key.clone(),
             CachedOcspResponse::new(at_secs(1000), at_secs(1000), None, b"good".to_vec()),
         ));
@@ -2577,7 +2526,7 @@ mod tests {
     fn a_first_insert_is_not_staler() {
         let cache = InMemoryCache::new();
         let key = staleness_key();
-        assert!(cache.put_ocsp_if_not_staler(
+        assert!(cache.put_ocsp_unless_staler(
             key.clone(),
             CachedOcspResponse::new(at_secs(1), at_secs(1), None, b"first".to_vec()),
         ));

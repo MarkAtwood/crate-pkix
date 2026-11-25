@@ -410,3 +410,210 @@ fn len_and_is_empty_agree() {
     assert_eq!(cache.len(), 0);
     assert!(cache.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Usability as the wrappers' C parameter
+// ---------------------------------------------------------------------------
+
+/// An out-of-crate cache must work as the `C` parameter of the cache
+/// wrappers *by its own concrete type*, not only behind
+/// `Arc<dyn RevocationCache>`.
+///
+/// The guarded inserts used to live on crate-private traits
+/// (`CrlAtomicPut` / `OcspAtomicPut`) that the wrappers required but no
+/// consumer could implement, so `FlatStore` satisfied `RevocationCache`
+/// and still could not be used: the bound failed on a trait whose name
+/// the error message gave and whose definition was unreachable. The
+/// guarded inserts are now defaulted methods on `RevocationCache`
+/// itself, so implementing that trait is sufficient.
+///
+/// This is a compile-time test above all — if the bound regresses, this
+/// file stops building.
+#[test]
+fn an_out_of_crate_cache_works_as_the_wrappers_cache_parameter() {
+    use der::Decode as _;
+    use pkix_path::DefaultVerifier;
+    use pkix_revocation::RevocationChecker as _;
+    use pkix_revocation_http::{
+        CachedHttpCrlFetcher, CachedHttpOcspFetcher, FetchError, FetchRequest, FetchResponse,
+        HttpCrlFetcher, HttpOcspFetcher, RevocationFetcher,
+    };
+
+    struct Offline;
+    impl RevocationFetcher for Offline {
+        fn fetch(&self, _req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
+            Err(FetchError::HttpStatus(503))
+        }
+    }
+
+    let cert = x509_cert::Certificate::from_der(include_bytes!("fixtures/review/leaf-serial2.der"))
+        .expect("fixture parses");
+    let ca = x509_cert::Certificate::from_der(include_bytes!("fixtures/review/ca.der"))
+        .expect("fixture parses");
+
+    // By concrete type.
+    let crl = CachedHttpCrlFetcher::new(
+        HttpCrlFetcher::new(Offline, DefaultVerifier, 1_780_272_000),
+        FlatStore::default(),
+    );
+    // The transport refuses every request, so this reports a fetch
+    // failure; what matters is that it compiles and runs at all.
+    assert!(crl.check_revocation(&cert, &ca).is_err());
+
+    let ocsp = CachedHttpOcspFetcher::new(
+        HttpOcspFetcher::new(Offline, DefaultVerifier, 1_780_272_000),
+        FlatStore::default(),
+    );
+    assert!(ocsp.check_revocation(&cert, &ca).is_err());
+}
+
+/// The defaulted guarded inserts must actually guard for an
+/// implementation that does not override them. `FlatStore` overrides
+/// neither, so these exercise the trait's own default bodies.
+#[test]
+fn the_default_guarded_inserts_reject_a_rollback_and_a_staler_response() {
+    let store = FlatStore::default();
+
+    store.put_crl(
+        crl_key(),
+        CachedCrl::new(
+            Some(vec![5]),
+            at(2_000),
+            Some(at(99_999)),
+            b"newer".to_vec(),
+        ),
+    );
+    assert!(
+        !store.put_crl_unless_rollback(
+            crl_key(),
+            CachedCrl::new(
+                Some(vec![4]),
+                at(1_000),
+                Some(at(99_999)),
+                b"older".to_vec()
+            ),
+        ),
+        "a lower CRLNumber must be rejected by the default implementation"
+    );
+    assert_eq!(store.get_crl(&crl_key()).expect("entry").bytes(), b"newer");
+
+    store.put_ocsp(
+        ocsp_key(),
+        CachedOcspResponse::new(at(2_000), at(2_000), Some(at(99_999)), b"revoked".to_vec()),
+    );
+    assert!(
+        !store.put_ocsp_unless_staler(
+            ocsp_key(),
+            CachedOcspResponse::new(at(1_000), at(1_000), Some(at(99_999)), b"good".to_vec()),
+        ),
+        "an older thisUpdate must be rejected by the default implementation"
+    );
+    assert_eq!(
+        store.get_ocsp(&ocsp_key()).expect("entry").bytes(),
+        b"revoked"
+    );
+
+    // And a genuine refresh still lands.
+    assert!(store.put_crl_unless_rollback(
+        crl_key(),
+        CachedCrl::new(
+            Some(vec![6]),
+            at(3_000),
+            Some(at(99_999)),
+            b"newest".to_vec()
+        ),
+    ));
+    assert_eq!(store.get_crl(&crl_key()).expect("entry").bytes(), b"newest");
+}
+
+/// `Arc<T>` and `Arc<dyn RevocationCache>` must forward the guarded
+/// inserts to the inner cache's overrides, not fall back to the trait
+/// defaults.
+///
+/// This is the one failure mode in this area that nothing else catches:
+/// omitting the two methods from the `Arc<T>` forwarding impl compiles
+/// and behaves almost correctly, because the defaults do perform the
+/// same comparison — just non-atomically, across a separate get and put.
+/// So `Arc<InMemoryCache>` would quietly lose the single-write-lock
+/// guarantee it was given, and `Arc<dyn RevocationCache>` is exactly the
+/// shape the wrappers document for sharing one store between the CRL and
+/// OCSP fetchers.
+///
+/// `Counting` overrides both methods and records the fact, so reaching
+/// the default instead is observable.
+#[test]
+fn arc_forwards_the_guarded_inserts_to_the_inner_override() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Default)]
+    struct Counting {
+        inner: InMemoryCache,
+        guarded_crl: AtomicUsize,
+        guarded_ocsp: AtomicUsize,
+    }
+
+    impl RevocationCache for Counting {
+        fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>> {
+            self.inner.get_crl(key)
+        }
+        fn put_crl(&self, key: CrlCacheKey, entry: CachedCrl) {
+            self.inner.put_crl(key, entry);
+        }
+        fn invalidate_crl(&self, key: &CrlCacheKey) {
+            self.inner.invalidate_crl(key);
+        }
+        fn get_ocsp(&self, key: &OcspCacheKey) -> Option<Arc<CachedOcspResponse>> {
+            self.inner.get_ocsp(key)
+        }
+        fn put_ocsp(&self, key: OcspCacheKey, entry: CachedOcspResponse) {
+            self.inner.put_ocsp(key, entry);
+        }
+        fn invalidate_ocsp(&self, key: &OcspCacheKey) {
+            self.inner.invalidate_ocsp(key);
+        }
+        fn put_crl_unless_rollback(&self, key: CrlCacheKey, entry: CachedCrl) -> bool {
+            self.guarded_crl.fetch_add(1, Ordering::SeqCst);
+            self.inner.put_crl_unless_rollback(key, entry)
+        }
+        fn put_ocsp_unless_staler(&self, key: OcspCacheKey, entry: CachedOcspResponse) -> bool {
+            self.guarded_ocsp.fetch_add(1, Ordering::SeqCst);
+            self.inner.put_ocsp_unless_staler(key, entry)
+        }
+    }
+
+    let counting = Arc::new(Counting::default());
+
+    // Through Arc<Counting>.
+    let via_arc: Arc<Counting> = Arc::clone(&counting);
+    assert!(via_arc.put_crl_unless_rollback(
+        crl_key(),
+        CachedCrl::new(Some(vec![1]), at(1), None, vec![0x01]),
+    ));
+    assert!(via_arc.put_ocsp_unless_staler(
+        ocsp_key(),
+        CachedOcspResponse::new(at(1), at(1), None, vec![0x01]),
+    ));
+
+    // Through Arc<dyn RevocationCache>.
+    let via_dyn: Arc<dyn RevocationCache> = Arc::clone(&counting) as Arc<dyn RevocationCache>;
+    assert!(via_dyn.put_crl_unless_rollback(
+        crl_key(),
+        CachedCrl::new(Some(vec![2]), at(2), None, vec![0x02]),
+    ));
+    assert!(via_dyn.put_ocsp_unless_staler(
+        ocsp_key(),
+        CachedOcspResponse::new(at(2), at(2), None, vec![0x02]),
+    ));
+
+    assert_eq!(
+        counting.guarded_crl.load(Ordering::SeqCst),
+        2,
+        "Arc<T> and Arc<dyn RevocationCache> must both reach the inner \
+         put_crl_unless_rollback override, not the trait default"
+    );
+    assert_eq!(
+        counting.guarded_ocsp.load(Ordering::SeqCst),
+        2,
+        "same for put_ocsp_unless_staler"
+    );
+}
