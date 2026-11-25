@@ -10,7 +10,8 @@
 //! `verify_time_stamper` enforces this post-validation.
 
 use pkix_chain::{
-    verify_time_stamper, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, TrustAnchor,
+    verify_time_stamper, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, ProfileViolationKind,
+    TrustAnchor,
 };
 use pkix_profiles::BasicTimeStampingProfile;
 use x509_cert::der::Decode as _;
@@ -74,11 +75,8 @@ fn verify_time_stamper_non_critical_eku_returns_profile_violation() {
     )
     .expect_err("non-critical EKU must fail RFC 3161 §2.3 check");
     match err {
-        Error::ProfileViolation { reason } => {
-            assert!(
-                reason.contains("critical"),
-                "reason should mention critical, got: {reason:?}"
-            );
+        Error::ProfileViolation { kind, .. } => {
+            assert_eq!(kind, ProfileViolationKind::TsaEkuNotCritical);
         }
         other => panic!("expected Error::ProfileViolation, got: {other:?}"),
     }
@@ -106,11 +104,8 @@ fn verify_time_stamper_extra_eku_returns_profile_violation() {
     )
     .expect_err("timeStamping+codeSigning EKU must fail RFC 3161 §2.3 sole check");
     match err {
-        Error::ProfileViolation { reason } => {
-            assert!(
-                reason.contains("only id-kp-timeStamping"),
-                "reason should mention sole-EKU rule, got: {reason:?}"
-            );
+        Error::ProfileViolation { kind, .. } => {
+            assert_eq!(kind, ProfileViolationKind::TsaEkuNotSoleTimeStamping);
         }
         other => panic!("expected Error::ProfileViolation, got: {other:?}"),
     }
@@ -143,15 +138,8 @@ fn verify_time_stamper_bad_ku_returns_profile_violation() {
     )
     .expect_err("KU=digitalSignature+keyEncipherment must fail RFC 3161 §2.1 #10 / KU-shape check");
     match err {
-        Error::ProfileViolation { reason } => {
-            assert!(
-                reason.contains("KeyUsage"),
-                "reason should mention KeyUsage, got: {reason:?}"
-            );
-            assert!(
-                reason.contains("digitalSignature") || reason.contains("nonRepudiation"),
-                "reason should mention the permitted bits, got: {reason:?}"
-            );
+        Error::ProfileViolation { kind, .. } => {
+            assert_eq!(kind, ProfileViolationKind::TsaKeyUsageNotSigningOnly);
         }
         other => panic!("expected Error::ProfileViolation, got: {other:?}"),
     }

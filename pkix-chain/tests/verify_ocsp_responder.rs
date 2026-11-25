@@ -18,8 +18,8 @@
 //! caller's checker for the responder leaf only.
 
 use pkix_chain::{
-    verify_ocsp_responder, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, RevocationChecker,
-    TrustAnchor,
+    verify_ocsp_responder, DefaultVerifier, Error, NoAiaFetcher, NoRevocation, OcspDelegationKind,
+    RevocationChecker, TrustAnchor,
 };
 use pkix_profiles::BasicOcspResponderProfile;
 use pkix_revocation::Error as RevocationError;
@@ -121,11 +121,8 @@ fn verify_ocsp_responder_wrong_issuer_returns_ocsp_delegation() {
     )
     .expect_err("issuer-DN mismatch must fail RFC 6960 §4.2.2.2 delegation check");
     match err {
-        Error::OcspDelegation { reason } => {
-            assert!(
-                reason.contains("issuer DN"),
-                "reason should mention issuer DN, got: {reason:?}"
-            );
+        Error::OcspDelegation { kind, .. } => {
+            assert_eq!(kind, OcspDelegationKind::IssuerDnMismatch);
         }
         other => panic!("expected Error::OcspDelegation, got: {other:?}"),
     }
@@ -170,14 +167,12 @@ fn verify_ocsp_responder_twin_dn_issuer_returns_ocsp_delegation() {
          cryptographic delegation binding even though the DN-equality gate passes",
     );
     match err {
-        Error::OcspDelegation { reason } => {
-            // The reason must point at the signature-binding failure,
-            // not the DN gate — both surface as OcspDelegation but
-            // mean different things diagnostically.
-            assert!(
-                reason.contains("signature"),
-                "reason should mention signature-binding failure, got: {reason:?}"
-            );
+        Error::OcspDelegation { kind, .. } => {
+            // The signature-binding failure, not the DN gate. Both
+            // surface as OcspDelegation and mean different things, which
+            // is why the payload is a typed kind: this used to be
+            // `reason.contains("signature")`.
+            assert_eq!(kind, OcspDelegationKind::SignatureNotVerified);
         }
         other => panic!("expected Error::OcspDelegation, got: {other:?}"),
     }

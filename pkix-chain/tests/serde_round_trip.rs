@@ -14,9 +14,8 @@
 
 #![cfg(feature = "serde")]
 
-use pkix_chain::Error;
+use pkix_chain::{Error, OcspDelegationKind, ProfileViolationKind};
 use pkix_identity::IdentityError;
-use std::borrow::Cow;
 
 /// `Error::Identity` round-trips, preserving the inner `IdentityError`
 /// variant identity.
@@ -65,39 +64,70 @@ fn error_revocation_forwards_inner_serde() {
 }
 
 /// `Error::ProfileViolation` and `Error::OcspDelegation` preserve their
-/// `Cow<'static, str>` reason field through serde. The recovered value
-/// is `Cow::Owned(String)`; `PartialEq` between `Borrowed` and `Owned`
-/// of the same content is `true` (Cow Eq is content-based, not
-/// variant-based), so the round-trip preserves PartialEq.
+/// typed kind through serde.
+///
+/// These used to carry a `Cow<'static, str>` and this test turned on
+/// `Cow`'s content-based equality surviving the `Borrowed` to `Owned`
+/// transition. The payload is now an enum, so the round trip is an
+/// ordinary one and the kind comes back the kind it went in as — which
+/// is the point: a caller caching one of these recovers something it can
+/// still match on.
+///
+/// Every kind is covered rather than one sample, since the whole value of
+/// the change is that the kinds are distinguishable.
 #[test]
-fn profile_violation_and_ocsp_delegation_preserve_reason() {
-    for err in [
-        Error::ProfileViolation {
-            reason: Cow::Borrowed("test reason"),
-        },
-        Error::OcspDelegation {
-            reason: Cow::Borrowed("delegation reason"),
-        },
-    ] {
+fn profile_violation_and_ocsp_delegation_preserve_their_kind() {
+    let profile = [
+        ProfileViolationKind::TsaEkuMissing,
+        ProfileViolationKind::TsaEkuNotCritical,
+        ProfileViolationKind::TsaEkuMalformed,
+        ProfileViolationKind::TsaEkuNotSoleTimeStamping,
+        ProfileViolationKind::TsaKeyUsageMalformed,
+        ProfileViolationKind::TsaKeyUsageNotSigningOnly,
+    ];
+    let delegation = [
+        OcspDelegationKind::EmptyChain,
+        OcspDelegationKind::IssuerDnMismatch,
+        OcspDelegationKind::TbsReencodeFailed,
+        OcspDelegationKind::SignatureNotVerified,
+    ];
+
+    let cases: Vec<Error> = profile
+        .iter()
+        .copied()
+        .map(Error::profile_violation)
+        .chain(delegation.iter().copied().map(Error::ocsp_delegation))
+        .collect();
+
+    for err in cases {
         let json = serde_json::to_string(&err).expect("serialize");
         let back: Error = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(err, back);
-        // Display should also be preserved.
+        assert_eq!(err, back, "round trip changed the error: {json}");
         assert_eq!(format!("{err}"), format!("{back}"));
     }
+
+    // Distinct kinds must not collapse to the same wire form, or caching
+    // one and reloading it would silently lose the classification.
+    let mut wire: Vec<String> = profile
+        .iter()
+        .copied()
+        .map(Error::profile_violation)
+        .map(|e| serde_json::to_string(&e).expect("serialize"))
+        .collect();
+    wire.sort_unstable();
+    let before = wire.len();
+    wire.dedup();
+    assert_eq!(before, wire.len(), "two kinds share a wire form: {wire:?}");
 }
 
 /// Hand-written expected JSON for `Error::ProfileViolation`. Acts as an
-/// independent oracle that the wire form is the simple
-/// `{"ProfileViolation":{"reason":"..."}}` shape (serde-default for
-/// externally-tagged enums with a struct payload).
+/// independent oracle on the wire form: externally tagged, with the kind
+/// as a nested name rather than a prose string.
 #[test]
 fn profile_violation_wire_form_is_externally_tagged() {
-    let err = Error::ProfileViolation {
-        reason: Cow::Borrowed("invariant"),
-    };
+    let err = Error::profile_violation(ProfileViolationKind::TsaEkuNotCritical);
     let json = serde_json::to_string(&err).expect("serialize");
-    assert_eq!(json, r#"{"ProfileViolation":{"reason":"invariant"}}"#);
+    assert_eq!(json, r#"{"ProfileViolation":{"kind":"TsaEkuNotCritical"}}"#);
 }
 
 /// `Error::Aia` forwards a `pkix_aia::AiaError` through serde. Variant

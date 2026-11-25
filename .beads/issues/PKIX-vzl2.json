@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-vzl2",
+  "title": "absorb() reports FetchingDisabled when a fetch succeeded but added nothing",
+  "description": "pkix-chain/src/sans_io.rs:300-309. When absorb() finds that no certificate was added from a fetch round, it returns:\n\n    Some(Error::Aia(state.last_aia_error.clone().unwrap_or(AiaError::FetchingDisabled)))\n\nThe unwrap_or is wrong when the fetch SUCCEEDED. A fetcher that returns a certificate already in the pool (a stale CA generation still published at its AIA URI, say, or a repository serving the same intermediate the caller supplied) produces no last_aia_error, so the caller is told AIA fetching is disabled. It was not: a request was made and answered.\n\nFound while writing a test for PKIX-rm8.45, where this was one of two reports that outranked the one under test. The scenario is ordinary, not adversarial.\n\nSuggested shape: a distinct AiaError for 'fetched, but nothing usable was added' -- the enum is #[non_exhaustive], so adding a variant is additive. FetchingDisabled should be reserved for the case where no fetch was attempted, which is what NoAiaFetcher means by it.\n\nNote the existing precedence logic is sound and should be kept: a fetch attempted and failed outranks a URI never tried. This is only about the fallback value when nothing failed.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-25T22:07:46.650051291Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T22:07:46.650051291Z"
+}

@@ -123,7 +123,6 @@ pub use pkix_revocation::CrlChecker;
 pub use pkix_revocation::OcspChecker;
 pub use pkix_revocation::{self, NoRevocation, RevocationChecker};
 
-use std::borrow::Cow;
 use x509_cert::Certificate;
 
 mod aia_extract;
@@ -259,6 +258,110 @@ impl Default for AiaConfig {
     }
 }
 
+/// Which profile invariant a certificate failed.
+///
+/// Replaces the fixed string [`Error::ProfileViolation`] used to carry.
+/// That string was documented as "not parsed by the engine; pattern-match
+/// on the variant rather than the inner string", which was honest about
+/// the constraint and left callers with one bit of information — that
+/// *some* profile rule was broken — for what is a many-way
+/// classification. These are the ways.
+///
+/// Every variant today is an RFC 3161 time-stamping rule, because that is
+/// the only profile with post-validation checks in this crate. The enum
+/// is `#[non_exhaustive]` so other profiles can be added without a
+/// breaking change; match with a `_` arm.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum ProfileViolationKind {
+    /// RFC 3161 §2.3: the TSA certificate carries no `ExtendedKeyUsage`.
+    TsaEkuMissing,
+    /// RFC 3161 §2.3: `ExtendedKeyUsage` is present but not critical.
+    TsaEkuNotCritical,
+    /// The `ExtendedKeyUsage` extension could not be decoded.
+    TsaEkuMalformed,
+    /// RFC 3161 §2.3: `ExtendedKeyUsage` must contain `id-kp-timeStamping`
+    /// and nothing else.
+    TsaEkuNotSoleTimeStamping,
+    /// The `KeyUsage` extension could not be decoded.
+    TsaKeyUsageMalformed,
+    /// RFC 3161 §2.1: `KeyUsage` must contain only `digitalSignature`
+    /// and/or `nonRepudiation`.
+    TsaKeyUsageNotSigningOnly,
+}
+
+impl core::fmt::Display for ProfileViolationKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let s = match self {
+            Self::TsaEkuMissing => "TSA certificate has no ExtendedKeyUsage extension",
+            Self::TsaEkuNotCritical => {
+                "TSA ExtendedKeyUsage extension must be marked critical (RFC 3161 §2.3)"
+            }
+            Self::TsaEkuMalformed => "TSA ExtendedKeyUsage extension is malformed",
+            Self::TsaEkuNotSoleTimeStamping => {
+                "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)"
+            }
+            Self::TsaKeyUsageMalformed => "TSA KeyUsage extension is malformed",
+            Self::TsaKeyUsageNotSigningOnly => {
+                "TSA KeyUsage must contain only digitalSignature and/or nonRepudiation \
+                 (RFC 3161 §2.1 #10; matches OpenSSL `-purpose timestampsign`)"
+            }
+        };
+        f.write_str(s)
+    }
+}
+
+/// Which RFC 6960 §4.2.2.2 delegation requirement an OCSP responder
+/// certificate failed.
+///
+/// Replaces the fixed string [`Error::OcspDelegation`] used to carry, for
+/// the same reason as [`ProfileViolationKind`]. The distinction that
+/// matters most here is the last two: a DN that does not match is a
+/// configuration error, while a DN that matches whose signature does not
+/// verify is the DN-twin attack the binding exists to detect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum OcspDelegationKind {
+    /// The supplied chain was empty, so there is no responder certificate.
+    EmptyChain,
+    /// RFC 6960 §4.2.2.2: the responder certificate's issuer DN does not
+    /// match the supplied issuer's subject DN.
+    IssuerDnMismatch,
+    /// The responder certificate's `TBSCertificate` could not be
+    /// re-encoded, so the delegation signature cannot be checked.
+    TbsReencodeFailed,
+    /// The responder certificate's signature does not verify under the
+    /// supplied issuer's key.
+    ///
+    /// Distinct from [`IssuerDnMismatch`](Self::IssuerDnMismatch): the
+    /// names agree and the cryptography does not, which is what a
+    /// cross-signed DN twin looks like.
+    SignatureNotVerified,
+}
+
+impl core::fmt::Display for OcspDelegationKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let s = match self {
+            Self::EmptyChain => "OCSP responder chain must contain at least the responder cert",
+            Self::IssuerDnMismatch => {
+                "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
+                 (RFC 6960 §4.2.2.2 delegation requirement)"
+            }
+            Self::TbsReencodeFailed => {
+                "OCSP responder cert TBSCertificate re-encoding failed \
+                 (cannot verify delegation signature)"
+            }
+            Self::SignatureNotVerified => {
+                "OCSP responder cert signature does not verify under the supplied issuer's key \
+                 — DN match without cryptographic binding is insufficient"
+            }
+        };
+        f.write_str(s)
+    }
+}
+
 /// Combined error type for chain verification.
 ///
 /// Wraps path validation errors ([`pkix_path::Error`]),
@@ -287,18 +390,12 @@ pub enum Error {
     /// `ExtendedKeyUsage` extension be marked critical and contain only
     /// `id-kp-timeStamping`.
     ///
-    /// `reason` is a fixed-string description suitable for logging and
-    /// diagnostic display. It is not parsed by the engine; pattern-match
-    /// on the variant rather than the inner string.
+    /// `kind` says which invariant was broken, so it can be matched on.
+    /// Construct with [`Error::profile_violation`].
+    #[non_exhaustive]
     ProfileViolation {
-        /// Fixed-string description of which profile invariant was violated.
-        ///
-        /// `Cow<'static, str>` rather than `&'static str` so the serde
-        /// deserialize path can yield an owned `String` without leaking
-        /// memory. Producers always supply `Cow::Borrowed` from a
-        /// `&'static str` literal; the `Cow::Owned` variant arises only
-        /// on the deserialize path.
-        reason: std::borrow::Cow<'static, str>,
+        /// Which profile invariant was violated.
+        kind: ProfileViolationKind,
     },
     /// An RFC 6960 §4.2.2.2 OCSP-responder delegation check failed.
     ///
@@ -317,15 +414,12 @@ pub enum Error {
     ///    DN equality alone admits a DN-twin attack in cross-signed
     ///    topologies (two CAs with colliding names but different keys).
     ///
-    /// `reason` is a fixed-string description suitable for logging and
-    /// diagnostic display. It is not parsed by the engine; pattern-match
-    /// on the variant rather than the inner string.
+    /// `kind` says which delegation requirement was broken, so it can be
+    /// matched on. Construct with [`Error::ocsp_delegation`].
+    #[non_exhaustive]
     OcspDelegation {
-        /// Fixed-string description of which delegation invariant was violated.
-        ///
-        /// See [`Error::ProfileViolation::reason`] for why the field is
-        /// `Cow<'static, str>` rather than `&'static str`.
-        reason: std::borrow::Cow<'static, str>,
+        /// Which delegation requirement was violated.
+        kind: OcspDelegationKind,
     },
     /// AIA fetching failed during chain reassembly.
     ///
@@ -383,14 +477,35 @@ pub enum Error {
     AiaDeadlineExceeded,
 }
 
+impl Error {
+    /// Builds [`Error::ProfileViolation`].
+    ///
+    /// The variant is `#[non_exhaustive]`, so it cannot be constructed
+    /// with a struct literal outside this crate. That is deliberate — it
+    /// leaves room to add context to the variant later without a breaking
+    /// change — and it is why these constructors exist: tests, mocks and
+    /// adapters still need to build one.
+    #[must_use]
+    pub const fn profile_violation(kind: ProfileViolationKind) -> Self {
+        Self::ProfileViolation { kind }
+    }
+
+    /// Builds [`Error::OcspDelegation`]. See
+    /// [`profile_violation`](Self::profile_violation) for why this exists.
+    #[must_use]
+    pub const fn ocsp_delegation(kind: OcspDelegationKind) -> Self {
+        Self::OcspDelegation { kind }
+    }
+}
+
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Path(e) => write!(f, "path validation: {e}"),
             Self::Revocation(e) => write!(f, "revocation: {e}"),
             Self::Identity(e) => write!(f, "identity binding: {e}"),
-            Self::ProfileViolation { reason } => write!(f, "profile violation: {reason}"),
-            Self::OcspDelegation { reason } => write!(f, "ocsp responder delegation: {reason}"),
+            Self::ProfileViolation { kind } => write!(f, "profile violation: {kind}"),
+            Self::OcspDelegation { kind } => write!(f, "ocsp responder delegation: {kind}"),
             Self::Aia(e) => write!(f, "aia fetch: {e}"),
             #[cfg(feature = "dane")]
             Self::Dane(e) => write!(f, "dane: {e}"),
@@ -1419,9 +1534,7 @@ where
     A: AiaFetcher,
 {
     if chain.is_empty() {
-        return Err(Error::OcspDelegation {
-            reason: Cow::Borrowed("OCSP responder chain must contain at least the responder cert"),
-        });
+        return Err(Error::ocsp_delegation(OcspDelegationKind::EmptyChain));
     }
 
     // RFC 6960 §4.2.2.2.1: if chain[0] carries id-pkix-ocsp-nocheck, the
@@ -1501,12 +1614,7 @@ fn verify_responder_is_delegated_by<V: SignatureVerifier>(
         responder.tbs_certificate().issuer(),
         issuer.tbs_certificate().subject(),
     ) {
-        return Err(Error::OcspDelegation {
-            reason: Cow::Borrowed(
-                "OCSP responder cert issuer DN does not match the supplied issuer's subject DN \
-                 (RFC 6960 §4.2.2.2 delegation requirement)",
-            ),
-        });
+        return Err(Error::ocsp_delegation(OcspDelegationKind::IssuerDnMismatch));
     }
 
     // 2. Cryptographic binding: responder.signature must verify under
@@ -1514,12 +1622,8 @@ fn verify_responder_is_delegated_by<V: SignatureVerifier>(
     //    `pkix_path::tbs_certificate_der`, which keeps validity times as
     //    parsed). This is the spec-correct delegation check; DN equality
     //    alone admits a DN-twin attack in cross-signed topologies.
-    let tbs_der = pkix_path::tbs_certificate_der(responder).map_err(|_| Error::OcspDelegation {
-        reason: Cow::Borrowed(
-            "OCSP responder cert TBSCertificate re-encoding failed \
-                 (cannot verify delegation signature)",
-        ),
-    })?;
+    let tbs_der = pkix_path::tbs_certificate_der(responder)
+        .map_err(|_| Error::ocsp_delegation(OcspDelegationKind::TbsReencodeFailed))?;
     verifier
         .verify_signature(
             responder.signature_algorithm().owned_to_ref(),
@@ -1530,13 +1634,7 @@ fn verify_responder_is_delegated_by<V: SignatureVerifier>(
             &tbs_der,
             responder.signature().raw_bytes(),
         )
-        .map_err(|_| Error::OcspDelegation {
-            reason: Cow::Borrowed(
-                "OCSP responder cert signature does not verify under the supplied issuer's \
-                 public key (RFC 6960 §4.2.2.2: responder must be issued directly by the \
-                 named CA — DN match without cryptographic binding is insufficient)",
-            ),
-        })?;
+        .map_err(|_| Error::ocsp_delegation(OcspDelegationKind::SignatureNotVerified))?;
     Ok(())
 }
 
@@ -1661,34 +1759,27 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
         .map_or(&[][..], |e| e.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
-        .ok_or(Error::ProfileViolation {
-            reason: Cow::Borrowed("TSA certificate has no ExtendedKeyUsage extension"),
-        })?;
+        .ok_or(Error::profile_violation(
+            ProfileViolationKind::TsaEkuMissing,
+        ))?;
 
     if !ext.critical {
-        return Err(Error::ProfileViolation {
-            reason: Cow::Borrowed(
-                "TSA ExtendedKeyUsage extension must be marked critical (RFC 3161 §2.3)",
-            ),
-        });
+        return Err(Error::profile_violation(
+            ProfileViolationKind::TsaEkuNotCritical,
+        ));
     }
 
-    let eku = ExtendedKeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| {
-        Error::ProfileViolation {
-            reason: Cow::Borrowed("TSA ExtendedKeyUsage extension is malformed"),
-        }
-    })?;
+    let eku = ExtendedKeyUsage::from_der(ext.extn_value.as_bytes())
+        .map_err(|_| Error::profile_violation(ProfileViolationKind::TsaEkuMalformed))?;
 
     // RFC 3161 §2.3: timeStamping MUST be the sole EKU value. Everything
     // the guarded arm does not accept — a different single OID, several
     // OIDs, or none — fails for that one reason, so it is one arm.
     match eku.0.as_slice() {
         [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),
-        _ => Err(Error::ProfileViolation {
-            reason: Cow::Borrowed(
-                "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
-            ),
-        }),
+        _ => Err(Error::profile_violation(
+            ProfileViolationKind::TsaEkuNotSoleTimeStamping,
+        )),
     }
 }
 
@@ -1733,10 +1824,8 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
         return Ok(());
     };
 
-    let ku =
-        KeyUsage::from_der(ext.extn_value.as_bytes()).map_err(|_| Error::ProfileViolation {
-            reason: Cow::Borrowed("TSA KeyUsage extension is malformed"),
-        })?;
+    let ku = KeyUsage::from_der(ext.extn_value.as_bytes())
+        .map_err(|_| Error::profile_violation(ProfileViolationKind::TsaKeyUsageMalformed))?;
 
     // A TSA's key is signing-only. digitalSignature and nonRepudiation
     // (contentCommitment) are the two permitted bits; every other bit
@@ -1749,12 +1838,9 @@ fn enforce_timestamping_ku_shape(leaf: &Certificate) -> crate::Result<()> {
         || ku.encipher_only()
         || ku.decipher_only()
     {
-        return Err(Error::ProfileViolation {
-            reason: Cow::Borrowed(
-                "TSA KeyUsage must contain only digitalSignature and/or nonRepudiation \
-                 (RFC 3161 §2.1 #10; matches OpenSSL `-purpose timestampsign`)",
-            ),
-        });
+        return Err(Error::profile_violation(
+            ProfileViolationKind::TsaKeyUsageNotSigningOnly,
+        ));
     }
 
     Ok(())
@@ -1969,12 +2055,8 @@ mod tests {
             Error::Identity(IdentityError::MissingSan),
             Error::Identity(IdentityError::MalformedSan),
             Error::Identity(IdentityError::MalformedInput),
-            Error::ProfileViolation {
-                reason: Cow::Borrowed("test violation"),
-            },
-            Error::OcspDelegation {
-                reason: Cow::Borrowed("test delegation failure"),
-            },
+            Error::profile_violation(ProfileViolationKind::TsaEkuMissing),
+            Error::ocsp_delegation(OcspDelegationKind::SignatureNotVerified),
         ];
         for err in cases {
             let s = format!("{err}");
