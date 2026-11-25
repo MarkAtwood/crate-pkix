@@ -1502,6 +1502,7 @@ dependencies = [
  "pkix-dane",
  "pkix-dane-resolver",
  "pkix-identity",
+ "pkix-mta-sts",
  "pkix-path",
  "pkix-path-builder",
  "pkix-profiles",

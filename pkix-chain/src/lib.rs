@@ -169,6 +169,10 @@ pub use dane::{verify_tls_server_dane, DaneConfig, DaneFailurePolicy, TlsAuthori
 #[cfg_attr(docsrs, doc(cfg(feature = "dane")))]
 pub use smtp::{verify_smtp_server_dane, SmtpDaneFailure, SmtpDaneVerdict};
 
+#[cfg(feature = "mta-sts")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mta-sts")))]
+pub use smtp::{combine_smtp_transport_security, SmtpTransportDenial, SmtpTransportSecurity};
+
 /// DNSSEC-validating TLSA resolution, re-exported under the
 /// `dane-resolver` feature.
 ///

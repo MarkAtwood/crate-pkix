@@ -30,6 +30,12 @@ default     = ["pkix-path/default", "dane"]
 # enabling this.
 dane        = ["dep:pkix-dane", "pkix-dane/smtp"]
 dane-resolver = ["dane", "dep:pkix-dane-resolver"]
+
+# MTA-STS (RFC 8461) combined with DANE. Implies `dane`, because the whole
+# point of the combination is §2's rule that an MTA-STS result MUST NOT
+# override a failing DANE validation — without a DANE verdict there is
+# nothing to combine, and the precedence rule has no meaning.
+mta-sts     = ["dane", "dep:pkix-mta-sts"]
 rustcrypto  = ["pkix-path/rustcrypto"]
 crl         = ["pkix-revocation/crl"]
 ocsp        = ["pkix-revocation/ocsp"]
@@ -75,6 +81,7 @@ pkix-dane         = { workspace = true, optional = true }
 # DNSSEC-validating resolution, behind `dane-resolver`. Pulls the DNS
 # stack, which is why it is not default-on.
 pkix-dane-resolver = { workspace = true, optional = true }
+pkix-mta-sts       = { workspace = true, optional = true }
 # pkix-path-builder provides the `CertPool` + `build_first_valid_path`
 # entry points used to reassemble an incomplete chain from AIA-fetched
 # intermediates (PKIX-zkjb.7). Note: pkix-path-builder is no_std-friendly

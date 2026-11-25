@@ -369,3 +369,155 @@ fn has_usage(response: &pkix_dane::TlsaResponse, usage: TlsaUsage) -> bool {
         .iter()
         .any(|r| r.usage() == usage && r.is_usable())
 }
+
+// ---------------------------------------------------------------------------
+// Combining DANE with MTA-STS (RFC 8461 §2)
+// ---------------------------------------------------------------------------
+
+/// Why delivery to a host is forbidden.
+#[cfg(feature = "mta-sts")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mta-sts")))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SmtpTransportDenial {
+    /// DANE validation failed.
+    ///
+    /// RFC 8461 §2 makes this final: no MTA-STS result may override it, so a
+    /// matching MTA-STS policy does not rescue the delivery.
+    DaneFailed,
+
+    /// DANE did not apply, and an MTA-STS policy in `enforce` mode rejected
+    /// the host.
+    ///
+    /// RFC 8461 §5: "Sending MTAs MUST NOT deliver the message to hosts that
+    /// fail MX matching or certificate validation or that do not support
+    /// STARTTLS."
+    MtaStsEnforceFailed,
+}
+
+/// What authenticated an SMTP connection, or why it may not proceed.
+///
+/// The combined verdict from both of SMTP's transport-security mechanisms.
+/// A sender that implements only one does not need this.
+#[cfg(feature = "mta-sts")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mta-sts")))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SmtpTransportSecurity {
+    /// DANE authenticated the connection.
+    ///
+    /// The strongest outcome, and not weakened by any MTA-STS result: §2's
+    /// precedence runs one way, so a failing MTA-STS policy does not
+    /// downgrade a successful DANE validation either.
+    DaneAuthenticated,
+
+    /// DANE did not apply, and an MTA-STS policy permitted the host.
+    ///
+    /// Weaker than [`DaneAuthenticated`](Self::DaneAuthenticated): the policy
+    /// is authenticated by the Web PKI plus an unsigned TXT record, so first
+    /// contact is trust-on-first-use. Distinguished from DANE precisely so a
+    /// consumer can tell which mechanism was used rather than reading both as
+    /// equivalent.
+    MtaStsMatched,
+
+    /// Neither mechanism applied.
+    ///
+    /// Delivery may proceed over opportunistic TLS or in the clear. Reported
+    /// rather than folded into a failure because the overwhelming majority of
+    /// SMTP has no transport-security policy at all, and treating that as an
+    /// error would make the type useless.
+    Unprotected,
+
+    /// Delivery must not proceed.
+    Forbidden(SmtpTransportDenial),
+}
+
+#[cfg(feature = "mta-sts")]
+impl SmtpTransportSecurity {
+    /// Whether delivery may proceed.
+    ///
+    /// False only for [`Forbidden`](Self::Forbidden). An unprotected
+    /// connection is permitted — see that variant.
+    #[must_use]
+    pub const fn permits_delivery(&self) -> bool {
+        !matches!(self, Self::Forbidden(_))
+    }
+
+    /// Whether a transport-security mechanism authenticated the peer.
+    ///
+    /// True for DANE and for a matched MTA-STS policy. A consumer that needs
+    /// to tell those apart should match on the variant, because they are not
+    /// equally strong.
+    #[must_use]
+    pub const fn is_authenticated(&self) -> bool {
+        matches!(self, Self::DaneAuthenticated | Self::MtaStsMatched)
+    }
+}
+
+/// Combine a DANE verdict with an MTA-STS outcome, enforcing RFC 8461 §2.
+///
+/// §2, verbatim:
+///
+/// > senders who implement MTA-STS validation MUST NOT allow MTA-STS Policy
+/// > validation to override a failing DANE validation.
+///
+/// So a failing DANE verdict decides the question before MTA-STS is consulted
+/// at all. This function exists to make that ordering impossible to get
+/// wrong: the alternative is every caller rediscovering it from the RFC, and
+/// the failure mode is silent — a matching MTA-STS policy would quietly
+/// rescue a delivery that DANE had already refused, which is precisely the
+/// downgrade DANE was deployed to prevent.
+///
+/// `mta_sts` is `None` when no policy was fetched, which is the common case:
+/// most domains publish none.
+///
+/// # What this does not do
+///
+/// It combines verdicts. It does not fetch a policy, validate a certificate
+/// or check STARTTLS support — RFC 8461 §4.2 and §5 are the caller's, and a
+/// [`pkix_mta_sts::PolicyOutcome::Matched`] says only that MX matching
+/// passed.
+#[cfg(feature = "mta-sts")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mta-sts")))]
+#[must_use]
+pub fn combine_smtp_transport_security(
+    dane: &SmtpDaneVerdict,
+    mta_sts: Option<pkix_mta_sts::PolicyOutcome>,
+) -> SmtpTransportSecurity {
+    use pkix_mta_sts::PolicyOutcome;
+
+    // §2 first, and unconditionally. Deliberately before any look at
+    // `mta_sts`, so no MTA-STS result can reach the decision.
+    if let SmtpDaneVerdict::Failed(_) = dane {
+        return SmtpTransportSecurity::Forbidden(SmtpTransportDenial::DaneFailed);
+    }
+
+    // A successful DANE validation is likewise not weakened by MTA-STS. §2's
+    // precedence is one-directional: it protects DANE's verdict, and nothing
+    // in RFC 8461 lets a policy failure downgrade an authenticated channel.
+    if dane.is_authenticated() {
+        return SmtpTransportSecurity::DaneAuthenticated;
+    }
+
+    let Some(outcome) = mta_sts else {
+        return SmtpTransportSecurity::Unprotected;
+    };
+
+    // The delivery decision comes from the predicate, not from the variant.
+    // `PolicyOutcome` is non-exhaustive, so a variant added later that
+    // forbids delivery must still forbid it here; matching variant by variant
+    // would silently permit it.
+    if !outcome.mta_sts_permits_delivery() {
+        return SmtpTransportSecurity::Forbidden(SmtpTransportDenial::MtaStsEnforceFailed);
+    }
+
+    if outcome == PolicyOutcome::Matched {
+        SmtpTransportSecurity::MtaStsMatched
+    } else {
+        // A `testing` failure delivers as though there were no failure (§5),
+        // `none` means no active policy, and an outcome this version does not
+        // know cannot be claimed to have authenticated anything. All three
+        // permit delivery without protection.
+        SmtpTransportSecurity::Unprotected
+    }
+}
