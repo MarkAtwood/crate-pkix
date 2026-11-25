@@ -338,20 +338,24 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ///    bundle (see "Limitations" below for what "chains structurally"
     ///    means and why it differs from full RFC 5280 §6.1 validation).
     /// 5. Stores the discovered signer for use as the effective CRL
-    ///    signer when [`RevocationChecker::check_revocation`] is later
-    ///    called on `cert_to_check`. The signer is used regardless of
-    ///    whether the CRL's `IssuingDistributionPoint.indirectCRL` flag
-    ///    is set, which is required to support PKITS §4.5 (direct CRLs
-    ///    signed by self-issued key-rollover bridge certs).
+    ///    signer whenever [`RevocationChecker::check_revocation`] is
+    ///    later called. The signer is used regardless of whether the
+    ///    CRL's `IssuingDistributionPoint.indirectCRL` flag is set,
+    ///    which is required to support PKITS §4.5 (direct CRLs signed by
+    ///    self-issued key-rollover bridge certs).
     ///
-    /// `cert_to_check` is the certificate whose revocation status will be
-    /// queried via `check_revocation`. It is taken at construction time
-    /// only for ergonomic symmetry with the discovery flow; the actual
-    /// revocation lookup happens at `check_revocation` call time. Passing
-    /// a different `cert` argument to `check_revocation` later is well-
-    /// defined: the stored signer is the one whose SPKI is used to
-    /// authenticate the CRL, but the `(issuer, serial)` lookup is driven
-    /// by the `cert` argument at call time.
+    /// The checker is not bound to a particular certificate. It used to
+    /// take a `cert_to_check` argument "for ergonomic symmetry with the
+    /// discovery flow", which was misleading: the argument was never
+    /// read, and the certificate whose status is actually queried is the
+    /// one passed to [`RevocationChecker::check_revocation`] later. A
+    /// parameter in the constructor implied a binding that did not
+    /// exist, so one checker could be built naming certificate A and
+    /// then used to check certificate B with no complaint.
+    ///
+    /// What is stored is the signer: its SPKI authenticates the CRL,
+    /// while the `(issuer, serial)` lookup is driven by the `cert`
+    /// argument at call time.
     ///
     /// # Errors
     ///
@@ -426,7 +430,6 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     pub fn new_with_signer_discovery(
         crl_der: impl AsRef<[u8]>,
         bundle: &[Certificate],
-        _cert_to_check: &Certificate,
         now_unix: u64,
         verifier: V,
     ) -> crate::Result<Self> {

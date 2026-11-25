@@ -348,7 +348,6 @@ fn check_revocation(
                     CrlChecker::new_with_signer_discovery(
                         crl.clone(),
                         bundle,
-                        cert,
                         now_unix,
                         DefaultVerifier,
                     )

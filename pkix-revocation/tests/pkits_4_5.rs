@@ -97,9 +97,8 @@ fn pkits_4_5_1_test1_not_revoked() {
     ]);
     let crl = pkits_crl("BasicSelfIssuedNewKeyCACRL");
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     // The discovered signer is BasicSelfIssuedNewKeyCACert. The `issuer` arg
     // is the cert that issued the EE per the cert's `issuer` field — that
     // shares the subject DN with the discovered signer (key rollover case),
@@ -127,9 +126,8 @@ fn pkits_4_5_2_test2_revoked() {
     let crl = pkits_crl("BasicSelfIssuedNewKeyCACRL");
     let bridge = load_cert(&pkits_cert("BasicSelfIssuedNewKeyOldWithNewCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     let result = checker.check_revocation(&ee, &bridge);
     assert!(
         matches!(result, Err(pkix_revocation::Error::Revoked { .. })),
@@ -165,9 +163,8 @@ fn pkits_4_5_3_test3_not_revoked() {
     let crl = pkits_crl("BasicSelfIssuedOldKeyCACRL");
     let issuer = load_cert(&pkits_cert("BasicSelfIssuedOldKeyCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     checker
         .check_revocation(&ee, &issuer)
         .expect("§4.5.3: Test3EE serial 02 is not on the CRL");
@@ -191,9 +188,8 @@ fn pkits_4_5_4_test4_not_revoked() {
     let crl = pkits_crl("BasicSelfIssuedOldKeyCACRL");
     let issuer = load_cert(&pkits_cert("BasicSelfIssuedOldKeyCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     checker
         .check_revocation(&ee, &issuer)
         .expect("§4.5.4: Test4EE serial 03 is not on the CRL");
@@ -213,9 +209,8 @@ fn pkits_4_5_5_test5_revoked() {
     let crl = pkits_crl("BasicSelfIssuedOldKeyCACRL");
     let issuer = load_cert(&pkits_cert("BasicSelfIssuedOldKeyCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     let result = checker.check_revocation(&ee, &issuer);
     assert!(
         matches!(result, Err(pkix_revocation::Error::Revoked { .. })),
@@ -252,9 +247,8 @@ fn pkits_4_5_6_test6_not_revoked() {
     let crl = pkits_crl("BasicSelfIssuedCRLSigningKeyCACRL");
     let issuer = load_cert(&pkits_cert("BasicSelfIssuedCRLSigningKeyCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     checker
         .check_revocation(&ee, &issuer)
         .expect("§4.5.6: Test6EE serial 02 is not on the CRL");
@@ -274,9 +268,8 @@ fn pkits_4_5_7_test7_revoked() {
     let crl = pkits_crl("BasicSelfIssuedCRLSigningKeyCACRL");
     let issuer = load_cert(&pkits_cert("BasicSelfIssuedCRLSigningKeyCACert"));
 
-    let checker =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier)
-            .expect("CRL signer discovery must succeed");
+    let checker = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier)
+        .expect("CRL signer discovery must succeed");
     let result = checker.check_revocation(&ee, &issuer);
     assert!(
         matches!(result, Err(pkix_revocation::Error::Revoked { .. })),
@@ -291,9 +284,8 @@ fn pkits_4_5_7_test7_revoked() {
 /// Empty bundle → CrlSignerNotFound (RFC 5280 §6.3.3(f) cannot locate signer).
 #[test]
 fn discovery_empty_bundle_returns_signer_not_found() {
-    let ee = load_cert(&pkits_cert("ValidBasicSelfIssuedOldWithNewTest1EE"));
     let crl = pkits_crl("BasicSelfIssuedNewKeyCACRL");
-    let result = CrlChecker::new_with_signer_discovery(crl, &[], &ee, PKITS_NOW, DefaultVerifier);
+    let result = CrlChecker::new_with_signer_discovery(crl, &[], PKITS_NOW, DefaultVerifier);
     assert!(
         matches!(result, Err(pkix_revocation::Error::CrlSignerNotFound)),
         "empty bundle must yield CrlSignerNotFound, got: {result:?}"
@@ -307,11 +299,9 @@ fn discovery_empty_bundle_returns_signer_not_found() {
 /// no anchor candidate reachable, so the structural §6.3.3(f) gate fails.
 #[test]
 fn discovery_no_anchor_in_bundle_returns_not_trusted() {
-    let ee = load_cert(&pkits_cert("ValidBasicSelfIssuedOldWithNewTest1EE"));
     let bundle = load_bundle(&["BasicSelfIssuedNewKeyCACert"]);
     let crl = pkits_crl("BasicSelfIssuedNewKeyCACRL");
-    let result =
-        CrlChecker::new_with_signer_discovery(crl, &bundle, &ee, PKITS_NOW, DefaultVerifier);
+    let result = CrlChecker::new_with_signer_discovery(crl, &bundle, PKITS_NOW, DefaultVerifier);
     assert!(
         matches!(result, Err(pkix_revocation::Error::CrlSignerNotTrusted)),
         "bundle without anchor must yield CrlSignerNotTrusted, got: {result:?}"

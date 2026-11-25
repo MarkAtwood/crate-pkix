@@ -66,12 +66,9 @@ fn the_discovered_signer_is_reachable() {
         cert("SeparateCertificateandCRLKeysCA2CertificateSigningCACert"),
         cert("SeparateCertificateandCRLKeysCA2CRLSigningCert"),
     ];
-    let leaf = cert("InvalidSeparateCertificateandCRLKeysTest21EE");
-
     let checker = CrlChecker::new_with_signer_discovery(
         crl("SeparateCertificateandCRLKeysCA2CRL"),
         &bundle,
-        &leaf,
         NOW,
         DefaultVerifier,
     )
@@ -144,7 +141,6 @@ fn a_caller_can_detect_a_revoked_crl_signer() {
     let checker = CrlChecker::new_with_signer_discovery(
         crl("SeparateCertificateandCRLKeysCA2CRL"),
         &bundle,
-        &leaf,
         NOW,
         DefaultVerifier,
     )
@@ -236,7 +232,7 @@ fn discovery_rejects_a_direct_crl_from_a_different_ca_than_the_certs_issuer() {
     // rejection cannot be blamed on a failed lookup.
     let bundle = [anchor.clone(), good_ca.clone()];
     let checker =
-        CrlChecker::new_with_signer_discovery(&foreign_crl, &bundle, &ee, NOW, DefaultVerifier)
+        CrlChecker::new_with_signer_discovery(&foreign_crl, &bundle, NOW, DefaultVerifier)
             .expect("the CRL's signer is in the bundle, so discovery must succeed");
     assert!(
         checker.crl_signer().is_some(),
@@ -267,9 +263,8 @@ fn discovery_accepts_a_direct_crl_from_the_certs_own_issuer() {
 
     let own_crl = crl("GoodCACRL");
     let bundle = [anchor, good_ca.clone()];
-    let checker =
-        CrlChecker::new_with_signer_discovery(&own_crl, &bundle, &ee, NOW, DefaultVerifier)
-            .expect("GoodCA is in the bundle");
+    let checker = CrlChecker::new_with_signer_discovery(&own_crl, &bundle, NOW, DefaultVerifier)
+        .expect("GoodCA is in the bundle");
 
     checker
         .check_revocation(&ee, &good_ca)
