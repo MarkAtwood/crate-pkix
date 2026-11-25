@@ -81,7 +81,12 @@ use alloc::borrow::Cow;
 use std::borrow::Cow;
 
 use der::Tagged;
-use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
+// Re-exported, not merely imported: both types appear in
+// `SignatureVerifier::verify_signature`'s signature, so an out-of-crate
+// implementor has to name them. Reachable only as `spki::...` they meant
+// reading this crate's source to discover the origin and taking a direct
+// dependency on a matching `spki` version to say it.
+pub use spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
 /// Helper module for format-adaptive serde serialization of DER-encodable
@@ -681,6 +686,65 @@ pub trait SignatureVerifier {
         message: &[u8],
         signature: &[u8],
     ) -> core::result::Result<(), VerificationError>;
+}
+
+/// Forwarding impl so a shared reference to a verifier is itself a
+/// verifier.
+///
+/// This is what makes a verifier that cannot be `Clone` usable.
+/// [`crate::validate_path`] and the `CrlChecker` / `OcspChecker` types in
+/// `pkix-revocation` take a verifier by value and require `Clone`, since
+/// they hold it and may be cloned themselves. A verifier that owns a
+/// hardware token handle, an open session, or anything else not
+/// duplicable therefore could not be used at all.
+///
+/// With this impl it can: pass `&verifier` and the type parameter
+/// becomes `&V`, which is `Copy`, so the `Clone` bound is satisfied for
+/// free and nothing is duplicated. The borrow is the only cost, and it
+/// is what a scoped validation wants anyway.
+///
+/// For a verifier shared by something outliving a borrow — a fetcher
+/// held for the life of a process — use the `Arc` impl below instead.
+impl<T: SignatureVerifier + ?Sized> SignatureVerifier for &T {
+    fn verify_signature(
+        &self,
+        algorithm: AlgorithmIdentifierRef<'_>,
+        issuer_spki: SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> core::result::Result<(), VerificationError> {
+        (**self).verify_signature(algorithm, issuer_spki, message, signature)
+    }
+}
+
+/// Forwarding impl so an `Arc`-shared verifier is itself a verifier.
+///
+/// The owned counterpart to the `&T` impl above, for a verifier that has
+/// to outlive any particular borrow. `Arc<V>` is `Clone` whatever `V` is,
+/// and cloning it is a refcount bump rather than a duplication of
+/// whatever the verifier holds.
+///
+/// # Why this is gated on `std`
+///
+/// `Arc` lives in `alloc::sync`, which exists only on targets with
+/// atomic compare-and-swap. Implementing it unconditionally would make
+/// this crate stop compiling for a `no_std` target without atomics
+/// (`thumbv6m-none-eabi`, for instance) in exchange for a convenience.
+/// Under `std` those atomics are guaranteed, so the impl is free there.
+/// A `no_std` consumer that does have atomics and wants this shape can
+/// write the same four-line forwarding impl over its own newtype.
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl<T: SignatureVerifier + ?Sized> SignatureVerifier for std::sync::Arc<T> {
+    fn verify_signature(
+        &self,
+        algorithm: AlgorithmIdentifierRef<'_>,
+        issuer_spki: SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> core::result::Result<(), VerificationError> {
+        (**self).verify_signature(algorithm, issuer_spki, message, signature)
+    }
 }
 
 /// A trust anchor used to terminate path validation.
