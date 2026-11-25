@@ -44,7 +44,7 @@
 
 use core::fmt;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, PoisonError, RwLock};
 use std::time::SystemTime;
 
 #[cfg(test)]
@@ -236,6 +236,28 @@ pub trait RevocationCache: Send + Sync {
 /// Internal locking is `RwLock`, not `DashMap`, to avoid the extra
 /// dependency in the reference impl. Read paths take the read lock;
 /// write paths take the write lock briefly.
+///
+/// # Lock poisoning
+///
+/// Poisoning is ignored: every access recovers the guard with
+/// [`PoisonError::into_inner`] and proceeds. This is sound here because
+/// the only operations performed while either lock is held are
+/// `HashMap` insert, get, remove and len, over keys whose `Hash` and
+/// `Eq` are derived on `Vec<u8>` / `Option<String>` and values that are
+/// plain data behind an `Arc`. None of those can panic part-way and
+/// leave a map half-updated, so a poisoned flag here cannot mean the
+/// map is inconsistent — it can only mean some unrelated panic unwound
+/// through a thread that happened to hold the lock.
+///
+/// The alternative behaviours were both worse. Treating poisoning as a
+/// miss (and silently dropping writes) turns one unrelated panic into a
+/// cache that misses everything and never repopulates, for the life of
+/// the process, with nothing in any error path to say so: every
+/// validation silently refetches from the network forever. Panicking
+/// instead would propagate an unrelated thread's failure into path
+/// validation, where the cache is meant to be a transparent
+/// optimisation. Recovering is the only option that keeps the cache
+/// doing its job.
 #[derive(Default)]
 pub struct InMemoryCache {
     crl: RwLock<HashMap<CrlCacheKey, Arc<CachedCrl>>>,
@@ -263,10 +285,11 @@ impl InMemoryCache {
     /// two calls.
     #[cfg(feature = "crl")]
     pub(crate) fn put_crl_if_not_rollback(&self, key: CrlCacheKey, new_entry: CachedCrl) -> bool {
-        let mut guard = match self.crl.write() {
-            Ok(g) => g,
-            Err(_) => return false,
-        };
+        // A poisoned lock is recovered rather than reported: see the
+        // type-level "Lock poisoning" notes. Returning `false` here
+        // would be a lie, because `false` means "suppressed as a
+        // rollback" to every caller.
+        let mut guard = self.crl.write().unwrap_or_else(PoisonError::into_inner);
         if let Some(existing) = guard.get(&key) {
             if is_rollback(Some(existing.as_ref()), new_entry.crl_number.as_deref()) {
                 return false;
@@ -279,8 +302,16 @@ impl InMemoryCache {
 
 impl fmt::Debug for InMemoryCache {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let crl_len = self.crl.read().map(|m| m.len()).unwrap_or(0);
-        let ocsp_len = self.ocsp.read().map(|m| m.len()).unwrap_or(0);
+        let crl_len = self
+            .crl
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len();
+        let ocsp_len = self
+            .ocsp
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len();
         f.debug_struct("InMemoryCache")
             .field("crl_entries", &crl_len)
             .field("ocsp_entries", &ocsp_len)
@@ -298,37 +329,53 @@ fn is_live(next_update: Option<SystemTime>, now: SystemTime) -> bool {
     }
 }
 
+/// Every method recovers a poisoned lock with [`PoisonError::into_inner`]
+/// rather than degrading to a miss or a dropped write; see the
+/// [`InMemoryCache`] type-level "Lock poisoning" notes for why that is
+/// sound and why the alternatives are worse.
 impl RevocationCache for InMemoryCache {
     fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>> {
-        self.crl.read().ok()?.get(key).cloned()
+        self.crl
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(key)
+            .cloned()
     }
 
     fn put_crl(&self, key: CrlCacheKey, entry: CachedCrl) {
-        if let Ok(mut guard) = self.crl.write() {
-            guard.insert(key, Arc::new(entry));
-        }
+        self.crl
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(key, Arc::new(entry));
     }
 
     fn invalidate_crl(&self, key: &CrlCacheKey) {
-        if let Ok(mut guard) = self.crl.write() {
-            guard.remove(key);
-        }
+        self.crl
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(key);
     }
 
     fn get_ocsp(&self, key: &OcspCacheKey) -> Option<Arc<CachedOcspResponse>> {
-        self.ocsp.read().ok()?.get(key).cloned()
+        self.ocsp
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(key)
+            .cloned()
     }
 
     fn put_ocsp(&self, key: OcspCacheKey, entry: CachedOcspResponse) {
-        if let Ok(mut guard) = self.ocsp.write() {
-            guard.insert(key, Arc::new(entry));
-        }
+        self.ocsp
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(key, Arc::new(entry));
     }
 
     fn invalidate_ocsp(&self, key: &OcspCacheKey) {
-        if let Ok(mut guard) = self.ocsp.write() {
-            guard.remove(key);
-        }
+        self.ocsp
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(key);
     }
 }
 
@@ -452,28 +499,6 @@ fn parse_ocsp_metadata(der_bytes: &[u8]) -> Result<OcspMetadata, der::Error> {
         this_update,
         next_update,
     })
-}
-
-/// Extract `(serial_number_bytes, issuer_key_hash_bytes)` from a DER-encoded
-/// OCSP request. Used to derive cache keys without re-implementing
-/// `Request::from_cert`'s hashing logic.
-///
-/// Pulls from the first `Request` in `tbs_request.request_list` — the
-/// builder used by [`crate::build_ocsp_request`] always emits exactly
-/// one, but if a future helper ever bundles multiple, only the first is
-/// keyed (matching the OCSP wrapper's single-cert semantics).
-#[cfg(feature = "ocsp")]
-fn extract_cert_id_identity(req_body: &[u8]) -> Result<(Vec<u8>, Vec<u8>), der::Error> {
-    let req = x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(req_body)?;
-    let first = req
-        .tbs_request
-        .request_list
-        .first()
-        .ok_or_else(|| der::Error::from(der::ErrorKind::Failed))?;
-    let cert_id = &first.req_cert;
-    let serial = cert_id.serial_number.as_bytes().to_vec();
-    let issuer_key_hash = cert_id.issuer_key_hash.as_bytes().to_vec();
-    Ok((serial, issuer_key_hash))
 }
 
 /// Decide whether a newly-fetched CRL is a rollback relative to the
@@ -915,16 +940,14 @@ where
             return Ok(());
         }
 
-        // Extract (serial, issuer_key_hash) from the request body for
-        // cache-key derivation. We parse the body we just built rather
-        // than mirroring the CertID hashing logic, so the two cannot
-        // drift apart.
-        let (cert_serial, issuer_key_hash) =
-            extract_cert_id_identity(&req_bytes.body).map_err(|e| {
-                RevError::RevocationFetchFailed {
-                    description: format!("OCSP request CertID extract failed: {e}"),
-                }
-            })?;
+        // The CertID identity comes from the builder that produced
+        // `req_bytes`, not from re-decoding its body. Re-decoding would
+        // repeat work already done and, worse, add a failure path for
+        // bytes this crate encoded itself: a decode error there used to
+        // abort the whole check with RevocationFetchFailed even though a
+        // perfectly good request body was in hand.
+        let cert_serial = &req_bytes.cert_serial;
+        let issuer_key_hash = &req_bytes.issuer_key_hash;
         let now = SystemTime::UNIX_EPOCH + core::time::Duration::from_secs(self.inner.now_unix);
 
         let mut failures: Vec<String> = Vec::with_capacity(aia.ocsp.len());
@@ -1416,28 +1439,194 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // CertID identity extraction (OCSP cache-key derivation)
+    // Lock poisoning
     // -----------------------------------------------------------------
 
+    /// A panic in an unrelated thread must not disable the cache.
+    ///
+    /// `InMemoryCache` holds its maps behind `RwLock`. If a thread
+    /// panics anywhere while holding one — or, as here, panics while
+    /// holding it deliberately — the lock is left poisoned forever.
+    /// The cache used to map that to `None` on every read and to a
+    /// dropped write on every insert, so one unrelated panic turned the
+    /// process's revocation cache into a permanent miss-everything
+    /// black hole with nothing anywhere reporting it.
+    #[test]
+    fn a_poisoned_cache_still_stores_and_serves_entries() {
+        let cache = Arc::new(InMemoryCache::new());
+
+        // Poison both locks from a thread that panics while holding them.
+        let poisoner = Arc::clone(&cache);
+        let joined = std::thread::spawn(move || {
+            let _crl = poisoner.crl.write().unwrap();
+            panic!("deliberate panic to poison the CRL lock");
+        })
+        .join();
+        assert!(joined.is_err(), "the poisoning thread must have panicked");
+
+        let poisoner = Arc::clone(&cache);
+        let joined = std::thread::spawn(move || {
+            let _ocsp = poisoner.ocsp.write().unwrap();
+            panic!("deliberate panic to poison the OCSP lock");
+        })
+        .join();
+        assert!(joined.is_err(), "the poisoning thread must have panicked");
+
+        assert!(
+            cache.crl.is_poisoned() && cache.ocsp.is_poisoned(),
+            "the test's premise is that both locks are now poisoned"
+        );
+
+        // A round trip must still work on both maps.
+        let crl_key = CrlCacheKey {
+            issuer_dn_der: vec![1, 2, 3],
+            distribution_point_uri: Some("http://crl.example/a.crl".to_string()),
+        };
+        cache.put_crl(
+            crl_key.clone(),
+            CachedCrl {
+                crl_number: Some(vec![7]),
+                this_update: SystemTime::UNIX_EPOCH,
+                next_update: None,
+                bytes: vec![0xaa],
+            },
+        );
+        let got = cache
+            .get_crl(&crl_key)
+            .expect("a poisoned lock must not turn a stored CRL into a miss");
+        assert_eq!(got.bytes, vec![0xaa]);
+
+        let ocsp_key = OcspCacheKey {
+            cert_serial: vec![9],
+            issuer_key_hash: vec![8],
+            responder_url: "http://ocsp.example/".to_string(),
+        };
+        cache.put_ocsp(
+            ocsp_key.clone(),
+            CachedOcspResponse {
+                produced_at: SystemTime::UNIX_EPOCH,
+                this_update: SystemTime::UNIX_EPOCH,
+                next_update: None,
+                bytes: vec![0xbb],
+            },
+        );
+        let got = cache
+            .get_ocsp(&ocsp_key)
+            .expect("a poisoned lock must not turn a stored OCSP response into a miss");
+        assert_eq!(got.bytes, vec![0xbb]);
+
+        // Invalidation and Debug must survive it too.
+        cache.invalidate_crl(&crl_key);
+        assert!(cache.get_crl(&crl_key).is_none());
+        let rendered = format!("{cache:?}");
+        assert!(
+            rendered.contains("ocsp_entries: 1"),
+            "Debug must report real counts through a poisoned lock, got {rendered}"
+        );
+    }
+
+    /// `put_crl_if_not_rollback` returns `false` to mean exactly one
+    /// thing: the insert was suppressed because it would roll back a
+    /// newer CRL. It used to also return `false` for a poisoned lock,
+    /// so a caller could not distinguish "I protected you from a stale
+    /// CRL" from "my lock is broken and I silently stored nothing".
+    #[cfg(feature = "crl")]
+    #[test]
+    fn a_poisoned_lock_does_not_masquerade_as_a_rollback() {
+        let cache = Arc::new(InMemoryCache::new());
+        let poisoner = Arc::clone(&cache);
+        let _ = std::thread::spawn(move || {
+            let _g = poisoner.crl.write().unwrap();
+            panic!("deliberate panic to poison the CRL lock");
+        })
+        .join();
+        assert!(cache.crl.is_poisoned());
+
+        let key = CrlCacheKey {
+            issuer_dn_der: vec![1],
+            distribution_point_uri: None,
+        };
+        assert!(
+            cache.put_crl_if_not_rollback(
+                key.clone(),
+                CachedCrl {
+                    crl_number: Some(vec![1]),
+                    this_update: SystemTime::UNIX_EPOCH,
+                    next_update: None,
+                    bytes: vec![0xcc],
+                },
+            ),
+            "an insert into a poisoned-but-consistent map is not a rollback"
+        );
+        assert!(cache.get_crl(&key).is_some());
+    }
+
+    // -----------------------------------------------------------------
+    // CertID identity carried on OcspRequestBytes (OCSP cache-key source)
+    // -----------------------------------------------------------------
+
+    /// The identity fields the builder carries must agree with the
+    /// `CertID` actually encoded in the body it produced.
+    ///
+    /// The wrapper keys its cache off `req_bytes.cert_serial` /
+    /// `req_bytes.issuer_key_hash` and never decodes the body, so a drift
+    /// between the two would key every entry under an identity no
+    /// responder's answer corresponds to — a silent cache that never
+    /// hits, or worse, hits under the wrong certificate's key. Decoding
+    /// the body here is the independent oracle for that agreement.
     #[cfg(feature = "ocsp")]
     #[test]
-    fn extract_cert_id_identity_round_trips_through_build_ocsp_request() {
-        // Build an OCSP request the same way the wrapper does, then pull
-        // the (serial, issuer_key_hash) back out and check the extracted
-        // serial matches the leaf cert's serialNumber.
+    fn carried_cert_id_identity_matches_the_encoded_request_body() {
         use crate::{build_ocsp_request, OcspHashAlg};
         const CA: &[u8] = include_bytes!("../tests/fixtures/http-ca.der");
         const LEAF: &[u8] = include_bytes!("../tests/fixtures/http-leaf-good.der");
         let leaf = Certificate::from_der(LEAF).unwrap();
         let ca = Certificate::from_der(CA).unwrap();
         let req = build_ocsp_request(&leaf, &ca, OcspHashAlg::Sha256).unwrap();
-        let (serial, issuer_key_hash) = extract_cert_id_identity(&req.body).unwrap();
-        // Independent oracle: the leaf's tbsCertificate.serialNumber
-        // bytes must match. (Confirms we are pulling from the request's
-        // CertID, not somewhere else.)
-        assert_eq!(serial, leaf.tbs_certificate().serial_number().as_bytes());
-        // SHA-256 hash is 32 bytes.
-        assert_eq!(issuer_key_hash.len(), 32);
+
+        // Oracle: decode the body and read its CertID back out.
+        let decoded =
+            x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(&req.body).unwrap();
+        let cert_id = &decoded.tbs_request.request_list.first().unwrap().req_cert;
+
+        assert_eq!(
+            req.cert_serial,
+            cert_id.serial_number.as_bytes(),
+            "carried cert_serial must match the CertID in the encoded body"
+        );
+        assert_eq!(
+            req.issuer_key_hash,
+            cert_id.issuer_key_hash.as_bytes(),
+            "carried issuer_key_hash must match the CertID in the encoded body"
+        );
+
+        // Second, independent oracle: the serial is the leaf's own, and
+        // the SHA-256 issuerKeyHash is 32 bytes.
+        assert_eq!(
+            req.cert_serial,
+            leaf.tbs_certificate().serial_number().as_bytes()
+        );
+        assert_eq!(req.issuer_key_hash.len(), 32);
+    }
+
+    /// The same agreement for the anchor flow, which computes the
+    /// `CertID` from a [`TrustAnchor`] rather than an issuer certificate.
+    #[cfg(feature = "ocsp")]
+    #[test]
+    fn carried_cert_id_identity_matches_the_body_in_the_anchor_flow() {
+        use crate::{build_ocsp_request_for_anchor, OcspHashAlg};
+        const CA: &[u8] = include_bytes!("../tests/fixtures/http-ca.der");
+        const LEAF: &[u8] = include_bytes!("../tests/fixtures/http-leaf-good.der");
+        let leaf = Certificate::from_der(LEAF).unwrap();
+        let anchor = TrustAnchor::from_cert(Certificate::from_der(CA).unwrap());
+        let req = build_ocsp_request_for_anchor(&leaf, &anchor, OcspHashAlg::Sha256).unwrap();
+
+        let decoded =
+            x509_ocsp::OcspRequest::<x509_cert::certificate::Rfc5280>::from_der(&req.body).unwrap();
+        let cert_id = &decoded.tbs_request.request_list.first().unwrap().req_cert;
+
+        assert_eq!(req.cert_serial, cert_id.serial_number.as_bytes());
+        assert_eq!(req.issuer_key_hash, cert_id.issuer_key_hash.as_bytes());
     }
 
     // -----------------------------------------------------------------
@@ -1745,16 +1934,15 @@ mod tests {
                 .check_revocation(&cert(LEAF_GOOD), &cert(CA))
                 .unwrap();
 
-            // Find at least one entry under the responder URL the fixture
+            // Find the entry under the responder URL the fixture
             // advertises ("http://ocsp.example.com/" per ocsp.rs tests).
-            // We don't know the exact (serial, issuer_key_hash) without
-            // re-parsing, so probe via the request-build path.
+            // Rebuild the request to recover the identity the wrapper
+            // keyed by — the builder carries it, so no decode is needed.
             use crate::{build_ocsp_request, OcspHashAlg};
             let req = build_ocsp_request(&cert(LEAF_GOOD), &cert(CA), OcspHashAlg::Sha256).unwrap();
-            let (serial, ikh) = extract_cert_id_identity(&req.body).unwrap();
             let key = OcspCacheKey {
-                cert_serial: serial,
-                issuer_key_hash: ikh,
+                cert_serial: req.cert_serial,
+                issuer_key_hash: req.issuer_key_hash,
                 responder_url: "http://ocsp.example.com/".to_string(),
             };
             assert!(

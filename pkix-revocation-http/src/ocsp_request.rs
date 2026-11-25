@@ -31,14 +31,28 @@ pub enum OcspHashAlg {
     Sha256,
 }
 
-/// DER bytes of an OCSP request and the matching `Content-Type` header
-/// for an HTTP POST per RFC 6960 §A.1.
+/// DER bytes of an OCSP request, the matching `Content-Type` header for an
+/// HTTP POST per RFC 6960 §A.1, and the `CertID` fields that identify the
+/// certificate being asked about.
+///
+/// The `CertID` fields are carried alongside the body because the builder
+/// has just computed them. A consumer that needs to identify the request
+/// — to key a cache, or to correlate a response — must otherwise re-decode
+/// the body it was just handed, which both duplicates the work and
+/// introduces a failure path for bytes this crate itself produced.
 #[derive(Debug, Clone)]
 pub struct OcspRequestBytes {
     /// DER-encoded `OCSPRequest`. Suitable as the body of an HTTP POST.
     pub body: Vec<u8>,
     /// Always `"application/ocsp-request"` (RFC 6960 §A.1).
     pub content_type: &'static str,
+    /// `CertID.serialNumber` of the single `Request` in `body`, as the DER
+    /// `INTEGER` content bytes.
+    pub cert_serial: Vec<u8>,
+    /// `CertID.issuerKeyHash` of the single `Request` in `body` — the
+    /// issuer `subjectPublicKey` BIT STRING value hashed under the
+    /// [`OcspHashAlg`] this request was built with.
+    pub issuer_key_hash: Vec<u8>,
 }
 
 /// Errors returned by [`build_ocsp_request`].
@@ -160,6 +174,13 @@ fn build_for_issuer_identity(
         OcspHashAlg::Sha256 => cert_id::<sha2::Sha256>(issuer_name, issuer_key, serial),
     }?;
 
+    // Capture the CertID identity before the builder consumes it. These
+    // are the exact bytes a cache key or a response correlator needs, and
+    // taking them here means nothing has to re-decode `body` to recover
+    // what we already had in hand.
+    let cert_serial = cert_id.serial_number.as_bytes().to_vec();
+    let issuer_key_hash = cert_id.issuer_key_hash.as_bytes().to_vec();
+
     let req = OcspRequestBuilder::default()
         .with_request(Request::new(cert_id))
         .build();
@@ -169,6 +190,8 @@ fn build_for_issuer_identity(
     Ok(OcspRequestBytes {
         body,
         content_type: "application/ocsp-request",
+        cert_serial,
+        issuer_key_hash,
     })
 }
 
