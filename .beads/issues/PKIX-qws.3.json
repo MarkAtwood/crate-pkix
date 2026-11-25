@@ -1,19 +1,20 @@
 {
   "id": "PKIX-qws.3",
   "title": "ECDSA P-521 + SHA-512 SignatureVerifier",
-  "description": "Add P-521 signature verification to DefaultVerifier. Old: PKIX-gphz.5",
+  "description": "## Why\n\nP-521 is rare in the wild — used in some government and high-assurance PKI deployments but not common in TLS. Filed for completeness.\n\nOID: `1.2.840.10045.4.3.4` (ecdsa-with-SHA512).\n\n## What\n\n1. New `EcdsaP521Verifier` behind `feature = \"p521\"`. Mirror P-256/P-384 patterns.\n2. Add `p521` to workspace deps.\n3. OID dispatch in `DefaultVerifier`.\n\n## Acceptance\n\n- [ ] Verifier impls `SignatureVerifier`.\n- [ ] Unit tests against independent test vectors.\n- [ ] `DefaultVerifier` dispatches.\n\n## Filed as\n\nPKIX-gphz child #5. Lowest priority of the crypto-coverage set; file as P3.\n\nMay discover that `p521` crate has different no_std posture or feature flags than p256/p384; document any divergence. If `p521` is not yet stable, may need to defer or use an alternative impl.\n\nProvenance: filed as PKIX-gphz.5 on 2026-05-08, re-filed as PKIX-qws.3 on 2026-06-15 with the description reduced to a pointer. PKIX-gphz.5 is closed; this bead now carries its analysis verbatim.",
   "status": "open",
   "priority": 2,
   "issue_type": "feature",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T17:52:35Z",
-  "updated_at": "2026-06-15T17:52:35Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T17:50:35.334337494Z",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-qws",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:52:35Z"
+      "type": "",
+      "created_at": "2026-06-15T10:52:35Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
