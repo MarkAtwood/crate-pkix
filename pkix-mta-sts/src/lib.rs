@@ -68,6 +68,13 @@
 
 extern crate alloc;
 
+pub mod discovery;
+
+pub use discovery::{
+    plan, policy_host, policy_to_apply, policy_url, txt_name, CachedPolicy, DiscoveryPlan,
+    StsTxtRecord, TxtError,
+};
+
 use alloc::string::String;
 use alloc::vec::Vec;
 

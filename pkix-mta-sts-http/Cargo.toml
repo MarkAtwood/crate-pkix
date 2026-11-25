@@ -1,0 +1,40 @@
+[package]
+name        = "pkix-mta-sts-http"
+description = "MTA-STS (RFC 8461) policy fetching over HTTPS: §3.3 rules enforced, non-public destinations refused"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["smtp", "mta-sts", "email", "https", "pki"]
+categories  = ["cryptography", "network-programming"]
+readme      = "README.md"
+
+[features]
+default = ["client-ureq"]
+
+# Synchronous fetching via `ureq`.
+client-ureq = ["dep:ureq", "pkix-net-guard/ureq"]
+
+# Asynchronous fetching via `reqwest`.
+client-reqwest = ["dep:reqwest", "dep:tokio", "pkix-net-guard/reqwest"]
+
+[dependencies]
+pkix-mta-sts   = { workspace = true }
+# §3.3 fetches from `mta-sts.<recipient-domain>`, a host derived from data the
+# sender did not choose. The destination policy is shared with pkix-aia-http
+# rather than restated: a second copy of address classification whose job is
+# refusing a request would be a divergence hazard.
+pkix-net-guard = { workspace = true }
+
+ureq    = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+tokio   = { version = "1", default-features = false, features = ["net"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = ["macros", "rt", "net"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
