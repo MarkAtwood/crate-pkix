@@ -324,6 +324,26 @@ pub enum Error {
         index: usize,
     },
 
+    /// An extension this crate's own gates read could not be DER-decoded.
+    ///
+    /// The extension is present; its contents are unparseable. Raised by
+    /// the `BasicConstraints` and `KeyUsage` gates, which decode those
+    /// extensions themselves to narrow the accepted input before
+    /// validation runs.
+    ///
+    /// Distinct from [`Error::Path`] on purpose. `Path` carries the
+    /// verdict of RFC 5280 path validation, which this crate delegates;
+    /// this variant is this crate refusing an input of its own accord,
+    /// which is what every other variant here also does. Previously
+    /// these three decode failures went out as
+    /// `Path(pkix_path::Error::from(der_error))`, which attributed a
+    /// local gate's refusal to the delegated validator.
+    MalformedExtension {
+        /// Zero-based index into `chain` of the certificate whose
+        /// extension failed to decode.
+        index: usize,
+    },
+
     /// The end-entity certificate has `BasicConstraints` cA=TRUE, which means
     /// it is a CA certificate, not a leaf. This crate does not validate chains
     /// where the subject is itself a CA.
@@ -372,6 +392,13 @@ impl core::fmt::Display for Error {
                     f,
                     "intermediate at index {index} is missing a required extension \
                      (BasicConstraints cA=TRUE or KeyUsage keyCertSign)"
+                )
+            }
+            Self::MalformedExtension { index } => {
+                write!(
+                    f,
+                    "certificate at index {index} has an extension that could not be decoded \
+                     (BasicConstraints or KeyUsage)"
                 )
             }
             Self::LeafIsCA => write!(f, "end-entity certificate has BasicConstraints cA=TRUE"),
@@ -564,7 +591,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
         {
             let bc = BasicConstraints::from_der(ext.extn_value.as_bytes())
-                .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
+                .map_err(|_| Error::MalformedExtension { index })?;
             if bc.ca {
                 return Err(Error::LeafIsCA);
             }
@@ -576,7 +603,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_BASIC_CONSTRAINTS)
             .ok_or(Error::MissingRequiredExtension { index })?;
         let bc = BasicConstraints::from_der(bc_ext.extn_value.as_bytes())
-            .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
+            .map_err(|_| Error::MalformedExtension { index })?;
         if !bc.ca {
             return Err(Error::MissingRequiredExtension { index });
         }
@@ -587,7 +614,7 @@ fn check_extensions(index: usize, cert: &Certificate, is_leaf: bool) -> Result<(
             .find(|e| e.extn_id == OID_EXT_KEY_USAGE)
             .ok_or(Error::MissingRequiredExtension { index })?;
         let ku = KeyUsage::from_der(ku_ext.extn_value.as_bytes())
-            .map_err(|e| Error::Path(pkix_path::Error::from(e)))?;
+            .map_err(|_| Error::MalformedExtension { index })?;
         if !ku.key_cert_sign() {
             return Err(Error::MissingRequiredExtension { index });
         }
