@@ -13,22 +13,21 @@
 //! together, so the §4.3 list can be read against what actually produces each
 //! value — and the gaps are visible, which matters more than the mappings.
 //!
-//! # The gaps, stated rather than papered over
+//! # Notes on particular mappings
 //!
-//! **`sts-webpki-invalid` is never produced.** §4.3.2.2 defines it as "the
-//! MTA-STS Policy could not be authenticated using PKIX validation", which is
-//! the most security-relevant thing a report can say about MTA-STS: the
-//! policy's only authentication is the HTTPS certificate. But
-//! `pkix_mta_sts_http::FetchError::Transport` carries both "the certificate
-//! did not validate" and "the connection was refused" as one string, because
-//! the two HTTP backends report them as incompatible opaque types.
+//! **`sts-webpki-invalid` comes from
+//! [`FetchError::TlsValidation`](pkix_mta_sts_http::FetchError::TlsValidation),
+//! and only from it.** §4.3.2.2 defines it as "the MTA-STS Policy could not
+//! be authenticated using PKIX validation", the most security-relevant thing
+//! a report can say about MTA-STS: the HTTPS certificate is the policy's only
+//! authentication, so a policy fetched over a connection that did not
+//! authenticate is a policy an attacker may have written.
 //!
-//! Classifying `Transport` as `sts-webpki-invalid` would tell a domain its
-//! certificate is broken whenever its policy host is merely down, which is
-//! worse than imprecise — an operator would chase a certificate that is fine.
-//! So it maps to `sts-policy-fetch-error` and the stronger claim is left
-//! unmade. Distinguishing them needs a new `FetchError` variant populated
-//! from each backend's TLS error.
+//! `FetchError::Transport` is deliberately **not** mapped to it. A refused
+//! connection means the web server is down, and reporting that as a
+//! certificate failure would send an operator after a certificate that is
+//! fine. The two were one variant until `FetchError::TlsValidation` was
+//! added precisely so this distinction could be reported.
 //!
 //! **Transient failures are not classified.** §4.3.4: "Transient errors due
 //! to too-busy networks, TCP timeouts, etc., are not required to be
@@ -93,6 +92,14 @@ pub fn classify_fetch_error(
         // sts-policy-invalid: "a validation error for the overall MTA-STS
         // Policy".
         E::Malformed(_) => (ResultType::StsPolicyInvalid, None),
+
+        // §4.3.2.2 sts-webpki-invalid: "the MTA-STS Policy could not be
+        // authenticated using PKIX validation". The most security-relevant
+        // thing a report can say about MTA-STS, because the HTTPS
+        // certificate is the policy's only authentication — so a policy
+        // fetched over a connection that did not authenticate is a policy an
+        // attacker may have written.
+        E::TlsValidation(_) => (ResultType::StsWebpkiInvalid, None),
 
         // A body served under the wrong media type is also a defect in what
         // the domain published rather than a failure to reach it, so it is a

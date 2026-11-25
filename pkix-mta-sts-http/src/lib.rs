@@ -146,11 +146,33 @@ pub enum FetchError {
     /// The request timed out.
     Timeout,
 
-    /// Any other transport or TLS failure, including a certificate that is
-    /// not valid for `mta-sts.<policy-domain>`.
+    /// The policy host's certificate did not validate (§3.3).
+    ///
+    /// §3.3 requires the certificate to be "valid for the `mta-sts` DNS-ID",
+    /// chain "to a root CA that is trusted by the Sending MTA", and be
+    /// non-expired. This is that check failing — expired, untrusted issuer,
+    /// wrong host, bad chain.
+    ///
+    /// Reported separately from [`Transport`](Self::Transport) because this
+    /// is the one failure with security meaning rather than operational.
+    /// The HTTPS certificate is an MTA-STS policy's **only** authentication:
+    /// the `_mta-sts` TXT record is unsigned and the policy body carries no
+    /// signature. So this means "the policy may have been written by
+    /// whoever is on the path", where `Transport` means "the web server is
+    /// down". RFC 8460 §4.3.2.2 reports them as `sts-webpki-invalid` and
+    /// `sts-policy-fetch-error` respectively, and an operator who cannot
+    /// tell them apart cannot alert on the first without the second.
+    ///
+    /// Carries the underlying description.
+    TlsValidation(String),
+
+    /// Any other transport failure — connection refused or reset, DNS
+    /// failure, a protocol error.
     ///
     /// A string because the two backends report incompatible error types and
-    /// §3.3 draws no distinction among them.
+    /// §3.3 draws no distinction among them. Does **not** include a
+    /// certificate that failed to validate; see
+    /// [`TlsValidation`](Self::TlsValidation).
     Transport(String),
 }
 
@@ -173,6 +195,7 @@ impl core::fmt::Display for FetchError {
             }
             Self::Malformed(e) => write!(f, "policy body is not a valid policy: {e}"),
             Self::DestinationRefused(host) => write!(f, "refused to fetch from {host}"),
+            Self::TlsValidation(e) => write!(f, "policy host certificate did not validate: {e}"),
             Self::Timeout => f.write_str("policy fetch timed out"),
             Self::Transport(e) => write!(f, "policy fetch failed: {e}"),
         }
@@ -281,6 +304,86 @@ pub fn check_media_type(content_type: Option<&str>, require: bool) -> Result<(),
     } else {
         Err(FetchError::UnexpectedMediaType(essence.to_owned()))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Recognising a certificate failure
+// ---------------------------------------------------------------------------
+
+/// Walk an error chain for a certificate-validation failure.
+///
+/// Returns the rustls description when one is found. Shared by both backends
+/// so they cannot disagree about what counts, which would make one of them
+/// quietly unable to report RFC 8460 §4.3.2.2's `sts-webpki-invalid`.
+///
+/// # How this is determined, and how reliable each way is
+///
+/// Two passes, in order of trustworthiness.
+///
+/// **A downcast to [`rustls::Error`].** Exact, no guessing. `ureq` reports a
+/// handshake failure as `Error::Io` whose `get_ref()` is the concrete
+/// `rustls::Error`, so this pass catches every `ureq` case.
+///
+/// **The `"invalid peer certificate"` prefix.** A fallback, needed because
+/// `reqwest` does not preserve the type: its chain reaches an `io::Error`
+/// whose inner value is an opaque wrapper, not a `rustls::Error`, with only
+/// the rendered string left. The prefix is rustls's own `Display` for
+/// `Error::InvalidCertificate` (`"invalid peer certificate: {e}"`), which is
+/// specific to certificate validation — exactly the scope of
+/// `sts-webpki-invalid` — and is not a phrase a connection failure produces.
+///
+/// String matching is fragile, so it is bounded: the marker is specific, it
+/// is tried only after the exact pass, and the tests assert both directions —
+/// that a bad certificate is recognised, and that a refused connection and a
+/// DNS failure are not. If `reqwest` or `hyper-rustls` ever preserves the
+/// type, the first pass starts catching it and the fallback becomes dead
+/// weight rather than a behaviour change.
+///
+/// Public for the same reason as [`check_status`]: a sender using its own
+/// HTTP client has to make the same determination, and RFC 8460 §4.3.2.2
+/// gives it a distinct report type, so restating this walk is exactly the
+/// kind of duplication that ends with one caller unable to report a
+/// man-in-the-middle.
+///
+/// Needs a backend feature, because the exact pass downcasts to
+/// [`rustls::Error`] and `rustls` arrives with whichever HTTP client is
+/// enabled. [`FetchError::TlsValidation`] itself is always present, so a
+/// consumer such as `pkix-tlsrpt` can classify one without either backend.
+#[cfg(any(feature = "client-ureq", feature = "client-reqwest"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(feature = "client-ureq", feature = "client-reqwest")))
+)]
+#[must_use]
+pub fn certificate_failure(start: &(dyn std::error::Error + 'static)) -> Option<String> {
+    /// rustls's `Display` prefix for `Error::InvalidCertificate`.
+    const MARKER: &str = "invalid peer certificate";
+
+    let mut cur: Option<&(dyn std::error::Error + 'static)> = Some(start);
+    let mut fallback: Option<String> = None;
+
+    while let Some(err) = cur {
+        if let Some(r) = err.downcast_ref::<rustls::Error>() {
+            return Some(r.to_string());
+        }
+        if let Some(io) = err.downcast_ref::<std::io::Error>() {
+            if let Some(inner) = io.get_ref() {
+                if let Some(r) = inner.downcast_ref::<rustls::Error>() {
+                    return Some(r.to_string());
+                }
+                let text = inner.to_string();
+                if text.contains(MARKER) {
+                    fallback.get_or_insert(text);
+                }
+            }
+        }
+        let text = err.to_string();
+        if text.contains(MARKER) {
+            fallback.get_or_insert(text);
+        }
+        cur = err.source();
+    }
+    fallback
 }
 
 /// The URL to fetch, and the host its certificate must be valid for.

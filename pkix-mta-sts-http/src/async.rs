@@ -115,6 +115,13 @@ fn map_reqwest_error(e: &reqwest::Error, policy_domain: &str) -> FetchError {
     if e.is_timeout() {
         return FetchError::Timeout;
     }
+    // Before flattening to a string: a certificate that did not validate is
+    // the one failure here with security meaning, and §4.3.2.2 reports it
+    // separately. reqwest does not preserve the rustls type, so this walk
+    // falls back to rustls's own message — see `certificate_failure`.
+    if let Some(cert) = crate::certificate_failure(e) {
+        return FetchError::TlsValidation(cert);
+    }
     // A destination refusal arrives as a connect error wrapping the
     // resolver's PermissionDenied. reqwest erases the type, so the message is
     // what identifies it — matched on the phrase pkix-net-guard builds.

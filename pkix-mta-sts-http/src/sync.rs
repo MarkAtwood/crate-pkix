@@ -110,7 +110,12 @@ impl PolicyFetcher {
     }
 }
 
-/// Map a `ureq` error, recovering a destination refusal from inside it.
+/// Map a `ureq` error, recovering what is buried inside it.
+///
+/// Two things hide in `Error::Io`'s payload and must be dug out before the
+/// error is flattened to a string: this crate's own destination refusal, and
+/// a `rustls::Error` from a failed handshake. Both carry more meaning than
+/// "transport failed".
 fn map_ureq_error(e: ureq::Error, policy_domain: &str) -> FetchError {
     if let ureq::Error::Io(io) = &e {
         if let Some(refused) = io
@@ -119,6 +124,16 @@ fn map_ureq_error(e: ureq::Error, policy_domain: &str) -> FetchError {
         {
             return FetchError::DestinationRefused(refused.0.clone());
         }
+        // ureq reports a handshake failure here, with the concrete
+        // rustls::Error as the payload, so this is an exact determination.
+        if let Some(inner) = io.get_ref() {
+            if let Some(cert) = crate::certificate_failure(inner) {
+                return FetchError::TlsValidation(cert);
+            }
+        }
+    }
+    if let Some(cert) = crate::certificate_failure(&e) {
+        return FetchError::TlsValidation(cert);
     }
     match e {
         // A 3xx with max_redirects(0) surfaces as a status code rather than

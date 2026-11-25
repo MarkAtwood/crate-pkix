@@ -77,28 +77,40 @@ fn retrieval_failures_are_sts_policy_fetch_error() {
     }
 }
 
-/// The documented gap: `sts-webpki-invalid` is never produced.
+/// A certificate that did not validate is `sts-webpki-invalid` (§4.3.2.2).
 ///
-/// §4.3.2.2 defines it as "the MTA-STS Policy could not be authenticated
-/// using PKIX validation", which is the most security-relevant thing a report
-/// can say about MTA-STS — the HTTPS certificate is the policy's only
-/// authentication.
-///
-/// `FetchError::Transport` carries both a certificate that did not validate
-/// and a connection that was refused, as one opaque string. Classifying it as
-/// `sts-webpki-invalid` would tell a domain its certificate is broken
-/// whenever its policy host is merely down, so the stronger claim is left
-/// unmade.
-///
-/// Asserted so the limitation is visible in the test suite and not only in a
-/// doc comment — and so that whoever adds a TLS-specific `FetchError` variant
-/// sees this test fail and updates the mapping.
+/// The most security-relevant thing a report can say about MTA-STS, because
+/// the HTTPS certificate is the policy's only authentication — the
+/// `_mta-sts` TXT record is unsigned and the policy body carries no
+/// signature. So this says "the policy may have been written by whoever is on
+/// the path".
 #[test]
-fn sts_webpki_invalid_is_never_produced_and_this_is_deliberate() {
+fn a_certificate_failure_is_sts_webpki_invalid() {
+    use pkix_mta_sts_http::FetchError;
+    let (t, _) = classify_fetch_error(&FetchError::TlsValidation(String::from(
+        "invalid peer certificate: UnknownIssuer",
+    )));
+    assert_eq!(t, ResultType::StsWebpkiInvalid);
+    assert!(t.is_sts_policy_failure());
+}
+
+/// Nothing else maps to `sts-webpki-invalid`.
+///
+/// This was the documented gap until `FetchError` gained a variant for a
+/// certificate failure: `Transport` carried both that and a refused
+/// connection, so claiming the stronger type would have told a domain its
+/// certificate was broken whenever its policy host was merely down.
+///
+/// The assertion is kept, inverted, because the harm it guards against has
+/// not changed — only the ability to distinguish the cases has. A future
+/// change that folded `TlsValidation` back into `Transport`, or that
+/// classified a network error as a certificate one, fails here.
+#[test]
+fn only_a_certificate_failure_maps_to_sts_webpki_invalid() {
     use pkix_mta_sts_http::FetchError;
     for e in [
-        FetchError::Transport(String::from("certificate verify failed")),
         FetchError::Transport(String::from("connection refused")),
+        FetchError::Transport(String::from("invalid peer certificate: UnknownIssuer")),
         FetchError::Timeout,
         FetchError::HttpStatus(500),
         FetchError::DestinationRefused(String::from("h")),
@@ -110,9 +122,8 @@ fn sts_webpki_invalid_is_never_produced_and_this_is_deliberate() {
         assert_ne!(
             t,
             ResultType::StsWebpkiInvalid,
-            "FetchError cannot distinguish a TLS failure from a network one, \
-             so claiming sts-webpki-invalid would mislead an operator into \
-             chasing a certificate that is fine"
+            "{e:?} is not a PKIX authentication failure; reporting it as one \
+             would send an operator after a certificate that is fine"
         );
     }
 }

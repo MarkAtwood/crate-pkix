@@ -23,7 +23,7 @@ record is unsigned. So none of these is hygiene:
 
 | Requirement | What goes wrong without it |
 |---|---|
-| Certificate valid for `mta-sts.<domain>`, trusted, unexpired | Anyone on the path writes the policy |
+| Certificate valid for `mta-sts.<domain>`, trusted, unexpired | Anyone on the path writes the policy — reported as `FetchError::TlsValidation`, separately from a network failure |
 | Only HTTP 200 is a policy | A 404 becomes "an empty policy"; a 500 becomes "no MTA-STS" |
 | 3xx **MUST NOT** be followed | Whoever controls the policy host moves the fetch somewhere whose certificate says nothing about the domain |
 | HTTP caching **MUST NOT** be used | A stale policy is extended by an interval the sender never agreed to |
@@ -79,7 +79,37 @@ store, or revocation checking as §3.3's MAY permits, configures the client.
 
 `check_status` and `check_media_type` are public and need no feature, so a
 sender using its own HTTP client applies the same rules rather than restating
-them.
+them. `certificate_failure` is public for the same reason and needs a backend,
+since it downcasts to `rustls::Error`.
+
+## Telling a certificate failure from a network failure
+
+`FetchError::TlsValidation` and `FetchError::Transport` are separate because
+only the first has security meaning. The certificate is the policy's only
+authentication, so a certificate that did not validate means the policy may
+have been written by whoever is on the path; a refused connection means the
+web server is down. RFC 8460 §4.3.2.2 reports them as `sts-webpki-invalid` and
+`sts-policy-fetch-error`, and an operator who cannot tell them apart cannot
+alert on the first without the second.
+
+How the determination is made, in order of trustworthiness:
+
+- **A downcast to `rustls::Error`.** Exact. `ureq` reports a handshake failure
+  as `Error::Io` whose payload is the concrete `rustls::Error`, so this covers
+  every `ureq` case.
+- **The `"invalid peer certificate"` prefix.** A fallback, needed because
+  `reqwest` does not preserve the type — its chain reaches an `io::Error`
+  whose inner value is an opaque wrapper, leaving only the rendered string.
+  The prefix is rustls's own `Display` for `Error::InvalidCertificate`, which
+  is specific to certificate validation and is not a phrase a connection
+  failure produces.
+
+String matching is fragile, so it is bounded: specific marker, tried only
+after the exact pass, and tested in **both** directions — three classes of bad
+certificate from `badssl.com` are recognised on both backends, while a refused
+connection, a DNS failure and a valid certificate are not. If `reqwest` ever
+preserves the type, the exact pass starts catching it and the fallback becomes
+dead weight rather than a behaviour change.
 
 ## License
 

@@ -54,23 +54,23 @@ features so a DANE-only reporter does not pull in MTA-STS:
 | `mta-sts-http` | `FetchError` → `sts-policy-*` |
 | `dane` | `SmtpDaneFailure`, `pkix_chain::Error`, `pkix_path::Error` |
 
-### The gap, stated rather than papered over
+### `sts-webpki-invalid` has exactly one source
 
-**`sts-webpki-invalid` is never produced.** §4.3.2.2 defines it as "the
-MTA-STS Policy could not be authenticated using PKIX validation", which is the
-most security-relevant thing a report can say about MTA-STS — the HTTPS
-certificate is the policy's only authentication.
+§4.3.2.2 defines it as "the MTA-STS Policy could not be authenticated using
+PKIX validation" — the most security-relevant thing a report can say about
+MTA-STS, because the HTTPS certificate is the policy's **only**
+authentication: the `_mta-sts` TXT record is unsigned and the policy body
+carries no signature.
 
-But `pkix_mta_sts_http::FetchError::Transport` carries both "the certificate
-did not validate" and "the connection was refused" as one string, because the
-two HTTP backends report them as incompatible opaque types.
+It is produced from `FetchError::TlsValidation` and nothing else.
+`FetchError::Transport` is deliberately not mapped to it: a refused connection
+means the web server is down, and reporting that as a certificate failure
+would send an operator after a certificate that is fine.
 
-Classifying `Transport` as `sts-webpki-invalid` would tell a domain its
-certificate is broken whenever its policy host is merely down — worse than
-imprecise, because an operator would chase a certificate that is fine. So it
-maps to `sts-policy-fetch-error` and the stronger claim is left unmade. There
-is a test asserting this, so whoever adds a TLS-specific `FetchError` variant
-will see it fail and update the mapping.
+Those two were one variant until `pkix-mta-sts-http` was changed to tell them
+apart, which is why the test asserting *nothing else* maps to
+`sts-webpki-invalid` is still there — the harm it guards against has not
+changed, only the ability to distinguish the cases has.
 
 ## What is deliberately not here
 

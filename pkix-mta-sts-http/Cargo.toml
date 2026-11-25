@@ -15,10 +15,10 @@ readme      = "README.md"
 default = ["client-ureq"]
 
 # Synchronous fetching via `ureq`.
-client-ureq = ["dep:ureq", "pkix-net-guard/ureq"]
+client-ureq = ["dep:ureq", "dep:rustls", "pkix-net-guard/ureq"]
 
 # Asynchronous fetching via `reqwest`.
-client-reqwest = ["dep:reqwest", "dep:tokio", "pkix-net-guard/reqwest"]
+client-reqwest = ["dep:reqwest", "dep:tokio", "dep:rustls", "pkix-net-guard/reqwest"]
 
 [dependencies]
 pkix-mta-sts   = { workspace = true }
@@ -28,6 +28,10 @@ pkix-mta-sts   = { workspace = true }
 # refusing a request would be a divergence hazard.
 pkix-net-guard = { workspace = true }
 
+# Recognising a certificate-validation failure by downcasting to
+# rustls::Error, rather than matching on an error message. Both backends use
+# rustls, so this adds nothing to the dependency tree.
+rustls  = { version = "0.23", default-features = false, optional = true }
 ureq    = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio   = { version = "1", default-features = false, features = ["net"], optional = true }
