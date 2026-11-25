@@ -27,7 +27,8 @@ use std::path::PathBuf;
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor, ValidationPolicy};
 use pkix_path_builder::{
-    build_first_valid_path, build_path, build_path_candidates, CertPool, Error,
+    build_first_valid_path, build_first_valid_path_with_config, build_path, build_path_candidates,
+    CertPool, Error, PathBuilderConfig,
 };
 use x509_cert::Certificate;
 
@@ -211,5 +212,75 @@ fn empty_pool_returns_no_path_found() {
     assert!(
         matches!(err, Error::NoPathFound),
         "empty pool should surface NoPathFound, got {err:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Budget propagation
+// ---------------------------------------------------------------------------
+
+/// A search budget exhausted mid-iteration must surface as `BudgetExceeded`,
+/// not as `NoValidPath`.
+///
+/// `build_first_valid_path_with_config` propagates an iterator error verbatim
+/// (`Some(Err(e)) => return Err(e)`) precisely so this distinction survives:
+/// `NoValidPath` asserts something far stronger than what was learned, namely
+/// that every candidate was built and rejected. Under an exhausted budget most
+/// candidates were never constructed, so the search is *inconclusive* — a path
+/// may well exist beyond the cut-off. A caller that retries with a larger
+/// budget, or reports "could not decide" rather than "untrusted", needs those
+/// apart, and collapsing them into `NoValidPath` would turn "I stopped
+/// looking" into "there is nothing to find".
+///
+/// Driven through the `_with_config` entry point because that is where the
+/// propagation lives; `build_first_valid_path` is the same loop with the
+/// default budget.
+#[test]
+fn an_exhausted_budget_propagates_verbatim_and_is_not_reported_as_no_valid_path() {
+    let ee = pkits_cert("ValidCertificatePathTest1EE");
+    let anchor = TrustAnchor::from(&pkits_cert("TrustAnchorRootCertificate"));
+    let policy = ValidationPolicy::new(PKITS_NOW);
+
+    let mut pool = CertPool::new();
+    pool.add(pkits_cert("GoodCACert"));
+
+    // Control: with the default budget this very chain validates. Without
+    // this the test could pass on a pool that was never solvable, which
+    // would prove nothing about the budget.
+    build_first_valid_path(
+        &ee,
+        &pool,
+        std::slice::from_ref(&anchor),
+        &policy,
+        &DefaultVerifier,
+    )
+    .expect("PKITS 4.1.1 chain must validate when the budget is not the constraint");
+
+    // One unit buys one DFS frame or one candidate examined, so the search
+    // cannot finish.
+    let mut config = PathBuilderConfig::new();
+    config.dfs_budget = 1;
+
+    let err = build_first_valid_path_with_config(
+        &ee,
+        &pool,
+        std::slice::from_ref(&anchor),
+        &policy,
+        &DefaultVerifier,
+        &config,
+    )
+    .expect_err("a one-unit budget cannot complete the search");
+
+    assert!(
+        matches!(err, Error::BudgetExceeded),
+        "expected BudgetExceeded to propagate verbatim, got {err:?}"
+    );
+    // Stated separately: this is the specific mis-reporting the propagation
+    // exists to prevent, and the assertion above would also pass if the
+    // variant were renamed rather than kept distinct.
+    assert!(
+        !matches!(err, Error::NoValidPath { .. }),
+        "an exhausted budget must not be reported as NoValidPath: \
+         the candidates were never built, so nothing was ruled out"
     );
 }
