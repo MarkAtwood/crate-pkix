@@ -236,3 +236,270 @@ fn review_aia_ignores_uris_of_certs_off_the_path() {
     assert_eq!(v.depth, 1);
     assert_eq!(f.fetched(), vec!["http://aia.test/int.der".to_owned()]);
 }
+
+/// A wrong-but-DN-matching intermediate must be displaced by a
+/// correctly-signed alternative fetched over AIA.
+///
+/// This is what `is_aia_recoverable`'s rustdoc promises:
+/// "`SignatureInvalid { index }` is included because a wrong-but-DN-matching
+/// intermediate in the pool can be displaced by a correctly-signed
+/// alternative fetched via AIA."
+///
+/// The scenario is an ordinary misconfiguration, not an exotic one: a
+/// server staples an intermediate from the wrong CA generation — after a
+/// key rollover, or a cross-signed pair mixed up — while its leaf's
+/// caIssuers URI still points at the right one. `int-wrong-key.der` has
+/// the real intermediate's subject DN and its own key, so the supplied
+/// chain fails on signature, and `http://aia.test/int.der` serves the
+/// intermediate that works.
+///
+/// Both halves are asserted. Validation has to succeed, and the fetcher
+/// has to have been asked — a pass with an empty fetch log would mean
+/// something else repaired the chain.
+#[test]
+fn review_aia_displaces_a_wrong_but_dn_matching_intermediate() {
+    let anchors = [TrustAnchor::from_cert(load("root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = MapFetcher::new(HashMap::from([(
+        "http://aia.test/int.der".to_owned(),
+        bytes("tests/fixtures/review", "int.der"),
+    )]));
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("leaf.der"), load("int-wrong-key.der")]);
+
+    assert!(
+        r.is_ok(),
+        "a wrong-key intermediate must be displaced by the AIA-fetched one; \
+         got {r:?} after fetching {:?}",
+        f.fetched()
+    );
+    assert!(
+        f.fetched().contains(&"http://aia.test/int.der".to_owned()),
+        "the AIA seam must have been consulted, fetched: {:?}",
+        f.fetched()
+    );
+}
+
+/// The premise of the test above, and the reason it exercises the
+/// `NoPathFound` branch rather than `NoValidPath`.
+///
+/// `int-wrong-key.der` is *self*-issued, so a pool holding it offers no
+/// topologically complete chain to the anchor at all — the path builder
+/// reports `NoPathFound`, which is precisely the signal that routes into
+/// an AIA fetch. With fetching disabled there is nothing to displace it,
+/// so the honest answer is that the fetch was needed and refused.
+#[test]
+fn review_control_self_issued_wrong_intermediate_needs_an_aia_fetch() {
+    let anchors = [TrustAnchor::from_cert(load("root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let wrong = load("int-wrong-key.der");
+
+    assert_eq!(
+        wrong.tbs_certificate().subject(),
+        load("int.der").tbs_certificate().subject(),
+        "the fixture is only interesting if its subject DN matches the real intermediate"
+    );
+
+    let r = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    )
+    .verify_one(&[load("leaf.der"), wrong]);
+    assert!(
+        matches!(r, Err(Error::Aia(_))),
+        "a self-issued wrong intermediate leaves no path, so the AIA seam \
+         is the only recourse and refusing it is the failure; got {r:?}"
+    );
+}
+
+/// The `NoValidPath` case: a wrong-key intermediate that DOES chain to the
+/// anchor, so topology completes and only the signature is wrong.
+///
+/// This is the one `PKIX-q9hv.2` is about. `nvp-int-wrong.der` shares
+/// `nvp-int.der`'s subject DN *and* its issuer, so a pool holding it
+/// yields a topologically complete chain to the anchor;
+/// `build_first_valid_path` then prunes it from the signature-aware
+/// search, falls back to validating the topology-only candidate, and
+/// reports `NoValidPath` carrying the signature failure rather than
+/// `NoPathFound`.
+///
+/// `is_aia_recoverable`'s rustdoc promises this is recoverable: "a
+/// wrong-but-DN-matching intermediate in the pool can be displaced by a
+/// correctly-signed alternative fetched via AIA". So the AIA seam has to
+/// be given the chance, and the fetched intermediate has to win.
+#[test]
+fn review_aia_displaces_a_wrong_key_intermediate_that_chains_to_the_anchor() {
+    let anchors = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = MapFetcher::new(HashMap::from([(
+        "http://aia.test/nvp-int.der".to_owned(),
+        bytes("tests/fixtures/review", "nvp-int.der"),
+    )]));
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")]);
+
+    assert!(
+        r.is_ok(),
+        "a wrong-key intermediate that chains to the anchor must still be \
+         displaced by the AIA-fetched one; got {r:?} after fetching {:?}",
+        f.fetched()
+    );
+    assert!(
+        f.fetched()
+            .contains(&"http://aia.test/nvp-int.der".to_owned()),
+        "the AIA seam must have been consulted, fetched: {:?}",
+        f.fetched()
+    );
+}
+
+/// The premise of the test above: the fixtures really do produce a
+/// topologically complete chain that fails only on signature, and the
+/// correct intermediate really does validate.
+#[test]
+fn review_control_nvp_fixtures_are_shaped_as_claimed() {
+    let anchors = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    // Same subject DN, same issuer — so topology completes either way.
+    let wrong = load("nvp-int-wrong.der");
+    let real = load("nvp-int.der");
+    assert_eq!(
+        wrong.tbs_certificate().subject(),
+        real.tbs_certificate().subject()
+    );
+    assert_eq!(
+        wrong.tbs_certificate().issuer(),
+        real.tbs_certificate().issuer()
+    );
+
+    // The correct intermediate validates with no AIA at all.
+    Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    )
+    .verify_one(&[load("nvp-leaf.der"), real])
+    .expect("the correct intermediate must validate without any fetching");
+
+    // With fetching disabled the wrong one cannot be displaced, so the
+    // chain fails. See
+    // `review_a_wrong_intermediate_reports_the_same_class_either_shape`
+    // for which error that is and why.
+    let r = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    )
+    .verify_one(&[load("nvp-leaf.der"), wrong]);
+    assert!(r.is_err(), "the wrong-key intermediate must not validate");
+}
+
+/// Both shapes of wrong intermediate report the same class of error when
+/// no AIA fetch is available, and that is deliberate.
+///
+/// The two shapes are a self-issued impostor (no topological path to the
+/// anchor at all) and one signed by the real root (topology completes,
+/// only the signature is wrong). They used to diverge: the first reported
+/// `Error::Aia`, because the builder asked for a fetch, while the second
+/// reported `Error::Path(SignatureInvalid)`, because the reassembly loop
+/// gave up before asking. The same misconfiguration produced two
+/// different diagnoses depending on who had signed the bad certificate,
+/// which is not a distinction a caller can act on.
+///
+/// Now both ask for the fetch, so both report `Error::Aia` when it is
+/// unavailable. That is the honest answer: the chain as supplied does not
+/// validate, and the only route to a valid one needs a certificate the
+/// caller did not provide.
+#[test]
+fn review_a_wrong_intermediate_reports_the_same_class_either_shape() {
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    // Self-issued impostor, under the gen.sh hierarchy.
+    let anchors_a = [TrustAnchor::from_cert(load("root.der"))];
+    let a = Verifier::new(
+        &anchors_a,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    )
+    .verify_one(&[load("leaf.der"), load("int-wrong-key.der")]);
+
+    // Root-signed wrong key, under the nvp hierarchy.
+    let anchors_b = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let b = Verifier::new(
+        &anchors_b,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NoAiaFetcher,
+    )
+    .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")]);
+
+    assert!(
+        matches!(a, Err(Error::Aia(_))),
+        "self-issued impostor: expected Error::Aia, got {a:?}"
+    );
+    assert!(
+        matches!(b, Err(Error::Aia(_))),
+        "root-signed wrong key: expected Error::Aia, got {b:?}"
+    );
+}
+
+/// The fetch budget bounds the newly-reachable route too.
+///
+/// Letting a complete-but-invalid candidate fall through to the AIA seam
+/// means a chain whose signature is simply wrong — a corrupted
+/// certificate rather than a stale intermediate — now spends fetches
+/// before failing. That is the documented price of the recovery, and
+/// `AiaConfig` is what bounds it, so the bound has to hold on this route
+/// and not only on the missing-intermediate one the caps were written
+/// against.
+#[test]
+fn review_the_fetch_budget_bounds_the_wrong_key_route() {
+    let anchors = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    // A fetcher that would happily serve the fix, under a zero budget.
+    let f = MapFetcher::new(HashMap::from([(
+        "http://aia.test/nvp-int.der".to_owned(),
+        bytes("tests/fixtures/review", "nvp-int.der"),
+    )]));
+    let mut cfg = AiaConfig::new();
+    cfg.max_total_fetches = 0;
+
+    let r = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .with_aia_config(cfg)
+        .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")]);
+
+    assert!(r.is_err(), "a zero fetch budget cannot repair the chain");
+    assert_eq!(
+        f.count(),
+        0,
+        "a zero budget must mean no request at all, fetched: {:?}",
+        f.fetched()
+    );
+
+    // And one fetch is enough when the budget allows it, so the zero-budget
+    // failure above is the budget and not something else.
+    let g = MapFetcher::new(HashMap::from([(
+        "http://aia.test/nvp-int.der".to_owned(),
+        bytes("tests/fixtures/review", "nvp-int.der"),
+    )]));
+    let mut ok_cfg = AiaConfig::new();
+    ok_cfg.max_total_fetches = 1;
+    Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &g)
+        .with_aia_config(ok_cfg)
+        .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")])
+        .expect("one fetch is all this repair needs");
+    assert_eq!(g.count(), 1);
+}

@@ -1714,7 +1714,23 @@ const _: fn() = || {
 /// `SignatureInvalid { index }` is included because a wrong-but-DN-matching
 /// intermediate in the pool can be displaced by a correctly-signed
 /// alternative fetched via AIA; `SignatureNotVerified` likewise, since a
-/// cross-certificate with a supported algorithm may exist.
+/// cross-certificate with a supported algorithm may exist. Both shapes of
+/// wrong intermediate reach the fetch: one that chains to an anchor and
+/// one that does not. (The second used to, and the first did not, because
+/// the reassembly loop treated a complete-but-invalid candidate as a
+/// finished chain and stopped.)
+///
+/// # Consequence for a chain that cannot be repaired
+///
+/// Admitting `SignatureInvalid` here means a chain whose signature is
+/// simply wrong — a corrupted certificate, not a stale intermediate —
+/// also reaches the AIA seam and spends fetches before failing. That is
+/// the price of the recovery, and it is bounded by [`AiaConfig`]: the
+/// depth cap, the total-fetch cap and the deadline all apply, and the
+/// URIs come from certificates on candidate paths rather than from
+/// anywhere in the pool. Callers who would rather fail fast than fetch
+/// on a bad signature pass [`NoAiaFetcher`], which turns the attempt
+/// into an immediate [`Error::Aia`].
 /// `PathTooLong` is included because pkix-path rejects an over-long input
 /// before looking at it; an unordered bag with extra certificates (an
 /// S/MIME `SignedData.certificates` set, for example) can still contain a

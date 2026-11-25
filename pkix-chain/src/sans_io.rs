@@ -36,6 +36,23 @@ use x509_cert::Certificate;
 use crate::{aia_extract, aia_response, orphans_on_paths, AiaConfig, Error};
 use pkix_path::ValidatedPath;
 
+/// What the path builder could make of the certificate pool as it stands.
+///
+/// Crate-private: the three cases exist to decide whether another AIA
+/// fetch could help, which is the reassembly loop's business and not a
+/// caller's.
+enum PoolVerdict {
+    /// A chain that validates against the anchors and policy.
+    Validated(Vec<Certificate>),
+    /// Topologically complete candidates exist and none validates. The
+    /// pool holds a certificate whose subject DN matches the issuer a
+    /// child names but whose key did not sign it, so a fetch may still
+    /// supply the one that did.
+    OnlyUnvalidated,
+    /// No candidate chain at all — an issuer is missing outright.
+    Nothing,
+}
+
 /// What the reassembly loop should do next.
 #[derive(Debug)]
 pub enum BuildStep {
@@ -108,16 +125,30 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         // try.
         if state.iteration >= self.config.max_depth {
             return match self.try_build(leaf, &state.pool) {
-                Ok(Some(built)) => BuildStep::Built(built),
-                Ok(None) | Err(_) => BuildStep::Failed(Error::AiaDepthExceeded),
+                Ok(PoolVerdict::Validated(built)) => BuildStep::Built(built),
+                // At the cap, a pool that only fails validation is still
+                // worth assembling: the caller learns what is wrong with
+                // the certificates rather than that we ran out of fetches.
+                Ok(PoolVerdict::OnlyUnvalidated) => self
+                    .assemble_unvalidated(leaf, &state.pool)
+                    .map_or(BuildStep::Failed(Error::AiaDepthExceeded), BuildStep::Built),
+                Ok(PoolVerdict::Nothing) | Err(_) => BuildStep::Failed(Error::AiaDepthExceeded),
             };
         }
 
-        match self.try_build(leaf, &state.pool) {
-            Ok(Some(built)) => return BuildStep::Built(built),
-            Ok(None) => {}
+        // `OnlyUnvalidated` falls through to the fetch below rather than
+        // ending the loop. The pool holds something whose subject DN
+        // matches the issuer the child names, and whose key did not sign
+        // it: a stale intermediate from the wrong CA generation, say, or
+        // one half of a cross-signed pair. An AIA fetch can supply the
+        // certificate that does sign it, which is exactly the recovery
+        // `is_aia_recoverable` admits `SignatureInvalid` for. Returning
+        // here instead meant that recovery never ran.
+        let verdict = match self.try_build(leaf, &state.pool) {
+            Ok(PoolVerdict::Validated(built)) => return BuildStep::Built(built),
+            Ok(unresolved) => unresolved,
             Err(e) => return BuildStep::Failed(e),
-        }
+        };
 
         // Collect caIssuers URIs from certificates on candidate paths whose
         // issuer is still missing.
@@ -142,6 +173,15 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
                 return BuildStep::Failed(Error::AiaFetchLimitExceeded {
                     limit: self.config.max_total_fetches,
                 });
+            }
+            // Nothing left to fetch. If the pool does hold a complete
+            // candidate and it merely fails to validate, hand it over so
+            // the caller sees the real defect instead of "no path found".
+            if matches!(verdict, PoolVerdict::OnlyUnvalidated) {
+                return match self.assemble_unvalidated(leaf, &state.pool) {
+                    Ok(built) => BuildStep::Built(built),
+                    Err(e) => BuildStep::Failed(e),
+                };
             }
             // The path builder found nothing and there are no URIs left to
             // try. A previous fetch failure is the more informative signal;
@@ -213,12 +253,8 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         }
     }
 
-    /// Asks the path builder for a complete chain from the current pool.
-    fn try_build(
-        &self,
-        leaf: &Certificate,
-        pool: &CertPool,
-    ) -> crate::Result<Option<Vec<Certificate>>> {
+    /// Asks the path builder what it can make of the current pool.
+    fn try_build(&self, leaf: &Certificate, pool: &CertPool) -> crate::Result<PoolVerdict> {
         match pkix_path_builder::build_first_valid_path(
             leaf,
             pool,
@@ -226,13 +262,27 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
             self.policy,
             self.sig_verifier,
         ) {
-            Ok(built) => Ok(Some(built)),
-            Err(pkix_path_builder::Error::NoPathFound) => Ok(None),
-            Err(pkix_path_builder::Error::NoValidPath { .. }) => Ok(Some(
-                pkix_path_builder::build_path(leaf, pool, self.anchors)?,
-            )),
+            Ok(built) => Ok(PoolVerdict::Validated(built)),
+            Err(pkix_path_builder::Error::NoPathFound) => Ok(PoolVerdict::Nothing),
+            Err(pkix_path_builder::Error::NoValidPath { .. }) => Ok(PoolVerdict::OnlyUnvalidated),
             Err(e) => Err(Error::PathBuild(e)),
         }
+    }
+
+    /// Assembles the best topology-only chain from `pool`.
+    ///
+    /// Used when the pool cannot produce a validating chain and there is
+    /// nothing left to fetch. Handing the caller a chain it will reject
+    /// gets the concrete `validate_path` failure in front of them — "bad
+    /// signature at index 0" — instead of a bare "no path found", which
+    /// says nothing about what is wrong with the certificates they
+    /// supplied.
+    fn assemble_unvalidated(
+        &self,
+        leaf: &Certificate,
+        pool: &CertPool,
+    ) -> crate::Result<Vec<Certificate>> {
+        pkix_path_builder::build_path(leaf, pool, self.anchors).map_err(Error::PathBuild)
     }
 }
 

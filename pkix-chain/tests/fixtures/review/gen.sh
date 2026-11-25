@@ -88,6 +88,11 @@ for i in $(seq 0 39); do
   printf 'basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\nsubjectKeyIdentifier=%s\n' "$INT_SKI" > bogus.ext
   mk "bogus$i" "/CN=Review Int" self bogus.ext
   cp "bogus$i.der" "$PB/bogus-int-$i.der"
+  # One copy stays here as the "wrong but DN-matching intermediate" used by
+  # review_aia.rs: same subject DN as the real `int`, its own key, so a leaf
+  # signed by the real `int` fails against it. Exercises the AIA seam's
+  # ability to displace it with a correctly-signed alternative.
+  [ "$i" -eq 0 ] && cp "bogus$i.der" "$HERE/int-wrong-key.der"
 done
 
 # --- GitHub #11: key rollover under a same-name anchor --------------------
