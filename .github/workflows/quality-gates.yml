@@ -249,11 +249,7 @@ jobs:
         # on the library is the right scope.
         run: |
           set -euo pipefail
-          crates="$(
-            for m in pkix-*/Cargo.toml; do
-              grep -q '"no-std"' "$m" && basename "$(dirname "$m")"
-            done
-          )"
+          crates="$(grep -l '"no-std"' pkix-*/Cargo.toml | xargs -n1 dirname)"
           echo "no-std crates: $(echo "$crates" | tr '\n' ' ')"
           for target in thumbv7em-none-eabi riscv64gc-unknown-none-elf; do
             for crate in $crates; do
@@ -275,9 +271,7 @@ jobs:
           RUSTFLAGS: --cfg sha2_backend="soft"
         run: |
           set -euo pipefail
-          for m in pkix-*/Cargo.toml; do
-            grep -q '"no-std"' "$m" || continue
-            crate="$(basename "$(dirname "$m")")"
+          for crate in $(grep -l '"no-std"' pkix-*/Cargo.toml | xargs -n1 dirname); do
             echo "::group::$crate on x86_64-unknown-none"
             cargo build -p "$crate" --target x86_64-unknown-none
             echo "::endgroup::"

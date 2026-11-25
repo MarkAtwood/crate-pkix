@@ -171,14 +171,17 @@
 //! [`CRLDistributionPoints`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13
 //! [`AuthorityInfoAccess`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1
 
-// In-memory cache + cached wrappers (PKIX-a1yc.7). Gated on either
-// `crl` or `ocsp` because the trait itself is shared but the wrapper
-// structs and parsing helpers each live behind their protocol feature.
-#[cfg(any(feature = "crl", feature = "ocsp"))]
 #[cfg(test)]
 #[path = "../tests/support/raw_cert.rs"]
 pub(crate) mod raw_cert;
 
+// In-memory cache + cached wrappers. Gated on either `crl` or `ocsp`
+// because the trait is shared but the wrapper structs and parsing helpers
+// each live behind their protocol feature. Without the gate the module
+// compiles with no feature enabled and every item in it is dead, which
+// `-D warnings` rejects: the attribute used to sit on `raw_cert` above,
+// where it did nothing, while the re-exports below were gated correctly.
+#[cfg(any(feature = "crl", feature = "ocsp"))]
 mod cache;
 pub mod clients;
 #[cfg(feature = "crl")]
