@@ -1,29 +1,25 @@
 {
-  "compaction_level": 0,
-  "content_hash": "88d3f2a54e8d098618cb50e5fd288fd6e45ef92bfbfd6bd7059dde60c0887622",
+  "id": "PKIX-o3op.4",
+  "title": "label_for table is a recurring maintenance tax across stdlib releases",
+  "description": "Scenario: stdlib stabilizes a new ErrorKind variant (this has happened repeatedly — see the io_error_more tracking issue, stabilized in tranches across 1.83 and surrounding releases).\n\nMaintenance consequence: each stabilization either silently loses information through pkix-aia's serde label helper (current behavior — see PKIX-o3op.1), or pkix-aia must ship a patch that adds the new variant to two parallel match arms (label_for and kind_for at pkix-aia/src/lib.rs:289-344). The same patch must update the cases table in tests at lines 356-377. Three places, no compile-time check that they stay in sync.\n\nIf the design is preserved (hand-maintained table), at minimum the maintenance contract should be made explicit: a comment saying 'this table must be updated whenever stdlib stabilizes a new ErrorKind variant; the build will not catch omissions' would help. Currently the contract is implicit and the existing comments overstate the helper's coverage (see PKIX-o3op.2 and PKIX-o3op.3).\n\nThe forward-compat fallback at line 312 ('_ =\u003e \"Other\"' for the deserialize side via kind_for) is only half the contract. The serialize side has no such fallback — silently emitting 'Other' for an unknown variant is the bug, not the cushion.\n\nResolving PKIX-o3op.1 by option (b) (format!(\"{kind:?}\") in serialize) eliminates this maintenance tax entirely. Resolving it by option (a) (extending the table) accepts the recurring tax.\n\nThis is the architectural decision worth recording: do future-stdlib labels round-trip by construction, or by ongoing maintenance?",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T19:27:41Z",
   "created_by": "Mark Atwood",
-  "description": "Scenario: stdlib stabilizes a new ErrorKind variant (this has happened repeatedly \u2014 see the io_error_more tracking issue, stabilized in tranches across 1.83 and surrounding releases).\n\nMaintenance consequence: each stabilization either silently loses information through pkix-aia's serde label helper (current behavior \u2014 see PKIX-o3op.1), or pkix-aia must ship a patch that adds the new variant to two parallel match arms (label_for and kind_for at pkix-aia/src/lib.rs:289-344). The same patch must update the cases table in tests at lines 356-377. Three places, no compile-time check that they stay in sync.\n\nIf the design is preserved (hand-maintained table), at minimum the maintenance contract should be made explicit: a comment saying 'this table must be updated whenever stdlib stabilizes a new ErrorKind variant; the build will not catch omissions' would help. Currently the contract is implicit and the existing comments overstate the helper's coverage (see PKIX-o3op.2 and PKIX-o3op.3).\n\nThe forward-compat fallback at line 312 ('_ => \"Other\"' for the deserialize side via kind_for) is only half the contract. The serialize side has no such fallback \u2014 silently emitting 'Other' for an unknown variant is the bug, not the cushion.\n\nResolving PKIX-o3op.1 by option (b) (format!(\"{kind:?}\") in serialize) eliminates this maintenance tax entirely. Resolving it by option (a) (extending the table) accepts the recurring tax.\n\nThis is the architectural decision worth recording: do future-stdlib labels round-trip by construction, or by ongoing maintenance?",
-  "ephemeral": 0,
-  "id": "PKIX-o3op.4",
-  "is_template": 0,
-  "issue_type": "task",
+  "updated_at": "2026-11-25T21:27:11.466755887Z",
+  "closed_at": "2026-11-25T21:27:11.466755887Z",
+  "close_reason": "STALE -- resolved by deleting the table rather than documenting it, which is the better outcome than this bead asked for.\n\nThe bead describes a hand-maintained ErrorKind table in pkix-aia: \"pkix-aia must ship a patch that adds the new variant to two parallel match arms (label_for and kind_for at pkix-aia/src/lib.rs:289-344). The same patch must update the cases table in tests at lines 356-377. Three places, no compile-time check that they stay in sync.\" Its fallback ask was \"at minimum the maintenance contract should be made explicit\" via a comment.\n\nNone of it exists now. grep for label_for and kind_for across the workspace returns nothing. The `kind: std::io::ErrorKind` field was removed from AiaError::IoFailure, which took the two match arms, the test table and a 170-line serde helper with it. There is no maintenance contract left to document because there is no table to keep in sync.\n\nVerified the knock-on claims rather than trusting the rustdoc:\n- pkix-aia has NO std feature any more. Its [features] block says so and gives the reason: core::error::Error (Rust 1.81, below the workspace MSRV) makes the Error impl unconditional, and the one variant that needed std was this one. So the field was indeed the crate only reason for a std feature, as the variant rustdoc claims.\n- ErrorKind now appears four times in pkix-aia/src/lib.rs, all in explanatory prose, none in code.\n- Sibling PKIX-o3op.1, which this bead cites for the information-loss behaviour, is closed.\n\nThe IoFailure rustdoc records the reasoning, and it is the right one: of the five places pkix-aia-http constructed the variant, four passed ErrorKind::Other (no information at all), the fifth had a real kind already rendered into the message, and nothing in the workspace matched on it. A field that is Other four times in five is not something a caller can act on. An adapter holding a real kind renders it into the message instead.\n\nSo the stdlib-stabilization treadmill this bead was about cannot recur: there is no longer any enumeration of io::ErrorKind variants anywhere in the crate.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 1,
-  "status": "open",
-  "timeout_ns": 0,
-  "title": "label_for table is a recurring maintenance tax across stdlib releases",
-  "updated_at": "2026-05-14T19:27:41Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-o3op",
+      "type": "parent-child",
       "created_at": "2026-05-14T12:27:41Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-o3op",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }
