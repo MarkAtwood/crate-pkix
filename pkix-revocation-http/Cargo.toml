@@ -35,7 +35,17 @@ client-reqwest-async = ["async", "dep:reqwest"]
 
 [dependencies]
 pkix-path       = { workspace = true }
-pkix-revocation = { workspace = true }
+# `features = ["std"]` is explicit rather than inherited. This crate is
+# unconditionally std — it fetches over the network and has no `no_std`
+# attribute or `std` feature of its own — and it names
+# `pkix_revocation::Error::RevocationFetchFailed`, which is `#[cfg(feature
+# = "std")]` there because it carries a `String`.
+#
+# That used to arrive by accident: `pkix-revocation/crl` implied `std`, so
+# enabling `crl` here pulled it in. `crl` no longer implies `std`, so the
+# requirement is stated where it is actually needed instead of riding on an
+# unrelated feature.
+pkix-revocation = { workspace = true, features = ["std"] }
 der             = { workspace = true }
 x509-cert       = { workspace = true }
 

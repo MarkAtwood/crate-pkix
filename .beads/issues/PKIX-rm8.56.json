@@ -1,19 +1,22 @@
 {
   "id": "PKIX-rm8.56",
   "title": "pkix-revocation crl feature gates on std, blocking no_std CRL checking",
-  "description": "In pkix-revocation's Cargo.toml, the 'crl' feature requires 'std': 'crl = [\"std\"]'. The OCSP feature similarly: 'ocsp = [\"std\", ...]'. This means CRL and OCSP checking are unavailable in no_std environments. The crate-level docs state 'The core trait and NoRevocation are no_std. Feature-gated checkers that perform network I/O are std-only' \u2014 but CrlChecker performs no network I/O (the docs say 'Offline CRL validation \u2014 no network; you provide the DER-encoded CRL bytes'). An offline CRL check that takes caller-supplied DER bytes should be feasible in no_std+alloc, yet the feature gate forces std.\n\nWhat goes wrong if this stays as-is: Embedded/no_std callers who can supply CRL DER bytes offline are locked out of CRL revocation checking. They are forced to use NoRevocation even when they have the CRL data available. This is a contract gap: the API promises 'offline, caller-supplied bytes' but the feature gate requires 'std'.\n\nThe likely reason for the std gate is that der::Error or x509-cert types used in the CRL path need std. Whether those deps actually need std or could be feature-gated to alloc-only is an implementation question.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-revocation/Cargo.toml line 22 ('crl = [\"std\"]')",
-  "status": "open",
+  "description": "In pkix-revocation's Cargo.toml, the 'crl' feature requires 'std': 'crl = [\"std\"]'. The OCSP feature similarly: 'ocsp = [\"std\", ...]'. This means CRL and OCSP checking are unavailable in no_std environments. The crate-level docs state 'The core trait and NoRevocation are no_std. Feature-gated checkers that perform network I/O are std-only' — but CrlChecker performs no network I/O (the docs say 'Offline CRL validation — no network; you provide the DER-encoded CRL bytes'). An offline CRL check that takes caller-supplied DER bytes should be feasible in no_std+alloc, yet the feature gate forces std.\n\nWhat goes wrong if this stays as-is: Embedded/no_std callers who can supply CRL DER bytes offline are locked out of CRL revocation checking. They are forced to use NoRevocation even when they have the CRL data available. This is a contract gap: the API promises 'offline, caller-supplied bytes' but the feature gate requires 'std'.\n\nThe likely reason for the std gate is that der::Error or x509-cert types used in the CRL path need std. Whether those deps actually need std or could be feature-gated to alloc-only is an implementation question.\n\nLocation: /home/mark/PROJECT/PKIX/pkix-revocation/Cargo.toml line 22 ('crl = [\"std\"]')",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T16:26:33Z",
-  "updated_at": "2026-06-15T17:07:36Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T21:13:56.476011837Z",
+  "closed_at": "2026-11-25T21:13:56.476011837Z",
+  "close_reason": "Fixed. crl = [] instead of crl = [\"std\"], and no_std CRL checking works.\n\nThe bead was right and the implication turned out to buy nothing. Audited what std the crl-gated code actually used: crl.rs had four std:: references, three of them `use std::borrow::Cow` and one naming it inline in a return type, plus one vec!. Cow is owned by alloc and merely re-exported by std. signer_discovery.rs had five std:: references, all inside #[cfg(test)] code (std::fs::read, std::slice::from_ref), which is irrelevant to the gate. lib.rs and ocsp.rs had zero.\n\nSo the fix was the cfg-gated-import pattern pkix-path already uses, not a refactor.\n\nEvidence: all eight combinations of crl/ocsp/std build under -D warnings, and cargo hack check -p pkix-revocation --feature-powerset --no-dev-deps is clean. Full workspace gate green, 2348 tests.\n\nTwo subtleties worth recording, both found by building rather than reasoning:\n\n1. extern crate alloc is gated on all(not(std), crl), not just not(std). The looser gate FAILS the bare --no-default-features build with unused_extern_crates, and that build passes at baseline -- so I would have introduced a regression while fixing this. Caught by testing the whole matrix against the pre-change baseline instead of only the combination I cared about.\n\n2. No #[macro_use] on it, unlike pkix-path. pkix-path wants alloc macros crate-wide; this crate needs vec! in one module and imports it by path. An unused #[macro_use] is itself an error in the combination where crl is off.\n\nOne consequence for consumers, documented in the feature comment: enabling crl alone no longer transitively enables std, so it no longer brings std::error::Error on Error. A std consumer who relied on that should name std explicitly alongside crl. Cargo features are additive, so this is the narrow case -- someone enabling ONLY crl in a std build.\n\nLeft alone: ocsp still implies std. It has no non-test std usage either, so the same treatment likely applies, but it also pulls dep:x509-ocsp, dep:sha1 and dep:sha2, and that was outside the scope of this bead. Worth its own issue if no_std OCSP is wanted.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-rm8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T09:26:32Z"
+      "type": "",
+      "created_at": "2026-06-15T09:26:32Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
