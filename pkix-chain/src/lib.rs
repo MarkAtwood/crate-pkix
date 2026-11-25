@@ -1598,13 +1598,14 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
     const ID_KP_TIME_STAMPING: der::asn1::ObjectIdentifier =
         der::asn1::ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.8");
 
-    let exts = leaf
+    // "no extensions at all" and "extensions present, no EKU among them"
+    // are the same thing to a caller, so they share one arm rather than
+    // two `ok_or`s carrying the same string. A certificate with no
+    // extension block is treated as having an empty one.
+    let ext = leaf
         .tbs_certificate()
         .extensions()
-        .ok_or(Error::ProfileViolation {
-            reason: Cow::Borrowed("TSA certificate has no ExtendedKeyUsage extension"),
-        })?;
-    let ext = exts
+        .map_or(&[][..], |e| e.as_slice())
         .iter()
         .find(|e| e.extn_id == OID_EXTENDED_KEY_USAGE)
         .ok_or(Error::ProfileViolation {
@@ -1625,14 +1626,11 @@ fn enforce_timestamping_eku_critical_and_sole(leaf: &Certificate) -> crate::Resu
         }
     })?;
 
-    // RFC 3161 §2.3: timeStamping MUST be the sole EKU value.
+    // RFC 3161 §2.3: timeStamping MUST be the sole EKU value. Everything
+    // the guarded arm does not accept — a different single OID, several
+    // OIDs, or none — fails for that one reason, so it is one arm.
     match eku.0.as_slice() {
         [oid] if *oid == ID_KP_TIME_STAMPING => Ok(()),
-        [_] => Err(Error::ProfileViolation {
-            reason: Cow::Borrowed(
-                "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
-            ),
-        }),
         _ => Err(Error::ProfileViolation {
             reason: Cow::Borrowed(
                 "TSA ExtendedKeyUsage must contain only id-kp-timeStamping (RFC 3161 §2.3)",
