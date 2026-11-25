@@ -32,6 +32,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use der::Decode;
 use pkix_path::{validate_path, DefaultVerifier, TrustAnchor, ValidationPolicy};
 use pkix_revocation::{CrlChecker, Error as RevError, RevocationChecker as _};
+use x509_cert::crl::CertificateList;
 use x509_cert::Certificate;
 
 use crate::{Chain, Verdict};
@@ -161,26 +162,94 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 /// Callers with no CRLs at all are unaffected: the caller skips this function
 /// entirely when `chain.crls` is empty, which preserves the no-revocation
 /// behaviour for the bulk of the corpus.
+/// RFC 5280 §5.2.4 `id-ce-deltaCRLIndicator`.
+const OID_DELTA_CRL_INDICATOR: der::asn1::ObjectIdentifier =
+    der::asn1::ObjectIdentifier::new_unwrap("2.5.29.27");
+
+/// Whether this CRL is a delta CRL.
+///
+/// Presence of the OID is the marker, not whether its value decodes: a
+/// malformed value still makes the CRL a delta and still must stop it being
+/// used as a base. `pkix-revocation` has the same predicate internally but
+/// does not export it; a one-OID presence test is cheap to restate here, and
+/// unlike the matching logic it guards nothing security-critical.
+fn is_delta_crl(crl_der: &[u8]) -> bool {
+    let Ok(crl) = CertificateList::<x509_cert::certificate::Rfc5280>::from_der(crl_der) else {
+        return false;
+    };
+    crl.tbs_cert_list
+        .crl_extensions
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .any(|e| e.extn_id == OID_DELTA_CRL_INDICATOR)
+}
+
+/// Build every checker the supplied CRLs can support, pairing deltas with
+/// their bases.
+///
+/// # Why pairing is required
+///
+/// A delta CRL is only meaningful alongside the base it extends. Handed one on
+/// its own, `pkix-revocation` correctly refuses it with `DeltaCrlAsComplete`
+/// (RFC 5280 §5.2.4, §6.3.3) — treating it as complete would let an on-path
+/// attacker serve a validly signed delta to un-revoke anything listed only in
+/// the base.
+///
+/// This oracle used to construct one `CrlChecker::new` per CRL and never call
+/// `with_delta`, so a certificate revoked *only in a delta* was never seen as
+/// revoked: the base cleared it and the delta was refused. PKITS 4.15.4 is
+/// exactly that shape — serial 3, `KeyCompromise`, listed only in
+/// `deltaCRLCA1deltaCRL`. Before `pkix-revocation` gained the standalone-delta
+/// check, the delta was accepted as complete and the chain failed for the wrong
+/// reason, which is why the committed baseline records a correct verdict.
+///
+/// # Pairing strategy
+///
+/// Every (base, delta) combination is offered to `with_delta`, which enforces
+/// the real rules itself: the base must not be a delta (§5.2.4), the delta's
+/// `IssuingDistributionPoint` must match the base's (§6.3.3(c)), and the CRL
+/// numbers must be consistent. A pairing that does not belong fails to
+/// construct and is dropped, so offering candidates is safe and keeps the
+/// matching rules in the library rather than restated here.
+///
+/// Each base is also kept unpaired, because a certificate revoked in the base
+/// must still be caught when no delta applies.
+///
+/// Standalone deltas are deliberately not added: they can only ever return
+/// `DeltaCrlAsComplete`, which carries no determination.
+fn build_checkers(crls: &[Vec<u8>], now_unix: u64) -> Vec<CrlChecker<DefaultVerifier>> {
+    let (deltas, bases): (Vec<&Vec<u8>>, Vec<&Vec<u8>>) =
+        crls.iter().partition(|c| is_delta_crl(c));
+
+    let mut checkers = Vec::new();
+    for base in &bases {
+        if let Ok(c) = CrlChecker::new((*base).clone(), now_unix, DefaultVerifier) {
+            checkers.push(c);
+        }
+        for delta in &deltas {
+            if let Ok(c) = CrlChecker::with_delta(base, delta, now_unix, DefaultVerifier) {
+                checkers.push(c);
+            }
+        }
+    }
+    checkers
+}
+
 fn check_revocation(
     chain: &[Certificate],
     anchor: &TrustAnchor,
     crls: &[Vec<u8>],
     now_unix: u64,
 ) -> Option<String> {
+    // Built once for the whole chain, with deltas paired to their bases.
+    let checkers = build_checkers(crls, now_unix);
+
     for (i, cert) in chain.iter().enumerate() {
         let issuer_cert: Option<&Certificate> = chain.get(i + 1);
         // Did any CRL actually reach a verdict about this certificate?
         let mut cleared_by_some_crl = false;
-        for crl_der in crls {
-            // Parse the CRL once per cert/CRL pair. This is wasteful — the
-            // CrlChecker re-parses on every construction — but keeps the
-            // function pure (no allocator state crossing iterations) and the
-            // PKITS corpus is small enough that perf is not a concern. If a
-            // larger corpus needs CRL caching, lift this into a Vec<CrlChecker>
-            // built once before the per-cert loop.
-            let Ok(checker) = CrlChecker::new(crl_der.clone(), now_unix, DefaultVerifier) else {
-                continue;
-            };
+        for checker in &checkers {
             let result = if let Some(issuer) = issuer_cert {
                 checker.check_revocation(cert, issuer)
             } else {
@@ -212,7 +281,9 @@ fn check_revocation(
             // the fail-open this function used to have.
             return Some(format!(
                 "pkix-path revocation: revocation status of cert at chain index {i} \
-                 is undetermined — none of the {} supplied CRL(s) applied to it",
+                 is undetermined — none of the {} checker(s) built from {} supplied \
+                 CRL(s) applied to it",
+                checkers.len(),
                 crls.len()
             ));
         }
