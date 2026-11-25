@@ -45,6 +45,83 @@
 //! runtime (`tokio`, `async-std`, `smol`, ...). The reference reqwest
 //! backend requires a tokio runtime to actually drive its sockets; that
 //! constraint is reqwest's, not ours.
+//!
+//! # Verification runs on the calling task, and can block it for tens of
+//! milliseconds
+//!
+//! Only the fetches are asynchronous. Once bytes arrive, this module
+//! decodes the CRL or OCSP response and verifies its signature
+//! synchronously, inside the `async fn`, on whatever executor thread is
+//! polling the future. Nothing yields during that work, so the thread
+//! runs no other task until it finishes.
+//!
+//! How long that is depends almost entirely on CRL size, and the range
+//! is wide. Measured on one x86-64 machine with a release build,
+//! verifying an RSA-2048-signed CRL and looking one serial up in it:
+//!
+//! | revoked entries | CRL size  | per verification |
+//! |-----------------|-----------|------------------|
+//! | 1 000           | 20 KiB    | 0.4 ms           |
+//! | 20 000          | 410 KiB   | 7.8 ms           |
+//! | 100 000         | 2.1 MiB   | 34 ms            |
+//!
+//! Signature verification is a small constant; the cost is dominated by
+//! DER-decoding the revoked-certificate list, so it grows with the
+//! number of entries. Large-CA CRLs reach the bottom row. (Reproduce
+//! with `examples/crl_verify_cost.rs`.)
+//!
+//! A multi-threaded executor runs one worker per core by default, so a
+//! 34 ms verification stalls every other task assigned to that worker
+//! for 34 ms — latency that shows up on requests having nothing to do
+//! with the certificate being validated.
+//!
+//! ## Why this module does not fix it for you
+//!
+//! Moving the work off the executor means handing it to a blocking pool,
+//! and every such pool belongs to a specific runtime
+//! (`tokio::task::spawn_blocking`, `async_global_executor::spawn_blocking`,
+//! ...). Calling one here would make this crate depend on a runtime and
+//! impose that choice on consumers who picked a different one — the same
+//! objection that ruled out shape B above. So the decision stays with
+//! the consumer, who knows which runtime is running.
+//!
+//! ## Doing it yourself
+//!
+//! The split is already available in public API, because the I/O half
+//! and the CPU half are separate public pieces:
+//!
+//! - [`crate::extract_cdp_http_urls`] / [`crate::extract_aia_http_urls`]
+//!   read the URLs off the certificate (no I/O, microseconds).
+//! - Your own HTTP client fetches them (I/O, `await`).
+//! - [`pkix_revocation::CrlChecker`] / [`pkix_revocation::OcspChecker`]
+//!   do the decode and verify (CPU, no I/O) and own their inputs.
+//!
+//! Because the checkers take owned bytes and borrow only the
+//! certificates, the CPU half moves to a blocking pool cleanly. With
+//! tokio:
+//!
+//! ```ignore
+//! let urls = pkix_revocation_http::extract_cdp_http_urls(cert)?;
+//! let bytes = my_client.get(&urls[0]).await?;   // I/O on the executor
+//!
+//! // Clone what the closure needs so it can outlive this frame, then
+//! // verify on the blocking pool instead of the executor thread.
+//! let (cert, issuer, verifier) = (cert.clone(), issuer.clone(), verifier.clone());
+//! let verdict = tokio::task::spawn_blocking(move || {
+//!     let checker = pkix_revocation::CrlChecker::new(bytes, now_unix, verifier)?;
+//!     checker.check_revocation(&cert, &issuer)
+//! })
+//! .await
+//! .expect("the verification closure does not panic")?;
+//! ```
+//!
+//! Implement [`AsyncRevocationChecker`] over that and the rest of the
+//! workspace uses it exactly as it uses the wrappers here.
+//!
+//! The wrappers in this module remain the right choice when CRLs are
+//! small, when OCSP is used instead (a single-response OCSP answer is
+//! orders of magnitude cheaper to verify than a large CRL), or when the
+//! executor is not shared with latency-sensitive work.
 
 #[cfg(feature = "ocsp")]
 use crate::OcspHashAlg;

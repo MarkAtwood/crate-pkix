@@ -107,8 +107,12 @@ fn control_offline_crl_checker_against_anchor_reports_revoked() {
 
 /// pkix-chain calls `check_revocation_against_anchor` for the certificate
 /// issued directly by the trust anchor (normally the top intermediate). All
-/// four HTTP wrappers used to inherit the trait default `Ok(())`, so that
-/// certificate was never fetched/checked: a revoked intermediate passed.
+/// six HTTP wrapper types — the two plain fetchers, the two cached
+/// wrappers, and the two async ones (covered in `review_async_anchor.rs`)
+/// — used to inherit the trait default `Ok(())`, so that certificate was
+/// never fetched or checked and a revoked intermediate passed. Each type
+/// needs its own test: the default is inherited per impl, so a dropped
+/// override on any one of them silently reopens the hole.
 #[test]
 fn review_http_crl_fetcher_checks_anchor_issued_cert() {
     let f = Sequence::new(vec![fx("base-crl.der")]);
