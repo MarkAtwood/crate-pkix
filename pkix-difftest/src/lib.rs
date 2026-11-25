@@ -154,6 +154,22 @@ pub struct Chain {
     /// Populated by corpus loaders (PKITS, limbo, pem-tree) when the source
     /// testcase ships CRLs.
     pub crls: Vec<Vec<u8>>,
+
+    /// Certificates in the source bundle that are **not** links in
+    /// [`certs_der`](Self::certs_der)'s signature chain.
+    ///
+    /// Path building reduces a bundle to one chain and drops everything that
+    /// is not a link in it. Several PKITS §4.4 and §4.5 vectors ship a CA's
+    /// dedicated *CRL-signing* certificate exactly that way — a sibling of
+    /// the chain, and the only certificate that verifies the CRL's signature.
+    ///
+    /// Dropping it makes CRL signer discovery impossible for those vectors, so
+    /// a certificate whose CRL was signed by another of the CA's keys reports
+    /// `CrlSignatureInvalid` and its revocation status reads as undetermined.
+    ///
+    /// Empty for corpora that do not reduce a bundle, and empty when path
+    /// building falls back to plain reversal.
+    pub aux_certs_der: Vec<Vec<u8>>,
     /// True when the last cert is intended as the trust anchor.
     /// Always true currently — see the type-level docs.
     pub root_in_chain: bool,
@@ -226,6 +242,7 @@ impl Chain {
         }
 
         Ok(Chain {
+            aux_certs_der: Vec::new(),
             certs_der: der_blocks,
             crls: Vec::new(),
             root_in_chain: true,
@@ -443,6 +460,7 @@ BBBB
         // We do not need a real CRL DER here — the field is a Vec<Vec<u8>>
         // with no parsing contract at the harness layer. Oracles parse it.
         let chain = Chain {
+            aux_certs_der: Vec::new(),
             certs_der: vec![vec![0u8; 4], vec![1u8; 4]],
             crls: Vec::new(),
             root_in_chain: true,

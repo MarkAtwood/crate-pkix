@@ -543,6 +543,8 @@ fn build_item(tc: &FilteredTestcase) -> io::Result<CorpusItem> {
         try_build_chain(&positional_der, tc.validation_time_unix).unwrap_or(positional_der);
 
     let chain = Chain {
+        // Limbo ships exactly the chain; nothing is dropped.
+        aux_certs_der: Vec::new(),
         certs_der,
         crls: Vec::new(),
         root_in_chain: true,

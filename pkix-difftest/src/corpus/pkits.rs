@@ -258,7 +258,16 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         crl_blocks.push(bytes);
     }
 
+    // Whatever path building left out. For several §4.4 and §4.5 vectors that
+    // is the CA's dedicated CRL-signing certificate.
+    let aux_certs_der: Vec<Vec<u8>> = der_blocks
+        .iter()
+        .filter(|d| !chain_der.contains(d))
+        .cloned()
+        .collect();
+
     let chain = Chain {
+        aux_certs_der,
         certs_der: chain_der,
         crls: crl_blocks,
         root_in_chain: true,

@@ -179,6 +179,7 @@ fn run_diff(role: Role) {
 
         // OpenSSL verdict
         let diff_chain = Chain {
+            aux_certs_der: Vec::new(),
             certs_der: vec![cert_der(&leaf), cert_der(&root)],
             crls: Vec::new(),
             root_in_chain: true,

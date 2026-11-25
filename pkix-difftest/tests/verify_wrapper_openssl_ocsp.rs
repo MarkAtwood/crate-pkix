@@ -135,6 +135,7 @@ fn verify_ocsp_responder_diff_against_openssl_ocsphelper() {
         );
 
         let diff_chain = Chain {
+            aux_certs_der: Vec::new(),
             certs_der: vec![cert_der(&leaf), cert_der(&root)],
             crls: Vec::new(),
             root_in_chain: true,

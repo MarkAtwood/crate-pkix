@@ -117,8 +117,18 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 
     // Path is valid. If the chain ships CRLs, run revocation per cert.
     if !chain.crls.is_empty() {
+        // Every certificate available as a CRL signer: the chain, the anchor,
+        // and whatever path building left out — which for several vectors is
+        // the CA's dedicated CRL-signing certificate.
         let mut bundle = validation_chain.clone();
         bundle.push(anchor_cert.clone());
+        for der in &chain.aux_certs_der {
+            if let Ok(c) = Certificate::from_der(der) {
+                bundle.push(c);
+            }
+        }
+        // A CRL signed by a revoked certificate must not be trusted.
+        let bundle = drop_revoked(&bundle, &chain.crls);
         if let Some(rev_reason) =
             check_revocation(&validation_chain, &anchors[0], &bundle, &chain.crls, now)
         {
@@ -166,6 +176,52 @@ pub fn verify(chain: &Chain) -> io::Result<Verdict> {
 /// Callers with no CRLs at all are unaffected: the caller skips this function
 /// entirely when `chain.crls` is empty, which preserves the no-revocation
 /// behaviour for the bulk of the corpus.
+/// Drop certificates that a supplied CRL says are revoked.
+///
+/// A CRL signed by a revoked certificate must not be trusted, so a revoked
+/// certificate must not be offered to signer discovery.
+/// `new_with_signer_discovery` enforces `cRLSign` (§6.3.3(f)) and requires the
+/// signer to chain to a self-signed certificate, but it does not ask whether
+/// the signer is still valid — nothing in its inputs would let it.
+///
+/// PKITS 4.4.21 is the vector that turns on this. It is structurally
+/// identical to 4.4.19 — same topology, CRL-signing certificate a sibling of
+/// the chain, empty CRL — and NIST classes it invalid for one reason: the
+/// CRL signer's certificate, serial 68, is revoked by `TrustAnchorRootCRL`.
+/// Trusting that CRL leaves the end entity's status undetermined, so a
+/// conformant validator fails closed.
+///
+/// The check is a direct serial lookup against CRLs issued by the
+/// certificate's own issuer, not full path validation of each bundle member.
+/// That is enough for the question being asked — "has this candidate signer
+/// been revoked by its own CA" — and avoids recursing into revocation
+/// checking while in the middle of a revocation check.
+fn drop_revoked(bundle: &[Certificate], crls: &[Vec<u8>]) -> Vec<Certificate> {
+    let parsed: Vec<CertificateList<x509_cert::certificate::Rfc5280>> = crls
+        .iter()
+        .filter_map(|c| CertificateList::from_der(c).ok())
+        .collect();
+
+    bundle
+        .iter()
+        .filter(|cert| {
+            let serial = cert.tbs_certificate().serial_number();
+            let issuer = cert.tbs_certificate().issuer();
+            !parsed.iter().any(|crl| {
+                &crl.tbs_cert_list.issuer == issuer
+                    && crl
+                        .tbs_cert_list
+                        .revoked_certificates
+                        .as_deref()
+                        .unwrap_or(&[])
+                        .iter()
+                        .any(|e| &e.serial_number == serial)
+            })
+        })
+        .cloned()
+        .collect()
+}
+
 /// RFC 5280 §5.2.4 `id-ce-deltaCRLIndicator`.
 const OID_DELTA_CRL_INDICATOR: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.27");

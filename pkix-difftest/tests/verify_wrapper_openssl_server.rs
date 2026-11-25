@@ -226,6 +226,7 @@ fn build_args<'a>(case: &'a ServerCase<'a>) -> oracles::openssl::VerifyArgs<'a> 
 
 fn make_diff_chain(leaf: &Certificate, root: &Certificate, case: &ServerCase<'_>) -> Chain {
     Chain {
+        aux_certs_der: Vec::new(),
         certs_der: vec![cert_der(leaf), cert_der(root)],
         crls: Vec::new(),
         root_in_chain: true,
