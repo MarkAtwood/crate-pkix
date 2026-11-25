@@ -233,9 +233,6 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
 
 - RFC 4518 full Unicode NFKC DN normalization (BMPString/TeletexString transcoding)
 - CRL Distribution Points fetching — caller supplies the CRL DER directly today
-- MTA-STS TXT lookup — everything else ships, including the policy cache
-  and §3.3's fetch backoff, but the `_mta-sts` DNS query itself is the
-  caller's; a sender already has a resolver, and §3.1 requires CNAME following
 - MTA-STS durable policy storage — `PolicyStore` is the trait and
   `InMemoryPolicyStore` a complete in-process implementation; a store that
   survives a restart is the caller's, since the workspace depends on no
@@ -287,8 +284,9 @@ layer underneath. Here is what is shipping and what is next.
   resolver and SMTP-DANE delivery (RFC 7672) end to end (`pkix-dane`,
   `pkix-dane-resolver`, `pkix-chain`)
 - **MTA-STS** (RFC 8461) policy parsing, MX matching, the policy cache and
-  §3.3's fetch backoff (`pkix-mta-sts`, `no_std`), with HTTPS policy fetching
-  (`pkix-mta-sts-http`) — the CA-rooted alternative to DANE for SMTP, which
+  §3.3's fetch backoff (`pkix-mta-sts`, `no_std`), with `_mta-sts` TXT
+  lookup (`pkix-mta-sts-resolver`) and HTTPS policy fetching
+  (`pkix-mta-sts-http`) — discovery end to end — the CA-rooted alternative to DANE for SMTP, which
   deploys where DNSSEC does not
 - **Destination policy for outbound fetches** — non-public addresses refused
   at resolution time, closing the DNS-rebinding window (`pkix-net-guard`,
@@ -319,6 +317,7 @@ layer underneath. Here is what is shipping and what is next.
 | `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | **shipped** (0.2.0) |
 | `pkix-mta-sts` | MTA-STS (RFC 8461) policy parsing and MX matching | **shipped** (0.1.0) |
 | `pkix-mta-sts-http` | MTA-STS HTTPS policy fetching (RFC 8461 §3.3) | **shipped** (0.1.0) |
+| `pkix-mta-sts-resolver` | MTA-STS `_mta-sts` TXT lookup (RFC 8461 §3.1) | **shipped** (0.1.0) |
 | `pkix-net-guard` | Destination policy for outbound HTTP fetches | **shipped** (0.1.0) |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |

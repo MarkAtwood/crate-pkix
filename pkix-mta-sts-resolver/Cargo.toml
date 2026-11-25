@@ -1,0 +1,24 @@
+[package]
+name        = "pkix-mta-sts-resolver"
+description = "MTA-STS (RFC 8461) _mta-sts TXT record lookup: §3.1 record selection over a real resolver"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["smtp", "mta-sts", "email", "dns", "pki"]
+categories  = ["cryptography", "network-programming"]
+readme      = "README.md"
+
+[dependencies]
+pkix-mta-sts     = { workspace = true }
+hickory-resolver = { workspace = true }
+hickory-proto    = { workspace = true }
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = ["macros", "rt"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

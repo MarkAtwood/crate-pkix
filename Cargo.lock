@@ -1660,10 +1660,21 @@ name = "pkix-mta-sts-http"
 version = "0.1.0"
 dependencies = [
  "pkix-mta-sts",
+ "pkix-mta-sts-resolver",
  "pkix-net-guard",
  "reqwest",
  "tokio",
  "ureq",
+]
+
+[[package]]
+name = "pkix-mta-sts-resolver"
+version = "0.1.0"
+dependencies = [
+ "hickory-proto",
+ "hickory-resolver",
+ "pkix-mta-sts",
+ "tokio",
 ]
 
 [[package]]

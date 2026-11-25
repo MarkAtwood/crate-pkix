@@ -17,6 +17,7 @@ members = [
     "pkix-lint",
     "pkix-mta-sts",
     "pkix-mta-sts-http",
+    "pkix-mta-sts-resolver",
     "pkix-net-guard",
     "pkix-lint-cabf",
     "pkix-ct",
@@ -142,6 +143,7 @@ pkix-ac               = { path = "pkix-ac",               version = "0.2.0" }
 pkix-identity         = { path = "pkix-identity",         version = "0.2.0" }
 pkix-mta-sts          = { path = "pkix-mta-sts",          version = "0.1.0" }
 pkix-mta-sts-http     = { path = "pkix-mta-sts-http",     version = "0.1.0" }
+pkix-mta-sts-resolver = { path = "pkix-mta-sts-resolver", version = "0.1.0" }
 pkix-net-guard        = { path = "pkix-net-guard",        version = "0.1.0" }
 pkix-chain            = { path = "pkix-chain",            version = "0.6.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }

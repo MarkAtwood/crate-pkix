@@ -381,3 +381,79 @@ fn a_subdomain_policy_domain_is_never_shortened_to_its_parent() {
     );
     assert_eq!(policy_host("mail.example.com"), "mta-sts.mail.example.com");
 }
+
+// ---------------------------------------------------------------------------
+// §3.1 multiple character-strings in one TXT record
+// ---------------------------------------------------------------------------
+
+/// "If the resulting TXT record contains multiple strings, then the record
+/// MUST be treated as if those strings are concatenated without adding
+/// spaces."
+///
+/// The rule that bites: a DNS TXT record is a sequence of length-prefixed
+/// character-strings each at most 255 bytes, so a long record arrives split.
+/// Joining with a space — the intuitive thing — corrupts whichever field
+/// straddles the boundary.
+#[test]
+fn multiple_character_strings_are_joined_without_spaces() {
+    let r = StsTxtRecord::from_txt_strings(&[b"v=STSv1; id=abc", b"123;"])
+        .expect("the halves join into one record");
+    assert_eq!(
+        r.id(),
+        "abc123",
+        "the id straddled the split and must come back whole"
+    );
+}
+
+/// A single string is the ordinary case and still works.
+#[test]
+fn a_single_character_string_parses() {
+    let r = StsTxtRecord::from_txt_strings(&[b"v=STSv1; id=abc123;"]).expect("parses");
+    assert_eq!(r.id(), "abc123");
+}
+
+/// Joining with a space would be detectably wrong, so assert it is not done.
+///
+/// Without this, an implementation that joined with a space would pass the
+/// test above whenever the split happened to fall between fields.
+#[test]
+fn the_join_inserts_nothing_at_the_boundary() {
+    // Split mid-token in a place where a space would survive parsing as a
+    // different id rather than as an error.
+    let joined = StsTxtRecord::from_txt_strings(&[b"v=STSv1; id=aaa", b"bbb;"])
+        .expect("parses")
+        .id()
+        .to_owned();
+    assert_eq!(joined, "aaabbb");
+    assert_ne!(joined, "aaa bbb");
+    // And a space really would have been rejected, confirming the assertion
+    // above is testing the join rather than the id validator.
+    assert!(StsTxtRecord::parse("v=STSv1; id=aaa bbb;").is_err());
+}
+
+/// Non-UTF-8 is not a conforming record; §3.1 requires US-ASCII.
+#[test]
+fn a_non_utf8_record_is_not_an_sts_record() {
+    assert_eq!(
+        StsTxtRecord::from_txt_strings(&[b"v=STSv1; id=\xff\xfe;"]),
+        Err(TxtError::NoStsRecord)
+    );
+}
+
+/// The discard test works on split strings too.
+#[test]
+fn the_discard_test_applies_to_split_strings() {
+    assert!(StsTxtRecord::is_sts_txt_strings(&[b"v=STS", b"v1; id=a;"]));
+    assert!(!StsTxtRecord::is_sts_txt_strings(&[b"v=spf1 ", b"-all"]));
+    assert!(!StsTxtRecord::is_sts_txt_strings(&[b"\xff"]));
+}
+
+/// An empty answer is not a record.
+#[test]
+fn no_character_strings_is_not_a_record() {
+    assert_eq!(
+        StsTxtRecord::from_txt_strings(&[]),
+        Err(TxtError::NoStsRecord)
+    );
+    assert!(!StsTxtRecord::is_sts_txt_strings(&[]));
+}

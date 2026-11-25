@@ -200,6 +200,47 @@ impl StsTxtRecord {
         })
     }
 
+    /// Parse one TXT record given as its separate character-strings (§3.1).
+    ///
+    /// "If the resulting TXT record contains multiple strings, then the
+    /// record MUST be treated as if those strings are concatenated without
+    /// adding spaces."
+    ///
+    /// A DNS TXT record is a sequence of length-prefixed character-strings,
+    /// each at most 255 bytes, so a record longer than that arrives split —
+    /// and an MTA-STS record with a long extension field can. Joining with a
+    /// space, which is the intuitive thing and what a careless
+    /// implementation does, would corrupt the field that straddles the
+    /// boundary.
+    ///
+    /// # Errors
+    ///
+    /// [`TxtError::NoStsRecord`] if the joined bytes are not UTF-8, since a
+    /// non-ASCII record cannot be a conforming one — §3.1 requires US-ASCII
+    /// — and §3.1 treats an unusable record as no policy. Otherwise whatever
+    /// [`parse`](Self::parse) reports.
+    pub fn from_txt_strings(strings: &[&[u8]]) -> Result<Self, TxtError> {
+        let mut joined = Vec::with_capacity(strings.iter().map(|s| s.len()).sum());
+        for s in strings {
+            joined.extend_from_slice(s);
+        }
+        let text = core::str::from_utf8(&joined).map_err(|_| TxtError::NoStsRecord)?;
+        Self::parse(text)
+    }
+
+    /// Whether these character-strings, joined, look like an MTA-STS record.
+    ///
+    /// The §3.1 discard test, for a caller filtering a resolver's answer
+    /// before deciding how many records it has.
+    #[must_use]
+    pub fn is_sts_txt_strings(strings: &[&[u8]]) -> bool {
+        let mut joined = Vec::with_capacity(strings.iter().map(|s| s.len()).sum());
+        for s in strings {
+            joined.extend_from_slice(s);
+        }
+        core::str::from_utf8(&joined).is_ok_and(begins_with_version_tag)
+    }
+
     /// Select the single MTA-STS record from a resolver's answer (§3.1).
     ///
     /// "If multiple TXT records for `_mta-sts` are returned by the resolver,
