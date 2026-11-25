@@ -571,7 +571,7 @@ where
 /// [`SignatureVerifier`] / [`RevocationChecker`] implementations
 /// themselves, both of which preserve the per-call interface needed
 /// for such layering.
-pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher = NoAiaFetcher> {
+pub struct Verifier<'a, V, R, A = NoAiaFetcher> {
     anchors: &'a [TrustAnchor],
     sig_verifier: &'a V,
     rev_checker: &'a R,
@@ -588,17 +588,21 @@ pub struct Verifier<'a, V: SignatureVerifier, R: RevocationChecker, A: AiaFetche
 /// wrong here: the struct holds `&V`, not `V`, and a shared reference is
 /// `Copy` whatever it points at. Deriving would have denied `Copy` to
 /// every verifier that is not itself `Copy`, for no reason.
-impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> Clone for Verifier<'_, V, R, A> {
+///
+/// These impls carry no bounds at all, not even the capability traits.
+/// A `Verifier` whose parameters implement nothing is a useless value —
+/// there is no way to construct one, since `new` requires the traits —
+/// but it is still `Copy`, and saying so keeps the obligation where it
+/// belongs: on the constructors and the methods, not on the type.
+impl<V, R, A> Clone for Verifier<'_, V, R, A> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> Copy for Verifier<'_, V, R, A> {}
+impl<V, R, A> Copy for Verifier<'_, V, R, A> {}
 
-impl<V: SignatureVerifier, R: RevocationChecker, A: AiaFetcher> core::fmt::Debug
-    for Verifier<'_, V, R, A>
-{
+impl<V, R, A> core::fmt::Debug for Verifier<'_, V, R, A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Verifier")
             .field("anchors_len", &self.anchors.len())
@@ -1745,41 +1749,19 @@ const _: fn() = || {
     _assert_send_sync::<Error>();
     _assert_send_sync::<ValidatedPath>();
 
-    // `Verifier` is `Copy` for EVERY conforming parameter set, including
-    // verifiers, checkers and fetchers that are not themselves `Copy` or
-    // `Clone`. That is the property a `#[derive]` would have silently
-    // taken away, by adding `V: Copy` bounds the struct does not need —
-    // it holds `&V`. `NonCopy` below implements the three traits and
-    // nothing else, so this stops compiling if anyone "tidies" the
-    // hand-written impls into a derive.
-    struct NonCopy;
-    impl SignatureVerifier for NonCopy {
-        fn verify_signature(
-            &self,
-            _: spki::AlgorithmIdentifierRef<'_>,
-            _: spki::SubjectPublicKeyInfoRef<'_>,
-            _: &[u8],
-            _: &[u8],
-        ) -> core::result::Result<(), pkix_path::VerificationError> {
-            unreachable!("compile-time assertion only")
-        }
-    }
-    impl RevocationChecker for NonCopy {
-        fn check_revocation(
-            &self,
-            _: &Certificate,
-            _: &Certificate,
-        ) -> pkix_revocation::Result<()> {
-            unreachable!("compile-time assertion only")
-        }
-    }
-    impl AiaFetcher for NonCopy {
-        fn fetch(&self, _: &str) -> core::result::Result<Vec<u8>, pkix_aia::AiaError> {
-            unreachable!("compile-time assertion only")
-        }
-    }
+    // `Verifier` is `Copy` for EVERY parameter set, and the struct
+    // carries no bounds at all (Rust API guideline C-STRUCT-BOUNDS: the
+    // obligation belongs on the constructors and methods, not the type).
+    //
+    // Both halves are asserted with one type that implements nothing —
+    // not `Copy`, not `Clone`, and none of the three capability traits.
+    // It fails to compile if someone reinstates bounds on the struct, and
+    // it fails if someone "tidies" the hand-written `Clone`/`Copy` into a
+    // `#[derive]`, which would add the `V: Copy` bounds the struct does
+    // not need, since it holds `&V` rather than `V`.
+    struct ImplementsNothing;
     fn _assert_copy<T: Copy>() {}
-    _assert_copy::<Verifier<'static, NonCopy, NonCopy, NonCopy>>();
+    _assert_copy::<Verifier<'static, ImplementsNothing, ImplementsNothing, ImplementsNothing>>();
 
     // `Verifier` is public surface and `verify_batch` invites callers to
     // fan chains out across threads, so it has to be `Send + Sync` too.
@@ -1791,12 +1773,7 @@ const _: fn() = || {
     // bound is `Sync` and not `Send` on each parameter because the struct
     // holds `&'a V` rather than `V`, and `&T` is `Send` exactly when `T`
     // is `Sync`.
-    fn _verifier_is_send_sync<'a, V, R, A>()
-    where
-        V: SignatureVerifier + Sync + 'a,
-        R: RevocationChecker + Sync + 'a,
-        A: AiaFetcher + Sync + 'a,
-    {
+    fn _verifier_is_send_sync<'a, V: Sync + 'a, R: Sync + 'a, A: Sync + 'a>() {
         _assert_send_sync::<Verifier<'a, V, R, A>>();
     }
 };
