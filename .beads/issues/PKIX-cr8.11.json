@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-cr8.11",
+  "title": "Revocation fetch loop has no cap on URLs tried: unbounded validation latency",
+  "description": "extract_cdp_http_urls and extract_aia_http_urls return every HTTP/HTTPS URL a certificate advertises, with no limit, and all four fetchers plus both cache wrappers try every one sequentially until one yields a determinative verdict.\n\nMemory is not the concern; latency is. Each attempt carries the transport's own timeout, so total time for one check is (number of URLs) x (timeout). A certificate listing 500 dead CDP URLs against a 10s timeout hangs a single path validation for well over an hour, inside pkix_chain::verify_chain, with no way for the caller to bound it. The accumulated per-URL failure string grows with it and is propagated in RevocationFetchFailed.description.\n\nExposure is gated behind 'a CA issued this certificate': revocation checking runs after path signature validation, so the extensions are whatever some trusted issuer signed. Public CAs will not issue a cert with hundreds of CDP URLs; a private or unsanitised CA might, and the field is the kind of thing nobody validates. Sibling issue PKIX-rm8.43 files the same class for the AIA certificate-fetch loop (no aggregate byte cap), so the pattern is already recognised in the workspace.\n\nCandidate fix: a documented cap on attempts per check (the loop already stops at the first success, so a cap only bites when URLs are failing), and/or an overall deadline for one revocation check rather than a per-request timeout. The cap value is a policy choice and should be stated, not implicit.\n\nFound while working PKIX-cr8; not one of the ten issues that epic was filed with.",
+  "status": "open",
+  "priority": 1,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-25T15:45:20.900062214Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:45:20.900062214Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-cr8.11",
+      "depends_on_id": "PKIX-cr8",
+      "type": "parent-child",
+      "created_at": "2026-11-25T15:45:21.143673601Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}

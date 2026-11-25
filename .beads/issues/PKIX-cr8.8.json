@@ -2,18 +2,23 @@
   "id": "PKIX-cr8.8",
   "title": "extract_cert_id_identity reparses OCSP request body",
   "description": "Reparses the OCSP request body to recover key material that build_ocsp_request already had. Old: PKIX-f1j4.9",
-  "status": "open",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
+  "assignee": "Mark Atwood",
   "created_at": "2026-06-15T17:53:23Z",
-  "updated_at": "2026-06-15T17:53:23Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:47:28.18462401Z",
+  "started_at": "2026-11-25T15:23:12.884992484Z",
+  "closed_at": "2026-11-25T15:47:28.18462401Z",
+  "close_reason": "OcspRequestBytes now carries cert_serial and issuer_key_hash, captured from the CertID before the builder consumes it; the OCSP cache wrapper reads them instead of re-decoding the body. Removed a failure path as well as duplicate work: a decode error on bytes this crate encoded itself used to abort the whole check with RevocationFetchFailed. The round-trip test was inverted rather than deleted and now decodes the body as an independent oracle to assert the carried fields agree with it. Commit 9c381db8.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-cr8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:53:23Z"
+      "type": "",
+      "created_at": "2026-06-15T10:53:23Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }

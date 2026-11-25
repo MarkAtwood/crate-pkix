@@ -2,18 +2,23 @@
   "id": "PKIX-cr8.4",
   "title": "Cached OCSP fetcher may cache stale response over fresh",
   "description": "CachedHttpOcspFetcher::maybe_populate_cache can overwrite a fresh response with a staler one. Old: PKIX-f1j4.6",
-  "status": "open",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
+  "assignee": "Mark Atwood",
   "created_at": "2026-06-15T17:53:04Z",
-  "updated_at": "2026-06-15T17:53:04Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:47:30.350198936Z",
+  "started_at": "2026-11-25T15:23:12.060393727Z",
+  "closed_at": "2026-11-25T15:47:30.350198936Z",
+  "close_reason": "is_staler_ocsp compares SingleResponse.thisUpdate and suppresses an insert carrying older status; OcspAtomicPut mirrors CrlAtomicPut so InMemoryCache holds one write lock across compare and insert. Revocation is monotone, so an older 'good' response displacing a cached 'revoked' one is always wrong and made every later cache hit report the certificate as good -- reachable without an attacker, since two threads validating the same certificate can land responses in the opposite order to the fetch order. thisUpdate rather than producedAt because RFC 6960 4.2.2.1 makes thisUpdate the time the status was known correct while producedAt is only when it was signed; a re-signed old snapshot would otherwise displace a newer answer. Verified the regression test fails when the compare is removed. Commit e1303f56.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-cr8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:53:03Z"
+      "type": "",
+      "created_at": "2026-06-15T10:53:03Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }

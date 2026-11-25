@@ -1,19 +1,24 @@
 {
   "id": "PKIX-cr8.7",
   "title": "Public fields on CachedCrl/CachedOcspResponse lock storage repr",
-  "description": "Public Vec<u8>/String fields on cache types lock the storage representation. Old: PKIX-f1j4.28",
-  "status": "open",
+  "description": "Public Vec\u003cu8\u003e/String fields on cache types lock the storage representation. Old: PKIX-f1j4.28",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
+  "assignee": "Mark Atwood",
   "created_at": "2026-06-15T17:53:19Z",
-  "updated_at": "2026-06-15T17:53:19Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:47:29.571884467Z",
+  "started_at": "2026-11-25T15:23:12.668590425Z",
+  "closed_at": "2026-11-25T15:47:29.571884467Z",
+  "close_reason": "CachedCrl and CachedOcspResponse fields are private behind new() and accessors, freeing the storage representation. Key types deliberately keep public fields -- an out-of-process implementation must read them to build its own key, and accessors would buy no representation freedom since the identity tuple is breaking to change either way; that asymmetry is now documented. cache.rs's unit tests are a child module and could reach the private fields, so tests/cache_public_api.rs implements a RevocationCache over a flat bytes-and-numbers store using only exported API; the OCSP fixture sets producedAt and thisUpdate 100s apart so a swapped accessor cannot pass. Commit a4b6668b.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-cr8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:53:18Z"
+      "type": "",
+      "created_at": "2026-06-15T10:53:18Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }

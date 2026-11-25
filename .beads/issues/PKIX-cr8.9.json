@@ -2,18 +2,21 @@
   "id": "PKIX-cr8.9",
   "title": "RevocationFetchFailed.description unstructured",
   "description": "Operators cannot telemetry per-URL failures because the description is an unstructured String. Old: PKIX-f1j4.11",
+  "notes": "Analysis from the PKIX-cr8 pass (2026-11-25). Left open deliberately; not a code change yet.\n\nThe core enum cannot carry the structure. pkix_revocation::Error::RevocationFetchFailed's own documentation states the decision: the variant stays Clone + PartialEq + Eq with a String so that no adapter-specific type leaks into the trait surface, and 'adapters surface structured failure information through their own APIs'. So the fix belongs here, not in pkix-revocation.\n\nBut there is only one possible channel. RevocationChecker::check_revocation returns pkix_revocation::Result\u003c()\u003e, so an adapter cannot return extra data alongside the verdict. Accumulating failures into the fetcher needs interior mutability and is wrong for a fetcher shared across threads. That leaves an observer callback -- which is also what PKIX-cr8.10 concluded independently ('callbacks are the right shape').\n\nSketch, if it is built:\n\n    pub enum FetchFailure\u003c'a\u003e {        // #[non_exhaustive]\n        Transport(\u0026'a FetchError),     // request produced no usable response\n        Decode(\u0026'a RevError),          // bytes arrived, would not decode\n        Indeterminate(\u0026'a RevError),   // decoded and verified, no determination\n    }\n    pub trait RevocationFetchObserver: Send + Sync {\n        fn on_url_failure(\u0026self, url: \u0026str, failure: \u0026FetchFailure\u003c'_\u003e);\n    }\n\nPlumbing: Option\u003cArc\u003cdyn RevocationFetchObserver\u003e\u003e on the four fetchers plus both cache wrappers, with_observer() on each, and a manual Debug (the trait object is not Debug) as was done for time::Clock.\n\nWhy it was not built in that pass: unlike the other eight issues in this epic, the right answer is not determined by an RFC or by logic -- it is determined by what a consumer needs to emit. A failure-only hook is half a telemetry story; operators typically also want fetch latency, HTTP status, bytes transferred, cache hit rate, and which URL succeeded. Designing that blind, with no consumer, risks committing public API in the wrong shape and then keeping it for compatibility. The crate has no external consumers yet.\n\nDo NOT 'fix' this by making description more parseable. The complaint is that operators have to parse a string; a better-formatted string encourages exactly that, and URLs contain colons and error text contains the separator.",
   "status": "open",
   "priority": 2,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T17:53:27Z",
-  "updated_at": "2026-06-15T17:53:27Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:48:46.037726671Z",
+  "started_at": "2026-11-25T15:23:13.091006411Z",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-cr8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:53:27Z"
+      "type": "",
+      "created_at": "2026-06-15T10:53:27Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }

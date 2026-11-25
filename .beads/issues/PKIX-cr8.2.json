@@ -2,18 +2,23 @@
   "id": "PKIX-cr8.2",
   "title": "InMemoryCache swallows lock poisoning into miss-everything cache",
   "description": "Lock poisoning is silently caught and treated as a cache miss. Should propagate or document the policy. Old: PKIX-f1j4.4",
-  "status": "open",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
+  "assignee": "Mark Atwood",
   "created_at": "2026-06-15T17:52:54Z",
-  "updated_at": "2026-06-15T17:52:54Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T15:47:28.843883212Z",
+  "started_at": "2026-11-25T15:23:11.642107328Z",
+  "closed_at": "2026-11-25T15:47:28.843883212Z",
+  "close_reason": "InMemoryCache recovers poisoned locks with PoisonError::into_inner rather than mapping poisoning to a miss and a dropped write. Sound because the only operations held under these locks are HashMap insert/get/remove/len over derived Hash+Eq on Vec\u003cu8\u003e and Option\u003cString\u003e, none of which can panic part-way and leave a map half-updated, so the poisoned flag cannot mean the map is inconsistent. Panicking was rejected: it would push an unrelated thread's failure into path validation, where the cache is meant to be a transparent optimisation. Also removes an ambiguity in put_crl_if_not_rollback, whose false return meant both 'suppressed as a rollback' and 'lock broken, stored nothing'. Two tests poison the locks deliberately and assert the cache still round-trips. Commit 9c381db8.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-cr8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T10:52:54Z"
+      "type": "",
+      "created_at": "2026-06-15T10:52:54Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
