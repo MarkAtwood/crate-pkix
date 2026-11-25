@@ -201,6 +201,45 @@ pub struct CrlChecker<V> {
 }
 
 impl<V: SignatureVerifier> CrlChecker<V> {
+    /// The certificate whose key verifies this CRL's signature, when it is not
+    /// the `issuer` argument passed to
+    /// [`check_revocation`](RevocationChecker::check_revocation).
+    ///
+    /// `Some` for an indirect CRL built with
+    /// [`new_with_crl_issuer`](Self::new_with_crl_issuer) or
+    /// [`with_delta_and_crl_issuer`](Self::with_delta_and_crl_issuer), and for
+    /// a signer located by
+    /// [`new_with_signer_discovery`](Self::new_with_signer_discovery). `None`
+    /// for a direct CRL, where the signer is the issuer the caller supplies at
+    /// check time and so is already in hand.
+    ///
+    /// # Why a caller wants this
+    ///
+    /// **This crate does not and cannot check whether the CRL's signer has
+    /// itself been revoked.** Nothing in a `CrlChecker`'s inputs carries that
+    /// information. A CRL signed by a revoked certificate must not be trusted,
+    /// so a caller enforcing revocation has to make that determination, and
+    /// needs to know which certificate to make it about.
+    ///
+    /// With discovery that certificate is chosen inside the constructor, so
+    /// without this accessor the caller could not find out. See
+    /// [`new_with_signer_discovery`](Self::new_with_signer_discovery) for the
+    /// concrete scenario.
+    #[must_use]
+    pub const fn crl_signer(&self) -> Option<&Certificate> {
+        self.crl_issuer_cert.as_ref()
+    }
+
+    /// Whether [`crl_signer`](Self::crl_signer) was located by discovery
+    /// rather than supplied by the caller.
+    ///
+    /// Useful to a caller that trusts a certificate it chose itself but wants
+    /// to re-examine one the library picked out of a bundle.
+    #[must_use]
+    pub const fn crl_signer_was_discovered(&self) -> bool {
+        self.signer_discovered
+    }
+
     /// Create a new `CrlChecker`.
     ///
     /// - `crl_der`  — DER-encoded `CertificateList` (any `AsRef<[u8]>`, e.g. `Vec<u8>` or `&[u8]`)
@@ -336,6 +375,41 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ///   `pkix-chain` already validated it), OR
     /// - The caller accepts the project's documented stance that bundle
     ///   pre-validation is the caller's responsibility.
+    ///
+    /// **The discovered signer is not checked for revocation, and cannot
+    /// be.** Nothing in this constructor's inputs says whether a bundle
+    /// certificate has been revoked, so a CRL signed by a revoked
+    /// certificate is accepted here. That is the one limitation above whose
+    /// consequence is not merely incomplete validation: revoking a
+    /// compromised CRL-signing certificate is the defence against whoever
+    /// holds its key, and a validator that keeps honouring its CRLs lets
+    /// them suppress revocations — including, potentially, the revocation
+    /// of the certificate they compromised.
+    ///
+    /// Note that "the bundle is already path-valid because `pkix-chain`
+    /// validated it" does **not** cover this. A CRL-signing certificate is
+    /// typically a *sibling* of the chain rather than a link in it, so the
+    /// chain validation never looked at it. NIST PKITS 4.4.21 is built on
+    /// exactly that gap: it is structurally identical to the 4.4.19 beside
+    /// it — same topology, CRL-signing certificate a sibling, empty CRL —
+    /// and differs only in that its signer's certificate is revoked by the
+    /// trust anchor's CRL. A validator must then treat the end entity's
+    /// status as undetermined.
+    ///
+    /// A caller enforcing revocation should either exclude revoked
+    /// certificates from `bundle` before calling, or inspect
+    /// [`crl_signer`](Self::crl_signer) afterwards and make the
+    /// determination itself. [`discover_crl_signer`][dcs] is public for the
+    /// first approach, so the signer can be identified without building a
+    /// checker.
+    ///
+    /// This is left to the caller rather than taken on here for the reason
+    /// the rest of this section gives: deciding it requires revocation
+    /// status for the signer, which is the question this type is being used
+    /// to answer, and resolving it internally would have a revocation check
+    /// recurse into itself.
+    ///
+    /// [dcs]: crate::discover_crl_signer
     ///
     /// **The bundle slice is not retained.** Only the discovered signer
     /// `Certificate` is cloned and stored.

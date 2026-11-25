@@ -84,6 +84,19 @@ const OID_SUBJECT_KEY_IDENTIFIER: der::asn1::ObjectIdentifier =
 ///
 /// [`CrlChecker::new_with_signer_discovery`]: crate::CrlChecker::new_with_signer_discovery
 #[must_use]
+/// # Revocation is not considered
+///
+/// This returns whichever bundle certificate signed the CRL. It does not ask
+/// whether that certificate has been revoked, and has no way to: nothing in
+/// its inputs carries revocation status.
+///
+/// A CRL signed by a revoked certificate must not be trusted. A caller
+/// enforcing revocation should check the returned certificate, or exclude
+/// revoked certificates from `bundle` beforehand. See
+/// [`CrlChecker::new_with_signer_discovery`][nwsd] for the NIST PKITS 4.4.21
+/// scenario this matters in.
+///
+/// [nwsd]: crate::CrlChecker::new_with_signer_discovery
 pub fn discover_crl_signer<'a>(
     bundle: &'a [Certificate],
     crl: &CertificateList,
