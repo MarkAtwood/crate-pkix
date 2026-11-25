@@ -2,18 +2,21 @@
   "id": "PKIX-rm8.43",
   "title": "AIA fetch loop: no aggregate byte cap",
   "description": "build_with_aia (pkix-chain/src/lib.rs:595-721) fetches intermediates via AIA caIssuers URIs and adds them to a CertPool. Bounded by AIA_MAX_DEPTH=5 iterations but no aggregate byte cap. What goes wrong (availability): memory growth from attacker-controlled AIA chains. Location: pkix-chain/src/lib.rs lines 607-700. Fix: aggregate byte counter in the loop.",
-  "status": "open",
+  "status": "closed",
   "priority": 1,
   "issue_type": "bug",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T16:25:57Z",
-  "updated_at": "2026-06-15T17:07:37Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T20:39:58.64795346Z",
+  "closed_at": "2026-11-25T20:39:58.64795346Z",
+  "close_reason": "WRONG AS FILED -- the aggregate cap the bead says is missing exists, is enforced, and is tested with an adversarial fixture.\n\nThe bead: \"Bounded by AIA_MAX_DEPTH=5 iterations but no aggregate byte cap ... memory growth from attacker-controlled AIA chains. Fix: aggregate byte counter in the loop.\"\n\nAiaConfig::max_total_fetches (default 8) is that aggregate bound. ChainBuildState seeds fetches_left from it (sans_io.rs:89), decrements by the number of new URIs per round (:203), and on exhaustion fails with Error::AiaFetchLimitExceeded { limit } (:173). It is a cap across the WHOLE reassembly, not per round, so it is not weakened by the depth loop.\n\nFour further bounds the bead does not account for:\n- tried_uris: every URI is fetched at most once across the whole reassembly, so a repeated URI cannot drain the budget again\n- max_certs_per_response (default 16) caps what parse_ca_issuers_response will extract, so retained certificates are bounded by 8 x 16 = 128\n- the pool refuses a certificate it already holds, so duplicates add nothing\n- a 30s deadline\n\nNet effect with the shipped fetcher: transient bytes \u003c= 8 fetches x DEFAULT_MAX_RESPONSE_SIZE (1 MiB) = 8 MiB, retained \u003c= 128 certificates. Not unbounded.\n\nTested, and with the exact shape the bead worries about: review_aia_total_fetch_cap (pkix-chain/tests/review_aia.rs:189) sets max_uris_per_cert = 64 against a 64-way fan-out fixture (leaf-fan64.der), sets max_total_fetches = 3, and asserts the fetcher was called exactly 3 times. 64 URIs advertised, 3 fetched. All 17 review_aia tests pass.\n\nHonest residual, not enough to keep this open at P1: pkix-chain counts FETCHES, not BYTES, so a custom AiaFetcher with no per-response cap of its own gives 8 x arbitrary size. pkix-chain cannot cap bytes it has not yet received -- the per-response cap is necessarily the fetchers job, and the shipped fetcher does it at 1 MiB. A caller supplying their own fetcher owns that bound, which is worth a rustdoc sentence on the AiaFetcher trait rather than a byte counter in the loop.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-rm8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T09:25:56Z"
+      "type": "",
+      "created_at": "2026-06-15T09:25:56Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
