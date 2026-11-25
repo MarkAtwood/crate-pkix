@@ -237,8 +237,11 @@ certificate chains the library can validate. Tracked as epic **PKIX-qws**
   `InMemoryPolicyStore` a complete in-process implementation; a store that
   survives a restart is the caller's, since the workspace depends on no
   filesystem
-- TLSRPT (RFC 8460) failure reporting — `PolicyOutcome::is_validation_failure`
-  is the hook a reporter needs, but no reporter ships
+- TLSRPT report delivery — `pkix-tlsrpt` builds and parses reports;
+  `mailto` delivery needs DKIM signing (RFC 8460 §3 MUST) and `https`
+  delivery is a POST, both of which belong to the MTA
+- TLSRPT report compression (RFC 8460 §5.2, a SHOULD) — needs a gzip
+  dependency; `ReportFilename` already distinguishes `json` from `json.gz`
 - Composite post-quantum + classical signature verification (`pkix-composite`, stub only)
 - RFC 5755 attribute certificate validation (`pkix-ac`, stub only)
 - OS-native trust store loading (`pkix-truststore-system`, stub only)
@@ -288,6 +291,9 @@ layer underneath. Here is what is shipping and what is next.
   lookup (`pkix-mta-sts-resolver`) and HTTPS policy fetching
   (`pkix-mta-sts-http`) — discovery end to end — the CA-rooted alternative to DANE for SMTP, which
   deploys where DNSSEC does not
+- **TLSRPT** (RFC 8460) SMTP TLS reporting — the `_smtp._tls` record, the
+  report schema, and classification of this workspace's own failures into
+  §4.3 result types (`pkix-tlsrpt`, `no_std`)
 - **Destination policy for outbound fetches** — non-public addresses refused
   at resolution time, closing the DNS-rebinding window (`pkix-net-guard`,
   shared by `pkix-aia-http` and `pkix-mta-sts-http`)
@@ -319,6 +325,7 @@ layer underneath. Here is what is shipping and what is next.
 | `pkix-mta-sts-http` | MTA-STS HTTPS policy fetching (RFC 8461 §3.3) | **shipped** (0.1.0) |
 | `pkix-mta-sts-resolver` | MTA-STS `_mta-sts` TXT lookup (RFC 8461 §3.1) | **shipped** (0.1.0) |
 | `pkix-net-guard` | Destination policy for outbound HTTP fetches | **shipped** (0.1.0) |
+| `pkix-tlsrpt` | TLSRPT (RFC 8460) records, report schema, classification | **shipped** (0.1.0) |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |
 | `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |

@@ -1,0 +1,10 @@
+# `typos` configuration.
+#
+# Only for identifiers that are fixed by a specification and would be WRONG if
+# "corrected". Nothing here is a spelling preference.
+
+[default.extend-words]
+# RFC 8460 §4.4's field name is "receiving-mx-helo", and HELO is the SMTP
+# command (RFC 5321 §4.1.1.1). Renaming it would change the wire format and
+# break every receiver.
+helo = "helo"

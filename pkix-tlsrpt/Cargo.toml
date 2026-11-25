@@ -1,0 +1,49 @@
+[package]
+name        = "pkix-tlsrpt"
+description = "TLSRPT (RFC 8460) SMTP TLS reporting: _smtp._tls discovery, the report schema, and result-type classification"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["smtp", "tlsrpt", "email", "mta-sts", "dane"]
+categories  = ["cryptography", "no-std", "email"]
+readme      = "README.md"
+
+[features]
+default = []
+
+# `to_json_string` / `to_json_bytes`, and `Report::from_json`. The schema
+# derives serde unconditionally — it is a JSON format, so a version of these
+# types that could not be serialised would be pointless — but the serialiser
+# itself is optional so a caller with its own can skip it.
+json = ["dep:serde_json"]
+
+# Classification of the workspace's own failures into §4.3 result types.
+# Separate features so a DANE-only reporter does not pull in MTA-STS, and a
+# reporter using its own TLS stack pulls in neither.
+mta-sts      = ["dep:pkix-mta-sts"]
+mta-sts-http = ["mta-sts", "dep:pkix-mta-sts-http"]
+dane         = ["dep:pkix-chain", "dep:pkix-dane", "dep:pkix-path"]
+
+[dependencies]
+# Not optional: the report schema IS a JSON document (§4.4), so the derives
+# are part of the types rather than an add-on.
+serde      = { workspace = true }
+serde_json = { workspace = true, optional = true }
+
+pkix-mta-sts      = { workspace = true, optional = true }
+pkix-mta-sts-http = { workspace = true, optional = true }
+pkix-chain        = { workspace = true, optional = true, features = ["dane"] }
+pkix-dane         = { workspace = true, optional = true }
+pkix-path         = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+# Constructing a pkix_chain::Error::Revocation in the classification tests.
+pkix-revocation = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -129,7 +129,12 @@ jobs:
             pkix-dane-resolver \
             pkix-dnssec-anchor \
             pkix-aia-http \
-            pkix-chain
+            pkix-chain \
+            pkix-mta-sts \
+            pkix-mta-sts-http \
+            pkix-mta-sts-resolver \
+            pkix-net-guard \
+            pkix-tlsrpt
 
   test:
     name: test (stable)

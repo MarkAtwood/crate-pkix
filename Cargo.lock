@@ -1793,6 +1793,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-tlsrpt"
+version = "0.1.0"
+dependencies = [
+ "pkix-chain",
+ "pkix-dane",
+ "pkix-mta-sts",
+ "pkix-mta-sts-http",
+ "pkix-path",
+ "pkix-revocation",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "pkix-truststore"
 version = "0.2.0"
 dependencies = [
