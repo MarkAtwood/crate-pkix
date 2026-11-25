@@ -12,6 +12,16 @@ use x509_cert::{
     Certificate,
 };
 
+// `Cow` is owned by `alloc` and re-exported by `std`. Importing it under one
+// name here keeps the three use sites free of cfg noise; writing
+// `alloc::borrow::Cow` unconditionally would not compile under `std`,
+// because `extern crate alloc` is gated to no_std mode. Same arrangement as
+// `pkix-path`.
+#[cfg(not(feature = "std"))]
+use alloc::{borrow::Cow, vec};
+#[cfg(feature = "std")]
+use std::borrow::Cow;
+
 // OID 2.5.29.21 — id-ce-CRLReasons (RFC 5280 §5.3.1)
 const OID_CRL_REASONS: der::asn1::ObjectIdentifier =
     der::asn1::ObjectIdentifier::new_unwrap("2.5.29.21");
@@ -1073,8 +1083,6 @@ fn find_matching_entry<'a>(
     crl_default_issuer: &x509_cert::name::Name,
     is_indirect: bool,
 ) -> crate::Result<Option<&'a RevokedCert>> {
-    use std::borrow::Cow;
-
     let mut effective: Cow<'_, x509_cert::name::Name> = Cow::Borrowed(crl_default_issuer);
     for entry in entries {
         // Only honor certificateIssuer in indirect CRLs (where it has
@@ -1501,8 +1509,7 @@ fn cert_crl_distribution_points(
 fn dpn_to_general_names<'a>(
     dpn: &'a x509_cert::ext::pkix::name::DistributionPointName,
     base_dn: &x509_cert::name::Name,
-) -> crate::Result<std::borrow::Cow<'a, [x509_cert::ext::pkix::name::GeneralName]>> {
-    use std::borrow::Cow;
+) -> crate::Result<Cow<'a, [x509_cert::ext::pkix::name::GeneralName]>> {
     use x509_cert::ext::pkix::name::{DistributionPointName, GeneralName};
 
     match dpn {
@@ -1827,7 +1834,6 @@ fn check_dp_scope(
     idp: Option<&x509_cert::ext::pkix::crl::IssuingDistributionPoint>,
     crl_issuer: &x509_cert::name::Name,
 ) -> crate::Result<()> {
-    use std::borrow::Cow;
     use x509_cert::ext::pkix::name::GeneralName;
 
     let idp_names = idp

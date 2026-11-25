@@ -18,8 +18,17 @@ default = []
 # on the std feature there as well).
 std = ["der/std", "pkix-path/std"]
 
-# Offline CRL validation (no network; you provide the DER-encoded CRL bytes)
-crl  = ["std"]
+# Offline CRL validation (no network; you provide the DER-encoded CRL bytes).
+#
+# Does NOT imply `std`. It used to, which made no_std CRL checking
+# impossible for no reason: the only non-test `std` usage in the module was
+# `std::borrow::Cow`, a type `alloc` owns and `std` merely re-exports. The
+# module now takes `Cow` and `vec!` from whichever of the two is available.
+#
+# Enabling `crl` alone therefore no longer brings `std::error::Error` on
+# `Error` with it. A std consumer who was relying on that transitively
+# should name `std` explicitly alongside `crl`.
+crl  = []
 
 # OCSP response validation (offline; you provide the DER-encoded response bytes)
 ocsp = ["std", "dep:x509-ocsp", "dep:sha1", "dep:sha2"]

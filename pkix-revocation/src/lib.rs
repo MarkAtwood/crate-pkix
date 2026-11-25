@@ -61,6 +61,24 @@
 //!   same algorithm gaps documented in `pkix-path` (Ed25519, P-521,
 //!   RSA-PSS — tracked under `PKIX-gphz`) apply here.
 
+// `alloc` for the `Cow` that CRL distribution-point scope checking needs.
+// Gated to no_std mode because under `std` the same types come from `std`,
+// which re-exports them — the arrangement `pkix-path` uses, and the reason
+// the `Cow` import in `crl` is cfg-gated rather than written as
+// `alloc::borrow::Cow` unconditionally.
+// Gated on `crl` as well as on the absence of `std`, because that is the
+// one combination that needs it: the CRL distribution-point scope check
+// uses `Cow` and `vec!`, and under `std` those come from `std` instead.
+// Both halves of the gate are load-bearing under `-D warnings` — an
+// `extern crate alloc` nothing uses is an `unused_extern_crates` error, so
+// a looser gate fails the bare `--no-default-features` build.
+//
+// No `#[macro_use]` either, unlike `pkix-path`: this crate imports `vec`
+// by path in the one module that needs it, and an unused `#[macro_use]` is
+// itself an error.
+#[cfg(all(not(feature = "std"), feature = "crl"))]
+extern crate alloc;
+
 use pkix_path::TrustAnchor;
 use x509_cert::{ext::pkix::crl::CrlReason, serial_number::SerialNumber, Certificate};
 
