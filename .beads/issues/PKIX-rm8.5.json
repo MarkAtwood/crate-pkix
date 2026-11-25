@@ -1,19 +1,22 @@
 {
   "id": "PKIX-rm8.5",
   "title": "pkix-chain::Error wraps upstream error types in public surface",
-  "description": "pkix-chain::Error wraps five upstream crate error types directly in its public enum variants: pkix_path::Error (Path), pkix_revocation::Error (Revocation), pkix_identity::IdentityError (Identity), pkix_aia::AiaError (Aia), and pkix_path_builder::Error (PathBuild). Each of these is a re-exported type from an upstream crate whose major version is locked into pkix-chain's API surface. A major version bump in any of these five crates forces a major version bump in pkix-chain even if pkix-chain itself has no API change.\n\nThis is more concerning for the non-workspace crate pkix_aia::AiaError and pkix_path_builder::Error than for the others, since pkix-path and pkix-revocation are tightly co-versioned within the workspace. However the From impls (e.g. From<pkix_path::Error> for Error, From<pkix_aia::AiaError> for Error) make the upstream type a first-class public API element.\n\nWhat goes wrong if this stays as-is: Each upstream major bump cascades as a forced major bump of pkix-chain. Pre-1.0 this is free per project policy, but post-1.0 it becomes a coordination headache. The pattern of mapping upstream errors into local stable error enums (like pkix-path does with DerError wrapping der::Error) is already established in the workspace for exactly this reason.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 150-243 (Error enum definition)\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 278-306 (From impls)",
-  "status": "open",
+  "description": "pkix-chain::Error wraps five upstream crate error types directly in its public enum variants: pkix_path::Error (Path), pkix_revocation::Error (Revocation), pkix_identity::IdentityError (Identity), pkix_aia::AiaError (Aia), and pkix_path_builder::Error (PathBuild). Each of these is a re-exported type from an upstream crate whose major version is locked into pkix-chain's API surface. A major version bump in any of these five crates forces a major version bump in pkix-chain even if pkix-chain itself has no API change.\n\nThis is more concerning for the non-workspace crate pkix_aia::AiaError and pkix_path_builder::Error than for the others, since pkix-path and pkix-revocation are tightly co-versioned within the workspace. However the From impls (e.g. From\u003cpkix_path::Error\u003e for Error, From\u003cpkix_aia::AiaError\u003e for Error) make the upstream type a first-class public API element.\n\nWhat goes wrong if this stays as-is: Each upstream major bump cascades as a forced major bump of pkix-chain. Pre-1.0 this is free per project policy, but post-1.0 it becomes a coordination headache. The pattern of mapping upstream errors into local stable error enums (like pkix-path does with DerError wrapping der::Error) is already established in the workspace for exactly this reason.\n\nLocations:\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 150-243 (Error enum definition)\n- /home/mark/PROJECT/PKIX/pkix-chain/src/lib.rs lines 278-306 (From impls)",
+  "status": "closed",
   "priority": 1,
   "issue_type": "task",
-  "created_by": "Mark Atwood",
   "created_at": "2026-06-15T16:24:08Z",
-  "updated_at": "2026-06-15T17:07:39Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-25T22:13:55.991981786Z",
+  "closed_at": "2026-11-25T22:13:55.991981786Z",
+  "close_reason": "WILL NOT DO -- correct by design. Closing per your ruling on the Right Thing, with the reasoning rather than a cost argument.\n\nThe bead: pkix-chain::Error has variants wrapping upstream error types (Path, Revocation, Identity, Aia, Dane, PathBuild -- six now, the bead said five), so a breaking change upstream becomes one here.\n\nThat coupling is real and it is also total already, independent of the error type. pkix-chain takes pkix-path types in every public signature -- verify_chain(chain: \u0026[Certificate], anchors: \u0026[TrustAnchor], policy: \u0026ValidationPolicy, ...) -- and it re-exports the upstream crates THEMSELVES: `pub use pkix_aia::{self, ...}`, `pub use pkix_path::{...}`, `pub use pkix_path_builder;`, `pub use pkix_revocation::{self, ...}` (lib.rs:111-124). A caller can write pkix_chain::pkix_path::Error today.\n\nSo insulating one error type while re-exporting the crate that defines it, and while demanding its ValidationPolicy and TrustAnchor on every call, would be incoherent -- not a smaller version of the fix, but an inconsistency. To make the insulation mean anything you would have to re-wrap the whole vocabulary.\n\nWhich is exactly what pkix-chain-simple is: \"Strict, opinionated X.509 chain verifier for the common happy-path case\", with eight purpose-built error variants of its own. The layering is already correct -- pkix-chain shares the vocabulary deliberately, pkix-chain-simple narrows it. PKIX-rm8.23 stays open because that crate has ONE Path(PathError) passthrough that undercuts its own design, and there the bead argument does land.\n\nCallers also lose nothing here: the wrapped variants let them match all the way down to the specific validation failure, which is what a PKI consumer needs to decide between \"expired\", \"revoked\", \"name mismatch\" and \"untrusted root\".\n\nSee also PKIX-sqek.27, closed with the same reasoning, and PKIX-sqek.25, which is the same question asked about the re-exports themselves.",
   "dependencies": [
     {
+      "issue_id": "",
       "depends_on_id": "PKIX-rm8",
-      "dep_type": "parent_child",
-      "created_by": "Mark Atwood",
-      "created_at": "2026-06-15T09:24:08Z"
+      "type": "",
+      "created_at": "2026-06-15T09:24:08Z",
+      "created_by": "Mark Atwood"
     }
   ]
 }
