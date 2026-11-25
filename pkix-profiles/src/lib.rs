@@ -80,11 +80,18 @@
 //!   `PolicyMappings`, `PolicyConstraints`, `InhibitAnyPolicy`) beyond
 //!   what `pkix-path` already does — these profiles add caller-friendly
 //!   structural overlays on top of that core algorithm.
-//! - **Deprecated re-exports drop in 0.4.0.** `WebPkiProfile`,
-//!   `SmimeProfile`, `CodeSigningProfile`, and `sc081_validity_cap`
-//!   moved to `pkix-profiles-cabf` in 0.3.0 and are kept here as
-//!   deprecated aliases for one minor cycle. Migrate to
-//!   `pkix-profiles-cabf` before upgrading past 0.3.x.
+//! - **Deprecated re-exports are still here.** `WebPkiProfile`,
+//!   `SmimeProfile`, `CodeSigningProfile`, `web_pki_policy`,
+//!   `smime_policy`, `code_signing_policy` and `sc081_validity_cap`
+//!   moved to `pkix-profiles-cabf` in 0.3.0 and remain available here as
+//!   deprecated aliases.
+//!
+//!   They will be removed in some future breaking release; this crate
+//!   does not say which, because the last attempt to name one was wrong.
+//!   This entry used to promise they would drop in 0.4.0, and 0.4.0
+//!   shipped with them intact. Until they go the aliases keep working
+//!   and emit a deprecation warning, so code written against 0.3.x still
+//!   compiles — but migrate to `pkix-profiles-cabf`, because they will go.
 //! - **No site-local extension.** Site-local policy is the caller's
 //!   responsibility; either implement [`pkix_path::Profile`] directly or
 //!   wrap a bundled profile and overlay site-specific rules.
