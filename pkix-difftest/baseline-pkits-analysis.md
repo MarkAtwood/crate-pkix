@@ -50,15 +50,55 @@ bead OR a written-out justification".
 
 | Class | Count | % | previous |
 |---|---:|---:|---:|
-| LooserThanWild       | 43  | 17.4% | 81 |
-| StricterThanWild     | 77  | 31.2% | 46 |
+| LooserThanWild       | 60  | 24.3% | 43 |
+| StricterThanWild     | 59  | 23.9% | 77 |
 | OracleDivergence     | 0   | 0.0%  | 0  |
-| DiagnosticDivergence | 67  | 27.1% | 49 |
-| Agreement            | 60  | 24.3% | 71 |
+| DiagnosticDivergence | 67  | 27.1% | 67 |
+| Agreement            | 61  | 24.7% | 60 |
 | **Total**            | **247** | | 247 |
 
-Ground-truth disagreements fell **46 → 35**. `LooserThanWild` — this oracle
-accepting what another rejects, the worst class — roughly halved.
+Ground-truth disagreements: **46 → 35 → 17** across two regenerations.
+
+### Second regeneration: CRL selection and signer discovery
+
+Eighteen further ground-truth fixes, no regressions. Three changes, and the
+order matters:
+
+1. **Distribution-point filtering.** The oracle considers only CRLs the
+   certificate points at, via `pkix_revocation::crl_applies_to`
+   (RFC 5280 §6.3.3(b)). Measured alone this is a perfect no-op — every CRL
+   that previously produced a verdict was already applicable — so it removes
+   nothing and constrains what follows.
+
+2. **Signer discovery, gated by that filter.** Among applicable CRLs,
+   `new_with_signer_discovery` finds which certificate actually signed each
+   one: the key-rollover and separate-CRL-key case, where a CA signs its CRL
+   with one certificate while having issued the subject from another.
+
+   Three earlier attempts added discovery or `cRLIssuer` candidates *without*
+   the filter and all three were worse — 35 (an 18-for-18 trade), 44, and 46
+   disagreements. Discovery answers "who signed this CRL", never "is this the
+   right CRL", so unfiltered it authenticates CRLs a certificate never
+   pointed at.
+
+3. **Dropped signers restored, revoked ones excluded.** Path building drops
+   certificates that are not links in the chain, including the CA's dedicated
+   CRL-signing certificate in several §4.4, §4.5 and §4.14 vectors.
+   `Chain::aux_certs_der` carries them to discovery.
+
+   That broke one negative test, 4.4.21, and the reason is worth keeping:
+   it is structurally identical to 4.4.19 beside it, and NIST fails it only
+   because the CRL signer's certificate (serial 68) is revoked by
+   `TrustAnchorRootCRL`, where 4.4.19's (serial 66) is not.
+   `new_with_signer_discovery` enforces `cRLSign` and requires the signer to
+   chain to a self-signed certificate, but cannot ask whether the signer is
+   still valid. `drop_revoked` removes revoked candidates before discovery
+   sees them.
+
+`LooserThanWild` rises 43 → 60 as a *consequence* of the fixes: a chain the
+oracle stopped wrongly rejecting, which pyca still rejects, moves
+`StricterThanWild` → `LooserThanWild`. Verified that no chain entered
+`LooserThanWild` without being a ground-truth fix.
 
 ### What moved, and why
 
@@ -90,30 +130,11 @@ Three changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
 
 3. **pyca 48.0.0 → 50.0.2**, as above.
 
-### The 20 valid chains this baseline records as failing
+### What still disagrees
 
-`StricterThanWild` rose because closing the fail-open exposed CRL forms the
-adapter cannot express. Classified individually:
-
-| cause | chains | fix belongs in |
-|---|---:|---|
-| CRL signed by another of the CA's keys (key rollover, separate CRL key) | ~9 | the adapter |
-| indirect CRL via `cRLIssuer` | ~7 | the adapter |
-| `onlySomeReasons` reason partitioning | 2 | `pkix-revocation` |
-| unclassified (4.5.4, 4.5.6) | 2 | unknown |
-
-Eighteen are adapter gaps: `pkix-revocation` already has
-`new_with_signer_discovery` and `new_with_crl_issuer`, and the adapter calls
-neither. A brute-force sweep over candidate signers was tried and **rejected**
-— it cleared 18 of these and broke 18 negative tests doing it, because
-enumerating candidates asks "does any certificate make some CRL usable"
-instead of "is this CRL usable per the certificate's distribution point", and
-vectors like *Bad CRL Signature* and *cRLSign False* exist precisely because
-no valid relationship exists. A correct version reads
-`CRLDistributionPoints` and selects from it.
-
-Only the two `onlySomeReasons` chains are a genuine library gap, documented
-when reason-partitioned combining was declared unimplemented.
+Seventeen chains. Two are the documented `onlySomeReasons` reason-partitioning
+gap in `pkix-revocation`; the rest predate this work and are catalogued per
+bucket below.
 
 ### Reading this baseline
 

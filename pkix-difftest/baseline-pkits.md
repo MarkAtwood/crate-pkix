@@ -4,16 +4,16 @@
 
 | Class | Count |
 |---|---:|
-| LooserThanWild | 43 |
-| StricterThanWild | 77 |
+| LooserThanWild | 60 |
+| StricterThanWild | 59 |
 | OracleDivergence | 0 |
 | DiagnosticDivergence | 67 |
-| Agreement | 60 |
+| Agreement | 61 |
 | **Total** | 247 |
 
 ## Ground-truth disagreements
 
-35 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
+17 chain(s) where pkix-path's verdict disagrees with the corpus's expected verdict. This category is orthogonal to oracle-classification — it counts pkix-path-vs-PKITS only, regardless of what the other oracles say.
 
 ### `4.10.1.2 Valid Policy Mapping Test1 (Subpart 2)`
 
@@ -87,27 +87,27 @@
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: Forbidden public key algorithm: AlgorithmIdentifier { oid: DefinedByMarker(PhantomData<asn1::object_identifier::ObjectIdentifier>), params: Dsa(DssParams { p: BigUint { data: [0, 223, 229, 17, 62, 218, 233, 182, 110, 16, 214, 234, 157, 226, 157, 58, 176, 71, 189, 68, 0, 199, 86, 200, 204, 110, 208, 51, 132, 86, 71, 53, 61, 246, 84, 200, 227, 194, 173, 187, 186, 117, 243, 47, 51, 12, 166, 249, 49, 236, 103, 227, 229, 153, 109, 252, 41, 110, 170, 87, 136, 114, 52, 226, 142, 0, 144, 224, 163, 172, 100, 142, 192, 246, 60, 29, 143, 180, 200, 74, 72, 48, 94, 127, 170, 156, 118, 38, 11, 219, 19, 115, 51, 131, 151, 192, 197, 179, 230, 55, 245, 62, 255, 21, 13, 212, 161, 46, 186, 49, 248, 171, 135, 216, 11, 204, 119, 152, 66, 110, 172, 147, 152, 194, 189, 46, 123, 52, 11] }, q: BigUint { data: [0, 207, 6, 4, 216, 255, 139, 235, 0, 233, 246, 92, 7, 150, 115, 253, 150, 101, 58, 47, 7] }, g: BigUint { data: [0, 204, 225, 124, 176, 206, 146, 95, 99, 236, 56, 187, 68, 186, 221, 146, 52, 182, 94, 190, 101, 123, 216, 113, 119, 4, 157, 236, 102, 124, 59, 4, 206, 182, 243, 82, 254, 15, 146, 85, 2, 239, 78, 18, 171, 93, 154, 46, 47, 110, 86, 243, 112, 236, 106, 237, 155, 34, 184, 168, 19, 203, 12, 156, 22, 234, 193, 10, 142, 33, 38, 68, 165, 12, 249, 160, 236, 98, 224, 112, 49, 204, 104, 245, 11, 133, 164, 74, 27, 110, 121, 244, 193, 249, 54, 90, 56, 111, 78, 239, 132, 83, 223, 103, 253, 204, 247, 89, 98, 143, 156, 156, 205, 16, 143, 92, 164, 15, 156, 183, 7, 236, 96, 243, 190, 175, 126, 57, 152] } }) })
 
-### `4.11.7 Valid Self-Issued inhibitPolicyMapping Test7`
+### `4.14.18 Valid onlySomeReasons Test18`
 
 * Ground truth: DISAGREES
 * Class: `StricterThanWild`
 * Verdicts:
-  * pkix-path: Fail(pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it)
-  * openssl: Pass
-  * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
+  * pkix-path: Fail(pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict)
+  * openssl: Fail(unable to get certificate CRL)
+  * pyca: Pass
 
-### `4.12.7 Valid Self-Issued inhibitAnyPolicy Test7`
+### `4.14.19 Valid onlySomeReasons Test19`
 
 * Ground truth: DISAGREES
 * Class: `StricterThanWild`
 * Verdicts:
-  * pkix-path: Fail(pkix-path revocation: revocation status of cert at chain index 1 is undetermined — none of the 3 checker(s) built from 3 supplied CRL(s) applied to it)
-  * openssl: Pass
-  * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.54: certificate contains unaccounted-for critical extensions)
+  * pkix-path: Fail(pkix-path revocation: revocation status of cert at chain index 0 is undetermined — none of the 4 checker(s) built from the 2 applicable CRL(s) produced a verdict)
+  * openssl: Fail(unable to get certificate CRL)
+  * pyca: Pass
 
-_(25 additional ground-truth disagreement(s) omitted; see JSON report.)_
+_(7 additional ground-truth disagreement(s) omitted; see JSON report.)_
 
-## LooserThanWild (43)
+## LooserThanWild (60)
 
 ### `4.10.1.1 Valid Policy Mapping Test1 (Subpart 1)`
 
@@ -199,9 +199,9 @@ _(25 additional ground-truth disagreement(s) omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
 
-_(33 additional sample(s) in this class omitted; see JSON report.)_
+_(50 additional sample(s) in this class omitted; see JSON report.)_
 
-## StricterThanWild (77)
+## StricterThanWild (59)
 
 ### `4.1.4 Valid DSA Signatures Test4`
 
@@ -293,7 +293,7 @@ _(33 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Fail(VerificationError: validation failed: candidates exhausted: invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions)
 
-_(67 additional sample(s) in this class omitted; see JSON report.)_
+_(49 additional sample(s) in this class omitted; see JSON report.)_
 
 ## DiagnosticDivergence (67)
 
@@ -389,7 +389,7 @@ _(67 additional sample(s) in this class omitted; see JSON report.)_
 
 _(57 additional sample(s) in this class omitted; see JSON report.)_
 
-## Agreement (60)
+## Agreement (61)
 
 ### `4.1.1 Valid Signatures Test1`
 
@@ -481,5 +481,5 @@ _(57 additional sample(s) in this class omitted; see JSON report.)_
   * openssl: Pass
   * pyca: Pass
 
-_(50 additional sample(s) in this class omitted; see JSON report.)_
+_(51 additional sample(s) in this class omitted; see JSON report.)_
 
