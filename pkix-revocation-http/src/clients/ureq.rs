@@ -187,7 +187,40 @@ impl RevocationFetcher for UreqFetcher {
         // distinguish "exactly limit bytes" from "more than limit
         // bytes".
         let limit = self.max_response_size;
+
+        // Cheap early-reject, matching the reqwest client: if the server
+        // has already promised more than `limit` bytes, refuse before
+        // reading any of them. The header is a hint and is unreliable
+        // for chunked responses, so the read below still enforces the
+        // cap -- this only avoids pulling a body we would discard.
+        if let Some(promised) = response
+            .headers()
+            .get(::ureq::http::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+        {
+            if promised > limit as u64 {
+                return Err(FetchError::TooLarge);
+            }
+        }
+
         let mut reader = response.into_body().into_reader();
+        // The initial capacity is deliberately a small constant and NOT
+        // taken from the response's Content-Length.
+        //
+        // Sizing the allocation from that header would hand an untrusted
+        // responder control of it: a server can promise `limit` bytes,
+        // send a hundred, and make every fetch allocate the full cap.
+        // The early-reject above uses the header only to refuse work,
+        // which a liar cannot exploit in that direction.
+        //
+        // What the conservative start costs is Vec doubling -- roughly
+        // seven reallocations for a 1 MiB CRL. Measured against a network
+        // round trip and the signature verification that follows (which
+        // is milliseconds, and tens of milliseconds for a large CRL),
+        // that memcpy is noise. Raising the floor instead would penalise
+        // the high-frequency case, since an OCSP response is a few
+        // hundred bytes and 8 KiB already covers it outright.
         let mut bytes = Vec::with_capacity(limit.min(8192));
         let limited_read = (&mut reader)
             .take((limit as u64).saturating_add(1))

@@ -52,7 +52,13 @@ where
         // uncapped walk costs (URLs listed) x (per-request timeout).
         let budget = self.max_urls;
         let attempted = urls.len().min(budget);
-        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        // `Vec::new` does not allocate until the first push, so a check
+        // whose first URL answers -- the common case, and the one every
+        // well-configured certificate hits -- pays nothing for the
+        // failure path. `with_capacity(attempted)` allocated on every
+        // call and then went unwritten. The failure path now grows the
+        // vector instead, which is at most `budget` small pushes.
+        let mut failures: Vec<String> = Vec::new();
         for url in urls.iter().take(budget) {
             let req = FetchRequest::get(url);
             match self.fetcher.fetch(&req).await {

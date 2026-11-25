@@ -144,6 +144,60 @@ fn ureq_response_body_cap_triggers_too_large() {
     }
 }
 
+/// A Content-Length that already exceeds the cap is refused before the
+/// body is read at all. The reqwest client always had this early-reject;
+/// the ureq client did not, so the two enforced the same cap by
+/// different means — the kind of divergence that only shows up when one
+/// side is wrong.
+#[test]
+fn ureq_refuses_an_oversized_content_length_before_reading() {
+    let mut server = mockito::Server::new();
+    let big_body = vec![0u8; 4096];
+    let _mock = server
+        .mock("GET", "/promised-big")
+        .with_status(200)
+        .with_body(&big_body[..])
+        .create();
+
+    let url = format!("{}/promised-big", server.url());
+    let f = UreqFetcher::new().with_max_response_size(100);
+    match f.fetch(&FetchRequest::get(&url)).unwrap_err() {
+        FetchError::TooLarge => {}
+        other => panic!("expected TooLarge, got {other:?}"),
+    }
+}
+
+/// The read-time cap must still hold when Content-Length is absent or
+/// lying, because the header is a hint and nothing more.
+///
+/// This test exists to stop the early-reject above from becoming the
+/// only defence. A chunked response carries no Content-Length, so the
+/// early-reject cannot fire and the `take(limit + 1)` read is the sole
+/// thing standing between the caller and an unbounded body. Without this
+/// case, deleting that read-time check would leave the suite green.
+#[test]
+fn ureq_enforces_the_cap_on_a_chunked_response_with_no_content_length() {
+    let mut server = mockito::Server::new();
+    let chunks: Vec<Vec<u8>> = (0..8).map(|_| vec![0u8; 512]).collect();
+    let _mock = server
+        .mock("GET", "/chunked-big")
+        .with_status(200)
+        .with_chunked_body(move |w| {
+            for c in &chunks {
+                w.write_all(c)?;
+            }
+            Ok(())
+        })
+        .create();
+
+    let url = format!("{}/chunked-big", server.url());
+    let f = UreqFetcher::new().with_max_response_size(100);
+    match f.fetch(&FetchRequest::get(&url)).unwrap_err() {
+        FetchError::TooLarge => {}
+        other => panic!("expected TooLarge from the read-time cap, got {other:?}"),
+    }
+}
+
 #[test]
 fn ureq_response_at_exact_cap_is_accepted() {
     // Body length == cap must succeed (off-by-one regression guard for

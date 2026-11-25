@@ -53,7 +53,8 @@ where
         // Cap the walk; see the CRL twin.
         let budget = self.max_urls;
         let attempted = aia.ocsp.len().min(budget);
-        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        // Not allocated until the first failure; see the CRL twin.
+        let mut failures: Vec<String> = Vec::new();
         for url in aia.ocsp.iter().take(budget) {
             let req = FetchRequest::post(url, &req_bytes.body, OCSP_REQUEST_CT);
             match self.fetcher.fetch(&req).await {

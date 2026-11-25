@@ -209,6 +209,22 @@ impl AsyncRevocationFetcher for ReqwestFetcher {
         // pattern: accumulate into Vec<u8>, abort if we exceed limit.
         use ::reqwest::Response;
         let mut resp: Response = resp;
+        // The initial capacity is deliberately a small constant and NOT
+        // taken from the response's Content-Length.
+        //
+        // Sizing the allocation from that header would hand an untrusted
+        // responder control of it: a server can promise `limit` bytes,
+        // send a hundred, and make every fetch allocate the full cap.
+        // The early-reject above uses the header only to refuse work,
+        // which a liar cannot exploit in that direction.
+        //
+        // What the conservative start costs is Vec doubling -- roughly
+        // seven reallocations for a 1 MiB CRL. Measured against a network
+        // round trip and the signature verification that follows (which
+        // is milliseconds, and tens of milliseconds for a large CRL),
+        // that memcpy is noise. Raising the floor instead would penalise
+        // the high-frequency case, since an OCSP response is a few
+        // hundred bytes and 8 KiB already covers it outright.
         let mut bytes: Vec<u8> = Vec::with_capacity(limit.min(8192));
         loop {
             match resp.chunk().await {

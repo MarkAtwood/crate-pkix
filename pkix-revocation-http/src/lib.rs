@@ -125,18 +125,52 @@
 //! [`CachedHttpCrlFetcher`] and [`CachedHttpOcspFetcher`] wrap their
 //! uncached counterparts with a pluggable [`RevocationCache`] so repeat
 //! validations within a CRL's / OCSP response's freshness window do not
-//! re-hit the network. The reference [`InMemoryCache`] is unbounded;
-//! consumers needing eviction implement [`RevocationCache`] over their
-//! preferred backing store (e.g. `moka`, Redis). See PKIX-a1yc.7.
+//! re-hit the network. The reference [`InMemoryCache`] reclaims on
+//! demand via [`prune_expired`](InMemoryCache::prune_expired) rather
+//! than on a timer; consumers wanting a hard ceiling implement
+//! [`RevocationCache`] over their preferred backing store (e.g. `moka`,
+//! Redis).
 //!
-//! # Status
+//! # Features
 //!
-//! Tracked under PKIX-a1yc. The trait surface, the concrete
-//! [`pkix_revocation::RevocationChecker`] impls for sync CRL / OCSP
-//! fetching, and the in-memory cache layer are in place. Online HTTP
-//! fetchers (`clients::ureq::UreqFetcher`,
-//! `clients::reqwest::ReqwestFetcher`) are gated behind their
-//! respective `client-*` features.
+//! Protocol and transport are separate axes, and **a transport feature
+//! on its own does not give you a working fetcher**. `client-ureq`
+//! enables the [`UreqFetcher`](clients::ureq::UreqFetcher) transport,
+//! but [`HttpCrlFetcher`] and [`HttpOcspFetcher`] — the types that turn a
+//! transport into a [`pkix_revocation::RevocationChecker`] — are gated
+//! on `crl` and `ocsp`. Enabling only `client-ureq` therefore leaves you
+//! holding a transport with nothing to plug it into.
+//!
+//! | Feature | Gives you |
+//! |---|---|
+//! | `crl` | [`HttpCrlFetcher`], CRL side of the cache |
+//! | `ocsp` | [`HttpOcspFetcher`], OCSP request building, OCSP side of the cache |
+//! | `client-ureq` | [`UreqFetcher`](clients::ureq::UreqFetcher), a sync rustls-backed transport |
+//! | `async` | [`AsyncRevocationFetcher`] / [`AsyncRevocationChecker`] and the async wrappers |
+//! | `client-reqwest-async` | [`ReqwestFetcher`](clients::reqwest::ReqwestFetcher); implies `async` |
+//!
+//! So the smallest useful combinations are:
+//!
+//! ```toml
+//! # Sync CRL + OCSP over the bundled transport
+//! pkix-revocation-http = { version = "0.2", features = ["crl", "ocsp", "client-ureq"] }
+//!
+//! # CRL only, your own transport
+//! pkix-revocation-http = { version = "0.2", features = ["crl"] }
+//!
+//! # Async, both protocols, bundled transport
+//! pkix-revocation-http = { version = "0.2", features = ["crl", "ocsp", "client-reqwest-async"] }
+//! ```
+//!
+//! ## Why `client-ureq` does not imply `crl` and `ocsp`
+//!
+//! Because Cargo features are additive and cannot be subtracted. If
+//! `client-ureq` pulled in both protocols, a consumer who wants CRLs and
+//! not OCSP would have no way to say so: they would get `x509-ocsp`,
+//! `sha1` and `sha2` in their dependency graph with no opt-out. Keeping
+//! the axes orthogonal costs one more feature in `Cargo.toml` and keeps
+//! that choice the consumer's. The cost of the orthogonality is this
+//! documentation, which is the right trade.
 //!
 //! # Limitations
 //!
@@ -154,11 +188,14 @@
 //!   enabled, the futures returned by the reference reqwest fetcher are
 //!   not bound to any specific runtime. Callers drive them with tokio,
 //!   async-std, smol, or any other executor.
-//! - **Cache shape is intentionally minimal.** The shipped [`InMemoryCache`]
-//!   is unbounded by design (lint-scope decision is to keep the reference
-//!   cache trivially correct). Production deployments needing eviction
-//!   (LRU, TTL bounded by memory pressure) implement [`RevocationCache`]
-//!   over `moka`, Redis, or any backing store they prefer.
+//! - **The reference cache evicts only when asked.** [`InMemoryCache`]
+//!   spawns no threads and reads no clock, so nothing runs an eviction
+//!   pass on its own; call
+//!   [`prune_expired`](InMemoryCache::prune_expired) from a maintenance
+//!   tick and watch [`len`](InMemoryCache::len). Deployments wanting a
+//!   hard ceiling (LRU, LFU, a byte budget) implement
+//!   [`RevocationCache`] over `moka`, Redis, or any backing store they
+//!   prefer.
 //! - **No CDP / AIA URI filtering.** This crate fetches whichever URI is
 //!   in the certificate's [`CRLDistributionPoints`] or
 //!   [`AuthorityInfoAccess`] extension. Which hosts and schemes are
@@ -491,6 +528,22 @@ impl std::error::Error for FetchError {
 /// The `V` generic mirrors `CrlChecker<V>` in `pkix-revocation`:
 /// the verifier is moved into the on-demand `CrlChecker` instance per
 /// request, so any `V: pkix_path::SignatureVerifier + Clone` works.
+///
+/// # A verifier that is not `Clone`
+///
+/// The `Clone` bound is real — a fresh checker is built per candidate
+/// URL — but it does not exclude a verifier that cannot be duplicated,
+/// such as one owning a hardware token handle or an open session.
+/// `pkix-path` forwards `SignatureVerifier` through shared references
+/// and through `Arc`, so pass the verifier by one of those instead of by
+/// value:
+///
+/// - `HttpCrlFetcher::new(fetcher, &verifier, now)` makes `V = &V`,
+///   which is `Copy`: the bound is satisfied and nothing is duplicated.
+///   Right for a fetcher scoped to one validation.
+/// - `HttpCrlFetcher::new(fetcher, Arc::new(verifier), now)` makes
+///   `V = Arc<V>`, whose clone is a refcount bump. Right for a fetcher
+///   held for the life of a process, where there is no borrow to hold.
 ///
 /// See [RFC 5280 §4.2.1.13](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.13).
 ///

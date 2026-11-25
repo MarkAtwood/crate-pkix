@@ -328,10 +328,48 @@ impl CachedOcspResponse {
 /// The trait does NOT enforce `CRLNumber` monotonicity. That belongs to
 /// the wrapper ([`CachedHttpCrlFetcher`]), which is the only piece that
 /// knows it has just fetched a newer (or older) CRL to compare against.
+///
+/// # Why the methods are suffixed rather than generic
+///
+/// `get_crl` / `get_ocsp` and their siblings carry a suffix that the
+/// types already imply: the key says which map is meant
+/// ([`CrlCacheKey`] vs [`OcspCacheKey`]) and so does the value. The
+/// suffixes are, strictly, redundant with the signature, and the
+/// alternative is tempting:
+///
+/// ```ignore
+/// trait RevocationCache {
+///     fn get<K: CacheKey>(&self, key: &K) -> Option<Arc<K::Value>>;
+///     fn put<K: CacheKey>(&self, key: K, value: K::Value);
+///     fn invalidate<K: CacheKey>(&self, key: &K);
+/// }
+/// ```
+///
+/// with `CrlCacheKey: CacheKey<Value = CachedCrl>`. Fewer methods,
+/// dispatch falling out of the key type.
+///
+/// It is not worth it here, for two reasons. The first is that an
+/// associated-type dance is a real cost for the people who pay it: every
+/// consumer backing this with Redis or SQL would write the `CacheKey`
+/// plumbing before writing any cache, in exchange for elegance in a
+/// trait they implement once. The second is that the generic form cannot
+/// express the guarded inserts
+/// ([`put_crl_unless_rollback`](Self::put_crl_unless_rollback),
+/// [`put_ocsp_unless_staler`](Self::put_ocsp_unless_staler)), whose
+/// comparison logic differs per protocol — `CRLNumber` monotonicity is
+/// not `thisUpdate` monotonicity — so those would need their own
+/// suffixed methods anyway and the trait would end up mixed rather than
+/// uniform.
+///
+/// Recorded here so the question is answered rather than rediscovered.
 pub trait RevocationCache: Send + Sync {
     /// Fetch a cached CRL.
     ///
-    /// Returns `None` on miss or expiry.
+    /// Returns `None` only when no entry is stored under `key`. An entry
+    /// whose `nextUpdate` has passed is still returned: this method does
+    /// no freshness filtering, because the cache has no clock to filter
+    /// against. Judging freshness is the caller's job, against the
+    /// caller's own time — see "Expiry semantics" on the trait.
     fn get_crl(&self, key: &CrlCacheKey) -> Option<Arc<CachedCrl>>;
 
     /// Store a CRL in the cache, overwriting any existing entry for the
@@ -345,7 +383,9 @@ pub trait RevocationCache: Send + Sync {
 
     /// Fetch a cached OCSP response.
     ///
-    /// Returns `None` on miss or expiry.
+    /// Returns `None` only when no entry is stored under `key`; as with
+    /// [`get_crl`](Self::get_crl), an expired entry is still returned
+    /// and freshness is the caller's to judge.
     fn get_ocsp(&self, key: &OcspCacheKey) -> Option<Arc<CachedOcspResponse>>;
 
     /// Store an OCSP response in the cache, overwriting any existing
@@ -856,6 +896,8 @@ fn parse_ocsp_metadata(der_bytes: &[u8]) -> Result<OcspMetadata, der::Error> {
 fn is_rollback(prior: Option<&CachedCrl>, incoming: Option<&[u8]>) -> bool {
     match (prior, incoming) {
         (Some(p), Some(inc)) => match p.crl_number() {
+            // Rollback iff the number already cached is greater than the
+            // one arriving: prior > incoming.
             Some(prior_num) => crl_number_gt(prior_num, inc),
             None => false,
         },
@@ -864,18 +906,29 @@ fn is_rollback(prior: Option<&CachedCrl>, incoming: Option<&[u8]>) -> bool {
 }
 
 /// Compare two `CRLNumber` byte strings (canonical unsigned-integer
-/// big-endian) for monotonicity. Returns `true` iff `incoming > stored`.
+/// big-endian). Returns `true` iff `a > b`.
+///
+/// # Parameter names
+///
+/// Deliberately positional rather than `(incoming, stored)`. The sole
+/// caller is [`is_rollback`], which asks whether the *prior* number is
+/// greater than the incoming one, so it passes them in that order —
+/// under role names the call read `crl_number_gt(prior, incoming)`
+/// against a signature saying `(incoming, stored)`, with both arguments
+/// bound to a parameter meaning the opposite. The behaviour was right
+/// and the names were not, which is the worst combination: anyone
+/// editing the call site had to re-derive the polarity from the body.
 ///
 /// Both values are stripped of any DER sign-prefix zero (we store the
 /// `Uint::as_bytes()` representation). Length-normalise by left-padding
 /// the shorter with zeros, then compare lexicographically.
 #[cfg(feature = "crl")]
-fn crl_number_gt(incoming: &[u8], stored: &[u8]) -> bool {
-    let len = incoming.len().max(stored.len());
+fn crl_number_gt(a_bytes: &[u8], b_bytes: &[u8]) -> bool {
+    let len = a_bytes.len().max(b_bytes.len());
     let mut a = vec![0u8; len];
     let mut b = vec![0u8; len];
-    a[len - incoming.len()..].copy_from_slice(incoming);
-    b[len - stored.len()..].copy_from_slice(stored);
+    a[len - a_bytes.len()..].copy_from_slice(a_bytes);
+    b[len - b_bytes.len()..].copy_from_slice(b_bytes);
     a > b
 }
 
@@ -1065,7 +1118,13 @@ where
         // request, not a wrong answer.
         let budget = self.inner.max_urls;
         let attempted = urls.len().min(budget);
-        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        // `Vec::new` does not allocate until the first push, so a check
+        // whose first URL answers -- the common case, and the one every
+        // well-configured certificate hits -- pays nothing for the
+        // failure path. `with_capacity(attempted)` allocated on every
+        // call and then went unwritten. The failure path now grows the
+        // vector instead, which is at most `budget` small pushes.
+        let mut failures: Vec<String> = Vec::new();
         for url in urls.iter().take(budget) {
             // Step 2 — Cache lookup.
             let key = issuer_dn_der.as_ref().map(|der| CrlCacheKey {
@@ -1292,7 +1351,8 @@ where
         // Cap the walk; see the CRL twin.
         let budget = self.inner.max_urls;
         let attempted = aia.ocsp.len().min(budget);
-        let mut failures: Vec<String> = Vec::with_capacity(attempted);
+        // Not allocated until the first failure; see the CRL twin.
+        let mut failures: Vec<String> = Vec::new();
         for url in aia.ocsp.iter().take(budget) {
             let key = OcspCacheKey {
                 cert_serial: cert_serial.clone(),
