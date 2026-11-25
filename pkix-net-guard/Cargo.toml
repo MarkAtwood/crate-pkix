@@ -1,0 +1,32 @@
+[package]
+name        = "pkix-net-guard"
+description = "Destination policy for HTTP fetches: refuse non-public addresses at resolution time, closing the DNS-rebinding window"
+version     = "0.1.0"
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+keywords    = ["ssrf", "http", "security", "dns", "pki"]
+categories  = ["network-programming", "cryptography"]
+readme      = "README.md"
+
+[features]
+default = []
+
+# `ureq`-backed synchronous resolver.
+ureq = ["dep:ureq"]
+
+# `reqwest`-backed asynchronous resolver. Needs tokio for a non-blocking
+# name lookup: std's ToSocketAddrs blocks, and blocking inside an async fn
+# starves the executor.
+reqwest = ["dep:reqwest", "dep:tokio"]
+
+[dependencies]
+ureq    = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+tokio   = { version = "1", default-features = false, features = ["net"], optional = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

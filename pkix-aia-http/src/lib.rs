@@ -155,12 +155,10 @@ pub use async_fetcher::{AsyncAiaFetcher, NoAsyncAiaFetcher, SyncAsAsync};
 pub use async_fetcher::{AsyncHttpFetcher, GuardedAsyncResolver};
 
 use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 
 use pkix_aia::{AiaError, AiaFetcher};
-use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
-use ureq::unversioned::transport::{DefaultConnector, NextTimeout};
+use ureq::unversioned::transport::DefaultConnector;
 
 /// Default cap on a single response body's size, in bytes.
 ///
@@ -374,105 +372,15 @@ fn map_ureq_err(e: ureq::Error) -> AiaError {
 // ---------------------------------------------------------------------------
 // Destination policy
 // ---------------------------------------------------------------------------
+//
+// Extracted to `pkix-net-guard` when MTA-STS policy fetching needed the same
+// policy. The address classification is subtle -- NAT64, IPv4-mapped and
+// IPv4-compatible forms, RFC 6598 shared space -- and a second copy of it
+// would be a divergence hazard on code whose whole job is refusing a request.
+// Re-exported here so this crate's public API is unchanged.
 
-/// `ureq` resolver that drops internal addresses (see the crate-level
-/// "Destination policy" section).
-///
-/// Wraps [`DefaultResolver`]; `ureq` connects only to the addresses a
-/// resolver returns, so filtering here (rather than checking the host
-/// name before the request) leaves no window for DNS rebinding.
-#[derive(Debug)]
-pub struct GuardedResolver;
-
-impl Resolver for GuardedResolver {
-    fn resolve(
-        &self,
-        uri: &ureq::http::Uri,
-        config: &ureq::config::Config,
-        timeout: NextTimeout,
-    ) -> Result<ResolvedSocketAddrs, ureq::Error> {
-        let resolved = DefaultResolver::default().resolve(uri, config, timeout)?;
-        let mut allowed = self.empty();
-        let mut any_allowed = false;
-        for addr in resolved.iter().filter(|a| is_public(a)) {
-            allowed.push(*addr);
-            any_allowed = true;
-        }
-        if !any_allowed {
-            let host = uri.host().unwrap_or("");
-            let addrs: Vec<String> = resolved.iter().map(|a| a.ip().to_string()).collect();
-            return Err(ureq::Error::Io(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                RefusedDestination(format!(
-                    "{host} resolves only to non-public addresses [{}]",
-                    addrs.join(", ")
-                )),
-            )));
-        }
-        Ok(allowed)
-    }
-}
-
-/// Marker error carried inside `ureq::Error::Io` so [`map_ureq_err`] can
-/// recognise a refusal by [`GuardedResolver`].
-#[derive(Debug)]
-struct RefusedDestination(String);
-
-impl std::fmt::Display for RefusedDestination {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for RefusedDestination {}
-
-pub(crate) fn is_public(addr: &SocketAddr) -> bool {
-    match addr.ip() {
-        IpAddr::V4(v4) => is_public_v4(v4),
-        IpAddr::V6(v6) => is_public_v6(v6),
-    }
-}
-
-fn is_public_v4(ip: Ipv4Addr) -> bool {
-    let [a, b, _, _] = ip.octets();
-    !(ip.is_unspecified()
-        || a == 0 // 0.0.0.0/8 "this network"
-        || ip.is_loopback()
-        || ip.is_private()
-        || ip.is_link_local()
-        || (a == 100 && (b & 0xc0) == 64) // 100.64.0.0/10 shared (RFC 6598)
-        || ip.is_multicast()
-        || a >= 240) // 240.0.0.0/4 reserved, incl. 255.255.255.255
-}
-
-fn is_public_v6(ip: Ipv6Addr) -> bool {
-    let seg = ip.segments();
-    // IPv4-mapped (::ffff:a.b.c.d), IPv4-compatible (::a.b.c.d) and NAT64
-    // well-known-prefix (64:ff9b::a.b.c.d) addresses reach the embedded
-    // IPv4 address; judge them by it.
-    let embedded = Ipv4Addr::new(
-        (seg[6] >> 8) as u8,
-        seg[6] as u8,
-        (seg[7] >> 8) as u8,
-        seg[7] as u8,
-    );
-    if seg[..5] == [0, 0, 0, 0, 0] && (seg[5] == 0xffff || seg[5] == 0) {
-        // `::` and `::1` fall in the IPv4-compatible range; reject them
-        // via the IPv6 checks below rather than as 0.0.0.x.
-        if seg[5] == 0xffff || !(ip.is_unspecified() || ip.is_loopback()) {
-            return is_public_v4(embedded);
-        }
-    }
-    if seg[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
-        return is_public_v4(embedded);
-    }
-    !(ip.is_unspecified()
-        || ip.is_loopback()
-        || (seg[0] & 0xfe00) == 0xfc00 // fc00::/7 unique local
-        || (seg[0] & 0xffc0) == 0xfe80 // fe80::/10 link-local
-        || (seg[0] & 0xffc0) == 0xfec0 // fec0::/10 site-local (deprecated)
-        || ip.is_multicast())
-}
+pub use pkix_net_guard::GuardedResolver;
+use pkix_net_guard::{is_public, RefusedDestination};
 
 // ---------------------------------------------------------------------------
 // Send + Sync invariant (AGENTS.md non-negotiable #6 / PKIX-2l0v.2)
@@ -559,54 +467,6 @@ mod tests {
         assert!(!is_http_scheme(""));
         // Bare colon.
         assert!(!is_http_scheme(":"));
-    }
-
-    #[test]
-    fn destination_filter_classification() {
-        let blocked = [
-            "0.0.0.0",
-            "0.1.2.3",
-            "127.0.0.1",
-            "10.1.2.3",
-            "172.16.0.1",
-            "172.31.255.255",
-            "192.168.1.1",
-            "169.254.169.254",
-            "100.64.0.1",
-            "100.127.255.255",
-            "224.0.0.1",
-            "240.0.0.1",
-            "255.255.255.255",
-            "::",
-            "::1",
-            "fc00::1",
-            "fd12:3456::1",
-            "fe80::1",
-            "fec0::1",
-            "ff02::1",
-            "::ffff:127.0.0.1",
-            "::ffff:169.254.169.254",
-            "::ffff:10.0.0.1",
-            "::10.0.0.1",
-            "64:ff9b::7f00:1",
-        ];
-        for ip in blocked {
-            let a = SocketAddr::new(ip.parse().unwrap(), 80);
-            assert!(!is_public(&a), "{ip} must be refused");
-        }
-        let allowed = [
-            "8.8.8.8",
-            "1.1.1.1",
-            "100.128.0.1",
-            "172.32.0.1",
-            "2001:4860:4860::8888",
-            "::ffff:8.8.8.8",
-            "64:ff9b::808:808",
-        ];
-        for ip in allowed {
-            let a = SocketAddr::new(ip.parse().unwrap(), 80);
-            assert!(is_public(&a), "{ip} must be allowed");
-        }
     }
 
     #[test]

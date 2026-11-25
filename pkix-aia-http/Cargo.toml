@@ -21,13 +21,16 @@ async = ["dep:async-trait", "dep:futures-util"]
 # The reqwest-backed reference async fetcher. Separate from `async` so a
 # consumer on a different async HTTP client (hyper, isahc) implements
 # AsyncAiaFetcher themselves without reqwest in their dependency graph.
-client-reqwest-async = ["async", "dep:reqwest", "dep:tokio"]
+client-reqwest-async = ["async", "dep:reqwest", "dep:tokio", "pkix-net-guard/reqwest"]
 
 [dependencies]
 # pkix-aia ships the AiaFetcher trait + AiaError type this crate
 # implements. The `std` feature is required because every transport
 # path on real fetchers can surface an io::Error variant.
 pkix-aia = { workspace = true }
+# Destination policy, extracted here when MTA-STS policy fetching needed the
+# same address classification. See the "Destination policy" section in lib.rs.
+pkix-net-guard = { workspace = true, features = ["ureq"] }
 
 # Reference sync HTTP transport. Same pinning rationale as
 # pkix-revocation-http: ureq for the minimal pure-Rust sync footprint,

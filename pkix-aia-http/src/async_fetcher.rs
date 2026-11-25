@@ -146,55 +146,14 @@ mod reqwest_backend {
 
     use async_trait::async_trait;
     use pkix_aia::AiaError;
-    use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
     use super::{AsyncAiaFetcher, DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_TIMEOUT};
     use crate::is_http_scheme;
 
-    /// `reqwest` resolver that drops non-public addresses.
-    ///
-    /// The async counterpart of [`crate::GuardedResolver`], and it filters in
-    /// the same place for the same reason: `reqwest` connects only to the
-    /// addresses a resolver returns, so refusing here leaves no window for
-    /// DNS rebinding. Checking the host name before the request would leave
-    /// one — the name could resolve to a public address at check time and a
-    /// loopback address at connect time.
-    ///
-    /// Name lookup uses `tokio::net::lookup_host`, which is asynchronous.
-    /// `std::net::ToSocketAddrs` would have been simpler and is what the sync
-    /// resolver ultimately uses, but it blocks, and blocking inside an async
-    /// fn starves the executor.
-    #[derive(Debug, Clone, Copy, Default)]
-    pub struct GuardedAsyncResolver;
-
-    impl Resolve for GuardedAsyncResolver {
-        fn resolve(&self, name: Name) -> Resolving {
-            Box::pin(async move {
-                let host = name.as_str().to_owned();
-                // Port 0 is a placeholder; reqwest substitutes the real port.
-                let resolved: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
-                    .await
-                    .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?
-                    .collect();
-
-                let allowed: Vec<SocketAddr> =
-                    resolved.iter().copied().filter(crate::is_public).collect();
-
-                if allowed.is_empty() {
-                    let addrs: Vec<String> = resolved.iter().map(|a| a.ip().to_string()).collect();
-                    return Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::PermissionDenied,
-                        format!(
-                            "{host} resolves only to non-public addresses [{}]",
-                            addrs.join(", ")
-                        ),
-                    ))
-                        as Box<dyn std::error::Error + Send + Sync>);
-                }
-                Ok(Box::new(allowed.into_iter()) as Addrs)
-            })
-        }
-    }
+    // The async destination policy lives in `pkix-net-guard` alongside the
+    // sync one, so the two cannot drift. Re-exported to keep this crate's
+    // public API unchanged.
+    pub use pkix_net_guard::GuardedAsyncResolver;
 
     /// `reqwest`-backed [`AsyncAiaFetcher`].
     ///
