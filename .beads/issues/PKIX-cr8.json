@@ -2,14 +2,11 @@
   "id": "PKIX-cr8",
   "title": "pkix-revocation-http hardening",
   "description": "Harden the HTTP CRL/OCSP fetcher crate. 10 P1 issues from old review pass PKIX-f1j4. Cache design, async footguns, API hygiene.",
-  "status": "in_progress",
+  "status": "open",
   "priority": 1,
   "issue_type": "epic",
-  "assignee": "Mark Atwood",
   "created_at": "2026-06-15T17:52:45Z",
   "created_by": "Mark Atwood",
-  "updated_at": "2026-11-25T15:23:11.256645218Z",
-  "started_at": "2026-11-25T15:23:11.256645218Z",
-  "lease_expires_at": "2026-11-25T15:28:11.256645218Z",
-  "heartbeat_at": "2026-11-25T15:23:11.256645218Z"
+  "updated_at": "2026-11-25T16:12:05.265726686Z",
+  "started_at": "2026-11-25T15:23:11.256645218Z"
 }
