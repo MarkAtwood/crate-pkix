@@ -1,29 +1,25 @@
 {
-  "compaction_level": 0,
-  "content_hash": "046a42156397c01467ee75094d31e7fc3aba197c39eea2894e935ee0a1b4b19f",
+  "id": "PKIX-sqek.4",
+  "title": "use-case wrappers silently disable AIA fetching; no opt-in path short of dropping to verify_chain",
+  "description": "All eight use-case wrappers (verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper, verify_ocsp_responder) bake `\u0026NoAiaFetcher` internally (lines 770, 855, 932, 1001, 1034, 1085, 1155, 1288). The only way to wire an AiaFetcher into a TLS-server-validation call is to abandon the wrapper and reimplement the path-build + identity-binding + post-validation-EKU/KU/delegation glue by hand on top of verify_chain.\n\nSCENARIO that triggers cost: a deployer wants AIA chain reassembly for TLS server validation (the original motivation for adding AIA fetching). They write `verify_tls_server(\u0026[leaf_only], \u0026anchors, \u0026name, \u0026profile, now, \u0026NoRevocation)` and get Error::Aia(FetchingDisabled). They look at the wrapper signature, find no fetcher arg, look at the docs, find 'Callers that want AIA fetching must drop down to verify_chain or construct a Verifier directly.' They now have to re-implement:\n\n- verify_tls_server: the verify_dns_name post-call on chain[0]\n- verify_smime_signer/recipient: the verify_mailbox post-call\n- verify_time_stamper: the enforce_timestamping_eku_critical_and_sole + enforce_timestamping_ku_shape post-calls (these are PRIVATE — they have no public API)\n- verify_ocsp_responder: the has_ocsp_no_check check, NoCheckShim construction, verify_responder_is_delegated_by post-call (also PRIVATE)\n\nSo 'drop down to verify_chain' is not actually a feasible escape hatch for the time-stamper and OCSP-responder wrappers because their post-validation logic is private. A caller wanting AIA + TSA validation literally cannot achieve it without forking pkix-chain.\n\nMAINTENANCE CONSEQUENCE: Every user with a non-trivial PKI hits this. They open an issue 'verify_tls_server doesn't fetch AIA, why bother adding AIA at all?' You then have to either (a) ship eight more wrappers with an extra fetcher arg, doubling the surface; (b) make the existing wrappers generic over A: AiaFetcher with a default of NoAiaFetcher; (c) make the post-validation helpers (enforce_timestamping_eku_critical_and_sole, etc.) pub. All three are API-additive but commit you to the shape.\n\nThe 1.0 CHANGELOG already commits to 'wrappers bake NoAiaFetcher; signatures unchanged.' Picking (b) now (generic with default) preserves the call-site shape AND admits AIA without a future breaking change. Picking (a) or (c) requires breaking changes or doubling the wrapper count later. This is exactly the kind of API-locked-in decision that needs to be made before 1.0, per AGENTS.md's 'Project phase and decision framing' guidance.\n\nRECOMMENDATION: before 1.0 ships, make the wrappers generic over A: AiaFetcher = NoAiaFetcher (matching Verifier's shape). The default behavior is preserved; the upgrade path is open without a 2.0.",
+  "status": "closed",
+  "priority": 1,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
   "created_at": "2026-05-14T17:58:47Z",
   "created_by": "Mark Atwood",
-  "description": "All eight use-case wrappers (verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper, verify_ocsp_responder) bake `&NoAiaFetcher` internally (lines 770, 855, 932, 1001, 1034, 1085, 1155, 1288). The only way to wire an AiaFetcher into a TLS-server-validation call is to abandon the wrapper and reimplement the path-build + identity-binding + post-validation-EKU/KU/delegation glue by hand on top of verify_chain.\n\nSCENARIO that triggers cost: a deployer wants AIA chain reassembly for TLS server validation (the original motivation for adding AIA fetching). They write `verify_tls_server(&[leaf_only], &anchors, &name, &profile, now, &NoRevocation)` and get Error::Aia(FetchingDisabled). They look at the wrapper signature, find no fetcher arg, look at the docs, find 'Callers that want AIA fetching must drop down to verify_chain or construct a Verifier directly.' They now have to re-implement:\n\n- verify_tls_server: the verify_dns_name post-call on chain[0]\n- verify_smime_signer/recipient: the verify_mailbox post-call\n- verify_time_stamper: the enforce_timestamping_eku_critical_and_sole + enforce_timestamping_ku_shape post-calls (these are PRIVATE \u2014 they have no public API)\n- verify_ocsp_responder: the has_ocsp_no_check check, NoCheckShim construction, verify_responder_is_delegated_by post-call (also PRIVATE)\n\nSo 'drop down to verify_chain' is not actually a feasible escape hatch for the time-stamper and OCSP-responder wrappers because their post-validation logic is private. A caller wanting AIA + TSA validation literally cannot achieve it without forking pkix-chain.\n\nMAINTENANCE CONSEQUENCE: Every user with a non-trivial PKI hits this. They open an issue 'verify_tls_server doesn't fetch AIA, why bother adding AIA at all?' You then have to either (a) ship eight more wrappers with an extra fetcher arg, doubling the surface; (b) make the existing wrappers generic over A: AiaFetcher with a default of NoAiaFetcher; (c) make the post-validation helpers (enforce_timestamping_eku_critical_and_sole, etc.) pub. All three are API-additive but commit you to the shape.\n\nThe 1.0 CHANGELOG already commits to 'wrappers bake NoAiaFetcher; signatures unchanged.' Picking (b) now (generic with default) preserves the call-site shape AND admits AIA without a future breaking change. Picking (a) or (c) requires breaking changes or doubling the wrapper count later. This is exactly the kind of API-locked-in decision that needs to be made before 1.0, per AGENTS.md's 'Project phase and decision framing' guidance.\n\nRECOMMENDATION: before 1.0 ships, make the wrappers generic over A: AiaFetcher = NoAiaFetcher (matching Verifier's shape). The default behavior is preserved; the upgrade path is open without a 2.0.",
-  "ephemeral": 0,
-  "id": "PKIX-sqek.4",
-  "is_template": 0,
-  "issue_type": "task",
+  "updated_at": "2026-11-25T20:53:52.332554856Z",
+  "closed_at": "2026-11-25T20:53:52.332554856Z",
+  "close_reason": "STALE -- fixed since filing. All eight wrappers now take an AiaFetcher parameter.\n\nThe bead says the wrappers \"bake \u0026NoAiaFetcher internally (lines 770, 855, 932, 1001, 1034, 1085, 1155, 1288)\" and that the only way to wire a fetcher in is to abandon the wrapper for verify_chain. Checked each of the eight named: verify_tls_server, verify_tls_client_dns, verify_tls_client_mailbox, verify_smime_signer, verify_smime_recipient, verify_code_signer, verify_time_stamper and verify_ocsp_responder all declare `aia: \u0026A` and are generic over A: AiaFetcher. A deployer wanting AIA reassembly for TLS server validation passes their fetcher and keeps the identity binding and post-validation EKU/KU glue the bead was worried about reimplementing.\n\nIndependently corroborated while fixing q9hv.17: those same five wrapper examples in pkix-chain/README.md had to gain explicit \u0026NoAiaFetcher (and \u0026DefaultVerifier) arguments precisely because the parameters exist -- the README was stale against the signatures, which is the mirror image of this bead being stale against them.\n\nThe remaining \u0026NoAiaFetcher occurrences are all deliberate and none is a wrapper:\n- lib.rs:486 inside verify_chain_default, the intentionally-minimal entry point that also fixes DefaultVerifier\n- lib.rs:635 inside Verifier::new_no_aia, which says so in its name\n- lib.rs:33 and :1349, rustdoc examples showing a caller passing it explicitly\n\nSo there is an opt-in path, and the no-AIA choices that remain are named rather than silent.",
   "metadata": {},
-  "no_history": 0,
-  "owner": "mark@reviewcommit.com",
-  "pinned": 0,
-  "priority": 1,
-  "status": "open",
-  "timeout_ns": 0,
-  "title": "use-case wrappers silently disable AIA fetching; no opt-in path short of dropping to verify_chain",
-  "updated_at": "2026-05-14T17:58:47Z",
   "dependencies": [
     {
+      "issue_id": "",
+      "depends_on_id": "PKIX-sqek",
+      "type": "parent-child",
       "created_at": "2026-05-14T10:58:47Z",
       "created_by": "Mark Atwood",
-      "depends_on_id": "PKIX-sqek",
-      "metadata": {},
-      "type": "parent-child"
+      "metadata": "{}"
     }
   ]
 }

@@ -771,6 +771,16 @@ def main():
     )
     write_der("leaf-via-intermediate.der", leaf_via_intermediate)
 
+    # caIssuers URI with a scheme pkix-chain does not fetch. Enterprise PKI
+    # commonly publishes CA certificates over LDAP (RFC 4523), so this is the
+    # realistic shape of a URI that is present, well-formed and declined.
+    # Used to check that the decline is reported rather than silent.
+    leaf_via_intermediate_ldap_aia = build_leaf_via_intermediate(
+        serial=104,
+        ca_issuers_uri="ldap://ldap.example.test/cn=intermediate,dc=example,dc=test",
+    )
+    write_der("leaf-via-intermediate-ldap-aia.der", leaf_via_intermediate_ldap_aia)
+
     leaf_via_intermediate_no_aia = build_leaf_via_intermediate(
         serial=102,
         ca_issuers_uri=None,

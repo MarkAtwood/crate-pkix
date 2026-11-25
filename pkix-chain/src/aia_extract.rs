@@ -35,24 +35,58 @@ const OID_AD_CA_ISSUERS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.
 /// Return the `caIssuers` HTTP/HTTPS URIs present on `cert`'s
 /// `AuthorityInfoAccess` extension, in the order they appear.
 ///
-/// Returns an empty `Vec` when the extension is absent, contains no
-/// caIssuers access descriptions, or every caIssuers `GeneralName` has a
-/// non-HTTP scheme. Malformed AIA extension values yield an empty result
-/// rather than an error — a malformed AIA on the orphan cert is not itself
-/// a chain-validation failure; the caller treats "no URIs to try" the same
+/// Yields nothing when the extension is absent, contains no caIssuers
+/// access descriptions, or every caIssuers `GeneralName` has a non-HTTP
+/// scheme. Malformed AIA extension values yield an empty result rather than
+/// an error — a malformed AIA on the orphan cert is not itself a
+/// chain-validation failure; the caller treats "no URIs to try" the same
 /// way it treats "every fetch returned `FetchingDisabled`".
+///
+/// URIs excluded for their scheme are not lost: see
+/// [`ca_issuers_unsupported_uris`], which the driver uses to say so.
 pub(crate) fn ca_issuers_http_uris(cert: &Certificate) -> impl Iterator<Item = String> {
+    ca_issuers_uris(cert, true)
+}
+
+/// Return the `caIssuers` URIs on `cert` that [`ca_issuers_http_uris`]
+/// *excluded* for having a non-HTTP scheme, in the order they appear.
+///
+/// This exists so the exclusion can be reported rather than merely
+/// happening. An `ldap://` caIssuers URI is common in enterprise PKI, and a
+/// caller who has written an `AiaFetcher` that speaks LDAP would otherwise
+/// see their fetcher constructed, never called, and the build fail with a
+/// bare `NoPathFound` — with nothing anywhere saying that a URI was found
+/// and then dropped. The driver turns the first of these into
+/// [`AiaError::UriUnsupported`](pkix_aia::AiaError::UriUnsupported), which
+/// names the URI and the fact that it was this crate, not the fetcher, that
+/// declined it.
+///
+/// Reporting is all this does. Whether `pkix-chain` should be deciding
+/// fetchability at all, rather than passing every URI to the fetcher and
+/// letting it answer, is a separate question about the `AiaFetcher`
+/// contract: the http-only filter is also what keeps a `file://` caIssuers
+/// URI from reaching a fetcher that might honour it.
+pub(crate) fn ca_issuers_unsupported_uris(cert: &Certificate) -> impl Iterator<Item = String> {
+    ca_issuers_uris(cert, false)
+}
+
+/// Shared walk over `caIssuers` access descriptions.
+///
+/// `want_http` selects which side of the scheme test to yield. Both views
+/// come from here so they cannot disagree about what counts as fetchable —
+/// a URI is reported as excluded exactly when it was not offered.
+fn ca_issuers_uris(cert: &Certificate, want_http: bool) -> impl Iterator<Item = String> {
     find_extension_value(cert, &OID_AUTHORITY_INFO_ACCESS)
         .and_then(|v| AuthorityInfoAccessSyntax::from_der(v).ok())
         .into_iter()
-        .flat_map(|aia| {
-            aia.0.into_iter().filter_map(|ad| {
+        .flat_map(move |aia| {
+            aia.0.into_iter().filter_map(move |ad| {
                 if ad.access_method != OID_AD_CA_ISSUERS {
                     return None;
                 }
                 if let GeneralName::UniformResourceIdentifier(uri) = ad.access_location {
                     let uri_str = uri.as_str();
-                    if is_http_scheme(uri_str) {
+                    if is_http_scheme(uri_str) == want_http {
                         return Some(uri_str.to_owned());
                     }
                 }

@@ -28,6 +28,7 @@ use x509_cert::Certificate;
 const ROOT_DER: &[u8] = include_bytes!("fixtures/root.der");
 const INTERMEDIATE_DER: &[u8] = include_bytes!("fixtures/intermediate.der");
 const LEAF_VIA_INTERMEDIATE_DER: &[u8] = include_bytes!("fixtures/leaf-via-intermediate.der");
+const LEAF_LDAP_AIA_DER: &[u8] = include_bytes!("fixtures/leaf-via-intermediate-ldap-aia.der");
 const LEAF_VIA_INTERMEDIATE_NO_AIA_DER: &[u8] =
     include_bytes!("fixtures/leaf-via-intermediate-no-aia.der");
 
@@ -293,4 +294,97 @@ fn aia_fetch_returns_garbage_surfaces_malformed_certificate() {
         }
         other => panic!("expected Aia(MalformedCertificate), got: {other:?}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// A caIssuers URI declined for its scheme is reported, not swallowed
+// ---------------------------------------------------------------------------
+
+/// `pkix-chain` fetches only `http`/`https` caIssuers URIs, and an excluded
+/// URI must still be named in the failure.
+///
+/// Before this, the exclusion happened inside the URI extractor and left no
+/// trace: the build ran out of URIs, `last_aia_error` stayed `None`, and the
+/// caller got `PathBuild(NoPathFound)`. For someone who has written an
+/// `AiaFetcher` that speaks LDAP — the common case in enterprise PKI, where
+/// CA certificates are published over LDAP (RFC 4523) — that reads as "my
+/// fetcher was constructed and never called, and nothing says why".
+///
+/// `UriUnsupported` carries the URI and says the decision was made before
+/// the fetcher was consulted, which is the distinction worth having: it is
+/// not "the fetch failed" but "this crate declined to try".
+///
+/// The fetcher below panics if called, so the test also pins that an
+/// excluded URI is never handed over.
+#[test]
+fn a_non_http_ca_issuers_uri_is_reported_rather_than_silently_dropped() {
+    struct NeverCalled;
+    impl AiaFetcher for NeverCalled {
+        fn fetch(&self, uri: &str) -> Result<Vec<u8>, AiaError> {
+            panic!("an excluded URI must not reach the fetcher, but got {uri}");
+        }
+    }
+
+    let leaf = load(LEAF_LDAP_AIA_DER);
+    let chain = [leaf];
+    let anchors = [TrustAnchor::from_cert(load(ROOT_DER))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    let verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &NeverCalled,
+    );
+    let err = verifier
+        .verify_one(&chain)
+        .expect_err("the intermediate is absent and its only AIA URI is not fetchable");
+
+    match err {
+        pkix_chain::Error::Aia(AiaError::UriUnsupported(uri)) => {
+            assert!(
+                uri.starts_with("ldap://"),
+                "the reported URI should be the excluded one, got {uri}"
+            );
+        }
+        other => panic!("expected Aia(UriUnsupported(..)) naming the ldap URI, got {other:?}"),
+    }
+}
+
+/// A real fetch failure still outranks the diagnostic.
+///
+/// A URI that was tried and failed says more than one that was never tried,
+/// so the excluded-URI report must not displace it. The leaf here advertises
+/// a fetchable `http` URI, so a genuine `HttpStatus` must survive to the
+/// caller rather than being replaced.
+#[test]
+fn a_real_fetch_failure_outranks_the_excluded_uri_report() {
+    struct AlwaysFails;
+    impl AiaFetcher for AlwaysFails {
+        fn fetch(&self, _uri: &str) -> Result<Vec<u8>, AiaError> {
+            Err(AiaError::HttpStatus(503))
+        }
+    }
+
+    let leaf = load(LEAF_VIA_INTERMEDIATE_DER);
+    let chain = [leaf];
+    let anchors = [TrustAnchor::from_cert(load(ROOT_DER))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+
+    let verifier = Verifier::new(
+        &anchors,
+        &DefaultVerifier,
+        &NoRevocation,
+        &policy,
+        &AlwaysFails,
+    );
+    let err = verifier
+        .verify_one(&chain)
+        .expect_err("every fetch failed, so the build cannot complete");
+
+    assert!(
+        matches!(err, pkix_chain::Error::Aia(AiaError::HttpStatus(503))),
+        "the attempted-and-failed fetch must be reported, got {err:?}"
+    );
 }

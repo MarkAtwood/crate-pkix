@@ -154,7 +154,13 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         // issuer is still missing.
         let mut new_uris: Vec<String> = Vec::new();
         let mut over_limit = false;
+        // A caIssuers URI this crate declined for its scheme, kept so the
+        // failure can name it instead of reporting a bare "no path found".
+        let mut excluded_uri: Option<String> = None;
         for cert in orphans_on_paths(leaf, &state.pool, self.anchors, self.sig_verifier) {
+            if excluded_uri.is_none() {
+                excluded_uri = aia_extract::ca_issuers_unsupported_uris(cert).next();
+            }
             for uri in aia_extract::ca_issuers_http_uris(cert).take(self.config.max_uris_per_cert) {
                 if state.tried_uris.contains(&uri) {
                     continue;
@@ -186,6 +192,18 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
             // The path builder found nothing and there are no URIs left to
             // try. A previous fetch failure is the more informative signal;
             // otherwise the honest answer is that no path can be completed.
+            // Prefer a real failure over the diagnostic: a fetch that was
+            // attempted and failed says more than a URI that was never
+            // tried. Only when nothing was attempted does an excluded URI
+            // become the most informative thing known — and it beats
+            // `NoPathFound`, which would leave a caller whose fetcher
+            // handles the scheme with no indication that a URI existed at
+            // all, let alone that this crate dropped it.
+            if state.last_aia_error.is_none() {
+                if let Some(uri) = excluded_uri {
+                    return BuildStep::Failed(Error::Aia(AiaError::UriUnsupported(uri)));
+                }
+            }
             return BuildStep::Failed(state.last_aia_error.clone().map_or(
                 Error::PathBuild(pkix_path_builder::Error::NoPathFound),
                 Error::Aia,
