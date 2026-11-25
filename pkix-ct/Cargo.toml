@@ -65,6 +65,11 @@ x509-cert = { workspace = true, features = ["pem", "std"] }
 # is dev-only: pkix-ct has no opinion about which crypto backend verifies.
 pkix-path = { workspace = true, features = ["rustcrypto"] }
 
+# A concrete serde format for the round-trip tests in tests/serde_types.rs.
+# The crate itself names no format: the `serde` feature only derives the
+# traits and leaves the wire choice to the caller.
+serde_json = { workspace = true }
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

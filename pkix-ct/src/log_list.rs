@@ -66,6 +66,7 @@ use crate::{Error, Result};
 
 /// Metadata for one CT log.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct CtLog {
     /// Log identifier — SHA-256 of `key_der` per RFC 6962 §3.2.
@@ -133,6 +134,11 @@ impl CtLog {
 
 /// A set of trusted CT logs indexed by `log_id`.
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(into = "alloc::vec::Vec<CtLog>", try_from = "alloc::vec::Vec<CtLog>")
+)]
 pub struct CtLogList {
     logs: BTreeMap<[u8; 32], CtLog>,
 }
@@ -718,6 +724,60 @@ mod google_schema {
             assert_eq!(usable_log.usable_from_ms, Some(1_704_067_200_000));
             assert_eq!(usable_log.retired_at_ms, None);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// serde for CtLogList
+// ---------------------------------------------------------------------------
+
+/// `CtLogList` serializes as a plain sequence of [`CtLog`], not as the map
+/// it stores internally.
+///
+/// Two reasons, and the second is the one that matters.
+///
+/// The map key is redundant: it *is* `SHA-256(key_der)` of the value it is
+/// filed under, so writing it would store the same bytes twice and invite
+/// the two copies to disagree.
+///
+/// More importantly, the round trip has to re-run the check.
+/// [`CtLogList::insert`] enforces RFC 6962 §3.2 — `log_id ==
+/// SHA-256(key_der)` — and rejects a mismatch as a corrupted source. A
+/// plain `#[derive(Deserialize)]` on the struct would fill the `BTreeMap`
+/// field directly and walk straight past that. The result would be a list
+/// whose entries are filed under keys that do not match them, and since
+/// [`CtLogList::get`] is how a caller maps a parsed SCT back to a trusted
+/// log key, that means verifying an SCT against the wrong key — exactly
+/// what the check exists to prevent.
+///
+/// Persisting a log list and reloading it is the use case this serde
+/// support is for, so it is also precisely the path where the check must
+/// run again.
+#[cfg(feature = "serde")]
+impl From<CtLogList> for alloc::vec::Vec<CtLog> {
+    fn from(list: CtLogList) -> Self {
+        list.logs.into_values().collect()
+    }
+}
+
+/// Rebuilds the list through [`CtLogList::insert`], so a deserialized list
+/// is held to the same RFC 6962 §3.2 consistency check as one built by hand
+/// or parsed from Google's log list JSON.
+///
+/// # Errors
+///
+/// Returns [`Error::ParseError`] if any entry's `log_id` does not match
+/// `SHA-256(key_der)`.
+#[cfg(feature = "serde")]
+impl TryFrom<alloc::vec::Vec<CtLog>> for CtLogList {
+    type Error = crate::Error;
+
+    fn try_from(logs: alloc::vec::Vec<CtLog>) -> Result<Self> {
+        let mut list = Self::new();
+        for log in logs {
+            list.insert(log)?;
+        }
+        Ok(list)
     }
 }
 

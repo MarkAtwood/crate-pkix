@@ -54,6 +54,7 @@ use crate::{Error, Result};
 /// require changes here. Signature interpretation lives one layer up
 /// (see [`crate::SctVerifier`]).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct SignedCertificateTimestamp {
     /// SCT version. Always 0 for the v1 protocol defined in RFC 6962. v2
@@ -163,6 +164,7 @@ impl SignedCertificateTimestamp {
 
 /// A parsed `SignedCertificateTimestampList` (RFC 6962 §3.3).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SctList(pub Vec<SignedCertificateTimestamp>);
 
 impl SctList {

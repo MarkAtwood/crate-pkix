@@ -626,6 +626,7 @@ const SIG_TYPE_TREE_HASH: u8 = 1;
 /// `get-sth` API is log-specific transport); the caller constructs
 /// this struct from whichever source they fetch STHs from.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct SignedTreeHead {
     /// Tree size at the time the STH was signed.
@@ -673,6 +674,7 @@ impl SignedTreeHead {
 /// type does not currently carry parser methods — `pkix-ct` is
 /// transport-agnostic.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct MerkleAuditPath {
     /// 0-based index of the leaf in the tree.
@@ -879,7 +881,7 @@ pub fn merkle_tree_leaf_for_precert(
 /// The wire parser can never produce a longer field, but
 /// [`SignedCertificateTimestamp`] has public fields and a public
 /// constructor, so the bound is re-checked here instead of truncating
-/// the prefix with `as u16` (which would mis-frame the signed input).
+/// the prefix with `as u16` (which would misframe the signed input).
 fn sct_extensions_len(sct: &SignedCertificateTimestamp) -> Result<u16> {
     u16::try_from(sct.extensions.len()).map_err(|_| Error::SctExtensionsTooLong)
 }
