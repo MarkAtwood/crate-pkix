@@ -536,6 +536,26 @@ pub enum Error {
     /// [`OcspChecker`]: crate::OcspChecker
     OutOfScope(OutOfScopeReason),
 
+    /// The checker does not implement
+    /// [`RevocationChecker::check_revocation_against_anchor`], so the
+    /// revocation status of the certificate issued directly by the trust
+    /// anchor is unknown.
+    ///
+    /// This is what the default implementation of that method returns. It
+    /// used to return `Ok(())` — "not revoked" — which meant a checker
+    /// written with only `check_revocation` silently passed the
+    /// certificate closest to the root, with no error, no log and no
+    /// metric. Failing is the honest answer: the checker was not asked a
+    /// question it could answer, so it must not claim the certificate is
+    /// good.
+    ///
+    /// A checker that genuinely cannot speak for anchor-issued
+    /// certificates should return this deliberately. A checker for which
+    /// skipping is correct — [`NoRevocation`] is the example — should
+    /// override the method and return `Ok(())` explicitly, so the choice
+    /// is visible in its source rather than inherited.
+    AnchorCheckUnsupported,
+
     /// All known sources for revocation data failed to produce a usable
     /// response.
     ///
@@ -653,6 +673,10 @@ impl core::fmt::Display for Error {
             Self::MalformedCertificate => f.write_str(
                 "certificate BasicConstraints extension is present but cannot be decoded",
             ),
+            Self::AnchorCheckUnsupported => f.write_str(
+                "revocation checker does not implement the anchor-issued certificate check, \
+                 so that certificate's revocation status is unknown",
+            ),
             Self::OutOfScope(reason) => {
                 write!(f, "revocation source out of scope: {reason}")
             }
@@ -754,45 +778,46 @@ pub trait RevocationChecker {
     /// chain. For example, in the chain `[leaf, intermediate_CA]` this method is
     /// called with `cert = intermediate_CA` and `anchor` set to the matched anchor.
     ///
-    /// **Default implementation returns `Ok(())` (skip).** Override this method
-    /// to enforce revocation checking for certificates issued directly by a trust
-    /// anchor (e.g., fetch and verify the CA's CRL using the anchor's public key).
+    /// **The default implementation fails**, returning
+    /// [`Error::AnchorCheckUnsupported`]. Override it to check revocation
+    /// for certificates issued directly by a trust anchor — typically by
+    /// verifying the CA's CRL or OCSP response against the anchor's public
+    /// key — or, if skipping is genuinely what you want, override it to
+    /// return `Ok(())` so that choice is visible in your own source.
     ///
-    /// `NoRevocation` inherits this default and skips the check, matching its
-    /// overall no-op behaviour. `CrlChecker` and `OcspChecker` both override
-    /// this method: they verify the pre-loaded CRL or OCSP response against the
-    /// anchor's subject DN and SPKI.
+    /// `CrlChecker`, `OcspChecker` and the fetchers in
+    /// `pkix-revocation-http` all check properly. [`NoRevocation`]
+    /// overrides it to return `Ok(())`, because skipping every check is
+    /// its entire purpose.
     ///
     /// # Security
     ///
-    /// **The default implementation silently skips revocation checking for the
-    /// anchor-issued certificate.** If your threat model requires revocation
-    /// checking for every certificate in the chain — including the one issued
-    /// directly by the trust anchor — you MUST override this method. There is
-    /// no compile-time or runtime warning when the default is used; the skip
-    /// is intentional for environments (e.g., embedded, offline, short-lived
-    /// certificates) where anchor-level revocation data is unavailable.
+    /// The default used to return `Ok(())`, and that was the defect. `Ok`
+    /// from a revocation checker means "not revoked", so an implementor
+    /// who wrote only [`check_revocation`](Self::check_revocation)
+    /// silently passed the certificate closest to the root — no error, no
+    /// log, no metric, and nothing in the type system to notice. The
+    /// documentation warned about it at length, which is not a substitute
+    /// for the behaviour being safe.
     ///
-    /// Failing to override this method in a context that requires full-chain
-    /// revocation coverage is a silent security gap.
-    ///
-    /// # Note: default is a no-op
-    ///
-    /// The default implementation performs **no revocation check** and always
-    /// returns `Ok(())`. Any implementor that does not override this method
-    /// silently skips revocation for the certificate directly issued by the
-    /// trust anchor. Override this method to enable anchor-level revocation.
+    /// Failing closed inverts that. A checker that was never asked a
+    /// question it could answer does not get to answer it favourably: the
+    /// status is unknown, so the caller is told so and decides. The
+    /// environments the old default existed for — embedded, offline,
+    /// short-lived certificates with no anchor-level revocation data — are
+    /// served by overriding with `Ok(())`, which costs four lines and
+    /// records the decision where a reader will find it.
     ///
     /// # Errors
     ///
-    /// The default implementation always returns `Ok(())`; override this method
+    /// The default always returns [`Error::AnchorCheckUnsupported`]; override this method
     /// to enable error-returning revocation checks.
     fn check_revocation_against_anchor(
         &self,
         _cert: &Certificate,
         _anchor: &TrustAnchor,
     ) -> crate::Result<()> {
-        Ok(())
+        Err(Error::AnchorCheckUnsupported)
     }
 }
 
@@ -815,6 +840,23 @@ pub struct NoRevocation;
 impl RevocationChecker for NoRevocation {
     #[inline]
     fn check_revocation(&self, _cert: &Certificate, _issuer: &Certificate) -> crate::Result<()> {
+        Ok(())
+    }
+
+    /// Overridden to say so explicitly.
+    ///
+    /// The trait's default fails closed with
+    /// [`Error::AnchorCheckUnsupported`], which is right for a checker
+    /// that forgot the method and wrong for this one: skipping every
+    /// check is the entire meaning of `NoRevocation`. Inheriting the
+    /// default would turn "check nothing" into "fail on the
+    /// anchor-issued certificate".
+    #[inline]
+    fn check_revocation_against_anchor(
+        &self,
+        _cert: &Certificate,
+        _anchor: &TrustAnchor,
+    ) -> crate::Result<()> {
         Ok(())
     }
 }

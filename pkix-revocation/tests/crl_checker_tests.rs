@@ -507,15 +507,21 @@ impl pkix_revocation::RevocationChecker for AlwaysRevokedChecker {
     // The trait default must return Ok(()).
 }
 
-/// The default `check_revocation_against_anchor` impl must return `Ok(())`
-/// even when `check_revocation` returns `Err`.
+/// The default `check_revocation_against_anchor` impl must FAIL, not skip.
 ///
-/// Oracle: the `RevocationChecker` trait doc promises "Default implementation
-/// returns Ok(()) (skip)." This test verifies that promise is upheld and
-/// that a custom checker that does not override the method truly skips the
-/// anchor-issued cert check.
+/// This test previously asserted the opposite: that the default returned
+/// `Ok(())`, "verifying that promise is upheld and that a custom checker
+/// that does not override the method truly skips the anchor-issued cert
+/// check". That promise was the defect. `Ok(())` means "not revoked", so a
+/// checker written with only `check_revocation` silently passed the
+/// certificate closest to the root — no error, no log, no metric.
+///
+/// The default now returns [`Error::AnchorCheckUnsupported`]. A checker
+/// that was never asked a question it could answer must not answer it
+/// favourably. Checkers for which skipping really is correct override the
+/// method and say so; `NoRevocation` does exactly that.
 #[test]
-fn check_revocation_against_anchor_default_returns_ok() {
+fn check_revocation_against_anchor_default_fails_closed() {
     use pkix_path::TrustAnchor;
     use pkix_revocation::RevocationChecker as _;
 
@@ -533,11 +539,33 @@ fn check_revocation_against_anchor_default_returns_ok() {
         "AlwaysRevokedChecker::check_revocation must return Err"
     );
 
-    // The default check_revocation_against_anchor must return Ok(()).
+    // The default must refuse rather than skip.
     let result = checker.check_revocation_against_anchor(&ca, &anchor);
+    assert_eq!(
+        result,
+        Err(pkix_revocation::Error::AnchorCheckUnsupported),
+        "a checker that does not implement the anchor check must not report the \
+         anchor-issued certificate as good"
+    );
+}
+
+/// `NoRevocation` overrides the default, because skipping is its purpose.
+///
+/// Without the override it would inherit the fail-closed default and start
+/// erroring on the anchor-issued certificate, which would turn "check
+/// nothing" into "fail on one specific certificate".
+#[test]
+fn no_revocation_still_skips_the_anchor_issued_certificate() {
+    use pkix_path::TrustAnchor;
+    use pkix_revocation::{NoRevocation, RevocationChecker as _};
+
+    let ca = load_cert("crl-ca.der");
+    let anchor = TrustAnchor::from_cert(ca.clone());
     assert!(
-        result.is_ok(),
-        "default check_revocation_against_anchor must return Ok(()); got: {result:?}"
+        NoRevocation
+            .check_revocation_against_anchor(&ca, &anchor)
+            .is_ok(),
+        "NoRevocation must skip every check, including the anchor-issued one"
     );
 }
 

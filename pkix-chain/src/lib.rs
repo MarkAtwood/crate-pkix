@@ -521,8 +521,11 @@ where
 /// - The last cert in `chain` (issued directly by the trust anchor): checked via
 ///   [`RevocationChecker::check_revocation_against_anchor`].
 ///
-/// The **default implementation** of `check_revocation_against_anchor` returns
-/// `Ok(())` (skip). `NoRevocation` inherits this default and skips the check.
+/// The **default implementation** of `check_revocation_against_anchor`
+/// fails with `pkix_revocation::Error::AnchorCheckUnsupported`, so a custom
+/// checker that implements only `check_revocation` is told it has a gap
+/// rather than silently passing the certificate closest to the root.
+/// `NoRevocation` overrides it to skip, because that is its purpose.
 /// `CrlChecker` and `OcspChecker` both **override** this method and actively
 /// verify the pre-loaded CRL or OCSP response against the anchor's identity.
 /// For full-chain revocation coverage with a custom checker, override
@@ -784,7 +787,7 @@ where
                 }
                 // Issued directly by the trust anchor. CrlChecker and
                 // OcspChecker override this; NoRevocation inherits the
-                // default Ok(()) skip.
+                // default, which now fails closed.
                 crate::sans_io::RevocationTarget::Anchor { cert, anchor } => {
                     self.rev_checker
                         .check_revocation_against_anchor(cert, anchor)?;
