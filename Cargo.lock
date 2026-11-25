@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain-simple"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "der",
@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-lint"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "der",
  "idna",
@@ -1690,7 +1690,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64ct",
  "der",
