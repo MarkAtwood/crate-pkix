@@ -1489,6 +1489,141 @@ fn general_names_intersect(
 /// if no DP passes (1), or
 /// [`CrlIdpDistributionPointMismatch`](crate::OutOfScopeReason::CrlIdpDistributionPointMismatch)
 /// if some DP passes (1) but none passes (2).
+/// Determine revocation status across several CRLs, combining
+/// reason-partitioned ones.
+///
+/// A CRL whose `IssuingDistributionPoint` carries `onlySomeReasons` covers
+/// only those revocation reasons. It can prove a certificate **is** revoked,
+/// but on its own it cannot prove the certificate is **not** revoked — some
+/// other reason may be listed on a CRL covering the remaining reasons. A
+/// single [`CrlChecker`] therefore returns
+/// [`CrlOnlySomeReasons`](crate::OutOfScopeReason::CrlOnlySomeReasons) rather
+/// than a clean bill of health, which is correct and incomplete.
+///
+/// This function implements RFC 5280 §6.3.3's `reasons_mask` accumulation: it
+/// walks the supplied CRLs, unions the reasons each one covers, and reports
+/// "not revoked" only once every reason is covered.
+///
+/// # Algorithm
+///
+/// 1. Skip any CRL the certificate's distribution points do not name
+///    ([`crl_applies_to`]).
+/// 2. Skip a CRL that adds no reason the mask lacks — processing it could
+///    change nothing.
+/// 3. Check the certificate against it. **Revoked wins immediately**: a
+///    partitioned CRL is authoritative for the reasons it covers.
+/// 4. Otherwise add its reasons to the mask and continue.
+/// 5. Report `Ok(())` when the mask covers every RFC 5280 §5.2.5 reason, and
+///    `CrlOnlySomeReasons` when it does not.
+///
+/// Order-independent by construction: the mask is a union and `Revoked`
+/// short-circuits, so the verdict does not depend on which CRL is seen first.
+///
+/// # Why a free function and not a `CrlChecker` method
+///
+/// [`CrlChecker`] holds one base CRL and an optional delta, which is the right
+/// shape for the single-CRL case and the wrong one here — reason partitioning
+/// is a property of a *set*. Rather than widen that type, this composes it:
+/// one checker per CRL, with the mask kept here.
+///
+/// # Errors
+///
+/// - [`Error::Revoked`] if any applicable CRL lists the certificate.
+/// - [`Error::OutOfScope`] with
+///   [`CrlOnlySomeReasons`](crate::OutOfScopeReason::CrlOnlySomeReasons) when
+///   the applicable CRLs leave some reason uncovered. Status is undetermined;
+///   a hard-fail caller must reject.
+/// - When no CRL applied at all, the first error a candidate produced, so the
+///   caller sees why rather than a misleading "partitioned" verdict.
+pub fn check_revocation_with_crls<V>(
+    cert: &Certificate,
+    issuer: &Certificate,
+    crls: &[&[u8]],
+    now_unix: u64,
+    verifier: &V,
+) -> crate::Result<()>
+where
+    V: SignatureVerifier + Clone,
+{
+    use x509_cert::ext::pkix::crl::dp::ReasonFlags;
+
+    let mut mask = ReasonFlags::default();
+    let mut processed_any = false;
+    let mut first_error: Option<Error> = None;
+
+    for crl_der in crls {
+        // (1) Only CRLs this certificate points at.
+        if let Err(e) = crl_applies_to(cert, crl_der) {
+            first_error.get_or_insert(e);
+            continue;
+        }
+        let Ok(parsed) = CertificateList::from_der(crl_der) else {
+            continue;
+        };
+        let reasons = match parse_issuing_dp(&parsed) {
+            Ok(idp) => idp
+                .and_then(|i| i.only_some_reasons)
+                .unwrap_or_else(all_reasons),
+            Err(e) => {
+                first_error.get_or_insert(e);
+                continue;
+            }
+        };
+
+        // (2) Nothing new to learn from this one: every reason it covers is
+        //     already in the mask, so processing it cannot change the verdict.
+        if (reasons - mask).is_empty() {
+            continue;
+        }
+
+        let Ok(checker) = CrlChecker::new(crl_der, now_unix, verifier.clone()) else {
+            continue;
+        };
+        match checker.check_revocation(cert, issuer) {
+            // (3) Authoritative for the reasons it covers.
+            Err(e @ Error::Revoked { .. }) => return Err(e),
+
+            // (4) Not listed. An unpartitioned CRL yields Ok; a partitioned
+            //     one yields CrlOnlySomeReasons, which is the single-CRL
+            //     fail-safe and exactly the case this function exists to
+            //     combine. Both mean "not listed for the reasons I cover".
+            Ok(()) | Err(Error::OutOfScope(crate::OutOfScopeReason::CrlOnlySomeReasons)) => {
+                mask |= reasons;
+                processed_any = true;
+            }
+
+            // This CRL could not be used at all.
+            Err(e) => {
+                first_error.get_or_insert(e);
+            }
+        }
+    }
+
+    if !processed_any {
+        return Err(first_error.unwrap_or(Error::CrlIssuerMismatch));
+    }
+    if covers_all_reasons(mask) {
+        Ok(())
+    } else {
+        Err(Error::OutOfScope(
+            crate::OutOfScopeReason::CrlOnlySomeReasons,
+        ))
+    }
+}
+
+/// Every RFC 5280 §5.2.5 reason flag, for a CRL with no `onlySomeReasons`.
+fn all_reasons() -> x509_cert::ext::pkix::crl::dp::ReasonFlags {
+    use x509_cert::ext::pkix::crl::dp::Reasons;
+    Reasons::KeyCompromise
+        | Reasons::CaCompromise
+        | Reasons::AffiliationChanged
+        | Reasons::Superseded
+        | Reasons::CessationOfOperation
+        | Reasons::CertificateHold
+        | Reasons::PrivilegeWithdrawn
+        | Reasons::AaCompromise
+}
+
 /// Whether `crl_der` is a CRL that `cert`'s distribution points name.
 ///
 /// This is RFC 5280 §6.3.3(b) **selection**: given a certificate and a

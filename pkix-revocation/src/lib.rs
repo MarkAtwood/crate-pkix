@@ -793,7 +793,7 @@ mod crl;
 mod signer_discovery;
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
-pub use crl::{crl_applies_to, CrlChecker};
+pub use crl::{check_revocation_with_crls, crl_applies_to, CrlChecker};
 #[cfg(feature = "crl")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crl")))]
 pub use signer_discovery::discover_crl_signer;

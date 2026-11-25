@@ -31,7 +31,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use der::Decode;
 use pkix_path::{validate_path, DefaultVerifier, TrustAnchor, ValidationPolicy};
-use pkix_revocation::{crl_applies_to, CrlChecker, Error as RevError, RevocationChecker as _};
+use pkix_revocation::{
+    check_revocation_with_crls, crl_applies_to, CrlChecker, Error as RevError,
+    RevocationChecker as _,
+};
 use x509_cert::crl::CertificateList;
 use x509_cert::Certificate;
 
@@ -377,6 +380,33 @@ fn check_revocation(
 
                 // This CRL carries no determination about this certificate.
                 // Try the next one; if none applies, the loop below fails.
+                Err(_) => {}
+            }
+        }
+
+        // Before failing as undetermined, try combining reason-partitioned
+        // CRLs. A CRL carrying onlySomeReasons cannot clear a certificate by
+        // itself, so the per-checker loop above reports nothing for a CA that
+        // splits its CRL by reason — PKITS 4.14.18 and 4.14.19 are exactly
+        // that shape. check_revocation_with_crls unions the reasons covered
+        // and clears the certificate only when every reason is accounted for.
+        if !cleared_by_some_crl {
+            let refs: Vec<&[u8]> = applicable.iter().map(Vec::as_slice).collect();
+            let combined = match issuer_cert {
+                Some(iss) => {
+                    check_revocation_with_crls(cert, iss, &refs, now_unix, &DefaultVerifier)
+                }
+                // The anchor-issued case has no issuer Certificate to pass;
+                // the per-checker loop already covered it.
+                None => Err(RevError::CrlIssuerMismatch),
+            };
+            match combined {
+                Ok(()) => cleared_by_some_crl = true,
+                Err(e @ RevError::Revoked { .. }) => {
+                    return Some(format!(
+                        "pkix-path revocation: cert at chain index {i} revoked by CRL: {e}"
+                    ));
+                }
                 Err(_) => {}
             }
         }
