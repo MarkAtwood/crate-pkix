@@ -21,7 +21,6 @@ include = [
     "google/sample-log_list.json",
     "google/sample-log_list.sig",
     "gen.sh",
-    "CHANGELOG.md",
     "README.md",
 ]
 

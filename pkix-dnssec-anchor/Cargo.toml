@@ -21,7 +21,6 @@ include = [
     "iana/icannbundle.pem",
     "gen.sh",
     "gen.py",
-    "CHANGELOG.md",
     "README.md",
 ]
 

@@ -6,9 +6,8 @@ at 1.0; the adjacent ecosystem continues at independent 0.x cadence.
 The 1.0 promise is **semver stability**: the public APIs in the crates
 listed below are frozen. Future breaking changes require a major bump.
 
-This document accompanies the per-crate `CHANGELOG.md` files. The
-authoritative per-crate change record lives there; this document is
-the one-page overview.
+This document is the one-page overview; the git history is the
+authoritative change record.
 
 ## What's included
 
@@ -190,24 +189,8 @@ The 1.0 release rests on substantial upstream and reference work:
 
 ## Per-crate details
 
-Every public-surface change between 0.x and 1.0 is enumerated in the
-crate's `CHANGELOG.md`:
-
-- [`pkix-path/CHANGELOG.md`](pkix-path/CHANGELOG.md)
-- [`pkix-revocation/CHANGELOG.md`](pkix-revocation/CHANGELOG.md)
-- [`pkix-chain/CHANGELOG.md`](pkix-chain/CHANGELOG.md)
-- [`pkix-path-builder/CHANGELOG.md`](pkix-path-builder/CHANGELOG.md)
-- [`pkix-truststore/CHANGELOG.md`](pkix-truststore/CHANGELOG.md)
-- [`pkix-identity/CHANGELOG.md`](pkix-identity/CHANGELOG.md)
-- [`pkix-profiles/CHANGELOG.md`](pkix-profiles/CHANGELOG.md)
-- [`pkix-profiles-cabf/CHANGELOG.md`](pkix-profiles-cabf/CHANGELOG.md)
-- [`pkix-lint/CHANGELOG.md`](pkix-lint/CHANGELOG.md)
-- [`pkix-lint-cabf/CHANGELOG.md`](pkix-lint-cabf/CHANGELOG.md)
-- [`pkix-revocation-http/CHANGELOG.md`](pkix-revocation-http/CHANGELOG.md)
-- [`pkix-aia/CHANGELOG.md`](pkix-aia/CHANGELOG.md)
-
-The unified workspace [`CHANGELOG.md`](CHANGELOG.md) carries the
-detailed per-change history; the per-crate files are the rollup view.
+Public-surface changes are in the git history. `git log --oneline <crate>/`
+for one crate, or `git log -p <crate>/src/lib.rs` for the surface itself.
 
 [AGENTS]: ./AGENTS.md
 [`pkix-path`]: pkix-path/

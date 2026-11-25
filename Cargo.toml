@@ -38,7 +38,7 @@ members = [
 
 [workspace.package]
 # Nov-2026 maintenance wave (x509-cert 0.3 / der 0.8 / RustCrypto 0.14,
-# MSRV 1.87; see CHANGELOG.md): every crate that exposes x509-cert, der,
+# MSRV 1.87): every crate that exposes x509-cert, der,
 # spki or signature types, or depends on one that does, takes a breaking
 # minor bump: pkix-path / pkix-revocation / pkix-path-builder / pkix-profiles
 # 0.4.0, pkix-chain / pkix-chain-simple 0.5.0, pkix-lint 0.10.0,

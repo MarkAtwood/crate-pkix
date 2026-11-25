@@ -59,7 +59,7 @@ Files relevant to this document:
 
 A version bump (e.g. OSCAL v1.3.x) is a coordinated workspace change:
 update the vendored schemas, re-run the cross-validation in CI, bump
-`pkix-lint`'s OSCAL version property, and CHANGELOG it.
+`pkix-lint`'s OSCAL version property.
 
 ## Models we DO emit/parse
 

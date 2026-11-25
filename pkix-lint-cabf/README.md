@@ -13,8 +13,7 @@ Maintained on a best-effort basis. If your deployment depends on bit-exact CA/B 
 ## Modules
 
 - `cabf_tls_br` — CA/B Forum TLS Baseline Requirements lint set. Migrated
-  from `pkix-lint` 0.4.0 (see workspace `CHANGELOG.md` under `pkix-lint
-  0.5.0`). Provides individual `Lint` impls for SC-081 phased validity caps,
+  from `pkix-lint` 0.4.0. Provides individual `Lint` impls for SC-081 phased validity caps,
   SHA-1 prohibition, RSA min-key-size, SAN/EKU presence, and
   `BasicConstraints` cA-flag checks, plus a canonical `all_lints()`
   constructor. The bundling lives on `pkix_profiles_cabf::WebPkiProfile`'s
