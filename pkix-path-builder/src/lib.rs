@@ -175,7 +175,26 @@ pub enum Error {
     /// with a fresh budget of [`PathBuilderConfig::dfs_budget`] units; one
     /// unit is charged per DFS frame entered and per pool candidate
     /// examined.
-    BudgetExceeded,
+    ///
+    /// `tried` and `last_error` separate "the budget ran out before
+    /// anything could be assessed" from "47 candidates were assessed and
+    /// rejected, and then the budget ran out". Those are different
+    /// situations — the first says the pool is too large to search, the
+    /// second says the pool is full of near-misses — and they used to
+    /// produce an identical error.
+    ///
+    /// The iterator that raises this has no validation state of its own,
+    /// so it reports `tried: 0, last_error: None`.
+    /// [`build_first_valid_path`] fills them in from what it had
+    /// accumulated when the budget ran out.
+    #[non_exhaustive]
+    BudgetExceeded {
+        /// Candidate chains tried and rejected before the budget ran out.
+        tried: usize,
+        /// The last validation failure before the budget ran out, if any
+        /// candidate got that far.
+        last_error: Option<pkix_path::Error>,
+    },
     /// [`build_first_valid_path`] exhausted [`build_path_candidates`] without
     /// finding a candidate that [`pkix_path::validate_path`] accepted.
     ///
@@ -211,6 +230,23 @@ pub enum Error {
     },
 }
 
+impl Error {
+    /// Builds [`Error::BudgetExceeded`].
+    ///
+    /// The variant is `#[non_exhaustive]`, so it cannot be built with a
+    /// struct literal outside this crate. That keeps room to add context
+    /// later; this constructor is how tests, mocks and adapters build one
+    /// in the meantime.
+    ///
+    /// Pass `tried: 0, last_error: None` from anywhere that does not
+    /// validate candidates — the candidate iterator, for instance, which
+    /// cannot know either value.
+    #[must_use]
+    pub const fn budget_exceeded(tried: usize, last_error: Option<pkix_path::Error>) -> Self {
+        Self::BudgetExceeded { tried, last_error }
+    }
+}
+
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -218,9 +254,18 @@ impl core::fmt::Display for Error {
             Self::DepthExceeded => f.write_str(
                 "configured maximum intermediate chain depth exceeded; the chain may require a deeper path than this builder is configured to attempt",
             ),
-            Self::BudgetExceeded => f.write_str(
-                "DFS node-visit budget exceeded; pool may be adversarially large",
-            ),
+            Self::BudgetExceeded { tried, last_error } => match last_error {
+                Some(last) => write!(
+                    f,
+                    "DFS node-visit budget exceeded after trying {tried} candidate path(s); \
+                     pool may be adversarially large. Last validation error: {last}"
+                ),
+                None => write!(
+                    f,
+                    "DFS node-visit budget exceeded before any candidate path could be \
+                     validated; pool may be adversarially large"
+                ),
+            },
             Self::NoValidPath { tried, last_error } => write!(
                 f,
                 "tried {tried} candidate path(s); none validated. Last validation error: {last_error}"
@@ -238,6 +283,9 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::NoValidPath { last_error, .. } => Some(last_error),
+            Self::BudgetExceeded { last_error, .. } => last_error
+                .as_ref()
+                .map(|e| e as &(dyn std::error::Error + 'static)),
             _ => None,
         }
     }
@@ -772,7 +820,7 @@ impl Iterator for PathCandidates<'_> {
             if !top.anchor_checked {
                 if !self.charge() {
                     self.done = true;
-                    return Some(Err(Error::BudgetExceeded));
+                    return Some(Err(Error::budget_exceeded(0, None)));
                 }
                 self.frames.last_mut().expect("non-empty").anchor_checked = true;
                 if self.anchor_matches(node) {
@@ -816,7 +864,7 @@ impl Iterator for PathCandidates<'_> {
             // `dfs_budget` steps.
             if !self.charge() {
                 self.done = true;
-                return Some(Err(Error::BudgetExceeded));
+                return Some(Err(Error::budget_exceeded(0, None)));
             }
 
             // SPKI cycle guard (cheap; before any signature work).
@@ -1170,9 +1218,20 @@ where
                 }
             }
             // The iterator surfaces its own errors (BudgetExceeded; in
-            // principle future variants). Propagate verbatim. We do NOT
-            // wrap these in NoValidPath because they describe failures
-            // of the topological search, not of signature verification.
+            // principle future variants). These are not wrapped in
+            // NoValidPath, because they describe failures of the
+            // topological search rather than of signature verification —
+            // "I stopped looking" is not "there is nothing to find".
+            //
+            // BudgetExceeded is enriched rather than wrapped. The
+            // iterator cannot know how many candidates were validated
+            // and rejected before the budget ran out, because it does
+            // not validate; this loop does. Without this, a search that
+            // assessed 47 near-misses and then ran out reported exactly
+            // what a search that ran out on its first frame reported.
+            Some(Err(Error::BudgetExceeded { .. })) => {
+                return Err(Error::budget_exceeded(tried, last_error))
+            }
             Some(Err(e)) => return Err(e),
             // Iterator exhausted.
             None => {

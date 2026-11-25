@@ -277,7 +277,7 @@ fn an_exhausted_budget_propagates_verbatim_and_is_not_reported_as_no_valid_path(
     .expect_err("a one-unit budget cannot complete the search");
 
     assert!(
-        matches!(err, Error::BudgetExceeded),
+        matches!(err, Error::BudgetExceeded { .. }),
         "expected BudgetExceeded to propagate verbatim, got {err:?}"
     );
     // Stated separately: this is the specific mis-reporting the propagation
@@ -288,4 +288,50 @@ fn an_exhausted_budget_propagates_verbatim_and_is_not_reported_as_no_valid_path(
         "an exhausted budget must not be reported as NoValidPath: \
          the candidates were never built, so nothing was ruled out"
     );
+}
+
+/// The two budget-exhaustion situations must not report identically.
+///
+/// This is what PKIX-wnnn.6 was about: before the variant carried state,
+/// a search that assessed 47 candidates and then ran out of budget
+/// produced the same error as one that ran out on its first frame. Those
+/// mean different things — the first says the pool is full of near-misses,
+/// the second says the pool is too large to search at all — and a
+/// post-mortem could not tell them apart.
+///
+/// Constructed directly rather than provoked, because provoking the
+/// `tried >= 1` case needs a pool tuned so that candidates are validated
+/// and rejected before the budget runs out, which makes a brittle fixture
+/// out of a budget constant. What matters here is that the two shapes are
+/// distinguishable and that `Display` says which is which; that the driver
+/// supplies the values is covered by it compiling against the
+/// accumulators it already maintained.
+#[test]
+fn the_two_budget_exhaustion_cases_report_differently() {
+    let before_any = Error::budget_exceeded(0, None);
+    let after_some =
+        Error::budget_exceeded(47, Some(pkix_path::Error::SignatureInvalid { index: 2 }));
+
+    assert_ne!(before_any, after_some);
+
+    let before_text = before_any.to_string();
+    let after_text = after_some.to_string();
+    assert_ne!(
+        before_text, after_text,
+        "the two cases must be distinguishable in a log line"
+    );
+    assert!(
+        before_text.contains("before any candidate"),
+        "got {before_text}"
+    );
+    assert!(
+        after_text.contains("47"),
+        "the tried count is the whole point; got {after_text}"
+    );
+
+    // The cause is reachable for the case that has one, and absent for
+    // the case that does not.
+    use std::error::Error as _;
+    assert!(after_some.source().is_some());
+    assert!(before_any.source().is_none());
 }

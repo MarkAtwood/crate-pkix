@@ -313,8 +313,15 @@ fn test_build_path_adversarial_pool_budget_exceeded() {
     let elapsed = start.elapsed();
 
     assert!(
-        matches!(err, pkix_path_builder::Error::BudgetExceeded),
-        "expected BudgetExceeded, got {err}"
+        matches!(
+            err,
+            pkix_path_builder::Error::BudgetExceeded {
+                tried: 0,
+                last_error: None,
+                ..
+            }
+        ),
+        "build_path does not validate, so it reports no candidates tried; got {err}"
     );
     assert!(
         elapsed.as_secs() < 2,
@@ -649,7 +656,14 @@ fn test_iterator_budget_bounded_across_calls() {
             Some(Ok(_)) => {
                 yielded_chains += 1;
             }
-            Some(Err(pkix_path_builder::Error::BudgetExceeded)) => {
+            // The iterator yields candidates and does not validate them,
+            // so it has no tried count or validation error to report.
+            // `build_first_valid_path` is what fills those in.
+            Some(Err(pkix_path_builder::Error::BudgetExceeded {
+                tried: 0,
+                last_error: None,
+                ..
+            })) => {
                 got_budget_exceeded = true;
                 break;
             }
