@@ -136,19 +136,45 @@ def role_attribute(role_uri: str) -> bytes:
     return seq(oid(ID_AT_ROLE), tlv(0x31, role))  # SET OF AttributeValue
 
 
+def issuer_serial_contents(name_der: bytes, serial: int) -> bytes:
+    """The contents of an IssuerSerial — RFC 5755 §4.1.
+
+    Returned unwrapped so a caller can apply an IMPLICIT context tag,
+    which replaces the SEQUENCE tag rather than adding a layer.
+    """
+    return general_names(general_name_directory(name_der)) + integer(serial)
+
+
 def acinfo(holder_name: bytes, issuer_name: bytes, serial: int,
-           not_before: str, not_after: str, attrs: bytes) -> bytes:
+           not_before: str, not_after: str, attrs: bytes,
+           issuer_v1_form: bool = False,
+           holder_both_forms: bool = False) -> bytes:
     version = integer(1)  # AttCertVersion v2
     # IMPLICIT tagging: [1] REPLACES the SEQUENCE OF tag of GeneralNames,
     # so the GeneralName sits directly inside [1] with no inner SEQUENCE.
     # Wrapping one in — the explicit reading, and the RFC 5280 habit —
     # produces a structure one level too deep that no conforming parser
     # will read.
-    holder = seq(tlv(0xA1, general_name_directory(holder_name)))
+    if holder_both_forms:
+        # §4.2.2 requires exactly one of baseCertificateID and
+        # entityName. This gives both, so which one identifies the
+        # holder is ambiguous.
+        holder = seq(
+            tlv(0xA0, issuer_serial_contents(holder_name, 0x99)),
+            tlv(0xA1, general_name_directory(holder_name)),
+        )
+    else:
+        holder = seq(tlv(0xA1, general_name_directory(holder_name)))
     # Likewise [0] replaces V2Form's own SEQUENCE tag. What remains
     # inside is V2Form's first field, issuerName, which is untagged and
     # so keeps its SEQUENCE OF tag.
-    issuer = tlv(0xA0, general_names(general_name_directory(issuer_name)))
+    if issuer_v1_form:
+        # AttCertIssuer's first CHOICE arm: GeneralNames with no context
+        # tag. §4.2.3 forbids it, and a conforming parser must still be
+        # able to read it in order to say so.
+        issuer = general_names(general_name_directory(issuer_name))
+    else:
+        issuer = tlv(0xA0, general_names(general_name_directory(issuer_name)))
     validity = seq(gen_time(not_before), gen_time(not_after))
     return seq(version, holder, issuer, ECDSA_SHA256, integer(serial),
                validity, attrs)
@@ -195,6 +221,21 @@ def main() -> None:
                   "20200101000000Z", "20210101000000Z",
                   seq(role_attribute("urn:example:role:auditor")))
     (HERE / "ac-expired.der").write_bytes(attribute_certificate(info))
+
+    # Non-conforming on purpose, to give the profile checks something
+    # to reject. Both parse: the syntax permits what the profile does
+    # not, which is why parsing and profile checking are separate.
+    info = acinfo(leaf_subject, aa_subject, 0x2D,
+                  "20250101000000Z", "20260101000000Z",
+                  seq(role_attribute("urn:example:role:auditor")),
+                  issuer_v1_form=True)
+    (HERE / "ac-issuer-v1form.der").write_bytes(attribute_certificate(info))
+
+    info = acinfo(leaf_subject, aa_subject, 0x2E,
+                  "20250101000000Z", "20260101000000Z",
+                  seq(role_attribute("urn:example:role:auditor")),
+                  holder_both_forms=True)
+    (HERE / "ac-holder-both.der").write_bytes(attribute_certificate(info))
 
     for f in sorted(HERE.glob("ac-*.der")):
         print(f"{f.name}: {f.stat().st_size} bytes")

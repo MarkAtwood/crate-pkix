@@ -146,7 +146,7 @@ pkix-lint             = { path = "pkix-lint",             version = "0.10.2" }
 pkix-ct               = { path = "pkix-ct",               version = "0.3.2" }
 pkix-ct-google        = { path = "pkix-ct-google",        version = "0.1.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.2.0" }
-pkix-ac               = { path = "pkix-ac",               version = "0.2.2" }
+pkix-ac               = { path = "pkix-ac",               version = "0.3.0" }
 pkix-identity         = { path = "pkix-identity",         version = "0.3.1" }
 pkix-mta-sts          = { path = "pkix-mta-sts",          version = "0.1.0" }
 pkix-mta-sts-http     = { path = "pkix-mta-sts-http",     version = "0.1.0" }
