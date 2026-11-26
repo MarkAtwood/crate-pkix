@@ -44,10 +44,11 @@
 //! are provided by opt-in adapter crates that produce DER bytes and feed them
 //! to [`from_der_iter`]:
 //!
-//! - `pkix-truststore-system` — OS-native trust stores (macOS Security,
-//!   Windows CryptoAPI, Linux/BSD distro bundles). See bead `PKIX-8h87`.
+//! - `pkix-truststore-system` — OS-native trust stores: PEM bundles and
+//!   certificate directories on any target, plus macOS Keychain and
+//!   Windows CryptoAPI on those targets (`PKIX-8h87`).
 //! - `pkix-truststore-pkcs11` — HSMs, smart cards, TPM 2.0 via PKCS#11.
-//!   See bead `PKIX-p8vz`.
+//!   Still a stub; substantive content lands via `PKIX-p8vz`.
 //!
 //! Plausible future adapters (file when concrete demand): cloud KMS
 //! (AWS / Azure / GCP), Vault PKI, NSS, EST, SCEP, CMP.
@@ -112,18 +113,14 @@
 //!
 //! # Limitations
 //!
-//! - **No compiled-in CA bundle.** This crate ships zero trust data by
-//!   design. See "Project stance" above. Callers needing the Mozilla CA
-//!   list must download it (e.g., from curl.se/docs/caextract.html) and
-//!   load it with [`from_pem`] / [`from_pem_file`]; this is a
-//!   deployment-configuration decision, not a library decision.
-//! - **No platform integration in this crate.** Loading from the OS-native
-//!   trust store (macOS Security framework, Windows CryptoAPI, iOS, Android)
-//!   is the job of `pkix-truststore-system` (skeleton; substantive content
-//!   tracked under `PKIX-8h87`). Loading from PKCS#11 / HSM / smart card
-//!   tokens is the job of `pkix-truststore-pkcs11` (skeleton; tracked
-//!   under `PKIX-p8vz`). Both adapter crates feed [`from_der_iter`] and
-//!   stay outside the 1.0 release; they ship at their own 0.x cadence.
+//! - **No compiled-in CA bundle.** See "Project stance" above. Callers
+//!   needing the Mozilla CA list download it (e.g., from
+//!   curl.se/docs/caextract.html) and load it with [`from_pem`] /
+//!   [`from_pem_file`].
+//! - **No platform integration in this crate.** OS-native trust stores
+//!   and PKCS#11 tokens are the adapter crates' job — see "Source
+//!   coverage" above. Both feed [`from_der_iter`], stay outside the 1.0
+//!   release, and ship at their own 0.x cadence.
 //! - **No constraint metadata beyond DER.** This crate loads certificates
 //!   as [`TrustAnchor`] values and does not surface per-anchor policy
 //!   constraints (Mozilla's "websites trust bit", root-program-specific

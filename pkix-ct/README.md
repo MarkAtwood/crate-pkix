@@ -37,9 +37,6 @@ Implemented:
   `precert_entry` log entry types via [`SctVerifier`][verifier],
   dispatching algorithm-specific verification through `pkix-path`'s
   [`SignatureVerifier`] trait.
-
-Implemented (continued):
-
 - Merkle inclusion proof verification and Signed Tree Head signature
   verification (RFC 6962 §2.1.1 / §3.5). See
   [`SctVerifier::verify_inclusion`][verifier-inclusion] and

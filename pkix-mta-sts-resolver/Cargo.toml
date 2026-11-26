@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-mta-sts-resolver"
 description = "MTA-STS (RFC 8461) _mta-sts TXT record lookup: §3.1 record selection over a real resolver"
-version     = "0.1.0"
+version     = "0.1.1"
 edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true

@@ -1,5 +1,3 @@
-//! # pkix-truststore-system
-//!
 //! Loads trust anchors from where the operating system keeps them, and
 //! hands them to [`pkix-truststore`](pkix_truststore) to become
 //! [`TrustAnchor`] values. The `rustls-native-certs` analogue for the
@@ -29,11 +27,14 @@
 //!   in containers, in Nix and Guix builds, and in any sandbox that
 //!   relocates the store. A caller who sets them has made a decision,
 //!   and it is honoured over anything found on disk.
-//! - **Keychain and CryptoAPI are feature-gated backends** layered on
-//!   top, for the platforms whose canonical store is not a file.
+//! - **Keychain and CryptoAPI are per-target backends** layered on top,
+//!   for the platforms whose canonical store is not a file. They are
+//!   selected by target rather than behind a feature, so a macOS build
+//!   gets the Keychain reader without opting in and a Linux build
+//!   compiles neither.
 //!
-//! Linux is the primary target, so it is the backend that is implemented
-//! and tested here rather than the one left out.
+//! Linux is the primary target, which is why the portable reader is the
+//! default rather than a fallback.
 //!
 //! # Why this is not just `from_pem_file`
 //!
@@ -104,9 +105,6 @@
 //!
 //! - `serde` — propagates to [`pkix-truststore`](pkix_truststore) so
 //!   [`Error`] and the re-exported [`IoFailure`] gain the derives.
-//!
-//! No platform backend is enabled by default; the portable reader needs
-//! none.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]

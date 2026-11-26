@@ -26,8 +26,7 @@ checks via subprocess at runtime (PKIX-jy95.10).
 
 The S/MIME and CS BR documents are also audited at the workspace
 level (see `pkix-profiles-cabf/divergences.md`), but this crate
-currently ships lints only for TLS BR. S/MIME / CS lint coverage is
-intentionally deferred to `pkix-policy-zlint`.
+currently ships lints only for TLS BR.
 
 ## Lint coverage
 
@@ -46,8 +45,7 @@ intentionally deferred to `pkix-policy-zlint`.
 
 This crate ships six marquee lints. Full TLS BR predicate coverage
 (roughly one Lint per BR sub-section, matching zlint's CA/B Forum
-ruleset) is intentionally out of scope here. Use `pkix-policy-zlint`
-when you need that breadth.
+ruleset) is intentionally out of scope here.
 
 ### `BcCaFlagLint` cites the umbrella `BasicConstraints` section
 

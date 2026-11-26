@@ -1,8 +1,7 @@
 # Hostname-binding corpus — pass-rate baseline
 
-Pass-rate baseline for the curated RFC 6125 hostname-binding corpus
-exercised by `tests/hostname_corpus.rs` against
-`pkix_chain::verify_tls_server`.
+The curated RFC 6125 hostname-binding corpus exercised by
+`tests/hostname_corpus.rs` against `pkix_chain::verify_tls_server`.
 
 Tracks PKIX-fmtv.22. Companion to `tests/fixtures/gen.py` (fixture
 production via pyca/cryptography) and `tests/verify_tls_server.rs` (the
@@ -78,9 +77,7 @@ S/MIME bindings (PKIX-fmtv.23).
 
 - SANs are matched as A-labels (real-world CAs do not emit U-labels).
   `ServerName::dns_name` accepts a U-label target and normalizes it to
-  A-label form via idna 2008 before the matcher runs. End-to-end:
-  caller passes either form, U-label converts client-side, match
-  happens in A-label space. Tests 12, 13.
+  A-label form via idna 2008 before the matcher runs. Tests 12, 13.
 
 ### IP literals (RFC 5280 §4.2.1.6)
 
@@ -111,10 +108,8 @@ S/MIME bindings (PKIX-fmtv.23).
 - **x509-limbo `webpki` suite.** x509-limbo contains hundreds of RFC
   6125-shaped cases; consuming it cross-crate would require pulling
   the corpus through pkix-difftest into pkix-chain tests, which crosses
-  a layering boundary. The corpus here is hand-curated and
-  self-contained inside pkix-chain. Future expansion via x509-limbo
-  belongs in pkix-difftest's differential harness, not in this
-  per-wrapper corpus.
+  a layering boundary. Future expansion via x509-limbo belongs in
+  pkix-difftest's differential harness, not in this per-wrapper corpus.
 - **`verify_tls_client_dns` corpus coverage.** The DNS-name client
   wrapper shipped under PKIX-fmtv.11.2 with its own smaller
   smoke-test surface (`tests/verify_tls_client.rs`). Re-running this
@@ -128,7 +123,7 @@ S/MIME bindings (PKIX-fmtv.23).
   (test 9) is the closest the workspace comes.
 - **Malformed iPAddress extension.** `x509.IPAddress` is typed at the
   pyca layer (`ipaddress.IPv4Address`/`IPv6Address`), so producing a
-  malformed SAN value requires raw DER construction. Robustness against
+  malformed SAN value requires raw DER construction. Behavior on
   malformed IP SAN encoding is `pkix-identity` unit-test territory; the
   wrapper corpus exercises only the structural behavior.
 

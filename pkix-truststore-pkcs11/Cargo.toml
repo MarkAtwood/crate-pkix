@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-truststore-pkcs11"
 description = "PKCS#11 / HSM / smart card trust store adapter for pkix-truststore — stub"
-version     = "0.1.1"
+version     = "0.1.2"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true

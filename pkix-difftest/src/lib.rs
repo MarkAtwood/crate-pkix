@@ -10,10 +10,10 @@
 //! See the parent bead `PKIX-7nsf` and the in-scope decomposition
 //! `PKIX-7nsf.1`–`PKIX-7nsf.8` for full context.
 //!
-//! Status (PKIX-7nsf.1, this commit): only the `Chain` loader and the
-//! in-process `pkix-path` oracle are implemented. The `OpenSsl` and `Pyca`
-//! oracle modules are stubbed; the `pkits` and `pem-tree` corpus loaders
-//! are TODO.
+//! That decomposition has landed: the `Chain` loader, all three oracles
+//! ([`oracles::pkix_path`], [`oracles::openssl`], [`oracles::pyca`]), the
+//! PKITS, PEM-tree and x509-limbo corpus loaders, and the verdict
+//! classifier and reporter all ship here.
 
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]

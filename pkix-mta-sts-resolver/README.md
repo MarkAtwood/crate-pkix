@@ -19,10 +19,10 @@ println!("policy id: {}", record.id());
 
 ## DNSSEC is not required here, unlike DANE
 
-Worth stating plainly, because the workspace's other resolver insists on it.
-`pkix-dane-resolver` sets hickory's `validate` option and refuses an
-unvalidated answer, because RFC 7672 §2.1.1 makes an indeterminate TLSA lookup
-equivalent to an insecure one — DANE's whole trust basis is DNSSEC.
+The workspace's other resolver insists on it: `pkix-dane-resolver` sets
+hickory's `validate` option and refuses an unvalidated answer, because
+RFC 7672 §2.1.1 makes an indeterminate TLSA lookup equivalent to an insecure
+one — DANE's whole trust basis is DNSSEC.
 
 MTA-STS's is not. RFC 8461 §1 "relies on certification authorities (CAs) and
 does not require DNSSEC, at a cost of risking malicious downgrades". The TXT

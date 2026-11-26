@@ -15,7 +15,7 @@ RFC 5280 path validator that is:
 - **Dependency-light** — built entirely on the RustCrypto `formats` crates
 
 `rustls-webpki` is excellent for its use case but hard-couples to `ring`, enforces
-CA/Browser Forum TLS rules, and is not `no_std`. This project fills the gap.
+CA/Browser Forum TLS rules, and is not `no_std`.
 
 ## Crate map
 
@@ -42,10 +42,8 @@ Per-crate versions live on crates.io and in each crate's `Cargo.toml`.
 These crates encode specific industry-forum requirements (e.g., CA/B Forum
 Baseline Requirements) on top of the core framework. They are explicit
 reference implementations — snapshot-style, not maintained as canonical
-encodings — and ship with a "fork and adapt to your deployment's current
-interpretation" caveat in their crate-level rustdoc. See the
-[framework / policy split](#framework--policy-split) section below for the
-rationale.
+encodings. See [framework / policy split](#framework--policy-split) for the
+rationale and the caveat they carry.
 
 | Crate | What it does | `no_std` | Status |
 |-------|-------------|----------|--------|
@@ -166,7 +164,7 @@ of the BR text.
 | `Lint` trait, `LintRunner`, `EvaluationReport`, RFC-conformance lints | [`pkix-lint`] | — |
 | CA/B Forum TLS BR lints (`cabf_tls_br`) | — | [`pkix-lint-cabf`] |
 
-Encoded as workspace stance in [`AGENTS.md`] non-negotiable #6 (PKIX-amgn).
+Encoded as workspace stance in [`AGENTS.md`] non-negotiable #5 (PKIX-amgn).
 
 [`AGENTS.md`]: ./AGENTS.md
 
@@ -262,7 +260,7 @@ filtering). These are deferred, not forgotten.
 
 Our goal is to become the standard PKIX library for Rust — the way
 `rustls` is the standard TLS library but for the certificate validation
-layer underneath. Here is what is shipping and what is next.
+layer underneath.
 
 ### Shipping today
 
@@ -319,13 +317,6 @@ layer underneath. Here is what is shipping and what is next.
 
 | Crate | What | Status |
 |-------|------|--------|
-| `pkix-dane` | DANE / TLSA (RFC 6698 + 7218 + 7671) matching | **shipped** (0.2.0) |
-| `pkix-dane-resolver` | DNSSEC-validating TLSA resolver | **shipped** (0.2.0) |
-| `pkix-mta-sts` | MTA-STS (RFC 8461) policy parsing and MX matching | **shipped** (0.1.0) |
-| `pkix-mta-sts-http` | MTA-STS HTTPS policy fetching (RFC 8461 §3.3) | **shipped** (0.1.0) |
-| `pkix-mta-sts-resolver` | MTA-STS `_mta-sts` TXT lookup (RFC 8461 §3.1) | **shipped** (0.1.0) |
-| `pkix-net-guard` | Destination policy for outbound HTTP fetches | **shipped** (0.1.0) |
-| `pkix-tlsrpt` | TLSRPT (RFC 8460) records, report schema, classification | **shipped** (0.2.0) |
 | `pkix-composite` | Post-quantum + classical composite signatures | stub |
 | `pkix-ac` | RFC 5755 attribute certificate validation | stub |
 | `pkix-pkilint-bridge` | pkilint subprocess integration | name reserved |

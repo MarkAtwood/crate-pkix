@@ -37,10 +37,9 @@ but violates CA/B Forum TLS BR §7.1.4.2" without aborting validation entirely.
   method so a profile struct bundles its own lint set.
 - **`deviation` module** — a waiver/exception mechanism that records approved
   deviations from lint rules for audit purposes.
-- **`EvaluationReport`** — an exportable evidence pack. The optional
-  `oscal` feature can serialize it as OSCAL Assessment Results JSON;
-  callers can also consume it directly as Rust data or marshal it into
-  any other format.
+- **`EvaluationReport`** — an exportable evidence pack, consumable directly
+  as Rust data or serialized as OSCAL Assessment Results JSON via the
+  `oscal` feature.
 
 ## Advisory-only contract
 
@@ -56,19 +55,15 @@ layer. This is intentional:
 
 ## Built-in lints (`pkix-lint::rfc5280`)
 
-`pkix-lint` ships the framework and standards-body (RFC) conformance lints.
-CA/B Forum lint bundles live in the sibling [`pkix-lint-cabf`] crate marked
-"reference / not authoritative"; project policy (see workspace `AGENTS.md`)
-is that vendor and industry-forum policy interpretations stay out of the
-main crate.
-
 | ID | Rule | Scope |
 |----|------|-------|
 | `rfc5280.cert.serial_number.max_octets` | Certificate `serialNumber` length cap (RFC 5280 §4.1.2.2) | Any |
 
 CA/B Forum TLS BR lints (`cabf.br.tls.*`) — SC-081 phased validity caps,
 SHA-1 prohibition, RSA min-key-size, SAN/EKU presence, `BasicConstraints`
-cA-flag — are in [`pkix-lint-cabf::cabf_tls_br`].
+cA-flag — are in [`pkix-lint-cabf::cabf_tls_br`], marked "reference / not
+authoritative": project policy (see workspace `AGENTS.md`) is that vendor and
+industry-forum policy interpretations stay out of the main crate.
 
 [`pkix-lint-cabf`]: https://docs.rs/pkix-lint-cabf
 [`pkix-lint-cabf::cabf_tls_br`]: https://docs.rs/pkix-lint-cabf/latest/pkix_lint_cabf/cabf_tls_br/
@@ -157,6 +152,7 @@ change between crate versions without a semver-major bump. Format convention:
 | Feature | Enables |
 |---------|---------|
 | `serde` | `Serialize`/`Deserialize` on `Finding`, `EvaluationReport`, `Deviation`, and related types |
+| `oscal` | The `oscal` module: a NIST OSCAL Catalog / Profile / Assessment Results bridge |
 
 ## Standards
 

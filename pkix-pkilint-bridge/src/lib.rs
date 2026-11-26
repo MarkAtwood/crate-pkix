@@ -1,7 +1,5 @@
-//! # pkix-pkilint-bridge
-//!
-//! **Shared subprocess and output-parsing infrastructure for running
-//! [pkilint] on certificates. Stub crate.**
+//! Shared subprocess and output-parsing infrastructure for running
+//! [pkilint] on certificates. **Stub crate.**
 //!
 //! `pkix-pkilint-bridge` will provide Rust-shaped infrastructure for
 //! running pkilint on X.509 certificates: subprocess plumbing, output
@@ -15,11 +13,11 @@
 //! - **`pkix-difftest`**'s pkilint oracle — differential testing of
 //!   workspace lints against pkilint's verdicts on the same certificate.
 //!
-//! ## Status
+//! # Status
 //!
-//! Stub crate — namespace reservation. The substantive content
-//! (subprocess management, pkilint JSON output parsing, verdict cache,
-//! error types) is planned for a future release.
+//! Namespace reservation. The substantive content (subprocess
+//! management, pkilint JSON output parsing, verdict cache, error types)
+//! is planned for a future release.
 //!
 //! [pkilint]: https://github.com/digicert/pkilint
 //! [`pkix-zlint-bridge`]: https://docs.rs/pkix-zlint-bridge

@@ -15,29 +15,36 @@
 //! - RFC 9162 — Certificate Transparency Version 2.0
 //! - CA/Browser Forum TLS Baseline Requirements §3.2.2.9 — SCT requirements
 //!
+//! # What is implemented
+//!
+//! - SCT binary-format parsing, RFC 6962 §3.2 / §3.3:
+//!   [`SignedCertificateTimestamp`], [`SctList`].
+//! - Delivery-channel adapters: [`sct_list_from_tls_extension`] for the
+//!   TLS handshake extension and, behind the `ocsp` feature,
+//!   `sct_list_from_ocsp_response`.
+//! - CT log list management, behind the `log-list` and `log-list-json`
+//!   features: [`CtLog`], [`CtLogList`],
+//!   `CtLogList::from_google_log_list_json`.
+//! - SCT signature verification for both log entry types:
+//!   [`SctVerifier::verify_sct_for_cert`] for `x509_entry` (SCTs delivered
+//!   via OCSP or the TLS handshake) and
+//!   [`SctVerifier::verify_sct_for_precert`] for `precert_entry` (SCTs
+//!   embedded in the issued certificate via the SCT-list extension).
+//! - Merkle inclusion proof verification (RFC 6962 §2.1.1) and Signed Tree
+//!   Head signature verification (RFC 6962 §3.5):
+//!   [`SctVerifier::verify_inclusion`] and [`SctVerifier::verify_sth`],
+//!   with the `MerkleTreeLeaf` builders [`merkle_tree_leaf_for_cert`] and
+//!   [`merkle_tree_leaf_for_precert`] plus [`merkle_leaf_hash`] completing
+//!   the "parse SCT → build leaf → hash → verify inclusion" path.
+//!
 //! # Limitations
 //!
-//! SCT binary-format parsing (RFC 6962 §3.2 / §3.3) is implemented; see
-//! [`SignedCertificateTimestamp`] and [`SctList`]. Delivery-channel
-//! adapters for the TLS handshake extension and OCSP responses are also
-//! implemented; see [`sct_list_from_tls_extension`] and (behind the
-//! `ocsp` feature) `sct_list_from_ocsp_response`. CT log list management
-//! is implemented behind the `log-list` and `log-list-json` features;
-//! see [`CtLog`], [`CtLogList`], and `CtLogList::from_google_log_list_json`.
-//! SCT signature verification for both the `x509_entry` and
-//! `precert_entry` log entry types is implemented; see
-//! [`SctVerifier::verify_sct_for_cert`] (used when SCTs are delivered
-//! via OCSP or the TLS handshake) and
-//! [`SctVerifier::verify_sct_for_precert`] (used when SCTs are
-//! embedded directly in the issued certificate via the SCT-list
-//! extension). Merkle inclusion proof verification (RFC 6962 §2.1.1)
-//! and Signed Tree Head signature verification (RFC 6962 §3.5) are
-//! also implemented; see [`SctVerifier::verify_inclusion`] and
-//! [`SctVerifier::verify_sth`]. Public `MerkleTreeLeaf` builders for
-//! both entry types are exposed as [`merkle_tree_leaf_for_cert`] and
-//! [`merkle_tree_leaf_for_precert`], pairing with
-//! [`merkle_leaf_hash`] to give consumers the full
-//! "parse SCT → build leaf → hash → verify inclusion" pipeline.
+//! - Only RFC 6962 v1 SCTs are accepted; a non-zero version byte is
+//!   rejected with [`Error::UnsupportedVersion`]. RFC 9162 is cited above
+//!   for context, not as implemented.
+//! - Everything past parsing — signature, inclusion-proof and STH
+//!   verification — needs the issuing log's public key, so it sits behind
+//!   the `log-list` feature. A default build parses SCTs and no more.
 
 extern crate alloc;
 

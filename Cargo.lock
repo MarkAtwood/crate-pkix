@@ -1461,7 +1461,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ac"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -1480,7 +1480,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia-http"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1494,7 +1494,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "der",
  "mockito",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "der",
@@ -1612,7 +1612,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-dnssec-anchor"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "pkix-identity"
@@ -1626,7 +1626,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-lint"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "der",
  "idna",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-lint-cabf"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "der",
  "pkix-lint",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-mta-sts-resolver"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "hickory-proto",
  "hickory-resolver",
@@ -1691,7 +1691,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "base64ct",
  "der",
@@ -1711,7 +1711,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-path-builder"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -1741,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "der",
  "pkix-lint",
@@ -1751,7 +1751,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles-cabf"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "der",
  "pkix-lint",
@@ -1762,7 +1762,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -1777,7 +1777,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-revocation-http"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "der",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-truststore"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "der",
  "pkix-path",
@@ -1838,11 +1838,11 @@ dependencies = [
 
 [[package]]
 name = "pkix-truststore-pkcs11"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "pkix-truststore-system"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pkix-truststore",
  "schannel",
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-zlint-bridge"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "pkix-lint",
  "rustix",

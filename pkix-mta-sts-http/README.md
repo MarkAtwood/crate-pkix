@@ -23,7 +23,7 @@ record is unsigned. So none of these is hygiene:
 
 | Requirement | What goes wrong without it |
 |---|---|
-| Certificate valid for `mta-sts.<domain>`, trusted, unexpired | Anyone on the path writes the policy — reported as `FetchError::TlsValidation`, separately from a network failure |
+| Certificate valid for `mta-sts.<domain>`, trusted, unexpired | Anyone on the path writes the policy — reported as `FetchError::TlsValidation` |
 | Only HTTP 200 is a policy | A 404 becomes "an empty policy"; a 500 becomes "no MTA-STS" |
 | 3xx **MUST NOT** be followed | Whoever controls the policy host moves the fetch somewhere whose certificate says nothing about the domain |
 | HTTP caching **MUST NOT** be used | A stale policy is extended by an interval the sender never agreed to |

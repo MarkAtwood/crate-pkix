@@ -30,7 +30,6 @@ URLs for chain building but *does* refuse non-public destinations by default.
 The two crates ship opposite defaults for the same threat. Do not carry an
 assumption from one to the other.
 
-
 ## What this does
 
 [`pkix-revocation`] requires the caller to supply pre-fetched DER bytes for

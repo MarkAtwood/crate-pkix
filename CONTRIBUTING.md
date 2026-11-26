@@ -22,7 +22,7 @@ it must be correct, and it must be tested.
   `Co-Authored-By`, or any other trailer naming a model or tool. No commit in
   this repository has ever carried one. What matters is whether you can
   explain and stand behind the change, which the first rule above already
-  covers; a trailer does not establish that and is not a substitute for it.
+  covers; a trailer does not establish that.
 
 ## Developer Certificate of Origin
 

@@ -66,15 +66,13 @@
 //!   AVAs use raw DER byte comparison by policy — `pkix-path` deliberately
 //!   does not transcode T.61 to Unicode; see `any_to_str_bytes` rustdoc
 //!   for the rationale.
-//! - **Online revocation** — revocation is handled by `pkix-revocation`
-//!   (CRL/OCSP); this crate is network-free by design.
 //! - **Path building** — converting an unordered bag of certificates into a
 //!   validated chain is handled by `pkix-path-builder`. This crate validates
 //!   a caller-ordered `&[Certificate]` only.
 //! - **AIA fetching** — chains with missing intermediates are not
-//!   reassembled from `AuthorityInfoAccess` URIs. Callers must supply a
-//!   complete chain. The `pkix-aia` crate (trait + `NoAiaFetcher` default)
-//!   and `pkix-aia-http` adapter are tracked under `PKIX-zkjb`.
+//!   reassembled from `AuthorityInfoAccess` URIs here. Callers supply a
+//!   complete chain, or go through `pkix-chain`, which follows
+//!   `caIssuers` URIs via `pkix-aia` / `pkix-aia-http` (`PKIX-zkjb`).
 
 // For no_std builds, pull in the alloc crate explicitly so `alloc::` paths
 // and the `vec!` macro resolve. `#[macro_use]` re-exports alloc macros

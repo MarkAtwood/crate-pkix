@@ -21,11 +21,9 @@
 //! signature check itself is not a PKI question.
 //!
 //! Doing it here means `x509-cert` parses the certificate and
-//! [`pkix_path::SignatureVerifier`] verifies the signature, and no
-//! webpki code runs in the connection at all — the default verifier is
-//! not installed, and this was the only other live path into it. webpki
-//! remains linked, because rustls depends on it unconditionally, but it
-//! is dead code.
+//! [`pkix_path::SignatureVerifier`] verifies the signature. It was also
+//! the last live path into webpki — see the crate documentation for why
+//! webpki is nonetheless still linked.
 //!
 //! # What has to be exactly right
 //!

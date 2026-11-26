@@ -6,8 +6,7 @@
 //!
 //! rustls asks one question of a certificate chain — *should I trust
 //! this?* — and answers it by default with `rustls-webpki`. This crate
-//! answers it with [`pkix_chain`] instead, which is the whole of what it
-//! does.
+//! answers it with [`pkix_chain`] instead.
 //!
 //! ```no_run
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,9 +54,7 @@
 //!
 //! This crate still does not implement any cryptography: key exchange,
 //! AEAD, HKDF and the TLS state machine are all rustls's, and the
-//! signature primitives are `pkix-path`'s existing backends. What it
-//! replaces is the trust decision and the certificate parsing that
-//! feeds it.
+//! signature primitives are `pkix-path`'s existing backends.
 //!
 //! # What about `rustls-webpki`?
 //!
@@ -87,8 +84,8 @@
 //! `NotValidYet`, `Revoked`, `UnknownIssuer`, `BadSignature`,
 //! `NotValidForName` and the rest — and every error that does not is
 //! carried intact inside [`CertificateError::Other`], which exists for
-//! this purpose. Nothing is flattened into a generic failure, so an
-//! application can still recover exactly why a chain was refused:
+//! this purpose, so an application can still recover exactly why a
+//! chain was refused:
 //!
 //! ```no_run
 //! # use rustls::CertificateError;

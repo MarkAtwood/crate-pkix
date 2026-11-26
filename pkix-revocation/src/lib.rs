@@ -29,8 +29,9 @@
 //!
 //! # `no_std` note
 //!
-//! The core trait and `NoRevocation` are `no_std`. Feature-gated checkers
-//! that perform network I/O are `std`-only and gated behind separate features.
+//! The core trait, `NoRevocation` and `CrlChecker` are `no_std`: the `crl`
+//! feature does not imply `std`. `OcspChecker` is `std`-only: the `ocsp`
+//! feature enables `std` alongside the OCSP response types.
 //!
 //! # Security: anchor-issued certificate revocation
 //!
@@ -57,9 +58,10 @@
 //!   concern handled by the TLS stack; once extracted, the response bytes
 //!   feed `OcspChecker` like any other.
 //! - **Algorithm coverage tracks `pkix-path`.** CRL and OCSP-response
-//!   signature verification is delegated to a `SignatureVerifier`; the
-//!   same algorithm gaps documented in `pkix-path` (Ed25519, P-521,
-//!   RSA-PSS — tracked under `PKIX-gphz`) apply here.
+//!   signature verification is delegated to a `SignatureVerifier`, so the
+//!   algorithms available here are exactly the ones that verifier
+//!   implements — for `pkix-path`'s bundled backends, whichever of its
+//!   `rsa` / `p256` / `p384` / `p521` / `ed25519` features are on.
 
 // `alloc` for the `Cow` that CRL distribution-point scope checking needs.
 // Gated to no_std mode because under `std` the same types come from `std`,

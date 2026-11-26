@@ -1,6 +1,5 @@
-//! # pkix-profiles-cabf
-//!
-//! **Reference implementation of CA/Browser Forum cert profile requirements. Not authoritative.**
+//! Reference implementation of CA/Browser Forum cert profile requirements.
+//! **Not authoritative.**
 //!
 //! CA/B Forum Baseline Requirements (TLS BR, S/MIME BR, Code Signing BR) change
 //! on a ballot cycle. The implementations in this crate are a small, curated
@@ -35,17 +34,14 @@
 //!
 //! The exception is **not a template.** No equivalent `pkix-profiles-mozilla`,
 //! `pkix-profiles-fedramp`, `pkix-profiles-dod`, or `pkix-profiles-etsi`
-//! crates are admitted without explicit human re-decision. For comprehensive
-//! CA/B Forum coverage (matching zlint's ~700-lint scope), use
-//! `pkix-policy-zlint` (PKIX-jy95).
+//! crates are admitted without explicit human re-decision. For
+//! predicate-comprehensive CA/B Forum coverage, use `pkix-policy-zlint`
+//! (PKIX-jy95).
 //!
 //! # Reporting divergences
 //!
-//! This crate is a snapshot interpretation of the CA/B Forum Baseline
-//! Requirements. The canonical source is the CA/B Forum's published BR
-//! text; this crate is reference, not authoritative. See `divergences.md`
-//! in this crate's source tree for the spec versions last refreshed
-//! against and the known intentional divergences.
+//! `divergences.md` in this crate's source tree records the spec versions
+//! last refreshed against and the known intentional divergences.
 //!
 //! If you find that a constraint in this crate differs from what the
 //! current CA/B Forum BR says — wrong section reference, outdated rule,
@@ -54,7 +50,7 @@
 //! welcomed from anyone in the community; you do not need to be a
 //! maintainer.
 //!
-//! Canonical BR sources:
+//! The BR source text to check a divergence against:
 //!
 //! - TLS BR: <https://github.com/cabforum/servercert/blob/main/docs/BR.md>
 //! - S/MIME BR: <https://github.com/cabforum/smime/blob/main/SBR.md>
@@ -103,15 +99,12 @@
 //!
 //! # Stance
 //!
-//! - AGENTS.md non-negotiable #5 — three-mode policy-class architecture,
-//!   including the unprincipled-exception clause that admits this crate.
-//! - Stance / epic: [PKIX-amgn].
+//! AGENTS.md non-negotiable #5 — three-mode policy-class architecture,
+//! including the unprincipled-exception clause that admits this crate.
+//! Stance / epic: [PKIX-amgn].
 //!
 //! # Limitations
 //!
-//! - **Reference, not authoritative.** See the unprincipled-exception
-//!   clause above. The BR text is the only canonical source; this crate
-//!   ships a curated subset.
 //! - **Subscriber-cert taxonomy only.** Per the AGENTS.md spec-taxonomy
 //!   principle (`PKIX-mzsk`), this crate ships idiomatic Rust [`Profile`]
 //!   types for each subscriber-certificate profile explicitly named in
@@ -119,24 +112,11 @@
 //!   here — that is the path validator's job (RFC 5280 §6.1, in
 //!   `pkix-path`). Per-predicate Lint enforcement is not in scope —
 //!   that is `pkix-policy-zlint`'s job.
-//! - **S/MIME BR sub-profile families partially split.** [`SmimeProfile`]
-//!   ships the Mailbox-validated tier baseline targeting the Strict generation;
-//!   [`SmimeSponsorValidated`] ships the Sponsor-validated tier (§7.5) Strict
-//!   generation; [`SmimeSponsorValidatedMultipurpose`] ships the
-//!   Sponsor-validated tier (§7.5) Multipurpose generation;
-//!   [`SmimeIndividualValidated`] ships the Individual-validated
-//!   tier (§7.6) Strict generation; [`SmimeIndividualValidatedMultipurpose`]
-//!   ships the Individual-validated tier (§7.6) Multipurpose generation;
-//!   the Organization-validated tier (Strict) and the Mailbox / Organization
-//!   Multipurpose siblings remain tracked under `PKIX-jbvb`
-//!   (Org Strict: PKIX-jbvb.1; remaining Multipurpose siblings: PKIX-jbvb.9).
-//!   Legacy generation (`.1`) Profile types are not shipped — Legacy
-//!   issuance was BR-banned effective 2025-07-15 per §7.1.6.1.
-//! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** Cross-spec horizontal
-//!   expansion is barred by the AGENTS.md spec-taxonomy clause. Other
-//!   industry-forum / vendor / government policies must come in via
-//!   policy-adapter crates that defer to upstream tools, not via
-//!   workspace-internal transcription.
+//! - **S/MIME BR sub-profile families partially split.** The table above
+//!   is what ships. The Organization-validated tier (Strict) and the
+//!   Mailbox / Organization Multipurpose siblings remain tracked under
+//!   `PKIX-jbvb` (Org Strict: PKIX-jbvb.1; remaining Multipurpose
+//!   siblings: PKIX-jbvb.9).
 //!
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-profiles`]: https://docs.rs/pkix-profiles

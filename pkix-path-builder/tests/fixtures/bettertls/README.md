@@ -77,10 +77,10 @@ failures in `pkix-path`, not path-discovery failures in
 `pkix-path-builder`. See the PKIX-lwr9 comment thread for the
 follow-up plan.
 
-The standing fixture set is sized to also cover the path-builder
-behaviour PKIX-lwr9.2/.3/.4 will land: even though the current baseline
-is mostly green, the fixtures remain useful as regression coverage
-against future path-builder refactors.
+The fixture set is sized to also cover the path-builder behaviour
+PKIX-lwr9.2/.3/.4 will land: the current baseline is mostly green, but
+the fixtures are regression coverage against future path-builder
+refactors.
 
 ## Regenerating fixtures
 

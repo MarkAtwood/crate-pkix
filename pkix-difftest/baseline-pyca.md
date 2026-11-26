@@ -70,9 +70,7 @@ For the `pkix-difftest` baseline of "run on a real-world corpus
 and surface divergences", the PKITS baseline (PKIX-7nsf.6,
 `baseline-pkits.{md,json}`) already satisfies the parent epic's
 "at least one real divergence found, classified, and recorded"
-acceptance criterion — 42 LooserThanWild and 60 StricterThanWild
-divergences are documented and explained in
-`baseline-pkits-analysis.md`.
+acceptance criterion.
 
 ## Status: PKIX-7nsf.7 acceptance
 

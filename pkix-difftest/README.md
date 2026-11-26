@@ -332,19 +332,12 @@ new `SignatureVerifier` lands or the corpus is refreshed.
 This section predates the proper LimboCorpus loader (see "Tier-2"
 above for the supported workflow). It is kept for reference because
 the PEM-tree converter is still useful for ad-hoc cherry-picking of
-testcases into shareable on-disk corpora.
+testcases into shareable on-disk corpora. Prefer `run limbo` for any
+baseline run.
 
-
-
-[x509-limbo](https://github.com/C2SP/x509-limbo) is the curated 9,773-
-testcase chain-validation corpus that pyca/cryptography's verifier tests
-run against. It is the corpus the parent epic PKIX-7nsf originally
-called "Tier 2: pyca corpus" (see `baseline-pyca.md` for the discovery
-that pyca's `tests/x509/` is parser-shaped, not chain-shaped).
-
-The structurally-correct integration is `run limbo` (see "Tier-2: x509-limbo
-corpus" above). The PEM-tree converter described below is a legacy ad-hoc
-path predating the proper loader; prefer `run limbo` for any baseline run.
+x509-limbo is the corpus the parent epic PKIX-7nsf originally called
+"Tier 2: pyca corpus" (see `baseline-pyca.md` for the discovery that
+pyca's `tests/x509/` is parser-shaped, not chain-shaped).
 
 ```sh
 # 1. Clone x509-limbo (~88MB, one-time):
@@ -371,8 +364,7 @@ report.
 
 ### Demo-path limitations
 
-This is a **demo path**, not a substitute for the real LimboCorpus
-integration:
+Not a substitute for the real LimboCorpus integration:
 
 * **`validation_time` is ignored** — the harness uses the system
   clock for every chain. Testcases whose chain was valid only at a
@@ -409,9 +401,8 @@ fastest way to see the harness exercise a large real-world corpus.
   verdicts only; revocation differential testing is a separate
   problem (OCSP responder semantics, CRL distribution-point
   matching). Out of scope for this harness (tracked as PKIX-emf1).
-* CT-log scrape (Tier-3 corpus) ships as a separate workflow; see
-  the "Tier-3: CT log scrape corpus" section above. The harness's
-  PKITS and limbo paths are unchanged.
+* The CT-log scrape (Tier-3 corpus) is a separate workflow; it does
+  not affect the PKITS or limbo paths.
 
 ## Independent oracle discipline
 

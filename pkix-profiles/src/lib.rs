@@ -4,19 +4,18 @@
 
 //! RFC-baseline profile implementations for `pkix-path`.
 //!
-//! # What this crate is
-//!
 //! `pkix-profiles` ships RFC-baseline [`Profile`] implementations: the structural
 //! constraints that any standards-conforming PKI deployment can rely on, derived
 //! directly from IETF RFCs without overlaying any individual industry-forum
 //! interpretation.
 //!
 //! CA/Browser Forum-specific profiles (`WebPkiProfile`, `SmimeProfile`,
-//! `CodeSigningProfile`) and the SC-081 phased validity helper live in the
-//! sibling [`pkix-profiles-cabf`] crate; they moved there in
-//! `pkix-profiles 0.3.0`. Deprecated aliases kept them importable from here
-//! for two releases and have now been removed, so import them from
-//! `pkix-profiles-cabf` directly.
+//! `CodeSigningProfile`, with their `web_pki_policy` / `smime_policy` /
+//! `code_signing_policy` aliases) and the SC-081 phased validity helper
+//! `sc081_validity_cap` live in the sibling [`pkix-profiles-cabf`] crate;
+//! they moved there in `pkix-profiles 0.3.0`. Deprecated aliases kept them
+//! importable from here for two releases and have now been removed, so
+//! import them from `pkix-profiles-cabf` directly.
 //!
 //! Third-party crates (`pkix-fpki`, `pkix-etsi`, etc.) implement
 //! [`pkix_path::Profile`] directly against `pkix-path` and do not need to
@@ -35,9 +34,6 @@
 //! | [`BasicCodeSigningProfile`] | [`basic_code_signing_policy`] | RFC 5280 §4.2.1.12 | id-kp-codeSigning EKU |
 //! | [`BasicTimeStampingProfile`] | [`basic_time_stamping_policy`] | RFC 3161 §2.3 | id-kp-timeStamping EKU |
 //! | [`BasicOcspResponderProfile`] | [`basic_ocsp_responder_policy`] | RFC 6960 §4.2.2.2 | id-kp-OCSPSigning EKU |
-//!
-//! For CA/Browser Forum profile content (TLS BR, S/MIME BR, Code Signing BR,
-//! SC-081 phased validity caps), use [`pkix-profiles-cabf`].
 //!
 //! # Usage
 //!
@@ -70,9 +66,8 @@
 //!   shape, RFC 8551 §3 S/MIME shape, RFC 3161 §2.3 TSA EKU, RFC 6960
 //!   §4.2.2.2 OCSP-responder EKU). Industry-forum policy (CA/B Forum
 //!   Baseline Requirements, Mozilla / Apple / Microsoft root-program
-//!   rules, ETSI, FedRAMP, DoD) is **not** shipped here. CA/B Forum
-//!   reference profiles live in `pkix-profiles-cabf`; comprehensive
-//!   industry-forum coverage is the job of policy-adapter crates
+//!   rules, ETSI, FedRAMP, DoD) is **not** shipped here;
+//!   predicate-comprehensive industry-forum coverage is the job of policy-adapter crates
 //!   (`pkix-policy-zlint`, `pkix-policy-pkilint`).
 //! - **EKU shape, not chain semantics.** The bundled profiles enforce the
 //!   end-entity EKU / SAN / `BasicConstraints` shape required by the RFC.
@@ -80,13 +75,6 @@
 //!   `PolicyMappings`, `PolicyConstraints`, `InhibitAnyPolicy`) beyond
 //!   what `pkix-path` already does — these profiles add caller-friendly
 //!   structural overlays on top of that core algorithm.
-//! - **CA/B Forum content lives in `pkix-profiles-cabf`.**
-//!   `WebPkiProfile`, `SmimeProfile`, `CodeSigningProfile`,
-//!   `web_pki_policy`, `smime_policy`, `code_signing_policy` and
-//!   `sc081_validity_cap` moved there in 0.3.0. Deprecated aliases kept
-//!   them importable from here for two releases; they are now gone.
-//!   Import them from `pkix-profiles-cabf`.
-
 //! - **No site-local extension.** Site-local policy is the caller's
 //!   responsibility; either implement [`pkix_path::Profile`] directly or
 //!   wrap a bundled profile and overlay site-specific rules.

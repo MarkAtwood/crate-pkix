@@ -56,9 +56,7 @@ Scope: Full PKIX workspace (`pkix-path`, `pkix-revocation`, `pkix-revocation-htt
 
 ## Summary
 
-- **46 total findings** across 4 completed scan modes
-- **3 duplicates** of already-tracked issues (P1, P2, P3)
-- **4 genuinely new** actionable findings filed (1 P2, 3 P3)
-- **39 false positives / non-actionable** dismissed with rationale
-- **1 scan mode** (RFC conformance) remains open, blocked on API credits
-- **0 P0/P1 new findings** — no emergency fixes required
+46 findings across 4 completed scan modes: 3 duplicates of already-tracked
+issues (P1, P2, P3), 4 genuinely new findings filed as fix beads (1 P2,
+3 P3), 39 dismissed with rationale. No new P0/P1 findings, so no emergency
+fixes. The RFC-conformance scan mode remains open, blocked on API credits.

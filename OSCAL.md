@@ -2,10 +2,9 @@
 
 `pkix-lint` ships emit/parse support for a subset of [NIST OSCAL] JSON
 models — Catalog, Profile, Assessment Results, and the embedded
-Finding / Observation / Risk sub-models. This document records which
-OSCAL models the shipped code in `pkix-lint/src/oscal/*` touches,
-which Rust types serialize to or parse from each, and which models
-are out of scope.
+Finding / Observation / Risk sub-models. The tables below name, per
+model, the Rust types that the shipped code in
+`pkix-lint/src/oscal/*` serializes to or parses from.
 
 [NIST OSCAL]: https://pages.nist.gov/OSCAL/
 
@@ -22,18 +21,14 @@ AGENTS.md non-negotiable #5 and memory `pkix-oscal-demoted-2026-05-11`).
 
 What this means for this document:
 
-- The model coverage tables below describe what the shipped OSCAL
-  emit/parse code in `pkix-lint/src/oscal/*` produces and consumes.
-  They remain accurate as a reference for that code.
 - Phrases such as "OSCAL Catalog is the container for ..." refer to
   OSCAL's own internal canonicalization for those models within OSCAL.
   They are not workspace prescriptions that OSCAL is the canonical
   workspace format.
-- An earlier section titled "Constraints inherited from non-negotiables"
-  has been removed. The workspace ships OSCAL emit/parse because the
-  code is useful, not because OSCAL is prescribed. The remaining
-  invariant properties of the shipped surface are listed under "What
-  stays constant about the OSCAL emit/parse surface" below.
+- The workspace ships OSCAL emit/parse because the code is useful, not
+  because OSCAL is prescribed. The invariant properties of the shipped
+  surface are listed under "What stays constant about the OSCAL
+  emit/parse surface" below.
 
 The full demotion history lives in epic `PKIX-ncab`.
 
@@ -187,7 +182,7 @@ We do not implement AP authoring tools, AP validation beyond
 
 ## Models we DO NOT emit/parse (out of scope)
 
-### Component Definition (out of scope)
+### Component Definition
 
 OSCAL Component Definition describes "this component implements these
 controls." `pkix-lint` is a validator, not a system inventory tool. It
@@ -195,20 +190,20 @@ does not describe components or their control implementations. Out of
 scope unless / until a downstream consumer asks for it with a concrete
 use case.
 
-### System Security Plan (out of scope)
+### System Security Plan
 
 OSCAL SSP describes "this system is configured this way and inherits
 these controls from these components." Far beyond what a path-validation
-lint engine produces. Out of scope.
+lint engine produces.
 
-### Control Mapping (out of scope)
+### Control Mapping
 
 OSCAL Mapping (`oscal_mapping_schema.json`) maps controls between
 catalogs (e.g., NIST 800-53 ↔ ISO 27001). The PKIX workspace authors
 PKIX-domain Catalogs and does not currently need to map them against
 other frameworks. Out of scope unless a downstream consumer needs it.
 
-### Rego rule mappings (out of scope)
+### Rego rule mappings
 
 OSCAL has a Rego profile for executable policy. The PKIX workspace's
 executable side is Rust traits (`Lint::check_cert` / `Lint::check_path`),
@@ -238,10 +233,9 @@ These are properties of the shipped code, not workspace prescriptions:
 2. **`pkix-path::ValidationPolicy` is not in scope of the OSCAL surface.**
    It is the validator's runtime config, not a compliance assertion.
    The OSCAL emit/parse surface lives in `pkix-lint`, not `pkix-path`.
-3. **Framework, not policy.** `pkix-lint` ships only the framework plus
-   RFC-baseline lints. CA/B Forum content lives in `pkix-lint-cabf`
-   (per PKIX-amgn). The OSCAL emit/parse code in `pkix-lint` is
-   consumed by both crates.
+3. **Framework, not policy.** The OSCAL emit/parse code lives in
+   `pkix-lint` and is consumed both by it and by `pkix-lint-cabf`,
+   which is where CA/B Forum content lives (per PKIX-amgn).
 
 ## Cross-references
 

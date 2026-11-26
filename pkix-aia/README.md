@@ -10,7 +10,7 @@ This crate ships the trait surface only:
 - `AiaFetcher` trait — synchronous `&self` fetch with `Result<Vec<u8>, AiaError>` return; default-impl `batch_fetch` for multi-URI batches.
 - `NoAiaFetcher` — zero-sized unit struct that always returns `FetchingDisabled`; designed to be the default `A: AiaFetcher` placeholder in `pkix-chain::Verifier`.
 
-Real HTTP fetching lives in a separate adapter crate, `pkix-aia-http`, which is also planned (PKIX-zkjb.5).
+Real HTTP fetching lives in a separate adapter crate, `pkix-aia-http`.
 
 ## Architectural placement
 
@@ -20,7 +20,7 @@ pkix-chain  ----+------>  pkix-aia          (trait + error + no-op default)
                 +------>  pkix-aia-http     (real HTTP fetcher adapter)
 ```
 
-`pkix-chain`'s `Verifier` struct holds an `A: AiaFetcher` generic parameter that defaults to `NoAiaFetcher`. Callers who do not need AIA fetching see no API change; callers who do can plug in any `AiaFetcher` implementation, including HTTP adapters shipped by separate crates or in-process caching wrappers.
+Callers who do not need AIA fetching see no API change; callers who do can plug in any `AiaFetcher` implementation, including HTTP adapters shipped by separate crates or in-process caching wrappers.
 
 ## `no_std` and feature flags
 
@@ -28,7 +28,7 @@ The default build is `no_std + alloc`. Enabling `std` unlocks the `AiaError::IoF
 
 ## Status
 
-Initial release: `AiaError` + `AiaFetcher` trait + `NoAiaFetcher` default. The remaining work under the PKIX-zkjb epic integrates the trait into `pkix-chain::Verifier` and ships the HTTP transport adapter (`pkix-aia-http`).
+Initial release: `AiaError` + `AiaFetcher` trait + `NoAiaFetcher` default. Both of the follow-ups that release deferred have since landed: `pkix-chain::Verifier` carries the `A: AiaFetcher` parameter, and `pkix-aia-http` ships the HTTP transport.
 
 ## License
 

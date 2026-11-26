@@ -19,9 +19,7 @@ certificate issuance and want to reject anything unexpected.
 | Custom crypto backend | ✓ | no (DefaultVerifier only) |
 | Intended for | general use | controlled/closed PKIs |
 
-Use `pkix-chain-simple` when certificates are issued by your own CA and you
-want strict, auditable enforcement that fails loudly on anything out of the
-ordinary. Use `pkix-chain` for general-purpose validation where certificates
+Use `pkix-chain` instead for general-purpose validation, where certificates
 may carry extensions or algorithms you haven't explicitly listed.
 
 ## Usage

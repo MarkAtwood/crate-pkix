@@ -23,8 +23,7 @@ features) and
 
 The raw chain corpus lives out of tree at `$PKIX_CT_CORPUS` (default
 `~/PKIX-CT-CORPUS/Nimbus2026-v2/`); only the summary JSON + analysis MD
-files are committed in-repo. See the "Storage strategy" section in the
-[README](README.md#tier-3-ct-log-scrape-corpus) for the rationale.
+files are committed in-repo.
 
 ## Summary
 

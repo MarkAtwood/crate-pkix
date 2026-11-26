@@ -40,7 +40,7 @@ println!("anchor index: {}", validated.anchor_index);
 ## Pluggable crypto
 
 The [`SignatureVerifier`] trait is the seam between path validation logic and
-cryptographic operations. Implement it to use any backend:
+cryptographic operations:
 
 ```rust
 use pkix_path::SignatureVerifier;

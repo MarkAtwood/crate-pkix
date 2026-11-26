@@ -34,17 +34,13 @@
 //!
 //! The exception is **not a template.** No equivalent `pkix-lint-mozilla`,
 //! `pkix-lint-fedramp`, `pkix-lint-dod`, or `pkix-lint-etsi` crates are
-//! admitted without explicit human re-decision. For comprehensive CA/B Forum
-//! coverage (matching zlint's ~700-lint scope), use `pkix-policy-zlint`
-//! (PKIX-jy95).
+//! admitted without explicit human re-decision. For full CA/B Forum coverage
+//! (matching zlint's ~700-lint scope), use `pkix-policy-zlint` (PKIX-jy95).
 //!
 //! ## Reporting divergences
 //!
-//! This crate is a snapshot interpretation of the CA/B Forum Baseline
-//! Requirements. The canonical source is the CA/B Forum's published BR
-//! text; this crate is reference, not authoritative. See `divergences.md`
-//! in this crate's source tree for the spec versions last refreshed
-//! against and the known intentional divergences.
+//! `divergences.md` in this crate's source tree records the spec versions
+//! last refreshed against and the known intentional divergences.
 //!
 //! If you find that a lint in this crate differs from what the current
 //! CA/B Forum BR says — wrong section reference, outdated rule, missing
@@ -77,23 +73,15 @@
 //!
 //! ## Limitations
 //!
-//! - **Reference, not authoritative.** See the unprincipled-exception
-//!   clause above. The BR text is the only canonical source; this crate
-//!   ships a curated subset of marquee BR predicates as Lint impls.
-//! - **Not predicate-comprehensive.** [`cabf_tls_br`] covers SC-081
-//!   phased validity caps, SHA-1 prohibition, RSA min-key-size, SAN/EKU
-//!   presence, and `BasicConstraints` cA-flag checks. Full TLS BR
-//!   predicate coverage (matching zlint's CA/B Forum lints, roughly
-//!   one Lint per BR sub-section) is the job of `pkix-policy-zlint`
-//!   (tracked under `PKIX-jy95.10`).
+//! - **Not predicate-complete.** [`cabf_tls_br`] covers the predicates
+//!   listed under Modules above and no others. Full TLS BR predicate
+//!   coverage (matching zlint's CA/B Forum lints, roughly one Lint per BR
+//!   sub-section) is the job of `pkix-policy-zlint` (tracked under
+//!   `PKIX-jy95.10`).
 //! - **No S/MIME BR or Code Signing BR lint module yet.** The
 //!   `pkix-profiles-cabf` crate ships the corresponding [`Profile`]
 //!   types (`SmimeProfile`, `CodeSigningProfile`); per-predicate Lint
-//!   coverage for those BRs is comprehensive via `pkix-policy-zlint`.
-//! - **No `-mozilla`, `-fedramp`, `-dod`, `-etsi`.** The unprincipled
-//!   exception applies to CA/B Forum content only. Other industry-forum,
-//!   government, or vendor policies must come in via policy-adapter
-//!   crates that defer to upstream tools.
+//!   coverage for those BRs comes from `pkix-policy-zlint`.
 //!
 //! [PKIX-amgn]: https://github.com/MarkAtwood/crate-pkix
 //! [`pkix-lint`]: https://docs.rs/pkix-lint

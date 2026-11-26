@@ -26,7 +26,7 @@ adjacent PKI concerns.
 - **`pkix-composite`** — Composite (PQC + classical) signature verification (skeleton).
 - **`pkix-identity`** — Cert-side identity matching (RFC 6125 hostname, RFC 5280 §4.2.1.6 + RFC 8398 mailbox, IP literal). Pure function over (cert, identity-string); no chain context, no trust anchors. Scaffold-only at 0.1.0; bodies land via PKIX-fmtv.11 / .12.
 - **`pkix-dane`** — DANE (RFC 6698 + 7218 + 7671) TLSA record parsing and per-usage match logic (PKIX-TA / PKIX-EE / DANE-TA / DANE-EE). No DNS: the `TlsaResolver` trait is the seam, and callers supply a `TlsaResponse` pairing records with the `DnssecStatus` they arrived under, so the DNSSEC check cannot be skipped. Matching hashes the certificate **as the peer presented it**, never a re-encoding — `x509-cert` 0.3 normalizes pre-2050 `GeneralizedTime` to `UTCTime`, so `to_der()` output would not match a correctly-published TLSA record (see `tests/byte_exactness.rs`). Shipped at 0.2.0 with all four usages (PKIX-j32w.1); `pkix-chain` integration is PKIX-j32w.3.
-- **`pkix-dane-resolver`** — DNSSEC-validating resolver that fetches TLSA records. Std-only. Default upstream uses system resolv.conf. Not yet shipped; planned per PKIX-j32w.
+- **`pkix-dane-resolver`** — DNSSEC-validating resolver that fetches TLSA records. Std-only. Default upstream uses system resolv.conf.
 - **`pkix-zlint-bridge`** — Shared subprocess + NDJSON-parsing infrastructure for running zlint on certificates. Consumed by `pkix-policy-zlint` (runtime adapter) and `pkix-difftest`'s zlint oracle. Shipped at 0.0.0 with full public surface (`Verdict`, `ZlintLintInfo`, `BridgeError`, `PerCertError`, `BridgeConfig`, `ZlintBridge`) and the `enumerate_lints` / `run_on_cert` / `run_on_certs` entry points (PKIX-jy95.7.1 / .7.2 / .7.3 / .7.4 all closed).
 - **`pkix-pkilint-bridge`** — Shared subprocess + output-parsing infrastructure for running pkilint on certificates. Same shape as `pkix-zlint-bridge` for pkilint. Not yet shipped; planned per PKIX-jy95.8.
 - **`pkix-policy-zlint`** — Thin `pkix_lint::Lint` adapter wrapping each zlint catalog check (~400) via `pkix-zlint-bridge`. The principled path for predicate-comprehensive CA/B Forum coverage (PKIX-jy95.10). zlint stays the source of truth for the checks it covers; the workspace contributes the framework. Shipped at 0.0.0; post-1.0 0.x cadence.
@@ -36,7 +36,7 @@ adjacent PKI concerns.
 - **`pkix-profiles-cabf`** — CA/Browser Forum profile types (TLS BR, S/MIME BR, Code Signing BR), hand-authored as a small curated reference set. Explicit **unprincipled exception** to non-negotiable #5's no-transcription rule. For comprehensive CA/B Forum coverage, use `pkix-policy-zlint` (sibling adapter crate).
 - **`pkix-lint-cabf`** — CA/Browser Forum lint bundles, hand-authored as a small curated reference set. Same **unprincipled exception** status as `pkix-profiles-cabf`. For comprehensive coverage, use `pkix-policy-zlint`.
 
-**Trust store adapter crates** (each fetches DER bytes from a source-specific API and feeds them into `pkix_truststore::from_der_iter(...)`; platform-specific FFI lives here, not in `pkix-truststore`):
+**Trust store adapter crates** (see the `pkix-truststore` section below):
 
 - **`pkix-truststore-system`** — OS-native trust stores (macOS, Windows, iOS, Android). Currently a stub; substantive content lands via PKIX-8h87.
 - **`pkix-truststore-pkcs11`** — PKCS#11 / HSM / smart card adapters. Currently a stub; substantive content lands via PKIX-p8vz.
@@ -77,7 +77,7 @@ This workspace is **prelaunch**. The driving goal is "RFC 5280 X.509 for Rust, d
 
    1. **Standards-body specs** (IETF RFCs, ITU-T X.509, ISO standards governing cert structure) — authored as fast Rust validator/lint code in the workspace's core crates (`pkix-path`, `pkix-revocation`, `pkix-identity`, `pkix-profiles`, `pkix-lint` RFC-conformance Catalog). These are stable, slow-changing standards the workspace commits to; not "someone else's policy."
 
-   2. **Industry-forum / vendor policies** (CA/B Forum BR, Mozilla / Apple / Microsoft root programs, ETSI, DoD, root-program ingestion rules, FedRAMP, individual CA CPSs) — NOT transcribed as Rust in the workspace. Consumed via sibling **policy-adapter crates** that defer to the upstream maintainer's tool: `pkix-policy-zlint`, `pkix-policy-pkilint`, etc. Each adapter normalizes upstream findings into the workspace's `Finding`/`Lint` shape. The workspace does not transcribe vendor predicates.
+   2. **Industry-forum / vendor policies** (CA/B Forum BR, Mozilla / Apple / Microsoft root programs, ETSI, DoD, root-program ingestion rules, FedRAMP, individual CA CPSs) — NOT transcribed as Rust in the workspace. Consumed via sibling **policy-adapter crates** that defer to the upstream maintainer's tool: `pkix-policy-zlint`, `pkix-policy-pkilint`, etc. Each adapter normalizes upstream findings into the workspace's `Finding`/`Lint` shape.
 
    3. **Site-local policy** — entirely consumer-defined. Deployers write their own `Lint` / `Profile` impls or load policy data in whatever format suits them. Workspace does not prescribe shape.
 
@@ -161,7 +161,6 @@ The RustCrypto upstream gap is tracked at RustCrypto/formats#838 (open since 202
 - Path building (RFC 4158 — cross-signed certs, multiple candidate issuers) lives in `pkix-path-builder`. `pkix-path` itself is positional: `chain[i+1]` must be the issuer of `chain[i]`.
 - DN comparison must follow RFC 4518 string prep — do not use byte-equality for names.
 - `BasicConstraints` cA=TRUE is mandatory on every intermediate; keyCertSign in KeyUsage must be checked.
-- PKITS (NIST) test corpus is the integration test bar.
 
 ## Trust anchor loading: `pkix-truststore`
 
@@ -200,7 +199,7 @@ and `pkix-difftest/baseline-limbo-analysis.md` for current state.
 - No test may use the code under test as its own oracle.
 - External oracles for differential testing: OpenSSL (`openssl verify`), pyca/cryptography.
 - Test vector / expected-result sources: NIST PKITS (binary fixtures committed), x509-limbo (curated JSON manifest, fetched into `~/GIT/x509-limbo` on demand), per-RFC test vectors.
-- PKITS binary fixtures committed to the repo; tests are fully offline.
+- Tests are fully offline.
 
 ## Commit messages: no tool attribution
 

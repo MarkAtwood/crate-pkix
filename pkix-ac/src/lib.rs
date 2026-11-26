@@ -13,9 +13,8 @@
 //!
 //! # Relationship to `pkix-path`
 //!
-//! `pkix-path` validates public key certificates (PKCs). This crate validates
-//! attribute certificates, using `pkix-path` to authenticate the Attribute
-//! Authority's certification chain.
+//! The AA's own certification chain is a PKC chain, so it is authenticated
+//! with `pkix-path`; this crate validates only the AC that hangs off it.
 //!
 //! # Spec references
 //!

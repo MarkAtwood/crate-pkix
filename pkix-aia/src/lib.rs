@@ -14,12 +14,11 @@
 //! fetch missing intermediate certificates when the caller-supplied
 //! chain is incomplete.
 //!
-//! This crate ships only the *trait surface*: the [`AiaError`] type
-//! (this release), the `AiaFetcher` trait (planned, tracked at
-//! `PKIX-zkjb.3`), and the `NoAiaFetcher` zero-cost default
-//! (planned, tracked at `PKIX-zkjb.4`). Real HTTP fetching lives in
-//! a separate adapter crate (`pkix-aia-http`, planned, tracked at
-//! `PKIX-zkjb.5`).
+//! This crate ships only the *trait surface*: the [`AiaError`] type, the
+//! [`AiaFetcher`] trait (`PKIX-zkjb.3`) and the [`NoAiaFetcher`] zero-cost
+//! default (`PKIX-zkjb.4`). Real HTTP fetching lives in a separate adapter
+//! crate, `pkix-aia-http` (`PKIX-zkjb.5`), which `pkix-chain::Verifier`
+//! accepts through the same trait (`PKIX-zkjb.9`).
 //!
 //! ## Architectural placement
 //!
@@ -46,16 +45,7 @@
 //!
 //! Per AGENTS.md non-negotiable #6, [`AiaError`] is
 //! `Clone + Debug + PartialEq + Eq + Send + Sync` (compile-time
-//! asserted) and is `#[non_exhaustive]`. No embedded `std::io::Error`
-//! handle (it is not `Clone + Eq + Serialize`); the variant uses the
-
-//!
-//! ## Status
-//!
-//! Initial release: [`AiaError`] + [`AiaFetcher`] + [`NoAiaFetcher`].
-//! The remaining work under the PKIX-zkjb epic integrates the trait
-//! into `pkix-chain::Verifier` (PKIX-zkjb.9) and ships the HTTP
-//! transport adapter `pkix-aia-http` (PKIX-zkjb.5).
+//! asserted) and is `#[non_exhaustive]`.
 
 extern crate alloc;
 

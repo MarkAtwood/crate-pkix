@@ -97,15 +97,12 @@
 //!
 //! On the maintainer's side: a roll means `./gen.sh`,
 //! `cargo test -p pkix-dnssec-anchor`, and a release of **this crate alone**.
-//! `pkix-dane-resolver` needs no change, which is the whole reason the
-//! anchors live here.
 //!
 //! ## Supplying your own anchor
 //!
 //! A private DNSSEC root — a split-horizon enterprise zone, or a test root —
-//! is built with [`RootAnchor::new`] and the `with_*` methods. Nothing here
-//! privileges IANA's keys over a caller's; they are simply the ones most
-//! people want.
+//! is built with [`RootAnchor::new`] and the `with_*` methods. IANA's keys
+//! are shipped because they are the ones most people want.
 //!
 //! [`pkix-dane-resolver`]: https://docs.rs/pkix-dane-resolver
 //! [`webpki-roots`]: https://docs.rs/webpki-roots

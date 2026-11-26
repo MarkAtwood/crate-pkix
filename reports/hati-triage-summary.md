@@ -47,9 +47,5 @@ Total: $8.26 across 11 agent invocations.
 
 ## Summary
 
-- **9 attack classes** scanned via 3-stage adversarial pipeline
-- **1 raw finding** surfaced by Hunt stage (path traversal)
-- **1 finding** survived Validate stage (confirmed with high confidence)
-- **0 findings** survived Trace stage (reachability analysis classified it as unreachable)
-- **0 actionable findings** — clean scan
-- **0 P0/P1/P2/P3 new findings** — no fixes required
+Clean scan. The one raw finding the Hunt stage surfaced did not survive
+reachability analysis, so no fixes are required.

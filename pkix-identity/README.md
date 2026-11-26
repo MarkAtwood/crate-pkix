@@ -81,9 +81,9 @@ The line is drawn deliberately.
 - **DN canonicalization (RFC 4518 string prep).** Already in
   `pkix-path`; not duplicated here.
 - **CSR parsing.** Not a verifier concern.
-- **Public Suffix List enforcement (eTLD blocking).** Deliberately not
-  included. Callers who need it pull in their own PSL crate. `webpki`
-  makes the same choice; this crate follows.
+- **Public Suffix List enforcement (eTLD blocking).** Callers who need it
+  pull in their own PSL crate. `webpki` makes the same choice; this crate
+  follows.
 - **CN fallback.** Deprecated by RFC 6125 §6.4.4; `verify_dns_name`
   intentionally does not look at Subject DN CN.
 - Anything that requires chain context, trust-anchor knowledge, or

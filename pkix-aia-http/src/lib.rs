@@ -123,13 +123,13 @@
 //!   trust roots) should construct their own [`ureq::Agent`] and
 //!   inject via [`HttpFetcher::with_agent`].
 //!
-//! ## # Limitations
+//! ## Limitations
 //!
-//! - No LDAP transport, see below. For the async story, see the
-//!   `async` and `client-reqwest-async` features: `AsyncAiaFetcher` is
-//!   the async analogue of `AiaFetcher`, and `AsyncHttpFetcher` the
-//!   `reqwest`-backed reference implementation. Both are off by
-//!   default, so a synchronous consumer pays nothing for them.
+//! - Synchronous by default. The `async` and `client-reqwest-async`
+//!   features add `AsyncAiaFetcher`, the async analogue of `AiaFetcher`,
+//!   and `AsyncHttpFetcher`, its `reqwest`-backed reference
+//!   implementation. Both are off by default, so a synchronous consumer
+//!   pays nothing for them.
 //! - No LDAP transport. RFC 5280 §4.2.2.1 permits any URI scheme in
 //!   AIA `accessLocation` `GeneralName`s; in practice HTTP and HTTPS
 //!   dominate. An `ldap://` fetcher could ship as a sibling

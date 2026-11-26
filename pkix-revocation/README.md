@@ -131,7 +131,6 @@ impl RevocationChecker for MyRevocationChecker {
 
 ## Limitations
 
-- CRL checking does not follow CRL Distribution Points — caller supplies the CRL.
 - Indirect CRLs (RFC 5280 §5.2.6) are supported via
   `CrlChecker::new_with_crl_issuer`; the cRLIssuer's own chain must be
   validated by the caller.

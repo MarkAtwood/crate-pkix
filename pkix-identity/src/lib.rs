@@ -48,8 +48,11 @@
 //!   `pkix-path`; not duplicated here.
 //! - **CSR parsing.** Not a verifier concern.
 //! - **Public Suffix List enforcement (eTLD blocking).** Deliberately not
-//!   included. Callers who need it pull in their own PSL crate. `webpki`
-//!   makes the same choice; this crate follows.
+//!   included: a wildcard SAN like `*.example.com` matches
+//!   `host.example.com` per RFC 6125 §6.4.3, and a public-suffix wildcard
+//!   like `*.co.uk` is not blocked either. Callers who need eTLD-aware
+//!   blocking pull in their own PSL crate. `webpki` makes the same choice;
+//!   this crate follows.
 //! - Anything that requires chain context or trust-anchor knowledge.
 //!
 //! # Spec references
@@ -68,17 +71,8 @@
 //!
 //! # Limitations
 //!
-//! - **Cert-side only.** This crate answers "does this leaf authorize this
-//!   name?" given an already-parsed [`Certificate`]. Name-constraint
-//!   matching at intermediate-CA scope is a different problem and lives
-//!   in `pkix-path` (`dns_name_matches_constraint`).
-//! - **No Public Suffix List enforcement.** A wildcard SAN like
-//!   `*.example.com` matches `host.example.com` per RFC 6125 §6.4.3; this
-//!   crate does not block PSL-public-suffix wildcards (`*.co.uk`). The
-//!   `webpki` crate makes the same choice; deployments that need
-//!   eTLD-aware blocking pull in their own PSL crate.
-//! - **No CSR / CertificationRequest parsing.** Identity matching runs on
-//!   already-issued certificates only.
+//! Beyond the out-of-scope list above:
+//!
 //! - **No legacy `commonName` fallback.** RFC 6125 §6.4.4 deprecated
 //!   `subject.CN` fallback; this crate matches against `dNSName` /
 //!   `iPAddress` / `rfc822Name` / `SmtpUTF8Mailbox` SAN entries only.

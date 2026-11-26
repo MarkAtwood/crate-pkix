@@ -15,8 +15,8 @@
 //! - [`Lint`] — the unit of evaluation. Each lint has a stable ID, a normative
 //!   citation, a severity, a scope (certificate vs. full chain path), and a
 //!   subject-kind filter (leaf, intermediate CA, etc.).
-//! - [`LintResult`] — `Pass | NotApplicable | Warn | Error | Fatal`. `Warn`
-//!   and `Error` carry a `&'static str` detail message. `Fatal` within
+//! - [`LintResult`] — `Pass | NotApplicable | Warn | Error | Fatal`. `Warn`,
+//!   `Error` and `Fatal` carry a `Cow<'static, str>` detail. `Fatal` within
 //!   `pkix-lint` means "stop evaluating further lints" — it is **not** a TLS
 //!   hard-fail. See the advisory-only contract below.
 //! - [`Finding`] — a lint ID paired with a [`LintResult`], optionally referencing
@@ -107,17 +107,14 @@
 //!
 //! # Limitations
 //!
-//! - **Framework, not a comprehensive rule set.** This crate ships the
-//!   [`Lint`] trait, [`LintRunner`], and a small RFC-conformance lint set
-//!   in the `rfc5280`, `rfc6125`, `rfc8398`, and `rfc8551` modules.
-//!   Comprehensive industry-forum lint coverage is the job of policy
-//!   adapter crates (`pkix-policy-zlint` for zlint's ~700 rules,
-//!   `pkix-policy-pkilint` for pkilint's S/MIME BR + ETSI coverage).
-//!   CA/B Forum reference lints live in the sibling `pkix-lint-cabf`
-//!   crate; that crate is also explicitly small and curated.
-//! - **Advisory-only.** Findings never cause a TLS rejection by themselves
-//!   (see the contract above). Plumbing findings into hard-fail or
-//!   waiver decisions is the integration layer's job.
+//! - **Framework, not a rule set.** This crate ships the [`Lint`] trait,
+//!   [`LintRunner`], and a small RFC-conformance lint set in the `rfc5280`,
+//!   `rfc6125`, `rfc8398`, and `rfc8551` modules. Industry-forum lint
+//!   coverage at scale is the job of policy adapter crates
+//!   (`pkix-policy-zlint` for zlint's ~700 rules, `pkix-policy-pkilint` for
+//!   pkilint's S/MIME BR + ETSI coverage). CA/B Forum reference lints live
+//!   in the sibling `pkix-lint-cabf` crate; that crate is also explicitly
+//!   small and curated.
 //! - **OSCAL adapter is one supported output, not the canonical format.**
 //!   The `oscal` feature emits OSCAL Assessment Results JSON and parses
 //!   OSCAL Risk-based deviations back into [`deviation::DeviationStore`].

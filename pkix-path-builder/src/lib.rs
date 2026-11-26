@@ -42,14 +42,9 @@
 //! # Limitations
 //!
 //! - **Caller supplies the candidate set.** [`CertPool`] takes a pool of
-//!   already-loaded certificates. This crate does not fetch missing
-//!   intermediates from `AuthorityInfoAccess` URIs; the optional
-//!   `pkix-aia` / `pkix-aia-http` cascade handles that (tracked under
-//!   `PKIX-zkjb`).
-//! - **Output feeds `pkix-path`.** The validation algorithm (RFC 5280 §6.1
-//!   signature chain walk, name constraints, policy machinery, revocation)
-//!   lives in `pkix-path` and `pkix-revocation`. This crate's job ends
-//!   when it returns an ordered candidate chain.
+//!   already-loaded certificates. Fetching missing intermediates from
+//!   `AuthorityInfoAccess` URIs is the `pkix-aia` / `pkix-aia-http`
+//!   cascade's job, wired by `pkix-chain` (`PKIX-zkjb`).
 //! - **No known residual divergence.** The bettertls path-building corner
 //!   case `pathbuilding::tc60`, which this crate used to reject where
 //!   other implementations accepted, is resolved: it agrees with all

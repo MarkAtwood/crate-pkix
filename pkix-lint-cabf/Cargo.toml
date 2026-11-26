@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-lint-cabf"
 description = "Reference CA/Browser Forum lint bundles for pkix-lint (TLS BR, S/MIME BR) — not authoritative"
-version     = "0.3.0"
+version     = "0.3.1"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true

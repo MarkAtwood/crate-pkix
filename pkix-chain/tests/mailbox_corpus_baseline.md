@@ -1,7 +1,7 @@
 # Mailbox-binding corpus — pass-rate baseline
 
-Pass-rate baseline for the curated RFC 5280 §4.2.1.6 / RFC 8398 mailbox-
-binding corpus exercised by `tests/mailbox_corpus.rs` against
+The curated RFC 5280 §4.2.1.6 / RFC 8398 mailbox-binding corpus
+exercised by `tests/mailbox_corpus.rs` against
 `pkix_chain::verify_smime_signer` and `pkix_chain::verify_smime_recipient`.
 
 Tracks PKIX-fmtv.23. Companion to `tests/fixtures/gen.py` (fixture

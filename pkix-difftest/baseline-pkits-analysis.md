@@ -57,7 +57,7 @@ bead OR a written-out justification".
 | Agreement            | 61  | 24.7% | 61 |
 | **Total**            | **247** | | 247 |
 
-Ground-truth disagreements: **46 → 35 → 17 → 15** across three regenerations.
+Ground-truth disagreements: **46 → 35 → 17 → 15 → 2** across four regenerations.
 
 The last step closed the `onlySomeReasons` gap: `pkix-revocation` now
 combines reason-partitioned CRLs per RFC 5280 §6.3.3, so 4.14.18 and 4.14.19
@@ -107,7 +107,7 @@ oracle stopped wrongly rejecting, which pyca still rejects, moves
 
 ### What moved, and why
 
-Three changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
+Changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
 
 1. **The adapter no longer fails open on undetermined revocation.** It used to
    treat every outcome except `Revoked` as "no negative determination", which
@@ -133,18 +133,22 @@ Three changes to the `pkix-path` oracle adapter, plus one oracle upgrade:
    commit closed as a vulnerability. A baseline can encode a vulnerability as
    an expectation.
 
-3. **pyca 48.0.0 → 50.0.2**, as above.
+3. **pyca 48.0.0 → 50.0.2**.
 
 ### What still disagrees
 
-Fifteen chains, all predating this work and catalogued per bucket below. The
-`onlySomeReasons` gap that accounted for two of them is closed.
+Two chains, both predating this work and catalogued per bucket below.
 
 ### Reading this baseline
 
+The per-bucket breakdowns below were hand-classified against an earlier
+regeneration and their internal counts are from that run. The authoritative
+current totals are the summary table above and `baseline-pkits.json`, which
+the CI gate compares; re-classifying the buckets is tracked separately.
+
 `ground_truth_disagreements` is compared by **chain name**, not just by count,
 so a newly-disagreeing chain shows up as a diff even if the totals happen to
-match. The 35 recorded here are expected; a 36th is a regression.
+match. The 2 recorded here are expected; a 3rd is a regression.
 
 Two PKITS chains are excluded from classification (harness errors):
 
@@ -231,9 +235,7 @@ oracle alongside OpenSSL. Specific testcases that flipped:
 
 Out of scope for the pyca baseline check (indirect/scoped CRLs,
 CRL signature verification, IDP onlySomeReasons honoring) — these
-remain pkix-path-only enforcement points. Future divergences in
-those areas will surface as `StricterThanWild` per the existing
-pattern.
+remain pkix-path-only enforcement points.
 
 ## What changed in PKIX-emf1.7 (CRL revocation wiring)
 
@@ -255,18 +257,15 @@ The shift is dominated by CRL-aware revocation flips:
   CRL-aware oracle (mainly OpenSSL) fails on CRL-coverage strictness:
   "unable to get certificate CRL" (10), "different CRL scope" (6),
   "CRL has expired" (2), "key usage does not include CRL signing" (2),
-  and similar. pkix-path's per-CRL "soft skip" policy (oracles/pkix-path.rs
-  module docs) is intentionally lenient on CRL applicability — when a CRL
-  does not apply to a cert (scope, expiry, signer), pkix-path treats that
-  as "no determination" and continues, while OpenSSL fails closed. That
-  divergence is a documented design choice, not a pkix-path bug.
+  and similar — pkix-path's per-CRL "soft skip" policy
+  (oracles/pkix-path.rs module docs) against OpenSSL failing closed.
 * **+17 StricterThanWild chains** are cases where pkix-path now flips to
   `Fail (revoked)` post-emf1.2, while at least one oracle still passes —
   almost entirely pyca, which has no CRL support. 8 of those 17 are the
   cleanest case: pkix-path **and** OpenSSL agree on `Fail (revoked)` and
   pyca alone passes (PKITS §4.4 / §4.13 revoked-EE / revoked-CA tests).
 
-## LooserThanWild (81) — pkix-path Pass, ≥1 oracle Fail
+## LooserThanWild — pkix-path Pass, ≥1 oracle Fail
 
 Bucketed by the **failing** oracle and reason. pkix-path passing here is
 either a deliberate design choice (soft CRL handling) or a permissive
@@ -311,7 +310,7 @@ No follow-up beads filed for this bucket beyond PKIX-cqwt (CRL signer
 discovery, which addresses the 1 "certificate revoked" entry where
 OpenSSL finds a CRL pkix-path could not match to a signer).
 
-## StricterThanWild (60) — pkix-path Fail, ≥1 oracle Pass
+## StricterThanWild — pkix-path Fail, ≥1 oracle Pass
 
 | Reason bucket | Count | Classification |
 |---|---:|---|
@@ -326,10 +325,7 @@ OpenSSL finds a CRL pkix-path could not match to a signer).
 agree, pyca lags due to no CRL support — PKIX-emf1.4). The remaining 43
 follow the same pattern as before: pkix-path strict §6.1 enforcement vs
 OpenSSL leniency. The previous baseline's 13 `signature invalid at chain
-index N` entries (harness limitation tracked under PKIX-t0w4) are now
-gone — the PKITS loader runs `CertPath` through `pkix-path-builder`
-before classification, so the CRL-signing cert no longer poisons the
-positional walk.
+index N` entries are gone via the PKIX-t0w4 path-building integration.
 
 Follow-up beads: **PKIX-emf1.4** (pyca CRL strategy, surfaces the
 no-revocation divergence visibly here).
@@ -343,13 +339,13 @@ classify as `LooserThanWild` or `StricterThanWild` based on which side
 of the split pkix-path falls on. With OpenSSL + pyca only, 3-way
 divergence is impossible by construction.)
 
-## DiagnosticDivergence (35)
+## DiagnosticDivergence
 
 Every oracle agrees on Pass/Fail; only the reason strings differ. This is
 expected — the three implementations have three different error
 vocabularies. Low-signal; no follow-up.
 
-## Agreement (71)
+## Agreement
 
 All three oracles produce identical Pass/Fail verdicts. The 40-chain
 drop versus the prior baseline reflects the CRL revocation findings
@@ -369,25 +365,10 @@ desired direction. Net ground-truth agreement should improve under
 this baseline; the exact delta is left to a future analysis pass once
 PKIX-emf1.4 resolves the pyca side.
 
-## Conclusion
+## Net pkix-path correctness regressions
 
-The PKIX-emf1 revocation wiring + PKIX-t0w4 path-building integration
-produced clear new signal:
-
-1. **17 PKITS revocation chains** correctly flip to `Fail (revoked)`
-   under both pkix-path and openssl, matching PKITS' expected
-   ShouldValidate=false.
-2. **CRL coverage policy divergence between pkix-path and openssl** is
-   visible as a documented design difference (22 LooserThanWild
-   chains).
-3. **Pyca's lack of CRL support** is visible as 8+ Stricter chains
-   where the two CRL-aware oracles agree on revoked and pyca lags;
-   PKIX-emf1.4 documents the maintainer-bound strategy decision.
-4. **PKITS §4.4 / §4.14 / §4.5 path-building harness limitation
-   eliminated** — 13 `signature invalid at chain index N` Stricter
-   chains are gone; pkix-path now validates the rebuilt chains
-   alongside OpenSSL.
-
-No new pkix-path correctness regressions detected. The harness output is
+None. The PKIX-emf1 revocation wiring and the PKIX-t0w4 path-building
+integration added signal, not regressions — every divergence they
+surfaced is accounted for per bucket above. The harness output is
 committed as the canonical baseline for diff-friendly regression
 detection on future runs.

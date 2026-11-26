@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-10ev",
+  "title": "CI never builds the workspace in a default-feature configuration",
+  "description": "Three separate defects have now been found that are invisible to CI because\nevery gate runs --all-features:\n\n  PKIX-6vfq  pkix-tlsrpt's tests do not compile without --all-features.\n  PKIX-1hq5  pkix-ct pulls in pkix-path, and pkix-revocation-http pulls in\n             pkix-revocation, unconditionally, though nothing in a default\n             build uses either. Surfaced by `cargo publish`, which runs its\n             verification build with default features.\n  this bead  `RUSTDOCFLAGS=\"-D warnings\" cargo doc -p pkix-ct --no-deps`\n             fails with six unresolved intra-doc links — CtLog, CtLogList,\n             SctVerifier::verify_sct_for_cert, ::verify_sct_for_precert,\n             ::verify_inclusion, ::verify_sth — all of which are\n             `#[cfg(feature = \"log-list\")]`. Links come from both the crate\n             doc and item docs at lib.rs:131-164 and sct.rs:55/66. With\n             --all-features it is clean, so pkix-ct cannot document in the\n             configuration a consumer gets by default.\n\nThe pattern, not the three symptoms, is the thing to fix. quality-gates runs\nclippy, test and doc with --all-features, and `cargo hack --feature-powerset\n--depth 2` passes `--no-dev-deps`, which skips test targets. So no job in CI\never compiles the workspace, its tests, or its documentation the way an\nunsuspecting downstream consumer would.\n\nSuggested minimum: add a job running `cargo test --workspace` and\n`RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps` with default\nfeatures. That alone would have caught all three.\n\nThe pkix-ct links specifically want `#[cfg_attr(docsrs, doc(cfg(...)))]`\ntreatment or feature-gated doc text, not link removal — the links are\ncorrect when the feature is on.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-26T07:27:54.256172108Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-26T07:27:54.256172108Z"
+}

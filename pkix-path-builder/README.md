@@ -14,10 +14,8 @@ first). This crate handles the step before that: given a target leaf and a pool
 of candidate intermediates, find and return a valid ordering from the target to
 one of the provided trust anchors.
 
-This enables:
-- Processing certificate bags from PKCS#7/CMS envelopes
-- Handling cross-certificates and bridge CA topologies
-- Path discovery when the chain order is not known in advance
+Cross-certificates and bridge CA topologies are handled here, not in
+`pkix-path`.
 
 ## Usage
 
@@ -41,10 +39,11 @@ let validated = validate_path(&chain, &trust_anchors, &policy, &DefaultVerifier)
 
 ## How it works
 
-`build_path` implements iterative-deepening DFS per RFC 4158 §2.5. At each
-step, candidates are selected by matching the current certificate's `issuer`
-field against candidate `subject` fields. The search is a single
-depth-first pass of up to 10 intermediates, ranked by AKI/SKI match.
+`build_path` performs a single depth-first pass of up to 10 intermediates,
+per RFC 4158 §2.5 — there is no iterative deepening, so shortest-first is
+not guaranteed. At each step, candidates are selected by matching the current
+certificate's `issuer` field against candidate `subject` fields, and ranked by
+AKI/SKI match.
 `build_first_valid_path` additionally checks each link's signature
 before descending (so same-name decoys in an untrusted bag are pruned
 immediately) and tries anchor-issued candidates first.

@@ -30,7 +30,8 @@
 //!
 //! # Status
 //!
-//! Version 0.0.0. All four parent-epic children landed:
+//! Version 0.0.0, with the parent epic's children all closed:
+//! the public surface (PKIX-jy95.7.1),
 //! [`ZlintBridge::enumerate_lints`] (PKIX-jy95.7.2),
 //! [`ZlintBridge::run_on_cert`] with the per-cert SHA-256 verdict
 //! cache (PKIX-jy95.7.3), and [`ZlintBridge::run_on_certs`] batch

@@ -1,7 +1,5 @@
-//! # pkix-policy-pkilint
-//!
-//! **Thin [`pkix_lint::Lint`] adapter over [`pkix_pkilint_bridge`]. Stub
-//! crate.**
+//! Thin [`pkix_lint::Lint`] adapter over [`pkix_pkilint_bridge`].
+//! **Stub crate.**
 //!
 //! `pkix-policy-pkilint` will expose each of pkilint's per-check
 //! verdicts as a workspace [`pkix_lint::Lint`] implementation, so
@@ -12,11 +10,11 @@
 //!
 //! This is the pkilint analog of [`pkix-policy-zlint`].
 //!
-//! ## Status
+//! # Status
 //!
-//! Stub crate — namespace reservation. The substantive content (Lint
-//! impl wrapping pkilint checks, verdict mapping, catalog enumeration)
-//! is planned for a future release.
+//! Namespace reservation. The substantive content (Lint impl wrapping
+//! pkilint checks, verdict mapping, catalog enumeration) is planned for
+//! a future release.
 //!
 //! [`pkix_lint::Lint`]: https://docs.rs/pkix-lint
 //! [`pkix_lint::LintRunner`]: https://docs.rs/pkix-lint

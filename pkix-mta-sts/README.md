@@ -86,9 +86,11 @@ wildcard bug is a security bug. A test asserts the two agree.
 
 ## What is deliberately not here
 
-**Policy discovery.** The `_mta-sts.<domain>` TXT lookup and the HTTPS GET of
-`https://mta-sts.<domain>/.well-known/mta-sts.txt` need a resolver, a TLS
-client and a cache. They belong in an adapter, which does not exist yet.
+**Policy discovery.** The `_mta-sts.<domain>` TXT lookup lives in
+`pkix-mta-sts-resolver` and the HTTPS GET of
+`https://mta-sts.<domain>/.well-known/mta-sts.txt` in `pkix-mta-sts-http`.
+Both need a resolver or a TLS client; this crate needs neither, which is why
+they are separate.
 
 **TLSRPT (RFC 8460).** `PolicyOutcome::is_validation_failure` is the hook a
 reporter needs — it is true for `testing` failures, which is the distinction

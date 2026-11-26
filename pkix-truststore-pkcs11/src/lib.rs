@@ -1,11 +1,10 @@
-//! # pkix-truststore-pkcs11
+//! PKCS#11 / HSM / smart card trust store adapter for
+//! [`pkix-truststore`]. **Stub crate.**
 //!
-//! **PKCS#11 / HSM / smart card trust store adapter for [`pkix-truststore`]. Stub crate.**
-//!
-//! Opens a PKCS#11 session, enumerates `CKO_CERTIFICATE` objects with
-//! `CKA_TRUSTED=true` (or filtered by other criteria), extracts `CKA_VALUE`
-//! (DER bytes), and feeds them through [`pkix_truststore::from_der_iter`] to
-//! produce `Vec<TrustAnchor>`.
+//! When it lands it will open a PKCS#11 session, enumerate
+//! `CKO_CERTIFICATE` objects with `CKA_TRUSTED=true` (or filtered by other
+//! criteria), extract `CKA_VALUE` (DER bytes), and feed those through
+//! [`pkix_truststore::from_der_iter`] to produce `Vec<TrustAnchor>`.
 //!
 //! Planned support:
 //! - General PKCS#11 tokens (Yubico HSM, Thales, AWS CloudHSM, Azure
@@ -14,18 +13,18 @@
 //! - FIPS-mode deployments where trust roots live on a token rather than
 //!   in a filesystem PEM bundle
 //!
-//! ## Project stance
+//! # Project stance
 //!
 //! No baked-in trust data, no baked-in trust source. Per the workspace
 //! `pkix-truststore` stance, platform / HSM / cloud KMS sources are adapter
 //! crates that fetch DER bytes from a source-specific API and feed them into
-//! [`pkix_truststore::from_der_iter`]. This crate is one such adapter.
+//! [`pkix_truststore::from_der_iter`].
 //!
-//! ## Status
+//! # Status
 //!
-//! Stub crate. The substantive content (PKCS#11 session management, object
-//! enumeration, `CKA_TRUSTED` filtering, error mapping) is scheduled to land
-//! via [PKIX-p8vz].
+//! Nothing is implemented yet. The substantive content (PKCS#11 session
+//! management, object enumeration, `CKA_TRUSTED` filtering, error mapping)
+//! is scheduled to land via [PKIX-p8vz].
 //!
 //! [`pkix-truststore`]: https://docs.rs/pkix-truststore
 //! [`pkix_truststore::from_der_iter`]: https://docs.rs/pkix-truststore

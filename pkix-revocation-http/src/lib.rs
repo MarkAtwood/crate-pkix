@@ -201,8 +201,7 @@
 //! not OCSP would have no way to say so: they would get `x509-ocsp`,
 //! `sha1` and `sha2` in their dependency graph with no opt-out. Keeping
 //! the axes orthogonal costs one more feature in `Cargo.toml` and keeps
-//! that choice the consumer's. The cost of the orthogonality is this
-//! documentation, which is the right trade.
+//! that choice the consumer's.
 //!
 //! # Limitations
 //!
@@ -224,18 +223,12 @@
 //!   spawns no threads and reads no clock, so nothing runs an eviction
 //!   pass on its own; call
 //!   [`prune_expired`](InMemoryCache::prune_expired) from a maintenance
-//!   tick and watch [`len`](InMemoryCache::len). Deployments wanting a
-//!   hard ceiling (LRU, LFU, a byte budget) implement
-//!   [`RevocationCache`] over `moka`, Redis, or any backing store they
-//!   prefer.
+//!   tick and watch [`len`](InMemoryCache::len).
 //! - **No CDP / AIA URI filtering.** This crate fetches whichever URI is
 //!   in the certificate's [`CRLDistributionPoints`] or
-//!   [`AuthorityInfoAccess`] extension. Which hosts and schemes are
-//!   acceptable is a deployment-policy decision and stays outside this
-//!   crate, because the transport is caller-supplied and a policy baked in
-//!   here would be one the caller could neither see nor override. **See
-//!   "Security considerations" above** — this is the limitation most likely
-//!   to matter, and it differs from `pkix-aia-http`'s default.
+//!   [`AuthorityInfoAccess`] extension. **See "Security considerations"
+//!   above** — this is the limitation most likely to matter, and it
+//!   differs from `pkix-aia-http`'s default.
 //!
 //! [`CRLDistributionPoints`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.13
 //! [`AuthorityInfoAccess`]: https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.2.1

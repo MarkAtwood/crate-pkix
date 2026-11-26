@@ -152,12 +152,9 @@ Counts marked `~N` are approximations because the underlying pyca
 error strings vary by SAN content. Exact per-string counts live in
 `baseline-limbo.json`; the bucket Total reflects the true 819.
 
-
-
 ### BetterTLS nameConstraints (748 / 91%)
 
-The single dominant divergence family. Every entry is a
-`bettertls::nameconstraints::tc*` testcase where:
+Every entry is a `bettertls::nameconstraints::tc*` testcase where:
 
 * an intermediate carries a `nameConstraints` extension with a `permitted`
   or `excluded` dNSName subtree (typically `localhost`-anchored), and
@@ -197,10 +194,8 @@ deliberately does not provide that, since CN-as-dNSName extraction is a
 hostname-binding decision that should live in a separate `pkix-tls` /
 `pkix-rfc6125` layer, not in `pkix-path`.
 
-This bucket is documented in `pkix-path/src/lib.rs` (NameConstraints
-handling) and tracked in this analysis. **No follow-up bead filed** —
-the divergence is by design and the WebPKI strict-CN behaviour belongs
-in a future hostname-verification crate, not in pkix-path itself.
+Documented in `pkix-path/src/lib.rs` (NameConstraints handling).
+**No follow-up bead filed** — the divergence is by design.
 
 ### Other LooserThanWild buckets
 
@@ -344,40 +339,15 @@ and the smaller signal isolates the genuine follow-up work.
   (design call pending: harness fix vs new pkix-path-builder helper).
 * **PKIX-wmch** — pkix-difftest secondary baseline with all pkix-path
   signature features enabled (p384, etc.) to validate real-world
-  ECDSA chains. Confirmed: 4 online::* chains flip to Agreement with
-  `rustcrypto`. Snapshot baseline maintained as
+  ECDSA chains. Snapshot baseline maintained as
   `baseline-limbo-allfeatures.{json,md}`.
 
-## Conclusion
+## Net pkix-path correctness regressions
 
-The x509-limbo Tier-2 baseline produces clear signal:
-
-1. **One residual real divergence**: `bettertls::pathbuilding::tc60`,
-   a single depth-6 chain. Down from 47 cases before PKIX-lwr9.6
-   wired the harness through `build_path`. PKIX-lwr9.4 diagnosed the
-   residual as a consumer-side harness/API-gap (`build_path` is
-   single-shot; harness does not iterate `build_path_candidates` past
-   a first candidate whose intermediate carries an algorithm
-   `DefaultVerifier` rejects), not an algorithmic builder bug.
-   Resolution design call pending under PKIX-lwr9.4.
-2. **One documented intentional divergence**: openssl applies a
-   CN-as-dNSName rule on nameConstraints checks that RFC 5280
-   §4.2.1.10 explicitly forbids; pkix-path and pyca agree on the
-   RFC-literal reading. 748 of 827 LooserThanWild cases are this
-   family.
-3. **One harness-shape limitation**: default-features-only build
-   excludes p384, causing 4 online::* ECDSA chains (apple.com,
-   cloudflare.com, akamai.com, stackoverflow.com) to fail signature
-   verification. Tracked as PKIX-wmch — the secondary `rustcrypto`-
-   features baseline below confirms these 4 are the only signature-
-   verification flips from the feature surface change.
-4. **Zero new pkix-path correctness regressions** detected against
-   the existing project policy lines (no DSA, no P-192,
-   permissive-by-default EKU/SAN/criticality).
-
-Future runs should diff against this baseline as a regression
-detector: any chain that flips Pass/Fail without a corresponding
-documented change in pkix-path or the harness is worth investigating.
+Zero, against the existing project policy lines (no DSA, no P-192,
+permissive-by-default EKU/SAN/criticality). Every divergence above is
+an intentional difference, a harness-shape limitation, or a tracked
+follow-up bead.
 
 ## With full crypto (`--features rustcrypto`, PKIX-wmch)
 
@@ -437,8 +407,6 @@ Global Root G3 family for the first three; the fourth has a P-384
 root higher in the chain). Activating `pkix-path/p384` is sufficient
 for `DefaultVerifier` to dispatch the `ecdsa-with-SHA384` OID and
 verify the certificate signatures end-to-end.
-
-No other case changed class.
 
 ### Why no `webpki::*` flips
 

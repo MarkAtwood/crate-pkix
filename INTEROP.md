@@ -34,8 +34,7 @@ same commit.
 * **Zero correctness regressions detected** against OpenSSL across the
   247 PKITS chains the harness can classify. Every chain where
   `pkix-path` and OpenSSL disagree is documented below as either
-  intentional (we follow the literal RFC 5280 reading) or harness
-  limitation (chain shape exposes a `pkix-difftest` gap).
+  intentional or harness limitation.
 
 ## 1. pyca rejects critical PolicyMappings, InhibitAnyPolicy, PolicyConstraints
 

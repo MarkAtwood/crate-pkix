@@ -19,8 +19,8 @@ So a sender implementing MTA-STS or DANE without TLSRPT is a free rider on
 the domains that do report — it takes the protection and contributes nothing
 to anyone else's rollout.
 
-Note that this is not a security argument. A report protects the
-**recipient's deployment**, not the sender's mail.
+This is not a security argument: a report protects the **recipient's
+deployment**, not the sender's mail.
 
 ## What a report says about someone else
 
