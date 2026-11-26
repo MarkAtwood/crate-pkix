@@ -26,9 +26,13 @@ println!("fetched {} bytes", der_bytes.len());
 
 The default fetcher carries a 10-second timeout and a 1 MiB response
 body cap, does not follow redirects, ignores environment proxies, and
-refuses destinations that resolve to loopback, private, link-local,
-ULA, multicast or unspecified addresses (`AiaError::DestinationNotAllowed`),
-because caIssuers URIs come from not-yet-validated certificates (SSRF).
+refuses destinations that do not resolve to a public address
+(`AiaError::DestinationNotAllowed`), because caIssuers URIs come from
+not-yet-validated certificates (SSRF). What counts as non-public is
+`pkix-net-guard`'s decision, not a list kept here: besides loopback,
+private, link-local, ULA, multicast and unspecified addresses it covers
+RFC 6598 shared space and the IPv4-mapped, IPv4-compatible and NAT64
+forms, which are the usual way an address filter is slipped past.
 Override the size cap via `with_max_response_size`, the destination
 filter via `allow_private_destinations`, or everything by injecting a
 pre-configured `ureq::Agent` via `with_agent` (which then owns redirect
@@ -43,6 +47,16 @@ This crate intentionally mirrors `pkix-revocation-http`'s
 in the same process can configure a custom `ureq::Agent` once and
 pass it to both fetchers via the `with_agent` builders, sharing
 connection pools.
+
+**The mirroring stops at destination policy, and that is the one place it
+matters.** This crate refuses non-public destinations by default;
+`pkix-revocation-http` applies no destination policy at all, leaving it to
+the caller's fetcher. Both choices are deliberate — this crate owns its
+transport and so can own a policy, while that crate's transport is a
+caller-supplied trait — but a reader who has absorbed how similar the two
+crates are is exactly the reader who will assume the defaults match. They
+do not. If you learnt here that AIA fetching is SSRF-safe out of the box,
+revocation fetching is not.
 
 The one-callback-per-crate split (`pkix-revocation-http` for
 CRL / OCSP, `pkix-aia-http` for AIA) follows the workspace's
