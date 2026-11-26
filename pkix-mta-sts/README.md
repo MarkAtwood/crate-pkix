@@ -99,7 +99,10 @@ that mode exists to create — but this crate emits no reports.
 **Persistent policy storage.** `PolicyStore` is the trait, and
 `InMemoryPolicyStore` (feature `std`) is a complete in-process
 implementation — it survives the life of the process, which covers a
-long-running MTA, but not a restart. Since MTA-STS's protection comes from
+long-running MTA, but not a restart. There is no durable implementation
+here because the workspace depends on no filesystem and no OS, which is
+what leaves the choice of store to the deployment rather than an
+oversight. Since MTA-STS's protection comes from
 holding a policy across the moment an attacker shows up, a process that
 restarts often wants something durable; implement the trait over whatever the
 deployment already has. Enable `serde` to persist a `CachedPolicy`.

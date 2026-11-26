@@ -365,8 +365,11 @@ jobs:
 
       # No exclusions. pkix-ct and pkix-lint were excluded because both
       # linked unconditionally to items that only exist behind a feature,
-      # which a default-feature rustdoc run cannot resolve; those 24
-      # references are now code spans, following the convention those two
-      # crates already used for the same situation.
+      # which a default-feature rustdoc run cannot resolve. Each now
+      # allows rustdoc::broken_intra_doc_links only in the configurations
+      # where those items do not exist, the pattern pkix-path and
+      # pkix-revocation-http already used, so the links keep working on
+      # docs.rs — which builds all features — and the lint stays denied
+      # everywhere it can tell a gated item from a typo.
       - name: Documentation builds with default features
         run: cargo doc --workspace --no-deps

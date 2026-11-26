@@ -52,7 +52,7 @@ use crate::{Error, Result};
 /// `sig_alg` are the raw 1-byte tags from RFC 5246 §7.4.1.4.1 rather than
 /// typed enums, so future TLS revisions adding new algorithms do not
 /// require changes here. Signature interpretation lives one layer up
-/// (see `crate::SctVerifier`).
+/// (see [`crate::SctVerifier`]).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
@@ -63,7 +63,7 @@ pub struct SignedCertificateTimestamp {
     pub version: u8,
     /// Log identifier — SHA-256 of the log's public key DER encoding
     /// (RFC 6962 §3.2). Used to look up the log's verifying key in a
-    /// `crate::CtLogList`.
+    /// [`crate::CtLogList`].
     pub log_id: [u8; 32],
     /// Timestamp the log committed to, in milliseconds since the Unix
     /// epoch. Decoded from the 8-byte big-endian wire field.

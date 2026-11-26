@@ -2,7 +2,7 @@
 
 **Reference CA/Browser Forum lint bundles for [`pkix-lint`](https://docs.rs/pkix-lint). Not authoritative.**
 
-CA/B Forum Baseline Requirements (TLS BR, S/MIME BR) change on a ballot cycle. The lint bundles in this crate are a snapshot of those requirements at the time of the most recent revision. They are intended as a starting point: fork and adapt to your deployment's current interpretation of the BR text, which is the only canonical source.
+CA/B Forum Baseline Requirements (TLS BR, S/MIME BR) change on a ballot cycle. The lint bundles in this crate are a small, curated snapshot of marquee BR requirements. They are intended as a starting point: fork and adapt to your deployment's current interpretation of the BR text, which is the only canonical source.
 
 For the current Baseline Requirements:
 - <https://cabforum.org/baseline-requirements/> (TLS)

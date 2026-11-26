@@ -186,9 +186,9 @@ belongs in an adapter crate.
 
 Crypto coverage, RFC compliance, and feature surfaces land incrementally.
 Per-crate `# Limitations` rustdoc sections describe what each crate's
-shipped code currently does and does not do. The driving goal is full
-RFC 5280 and adjacent-RFC coverage; no work is gated by a version
-milestone.
+shipped code currently does and does not do. The scope being worked
+towards is full RFC 5280 and adjacent-RFC coverage; no work is gated by
+a version milestone.
 
 PKITS (NIST) test corpus is the Tier-1 integration-test bar; the
 x509-limbo corpus is Tier-2. See `pkix-difftest/baseline-pkits-analysis.md`

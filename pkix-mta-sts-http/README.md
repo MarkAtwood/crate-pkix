@@ -58,7 +58,8 @@ second one. `pkix_mta_sts::txt_name` builds the name and
 
 **Persistent cache storage.** `pkix_mta_sts::PolicyStore` is the trait and
 `InMemoryPolicyStore` the in-process implementation; a durable one is the
-caller's, because the workspace depends on no filesystem or OS.
+caller's. `pkix-mta-sts`'s README has the full reasoning, including what
+surviving the process but not a restart costs an MTA that restarts.
 
 Use `fetch_and_record` rather than `fetch` when you have a store. Every fetch
 must be followed by one of two bookkeeping steps — store the policy, or
