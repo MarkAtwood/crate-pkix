@@ -24,7 +24,7 @@
 //! - `deviated_findings` → `assessment-results.results.risks[status=deviation-approved]`
 //!
 //! The OSCAL Assessment Results emitter ships in-crate under the `oscal`
-//! cargo feature ([`crate::oscal::emit::assessment_results`]). See that
+//! cargo feature (`crate::oscal::emit::assessment_results`). See that
 //! module's docs for the full field-mapping table and round-trip
 //! guarantees.
 

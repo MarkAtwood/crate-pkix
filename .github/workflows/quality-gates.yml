@@ -363,12 +363,10 @@ jobs:
       - name: Tests build and pass with default features
         run: cargo test --workspace
 
-      # pkix-ct and pkix-lint are excluded: both document public items
-      # that only exist behind a feature, and their docs link to those
-      # items unconditionally, so a default-feature rustdoc run cannot
-      # resolve them (19 and 5 links respectively). Every other crate in
-      # the workspace documents clean this way. Tracked in PKIX-10ev;
-      # remove each exclusion as it is fixed, because a gate that is
-      # allowed to fail is not a gate.
+      # No exclusions. pkix-ct and pkix-lint were excluded because both
+      # linked unconditionally to items that only exist behind a feature,
+      # which a default-feature rustdoc run cannot resolve; those 24
+      # references are now code spans, following the convention those two
+      # crates already used for the same situation.
       - name: Documentation builds with default features
-        run: cargo doc --workspace --no-deps --exclude pkix-ct --exclude pkix-lint
+        run: cargo doc --workspace --no-deps

@@ -23,18 +23,18 @@
 //!   TLS handshake extension and, behind the `ocsp` feature,
 //!   `sct_list_from_ocsp_response`.
 //! - CT log list management, behind the `log-list` and `log-list-json`
-//!   features: [`CtLog`], [`CtLogList`],
+//!   features: `CtLog`, `CtLogList`,
 //!   `CtLogList::from_google_log_list_json`.
 //! - SCT signature verification for both log entry types:
-//!   [`SctVerifier::verify_sct_for_cert`] for `x509_entry` (SCTs delivered
+//!   `SctVerifier::verify_sct_for_cert` for `x509_entry` (SCTs delivered
 //!   via OCSP or the TLS handshake) and
-//!   [`SctVerifier::verify_sct_for_precert`] for `precert_entry` (SCTs
+//!   `SctVerifier::verify_sct_for_precert` for `precert_entry` (SCTs
 //!   embedded in the issued certificate via the SCT-list extension).
 //! - Merkle inclusion proof verification (RFC 6962 §2.1.1) and Signed Tree
 //!   Head signature verification (RFC 6962 §3.5):
-//!   [`SctVerifier::verify_inclusion`] and [`SctVerifier::verify_sth`],
-//!   with the `MerkleTreeLeaf` builders [`merkle_tree_leaf_for_cert`] and
-//!   [`merkle_tree_leaf_for_precert`] plus [`merkle_leaf_hash`] completing
+//!   `SctVerifier::verify_inclusion` and `SctVerifier::verify_sth`,
+//!   with the `MerkleTreeLeaf` builders `merkle_tree_leaf_for_cert` and
+//!   `merkle_tree_leaf_for_precert` plus `merkle_leaf_hash` completing
 //!   the "parse SCT → build leaf → hash → verify inclusion" path.
 //!
 //! # Limitations
@@ -93,8 +93,8 @@ pub enum Error {
     /// A length prefix in the SCT or SCT list ran past the available input,
     /// or trailing bytes remained after the declared length was consumed.
     TruncatedOrTrailing,
-    /// The SCT's `log_id` does not appear in the [`CtLogList`] used to
-    /// construct the [`SctVerifier`].
+    /// The SCT's `log_id` does not appear in the `CtLogList` used to
+    /// construct the `SctVerifier`.
     UnknownLog,
     /// The SCT's signature did not verify as asked, but does verify
     /// under the *other* RFC 6962 §3.1 log entry type.
@@ -128,8 +128,8 @@ pub enum Error {
     /// certificate during path validation.
     DuplicateSctListExtension,
     /// The SCT carries `(hash_alg, sig_alg)` tags that
-    /// [`SctVerifier`] does not know how to map to an X.509 signature
-    /// algorithm. See the [`SctVerifier`] module documentation for the
+    /// `SctVerifier` does not know how to map to an X.509 signature
+    /// algorithm. See the `SctVerifier` module documentation for the
     /// supported combinations.
     UnsupportedSignatureAlgorithm {
         /// RFC 5246 §7.4.1.4.1 `HashAlgorithm` tag carried by the SCT.
@@ -137,11 +137,11 @@ pub enum Error {
         /// RFC 5246 §7.4.1.4.1 `SignatureAlgorithm` tag carried by the SCT.
         sig_alg: u8,
     },
-    /// The [`CtLog::key_der`] bytes did not parse as a valid
+    /// The `CtLog::key_der` bytes did not parse as a valid
     /// `SubjectPublicKeyInfo`. Indicates a corrupted log list.
     LogKeyMalformed,
     /// The SCT timestamp falls outside the log's usable window —
-    /// before [`CtLog::usable_from`], at or after
+    /// before `CtLog::usable_from`, at or after
     /// `CtLog::retired_at_ms`, or signed by a log that never became
     /// usable at all.
     SctTimestampOutsideLogWindow,
@@ -174,12 +174,12 @@ pub enum Error {
     /// the second is settled.
     OcspResponseNotSuccessful(u8),
     /// The final leaf certificate passed to
-    /// [`SctVerifier::verify_sct_for_precert`] does not contain an
+    /// `SctVerifier::verify_sct_for_precert` does not contain an
     /// SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2). Verifying a
     /// `precert_entry` SCT against a cert that never carried the
     /// embedded list is nonsensical — the SCT must have come from a
     /// different delivery channel (OCSP / TLS handshake), for which
-    /// callers should use [`SctVerifier::verify_sct_for_cert`].
+    /// callers should use `SctVerifier::verify_sct_for_cert`.
     LeafMissingSctList,
     /// Merkle inclusion proof verification failed: the reconstructed
     /// root hash does not match the supplied root, or the proof's

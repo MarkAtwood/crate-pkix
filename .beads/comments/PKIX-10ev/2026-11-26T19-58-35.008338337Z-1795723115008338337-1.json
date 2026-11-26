@@ -1,0 +1,7 @@
+{
+  "id": "1795723115008338337-1",
+  "issue_id": "PKIX-10ev",
+  "author": "Mark Atwood",
+  "text": "Closed out. The default-feature CI job shipped earlier with pkix-ct and pkix-lint excluded, because both linked unconditionally to items that only exist behind a feature and a default-feature rustdoc run cannot resolve them. Both exclusions are now gone, so the job covers the whole workspace.\n\n24 references converted from intra-doc links to code spans, which is the convention those two crates already used for exactly this situation -- pkix-ct's own crate docs already wrote sct_list_from_ocsp_response and CtLogList::from_google_log_list_json as code spans, two bullets away from the links that were breaking.\n\nTradeoff worth recording: on docs.rs, which builds with all features, those 24 references are no longer clickable. The alternative was cfg_attr'd doc text at every site, or leaving a gate excluded, and a gate that is allowed to fail is not a gate.\n\npkix-lint 0.10.3 for the doc change, which the divergence gate required.",
+  "created_at": "2026-11-26T19:58:35.008338337Z"
+}

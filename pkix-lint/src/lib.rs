@@ -776,7 +776,7 @@ impl core::fmt::Display for Finding {
 /// `Lint + Clone + 'static`. Concrete lint types just need to derive
 /// or implement [`Clone`].
 ///
-/// The clone is used by [`LintRunner::apply_parameter_overrides`] to
+/// The clone is used by `LintRunner::apply_parameter_overrides` to
 /// validate parameter values against a fresh copy of the lint before
 /// committing the change to the runner's registered state, giving
 /// atomic application semantics on `set_parameter` failures
@@ -862,7 +862,7 @@ impl Clone for Box<dyn Lint> {
 /// `Lint + Clone + 'static`, so implementors just need to derive or
 /// implement [`Clone`] on their concrete type — they do NOT need to
 /// implement `LintClone` directly. This requirement is necessary for
-/// [`LintRunner::apply_parameter_overrides`] to provide atomic
+/// `LintRunner::apply_parameter_overrides` to provide atomic
 /// parameter-application semantics: the runner clones lints, applies
 /// overrides to the clones, and only swaps on success
 /// (PKIX-hy2e.6).
@@ -1828,7 +1828,7 @@ pub trait LintProfile: Profile {
 ///
 /// This is a fast single-cert convenience over the lint engine. It sits
 /// between [`pkix_path::validate_path`] (the path-validation gate) and
-/// [`crate::oscal::emit::assessment_results`] (compliance assertion).
+/// `crate::oscal::emit::assessment_results` (compliance assertion).
 ///
 /// # Layered semantics
 ///
@@ -1836,7 +1836,7 @@ pub trait LintProfile: Profile {
 /// |-------|----------|------|
 /// | `check_shape` (this fn) | Single cert, structural sanity. \"Is this a sanely-shaped X cert?\" | O(number of lints), microseconds |
 /// | [`pkix_path::validate_path`] | Full chain, RFC 5280 §6 path validation including signature checks | O(chain length × verifier cost), milliseconds |
-/// | [`crate::oscal::emit::assessment_results`] | OSCAL Assessment Results JSON for compliance audit | Per-finding serialisation cost |
+/// | `crate::oscal::emit::assessment_results` | OSCAL Assessment Results JSON for compliance audit | Per-finding serialisation cost |
 ///
 /// # Contract
 ///
