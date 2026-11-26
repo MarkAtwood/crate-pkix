@@ -8,6 +8,7 @@ use hickory_proto::rr::{RData, RecordType};
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::net::NetError;
+use hickory_resolver::net::{DnsError, NoRecords};
 use hickory_resolver::{Resolver, TokioResolver};
 use pkix_dane::{
     DaneError, DnssecStatus, TlsaMatchingType, TlsaName, TlsaRecord, TlsaResponse, TlsaSelector,
@@ -262,22 +263,178 @@ fn convert_record(tlsa: &hickory_proto::rr::rdata::TLSA) -> TlsaRecord {
 /// distinguishes "the domain signed that it publishes no TLSA record" from
 /// "something ate the answer".
 fn classify_lookup_error(err: &NetError) -> Result<TlsaResponse, DaneError> {
-    if err.is_no_records_found() {
-        // DNS answered that the name holds no TLSA records. Whether that is
-        // an authenticated denial or an unsigned nothing is carried by the
-        // negative answer's own DNSSEC state, which this error type does not
-        // surface per-record. Indeterminate is the fail-closed reading: it
-        // does not authenticate, and under the opportunistic policy it
-        // permits PKIX fallback, which is the correct handling for "the
-        // domain appears to publish no TLSA record".
-        //
-        // A signed NXDOMAIN or NODATA *should* be reported Secure so that
-        // TlsaResponse::is_authenticated_denial can distinguish it. Doing so
-        // needs the SOA's proof off the negative response; filed as follow-up
-        // work rather than guessed at here, because reporting Secure for an
-        // unvalidated negative answer would be the one direction that is
-        // unsafe.
-        return Ok(TlsaResponse::new(Vec::new(), DnssecStatus::Indeterminate));
+    // DNS answered that the name holds no TLSA records. Whether that is an
+    // authenticated denial — the zone has signed a statement that it
+    // publishes no TLSA record — or an unsigned nothing that an attacker
+    // could have produced by stripping records is carried by the negative
+    // answer's own DNSSEC state, which `NoRecords` does surface.
+    if let NetError::Dns(DnsError::NoRecordsFound(no_records)) = err {
+        return Ok(TlsaResponse::new(
+            Vec::new(),
+            negative_answer_status(no_records),
+        ));
     }
     Err(DaneError::ResolutionFailed(err.to_string()))
+}
+
+/// DNSSEC status of a negative answer — RFC 7672 §3.1.3.
+///
+/// A signed NODATA or NXDOMAIN is a statement the zone signed, so a client
+/// knows DANE is deliberately absent rather than merely missing. That is
+/// what [`TlsaResponse::is_authenticated_denial`] reports, and it is a
+/// stronger fact than an unsigned nothing: nothing was stripped.
+///
+/// The denial is proven by the authority section — the NSEC or NSEC3
+/// records and their signatures — and by the SOA. So the status is taken
+/// from the proofs hickory attached to those records, and `Secure` is
+/// returned only when every one of them is `Secure` and there is at least
+/// one to inspect.
+///
+/// Erring in the other direction is the unsafe one. Reporting `Secure`
+/// for a negative answer that was not validated would let a stripped
+/// response pass as a deliberate absence, which is the attack DANE exists
+/// to stop, so anything short of a complete `Secure` set degrades:
+/// `Bogus` if any proof failed validation, `Insecure` if the zone is
+/// provably unsigned, and `Indeterminate` when there is nothing to judge
+/// — including the case where hickory attached no authority records at
+/// all, which is what a resolver with no trust anchors produces.
+fn negative_answer_status(no_records: &NoRecords) -> DnssecStatus {
+    let mut proofs = Vec::new();
+    if let Some(soa) = no_records.soa.as_deref() {
+        proofs.push(soa.proof);
+    }
+    if let Some(authorities) = no_records.authorities.as_deref() {
+        proofs.extend(authorities.iter().map(|r| r.proof));
+    }
+
+    if proofs.is_empty() {
+        return DnssecStatus::Indeterminate;
+    }
+    // Order matters: a single failed proof outranks any number of good
+    // ones, because the denial is only as good as its weakest link.
+    if proofs.contains(&Proof::Bogus) {
+        return DnssecStatus::Bogus;
+    }
+    if proofs.contains(&Proof::Insecure) {
+        return DnssecStatus::Insecure;
+    }
+    if proofs.iter().all(|p| *p == Proof::Secure) {
+        return DnssecStatus::Secure;
+    }
+    DnssecStatus::Indeterminate
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hickory_proto::op::{Query, ResponseCode};
+    use hickory_proto::rr::rdata::SOA;
+    use hickory_proto::rr::{Name, RData, Record};
+
+    fn soa_record(proof: Proof) -> Record<SOA> {
+        let soa = SOA::new(
+            Name::from_ascii("ns.example.").expect("name"),
+            Name::from_ascii("hostmaster.example.").expect("name"),
+            1,
+            7200,
+            3600,
+            604_800,
+            3600,
+        );
+        let mut r = Record::from_rdata(Name::from_ascii("example.").expect("name"), 3600, soa);
+        r.proof = proof;
+        r
+    }
+
+    fn authority(proof: Proof) -> Record {
+        let mut r = Record::from_rdata(
+            Name::from_ascii("example.").expect("name"),
+            3600,
+            RData::NULL(hickory_proto::rr::rdata::NULL::new()),
+        );
+        r.proof = proof;
+        r
+    }
+
+    fn no_records(soa: Option<Record<SOA>>, authorities: Vec<Record>) -> NoRecords {
+        let mut nr = NoRecords::new(
+            Query::query(
+                Name::from_ascii("_25._tcp.mail.example.").expect("name"),
+                RecordType::TLSA,
+            ),
+            ResponseCode::NoError,
+        );
+        nr.soa = soa.map(Box::new);
+        if !authorities.is_empty() {
+            nr.authorities = Some(authorities.into());
+        }
+        nr
+    }
+
+    /// A validated negative answer is an authenticated denial.
+    ///
+    /// Oracle: RFC 7672 §3.1.3 — a signed NODATA is a statement the zone
+    /// signed, so the client knows DANE is deliberately absent rather
+    /// than stripped. This is what `is_authenticated_denial` reports,
+    /// and it was unreachable before: every negative answer came back
+    /// Indeterminate.
+    #[test]
+    fn a_validated_negative_answer_is_secure() {
+        let nr = no_records(
+            Some(soa_record(Proof::Secure)),
+            vec![authority(Proof::Secure)],
+        );
+        assert_eq!(negative_answer_status(&nr), DnssecStatus::Secure);
+    }
+
+    /// The direction that must never be wrong: anything short of a
+    /// complete Secure set must not report Secure, because that would
+    /// let a stripped response pass as a deliberate absence — the attack
+    /// DANE exists to stop.
+    #[test]
+    fn an_unvalidated_negative_answer_is_never_secure() {
+        for (soa, auth, expected) in [
+            // Nothing to judge: no authority section at all, which is
+            // what a resolver with no trust anchors produces.
+            (None, vec![], DnssecStatus::Indeterminate),
+            // A failed proof outranks any number of good ones.
+            (
+                Some(soa_record(Proof::Secure)),
+                vec![authority(Proof::Bogus)],
+                DnssecStatus::Bogus,
+            ),
+            (
+                Some(soa_record(Proof::Bogus)),
+                vec![authority(Proof::Secure)],
+                DnssecStatus::Bogus,
+            ),
+            // Provably unsigned zone.
+            (
+                Some(soa_record(Proof::Insecure)),
+                vec![authority(Proof::Insecure)],
+                DnssecStatus::Insecure,
+            ),
+            // Mixed Secure/Insecure is still not a validated denial.
+            (
+                Some(soa_record(Proof::Secure)),
+                vec![authority(Proof::Insecure)],
+                DnssecStatus::Insecure,
+            ),
+            // Indeterminate anywhere means the chain did not reach it.
+            (
+                Some(soa_record(Proof::Indeterminate)),
+                vec![authority(Proof::Secure)],
+                DnssecStatus::Indeterminate,
+            ),
+        ] {
+            let nr = no_records(soa, auth);
+            let got = negative_answer_status(&nr);
+            assert_eq!(got, expected, "expected {expected:?}, got {got:?}");
+            assert_ne!(
+                got,
+                DnssecStatus::Secure,
+                "an unvalidated denial must never report Secure"
+            );
+        }
+    }
 }
