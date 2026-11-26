@@ -39,6 +39,7 @@ members = [
     "pkix-dnssec-anchor",
     "pkix-pkilint-bridge",
     "pkix-policy-pkilint",
+    "pkix-rustls",
 ]
 
 [workspace.package]
@@ -168,6 +169,7 @@ pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.2.0" 
 pkix-dnssec-anchor      = { path = "pkix-dnssec-anchor",      version = "0.1.0" }
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
 pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
+pkix-rustls             = { path = "pkix-rustls",             version = "0.1.0" }
 
 # RustCrypto core.
 #

@@ -1,0 +1,81 @@
+[package]
+name        = "pkix-rustls"
+description = "Use PKIX path validation as rustls's certificate verifier, in place of rustls-webpki"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+authors.workspace     = true
+categories  = ["cryptography", "network-programming"]
+keywords    = ["rustls", "tls", "x509", "certificate", "pki"]
+
+# This crate is the implementation of PKIX-77k9.4. See the parent bead for
+# scope.
+#
+# Why this is a separate crate, and why it is the one place allowed to
+# name rustls
+#
+# rustls's certificate-verifier trait lives in a module called `danger`,
+# which is rustls saying it reserves the right to change it. Keeping the
+# dependency here means that when it does change, one crate needs a new
+# release and nothing else in the workspace moves. pkix-chain stays
+# unaware that rustls exists.
+#
+# The version pin
+#
+# `rustls = "0.23"` resolves 0.23.x and nothing else, which is the point:
+# 0.23 has had forty-odd patch releases on one API, and semver holds
+# inside it, so the trait cannot move under us without a new minor. A
+# 0.24 line is in development; supporting it is a new release of this
+# crate, not a silent upgrade.
+#
+# `rustls-pki-types` is at 1.x deliberately — it exists so that the
+# vocabulary rustls hands a verifier (CertificateDer, ServerName,
+# UnixTime) is stable independently of rustls itself. So the types this
+# crate converts are on a 1.x guarantee even though the trait is not.
+
+[dependencies]
+# The trait being implemented, and nothing else from rustls.
+#
+# default-features = false matters: rustls's defaults pull in a crypto
+# provider (aws-lc-rs), and a consumer who chose `ring` should not
+# compile a second one because of this crate. The provider is the
+# consumer's to pick and is passed in, so all this needs is the trait
+# and `std` for it.
+rustls = { version = "0.23", default-features = false, features = ["std"] }
+
+# The types in the trait's signatures. Separate from rustls and stable
+# at 1.x; see the pin note above.
+rustls-pki-types = { version = "1", features = ["std"] }
+
+# The verification this crate exists to delegate to.
+pkix-chain    = { workspace = true }
+pkix-identity = { workspace = true }
+pkix-path     = { workspace = true }
+
+# Named directly by the error mapping, which matches on their variants
+# to find the rustls equivalent, and by the default profile.
+pkix-revocation   = { workspace = true }
+pkix-profiles     = { workspace = true }
+pkix-path-builder = { workspace = true }
+
+# Cert parsing. The trait hands over DER, and `pkix-chain` wants parsed
+# certificates.
+x509-cert = { workspace = true, features = ["std"] }
+der       = { workspace = true }
+
+[dev-dependencies]
+# The tests need a real crypto provider to hand the verifier, and
+# `ring` is the one a consumer who avoided aws-lc-rs would pick. Only
+# the handshake-signature path and the advertised schemes touch it; the
+# chain never does.
+rustls = { version = "0.23", default-features = false, features = ["std", "ring"] }
+
+# The chain fixtures are pkix-chain's, read by relative path rather
+# than copied, so there is one corpus and it cannot drift.
+pkix-chain = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

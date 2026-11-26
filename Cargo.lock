@@ -1796,6 +1796,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkix-rustls"
+version = "0.1.0"
+dependencies = [
+ "der",
+ "pkix-chain",
+ "pkix-identity",
+ "pkix-path",
+ "pkix-path-builder",
+ "pkix-profiles",
+ "pkix-revocation",
+ "rustls",
+ "rustls-pki-types",
+ "x509-cert",
+]
+
+[[package]]
 name = "pkix-tlsrpt"
 version = "0.2.0"
 dependencies = [
