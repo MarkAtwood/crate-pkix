@@ -257,14 +257,21 @@ fn the_candidate_lists_have_no_duplicates() {
 // This host
 // ---------------------------------------------------------------------------
 
-/// Whatever this machine has, `from_system` must agree with reading its
-/// bundle directly — same anchor count, nothing silently dropped.
+/// `from_system` picks the first candidate bundle that exists.
+///
+/// Only the precedence claim lives here, because only it depends on a
+/// clean environment. The loader comparison moved to
+/// [`the_lenient_loader_agrees_with_the_strict_one_on_this_hosts_bundle`],
+/// which needs no environment at all — it had never once run, because
+/// both this machine and GitHub's Linux runners export `SSL_CERT_FILE`,
+/// so the skip below fired every time and the test passed by asserting
+/// nothing.
 ///
 /// Skipped rather than failed where there is no store, so the suite still
 /// passes in a scratch container. The assertion only runs where there is
 /// something to assert about.
 #[test]
-fn from_system_agrees_with_reading_the_host_bundle_directly() {
+fn from_system_prefers_the_first_candidate_bundle_that_exists() {
     // Env overrides would make this compare two different stores.
     if std::env::var_os(SSL_CERT_FILE).is_some() || std::env::var_os(SSL_CERT_DIR).is_some() {
         eprintln!("skipped: {SSL_CERT_FILE}/{SSL_CERT_DIR} set in this environment");
@@ -297,22 +304,61 @@ fn from_system_agrees_with_reading_the_host_bundle_directly() {
         "the first existing candidate should be the one used"
     );
 
-    // The strict loader is the oracle: where it succeeds, the lenient one
-    // must produce exactly the same number of anchors. A mismatch would
-    // mean the per-entry split is losing or inventing certificates.
-    if let Ok(strict) = pkix_truststore::from_pem_file(bundle) {
-        assert_eq!(
-            ours.len(),
-            strict.len(),
-            "lenient and strict loaders disagree on {}",
+    assert!(!ours.is_empty());
+}
+
+/// The strict loader is the oracle: where it succeeds on this host's real
+/// bundle, the lenient one must produce exactly the same number of
+/// anchors. A mismatch would mean the per-entry split is losing or
+/// inventing certificates.
+///
+/// Reads the bundle directly rather than through `from_system`, so no
+/// environment variable and no platform store can decide what is being
+/// compared. That matters more than it sounds: as part of
+/// `from_system_prefers_the_first_candidate_bundle_that_exists` this
+/// comparison never ran anywhere, because that test skips when
+/// `SSL_CERT_FILE` is set and both this workspace's machines and GitHub's
+/// Linux runners set it.
+///
+/// Skipped only where the host genuinely has no bundle.
+#[test]
+fn the_lenient_loader_agrees_with_the_strict_one_on_this_hosts_bundle() {
+    let Some(bundle) = candidate_bundle_files().find(|p| p.is_file()) else {
+        eprintln!("skipped: this host has no bundle at any candidate path");
+        return;
+    };
+
+    let (lenient, report) = from_bundle_file(bundle).expect("the bundle exists and was read");
+
+    let Ok(strict) = pkix_truststore::from_pem_file(bundle) else {
+        // The strict loader rejects the whole file over one bad entry,
+        // which is exactly the case the lenient one exists for. Then it
+        // is not an oracle and there is nothing to compare — but the
+        // lenient loader still has to have produced something, and to
+        // have said how much it dropped.
+        eprintln!(
+            "the strict loader rejected {}; checking only that the lenient one coped",
             bundle.display()
         );
-        assert_eq!(
-            report.skipped, 0,
-            "nothing should be skipped in a clean bundle"
+        assert!(!lenient.is_empty());
+        assert!(
+            report.skipped > 0,
+            "the strict loader failed, so at least one entry must have been skipped"
         );
-    }
-    assert!(!ours.is_empty());
+        return;
+    };
+
+    assert_eq!(
+        lenient.len(),
+        strict.len(),
+        "lenient and strict loaders disagree on {}",
+        bundle.display()
+    );
+    assert_eq!(
+        report.skipped, 0,
+        "nothing should be skipped in a bundle the strict loader accepted"
+    );
+    assert!(!lenient.is_empty());
 }
 
 /// On a platform whose canonical store is not a file, the native backend

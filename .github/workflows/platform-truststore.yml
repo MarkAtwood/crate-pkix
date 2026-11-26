@@ -80,4 +80,11 @@ jobs:
         run: cargo check -p pkix-truststore-system --all-features --all-targets
 
       - name: Run the platform backend against the live trust store
-        run: cargo test -p pkix-truststore-system --all-features
+        # --nocapture because several of these tests skip rather than fail
+        # where the host cannot support them, and a skip prints to stderr
+        # while still reporting ok. Without it a test that asserted
+        # nothing is indistinguishable in the log from one that passed,
+        # which is precisely the distinction this workflow exists to
+        # make: if SSL_CERT_FILE is set on a runner, from_system never
+        # consults the platform store and the native-backend test skips.
+        run: cargo test -p pkix-truststore-system --all-features -- --nocapture
