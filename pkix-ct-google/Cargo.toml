@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace      = true
 repository.workspace   = true
 authors.workspace      = true
-keywords    = ["certificate-transparency", "ct", "sct", "log-list", "pki"]
+keywords    = ["transparency", "ct", "sct", "log-list", "pki"]
 categories  = ["cryptography", "no-std"]
 
 # The committed Google artifacts are the provenance record for a release. A
