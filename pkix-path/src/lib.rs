@@ -46,6 +46,22 @@
 //! # Limitations
 //!
 //! The following are **not** currently implemented:
+//! - **Certificates with a `UTCTime` before 1970** — RFC 5280 §4.1.2.5.1
+//!   gives `UTCTime` the range 1950-2049, but `der` 0.8 supports only
+//!   1970-2049: "Due to common operations working on `UNIX_EPOCH`,
+//!   `UtcTime`s are only supported for the years 1970-2049." So a
+//!   certificate whose `notBefore` or `notAfter` predates the epoch does
+//!   not parse at all, and the error comes from the DER layer
+//!   ("malformed ASN.1 DER value for UTCTime") rather than from
+//!   validation. This is fail-closed — such a certificate is refused,
+//!   never misread — and it cannot be worked around here, because the
+//!   restriction lives in the type that `x509-cert` parses into.
+//!   OpenSSL reads these certificates, so the disagreement is real
+//!   rather than a matter of strictness: NIST PKITS §4.2.3 "Valid
+//!   pre2000 UTC notBefore Date Test3" is exactly this shape and is the
+//!   one PKITS vector this crate cannot evaluate. No conforming CA
+//!   issues pre-1970 certificates, so it has not been worth forking the
+//!   dependency over.
 //! - **Legacy signature algorithms** — SHA-1 verifiers (RFC 8017, legacy)
 //!   are intentionally not shipped; deployments requiring legacy SHA-1
 //!   trust must implement [`SignatureVerifier`] themselves. RSA moduli
