@@ -347,6 +347,10 @@ impl<'a> Cursor<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // This crate is `no_std`, so `vec!` is not in the prelude. With
+    // `--all-features` something else pulled it in and hid that; a default
+    // build did not. PKIX-10ev.
+    use alloc::vec;
 
     // Cursor unit tests — these test the parser plumbing only; the
     // independent oracle for the wire format is in tests/parser.rs.

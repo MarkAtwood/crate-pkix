@@ -326,3 +326,49 @@ jobs:
         # has a claim on. A registry it cannot reach fails the job rather
         # than passing quietly.
         run: ./scripts/check-registry-divergence.sh
+
+  default-features:
+    name: default features (what a consumer gets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      # WHY THIS JOB EXISTS
+      #
+      # Every other job here passes --all-features. A consumer who writes
+      # `pkix-chain = "0.8"` and nothing else gets the default feature
+      # set, which no job was compiling — so a default build could be
+      # broken for months without anything going red. Three defects were
+      # found through that gap in one day:
+      #
+      #   PKIX-6vfq  pkix-tlsrpt's tests did not compile without
+      #              --all-features.
+      #   PKIX-1hq5  pkix-ct and pkix-revocation-http each pull in a
+      #              dependency nothing in a default build uses, which
+      #              `cargo publish` surfaced because its verification
+      #              build uses default features.
+      #   PKIX-10ev  a `vec!` in a pkix-ct test resolved only with
+      #              --all-features; pkix-ct is no_std, so a default
+      #              build could not find the macro.
+      #
+      # `cargo hack --feature-powerset` does not cover this: it passes
+      # --no-dev-deps, so it never builds a test target.
+      - name: Tests build and pass with default features
+        run: cargo test --workspace
+
+      # pkix-ct and pkix-lint are excluded: both document public items
+      # that only exist behind a feature, and their docs link to those
+      # items unconditionally, so a default-feature rustdoc run cannot
+      # resolve them (19 and 5 links respectively). Every other crate in
+      # the workspace documents clean this way. Tracked in PKIX-10ev;
+      # remove each exclusion as it is fixed, because a gate that is
+      # allowed to fail is not a gate.
+      - name: Documentation builds with default features
+        run: cargo doc --workspace --no-deps --exclude pkix-ct --exclude pkix-lint

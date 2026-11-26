@@ -1,12 +1,19 @@
 //! The report schema — RFC 8460 §4.4 — and the filename — §5.1.
 
 use pkix_tlsrpt::{
-    rfc3339_utc, sts_policy_string, DateRange, FailureDetail, PolicyBlock, PolicyDescriptor,
-    PolicyType, Report, ReportFilename, ResultType, Summary,
+    rfc3339_utc, sts_policy_string, DateRange, FailureDetail, ReportFilename, ResultType,
 };
+
+// The report-building types are only reachable from the tests that
+// serialise one, and `to_json_string` / `from_json` live behind the `json`
+// feature — so in a default build this file would otherwise import names it
+// never uses. PKIX-6vfq.
+#[cfg(feature = "json")]
+use pkix_tlsrpt::{PolicyBlock, PolicyDescriptor, PolicyType, Report, Summary};
 
 /// A report built from the RFC's own schema example, with the field values
 /// from §4.4's prose and §4.5's policy sample.
+#[cfg(feature = "json")]
 fn example_report() -> Report {
     Report {
         organization_name: String::from("Company-X"),
@@ -47,6 +54,7 @@ fn example_report() -> Report {
 // ---------------------------------------------------------------------------
 
 /// The schema round-trips without loss.
+#[cfg(feature = "json")]
 #[test]
 fn a_report_round_trips_through_json() {
     let original = example_report();
@@ -60,6 +68,7 @@ fn a_report_round_trips_through_json() {
 /// Kebab-case with specific spellings, and a receiver matches on them
 /// literally — a report with `policy_type` instead of `policy-type` is not a
 /// report, however well-formed the JSON.
+#[cfg(feature = "json")]
 #[test]
 fn the_field_names_are_the_rfcs_own() {
     let json = example_report().to_json_string().expect("serialises");
@@ -118,6 +127,7 @@ fn the_field_names_are_the_rfcs_own() {
 /// Written as the RFC prints it rather than produced by this crate, so the
 /// deserialiser is tested against the spec rather than against the
 /// serialiser.
+#[cfg(feature = "json")]
 #[test]
 fn a_report_in_the_rfcs_literal_shape_parses() {
     let json = r#"{
@@ -382,6 +392,7 @@ fn a_date_range_spans_a_utc_day() {
 ///
 /// It tells a domain in MTA-STS `testing` mode that enforcing is safe, which
 /// is the entire purpose of that mode.
+#[cfg(feature = "json")]
 #[test]
 fn an_all_successful_report_has_no_failures_but_still_counts_sessions() {
     let report = Report {
