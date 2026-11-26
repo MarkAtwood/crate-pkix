@@ -133,6 +133,30 @@ pub struct VerifiedSct {
     pub timestamp_ms: u64,
 }
 
+/// Which RFC 6962 §3.1 log entry an SCT's signature covers.
+///
+/// Not carried on the transmitted SCT. RFC 6962 §3.2 puts `entry_type`
+/// inside the `digitally-signed` structure, so it is an *input* to
+/// verification that the caller supplies, not a field that can be
+/// parsed out of an SCT.
+///
+/// Only one case is determined by how the SCT arrived: an SCT embedded
+/// in a certificate must be [`LogEntryType::Precert`], because the log
+/// signed it before the certificate that now carries it existed. For
+/// SCTs delivered over the TLS handshake or OCSP, RFC 6962 §3.3 names
+/// no entry type — a server may staple either kind — which is why
+/// [`SctVerifier::diagnose_entry_type`] exists rather than a field on
+/// the SCT claiming to know.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum LogEntryType {
+    /// `x509_entry` (0) — the log signed the final certificate.
+    X509,
+    /// `precert_entry` (1) — the log signed a pre-certificate.
+    Precert,
+}
+
 /// One embedded SCT that did **not** verify, with the reason, as
 /// returned by [`SctVerifier::verify_embedded_scts_with_report`].
 ///
@@ -242,12 +266,23 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// directly in the issued cert via the SCT-list extension), use
     /// [`Self::verify_sct_for_precert`] instead.
     ///
-    /// Note: `pkix-ct`'s `SignedCertificateTimestamp` does not carry an
-    /// explicit `entry_type` field (it is implied by the
-    /// delivery channel — cert extension ⇒ precert_entry, OCSP /
-    /// TLS-handshake ⇒ x509_entry). This function unconditionally treats
-    /// the SCT as `x509_entry`; the caller is responsible for picking
-    /// the right entry point based on delivery channel.
+    /// This function always treats the SCT as `x509_entry`, because
+    /// RFC 6962 §3.2 carries `entry_type` inside the `digitally-signed`
+    /// structure rather than on the transmitted SCT: it is an input to
+    /// verification, not something an SCT can be asked.
+    ///
+    /// Which input is right is only settled for embedded SCTs, which
+    /// are necessarily `precert_entry` — the log signed them before the
+    /// certificate carrying them existed. RFC 6962 §3.3 names no entry
+    /// type for the TLS-handshake and OCSP channels, and a server may
+    /// staple either kind, so a caller holding one of those cannot
+    /// derive the answer and should not assume it.
+    ///
+    /// If this returns [`Error::InvalidSignature`] on an SCT that might
+    /// have been `precert_entry`, [`Self::diagnose_entry_type`] will
+    /// say which entry type does verify. This method cannot determine
+    /// that itself: the `precert_entry` form signs over the issuer's
+    /// key hash, and no issuer is passed here.
     ///
     /// On success the matching [`CtLog`] is returned so the caller can
     /// surface which log signed the SCT.
@@ -407,11 +442,67 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             parameters: None,
         };
 
-        self.verifier
+        if self
+            .verifier
             .verify_signature(alg_id, spki, &signed_input, &sct.signature)
-            .map_err(|_| Error::InvalidSignature)?;
+            .is_err()
+        {
+            // Before calling it a bad signature, check whether this is
+            // simply an x509_entry SCT asked the precert question. Only
+            // reachable here, and only on the failure path: this method
+            // holds the leaf DER that the x509_entry form signs over,
+            // whereas verify_sct_for_cert has no issuer and so cannot
+            // run the reverse check. The SCT is rejected either way;
+            // the point is to not call a caller's wiring mistake an
+            // attack.
+            if self.verify_sct_for_cert(sct, leaf_cert_der).is_ok() {
+                return Err(Error::EntryTypeMismatch);
+            }
+            return Err(Error::InvalidSignature);
+        }
 
         Ok(log)
+    }
+
+    /// Which entry type, if either, this SCT's signature verifies
+    /// under — the way out of an [`Error::InvalidSignature`] that might
+    /// really be a wrong-entry-point mistake.
+    ///
+    /// RFC 6962 §3.2 keeps `entry_type` inside the `digitally-signed`
+    /// structure, so it never arrives with the SCT and the caller has
+    /// to assume one. For an embedded SCT the answer is always
+    /// [`LogEntryType::Precert`]; for one delivered over the TLS
+    /// handshake or OCSP, RFC 6962 §3.3 names no entry type and a
+    /// server may staple either kind, so the only way to find out is to
+    /// try. That is what this does.
+    ///
+    /// Both entry types are attempted, `x509_entry` first. A success
+    /// says the SCT is genuine and names which question to ask; the
+    /// answer is a diagnosis, not an acceptance — nothing here decides
+    /// whether the SCT satisfies a CT policy.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidSignature`] — neither entry type verifies, so
+    ///   the SCT really is bad rather than misrouted.
+    /// - Any error either verification raises before reaching the
+    ///   signature check, such as [`Error::UnknownLog`].
+    pub fn diagnose_entry_type(
+        &self,
+        sct: &SignedCertificateTimestamp,
+        leaf_cert_der: &[u8],
+        issuer_cert_der: &[u8],
+    ) -> Result<LogEntryType> {
+        if self.verify_sct_for_cert(sct, leaf_cert_der).is_ok() {
+            return Ok(LogEntryType::X509);
+        }
+        match self.verify_sct_for_precert(sct, leaf_cert_der, issuer_cert_der) {
+            Ok(_) => Ok(LogEntryType::Precert),
+            // EntryTypeMismatch cannot surface here: the x509 case is
+            // tried first and returns above. Anything else is the
+            // genuine reason neither form worked.
+            Err(e) => Err(e),
+        }
     }
 
     /// Verify the SCTs embedded in `leaf_cert`'s SCT-list extension

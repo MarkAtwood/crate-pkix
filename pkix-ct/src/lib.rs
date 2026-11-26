@@ -60,8 +60,8 @@ pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
 pub use verify::{
     merkle_leaf_hash, merkle_tree_leaf_for_cert, merkle_tree_leaf_for_precert,
-    verify_inclusion_proof, EmbeddedSctReport, MerkleAuditPath, RejectedSct, SctVerifier,
-    SignedTreeHead, VerifiedSct,
+    verify_inclusion_proof, EmbeddedSctReport, LogEntryType, MerkleAuditPath, RejectedSct,
+    SctVerifier, SignedTreeHead, VerifiedSct,
 };
 
 /// Errors returned by SCT parsing and verification.
@@ -84,6 +84,19 @@ pub enum Error {
     /// The SCT's `log_id` does not appear in the [`CtLogList`] used to
     /// construct the [`SctVerifier`].
     UnknownLog,
+    /// The SCT's signature did not verify as asked, but does verify
+    /// under the *other* RFC 6962 §3.1 log entry type.
+    ///
+    /// Reported instead of [`Error::InvalidSignature`] so that calling
+    /// the wrong entry point is distinguishable from a forged or
+    /// tampered SCT. RFC 6962 puts `entry_type` inside the
+    /// `digitally-signed` structure rather than on the transmitted SCT,
+    /// so the verifier has to be told which one to assume, and being
+    /// told wrong used to look exactly like an attack.
+    ///
+    /// The SCT is still rejected. This names the likely cause; it does
+    /// not accept the signature.
+    EntryTypeMismatch,
     /// The SCT carries `(hash_alg, sig_alg)` tags that
     /// [`SctVerifier`] does not know how to map to an X.509 signature
     /// algorithm. See the [`SctVerifier`] module documentation for the
@@ -147,6 +160,10 @@ impl core::fmt::Display for Error {
                 f.write_str("SCT or SCT list bytes were truncated or had trailing data")
             }
             Self::UnknownLog => f.write_str("SCT log_id not present in the log list"),
+            Self::EntryTypeMismatch => f.write_str(
+                "SCT signature verifies under the other RFC 6962 log entry type \
+                 (wrong verification entry point for how this SCT was delivered)",
+            ),
             Self::UnsupportedSignatureAlgorithm { hash_alg, sig_alg } => {
                 write!(
                     f,

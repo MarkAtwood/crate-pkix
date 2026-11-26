@@ -267,6 +267,116 @@ fn rejects_unparsable_issuer() {
     );
 }
 
+// --- entry-type diagnosis (PKIX-d4h.5) -----------------------------------
+
+/// A `precert_entry` SCT asked the `x509_entry` question is reported as
+/// a bad signature, and `diagnose_entry_type` says what really happened.
+///
+/// RFC 6962 §3.2 puts `entry_type` inside the `digitally-signed`
+/// structure, so it never arrives with the SCT and the verifier has to
+/// be told which one to assume. Being told wrong produced
+/// `InvalidSignature` — the same answer as a forged SCT, a log key
+/// rotation, or a tampered signature. A caller wiring up CT had no way
+/// to tell those apart.
+///
+/// `verify_sct_for_cert` cannot resolve this itself: the `precert_entry`
+/// form signs over the issuer's key hash and that method takes no
+/// issuer. Hence the separate diagnostic, which takes both.
+#[test]
+fn precert_sct_asked_the_x509_question_is_diagnosable() {
+    let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+    let leaf = read_fixture("precert-leaf-final.der");
+    let issuer = read_fixture("precert-issuer.der");
+    let sct = load_precert_oracle_sct();
+
+    // Asked the wrong way, it looks like a bad signature.
+    assert_eq!(
+        v.verify_sct_for_cert(&sct, &leaf),
+        Err(Error::InvalidSignature),
+        "the x509_entry question over a precert SCT must not verify"
+    );
+
+    // The diagnostic names the entry type that does work.
+    assert_eq!(
+        v.diagnose_entry_type(&sct, &leaf, &issuer),
+        Ok(pkix_ct::LogEntryType::Precert),
+        "this SCT is genuine and precert_entry; saying so is the whole fix"
+    );
+}
+
+/// Neither entry type verifying still reports `InvalidSignature`.
+///
+/// The diagnostic must not turn a genuinely bad SCT into an
+/// entry-type story. Tampering with the signature leaves no entry type
+/// that works, and that has to keep reading as a bad signature.
+#[test]
+fn diagnosis_of_a_truly_bad_sct_is_still_invalid_signature() {
+    let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+    let leaf = read_fixture("precert-leaf-final.der");
+    let issuer = read_fixture("precert-issuer.der");
+    let mut sct = load_precert_oracle_sct();
+    let last = sct.signature.len() - 1;
+    sct.signature[last] ^= 0xFF;
+
+    assert_eq!(
+        v.diagnose_entry_type(&sct, &leaf, &issuer),
+        Err(Error::InvalidSignature),
+        "a tampered SCT verifies under no entry type and must stay a \
+         signature failure, not become a routing hint"
+    );
+}
+
+/// An `x509_entry` SCT asked the `precert_entry` question reports
+/// `EntryTypeMismatch`, not `InvalidSignature`.
+///
+/// The direction `verify_sct_for_precert` can resolve by itself: it
+/// already holds the leaf DER that the `x509_entry` form signs over, so
+/// once its own check fails it asks the other question for free.
+/// `verify_sct_for_cert` takes no issuer and so cannot rebuild the
+/// `PreCert` structure — that asymmetry is why
+/// [`SctVerifier::diagnose_entry_type`] exists as well.
+///
+/// The SCT is still rejected. `EntryTypeMismatch` names the likely
+/// cause without accepting the signature.
+///
+/// The fixture is an x509_entry SCT over `precert-leaf-final.der`
+/// rather than over `cert.der`, because `verify_sct_for_precert` strips
+/// the embedded SCT-list extension to rebuild the TBS and fails with
+/// `LeafMissingSctList` before any signature check when there is none.
+/// A final certificate logged as an x509 entry while also carrying
+/// embedded precert SCTs is an ordinary arrangement, not a contrived
+/// one.
+#[test]
+fn x509_sct_asked_the_precert_question_reports_the_mismatch() {
+    let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+    let leaf = read_fixture("precert-leaf-final.der");
+    let issuer = read_fixture("precert-issuer.der");
+    let sct_bytes = read_fixture("x509-over-precert-leaf-sct.bin");
+    let sct = SignedCertificateTimestamp::from_bytes(&sct_bytes).expect("parse oracle SCT");
+
+    // Precondition: a genuine x509_entry SCT for this leaf.
+    assert!(
+        v.verify_sct_for_cert(&sct, &leaf).is_ok(),
+        "fixture precondition: the x509_entry question is the right one here"
+    );
+
+    let err = v
+        .verify_sct_for_precert(&sct, &leaf, &issuer)
+        .expect_err("the precert_entry question over an x509_entry SCT must fail");
+    assert_eq!(
+        err,
+        Error::EntryTypeMismatch,
+        "asking the wrong entry type must not be indistinguishable from a \
+         forged SCT, which is what InvalidSignature here used to mean"
+    );
+
+    assert_eq!(
+        v.diagnose_entry_type(&sct, &leaf, &issuer),
+        Ok(pkix_ct::LogEntryType::X509),
+        "and the diagnostic names the entry type that works"
+    );
+}
+
 // --- verify_embedded_scts (PKIX-baac.7) ----------------------------------
 
 mod embedded {
