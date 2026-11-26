@@ -70,6 +70,29 @@ use x509_cert::Certificate;
 /// candidate intermediate certificates here; the path builder will select
 /// and order the subset that forms a valid path to a trust anchor.
 ///
+/// # Size is the caller's to bound
+///
+/// There is deliberately no cap on how many certificates a pool holds.
+/// A pool is the right place for a whole intermediate cache, which runs
+/// to thousands of certificates in a real deployment, so any default
+/// ceiling generous enough to be safe would still be smaller than a
+/// legitimate pool somewhere.
+///
+/// Nor would a cap here buy much. [`Self::add`] takes an already-decoded
+/// [`Certificate`], so the allocation happened before the pool saw it:
+/// the pool holds what the caller already built rather than amplifying
+/// it. CPU is bounded separately, by
+/// [`PathBuilderConfig::dfs_budget`] — a large pool makes path building
+/// slow, not unbounded.
+///
+/// What does need bounding is the step where untrusted bytes become
+/// certificates, and that belongs to whoever does the parsing. Within
+/// this workspace `pkix-chain` is the worked example: `AiaConfig` caps
+/// the bytes of one caIssuers response, the certificates taken from one
+/// certs-only CMS bundle, and the number of fetches, so the certificates
+/// AIA can contribute to a pool are bounded on every axis before any of
+/// them reaches `add`.
+///
 /// Note: `Hash` is not derived because `x509_cert::Certificate` does not
 /// currently implement `Hash` (upstream limitation); `CertPool` cannot be
 /// used as a hash-map key until that changes.
