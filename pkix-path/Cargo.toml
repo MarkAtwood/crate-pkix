@@ -30,6 +30,13 @@ categories  = ["cryptography", "no-std"]
 #
 # `rustcrypto` rather than the expanded list, so there is one place that
 # says what the full set is.
+#
+# Bare metal: thumbv7em and riscv64 build with these defaults as they
+# stand. x86_64-unknown-none additionally needs
+#   RUSTFLAGS='--cfg sha2_backend="soft" --cfg curve25519_dalek_backend="serial"'
+# because sha2 and curve25519-dalek both pick x86 SIMD backends that hit an
+# LLVM error on that soft-float target. The sha2 half was already required
+# before `ed25519` became default; curve25519-dalek is the new one.
 default   = ["rustcrypto"]
 
 # Enable std::error::Error impl on Error type (no_std cores stay no_std without this).

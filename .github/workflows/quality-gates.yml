@@ -267,15 +267,22 @@ jobs:
           done
 
       - name: Build for x86_64-unknown-none
-        # Needs the soft SHA-2 backend. sha2 0.11's x86 SIMD backend hits
-        # "rustc-LLVM ERROR: Do not know how to split the result of this
-        # operator!" on this soft-float target; the flag was confirmed
-        # necessary and sufficient when this job was written. Separated from
-        # the loop above so the flag applies only where it is needed and a
-        # future sha2 release fixing it is noticed by this step starting to
-        # pass without it.
+        # Needs the soft backends for both SIMD-dispatching crypto crates.
+        # sha2 0.11 and curve25519-dalek 5 each select an x86 SIMD backend
+        # that hits "rustc-LLVM ERROR: Do not know how to split the result
+        # of this operator!" on this soft-float target.
+        #
+        # curve25519-dalek joined the list when pkix-path made the whole
+        # RustCrypto set default: ed25519 pulls ed25519-dalek, which pulls
+        # curve25519-dalek, whose build script picks `simd` on x86_64
+        # whenever the target looks capable. thumbv7em and riscv64 are
+        # unaffected and stay in the loop above.
+        #
+        # Separated from that loop so the flags apply only where they are
+        # needed, and so a future release fixing either crate is noticed by
+        # this step starting to pass without them.
         env:
-          RUSTFLAGS: --cfg sha2_backend="soft"
+          RUSTFLAGS: --cfg sha2_backend="soft" --cfg curve25519_dalek_backend="serial"
         run: |
           set -euo pipefail
           for crate in $(grep -l '"no-std"' pkix-*/Cargo.toml | xargs -n1 dirname); do
