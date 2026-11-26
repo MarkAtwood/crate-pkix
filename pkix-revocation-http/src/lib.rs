@@ -46,7 +46,7 @@
 //! The [`RevocationFetcher`] trait abstracts the HTTP transport so callers
 //! can supply `reqwest`, `ureq`, `hyper`, or any other client. The concrete
 //! fetchers ([`HttpCrlFetcher`], [`HttpOcspFetcher`]) implement
-//! [`pkix_revocation::RevocationChecker`] by fetching on demand and
+//! `pkix_revocation::RevocationChecker` by fetching on demand and
 //! delegating to the underlying `CrlChecker` / `OcspChecker`.
 //!
 //! Requests are described by [`FetchRequest`] (URL + method) so a single
@@ -169,7 +169,7 @@
 //! on its own does not give you a working fetcher**. `client-ureq`
 //! enables the [`UreqFetcher`](clients::ureq::UreqFetcher) transport,
 //! but [`HttpCrlFetcher`] and [`HttpOcspFetcher`] — the types that turn a
-//! transport into a [`pkix_revocation::RevocationChecker`] — are gated
+//! transport into a `pkix_revocation::RevocationChecker` — are gated
 //! on `crl` and `ocsp`. Enabling only `client-ureq` therefore leaves you
 //! holding a transport with nothing to plug it into.
 //!
@@ -207,7 +207,7 @@
 //!
 //! - **No bundled HTTP client by default.** Enabling the `crl` or `ocsp`
 //!   feature gives you the [`RevocationFetcher`] trait and the wrapper
-//!   structs that implement [`pkix_revocation::RevocationChecker`] over
+//!   structs that implement `pkix_revocation::RevocationChecker` over
 //!   that trait. You supply the actual transport. Reference clients are
 //!   gated behind `client-ureq` (sync, rustls-backed HTTPS) and
 //!   `client-reqwest-async` (async, requires `async` feature and an
@@ -544,12 +544,12 @@ impl std::error::Error for FetchError {
     }
 }
 
-/// [`pkix_revocation::RevocationChecker`] driven by HTTP CRL fetches.
+/// `pkix_revocation::RevocationChecker` driven by HTTP CRL fetches.
 ///
 /// Reads `CRLDistributionPoints` from each certificate, fetches the
 /// CRL via the provided [`RevocationFetcher`], and delegates to
-/// [`pkix_revocation::CrlChecker`] using the supplied
-/// [`pkix_path::SignatureVerifier`] to verify the CRL signature.
+/// `pkix_revocation::CrlChecker` using the supplied
+/// `pkix_path::SignatureVerifier` to verify the CRL signature.
 ///
 /// The `V` generic mirrors `CrlChecker<V>` in `pkix-revocation`:
 /// the verifier is moved into the on-demand `CrlChecker` instance per
@@ -595,7 +595,7 @@ impl<F, V> HttpCrlFetcher<F, V> {
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `verifier`  — signature verifier passed to each on-demand
-    ///   [`pkix_revocation::CrlChecker`]
+    ///   `pkix_revocation::CrlChecker`
     /// - `now_unix`  — the instant every check is judged against, as
     ///   seconds since the Unix epoch
     ///
@@ -610,9 +610,9 @@ impl<F, V> HttpCrlFetcher<F, V> {
     /// fetcher.
     ///
     /// The `SignatureVerifier` and `RevocationFetcher` trait bounds are
-    /// applied at the [`pkix_revocation::RevocationChecker`] impl site,
+    /// applied at the `pkix_revocation::RevocationChecker` impl site,
     /// matching the bound-placement style of
-    /// [`pkix_revocation::CrlChecker`].
+    /// `pkix_revocation::CrlChecker`.
     pub const fn new(fetcher: F, verifier: V, now_unix: u64) -> Self {
         Self {
             fetcher,
@@ -666,11 +666,11 @@ impl<F, V> HttpCrlFetcher<F, V> {
     ///
     /// `0` attempts no URL at all, so any certificate advertising a
     /// distribution point yields
-    /// [`pkix_revocation::Error::RevocationFetchFailed`]. That is not
+    /// `pkix_revocation::Error::RevocationFetchFailed`. That is not
     /// clamped to `1`: quietly doing something other than what the
     /// caller asked for is worse than doing the useless thing they did
     /// ask for. To skip revocation entirely use
-    /// [`pkix_revocation::NoRevocation`].
+    /// `pkix_revocation::NoRevocation`.
     #[must_use]
     pub const fn with_max_urls_per_check(mut self, max: usize) -> Self {
         self.max_urls = max;
@@ -678,13 +678,13 @@ impl<F, V> HttpCrlFetcher<F, V> {
     }
 }
 
-/// [`pkix_revocation::RevocationChecker`] driven by HTTP OCSP requests.
+/// `pkix_revocation::RevocationChecker` driven by HTTP OCSP requests.
 ///
 /// Reads `AuthorityInfoAccess` from each certificate, sends a DER-encoded
 /// OCSP request via the provided [`RevocationFetcher`] (HTTP `POST` with
 /// `Content-Type: application/ocsp-request` per RFC 6960 §A.1), and
-/// delegates to [`pkix_revocation::OcspChecker`] using the supplied
-/// [`pkix_path::SignatureVerifier`] to verify the response signature.
+/// delegates to `pkix_revocation::OcspChecker` using the supplied
+/// `pkix_path::SignatureVerifier` to verify the response signature.
 ///
 /// See [RFC 5280 §4.2.2.1](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1)
 /// and [RFC 6960](https://www.rfc-editor.org/rfc/rfc6960).
@@ -711,7 +711,7 @@ impl<F, V> HttpOcspFetcher<F, V> {
     ///
     /// - `fetcher`   — HTTP transport implementation
     /// - `verifier`  — signature verifier passed to each on-demand
-    ///   [`pkix_revocation::OcspChecker`]
+    ///   `pkix_revocation::OcspChecker`
     /// - `now_unix`  — the instant every check is judged against, as
     ///   seconds since the Unix epoch
     ///

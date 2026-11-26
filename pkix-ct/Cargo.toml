@@ -17,7 +17,7 @@ default = []
 # parser is `no_std` + `alloc`; this feature gates only the std-only
 # trait impl plus propagates the std feature to transitive deps so they
 # can use std::io etc. when wired into a std-only consumer.
-std = ["der/std", "x509-cert/std", "x509-ocsp?/std"]
+std = ["der/std", "x509-cert?/std", "x509-ocsp?/std"]
 
 # Enable serde::Serialize / serde::Deserialize on the public Error type.
 serde = ["dep:serde"]
@@ -31,7 +31,7 @@ ocsp = ["dep:x509-ocsp"]
 # consistency check). Pulls in `sha2` for the consistency check. The
 # core SCT-parser does not depend on this; consumers only need it to
 # associate parsed SCTs back to trusted log keys.
-log-list = ["dep:sha2"]
+log-list = ["dep:sha2", "dep:pkix-path", "dep:x509-cert", "dep:spki"]
 
 # Enable the Google/Chrome log_list.json schema parser
 # (`CtLogList::from_google_log_list_json`). Pulls in `serde`,
@@ -39,14 +39,22 @@ log-list = ["dep:sha2"]
 log-list-json = ["log-list", "serde", "dep:serde_json", "dep:base64"]
 
 [dependencies]
-pkix-path = { workspace = true }
+# Only `verify` and `log_list` use it, and both carry the `log-list`
+# gate, so a default build would otherwise compile pkix-path and its
+# signature backends for nothing. `cargo publish` surfaces this as an
+# unused-dependency warning because it verifies with default features;
+# an --all-features CI gate never sees it.
+pkix-path = { workspace = true, optional = true }
 der        = { workspace = true }
-x509-cert  = { workspace = true }
+# Same story as pkix-path: only `verify` uses it. `sct.rs` names
+# x509_cert in a doc comment, which is not a use.
+x509-cert  = { workspace = true, optional = true }
 
 # SubjectPublicKeyInfo and AlgorithmIdentifier, for verifying Google's
 # detached signature over the CT log list. x509-cert re-exports these but
-# naming the crate directly keeps the dependency visible.
-spki       = { workspace = true }
+# naming the crate directly keeps the dependency visible. Only
+# `log_list` uses it, so it carries the same gate.
+spki       = { workspace = true, optional = true }
 x509-ocsp  = { workspace = true, optional = true }
 sha2       = { workspace = true, optional = true }
 serde      = { workspace = true, optional = true }

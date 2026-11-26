@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-revocation-http"
 description = "Online CRL and OCSP fetching for pkix-revocation"
-version               = "0.3.1"
+version               = "0.3.2"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -12,9 +12,10 @@ categories  = ["cryptography"]
 
 [features]
 default = []
-crl  = ["pkix-revocation/crl"]
+crl  = ["pkix-revocation/crl", "dep:pkix-path"]
 ocsp = [
     "pkix-revocation/ocsp",
+    "dep:pkix-path",
     "dep:x509-ocsp",
     "dep:sha1",
     "dep:sha2",
@@ -30,11 +31,14 @@ client-ureq = ["dep:ureq"]
 # `client-reqwest-async` additionally pulls in the reference reqwest
 # implementation. Consumers driving these futures must bring their own
 # async runtime (tokio, async-std); the crate does not.
-async                = ["dep:async-trait"]
+async                = ["dep:async-trait", "dep:pkix-path", "dep:pkix-revocation"]
 client-reqwest-async = ["async", "dep:reqwest"]
 
 [dependencies]
-pkix-path       = { workspace = true }
+# Optional for the same reason as pkix-revocation: the trust-anchor and
+# verifier types it provides are only named by the `cache` and async
+# modules, which carry the `crl` / `ocsp` / `async` gates.
+pkix-path       = { workspace = true, optional = true }
 # `features = ["std"]` is explicit rather than inherited. This crate is
 # unconditionally std — it fetches over the network and has no `no_std`
 # attribute or `std` feature of its own — and it names
@@ -45,7 +49,12 @@ pkix-path       = { workspace = true }
 # enabling `crl` here pulled it in. `crl` no longer implies `std`, so the
 # requirement is stated where it is actually needed instead of riding on an
 # unrelated feature.
-pkix-revocation = { workspace = true, features = ["std"] }
+# Optional: a default build of this crate exposes the URL extractors,
+# the RevocationFetcher trait and the error types, none of which touch
+# pkix-revocation — only the `crl` and `ocsp` checkers do, and both
+# features already name it. `cargo publish` verifies with default
+# features, which is where the unused-dependency warning showed up.
+pkix-revocation = { workspace = true, features = ["std"], optional = true }
 der             = { workspace = true }
 x509-cert       = { workspace = true }
 

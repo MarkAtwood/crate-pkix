@@ -140,7 +140,7 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 pkix-path             = { path = "pkix-path",             version = "0.4.5" }
 pkix-revocation       = { path = "pkix-revocation",       version = "0.5.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.5.2" }
-pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.1" }
+pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.2" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.5.1" }
 pkix-lint             = { path = "pkix-lint",             version = "0.11.0" }
 pkix-ct               = { path = "pkix-ct",               version = "0.4.0" }
