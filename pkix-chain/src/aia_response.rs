@@ -40,10 +40,24 @@ const OID_SIGNED_DATA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.
 /// `SignedData.certificates` (other `CertificateChoices` alternatives are
 /// skipped), at most `max_certs` of them; further entries are ignored so a
 /// hostile bundle cannot flood the path-builder pool.
+///
+/// A body longer than `max_bytes` is refused before parsing, with
+/// `AiaError::ResponseTooLarge`.
 pub(crate) fn parse_ca_issuers_response(
     bytes: &[u8],
     max_certs: usize,
+    max_bytes: usize,
 ) -> Result<Vec<Certificate>, AiaError> {
+    // Before any parsing. The DER parser is bounded by its own length
+    // encoding, but it still allocates in proportion to claimed lengths
+    // and walks the whole structure, so handing it an arbitrarily large
+    // body is an amplification step with nothing behind it.
+    if bytes.len() > max_bytes {
+        return Err(AiaError::ResponseTooLarge {
+            limit: max_bytes,
+            actual: bytes.len(),
+        });
+    }
     let single_err = match Certificate::from_der(bytes) {
         Ok(cert) => return Ok(vec![cert]),
         Err(e) => e,
@@ -133,28 +147,82 @@ mod tests {
 
     #[test]
     fn single_der_certificate() {
-        assert_eq!(parse_ca_issuers_response(INT_DER, 4).unwrap().len(), 1);
+        assert_eq!(
+            parse_ca_issuers_response(INT_DER, 4, usize::MAX)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
     fn certs_only_cms_yields_embedded_certificate() {
-        let certs = parse_ca_issuers_response(INT_P7C, 4).unwrap();
+        let certs = parse_ca_issuers_response(INT_P7C, 4, usize::MAX).unwrap();
         assert_eq!(certs, vec![Certificate::from_der(INT_DER).unwrap()]);
     }
 
     #[test]
     fn cert_cap_applies() {
-        assert!(parse_ca_issuers_response(INT_P7C, 0).unwrap().is_empty());
+        assert!(parse_ca_issuers_response(INT_P7C, 0, usize::MAX)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn garbage_is_malformed() {
         assert!(matches!(
-            parse_ca_issuers_response(b"\x30\x03\x02\x01\x00", 4),
+            parse_ca_issuers_response(b"\x30\x03\x02\x01\x00", 4, usize::MAX),
             Err(AiaError::MalformedCertificate(_))
         ));
         let mut truncated = INT_P7C.to_vec();
         truncated.truncate(truncated.len() - 10);
-        assert!(parse_ca_issuers_response(&truncated, 4).is_err());
+        assert!(parse_ca_issuers_response(&truncated, 4, usize::MAX).is_err());
+    }
+
+    /// An oversize body is refused before the DER parser sees it.
+    ///
+    /// The byte cap is defence in depth behind the fetcher's own body
+    /// cap. It is sized for a certs-only bundle rather than a single
+    /// certificate, because this function decodes both.
+    #[test]
+    fn an_oversize_response_is_refused_before_parsing() {
+        // A body one byte over the limit, and valid DER, so nothing but
+        // the cap can be refusing it.
+        let limit = INT_DER.len() - 1;
+        assert_eq!(
+            parse_ca_issuers_response(INT_DER, 4, limit),
+            Err(AiaError::ResponseTooLarge {
+                limit,
+                actual: INT_DER.len(),
+            }),
+            "over the cap must be ResponseTooLarge, naming both numbers"
+        );
+
+        // Exactly at the limit is allowed: the check is `>`, not `>=`,
+        // so a response of exactly the configured size still parses.
+        assert_eq!(
+            parse_ca_issuers_response(INT_DER, 4, INT_DER.len())
+                .expect("a body exactly at the cap is within it")
+                .len(),
+            1
+        );
+    }
+
+    /// The default must not sit on top of legitimate traffic.
+    ///
+    /// `max_certs_per_response` defaults to 16, and a certificate with
+    /// many SANs reaches about 16 KiB, so a bundle at those limits is
+    /// around 256 KiB. A cap sized for one certificate — the obvious
+    /// reading of "how big is a certificate" — would reject valid
+    /// bundles.
+    #[test]
+    fn the_default_cap_admits_a_full_legitimate_bundle() {
+        let cfg = crate::AiaConfig::default();
+        assert!(
+            cfg.max_response_bytes >= cfg.max_certs_per_response * 16 * 1024,
+            "default cap {} must admit {} certificates of 16 KiB",
+            cfg.max_response_bytes,
+            cfg.max_certs_per_response
+        );
     }
 }

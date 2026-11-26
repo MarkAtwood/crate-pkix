@@ -180,6 +180,26 @@ mod aia_response;
 /// This is the default for [`AiaConfig::max_depth`].
 pub const AIA_MAX_DEPTH: usize = 5;
 
+/// Default ceiling on the bytes of one caIssuers response that
+/// `pkix-chain` will decode — [`AiaConfig::max_response_bytes`].
+///
+/// 256 KiB. Sized for a certs-only CMS bundle, not a single
+/// certificate: this limit also covers a response carrying up to
+/// [`AiaConfig::max_certs_per_response`] certificates (16 by default),
+/// and a pathological certificate with many SANs reaches 16 KiB, so a
+/// per-certificate ceiling would sit on top of legitimate traffic. A
+/// typical single certificate is 1–4 KiB, a typical bundle under 16 KiB.
+///
+/// This is defence in depth, not the primary control. A transport
+/// adapter caps the body as it reads it — `pkix-aia-http` does, and
+/// reports [`pkix_aia::AiaError::ResponseTooLarge`] — which is the right
+/// place, because it can stop reading. This limit exists because that
+/// cap lives in an adapter and is per-fetcher configuration: a
+/// caller-supplied fetcher, a cache wrapper, or a different transport
+/// can simply not have one, and then nothing would bound what gets
+/// handed to the DER parser.
+pub const AIA_MAX_RESPONSE_BYTES: usize = 256 * 1024;
+
 // DANE composition. Gated on `dane`, which is default-on: the gate pulls
 // only the no_std pkix-dane crate, so the API surface costs a consumer
 // nothing until they also enable `dane-resolver`.
@@ -248,6 +268,14 @@ pub struct AiaConfig {
     /// Maximum number of certificates taken from one certs-only CMS
     /// response; further entries are ignored. Default: 16.
     pub max_certs_per_response: usize,
+    /// Maximum bytes of one caIssuers response that will be decoded.
+    /// A larger response is refused with
+    /// [`pkix_aia::AiaError::ResponseTooLarge`] before any parsing.
+    /// Default: [`AIA_MAX_RESPONSE_BYTES`].
+    ///
+    /// Defence in depth behind the fetcher's own body cap — see
+    /// [`AIA_MAX_RESPONSE_BYTES`] for why both exist.
+    pub max_response_bytes: usize,
     /// Overall wall-clock budget for AIA fetching in one
     /// [`Verifier::verify_one`] call, checked before each fetch round.
     /// A round already in progress is not interrupted, so the worst case
@@ -268,6 +296,7 @@ impl AiaConfig {
             max_uris_per_cert: 2,
             max_total_fetches: 8,
             max_certs_per_response: 16,
+            max_response_bytes: AIA_MAX_RESPONSE_BYTES,
             deadline: Some(std::time::Duration::from_secs(30)),
         }
     }

@@ -279,7 +279,11 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         let mut added_any = false;
         for result in results.into_iter().take(requested) {
             let parsed = result.and_then(|bytes| {
-                aia_response::parse_ca_issuers_response(&bytes, self.config.max_certs_per_response)
+                aia_response::parse_ca_issuers_response(
+                    &bytes,
+                    self.config.max_certs_per_response,
+                    self.config.max_response_bytes,
+                )
             });
             match parsed {
                 Ok(certs) => {
