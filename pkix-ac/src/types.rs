@@ -18,7 +18,7 @@ use alloc::vec::Vec;
 
 use der::asn1::{BitString, GeneralizedTime, ObjectIdentifier, SetOfVec};
 use der::{Any, Choice, Enumerated, Sequence};
-use x509_cert::ext::pkix::name::GeneralNames;
+use x509_cert::ext::pkix::name::{GeneralName, GeneralNames};
 use x509_cert::ext::Extensions;
 use x509_cert::serial_number::SerialNumber;
 use x509_cert::spki::AlgorithmIdentifierOwned;
@@ -188,4 +188,46 @@ pub struct AttCertValidityPeriod {
 pub struct Attribute {
     pub r#type: ObjectIdentifier,
     pub values: SetOfVec<Any>,
+}
+
+/// `Targets ::= SEQUENCE OF Target` — RFC 5755 §4.3.2.
+pub type Targets = Vec<Target>;
+
+/// `Target` — RFC 5755 §4.3.2.
+///
+/// Group membership is deliberately not defined by the RFC: "any given
+/// target 'knows' the names of the targetGroups to which it belongs or
+/// can otherwise determine its membership". So a `targetGroup` cannot be
+/// evaluated by this crate alone — the caller supplies its own group
+/// names. See [`crate::AttributeCertificate::check_targeting`].
+#[derive(Clone, Debug, Eq, PartialEq, Choice)]
+#[allow(missing_docs)]
+#[allow(clippy::large_enum_variant)]
+pub enum Target {
+    /// A name the intended verifier answers to.
+    #[asn1(context_specific = "0", tag_mode = "IMPLICIT")]
+    TargetName(GeneralName),
+
+    /// A group the intended verifier belongs to.
+    #[asn1(context_specific = "1", tag_mode = "IMPLICIT")]
+    TargetGroup(GeneralName),
+
+    /// `targetCert` exists "only to allow future compatibility with
+    /// [X.509-2000]" and §4.3.2 says it MUST NOT be used. Represented so
+    /// that an AC carrying one parses and can be refused with a reason.
+    #[asn1(context_specific = "2", tag_mode = "IMPLICIT", constructed = "true")]
+    TargetCert(TargetCert),
+}
+
+/// `TargetCert` — RFC 5755 §4.3.2. MUST NOT be used.
+#[derive(Clone, Debug, Eq, PartialEq, Sequence)]
+#[allow(missing_docs)]
+pub struct TargetCert {
+    pub target_certificate: IssuerSerial,
+
+    #[asn1(optional = "true")]
+    pub target_name: Option<GeneralName>,
+
+    #[asn1(optional = "true")]
+    pub cert_digest_info: Option<ObjectDigestInfo>,
 }

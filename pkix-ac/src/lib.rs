@@ -54,6 +54,7 @@ pub mod types;
 
 use alloc::vec::Vec;
 
+use der::asn1::ObjectIdentifier;
 use der::referenced::OwnedToRef as _;
 use der::{Decode as _, Encode as _};
 use x509_cert::ext::pkix::name::GeneralName;
@@ -191,7 +192,13 @@ impl AttributeCertificate {
             ));
         }
 
-        Ok(())
+        // §5 rule 7 and the §4.3 criticality rules. Called from here
+        // rather than left for the caller to remember: a caller doing
+        // the obvious thing — check the profile, then verify — would
+        // otherwise skip the unsupported-critical-extension rule
+        // entirely, which is the one extension rule that exists to
+        // make a verifier refuse what it does not understand.
+        self.check_extensions()
     }
 
     /// Verify the signature and the validity period.
@@ -306,6 +313,256 @@ impl AttributeCertificate {
     }
 }
 
+/// `id-pe-ac-auditIdentity` — RFC 5755 §4.3.1, `{ id-pe 4 }`.
+/// Criticality MUST be TRUE; the value is 1 to 20 octets.
+pub const ID_PE_AC_AUDIT_IDENTITY: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.4");
+
+/// `id-ce-targetInformation` — RFC 5755 §4.3.2, `{ id-ce 55 }`.
+/// Criticality MUST be TRUE.
+pub const ID_CE_TARGET_INFORMATION: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.55");
+
+/// `id-ce-noRevAvail` — RFC 5755 §4.3.6, `{ id-ce 56 }`.
+/// Criticality MUST be FALSE.
+pub const ID_CE_NO_REV_AVAIL: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.56");
+
+/// `id-ce-authorityKeyIdentifier` — RFC 5755 §4.3.3.
+pub const ID_CE_AUTHORITY_KEY_IDENTIFIER: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.5.29.35");
+
+/// `id-ce-cRLDistributionPoints` — RFC 5755 §4.3.5.
+pub const ID_CE_CRL_DISTRIBUTION_POINTS: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("2.5.29.31");
+
+/// `id-pe-authorityInfoAccess` — RFC 5755 §4.3.4.
+pub const ID_PE_AUTHORITY_INFO_ACCESS: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.1.1");
+
+/// Whether a verifier is among an attribute certificate's intended
+/// targets — RFC 5755 §4.3.2 and §5 rule 6.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum Targeting {
+    /// No `targetInformation` extension, so the certificate is not
+    /// targeted and any verifier may use it.
+    Untargeted,
+    /// The extension is present and this verifier is named by it, or
+    /// belongs to a group it names.
+    Matched,
+    /// The extension is present and this verifier is not among the
+    /// targets. The certificate is valid; it is not for this verifier.
+    NotATarget,
+}
+
+impl AttributeCertificate {
+    /// Does this certificate carry `noRevAvail` — RFC 5755 §4.3.6?
+    ///
+    /// Its presence is the issuer saying no revocation information will
+    /// be made available, so a verifier should not go looking. Absence
+    /// says nothing either way.
+    #[must_use]
+    pub fn no_revocation_available(&self) -> bool {
+        self.extension(&ID_CE_NO_REV_AVAIL).is_some()
+    }
+
+    /// The `auditIdentity` value — RFC 5755 §4.3.1 — if present.
+    ///
+    /// An opaque identifier for audit logs, deliberately not the
+    /// holder's name, so that logs can be correlated without recording
+    /// who the holder was. Returned as bytes because that is all it is.
+    #[must_use]
+    pub fn audit_identity(&self) -> Option<&[u8]> {
+        self.extension(&ID_PE_AC_AUDIT_IDENTITY)
+            .map(|e| e.extn_value.as_bytes())
+    }
+
+    fn extension(&self, oid: &ObjectIdentifier) -> Option<&x509_cert::ext::Extension> {
+        self.inner
+            .acinfo
+            .extensions
+            .as_ref()?
+            .iter()
+            .find(|e| &e.extn_id == oid)
+    }
+
+    /// Apply RFC 5755 §5 rule 7 and the §4.3 criticality rules.
+    ///
+    /// Rule 7 is the security-relevant one: *"If the AC contains an
+    /// unsupported critical extension, the AC MUST be rejected."* The
+    /// RFC defines support as being able to parse the value and
+    /// honouring a rejection the value implies, so a critical extension
+    /// this crate does not know how to act on is grounds for refusal
+    /// rather than something to step over.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::UnsupportedCriticalExtension`] — a critical extension
+    ///   this crate cannot act on.
+    /// - [`Error::ProfileViolation`] — an extension carries the wrong
+    ///   criticality, or an `auditIdentity` of illegal length.
+    pub fn check_extensions(&self) -> Result<()> {
+        let Some(exts) = self.inner.acinfo.extensions.as_ref() else {
+            return Ok(());
+        };
+
+        // §4.2: an extension must not appear twice. Two instances let
+        // two implementations read one certificate differently, which is
+        // the whole reason the rule exists.
+        for (i, e) in exts.iter().enumerate() {
+            if exts[i + 1..].iter().any(|o| o.extn_id == e.extn_id) {
+                return Err(Error::ProfileViolation(
+                    ProfileViolation::DuplicateExtension,
+                ));
+            }
+        }
+
+        for e in exts.iter() {
+            match e.extn_id {
+                // §4.3.1: criticality MUST be TRUE, value 1..=20 octets.
+                ID_PE_AC_AUDIT_IDENTITY => {
+                    if !e.critical {
+                        return Err(Error::ProfileViolation(
+                            ProfileViolation::AuditIdentityNotCritical,
+                        ));
+                    }
+                    let len = e.extn_value.as_bytes().len();
+                    if len == 0 || len > 20 {
+                        return Err(Error::ProfileViolation(
+                            ProfileViolation::AuditIdentityLength,
+                        ));
+                    }
+                }
+                // §4.3.2: criticality MUST be TRUE, and the value has to
+                // parse or the extension is not supported.
+                ID_CE_TARGET_INFORMATION => {
+                    if !e.critical {
+                        return Err(Error::ProfileViolation(
+                            ProfileViolation::TargetInformationNotCritical,
+                        ));
+                    }
+                    self.parse_targets()?;
+                }
+                // §4.3.6: criticality MUST be FALSE.
+                ID_CE_NO_REV_AVAIL => {
+                    if e.critical {
+                        return Err(Error::ProfileViolation(
+                            ProfileViolation::NoRevAvailCritical,
+                        ));
+                    }
+                }
+                // Profiled by §4.3.3/§4.3.4/§4.3.5 and not acted on
+                // here: they assist a verifier in finding the issuer's
+                // certificate or its revocation data, which is the
+                // caller's job in this workspace. None of them may be
+                // critical in a conforming AC, and if one is, the rule
+                // below refuses it rather than this arm waving it
+                // through.
+                ID_CE_AUTHORITY_KEY_IDENTIFIER
+                | ID_CE_CRL_DISTRIBUTION_POINTS
+                | ID_PE_AUTHORITY_INFO_ACCESS => {
+                    if e.critical {
+                        return Err(Error::UnsupportedCriticalExtension(e.extn_id));
+                    }
+                }
+                other => {
+                    if e.critical {
+                        return Err(Error::UnsupportedCriticalExtension(other));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The parsed `targetInformation` targets, flattened.
+    ///
+    /// §4.3.2 notes that X.509-2000 defines the extension as a
+    /// `SEQUENCE OF Targets` while a conforming issuer emits exactly
+    /// one `Targets`, and requires users to accept several and treat
+    /// them "as if all Target elements had been found within one
+    /// Targets element". So this flattens.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::UnsupportedCriticalExtension`] if the value does not
+    /// parse: the extension is critical, and §5 defines support as
+    /// including the ability to parse it.
+    pub fn targets(&self) -> Result<Option<types::Targets>> {
+        match self.extension(&ID_CE_TARGET_INFORMATION) {
+            None => Ok(None),
+            Some(_) => self.parse_targets().map(Some),
+        }
+    }
+
+    fn parse_targets(&self) -> Result<types::Targets> {
+        let ext = self
+            .extension(&ID_CE_TARGET_INFORMATION)
+            .ok_or(Error::ParseError)?;
+        let bytes = ext.extn_value.as_bytes();
+        // SEQUENCE OF Targets, each itself a SEQUENCE OF Target.
+        let groups = Vec::<types::Targets>::from_der(bytes)
+            .map_err(|_| Error::UnsupportedCriticalExtension(ID_CE_TARGET_INFORMATION))?;
+        Ok(groups.into_iter().flatten().collect())
+    }
+
+    /// Is this verifier among the certificate's intended targets —
+    /// RFC 5755 §5 rule 6?
+    ///
+    /// `my_names` are the names this verifier answers to and `my_groups`
+    /// the groups it belongs to. Both come from the caller because the
+    /// RFC leaves membership undefined: *"any given target 'knows' the
+    /// names of the targetGroups to which it belongs or can otherwise
+    /// determine its membership"*. A library cannot know whether it is
+    /// a printer, or which DNS domain it is in, so it does not guess.
+    ///
+    /// An untargeted certificate returns [`Targeting::Untargeted`]
+    /// rather than matching, so a caller cannot confuse "no restriction"
+    /// with "I am a named target".
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::ProfileViolation`] if a target uses `targetCert`,
+    ///   which §4.3.2 says MUST NOT be used.
+    /// - [`Error::UnsupportedCriticalExtension`] if the extension value
+    ///   does not parse.
+    pub fn check_targeting(
+        &self,
+        my_names: &[GeneralName],
+        my_groups: &[GeneralName],
+    ) -> Result<Targeting> {
+        let Some(targets) = self.targets()? else {
+            return Ok(Targeting::Untargeted);
+        };
+        let mut matched = false;
+        for t in &targets {
+            match t {
+                types::Target::TargetName(n) => {
+                    if my_names.contains(n) {
+                        matched = true;
+                    }
+                }
+                types::Target::TargetGroup(g) => {
+                    if my_groups.contains(g) {
+                        matched = true;
+                    }
+                }
+                // Checked even after a match: a certificate carrying a
+                // forbidden target is non-conforming whether or not this
+                // verifier happens to be named elsewhere in the list.
+                types::Target::TargetCert(_) => {
+                    return Err(Error::ProfileViolation(ProfileViolation::TargetCertUsed))
+                }
+            }
+        }
+        Ok(if matched {
+            Targeting::Matched
+        } else {
+            Targeting::NotATarget
+        })
+    }
+}
+
 /// Byte range of `acinfo` inside an attribute certificate's DER.
 ///
 /// `acinfo` is the first element of the outer `SEQUENCE`, so this is a
@@ -386,6 +643,19 @@ pub enum ProfileViolation {
     NoAttributes,
     /// §4.1: an attribute carries no values, though one is required.
     AttributeWithoutValues,
+    /// §4.2: the same extension appears more than once.
+    DuplicateExtension,
+    /// §4.3.1: `auditIdentity` is not marked critical, though it must be.
+    AuditIdentityNotCritical,
+    /// §4.3.1: `auditIdentity` is empty or longer than 20 octets.
+    AuditIdentityLength,
+    /// §4.3.2: `targetInformation` is not marked critical, though it
+    /// must be.
+    TargetInformationNotCritical,
+    /// §4.3.6: `noRevAvail` is marked critical, though it must not be.
+    NoRevAvailCritical,
+    /// §4.3.2: a target used `targetCert`, which MUST NOT be used.
+    TargetCertUsed,
 }
 
 impl core::fmt::Display for ProfileViolation {
@@ -404,6 +674,20 @@ impl core::fmt::Display for ProfileViolation {
             Self::HolderObjectDigestInfo => "holder uses objectDigestInfo, which is not profiled",
             Self::NoAttributes => "no attributes, though RFC 5755 §4.1 requires at least one",
             Self::AttributeWithoutValues => "an attribute carries no values",
+            Self::DuplicateExtension => "the same extension appears more than once",
+            Self::AuditIdentityNotCritical => {
+                "auditIdentity is not critical, though RFC 5755 §4.3.1 requires it to be"
+            }
+            Self::AuditIdentityLength => {
+                "auditIdentity must be between 1 and 20 octets (RFC 5755 §4.3.1)"
+            }
+            Self::TargetInformationNotCritical => {
+                "targetInformation is not critical, though RFC 5755 §4.3.2 requires it to be"
+            }
+            Self::NoRevAvailCritical => {
+                "noRevAvail is critical, though RFC 5755 §4.3.6 requires it not to be"
+            }
+            Self::TargetCertUsed => "a target used targetCert, which RFC 5755 §4.3.2 forbids",
         };
         f.write_str(s)
     }
@@ -428,6 +712,11 @@ pub enum Error {
     Expired,
     /// The signature did not verify under the AA's public key.
     SignatureInvalid,
+    /// A critical extension this crate cannot act on — RFC 5755 §5
+    /// rule 7. Carries the offending OID so a caller can say which.
+    UnsupportedCriticalExtension(
+        #[cfg_attr(feature = "serde", serde(with = "oid_as_dotted_string"))] ObjectIdentifier,
+    ),
 }
 
 impl core::fmt::Display for Error {
@@ -441,6 +730,9 @@ impl core::fmt::Display for Error {
             Self::NotYetValid => f.write_str("attribute certificate is not yet valid"),
             Self::Expired => f.write_str("attribute certificate has expired"),
             Self::SignatureInvalid => f.write_str("attribute certificate signature invalid"),
+            Self::UnsupportedCriticalExtension(oid) => {
+                write!(f, "unsupported critical extension {oid}")
+            }
         }
     }
 }
@@ -453,6 +745,40 @@ const _: fn() = || {
     _assert_send_sync::<Error>();
     _assert_send_sync::<AttributeCertificate>();
 };
+
+/// Serialising an [`ObjectIdentifier`] as its dotted form.
+///
+/// `der`'s `ObjectIdentifier` implements neither serde trait and
+/// `const-oid` ships no serde feature, so this does it by hand rather
+/// than drop the OID from [`Error::UnsupportedCriticalExtension`] —
+/// which would leave a caller told that *some* critical extension was
+/// unsupported without being able to say which.
+///
+/// The dotted string is the representation to put on a wire: it is
+/// stable, readable, and parses back. The internal byte encoding is an
+/// implementation detail of the OID type.
+#[cfg(feature = "serde")]
+mod oid_as_dotted_string {
+    use alloc::string::String;
+
+    use der::asn1::ObjectIdentifier;
+    use serde::de::Error as _;
+    use serde::{Deserialize as _, Deserializer, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(
+        oid: &ObjectIdentifier,
+        s: S,
+    ) -> core::result::Result<S::Ok, S::Error> {
+        s.collect_str(oid)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> core::result::Result<ObjectIdentifier, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse().map_err(D::Error::custom)
+    }
+}
 
 /// Result alias for this crate.
 pub type Result<T> = core::result::Result<T, Error>;
