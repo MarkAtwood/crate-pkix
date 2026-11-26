@@ -42,7 +42,7 @@
 
 use std::fs;
 
-use pkix_ct::{CtLog, CtLogList, Error, SctVerifier, SignedCertificateTimestamp};
+use pkix_ct::{CtLog, CtLogList, Error, SctVerifier, SignedCertificateTimestamp, UsableFrom};
 use pkix_path::DefaultVerifier;
 
 const FIXTURE_DIR: &str = "tests/fixtures/sct-oracle";
@@ -66,7 +66,7 @@ fn precert_oracle_log_list() -> CtLogList {
         log_spki,
         "precert-oracle".into(),
         "http://example.invalid/ct/".into(),
-        Some(0),
+        UsableFrom::Unrecorded,
         None,
     ))
     .expect("oracle log self-consistency");
@@ -385,13 +385,13 @@ mod embedded {
     //! cert's SCT-list extension verify against a [`CtLogList`].
 
     use super::{precert_oracle_log_list, read_fixture, DefaultVerifier, Error, SctVerifier};
-    use x509_cert::der::Decode as _;
-    use x509_cert::der::DecodePem as _;
-    use x509_cert::Certificate;
 
-    fn load_cert_der(name: &str) -> Certificate {
-        let der = read_fixture(name);
-        Certificate::from_der(&der).expect("parse cert")
+    /// The embedded-SCT entry points take the certificate's own DER,
+    /// not a parsed certificate: the `precert_entry` signed input is
+    /// built from those bytes, and re-encoding a parsed certificate to
+    /// recover them is what used to make a valid SCT look forged.
+    fn load_cert_der(name: &str) -> Vec<u8> {
+        read_fixture(name)
     }
 
     #[test]
@@ -551,7 +551,9 @@ mod embedded {
         // log_ids are not in the oracle log list, so each SCT fails
         // to verify with UnknownLog. The helper returns Ok(0).
         let pem = std::fs::read_to_string("tests/fixtures/cryptography-scts.pem").unwrap();
-        let leaf = Certificate::from_pem(&pem).unwrap();
+        // Through the PEM decoder rather than parse-and-re-encode, so
+        // the test hands over the CA's own bytes.
+        let (_label, leaf) = pem_rfc7468::decode_vec(pem.as_bytes()).expect("decode PEM");
         let issuer = load_cert_der("precert-issuer.der");
         let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
         let verified = v

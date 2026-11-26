@@ -64,10 +64,10 @@ fn tls_extension_parses_serialized_sct_list() {
     let payload = tls_ext_payload_from_cert(CRYPTOGRAPHY_SCTS_PEM);
     let list = sct_list_from_tls_extension(&payload).expect("parse TLS payload");
 
-    assert_eq!(list.0.len(), 2);
+    assert_eq!(list.scts().len(), 2);
     // Spot-check the first log_id — full vectors are validated in tests/parser.rs.
-    assert_eq!(list.0[0].log_id[0..4], [0x29, 0x3c, 0x51, 0x96]);
-    assert_eq!(list.0[1].log_id[0..4], [0x6f, 0x53, 0x76, 0xac]);
+    assert_eq!(list.scts()[0].log_id[0..4], [0x29, 0x3c, 0x51, 0x96]);
+    assert_eq!(list.scts()[1].log_id[0..4], [0x6f, 0x53, 0x76, 0xac]);
 }
 
 #[test]
@@ -122,14 +122,14 @@ mod ocsp {
         let result = sct_list_from_ocsp_response(&der).expect("parse OCSP");
         let list = result.expect("OCSP response contains SCT extension");
 
-        assert_eq!(list.0.len(), 4, "four SCTs expected");
-        assert_eq!(list.0[0].log_id[0..4], EXPECTED_LOG_ID_0_HEAD);
-        assert_eq!(list.0[1].log_id[0..4], EXPECTED_LOG_ID_1_HEAD);
-        assert_eq!(list.0[2].log_id[0..4], EXPECTED_LOG_ID_2_HEAD);
-        assert_eq!(list.0[3].log_id[0..4], EXPECTED_LOG_ID_3_HEAD);
+        assert_eq!(list.scts().len(), 4, "four SCTs expected");
+        assert_eq!(list.scts()[0].log_id[0..4], EXPECTED_LOG_ID_0_HEAD);
+        assert_eq!(list.scts()[1].log_id[0..4], EXPECTED_LOG_ID_1_HEAD);
+        assert_eq!(list.scts()[2].log_id[0..4], EXPECTED_LOG_ID_2_HEAD);
+        assert_eq!(list.scts()[3].log_id[0..4], EXPECTED_LOG_ID_3_HEAD);
 
         // All four are ECDSA-SHA256 signatures of 72 bytes.
-        for sct in &list.0 {
+        for sct in list.scts() {
             assert_eq!(sct.version, 0);
             assert_eq!(sct.hash_alg, 4); // SHA256
             assert_eq!(sct.sig_alg, 3); // ECDSA

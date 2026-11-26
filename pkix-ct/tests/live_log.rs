@@ -66,7 +66,7 @@ use std::fs;
 
 use pkix_ct::{
     merkle_leaf_hash, merkle_tree_leaf_for_precert, CtLog, CtLogList, MerkleAuditPath, SctList,
-    SctVerifier, SignedCertificateTimestamp, SignedTreeHead,
+    SctVerifier, SignedCertificateTimestamp, SignedTreeHead, UsableFrom,
 };
 use pkix_path::DefaultVerifier;
 
@@ -79,7 +79,7 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// Build a `CtLogList` containing only the captured log, with an open
 /// window (so the SCT's real-world timestamp falls inside).
-/// `usable_from_ms = Some(0)` means "usable since epoch" — the widest
+/// `UsableFrom::Unrecorded` imposes no lower bound — the widest
 /// valid window. `None` would mean "never usable" per the `CtLog` doc.
 fn captured_log_list() -> CtLogList {
     let log_id_bytes = fixture("log-id.bin");
@@ -93,7 +93,7 @@ fn captured_log_list() -> CtLogList {
         fixture("log-spki.der"),
         "live-log".into(),
         "http://example.invalid/ct/".into(),
-        Some(0),
+        UsableFrom::Unrecorded,
         None,
     ))
     .expect("captured log self-consistency");
@@ -112,8 +112,8 @@ fn captured_sct() -> SignedCertificateTimestamp {
     wrapped.extend_from_slice(&(raw.len() as u16).to_be_bytes());
     wrapped.extend_from_slice(&raw);
     let list = SctList::from_serialized_list(&wrapped).expect("parse captured SCT list");
-    assert_eq!(list.0.len(), 1, "captured fixture has exactly one SCT");
-    list.0.into_iter().next().unwrap()
+    assert_eq!(list.scts().len(), 1, "captured fixture has exactly one SCT");
+    list.into_inner().into_iter().next().unwrap()
 }
 
 /// Load the captured STH from `sth.bin`. Layout (big-endian):

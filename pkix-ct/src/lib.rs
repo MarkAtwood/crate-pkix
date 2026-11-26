@@ -44,6 +44,11 @@ extern crate alloc;
 mod delivery;
 #[cfg(feature = "log-list")]
 mod log_list;
+// Byte-preserving DER navigation for the RFC 6962 signed inputs. Only
+// `verify` needs it, so it carries the same gate; without one it would
+// be dead code in a default build.
+#[cfg(feature = "log-list")]
+mod raw_der;
 mod sct;
 #[cfg(feature = "log-list")]
 mod verify;
@@ -54,7 +59,7 @@ pub use delivery::sct_list_from_ocsp_response;
 pub use delivery::sct_list_from_tls_extension;
 #[cfg(feature = "log-list")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
-pub use log_list::{CtLog, CtLogList};
+pub use log_list::{CtLog, CtLogList, UsableFrom};
 pub use sct::{SctList, SignedCertificateTimestamp};
 #[cfg(feature = "log-list")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list")))]
@@ -97,6 +102,24 @@ pub enum Error {
     /// The SCT is still rejected. This names the likely cause; it does
     /// not accept the signature.
     EntryTypeMismatch,
+    /// An SCT list held no SCTs.
+    ///
+    /// RFC 6962 §3.3 declares the list as
+    /// `SerializedSCT sct_list<1..2^16-1>`, so zero entries is not a
+    /// short list but a malformed one. Returned both by the parsers
+    /// and by [`SctList::new`], which is the whole point of the latter
+    /// existing.
+    EmptySctList,
+    /// The leaf certificate carries more than one SCT-list extension.
+    ///
+    /// RFC 5280 §4.2 forbids a certificate from repeating an
+    /// extension. Reconstructing the `precert_entry` signed input
+    /// means removing that extension, and with two of them there is no
+    /// way to know which one the log was given — so this is refused
+    /// rather than guessed, in agreement with
+    /// `pkix-path::check_duplicate_extensions`, which rejects such a
+    /// certificate during path validation.
+    DuplicateSctListExtension,
     /// The SCT carries `(hash_alg, sig_alg)` tags that
     /// [`SctVerifier`] does not know how to map to an X.509 signature
     /// algorithm. See the [`SctVerifier`] module documentation for the
@@ -110,8 +133,10 @@ pub enum Error {
     /// The [`CtLog::key_der`] bytes did not parse as a valid
     /// `SubjectPublicKeyInfo`. Indicates a corrupted log list.
     LogKeyMalformed,
-    /// The SCT timestamp falls outside the log's
-    /// `[usable_from_ms, retired_at_ms)` window.
+    /// The SCT timestamp falls outside the log's usable window —
+    /// before [`CtLog::usable_from`], at or after
+    /// `CtLog::retired_at_ms`, or signed by a log that never became
+    /// usable at all.
     SctTimestampOutsideLogWindow,
     /// The supplied certificate DER exceeds the 2^24 - 1 octet limit of
     /// the RFC 6962 §3.2 `ASN.1Cert` (or `PreCert.tbs_certificate()`)
@@ -164,6 +189,12 @@ impl core::fmt::Display for Error {
                 "SCT signature verifies under the other RFC 6962 log entry type \
                  (wrong verification entry point for how this SCT was delivered)",
             ),
+            Self::EmptySctList => {
+                f.write_str("SCT list contains no SCTs (RFC 6962 §3.3 requires at least one)")
+            }
+            Self::DuplicateSctListExtension => {
+                f.write_str("leaf certificate carries more than one SCT-list extension")
+            }
             Self::UnsupportedSignatureAlgorithm { hash_alg, sig_alg } => {
                 write!(
                     f,

@@ -36,7 +36,7 @@
 
 use std::fs;
 
-use pkix_ct::CtLogList;
+use pkix_ct::{CtLogList, UsableFrom};
 
 const LOG_LIST_PATH: &str = "tests/fixtures/log_list_v3_snapshot.json";
 
@@ -86,7 +86,10 @@ fn argon2026h1_present_with_expected_metadata() {
     assert_eq!(log.log_id, ARGON2026H1_LOG_ID);
     assert!(log.description.contains("Argon2026h1"));
     assert_eq!(log.url, "https://ct.googleapis.com/logs/us1/argon2026h1/");
-    assert_eq!(log.usable_from_ms, Some(USABLE_2024_09_30_22_19_27_MS));
+    assert_eq!(
+        log.usable_from,
+        UsableFrom::At(USABLE_2024_09_30_22_19_27_MS)
+    );
     assert_eq!(log.retired_at_ms, None);
 }
 
@@ -97,7 +100,10 @@ fn argon2026h2_present() {
     let log = list.get(&ARGON2026H2_LOG_ID).expect("Argon2026h2 in list");
     assert_eq!(log.log_id, ARGON2026H2_LOG_ID);
     assert!(log.description.contains("Argon2026h2"));
-    assert_eq!(log.usable_from_ms, Some(USABLE_2024_09_30_22_19_27_MS));
+    assert_eq!(
+        log.usable_from,
+        UsableFrom::At(USABLE_2024_09_30_22_19_27_MS)
+    );
 }
 
 #[test]
@@ -107,7 +113,10 @@ fn nimbus2026_present() {
     let log = list.get(&NIMBUS2026_LOG_ID).expect("Nimbus2026 in list");
     assert!(log.description.contains("Nimbus2026"));
     assert_eq!(log.url, "https://ct.cloudflare.com/logs/nimbus2026/");
-    assert_eq!(log.usable_from_ms, Some(USABLE_2024_11_08_18_00_00_MS));
+    assert_eq!(
+        log.usable_from,
+        UsableFrom::At(USABLE_2024_11_08_18_00_00_MS)
+    );
 }
 
 #[test]

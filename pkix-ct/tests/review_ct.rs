@@ -5,10 +5,8 @@
 
 use std::fs;
 
-use der::Decode;
-use pkix_ct::{CtLog, CtLogList, SctVerifier, SignedCertificateTimestamp};
+use pkix_ct::{CtLog, CtLogList, SctVerifier, SignedCertificateTimestamp, UsableFrom};
 use pkix_path::DefaultVerifier;
-use x509_cert::Certificate;
 
 fn read(p: &str) -> Vec<u8> {
     fs::read(p).unwrap_or_else(|e| panic!("read {p}: {e}"))
@@ -25,7 +23,7 @@ fn oracle_logs() -> CtLogList {
         spki,
         "precert-oracle".into(),
         "https://example.invalid/".into(),
-        Some(0),
+        UsableFrom::Unrecorded,
         None,
     ))
     .unwrap();
@@ -37,9 +35,8 @@ fn oracle_logs() -> CtLogList {
 /// one verified log, not two.
 #[test]
 fn duplicate_embedded_sct_is_not_counted_twice() {
-    let leaf = Certificate::from_der(&read("tests/fixtures/review/leaf-dup-sct.der")).unwrap();
-    let issuer =
-        Certificate::from_der(&read("tests/fixtures/sct-oracle/precert-issuer.der")).unwrap();
+    let leaf = read("tests/fixtures/review/leaf-dup-sct.der");
+    let issuer = read("tests/fixtures/sct-oracle/precert-issuer.der");
     let v = SctVerifier::new(oracle_logs(), DefaultVerifier);
     let verified = v.verify_embedded_scts(&leaf, &issuer).expect("verify");
     assert_eq!(
@@ -70,8 +67,10 @@ fn verify_with_state(state: &str) -> Result<(), pkix_ct::Error> {
 }
 
 /// `from_google_log_list_json` documents retired logs as "historical
-/// SCTs remain valid", but it leaves `usable_from_ms = None`, which the
-/// window check treats as "never usable".
+/// SCTs remain valid", so it must import them as
+/// `UsableFrom::Unrecorded` rather than as a log that never became
+/// usable — the two differ by whether every historical SCT is thrown
+/// away.
 #[cfg(feature = "log-list-json")]
 #[test]
 fn retired_log_accepts_sct_issued_before_retirement() {
@@ -128,4 +127,41 @@ fn oversize_sct_extensions_is_an_error_not_a_panic() {
     let mut max = sct.clone();
     max.extensions.truncate(0xFFFF);
     assert!(pkix_ct::merkle_tree_leaf_for_cert(&max, &leaf).is_ok());
+}
+
+/// A certificate must not be read two ways.
+///
+/// RFC 5280 §4.2 forbids repeating an extension, and `leaf-two-sct-
+/// extensions.der` repeats the SCT-list one. Taking the first copy —
+/// which `verify_embedded_scts` did, via `find` — makes this crate's
+/// answer depend on extension order, and an implementation that took
+/// the last copy would disagree about the same bytes. That
+/// disagreement is the attack. Reconstructing the signed input is also
+/// impossible here on its own terms: removing "the" SCT-list extension
+/// is ambiguous when there are two.
+#[test]
+fn two_sct_list_extensions_are_refused_rather_than_read_as_one() {
+    let leaf = read("tests/fixtures/review/leaf-two-sct-extensions.der");
+    let issuer = read("tests/fixtures/sct-oracle/precert-issuer.der");
+    let v = SctVerifier::new(oracle_logs(), DefaultVerifier);
+
+    assert_eq!(
+        v.verify_embedded_scts(&leaf, &issuer),
+        Err(pkix_ct::Error::DuplicateSctListExtension),
+        "the duplicate must be named, not silently resolved to one of them"
+    );
+    assert_eq!(
+        v.count_embedded_sct_logs(&leaf, &issuer),
+        Err(pkix_ct::Error::DuplicateSctListExtension)
+    );
+}
+
+/// The single-extension sibling still verifies, so the check above is
+/// not simply refusing every certificate.
+#[test]
+fn one_sct_list_extension_is_still_accepted() {
+    let leaf = read("tests/fixtures/sct-oracle/precert-leaf-final.der");
+    let issuer = read("tests/fixtures/sct-oracle/precert-issuer.der");
+    let v = SctVerifier::new(oracle_logs(), DefaultVerifier);
+    assert_eq!(v.count_embedded_sct_logs(&leaf, &issuer), Ok(1));
 }

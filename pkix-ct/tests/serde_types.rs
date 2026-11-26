@@ -12,6 +12,7 @@
 
 use pkix_ct::{
     CtLog, CtLogList, MerkleAuditPath, SctList, SignedCertificateTimestamp, SignedTreeHead,
+    UsableFrom,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -24,7 +25,7 @@ fn consistent_log(key_der: &[u8], description: &str) -> CtLog {
         key_der.to_vec(),
         description.to_owned(),
         String::new(),
-        None,
+        UsableFrom::Unrecorded,
         None,
     )
 }
@@ -53,10 +54,11 @@ fn sct_round_trips() {
 
 #[test]
 fn sct_list_round_trips() {
-    let list = SctList(vec![
+    let list = SctList::new(vec![
         SignedCertificateTimestamp::new(0, [1u8; 32], 1, vec![], 4, 3, vec![1]),
         SignedCertificateTimestamp::new(0, [2u8; 32], 2, vec![], 4, 3, vec![2]),
-    ]);
+    ])
+    .expect("two SCTs are a legal list");
     assert_eq!(round_trip(&list), list);
 }
 

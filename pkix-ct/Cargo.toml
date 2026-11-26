@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-ct"
 description = "Certificate Transparency SCT verification for pkix-chain (RFC 6962)"
-version               = "0.2.2"
+version               = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -64,6 +64,13 @@ x509-cert = { workspace = true, features = ["pem", "std"] }
 # SignatureVerifier the caller supplies and ships no implementation, so this
 # is dev-only: pkix-ct has no opinion about which crypto backend verifies.
 pkix-path = { workspace = true, features = ["rustcrypto"] }
+
+# PEM -> DER for the one PEM fixture. The embedded-SCT entry points take
+# the certificate's own bytes, so a test cannot get them by parsing the
+# PEM into a Certificate and encoding it again — that is the divergence
+# those entry points exist to avoid. Already transitive via x509-cert's
+# `pem` feature; named here because the tests call `decode_vec` directly.
+pem-rfc7468 = { version = "1", features = ["alloc"] }
 
 # A concrete serde format for the round-trip tests in tests/serde_types.rs.
 # The crate itself names no format: the `serde` feature only derives the

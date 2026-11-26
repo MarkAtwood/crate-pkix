@@ -56,15 +56,16 @@
 
 use alloc::vec::Vec;
 use der::asn1::ObjectIdentifier;
-use der::{Decode as _, Encode as _};
+use der::Decode as _;
 use sha2::{Digest, Sha256};
 use x509_cert::spki::{AlgorithmIdentifierRef, SubjectPublicKeyInfoRef};
 use x509_cert::Certificate;
 
 use pkix_path::SignatureVerifier;
 
+use crate::raw_der;
 use crate::sct::SignedCertificateTimestamp;
-use crate::{CtLog, CtLogList, Error, Result};
+use crate::{CtLog, CtLogList, Error, Result, UsableFrom};
 
 /// `LogEntryType::x509_entry` — RFC 6962 §3.1.
 const ENTRY_TYPE_X509: u16 = 0;
@@ -82,6 +83,13 @@ const SCT_VERSION_V1: u8 = 0;
 /// from the final cert's TBS when reconstructing the bytes the log
 /// signed over for a `precert_entry` SCT.
 const OID_SCT_LIST: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.11129.2.4.2");
+
+/// The DER content octets of [`OID_SCT_LIST`], for matching an
+/// `extnID` in the certificate's own bytes without decoding it.
+///
+/// Derived from the same constant rather than written out, so the two
+/// cannot drift apart.
+const OID_SCT_LIST_BYTES: &[u8] = OID_SCT_LIST.as_bytes();
 
 // X.509 signature-algorithm OIDs. Duplicated here (rather than re-exported
 // from pkix-path) because pkix-path's copies are private and feature-gated;
@@ -222,21 +230,30 @@ pub struct EmbeddedSctReport {
 /// ```no_run
 /// # #[cfg(all(feature = "log-list", feature = "log-list-json"))]
 /// # fn example() -> Result<(), pkix_ct::Error> {
-/// use pkix_ct::{CtLogList, SctVerifier, SctList};
+/// use pkix_ct::{CtLogList, SctVerifier};
 /// use pkix_path::DefaultVerifier;
 ///
 /// // Caller-supplied log list (from a trusted source — pkix-ct ships none).
 /// let log_list_json = "..."; // read from disk, embed, etc.
 /// let logs = CtLogList::from_google_log_list_json(log_list_json)?;
 ///
-/// // Caller-supplied cert (final cert, DER-encoded).
+/// // The certificate exactly as it arrived, and its issuer. These are
+/// // the bytes the log signed, so they are what gets passed: a
+/// // certificate parsed and encoded again is not guaranteed to be the
+/// // same certificate.
 /// let cert_der: &[u8] = &[];
+/// let issuer_der: &[u8] = &[];
 ///
-/// // Parse the SCTs out of the cert and verify each one.
-/// let sct_list = SctList(vec![]);
 /// let v = SctVerifier::new(logs, DefaultVerifier);
-/// for sct in &sct_list.0 {
-///     let _log = v.verify_sct_for_cert(sct, cert_der)?;
+/// let report = v.verify_embedded_scts_with_report(cert_der, issuer_der)?;
+///
+/// // One entry per log that vouched for the certificate, and for each
+/// // SCT that did not verify, why.
+/// for ok in &report.verified {
+///     let _log_id = ok.log_id;
+/// }
+/// for bad in &report.rejected {
+///     let _reason = &bad.reason;
 /// }
 /// # Ok(())
 /// # }
@@ -377,11 +394,15 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///   actually issued `leaf_cert_der`. Callers wanting that
     ///   guarantee compose this with `pkix-path` chain validation
     ///   first (or use `pkix-chain`).
-    /// - The leaf's TBS is re-encoded after extension removal via
-    ///   [`der::Encode`]. This is bit-exact for canonically-encoded
-    ///   certs (the case for all real CT-logged certs), which is what
-    ///   `pkix-path` itself relies on for chain-signature verification
-    ///   (see the equivalent re-encoding at `pkix-path::lib::verify_cert_signature`).
+    /// - The leaf's TBS is not re-encoded. The SCT-list extension is
+    ///   spliced out of `leaf_cert_der` at the byte level, so the
+    ///   signed input is the certificate's own bytes rather than an
+    ///   encoder's rendering of them. This used to go through
+    ///   [`der::Encode`] and was bit-exact only for
+    ///   canonically-encoded certificates; a certificate whose
+    ///   `SET OF` ordering or time encoding the encoder normalised
+    ///   verified as [`Error::InvalidSignature`] despite carrying a
+    ///   good SCT.
     ///
     /// # Errors
     ///
@@ -560,6 +581,9 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///   the extension's serialized list is empty.
     /// - [`Error::ParseError`] — the SCT-list extension is present
     ///   but malformed, or either cert fails to parse.
+    /// - [`Error::DuplicateSctListExtension`] — the leaf carries the
+    ///   extension more than once, which RFC 5280 §4.2 forbids and
+    ///   which leaves no way to know which copy the log was given.
     /// - [`Error::TruncatedOrTrailing`] — the SCT-list extension is
     ///   present but the wire bytes are truncated or have trailing
     ///   garbage.
@@ -568,36 +592,38 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     ///   [`crate::SctList::from_extension_value`]).
     pub fn verify_embedded_scts_with_report(
         &self,
-        leaf_cert: &Certificate,
-        issuer_cert: &Certificate,
+        leaf_cert_der: &[u8],
+        issuer_cert_der: &[u8],
     ) -> Result<EmbeddedSctReport> {
-        use der::Encode as _;
-
+        // Parsed only to find the extension. The signed input is built
+        // from `leaf_cert_der` itself, which is why these take DER and
+        // not `&Certificate`: re-encoding a parsed certificate to
+        // recover its bytes reintroduces exactly the divergence
+        // `tbs_without_sct_list` was rewritten to avoid.
+        let leaf_cert = Certificate::from_der(leaf_cert_der).map_err(|_| Error::ParseError)?;
         let exts = leaf_cert
             .tbs_certificate()
             .extensions()
             .ok_or(Error::NoScts)?;
-        let ext = exts
-            .iter()
-            .find(|e| e.extn_id == OID_SCT_LIST)
-            .ok_or(Error::NoScts)?;
-
-        let scts = crate::sct::SctList::from_extension_value(ext.extn_value.as_bytes())?;
-        if scts.0.is_empty() {
-            return Err(Error::NoScts);
+        // Counted, not found. `find` would silently take the first of
+        // several, and which instance a verifier reads is exactly what
+        // an attacker exploits when two implementations choose
+        // differently — the same reason `pkix-identity` counts SAN
+        // extensions and `pkix-path::check_duplicate_extensions`
+        // rejects the certificate outright.
+        let mut matching = exts.iter().filter(|e| e.extn_id == OID_SCT_LIST);
+        let ext = matching.next().ok_or(Error::NoScts)?;
+        if matching.next().is_some() {
+            return Err(Error::DuplicateSctListExtension);
         }
 
-        let mut leaf_der = Vec::new();
-        leaf_cert
-            .encode_to_vec(&mut leaf_der)
-            .map_err(|_| Error::ParseError)?;
-        let mut issuer_der = Vec::new();
-        issuer_cert
-            .encode_to_vec(&mut issuer_der)
-            .map_err(|_| Error::ParseError)?;
+        // `SctList` cannot be empty, so an empty list arrives as a
+        // parse error rather than as a list; `NoScts` is reserved for
+        // a certificate that carries no extension at all.
+        let scts = crate::sct::SctList::from_extension_value(ext.extn_value.as_bytes())?;
 
         let mut report = EmbeddedSctReport::default();
-        for sct in &scts.0 {
+        for sct in scts.scts() {
             // One entry per log: a repeated SCT, or a second SCT from
             // a log already counted, adds no independent evidence.
             // Checked before verifying so duplicates cost no signature
@@ -609,7 +635,7 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             // The reason is kept, not dropped. This was `.is_ok()`,
             // which collapsed a forged signature and a stale log list
             // into the same empty result.
-            match self.verify_sct_for_precert(sct, &leaf_der, &issuer_der) {
+            match self.verify_sct_for_precert(sct, leaf_cert_der, issuer_cert_der) {
                 Ok(_) => report.verified.push(VerifiedSct {
                     log_id: sct.log_id,
                     timestamp_ms: sct.timestamp_ms,
@@ -641,11 +667,11 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// As for [`Self::verify_embedded_scts_with_report`].
     pub fn verify_embedded_scts(
         &self,
-        leaf_cert: &Certificate,
-        issuer_cert: &Certificate,
+        leaf_cert_der: &[u8],
+        issuer_cert_der: &[u8],
     ) -> Result<Vec<VerifiedSct>> {
         Ok(self
-            .verify_embedded_scts_with_report(leaf_cert, issuer_cert)?
+            .verify_embedded_scts_with_report(leaf_cert_der, issuer_cert_der)?
             .verified)
     }
 
@@ -666,10 +692,10 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// As for [`Self::verify_embedded_scts`].
     pub fn count_embedded_sct_logs(
         &self,
-        leaf_cert: &Certificate,
-        issuer_cert: &Certificate,
+        leaf_cert_der: &[u8],
+        issuer_cert_der: &[u8],
     ) -> Result<usize> {
-        self.verify_embedded_scts(leaf_cert, issuer_cert)
+        self.verify_embedded_scts(leaf_cert_der, issuer_cert_der)
             .map(|v| v.len())
     }
 
@@ -1180,12 +1206,12 @@ fn build_merkle_tree_leaf_precert_entry(
 /// `retired_at_ms = None` means the log has not been retired, so the
 /// upper bound is unbounded.
 fn log_window_contains(log: &CtLog, timestamp_ms: u64) -> bool {
-    let lo = match log.usable_from_ms {
-        Some(lo) => lo,
-        None => return false,
-    };
-    if timestamp_ms < lo {
-        return false;
+    match log.usable_from {
+        UsableFrom::At(lo) if timestamp_ms < lo => return false,
+        UsableFrom::At(_) | UsableFrom::Unrecorded => {}
+        // Nothing this log signed is trusted, so no timestamp is
+        // inside its window.
+        UsableFrom::Never => return false,
     }
     if let Some(hi) = log.retired_at_ms {
         if timestamp_ms >= hi {
@@ -1277,53 +1303,113 @@ fn build_signed_input_precert_entry(
     Ok(out)
 }
 
-/// Parse `leaf_cert_der`, remove the SCT-list extension (OID
-/// 1.3.6.1.4.1.11129.2.4.2) from its TBSCertificate, and re-encode the
-/// resulting TBS as DER.
+/// Remove the SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2) from
+/// `leaf_cert_der`'s TBSCertificate and return the resulting TBS DER.
 ///
-/// Returns [`Error::LeafMissingSctList`] if no such extension is
-/// present, [`Error::ParseError`] if the cert fails to parse, and
-/// [`Error::CertDerTooLong`] if the re-encoded TBS bytes do not fit in
-/// the RFC 6962 §3.2 u24 length prefix. The re-encoding goes through
-/// `x509-cert`'s [`der::Encode`] implementation; the same path used by
-/// `pkix-path` for cert-signature verification.
+/// # What this does not do
 ///
-/// Round-trip correctness assumption: a canonically-encoded TBS
-/// re-emitted by `x509-cert` matches the original byte-for-byte aside
-/// from the removed extension and its surrounding length fields. This
-/// holds for every real-world CT-logged certificate because the
-/// canonical form is what real CAs emit and what every X.509 toolchain
-/// in production accepts. The independent oracle in
-/// `pkix-ct/tests/fixtures/sct-oracle/gen_precert_entry_sct.py`
-/// asserts the same property by stripping the extension at the byte
-/// level in Python and verifying the Rust re-encoding produces
-/// identical bytes.
+/// It does not re-encode the certificate. RFC 6962 §3.2 signs the
+/// bytes the log was given, so the reconstruction has to reproduce
+/// them, and nothing obliges an encoder to reproduce its own input:
+/// `x509-cert` may normalise a `GeneralizedTime` that could have been
+/// a `UTCTime`, re-sort a `SET OF` the original CA left unsorted, or
+/// pick a different string type for an equivalent value. Any of those
+/// shifts a byte, the signature check fails, and the caller is told a
+/// valid certificate carries an invalid SCT — a report that looks
+/// exactly like forgery and points nowhere near the encoder.
+///
+/// So every byte here is copied from `leaf_cert_der`. The only bytes
+/// written are the three length fields that have to shrink: the
+/// extensions `SEQUENCE`, its `[3] EXPLICIT` wrapper, and the
+/// TBSCertificate `SEQUENCE`. Tag octets are copied too, not
+/// reconstructed.
+///
+/// This replaced a parse-and-re-encode implementation that was correct
+/// for canonically-encoded certificates and silently wrong for any
+/// other. `pkix-ct/tests/fixtures/sct-oracle/gen_precert_entry_sct.py`
+/// strips the extension independently in Python and commits the result,
+/// which `tbs_without_sct_list_matches_oracle_bytes` compares against.
+///
+/// # Errors
+///
+/// - [`Error::LeafMissingSctList`] — no extensions, or no SCT-list
+///   extension among them.
+/// - [`Error::DuplicateSctListExtension`] — more than one. RFC 5280
+///   §4.2 forbids it, and which one the log saw is unknowable.
+/// - [`Error::ParseError`] — the certificate is not well-formed DER to
+///   the depth this needs to walk.
+/// - [`Error::CertDerTooLong`] — the TBS does not fit the RFC 6962
+///   §3.2 `u24` length prefix.
 fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
-    let cert = Certificate::from_der(leaf_cert_der).map_err(|_| Error::ParseError)?;
-    let mut exts = cert
-        .tbs_certificate()
-        .extensions()
-        .cloned()
+    // Certificate ::= SEQUENCE { tbsCertificate, signatureAlgorithm,
+    // signatureValue }, so the first triple inside is the TBS.
+    let cert =
+        raw_der::read_tagged(leaf_cert_der, raw_der::TAG_SEQUENCE).ok_or(Error::ParseError)?;
+    let cert_body = cert.value(leaf_cert_der);
+    let tbs = raw_der::read_tagged(cert_body, raw_der::TAG_SEQUENCE).ok_or(Error::ParseError)?;
+    let tbs_tag = tbs.tag;
+    let tbs_body = tbs.value(cert_body);
+
+    // `extensions` is `[3] EXPLICIT`, which no other TBSCertificate
+    // field can be mistaken for, so find it by tag rather than by
+    // position.
+    let (ext_off, ext_wrapper) = raw_der::tlvs(tbs_body)
+        .ok_or(Error::ParseError)?
+        .into_iter()
+        .find(|(_, tlv)| tlv.tag == raw_der::TAG_EXTENSIONS)
         .ok_or(Error::LeafMissingSctList)?;
-    let before = exts.len();
-    exts.retain(|ext| ext.extn_id != OID_SCT_LIST);
-    if exts.len() == before {
-        return Err(Error::LeafMissingSctList);
+    let wrapper_body =
+        &tbs_body[ext_off + ext_wrapper.header_len..ext_off + ext_wrapper.total_len()];
+
+    // Extensions ::= SEQUENCE SIZE (1..MAX) OF Extension
+    let exts =
+        raw_der::read_tagged(wrapper_body, raw_der::TAG_SEQUENCE).ok_or(Error::ParseError)?;
+    let exts_body = exts.value(wrapper_body);
+
+    // Extension ::= SEQUENCE { extnID OBJECT IDENTIFIER, ... }, so the
+    // first triple inside each one is the OID to match on.
+    let mut target: Option<(usize, usize)> = None;
+    for (off, ext) in raw_der::tlvs(exts_body).ok_or(Error::ParseError)? {
+        if ext.tag != raw_der::TAG_SEQUENCE {
+            return Err(Error::ParseError);
+        }
+        let body = &exts_body[off + ext.header_len..off + ext.total_len()];
+        let oid = raw_der::read_tagged(body, raw_der::TAG_OID).ok_or(Error::ParseError)?;
+        if oid.value(body) == OID_SCT_LIST_BYTES {
+            if target.is_some() {
+                return Err(Error::DuplicateSctListExtension);
+            }
+            target = Some((off, ext.total_len()));
+        }
     }
-    // If all extensions were removed (the SCT-list was the only one),
-    // RFC 5280 §4.1.2.9 requires the [3] EXPLICIT Extensions field to
-    // be absent rather than encoded as an empty SEQUENCE.
-    let exts = (!exts.is_empty()).then_some(exts);
-    // `encode_tbs_certificate` keeps the validity times as parsed;
-    // x509-cert 0.3's own encoder would normalize them (RFC 5280
-    // §4.1.2.5) and break the signed-entry bytes for a certificate whose
-    // CA used GeneralizedTime before 2050.
-    let buf = pkix_path::encode_tbs_certificate(cert.tbs_certificate(), exts.as_ref())
-        .map_err(|_| Error::ParseError)?;
-    if buf.len() > 0x00FF_FFFF {
+    let (target_off, target_len) = target.ok_or(Error::LeafMissingSctList)?;
+
+    // The extensions SEQUENCE without that one Extension's octets.
+    let mut new_exts_body = Vec::with_capacity(exts_body.len() - target_len);
+    new_exts_body.extend_from_slice(&exts_body[..target_off]);
+    new_exts_body.extend_from_slice(&exts_body[target_off + target_len..]);
+
+    let mut new_tbs_body = Vec::with_capacity(tbs_body.len());
+    new_tbs_body.extend_from_slice(&tbs_body[..ext_off]);
+    if !new_exts_body.is_empty() {
+        let mut new_exts = Vec::with_capacity(new_exts_body.len() + 6);
+        raw_der::push_header(&mut new_exts, exts.tag, new_exts_body.len());
+        new_exts.extend_from_slice(&new_exts_body);
+        raw_der::push_header(&mut new_tbs_body, ext_wrapper.tag, new_exts.len());
+        new_tbs_body.extend_from_slice(&new_exts);
+    }
+    // When the SCT-list was the only extension the whole `[3]` field is
+    // dropped: RFC 5280 §4.1.2.9 requires an absent field rather than
+    // an empty SEQUENCE, and that is also what the log signed.
+    new_tbs_body.extend_from_slice(&tbs_body[ext_off + ext_wrapper.total_len()..]);
+
+    let mut out = Vec::with_capacity(new_tbs_body.len() + 6);
+    raw_der::push_header(&mut out, tbs_tag, new_tbs_body.len());
+    out.extend_from_slice(&new_tbs_body);
+    if out.len() > 0x00FF_FFFF {
         return Err(Error::CertDerTooLong);
     }
-    Ok(buf)
+    Ok(out)
 }
 
 /// Parse `issuer_cert_der` and return SHA-256 of its
@@ -1340,17 +1426,74 @@ fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
 /// Returns [`Error::ParseError`] if the cert or its SPKI cannot be
 /// parsed.
 fn issuer_key_hash_from_cert(issuer_cert_der: &[u8]) -> Result<[u8; 32]> {
-    let issuer = Certificate::from_der(issuer_cert_der).map_err(|_| Error::ParseError)?;
-    let mut spki_buf = Vec::new();
-    issuer
-        .tbs_certificate()
-        .subject_public_key_info()
-        .encode_to_vec(&mut spki_buf)
-        .map_err(|_| Error::ParseError)?;
-    let digest = Sha256::digest(&spki_buf);
+    let spki = spki_bytes(issuer_cert_der)?;
+    let digest = Sha256::digest(spki);
     let mut out = [0u8; 32];
     out.copy_from_slice(&digest);
     Ok(out)
+}
+
+/// The `subjectPublicKeyInfo` octets of `cert_der`, as they appear in
+/// `cert_der`.
+///
+/// Returned by reference into the input rather than re-encoded, for
+/// the reason given on [`tbs_without_sct_list`]: this hash goes into a
+/// signed input, so a byte the encoder chose differently from the CA
+/// is a verification failure blamed on the signature.
+///
+/// Located positionally, because unlike `extensions` the field carries
+/// no distinguishing tag — it is a `SEQUENCE`, as are four of the
+/// fields before it. RFC 5280 §4.1 fixes that order:
+///
+/// ```text
+/// TBSCertificate ::= SEQUENCE {
+///     version         [0] EXPLICIT Version DEFAULT v1,  -- optional
+///     serialNumber        CertificateSerialNumber,
+///     signature           AlgorithmIdentifier,
+///     issuer              Name,
+///     validity            Validity,
+///     subject             Name,
+///     subjectPublicKeyInfo SubjectPublicKeyInfo,
+///     ...
+/// }
+/// ```
+///
+/// Only `version` is optional, and it is `[0] EXPLICIT`, so skipping
+/// it when present and then counting five mandatory fields lands on
+/// the key. A v1 certificate omits it and the count starts at
+/// `serialNumber`, which is checked rather than assumed.
+///
+/// # Errors
+///
+/// [`Error::ParseError`] if the certificate is not well-formed DER to
+/// that depth, or if the fields are not in the order RFC 5280 fixes.
+fn spki_bytes(cert_der: &[u8]) -> Result<&[u8]> {
+    let cert = raw_der::read_tagged(cert_der, raw_der::TAG_SEQUENCE).ok_or(Error::ParseError)?;
+    let cert_body = cert.value(cert_der);
+    let tbs = raw_der::read_tagged(cert_body, raw_der::TAG_SEQUENCE).ok_or(Error::ParseError)?;
+    let tbs_body = tbs.value(cert_body);
+
+    let fields = raw_der::tlvs(tbs_body).ok_or(Error::ParseError)?;
+    let mut fields = fields.into_iter();
+    let mut next = fields.next().ok_or(Error::ParseError)?;
+    if next.1.tag == raw_der::TAG_VERSION {
+        next = fields.next().ok_or(Error::ParseError)?;
+    }
+    // serialNumber, then signature / issuer / validity / subject.
+    if next.1.tag != raw_der::TAG_INTEGER {
+        return Err(Error::ParseError);
+    }
+    for _ in 0..4 {
+        next = fields.next().ok_or(Error::ParseError)?;
+        if next.1.tag != raw_der::TAG_SEQUENCE {
+            return Err(Error::ParseError);
+        }
+    }
+    let (off, spki) = fields.next().ok_or(Error::ParseError)?;
+    if spki.tag != raw_der::TAG_SEQUENCE {
+        return Err(Error::ParseError);
+    }
+    Ok(&tbs_body[off..off + spki.total_len()])
 }
 
 #[cfg(test)]
@@ -1394,14 +1537,14 @@ mod tests {
 
     #[test]
     fn log_window_never_usable() {
-        // usable_from_ms = None means the log has never reached the
-        // usable state — the window check must always fail.
+        // The log never reached the usable state, so the window
+        // check must always fail.
         let log = CtLog {
             log_id: [0u8; 32],
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
-            usable_from_ms: None,
+            usable_from: UsableFrom::Never,
             retired_at_ms: None,
         };
         assert!(!log_window_contains(&log, 0));
@@ -1409,15 +1552,48 @@ mod tests {
     }
 
     #[test]
+    /// The two states that `Option<u64>` could not tell apart must
+    /// give opposite answers.
+    ///
+    /// `usable_from_ms: Option<u64>` had `None` meaning "never became
+    /// usable, reject everything" while the log-list importer needed a
+    /// value for "usable, but the list does not say since when" and
+    /// used `Some(0)` — relying on nothing predating the Unix epoch.
+    /// Two states, one of them a sentinel. They are now named, and
+    /// this is the assertion that was not previously expressible
+    /// without encoding that convention into the test.
+    #[test]
+    fn an_unrecorded_start_is_not_the_same_as_never_usable() {
+        let log = |usable_from| CtLog {
+            log_id: [0u8; 32],
+            key_der: Vec::new(),
+            description: "test".into(),
+            url: "http://example.com/".into(),
+            usable_from,
+            retired_at_ms: None,
+        };
+        for ts in [0, 1, 1_700_000_000_000, u64::MAX] {
+            assert!(
+                log_window_contains(&log(UsableFrom::Unrecorded), ts),
+                "an unrecorded start imposes no lower bound, so {ts} is inside"
+            );
+            assert!(
+                !log_window_contains(&log(UsableFrom::Never), ts),
+                "a log that never became usable vouches for nothing, so {ts} is outside"
+            );
+        }
+    }
+
+    #[test]
     fn log_window_unbounded_upper() {
-        // usable_from_ms = Some(0) with no retirement — the window is
-        // [0, +inf), accepting any timestamp.
+        // No recorded lower bound and no retirement: the window is
+        // open at both ends, accepting any timestamp.
         let log = CtLog {
             log_id: [0u8; 32],
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
-            usable_from_ms: Some(0),
+            usable_from: UsableFrom::Unrecorded,
             retired_at_ms: None,
         };
         assert!(log_window_contains(&log, 0));
@@ -1431,7 +1607,7 @@ mod tests {
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
-            usable_from_ms: Some(1_000),
+            usable_from: UsableFrom::At(1_000),
             retired_at_ms: None,
         };
         assert!(!log_window_contains(&log, 999));
@@ -1446,7 +1622,7 @@ mod tests {
             key_der: Vec::new(),
             description: "test".into(),
             url: "http://example.com/".into(),
-            usable_from_ms: Some(0),
+            usable_from: UsableFrom::Unrecorded,
             retired_at_ms: Some(2_000),
         };
         assert!(log_window_contains(&log, 1_999));
@@ -1692,6 +1868,206 @@ mod tests {
              canonicalized something the cryptography emitter did \
              differently. Compare with `xxd` to diagnose.",
         );
+    }
+
+    /// Every certificate in this crate's fixtures that carries an
+    /// SCT-list extension.
+    ///
+    /// Six certificates is not the "millions of CT-logged certs in
+    /// deployment" that the old parse-and-re-encode implementation
+    /// needed to be right about. It does not have to be: the property
+    /// asserted below is that bytes are copied rather than re-encoded,
+    /// and a copy cannot diverge on a certificate nobody tested.
+    #[cfg(feature = "std")]
+    pub(super) fn sct_bearing_fixtures() -> Vec<(&'static str, Vec<u8>)> {
+        let der_files = [
+            "tests/fixtures/sct-oracle/precert-leaf-final.der",
+            "tests/fixtures/live-log/leaf.der",
+            "tests/fixtures/invalid-sct-version.der",
+            "tests/fixtures/invalid-sct-length.der",
+            "tests/fixtures/review/leaf-dup-sct.der",
+        ];
+        let mut out: Vec<(&'static str, Vec<u8>)> = der_files
+            .iter()
+            .map(|p| {
+                (
+                    *p,
+                    std::fs::read(p).unwrap_or_else(|e| panic!("read {p}: {e}")),
+                )
+            })
+            .collect();
+
+        // The Let's Encrypt leaf from pyca/cryptography's vectors, the
+        // only PEM among them and the one issued by a real CA.
+        let pem = std::fs::read_to_string("tests/fixtures/cryptography-scts.pem")
+            .expect("read cryptography-scts.pem");
+        let b64: String = pem
+            .lines()
+            .skip_while(|l| !l.starts_with("-----BEGIN CERTIFICATE"))
+            .skip(1)
+            .take_while(|l| !l.starts_with("-----END CERTIFICATE"))
+            .collect();
+        let der = base64_decode(&b64).expect("decode cryptography-scts.pem");
+        out.push(("tests/fixtures/cryptography-scts.pem", der));
+        out
+    }
+
+    /// Minimal standard-alphabet base64, to read the one PEM fixture
+    /// without a dependency for six lines of test support.
+    #[cfg(feature = "std")]
+    fn base64_decode(s: &str) -> Option<Vec<u8>> {
+        let mut out = Vec::new();
+        let mut acc: u32 = 0;
+        let mut bits = 0u32;
+        for c in s.bytes() {
+            let v = match c {
+                b'A'..=b'Z' => c - b'A',
+                b'a'..=b'z' => c - b'a' + 26,
+                b'0'..=b'9' => c - b'0' + 52,
+                b'+' => 62,
+                b'/' => 63,
+                b'=' => break,
+                b'\r' | b'\n' | b' ' | b'\t' => continue,
+                _ => return None,
+            };
+            acc = (acc << 6) | u32::from(v);
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                out.push(((acc >> bits) & 0xFF) as u8);
+            }
+        }
+        Some(out)
+    }
+
+    /// The reconstructed TBS must be the original TBS with one
+    /// extension's octets removed — not a re-encoding of it.
+    ///
+    /// This is the property that retires the old implementation's
+    /// correctness assumption. The old code parsed the certificate and
+    /// asked `x509-cert` to emit it again, which is only faithful if
+    /// the encoder reproduces its input byte for byte; where it did
+    /// not, a valid SCT failed as `InvalidSignature` with nothing to
+    /// point at the encoder. Copying cannot fail that way, and this
+    /// asserts the copy really is one: every octet before the
+    /// extensions field, and every octet after it, identical to the
+    /// certificate as it arrived.
+    #[cfg(feature = "std")]
+    #[test]
+    fn tbs_without_sct_list_copies_rather_than_re_encodes() {
+        for (name, der) in sct_bearing_fixtures() {
+            let out = tbs_without_sct_list(&der)
+                .unwrap_or_else(|e| panic!("{name}: strip failed: {e:?}"));
+
+            // Locate the same structures in the original.
+            let cert = raw_der::read_tagged(&der, raw_der::TAG_SEQUENCE).expect("cert");
+            let cert_body = cert.value(&der);
+            let tbs = raw_der::read_tagged(cert_body, raw_der::TAG_SEQUENCE).expect("tbs");
+            let tbs_body = tbs.value(cert_body);
+            let (ext_off, wrapper) = raw_der::tlvs(tbs_body)
+                .expect("tbs fields")
+                .into_iter()
+                .find(|(_, t)| t.tag == raw_der::TAG_EXTENSIONS)
+                .expect("extensions field");
+
+            let out_tbs = raw_der::read_tagged(&out, raw_der::TAG_SEQUENCE)
+                .unwrap_or_else(|| panic!("{name}: output is not a SEQUENCE"));
+            assert_eq!(
+                out_tbs.total_len(),
+                out.len(),
+                "{name}: output has trailing bytes"
+            );
+            let out_body = out_tbs.value(&out);
+
+            assert_eq!(
+                &out_body[..ext_off],
+                &tbs_body[..ext_off],
+                "{name}: the octets before the extensions field changed — version, \
+                 serial, signature algorithm, issuer, validity, subject, public key \
+                 and any earlier extension must be copied verbatim"
+            );
+            let tail = &tbs_body[ext_off + wrapper.total_len()..];
+            assert!(
+                out_body.ends_with(tail),
+                "{name}: the octets after the extensions field changed"
+            );
+
+            // The SCT-list extension's own octets are gone, and every
+            // other extension's are still there untouched.
+            let wrapper_body =
+                &tbs_body[ext_off + wrapper.header_len..ext_off + wrapper.total_len()];
+            let exts = raw_der::read_tagged(wrapper_body, raw_der::TAG_SEQUENCE).expect("exts");
+            let exts_body = exts.value(wrapper_body);
+            let mut saw_sct_list = 0;
+            for (off, ext) in raw_der::tlvs(exts_body).expect("extensions") {
+                let bytes = &exts_body[off..off + ext.total_len()];
+                let body = &exts_body[off + ext.header_len..off + ext.total_len()];
+                let oid = raw_der::read_tagged(body, raw_der::TAG_OID).expect("extnID");
+                if oid.value(body) == OID_SCT_LIST_BYTES {
+                    saw_sct_list += 1;
+                    assert!(
+                        !contains(out_body, bytes),
+                        "{name}: the SCT-list extension survived the strip"
+                    );
+                } else {
+                    assert!(
+                        contains(out_body, bytes),
+                        "{name}: an unrelated extension was not copied verbatim"
+                    );
+                }
+            }
+            assert_eq!(saw_sct_list, 1, "{name}: expected one SCT-list extension");
+        }
+    }
+
+    #[cfg(feature = "std")]
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        needle.len() <= haystack.len() && haystack.windows(needle.len()).any(|w| w == needle)
+    }
+
+    /// A certificate the re-encoder does not reproduce must still be
+    /// reconstructed exactly.
+    ///
+    /// This is the test the old implementation could not pass.
+    /// `tests/fixtures/reencode/` holds two certificates that are
+    /// well-formed DER, that a CA could emit, and that a log would
+    /// sign — and that `x509-cert` re-encodes differently:
+    ///
+    /// - `leaf-generalizedtime-notbefore.der` puts a `GeneralizedTime`
+    ///   before 2050 in `notBefore`, which x509-cert normalises.
+    ///   `pkix_path::encode_tbs_certificate` was hand-written to patch
+    ///   around this one case and does preserve it.
+    /// - `leaf-unsorted-rdn.der` has a subject RDN whose `SET OF`
+    ///   members are not in the order X.690 §11.6 requires. x509-cert
+    ///   parses it and re-sorts on encode, and nothing patches around
+    ///   that: measured against this fixture,
+    ///   `encode_tbs_certificate` produced bytes that differ from the
+    ///   original. So the old implementation reconstructed the wrong
+    ///   signed input and a genuinely valid SCT came back as
+    ///   [`Error::InvalidSignature`] — the exact failure this crate
+    ///   now cannot produce, because it copies the bytes instead.
+    ///
+    /// The expected bytes are stripped independently in
+    /// `gen_reencode_fixtures.py`, so a shared mistake between the
+    /// generator and this crate would have to be made twice, in two
+    /// languages.
+    #[cfg(feature = "std")]
+    #[test]
+    fn a_cert_the_re_encoder_alters_is_still_reconstructed_exactly() {
+        for stem in ["leaf-generalizedtime-notbefore", "leaf-unsorted-rdn"] {
+            let der = std::fs::read(format!("tests/fixtures/reencode/{stem}.der"))
+                .unwrap_or_else(|e| panic!("read {stem}.der: {e}"));
+            let expected = std::fs::read(format!("tests/fixtures/reencode/{stem}-tbs-no-sct.bin"))
+                .unwrap_or_else(|e| panic!("read {stem}-tbs-no-sct.bin: {e}"));
+
+            let actual = tbs_without_sct_list(&der)
+                .unwrap_or_else(|e| panic!("{stem}: strip failed: {e:?}"));
+            assert_eq!(
+                actual, expected,
+                "{stem}: reconstructed TBS does not match the Python oracle; \
+                 a byte that came from the certificate was not copied"
+            );
+        }
     }
 
     /// Mirror test for `issuer_key_hash_from_cert`: the SHA-256 of

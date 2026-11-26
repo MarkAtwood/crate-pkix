@@ -288,6 +288,7 @@ mod sth {
 
     use pkix_ct::{
         merkle_leaf_hash, CtLog, CtLogList, Error, MerkleAuditPath, SctVerifier, SignedTreeHead,
+        UsableFrom,
     };
     use pkix_path::DefaultVerifier;
 
@@ -322,7 +323,11 @@ mod sth {
             spki,
             "sth-oracle".into(),
             "http://example.invalid/ct/".into(),
-            None,
+            // Was `None`, which meant "never usable". Kept as the
+            // equivalent rather than widened: these tests verify tree
+            // heads and inclusion proofs, neither of which consults
+            // the SCT timestamp window.
+            UsableFrom::Never,
             None,
         ))
         .unwrap();

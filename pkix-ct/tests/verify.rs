@@ -35,7 +35,7 @@
 
 use std::fs;
 
-use pkix_ct::{CtLog, CtLogList, Error, SctVerifier, SignedCertificateTimestamp};
+use pkix_ct::{CtLog, CtLogList, Error, SctVerifier, SignedCertificateTimestamp, UsableFrom};
 use pkix_path::DefaultVerifier;
 
 const FIXTURE_DIR: &str = "tests/fixtures/sct-oracle";
@@ -45,10 +45,9 @@ fn read_fixture(name: &str) -> Vec<u8> {
     fs::read(&path).unwrap_or_else(|e| panic!("read {path}: {e}"))
 }
 
-/// Build a `CtLogList` containing exactly the oracle log, with an
-/// open window. `usable_from_ms = Some(0)` means "usable since epoch"
-/// — the widest valid window. `None` would mean "never usable" per the
-/// `CtLog` doc.
+/// Build a `CtLogList` containing exactly the oracle log, with an open
+/// window. [`UsableFrom::Unrecorded`] is the widest valid lower bound;
+/// [`UsableFrom::Never`] would reject every SCT.
 fn oracle_log_list() -> CtLogList {
     let log_spki = read_fixture("log-spki.der");
     let log_id_bytes = read_fixture("log-id.bin");
@@ -63,7 +62,7 @@ fn oracle_log_list() -> CtLogList {
         log_spki,
         "oracle".into(),
         "http://example.invalid/ct/".into(),
-        Some(0),
+        UsableFrom::Unrecorded,
         None,
     ))
     .expect("oracle log self-consistency");
@@ -72,10 +71,7 @@ fn oracle_log_list() -> CtLogList {
 
 /// Build a `CtLogList` containing exactly the oracle log, but pinned to
 /// a narrow usable window for testing the timestamp-window guard.
-fn oracle_log_list_with_window(
-    usable_from_ms: Option<u64>,
-    retired_at_ms: Option<u64>,
-) -> CtLogList {
+fn oracle_log_list_with_window(usable_from: UsableFrom, retired_at_ms: Option<u64>) -> CtLogList {
     let log_spki = read_fixture("log-spki.der");
     let log_id_bytes = read_fixture("log-id.bin");
     let log_id: [u8; 32] = log_id_bytes.as_slice().try_into().unwrap();
@@ -86,7 +82,7 @@ fn oracle_log_list_with_window(
         log_spki,
         "oracle".into(),
         "http://example.invalid/ct/".into(),
-        usable_from_ms,
+        usable_from,
         retired_at_ms,
     ))
     .unwrap();
@@ -192,13 +188,13 @@ fn rejects_real_world_cert_with_retired_logs_as_unknown() {
         .find(|e| e.extn_id.to_string() == "1.3.6.1.4.1.11129.2.4.2")
         .unwrap();
     let scts = SctList::from_extension_value(sct_ext.extn_value.as_bytes()).unwrap();
-    assert!(!scts.0.is_empty());
+    assert!(!scts.scts().is_empty());
 
     let v = SctVerifier::new(oracle_log_list(), DefaultVerifier);
     // We don't have a final cert for these SCTs (they're precert SCTs
     // anyway); the log_id check fires before the cert is needed.
     let dummy_cert = read_fixture("cert.der");
-    for sct in &scts.0 {
+    for sct in scts.scts() {
         assert_eq!(
             v.verify_sct_for_cert(sct, &dummy_cert),
             Err(Error::UnknownLog),
@@ -215,7 +211,7 @@ fn rejects_sct_before_log_usable_from() {
 
     // Oracle SCT timestamp = 1_750_032_000_000. Set usable_from to one
     // ms later: SCT must be rejected.
-    let logs = oracle_log_list_with_window(Some(sct.timestamp_ms + 1), None);
+    let logs = oracle_log_list_with_window(UsableFrom::At(sct.timestamp_ms + 1), None);
     let v = SctVerifier::new(logs, DefaultVerifier);
     assert_eq!(
         v.verify_sct_for_cert(&sct, &cert_der),
@@ -229,7 +225,7 @@ fn accepts_sct_exactly_at_log_usable_from() {
     let cert_der = read_fixture("cert.der");
 
     // Lower bound is inclusive: SCT timestamp == usable_from must pass.
-    let logs = oracle_log_list_with_window(Some(sct.timestamp_ms), None);
+    let logs = oracle_log_list_with_window(UsableFrom::At(sct.timestamp_ms), None);
     let v = SctVerifier::new(logs, DefaultVerifier);
     assert!(v.verify_sct_for_cert(&sct, &cert_der).is_ok());
 }
@@ -240,7 +236,7 @@ fn rejects_sct_at_or_after_log_retired_at() {
     let cert_der = read_fixture("cert.der");
 
     // Upper bound is exclusive: SCT timestamp == retired_at must fail.
-    let logs = oracle_log_list_with_window(Some(0), Some(sct.timestamp_ms));
+    let logs = oracle_log_list_with_window(UsableFrom::Unrecorded, Some(sct.timestamp_ms));
     let v = SctVerifier::new(logs, DefaultVerifier);
     assert_eq!(
         v.verify_sct_for_cert(&sct, &cert_der),

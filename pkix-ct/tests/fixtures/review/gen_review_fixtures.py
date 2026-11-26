@@ -14,6 +14,10 @@ Outputs (this directory):
                      the cert is re-signed by the real issuer key with
                      `openssl dgst -sha256 -sign` so it is a validly
                      issued certificate, not a tampered one.
+  leaf-two-sct-extensions.der
+                     The same leaf with its SCT-list extension repeated,
+                     which RFC 5280 §4.2 forbids. Also re-signed, so the
+                     only thing wrong with it is the duplicate.
   log-list-retired.json / log-list-readonly.json
                      Google v3 log_list.json with the oracle log in the
                      `retired` / `readonly` state at 2025-09-01T00:00:00Z
@@ -94,6 +98,47 @@ def make_dup_leaf():
     (HERE / "leaf-dup-sct.der").write_bytes(cert)
 
 
+def make_two_sct_extensions_leaf():
+    """The same leaf, but its SCT-list extension appears twice.
+
+    RFC 5280 §4.2 forbids repeating an extension. Reconstructing the
+    `precert_entry` signed input means removing the SCT-list extension,
+    and with two of them there is no way to know which one the log was
+    given — so pkix-ct refuses rather than picking one, the same stance
+    `pkix-path::check_duplicate_extensions` takes during path
+    validation.
+
+    Not generated with pyca/cryptography: its builder rejects duplicate
+    extensions outright, which is why this is byte-level surgery. The
+    certificate is re-signed with the real issuer key, so it is validly
+    issued and only its extension list is at fault.
+    """
+    leaf = (ORACLE / "precert-leaf-final.der").read_bytes()
+    _, s, l = read_tlv(leaf, 0)
+    tbs_full, sigalg_full, _ = [c[1] for c in children(leaf[s:s + l])]
+    _, ts, tl = read_tlv(tbs_full, 0)
+    new_kids = []
+    for tag, full, content in children(tbs_full[ts:ts + tl]):
+        if tag == 0xA3:
+            (_, _, exts_content), = children(content)
+            new_exts = []
+            for _, ext_full, ext_content in children(exts_content):
+                new_exts.append(ext_full)
+                if ext_content.startswith(SCT_LIST_OID):
+                    new_exts.append(ext_full)  # again, verbatim
+            full = tlv(0xA3, tlv(0x30, b"".join(new_exts)))
+        new_kids.append(full)
+    new_tbs = tlv(0x30, b"".join(new_kids))
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "tbs.der"
+        p.write_bytes(new_tbs)
+        sig = subprocess.run(
+            ["openssl", "dgst", "-sha256", "-sign", str(ORACLE / "precert-issuer-key.pem"), str(p)],
+            check=True, capture_output=True).stdout
+    cert = tlv(0x30, new_tbs + sigalg_full + tlv(0x03, b"\x00" + sig))
+    (HERE / "leaf-two-sct-extensions.der").write_bytes(cert)
+
+
 def make_log_lists():
     spki = (ORACLE / "precert-log-spki.der").read_bytes()
     for state in ("retired", "readonly"):
@@ -118,5 +163,6 @@ def make_log_lists():
 
 if __name__ == "__main__":
     make_dup_leaf()
+    make_two_sct_extensions_leaf()
     make_log_lists()
     sys.exit(0)

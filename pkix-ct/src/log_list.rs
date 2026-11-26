@@ -64,6 +64,39 @@ use sha2::{Digest, Sha256};
 
 use crate::{Error, Result};
 
+/// When a CT log became usable, as far as the log list records it.
+///
+/// This replaced an `Option<u64>` that could not distinguish two
+/// states needing opposite answers: a log that never became usable, so
+/// every SCT it signed must be rejected, and a log whose usable
+/// timestamp the list simply does not carry, where imposing a lower
+/// bound would reject historical SCTs for want of metadata. `None`
+/// meant the first; `Some(0)` was pressed into service for the second,
+/// which only worked because no timestamp precedes the Unix epoch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum UsableFrom {
+    /// The log became usable at this timestamp, in milliseconds since
+    /// the Unix epoch.
+    ///
+    /// An SCT older than this is not trustworthy even though the
+    /// signature really is the log's.
+    At(u64),
+    /// The log is usable, or once was, and the list does not say when.
+    ///
+    /// No lower bound is imposed. Google's v3 schema records only a
+    /// log's *current* state, so a readonly or retired log carries no
+    /// usable timestamp while having certainly had one.
+    Unrecorded,
+    /// The log never reached the usable state.
+    ///
+    /// Every SCT it signed is rejected, whatever the timestamp. A
+    /// `qualified` log sits here: accepted into the program, not yet
+    /// trusted to vouch for anything.
+    Never,
+}
+
 /// Metadata for one CT log.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -84,20 +117,9 @@ pub struct CtLog {
     /// (`ct/v1/add-chain`, `ct/v1/get-proof-by-hash`, etc.) are
     /// resolved relative to this URL.
     pub url: String,
-    /// When the log became usable, if ever.
-    ///
-    /// - `Some(ts)` — the log became usable at timestamp `ts`
-    ///   (milliseconds since the Unix epoch). SCTs with timestamps
-    ///   before `ts` are not trustworthy even if signed by this
-    ///   log's key. `Some(0)` expresses "usable, start unknown" —
-    ///   `CtLogList::from_google_log_list_json` uses it for
-    ///   readonly / retired logs, whose usable timestamp the v3
-    ///   schema no longer carries.
-    /// - `None` — the log has never reached the usable state. SCTs
-    ///   from this log will fail the
-    ///   [`usable_from_ms`, `retired_at_ms`) window check
-    ///   unconditionally.
-    pub usable_from_ms: Option<u64>,
+    /// When the log became usable — see [`UsableFrom`] for the three
+    /// states and what each means for the window check.
+    pub usable_from: UsableFrom,
     /// Moment after which the log should not be relied on for new
     /// SCTs, in milliseconds since the Unix epoch. `None` means the
     /// log has not been retired. SCTs issued before this point are
@@ -118,7 +140,7 @@ impl CtLog {
         key_der: Vec<u8>,
         description: String,
         url: String,
-        usable_from_ms: Option<u64>,
+        usable_from: UsableFrom,
         retired_at_ms: Option<u64>,
     ) -> Self {
         Self {
@@ -126,7 +148,7 @@ impl CtLog {
             key_der,
             description,
             url,
-            usable_from_ms,
+            usable_from,
             retired_at_ms,
         }
     }
@@ -203,7 +225,7 @@ impl CtLogList {
 #[cfg(feature = "log-list-json")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log-list-json")))]
 mod google_schema {
-    use super::{CtLog, CtLogList};
+    use super::{CtLog, CtLogList, UsableFrom};
     use crate::{Error, Result};
     use alloc::vec::Vec;
     use base64::engine::general_purpose::STANDARD as BASE64;
@@ -295,24 +317,24 @@ mod google_schema {
         /// `pending` states — they are not trustworthy for SCT
         /// verification. Logs in all other states are imported:
         ///
-        /// * `usable` — actively trusted; `usable_from_ms` is set.
+        /// * `usable` — actively trusted;
+        ///   [`UsableFrom::At`] carries the timestamp.
         /// * `readonly` — no longer accepting submissions but still
         ///   trusted for existing SCTs; the readonly timestamp is
-        ///   stored as `retired_at_ms` and `usable_from_ms` is
-        ///   `Some(0)`.
+        ///   stored as `retired_at_ms`.
         /// * `retired` — no longer operated but historical SCTs remain
-        ///   valid; `retired_at_ms` is set and `usable_from_ms` is
-        ///   `Some(0)`.
+        ///   valid; `retired_at_ms` is set.
+        /// * `qualified` — accepted into the program but pre-usable, so
+        ///   [`UsableFrom::Never`]: nothing it signed is trusted yet.
+        /// * Logs with no `state` field are imported as-is.
         ///
         /// The v3 schema records only the *current* state, so a
-        /// readonly or retired log carries no record of when it
-        /// became usable. Such a log necessarily passed through
-        /// `usable`, so its window lower bound is imported as
-        /// `Some(0)` ("unknown, unbounded below"); leaving it `None`
-        /// would make every SCT from the log fail the window check.
-        /// * `qualified` — accepted into the program but pre-usable;
-        ///   imported with `usable_from_ms = None`.
-        /// * Logs with no `state` field are imported as-is.
+        /// readonly or retired log carries no record of when it became
+        /// usable, though it necessarily passed through `usable`. Those
+        /// import as [`UsableFrom::Unrecorded`], which imposes no lower
+        /// bound. The alternative, dropping their historical SCTs
+        /// because a timestamp is missing from the metadata, would be
+        /// the wrong answer to a question about the log's signature.
         ///
         /// # Errors
         ///
@@ -350,7 +372,7 @@ mod google_schema {
                         .try_into()
                         .map_err(|_| Error::ParseError)?;
                     let key_der = BASE64.decode(&log.key).map_err(|_| Error::ParseError)?;
-                    let mut usable_from_ms = log
+                    let usable_at = log
                         .state
                         .as_ref()
                         .and_then(|s| s.usable.as_ref())
@@ -366,19 +388,27 @@ mod google_schema {
                         .and_then(|s| s.retired.as_ref().or(s.readonly.as_ref()))
                         .map(|e| parse_rfc3339_to_unix_ms(&e.timestamp))
                         .transpose()?;
-                    // A readonly / retired log was usable before it
+                    // A readonly or retired log was usable before it
                     // reached that state, but the schema does not
-                    // record when. Open the window's lower bound so
-                    // SCTs issued before `retired_at_ms` still verify.
-                    if retired_at_ms.is_some() && usable_from_ms.is_none() {
-                        usable_from_ms = Some(0);
-                    }
+                    // record when, so say that rather than inventing a
+                    // timestamp: `Unrecorded` imposes no lower bound
+                    // and SCTs issued before `retired_at_ms` still
+                    // verify. This used to be `Some(0)`, which worked
+                    // only because nothing predates the Unix epoch.
+                    let usable_from = match (usable_at, retired_at_ms) {
+                        (Some(ts), _) => UsableFrom::At(ts),
+                        (None, Some(_)) => UsableFrom::Unrecorded,
+                        // No usable timestamp and not retired: the log
+                        // has not been trusted yet. `qualified` is the
+                        // state that lands here.
+                        (None, None) => UsableFrom::Never,
+                    };
                     out.insert(CtLog {
                         log_id,
                         key_der,
                         description: log.description,
                         url: log.url,
-                        usable_from_ms,
+                        usable_from,
                         retired_at_ms,
                     })?;
                 }
@@ -697,7 +727,7 @@ mod google_schema {
             assert_eq!(readonly_log.retired_at_ms, Some(1_748_736_000_000));
             // Lower bound is unknown (the schema carries only the
             // current state), so the window is open below.
-            assert_eq!(readonly_log.usable_from_ms, Some(0));
+            assert_eq!(readonly_log.usable_from, UsableFrom::Unrecorded);
         }
 
         #[test]
@@ -711,7 +741,7 @@ mod google_schema {
             // 2025-03-01T00:00:00Z = 1740787200000 ms
             // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2025,3,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
             assert_eq!(retired_log.retired_at_ms, Some(1_740_787_200_000));
-            assert_eq!(retired_log.usable_from_ms, Some(0));
+            assert_eq!(retired_log.usable_from, UsableFrom::Unrecorded);
         }
 
         #[test]
@@ -721,7 +751,7 @@ mod google_schema {
             let usable_log = list.iter().find(|l| l.description == "usable-log").unwrap();
             // 2024-01-01T00:00:00Z = 1704067200000 ms
             // Oracle: python3 -c "import datetime; print(int(datetime.datetime(2024,1,1,tzinfo=datetime.timezone.utc).timestamp()*1000))"
-            assert_eq!(usable_log.usable_from_ms, Some(1_704_067_200_000));
+            assert_eq!(usable_log.usable_from, UsableFrom::At(1_704_067_200_000));
             assert_eq!(usable_log.retired_at_ms, None);
         }
     }
@@ -795,7 +825,7 @@ mod tests {
             key_der,
             description: "test".into(),
             url: "http://example.com/ct/".into(),
-            usable_from_ms: None,
+            usable_from: UsableFrom::Never,
             retired_at_ms: None,
         }
     }
@@ -820,7 +850,7 @@ mod tests {
             key_der: b"fake key der".to_vec(),
             description: "test".into(),
             url: "http://example.com/ct/".into(),
-            usable_from_ms: None,
+            usable_from: UsableFrom::Never,
             retired_at_ms: None,
         };
         assert_eq!(list.insert(bad), Err(Error::ParseError));

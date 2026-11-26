@@ -163,11 +163,75 @@ impl SignedCertificateTimestamp {
 }
 
 /// A parsed `SignedCertificateTimestampList` (RFC 6962 §3.3).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SctList(pub Vec<SignedCertificateTimestamp>);
+///
+/// Holds at least one SCT. RFC 6962 §3.3 declares the list as
+/// `SerializedSCT sct_list<1..2^16-1>`, so an empty one is not a legal
+/// list, and every way of building this type enforces that: the
+/// parsers reject it, [`SctList::new`] returns
+/// [`Error::EmptySctList`], and deserialization goes through the same
+/// check.
+///
+/// The inner `Vec` used to be public, which let a caller write
+/// `SctList(Vec::new())` and hold a value the type claimed was a valid
+/// list while the parser was carefully refusing to produce one. The
+/// crate's own example did exactly that. Read the contents with
+/// [`SctList::scts`] or take ownership with [`SctList::into_inner`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(
+        into = "alloc::vec::Vec<SignedCertificateTimestamp>",
+        try_from = "alloc::vec::Vec<SignedCertificateTimestamp>"
+    )
+)]
+pub struct SctList(Vec<SignedCertificateTimestamp>);
+
+#[cfg(feature = "serde")]
+impl From<SctList> for Vec<SignedCertificateTimestamp> {
+    fn from(list: SctList) -> Self {
+        list.0
+    }
+}
+
+#[cfg(feature = "serde")]
+impl TryFrom<Vec<SignedCertificateTimestamp>> for SctList {
+    type Error = Error;
+
+    fn try_from(scts: Vec<SignedCertificateTimestamp>) -> Result<Self> {
+        Self::new(scts)
+    }
+}
 
 impl SctList {
+    /// Build a list from SCTs the caller already holds.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::EmptySctList`] if `scts` is empty, per RFC 6962 §3.3.
+    pub fn new(scts: Vec<SignedCertificateTimestamp>) -> Result<Self> {
+        if scts.is_empty() {
+            return Err(Error::EmptySctList);
+        }
+        Ok(Self(scts))
+    }
+
+    /// The SCTs in the list, in the order they appeared.
+    ///
+    /// Never empty.
+    #[must_use]
+    pub fn scts(&self) -> &[SignedCertificateTimestamp] {
+        &self.0
+    }
+
+    /// Consume the list and return its SCTs.
+    ///
+    /// Never empty.
+    #[must_use]
+    pub fn into_inner(self) -> Vec<SignedCertificateTimestamp> {
+        self.0
+    }
+
     /// Parse the value of a cert's SCT-list extension
     /// (OID 1.3.6.1.4.1.11129.2.4.2).
     ///
@@ -201,13 +265,14 @@ impl SctList {
     ///
     /// repeated until `total_length` bytes have been consumed. RFC 6962
     /// requires the list to contain at least one SCT
-    /// (`SerializedSCT sct_list<1..2^16-1>`), so an empty list is rejected
-    /// as a parse error.
+    /// (`SerializedSCT sct_list<1..2^16-1>`), so an empty list is
+    /// rejected.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::TruncatedOrTrailing`] or [`Error::ParseError`]
-    /// on malformed input.
+    /// Returns [`Error::EmptySctList`] for a well-formed but empty
+    /// list, and [`Error::TruncatedOrTrailing`] or
+    /// [`Error::ParseError`] on malformed input.
     pub fn from_serialized_list(bytes: &[u8]) -> Result<Self> {
         let mut outer = Cursor::new(bytes);
         let body = outer.read_u16_prefixed()?;
@@ -216,7 +281,7 @@ impl SctList {
         }
         if body.is_empty() {
             // RFC 6962 §3.3: sct_list<1..2^16-1> — empty list is not legal.
-            return Err(Error::ParseError);
+            return Err(Error::EmptySctList);
         }
         let mut inner = Cursor::new(body);
         let mut scts = Vec::new();
@@ -323,7 +388,29 @@ mod tests {
     fn empty_list_rejected() {
         // u16=0 outer length, no body
         let data = [0x00, 0x00];
-        assert_eq!(SctList::from_serialized_list(&data), Err(Error::ParseError));
+        assert_eq!(
+            SctList::from_serialized_list(&data),
+            Err(Error::EmptySctList)
+        );
+    }
+
+    /// The constructor enforces what the parser enforces. Before the
+    /// inner `Vec` was private, `SctList(Vec::new())` produced a value
+    /// this assertion could not be written about.
+    #[test]
+    fn new_rejects_an_empty_list() {
+        assert_eq!(SctList::new(Vec::new()), Err(Error::EmptySctList));
+        let one = SctList::new(vec![SignedCertificateTimestamp::new(
+            0,
+            [0u8; 32],
+            0,
+            Vec::new(),
+            4,
+            3,
+            vec![1],
+        )])
+        .expect("one SCT is a legal list");
+        assert_eq!(one.scts().len(), 1);
     }
 
     #[test]

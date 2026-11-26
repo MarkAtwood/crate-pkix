@@ -121,9 +121,9 @@ fn parses_real_world_cert_with_two_scts() {
     let ext_value = extract_sct_extension(&cert);
     let list = SctList::from_extension_value(&ext_value).expect("parse SCT list");
 
-    assert_eq!(list.0.len(), 2, "two SCTs expected");
+    assert_eq!(list.scts().len(), 2, "two SCTs expected");
 
-    let sct0 = &list.0[0];
+    let sct0 = &list.scts()[0];
     assert_eq!(sct0.version, 0);
     assert_eq!(sct0.log_id, EXPECTED_LOG_ID_0);
     assert_eq!(sct0.timestamp_ms, EXPECTED_TS_0_MS);
@@ -133,7 +133,7 @@ fn parses_real_world_cert_with_two_scts() {
     assert_eq!(sct0.signature.len(), 72);
     assert_eq!(&sct0.signature[..16], &EXPECTED_SIG_0_HEAD);
 
-    let sct1 = &list.0[1];
+    let sct1 = &list.scts()[1];
     assert_eq!(sct1.version, 0);
     assert_eq!(sct1.log_id, EXPECTED_LOG_ID_1);
     assert_eq!(sct1.timestamp_ms, EXPECTED_TS_1_MS);

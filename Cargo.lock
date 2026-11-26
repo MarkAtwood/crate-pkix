@@ -1538,10 +1538,11 @@ dependencies = [
 
 [[package]]
 name = "pkix-ct"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "der",
+ "pem-rfc7468",
  "pkix-path",
  "serde",
  "serde_json",
