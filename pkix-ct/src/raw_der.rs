@@ -71,7 +71,7 @@ impl Tlv {
     }
 
     /// The value octets, from the slice this was read from.
-    pub(crate) fn value<'a>(self, input: &'a [u8]) -> &'a [u8] {
+    pub(crate) fn value(self, input: &[u8]) -> &[u8] {
         &input[self.header_len..self.total_len()]
     }
 }

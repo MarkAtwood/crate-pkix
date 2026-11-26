@@ -1551,7 +1551,6 @@ mod tests {
         assert!(!log_window_contains(&log, u64::MAX));
     }
 
-    #[test]
     /// The two states that `Option<u64>` could not tell apart must
     /// give opposite answers.
     ///
