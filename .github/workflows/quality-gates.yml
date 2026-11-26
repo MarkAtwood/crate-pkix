@@ -290,3 +290,39 @@ jobs:
             cargo build -p "$crate" --target x86_64-unknown-none
             echo "::endgroup::"
           done
+
+  registry-divergence:
+    name: published versions still match
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: No crate claims a published version whose code it does not match
+        # WHAT THIS GATE CATCHES
+        #
+        #   Editing a published crate's manifest, sources or build script
+        #   without bumping its version. crates.io versions are immutable,
+        #   so once that lands there is no fix, only a yank or a new
+        #   version. pkix-dane 0.2.0 shipped exactly this way and had to be
+        #   yanked; nothing noticed, because `cargo build` in the workspace
+        #   resolves path dependencies and is always happy.
+        #
+        # WHAT IT DOES NOT CATCH
+        #
+        #   A repo version ahead of the registry — the normal state of
+        #   unreleased work, and always allowed. Whether a release is the
+        #   right semver step. And divergence in tests, fixtures, examples
+        #   or READMEs, which the script reports without failing, since no
+        #   dependent compiles them.
+        #
+        # Needs the network: it downloads each published tarball it still
+        # has a claim on. A registry it cannot reach fails the job rather
+        # than passing quietly.
+        run: ./scripts/check-registry-divergence.sh

@@ -121,9 +121,12 @@ members = [
 #                              `pkix_profiles_cabf::WebPkiProfile`.
 # Earlier pkix-lint at 0.4.0 (DeviationScope kind+props refactor; PKIX-9vnx.11)
 # and 0.3.0 (Cow<'static, str> migration; PKIX-ua6q). Implementation stubs at 0.0.0
-# (not published). Namespace-reservation stubs at 0.1.0:
-# pkix-truststore-system, pkix-truststore-pkcs11 — published to crates.io with
-# "not authoritative" / "stub" rustdoc to claim the namespace before real impl lands.
+# (not published). Namespace-reservation stubs were published to crates.io at
+# 0.1.0 with "not authoritative" / "stub" rustdoc, to claim the namespace before
+# a real implementation landed: pkix-truststore-pkcs11 is still one of those, at
+# 0.1.1. pkix-truststore-system is not — it carries a real implementation and is
+# at 0.2.0, which is why that version number no longer matches the stub serving
+# as 0.1.0 on crates.io. scripts/check-registry-divergence.sh keeps that honest.
 version      = "0.2.1"
 edition      = "2021"
 rust-version = "1.88"
@@ -154,8 +157,8 @@ pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
 pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.0" }
 pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.3.0" }
-pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" }
-pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }
+pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.2.0" }
+pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.1" }
 pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.0" }
 pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.0" }
 pkix-aia                = { path = "pkix-aia",                version = "0.2.1" }
