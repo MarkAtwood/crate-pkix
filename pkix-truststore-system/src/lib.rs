@@ -68,45 +68,37 @@
 //! a deployment that has no store says which paths were tried rather
 //! than reporting a bare not-found.
 //!
-//! # Unverified backends
+//! # Platform backend status
 //!
-//! **The macOS/iOS and Windows backends have never been compiled.**
+//! The macOS and Windows backends are compiled and run on every change
+//! to this crate, on `macos-latest` and `windows-latest` runners. What
+//! that establishes:
 //!
-//! Precisely what has and has not been checked:
+//! - **They compile and type-check**, with warnings denied, including
+//!   their test targets.
+//! - **They answer.** [`from_system`] reports
+//!   [`Source::Native`] and returns a non-empty anchor set on both, read
+//!   through Keychain trust settings and through CryptoAPI's `ROOT`
+//!   store respectively. A skipped assertion is not mistaken for a
+//!   passing one: the suite prints why it skipped and the runner log is
+//!   read for those lines.
 //!
-//! - **Parsed.** `rustc` on each file alone reports only unresolved
-//!   imports (the platform crates are absent on this target) and no
-//!   syntax errors, so the code is at least well-formed Rust.
-//! - **API shape matched.** Every call was written against the real
-//!   signatures of `security-framework` 3.7.0 and `schannel` 0.1.30,
-//!   read out of the crate sources rather than recalled —
-//!   `TrustSettings::iter`, `tls_trust_settings_for_certificate`,
-//!   `SecCertificate::to_der`, `CertStore::open_local_machine`,
-//!   `CertStore::certs`, `CertContext::to_der`.
-//! - **Not type-checked.** No Apple or Windows toolchain was available,
-//!   so the borrow checker and trait resolution have never seen these
-//!   files.
-//! - **Not run.** Neither has been executed against a real Keychain or
-//!   `ROOT` store, so no claim is made about how many anchors they
-//!   return, in what order, or what they reject.
+//! What is still not established:
 //!
-//! What that means in practice:
+//! - **iOS and Android are unverified.** iOS shares this crate's Apple
+//!   path but not its entitlements, and no runner exists for either, so
+//!   neither has been compiled or run.
+//! - **The Windows backend does not consult the `DISALLOWED` store**, so
+//!   an administrator's explicit distrust is not subtracted. That is
+//!   documented in its module. The Apple backend does honour `Deny`.
+//! - **Anchor sets are unmeasured.** A runner's trust store is not a
+//!   user's, so no claim is made about how many anchors either backend
+//!   returns, in what order, or which it rejects — only that the call
+//!   works and returns some.
 //!
-//! - Expect compile errors on first build for those targets. The fix is
-//!   likely to be small — a moved import, a changed `Result` alias —
-//!   but it has not been done.
-//! - The Windows backend knowingly does not consult the `DISALLOWED`
-//!   store, so an administrator's explicit distrust is not subtracted.
-//!   That is documented in its module and is a reason not to rely on it
-//!   yet. The Apple backend does honour `Deny`.
-//! - The behaviour of each against a real store — how many anchors, in
-//!   what order, with what rejected — is unmeasured.
-//!
-//! Treat them as reviewed drafts to finish on a machine that can build
-//! them, not as working code. The portable reader runs on those targets
-//! too, so a macOS or Windows consumer who needs something dependable
-//! today can set [`SSL_CERT_FILE`] or install a bundle and get the
-//! tested path.
+//! The portable reader runs on those targets too, so a consumer who
+//! wants to decide for themselves rather than rely on the platform can
+//! set [`SSL_CERT_FILE`] and get the file-based path on any OS.
 //!
 //! # Features
 //!
@@ -122,7 +114,9 @@
 
 // Platform backends. Selected by target rather than by feature, so a
 // consumer gets their OS's store without opting in and never compiles
-// another OS's. Both are UNVERIFIED -- see "Unverified backends" above.
+// another OS's. That also puts them out of reach of every Linux build,
+// which is why they have a CI workflow of their own; see "Platform
+// backend status" above for what it does and does not establish.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod apple;
 #[cfg(target_os = "windows")]

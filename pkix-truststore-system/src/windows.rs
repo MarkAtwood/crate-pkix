@@ -1,12 +1,15 @@
 //! CryptoAPI certificate-store backend for Windows.
 //!
-//! # UNVERIFIED
+//! # Verification
 //!
-//! **This file has never been compiled.** It was written against the
-//! real signatures of `schannel` 0.1.30, read from the crate source
-//! rather than recalled, but no Windows target was available to build or
-//! run it. Treat it as a reviewed draft. See the crate documentation's
-//! "Unverified backends" section.
+//! Compiled and run on a `windows-latest` runner on every change to
+//! this crate: `from_system` reports `Source::Native` there and returns
+//! a non-empty anchor set, so the CryptoAPI calls work and not merely
+//! type-check. How many anchors a given machine yields, in what order,
+//! and which it rejects is unmeasured — a runner's certificate stores
+//! are not a user's. The `DISALLOWED` omission below is unaffected by
+//! any of that. See the crate documentation's "Platform backend status"
+//! section.
 //!
 //! # What it reads
 //!

@@ -40,8 +40,11 @@ serde = { workspace = true, optional = true, features = ["derive", "std"] }
 # right shape here instead of one crate per OS: the cost of a platform you
 # do not target is already zero.
 #
-# UNVERIFIED: neither backend has been compiled. See the `unverified`
-# section of the crate documentation.
+# Both backends are compiled and run on macOS and Windows runners by
+# .github/workflows/platform-truststore.yml, which exists because no
+# Linux build reaches either of them. See the "Platform backend status"
+# section of the crate documentation for what that does and does not
+# establish.
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 # Safe wrapper over Security.framework; keeps this crate free of `unsafe`.

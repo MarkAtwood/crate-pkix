@@ -1,14 +1,18 @@
 //! Keychain backend for macOS and iOS.
 //!
-//! # UNVERIFIED
+//! # Verification
 //!
-//! **This file has never been compiled.** It was written against the
-//! real signatures of `security-framework` 3.7.0, read from the crate
-//! source rather than recalled, but no Apple target was available to
-//! build or run it. Treat it as a reviewed draft: the API calls match
-//! the upstream definitions, and nothing about its behaviour on a Mac
-//! has been observed. See the crate documentation's "Unverified
-//! backends" section.
+//! Compiled and run on a `macos-latest` runner on every change to this
+//! crate: `from_system` reports `Source::Native(MacosKeychain)` there
+//! and returns a non-empty anchor set, so the Keychain calls work and
+//! not merely type-check. How many anchors a given Mac yields, in what
+//! order, and which it rejects is unmeasured — a runner's trust
+//! settings are not a user's.
+//!
+//! iOS is a different matter: it shares this file but not its
+//! entitlements, and no runner exists for it, so nothing here has been
+//! compiled or run for an iOS target. See the crate documentation's
+//! "Platform backend status" section.
 //!
 //! # What it reads
 //!
