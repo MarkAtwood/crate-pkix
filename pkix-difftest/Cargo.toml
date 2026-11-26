@@ -30,17 +30,20 @@ path = "src/main.rs"
 # primary baseline corpus (baseline-pkits.* / baseline-limbo.*).
 default = []
 
-# Secondary baseline: activate every signature backend pkix-path ships
-# (pkix-path/rustcrypto = rsa + p256 + p384). Used to produce
+# Secondary baseline: activate every signature backend pkix-path ships.
+# pkix-path/rustcrypto is rsa + p256 + p384 + p521 + ed25519, and is now
+# pkix-path's default. Used to produce
 # baseline-limbo-allfeatures.{json,md} per PKIX-wmch — the "with full crypto"
 # delta that exercises real-world ECDSA P-384 chains (Apple, Cloudflare,
 # Akamai, StackOverflow roots) and webpki:: P-384 testcases.
 #
-# Ed25519 is intentionally NOT in this list: pkix-path does not yet implement
-# an Ed25519 SignatureVerifier (the rustcrypto umbrella feature is rsa + p256
-# + p384 only). Cases requiring Ed25519 will continue to fail signature
-# verification under this feature; that delta is documented in
-# baseline-limbo-analysis.md.
+# This comment used to say the umbrella was "rsa + p256 + p384 only" and
+# that "pkix-path does not yet implement an Ed25519 SignatureVerifier", so
+# Ed25519 cases would keep failing. Both statements were already false:
+# verifiers.rs dispatches Ed25519 (OID_ED25519) and P-521 (OID_SECP521R1).
+# baseline-limbo-analysis.md records the delta as it stood when captured
+# and is left as the historical record it is; a fresh capture would show a
+# different one.
 rustcrypto = ["pkix-path/rustcrypto"]
 
 # Lint-domain differential oracles (PKIX-hbzo.1.1). Pulls in `pkix-zlint-bridge`
