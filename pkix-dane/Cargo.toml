@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-dane"
 description = "DANE (RFC 6698 / RFC 7671) TLSA record parsing and per-usage match logic — no DNS, caller supplies validated TLSA records"
-version     = "0.2.1"
+version     = "0.3.0"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
