@@ -332,6 +332,94 @@ mod embedded {
         assert!(verified.is_empty());
     }
 
+    /// The two zero-count cases above are distinguishable through
+    /// `verify_embedded_scts_with_report`.
+    ///
+    /// This is the whole point of the report. `returns_zero_when_logs_empty`
+    /// and `returns_zero_when_issuer_wrong` assert the same thing — an
+    /// empty vector — from causes an operator must respond to
+    /// differently. An empty log list is this host's configuration being
+    /// stale. An issuer mismatch means the signatures do not check out,
+    /// which on a real certificate is a forged SCT list or a log key
+    /// gone bad.
+    ///
+    /// Asserted as a pair in one test, because the claim is that the two
+    /// differ, and one of them alone cannot show that.
+    #[test]
+    fn report_distinguishes_unknown_log_from_bad_signature() {
+        let leaf = load_cert_der("precert-leaf-final.der");
+        let issuer = load_cert_der("precert-issuer.der");
+
+        // Stale configuration: SCTs are fine, we just trust no log.
+        let untrusting = SctVerifier::new(pkix_ct::CtLogList::new(), DefaultVerifier);
+        let stale = untrusting
+            .verify_embedded_scts_with_report(&leaf, &issuer)
+            .expect("an untrusted log is not an error");
+        assert!(stale.verified.is_empty(), "no log is trusted");
+        assert_eq!(
+            stale.rejected.iter().map(|r| &r.reason).collect::<Vec<_>>(),
+            vec![&Error::UnknownLog],
+            "an empty log list must be reported as the log being unknown"
+        );
+
+        // Signatures do not check out, which is the alarming case.
+        let trusting = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let wrong_issuer = load_cert_der("cert.der");
+        let forged = trusting
+            .verify_embedded_scts_with_report(&leaf, &wrong_issuer)
+            .expect("a bad signature is not an error either");
+        assert!(forged.verified.is_empty(), "nothing verifies");
+        assert_eq!(
+            forged
+                .rejected
+                .iter()
+                .map(|r| &r.reason)
+                .collect::<Vec<_>>(),
+            vec![&Error::InvalidSignature],
+            "an issuer mismatch must be reported as a signature failure"
+        );
+
+        assert_ne!(
+            stale.rejected[0].reason, forged.rejected[0].reason,
+            "a stale log list and a failed signature must not look alike: \
+             that merge is what this report exists to undo"
+        );
+
+        // The claimed log_id is carried through, since for the stale
+        // case it is the log an operator needs to go and add.
+        let sct = super::load_precert_oracle_sct();
+        assert_eq!(stale.rejected[0].log_id, sct.log_id);
+        assert_eq!(stale.rejected[0].timestamp_ms, sct.timestamp_ms);
+    }
+
+    /// A duplicate SCT is not reported as a rejection.
+    ///
+    /// Dedup happens before verification, so a second SCT from a log
+    /// already verified is skipped. It is not a failure and must not
+    /// appear in `rejected`, or a caller counting rejections would read
+    /// a well-formed certificate as partly broken.
+    #[test]
+    fn a_verified_sct_leaves_rejected_empty() {
+        let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+        let leaf = load_cert_der("precert-leaf-final.der");
+        let issuer = load_cert_der("precert-issuer.der");
+        let report = v
+            .verify_embedded_scts_with_report(&leaf, &issuer)
+            .expect("verify embedded SCTs");
+        assert_eq!(report.verified.len(), 1);
+        assert!(
+            report.rejected.is_empty(),
+            "nothing failed, so nothing may be reported as failing: {:?}",
+            report.rejected
+        );
+        // The thin wrapper still agrees with the report.
+        assert_eq!(
+            v.verify_embedded_scts(&leaf, &issuer).expect("wrapper"),
+            report.verified,
+            "verify_embedded_scts must be exactly the report's verified half"
+        );
+    }
+
     #[test]
     fn errors_when_no_sct_extension() {
         // A cert with no SCT-list extension at all is a different

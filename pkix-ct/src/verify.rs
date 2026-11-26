@@ -124,12 +124,64 @@ fn tls_alg_to_x509_oid(hash_alg: u8, sig_alg: u8) -> Option<ObjectIdentifier> {
 /// diversity, SCT age) are evaluated over. Look the log up with
 /// [`CtLogList::get`] for its key and metadata.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct VerifiedSct {
     /// The verifying log's `log_id` (SHA-256 of its SPKI, RFC 6962 §3.2).
     pub log_id: [u8; 32],
     /// The SCT's timestamp, in milliseconds since the Unix epoch.
     pub timestamp_ms: u64,
+}
+
+/// One embedded SCT that did **not** verify, with the reason, as
+/// returned by [`SctVerifier::verify_embedded_scts_with_report`].
+///
+/// Exists because the reasons are not interchangeable. An SCT rejected
+/// as [`Error::InvalidSignature`] is a forged or tampered SCT, or a log
+/// signing key gone bad; one rejected as [`Error::UnknownLog`] is a
+/// stale log list on this host. The first is an alarm and the second is
+/// configuration, and a verifier that reports both as "zero valid SCTs"
+/// leaves its caller unable to tell which happened.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct RejectedSct {
+    /// The `log_id` the SCT claimed, which for an
+    /// [`Error::UnknownLog`] rejection is the log to go and look up.
+    ///
+    /// Claimed, not verified: on an [`Error::InvalidSignature`]
+    /// rejection nothing in this struct has been authenticated, so
+    /// treat it as a lead rather than as fact.
+    pub log_id: [u8; 32],
+    /// The timestamp the SCT claimed, in milliseconds since the Unix
+    /// epoch. Unauthenticated, for the same reason as `log_id`.
+    pub timestamp_ms: u64,
+    /// Why this SCT was rejected.
+    pub reason: Error,
+}
+
+/// The full outcome of verifying a certificate's embedded SCTs, as
+/// returned by [`SctVerifier::verify_embedded_scts_with_report`].
+///
+/// `verified` is what [`SctVerifier::verify_embedded_scts`] returns on
+/// its own; `rejected` is what that method discards. Both can be
+/// non-empty at once — three good SCTs and one with a bad signature is
+/// a certificate worth a second look, and a caller that only counts the
+/// good ones will not notice.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub struct EmbeddedSctReport {
+    /// One entry per distinct log that vouched for the certificate,
+    /// deduplicated by `log_id` as described on
+    /// [`SctVerifier::verify_embedded_scts`].
+    pub verified: Vec<VerifiedSct>,
+    /// One entry per SCT that failed, in the order the SCT list gave
+    /// them, each with its reason.
+    ///
+    /// An SCT skipped because an earlier SCT from the same log already
+    /// verified is not here: it is a duplicate, not a failure.
+    pub rejected: Vec<RejectedSct>,
 }
 
 /// Verify SCTs against a trusted CT log list using a pluggable
@@ -363,8 +415,13 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     }
 
     /// Verify the SCTs embedded in `leaf_cert`'s SCT-list extension
-    /// against this verifier's [`CtLogList`] and return one
-    /// [`VerifiedSct`] per distinct log that vouched for the cert.
+    /// against this verifier's [`CtLogList`], reporting both the logs
+    /// that vouched for the cert and the SCTs that failed, with why.
+    ///
+    /// Prefer this over [`Self::verify_embedded_scts`] anywhere the
+    /// answer might be acted on or logged: that method returns only the
+    /// successes, so "no valid SCTs" arrives with no way to tell a
+    /// forged SCT from a log list nobody has updated.
     ///
     /// Cert-embedded SCTs are always `precert_entry` (RFC 6962 §3.1):
     /// the log signed the pre-cert before the CA glued the SCT list
@@ -377,11 +434,17 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// [`crate::sct_list_from_tls_extension`] and call
     /// [`Self::verify_sct_for_cert`] in a loop.
     ///
-    /// An SCT is included only if it fully verified (signature OK,
-    /// log known, timestamp inside the log's usable window). SCTs
-    /// that don't verify — wrong signature, unknown log, retired
-    /// log, unsupported algorithm — are skipped but are NOT errors;
-    /// an empty `Vec` is a successful result.
+    /// An SCT lands in `verified` only if it fully verified (signature
+    /// OK, log known, timestamp inside the log's usable window). SCTs
+    /// that don't verify — wrong signature, unknown log, retired log,
+    /// unsupported algorithm — are NOT errors: they land in
+    /// [`EmbeddedSctReport::rejected`] with their reason, and an
+    /// all-rejected list is still a successful result.
+    ///
+    /// Each reason matters separately. [`Error::InvalidSignature`] on
+    /// every SCT means a forged SCT list or a log key gone bad;
+    /// [`Error::UnknownLog`] on every SCT means this host's log list is
+    /// stale. Alarm and misconfiguration, told apart.
     ///
     /// The result is **deduplicated by `log_id`**: at most one entry
     /// per log, keeping the first verified SCT in list order. An SCT
@@ -412,11 +475,11 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// - [`Error::UnsupportedVersion`] — an SCT in the list carries
     ///   an unsupported SCT version (propagated from
     ///   [`crate::SctList::from_extension_value`]).
-    pub fn verify_embedded_scts(
+    pub fn verify_embedded_scts_with_report(
         &self,
         leaf_cert: &Certificate,
         issuer_cert: &Certificate,
-    ) -> Result<Vec<VerifiedSct>> {
+    ) -> Result<EmbeddedSctReport> {
         use der::Encode as _;
 
         let exts = leaf_cert
@@ -442,27 +505,57 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             .encode_to_vec(&mut issuer_der)
             .map_err(|_| Error::ParseError)?;
 
-        let mut verified: Vec<VerifiedSct> = Vec::new();
+        let mut report = EmbeddedSctReport::default();
         for sct in &scts.0 {
             // One entry per log: a repeated SCT, or a second SCT from
             // a log already counted, adds no independent evidence.
             // Checked before verifying so duplicates cost no signature
             // verification. SCT lists are tiny (u16-bounded), so the
             // linear scan is fine.
-            if verified.iter().any(|v| v.log_id == sct.log_id) {
+            if report.verified.iter().any(|v| v.log_id == sct.log_id) {
                 continue;
             }
-            if self
-                .verify_sct_for_precert(sct, &leaf_der, &issuer_der)
-                .is_ok()
-            {
-                verified.push(VerifiedSct {
+            // The reason is kept, not dropped. This was `.is_ok()`,
+            // which collapsed a forged signature and a stale log list
+            // into the same empty result.
+            match self.verify_sct_for_precert(sct, &leaf_der, &issuer_der) {
+                Ok(_) => report.verified.push(VerifiedSct {
                     log_id: sct.log_id,
                     timestamp_ms: sct.timestamp_ms,
-                });
+                }),
+                Err(reason) => report.rejected.push(RejectedSct {
+                    log_id: sct.log_id,
+                    timestamp_ms: sct.timestamp_ms,
+                    reason,
+                }),
             }
         }
-        Ok(verified)
+        Ok(report)
+    }
+
+    /// The logs that vouched for `leaf_cert`, discarding why any other
+    /// SCT failed.
+    ///
+    /// Equivalent to
+    /// `verify_embedded_scts_with_report(..)?.verified`. Use it where
+    /// the rejections genuinely do not matter — a policy check that
+    /// only counts distinct logs, say. Where the zero case will be
+    /// surfaced to an operator or a log, use
+    /// [`Self::verify_embedded_scts_with_report`] instead: an empty
+    /// result here cannot distinguish a forged SCT list from a log list
+    /// this host has not refreshed.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::verify_embedded_scts_with_report`].
+    pub fn verify_embedded_scts(
+        &self,
+        leaf_cert: &Certificate,
+        issuer_cert: &Certificate,
+    ) -> Result<Vec<VerifiedSct>> {
+        Ok(self
+            .verify_embedded_scts_with_report(leaf_cert, issuer_cert)?
+            .verified)
     }
 
     /// Number of distinct logs with a verified SCT embedded in
@@ -471,6 +564,11 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// Convenience for callers whose policy is a plain log count.
     /// Policies that require operator diversity need the `log_id`s
     /// from [`Self::verify_embedded_scts`] instead.
+    ///
+    /// A returned `0` says only that nothing verified. To act on that,
+    /// or to log it, use [`Self::verify_embedded_scts_with_report`],
+    /// which says whether the SCTs failed their signatures or merely
+    /// named logs this host does not know.
     ///
     /// # Errors
     ///
