@@ -94,6 +94,17 @@ Per RFC 5280 §6.1, for each certificate in the chain:
   effect, as §4.2.1.10 requires
 - **Duplicate detection** — issuer+serial uniqueness across the chain
 
+## Supported date range
+
+`UTCTime` is supported for **1970-2049**, where RFC 5280 §4.1.2.5.1
+allows 1950-2049. A certificate dated in the missing twenty years is
+refused at the DER layer, before validation. Deliberate: the floor is
+the Unix epoch because `der` 0.8 puts it there, no conforming CA issues
+pre-1970 certificates, and lifting it would mean forking a dependency
+every consumer of this crate builds against. Fail-closed — such a
+certificate is refused, never misread — and OpenSSL does read them, so
+this is a real disagreement rather than a difference of strictness.
+
 ## Not validated
 
 - Path building — chain must be caller-ordered, leaf first;

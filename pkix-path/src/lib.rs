@@ -46,22 +46,25 @@
 //! # Limitations
 //!
 //! The following are **not** currently implemented:
-//! - **Certificates with a `UTCTime` before 1970** — RFC 5280 §4.1.2.5.1
-//!   gives `UTCTime` the range 1950-2049, but `der` 0.8 supports only
-//!   1970-2049: "Due to common operations working on `UNIX_EPOCH`,
-//!   `UtcTime`s are only supported for the years 1970-2049." So a
-//!   certificate whose `notBefore` or `notAfter` predates the epoch does
-//!   not parse at all, and the error comes from the DER layer
-//!   ("malformed ASN.1 DER value for UTCTime") rather than from
-//!   validation. This is fail-closed — such a certificate is refused,
-//!   never misread — and it cannot be worked around here, because the
-//!   restriction lives in the type that `x509-cert` parses into.
-//!   OpenSSL reads these certificates, so the disagreement is real
-//!   rather than a matter of strictness: NIST PKITS §4.2.3 "Valid
-//!   pre2000 UTC notBefore Date Test3" is exactly this shape and is the
-//!   one PKITS vector this crate cannot evaluate. No conforming CA
-//!   issues pre-1970 certificates, so it has not been worth forking the
-//!   dependency over.
+//! - **`UTCTime` before 1970.** The supported range is **1970-2049**,
+//!   where RFC 5280 §4.1.2.5.1 allows 1950-2049. A certificate whose
+//!   `notBefore` or `notAfter` falls in the missing twenty years is
+//!   refused, and refused at the DER layer — the error reads "malformed
+//!   ASN.1 DER value for UTCTime" and comes back before validation runs.
+//!
+//!   This is a deliberate scope decision, not an accident. The floor is
+//!   the Unix epoch because `der` 0.8 puts it there ("due to common
+//!   operations working on `UNIX_EPOCH`, `UtcTime`s are only supported
+//!   for the years 1970-2049"), and lifting it would mean forking the DER
+//!   layer every consumer of this crate depends on. No conforming CA
+//!   issues certificates dated before 1970, so the trade is a fork of a
+//!   foundational dependency against twenty years of dates nobody uses.
+//!
+//!   It is fail-closed: such a certificate is refused, never misread.
+//!   OpenSSL does read them, so expect a genuine disagreement rather than
+//!   a difference of strictness — NIST PKITS §4.2.3 "Valid pre2000 UTC
+//!   notBefore Date Test3" is exactly this shape, and is the one PKITS
+//!   vector this crate does not evaluate.
 //! - **Legacy signature algorithms** — SHA-1 verifiers (RFC 8017, legacy)
 //!   are intentionally not shipped; deployments requiring legacy SHA-1
 //!   trust must implement [`SignatureVerifier`] themselves. RSA moduli
