@@ -1,0 +1,83 @@
+# Compiles and runs `pkix-truststore-system` on macOS and Windows.
+#
+# Tracks PKIX-77k9.2.1.
+#
+# Why this is its own workflow
+#
+# `pkix-truststore-system` is the one crate in this workspace allowed to
+# look at an operating system. Its default backend reads PEM bundles and
+# certificate directories and is portable, so the Linux runners in
+# quality-gates cover it. Its other two backends are not reachable from
+# Linux at all: Security.framework is selected by
+# `cfg(any(target_os = "macos", target_os = "ios"))` and CryptoAPI by
+# `cfg(target_os = "windows")`, so a Linux build does not compile them,
+# does not download `security-framework` or `schannel`, and cannot fail on
+# either. They were written without ever being compiled.
+#
+# Scope decisions
+#
+# - Path-filtered, not on every push. macOS runner minutes bill at ten
+#   times Linux and Windows at two, and nothing outside this crate can
+#   change what these backends compile to. A change here opts in; anything
+#   else does not pay.
+#
+# - `--all-features` on the check, because `serde` is the only feature and
+#   it propagates to pkix-truststore. The backends themselves are selected
+#   per target rather than by feature, which is the whole reason this
+#   workflow has to exist: no feature selection on a Linux runner can
+#   reach them.
+#
+# - Tests run as well as the check. `from_system()` on these platforms
+#   reads the live Keychain or certificate store, so the test suite is the
+#   only thing that says the FFI actually returns anchors rather than
+#   merely type-checking. A runner's store is not a user's, so this
+#   verifies the call works, not that any particular anchor is present.
+#
+# - `-p`, not `--workspace`. The rest of the workspace has never claimed
+#   to build on these platforms, and dragging it in would turn an
+#   unrelated portability gap into this crate's failure.
+name: platform-truststore
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkix-truststore-system/**'
+      - '.github/workflows/platform-truststore.yml'
+  pull_request:
+    paths:
+      - 'pkix-truststore-system/**'
+      - '.github/workflows/platform-truststore.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: platform-truststore-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  platform:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check the platform backend
+        run: cargo check -p pkix-truststore-system --all-features --all-targets
+
+      - name: Run the platform backend against the live trust store
+        run: cargo test -p pkix-truststore-system --all-features
