@@ -9,7 +9,7 @@
 //! validate chains, so no chain context is needed.
 
 use der::Decode as _;
-use pkix_identity::{verify_dns_name, IdentityError, ServerName};
+use pkix_identity::{verify_dns_name, IdentityError, MailboxName, ServerName};
 use x509_cert::Certificate;
 
 fn load(name: &str) -> Certificate {
@@ -262,4 +262,71 @@ fn a_single_san_extension_is_still_accepted() {
     let cert = load("san-exact-dns.der");
     let name = ServerName::dns_name("www.example.com").expect("valid target");
     verify_dns_name(&cert, &name).expect("one SAN extension is the normal case");
+}
+
+// ---------------------------------------------------------------------------
+// Owned names as cache keys
+// ---------------------------------------------------------------------------
+
+/// The caller impact this closes out: a cache keyed by name.
+///
+/// `into_owned` already existed, so `'static` was reachable, but
+/// neither name type derived `Hash` or `Ord` — so `'static` or not, it
+/// could not key a `HashMap` or a `BTreeMap`. Both are needed: the
+/// first for a `std` consumer, the second for a `no_std` one, where
+/// `HashMap` is not available.
+#[test]
+fn an_owned_server_name_keys_both_kinds_of_map() {
+    use std::collections::{BTreeMap, HashMap};
+
+    let owned: ServerName<'static> = "www.example.com"
+        .parse()
+        .expect("FromStr yields a 'static name");
+    let ip: ServerName<'static> = "192.0.2.1".parse().expect("IP literal");
+
+    let mut hash: HashMap<ServerName<'static>, u32> = HashMap::new();
+    hash.insert(owned.clone(), 1);
+    hash.insert(ip.clone(), 2);
+    let mut tree: BTreeMap<ServerName<'static>, u32> = BTreeMap::new();
+    tree.insert(owned.clone(), 1);
+    tree.insert(ip, 2);
+    assert_eq!(hash.len(), 2);
+    assert_eq!(tree.len(), 2);
+
+    // The point of agreeing with Eq: a borrowed name finds the entry
+    // stored under an owned one. Cow compares and hashes its contents,
+    // so these are the same key.
+    let borrowed = ServerName::dns_name("www.example.com").expect("valid");
+    assert_eq!(borrowed, owned);
+    assert_eq!(hash.get(&borrowed), Some(&1));
+    assert_eq!(tree.get(&borrowed), Some(&1));
+}
+
+/// The same for mailboxes, including the case folding: a cache must
+/// not hold two entries for one mailbox.
+#[test]
+fn an_owned_mailbox_name_keys_both_kinds_of_map() {
+    use std::collections::{BTreeMap, HashMap};
+
+    let owned: MailboxName<'static> = "User@Example.COM"
+        .parse()
+        .expect("FromStr yields a 'static mailbox");
+
+    let mut hash: HashMap<MailboxName<'static>, u32> = HashMap::new();
+    hash.insert(owned.clone(), 1);
+    let mut tree: BTreeMap<MailboxName<'static>, u32> = BTreeMap::new();
+    tree.insert(owned.clone(), 1);
+
+    // The domain is case-folded at parse and the local-part is not, so
+    // this is the same mailbox and must be the same key.
+    let again = MailboxName::parse("User@example.com").expect("valid");
+    assert_eq!(again, owned);
+    assert_eq!(hash.get(&again), Some(&1));
+    assert_eq!(tree.get(&again), Some(&1));
+
+    // A different local-part is a different mailbox: the local-part is
+    // case-sensitive per RFC 5321 §2.4.
+    let other = MailboxName::parse("user@example.com").expect("valid");
+    assert_ne!(other, owned);
+    assert_eq!(hash.get(&other), None);
 }

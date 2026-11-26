@@ -145,14 +145,27 @@ const DNS_LABEL_MAX_LEN: usize = 63;
 /// The `'a` lifetime borrows from the caller's input only when no
 /// normalization was required (pure-ASCII lower-case DNS name, IP literal
 /// whose canonical encoding is independent of the textual form).
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// # As a map key
+///
+/// `Hash` and `Ord` are derived so that a `ServerName<'static>` can key
+/// a cache — `HashMap` under `std`, `BTreeMap` without it. Both agree
+/// with `Eq`, and because `Cow` compares and hashes its contents, a
+/// borrowed and an owned name for the same host are equal and hash
+/// alike: a lookup with a borrowed name finds an entry stored under an
+/// owned one.
+///
+/// The `Ord` order is total and stable but carries no meaning — it is
+/// derived, so it sorts DNS names before IP addresses and otherwise
+/// lexicographically. Do not present it to anyone as a ranking.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ServerName<'a> {
     repr: ServerNameRepr<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum ServerNameRepr<'a> {
     /// Lower-cased, possibly A-label-converted DNS hostname.
@@ -161,7 +174,7 @@ enum ServerNameRepr<'a> {
     Ip(IpRepr),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum IpRepr {
     V4([u8; 4]),
@@ -364,7 +377,15 @@ impl From<core::net::IpAddr> for ServerName<'static> {
 /// domain used to compare against `rfc822Name` SAN entries. The `'a`
 /// lifetime borrows from the caller's input only when no allocation
 /// was required.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// # As a map key
+///
+/// `Hash` and `Ord` are derived for the same reason as on
+/// [`ServerName`]: a `MailboxName<'static>` can key a cache, and a
+/// borrowed name looks up an entry stored under an owned one. The
+/// `Ord` order is total and stable but derived, so it compares
+/// local-parts before domains — useful for a `BTreeMap`, meaningless
+/// as a ranking.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct MailboxName<'a> {
