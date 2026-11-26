@@ -36,6 +36,8 @@
 
 extern crate alloc;
 
+pub mod types;
+
 use alloc::vec::Vec;
 use der::asn1::OctetString;
 use x509_cert::name::Name;
