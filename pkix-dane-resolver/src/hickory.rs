@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use hickory_proto::dnssec::{Algorithm, Proof, PublicKeyBuf, TrustAnchors};
-use hickory_proto::rr::{RData, RecordType};
+use hickory_proto::rr::{RData, Record, RecordType};
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::net::NetError;
@@ -146,30 +146,59 @@ impl AsyncTlsaResolver for HickoryTlsaResolver {
             Err(err) => return classify_lookup_error(&err),
         };
 
-        // Each record carries its own DNSSEC proof. Take the weakest across
-        // the answer rather than the strongest: an attacker who can inject one
-        // unvalidated record into an otherwise-secure RRset must not be able
-        // to have the set treated as secure.
-        let mut status: Option<DnssecStatus> = None;
-        let mut records = Vec::new();
-
-        for record in lookup.answers() {
-            let proof = proof_to_status(record.proof);
-            status = Some(match status {
-                None => proof,
-                Some(current) => weaker(current, proof),
-            });
-
-            if let RData::TLSA(tlsa) = &record.data {
-                records.push(convert_record(tlsa));
-            }
-        }
+        let status = answer_status(lookup.answers());
+        let records = lookup
+            .answers()
+            .iter()
+            .filter_map(|record| match &record.data {
+                RData::TLSA(tlsa) => Some(convert_record(tlsa)),
+                _ => None,
+            })
+            .collect();
 
         // No records at all: the DNSSEC state belongs to the authenticated
         // denial, which hickory reports on the lookup rather than on a record.
         let status = status.unwrap_or(DnssecStatus::Secure);
         Ok(TlsaResponse::new(records, status))
     }
+}
+
+/// The DNSSEC status of an answer, taken from the records in it.
+///
+/// Each record carries its own proof. This takes the **weakest** across
+/// the answer rather than the strongest: an attacker who can inject one
+/// unvalidated record into an otherwise-secure RRset must not be able to
+/// have the set treated as secure. That applies to the data — the TLSA
+/// records, and any `CNAME` or `DNAME` the answer was reached through,
+/// since an unauthenticated redirection must not yield authenticated
+/// data.
+///
+/// `RRSIG` records are skipped, and that exclusion is the whole point of
+/// this function existing. An `RRSIG` is not part of the RRset being
+/// authenticated; it is a signature over it, and a zone may legitimately
+/// publish signatures a validator cannot chain. A zone midway through an
+/// algorithm rollover carries `RRSIG`s under a new algorithm before the
+/// parent's DS set covers it, and those come back `Indeterminate` beside
+/// data that validates `Secure` under the old algorithm. RFC 6840 §5.11
+/// says a validator "MUST NOT insist that all algorithms signaled in the
+/// DNSKEY RRset work".
+///
+/// Folding `RRSIG` proofs in broke exactly that rule. `debian.org`'s
+/// `_25._tcp` TLSA answer is two TLSA records, both `Secure`, plus two
+/// `RRSIG`s — one `Secure` under algorithm 8, one `Indeterminate` under
+/// algorithm 13, which the parent publishes no DS for. That one
+/// signature dragged the whole response to `Indeterminate`, and DANE
+/// silently stopped applying to a correctly signed zone. The bug looked
+/// like a validator bug in the dependency and was ours.
+///
+/// `None` when the answer holds no records to judge; the caller maps
+/// that to the authenticated-denial case.
+fn answer_status(answers: &[Record]) -> Option<DnssecStatus> {
+    answers
+        .iter()
+        .filter(|record| record.record_type() != RecordType::RRSIG)
+        .map(|record| proof_to_status(record.proof))
+        .reduce(weaker)
 }
 
 /// Builds hickory's trust-anchor set from caller-supplied anchors.
@@ -369,6 +398,101 @@ mod tests {
             nr.authorities = Some(authorities.into());
         }
         nr
+    }
+
+    fn tlsa_record(proof: Proof) -> Record {
+        use hickory_proto::rr::rdata::tlsa::{CertUsage, Matching, Selector};
+        let tlsa = hickory_proto::rr::rdata::TLSA::new(
+            CertUsage::DaneEe,
+            Selector::Spki,
+            Matching::Sha256,
+            vec![0u8; 32],
+        );
+        let mut r = Record::from_rdata(
+            Name::from_ascii("_25._tcp.mail.example.").expect("name"),
+            3600,
+            RData::TLSA(tlsa),
+        );
+        r.proof = proof;
+        r
+    }
+
+    /// A record whose type is `RRSIG`.
+    ///
+    /// Built through `RData::Unknown`, which reports its `code` as the
+    /// record type, rather than by fabricating a signature: the only
+    /// thing [`answer_status`] reads is `record_type()`, and a synthetic
+    /// RRSIG body would suggest the signature mattered here when it does
+    /// not.
+    fn rrsig_record(proof: Proof) -> Record {
+        let mut r = Record::from_rdata(
+            Name::from_ascii("_25._tcp.mail.example.").expect("name"),
+            3600,
+            RData::Unknown {
+                code: RecordType::RRSIG,
+                rdata: hickory_proto::rr::rdata::NULL::new(),
+            },
+        );
+        r.proof = proof;
+        assert_eq!(
+            r.record_type(),
+            RecordType::RRSIG,
+            "fixture must be an RRSIG"
+        );
+        r
+    }
+
+    /// An unchainable RRSIG must not drag down data that validated.
+    ///
+    /// This is the shape `debian.org` presents while midway through an
+    /// algorithm rollover: TLSA records `Secure` under algorithm 8,
+    /// alongside an `RRSIG` under algorithm 13 that the parent
+    /// publishes no DS for, so it comes back `Indeterminate`.
+    ///
+    /// Oracle: RFC 6840 §5.11 — a validator "MUST NOT insist that all
+    /// algorithms signaled in the DNSKEY RRset work", and the zone is
+    /// entitled to publish an algorithm the DS set does not cover. The
+    /// answer's status is the status of its data.
+    #[test]
+    fn an_unchainable_rrsig_does_not_weaken_validated_data() {
+        let answers = vec![
+            tlsa_record(Proof::Secure),
+            tlsa_record(Proof::Secure),
+            rrsig_record(Proof::Secure),
+            rrsig_record(Proof::Indeterminate),
+        ];
+        assert_eq!(answer_status(&answers), Some(DnssecStatus::Secure));
+    }
+
+    /// But a weak *data* record still weakens the answer, which is the
+    /// property the RRSIG exclusion must not have cost us. An attacker
+    /// who injects one unvalidated record into an otherwise-secure
+    /// RRset must not get the set treated as secure.
+    #[test]
+    fn a_weak_data_record_still_weakens_the_answer() {
+        for (weak, expected) in [
+            (Proof::Bogus, DnssecStatus::Bogus),
+            (Proof::Insecure, DnssecStatus::Insecure),
+            (Proof::Indeterminate, DnssecStatus::Indeterminate),
+        ] {
+            let answers = vec![
+                tlsa_record(Proof::Secure),
+                tlsa_record(weak),
+                rrsig_record(Proof::Secure),
+            ];
+            assert_eq!(
+                answer_status(&answers),
+                Some(expected),
+                "a {weak:?} TLSA record must still weaken the answer"
+            );
+        }
+    }
+
+    /// An answer of nothing but signatures has no data to judge.
+    #[test]
+    fn an_answer_of_only_signatures_has_no_status() {
+        assert_eq!(answer_status(&[rrsig_record(Proof::Secure)]), None);
+        assert_eq!(answer_status(&[]), None);
     }
 
     /// A validated negative answer is an authenticated denial.

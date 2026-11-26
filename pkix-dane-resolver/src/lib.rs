@@ -76,48 +76,27 @@
 //! timeout: bogus means do not fall back to PKIX, while a timeout leaves that
 //! policy choice open. `Err` is reserved for not learning the answer at all.
 //!
-//! ## Known limitation: zones mid algorithm rollover
+//! ## Zones mid algorithm rollover
 //!
-//! A zone that publishes a DNSKEY algorithm the parent has no DS for comes
-//! back [`Indeterminate`](DnssecStatus::Indeterminate) instead of
-//! [`Secure`](DnssecStatus::Secure), even though it is signed, validated
-//! by upstream resolvers, and using algorithms hickory supports.
+//! A zone may publish a DNSKEY algorithm the parent has no DS for. RFC
+//! 6840 §5.11 allows it — "it is possible to add algorithms at the
+//! DNSKEY that aren't in the DS record" — and it is what an operator
+//! sees partway through an algorithm rollover, while new keys are
+//! published and the parent's DS set has not caught up.
 //!
-//! That shape is legal. RFC 6840 §5.11: "It is possible to add algorithms
-//! at the DNSKEY that aren't in the DS record, but not vice versa." It is
-//! also what an operator sees mid algorithm rollover, while the new keys
-//! are published but the parent's DS set has not caught up.
+//! Such a zone's answers carry signatures this resolver cannot chain,
+//! sitting beside data that validates perfectly well under the algorithm
+//! the DS does cover. Those answers come back
+//! [`Secure`](DnssecStatus::Secure), from the data, as §5.11 requires:
+//! "Validators SHOULD accept any single valid path ... and they MUST NOT
+//! insist that all algorithms signaled in the DNSKEY RRset work."
 //!
-//! The same section tells validators what to do with it: "Validators
-//! SHOULD accept any single valid path. They SHOULD NOT insist that all
-//! algorithms signaled in the DS RRset work, and they MUST NOT insist that
-//! all algorithms signaled in the DNSKEY RRset work." Our dependency does
-//! insist, so a valid path is discarded because some *other* algorithm in
-//! the zone has nothing to chain to.
-//!
-//! As of 2026-11-26, `debian.org` is in exactly this state and is the
-//! reproduction case: parent DS `40756 8 2` only, zone DNSKEYs at both
-//! algorithm 8 and algorithm 13. `huque.com` (all algorithm 13) and
-//! `freebsd.org` (all algorithm 8) validate `Secure` through the same
-//! resolver, anchors and upstream in the same process, which is what
-//! isolates the variable to the uncovered algorithm rather than to the
-//! zone, the network or the anchors.
-//!
-//! **Why this is not worked around here.** The obvious workaround is to
-//! believe the upstream resolver's `AD` bit, which is set on these
-//! answers. That is ruled out by this crate's own stance, above: an `AD`
-//! bit is a claim by a host on the network path, and accepting it would
-//! reduce DANE to the security of the link to that host — for every
-//! answer, not just this one. Trading that away to recover one zone is
-//! the wrong trade. Validation happens inside the dependency, so there is
-//! no third option available from here.
-//!
-//! **What it costs.** `Indeterminate` folds into "insecure" for every
-//! consumer, so under RFC 7672 DANE silently does not apply to such a
-//! zone's mail. Nothing errors; DANE just stops happening. A deployment
-//! that needs DANE for a specific peer in this state should check whether
-//! that peer's zone has an uncovered DNSKEY algorithm before concluding
-//! the problem is local.
+//! This is called out because getting it wrong is quiet. Folding those
+//! unchainable signatures into the answer's status yields
+//! [`Indeterminate`](DnssecStatus::Indeterminate), which folds into
+//! "insecure" for every consumer, so under RFC 7672 DANE simply stops
+//! applying to a correctly signed zone with nothing reporting an error.
+//! This crate had that bug; `debian.org` is the zone that exposed it.
 //!
 //! [`pkix-dnssec-anchor`]: https://docs.rs/pkix-dnssec-anchor
 
