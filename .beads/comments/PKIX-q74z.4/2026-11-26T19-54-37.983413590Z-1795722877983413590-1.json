@@ -1,0 +1,7 @@
+{
+  "id": "1795722877983413590-1",
+  "issue_id": "PKIX-q74z.4",
+  "author": "Mark Atwood",
+  "text": "Already fixed, verified against current code. sct_extensions_len uses u16::try_from(...).map_err(|_| Error::SctExtensionsTooLong) -- the debug_assert the bead describes is gone and the variant exists.\n\nThe four remaining 'as u16' casts in the build_* functions are correct and not the bug: they write the LOW 16 BITS of a u24 length prefix whose high byte is pushed separately as ((len \u003e\u003e 16) \u0026 0xFF), and the length is bounded above by a MAX_ASN1_CERT_LEN check that returns CertDerTooLong. Named that constant in this pass; it was the same magic number in six places.",
+  "created_at": "2026-11-26T19:54:37.98341359Z"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "1795722878352628633-1",
+  "issue_id": "PKIX-q74z.1",
+  "author": "Mark Atwood",
+  "text": "Fixed. Partly addressed already -- per-SCT reasons are kept in EmbeddedSctReport.rejected since 'report why each embedded SCT failed' -- but the defect the bead names was still live: the certificate-derived work ran inside the per-SCT loop, so a malformed issuer certificate failed every SCT with ParseError, every failure landed in 'rejected', and verify_embedded_scts returned Ok(vec![]). Indistinguishable from 'no log vouched for this certificate'.\n\ntbs_without_sct_list and issuer_key_hash_from_cert depend on the certificates and not on the SCT, so they are loop-invariant: hoisted out, they now error before any SCT is examined. CertDerTooLong is loop-invariant for the same reason (it is the length of that same reconstructed TBS) and is checked there too.\n\nThe rustdoc already said ParseError covers 'either cert fails to parse', so this brings behaviour into line with documentation rather than changing the contract.\n\nAlso an efficiency win that fell out of it: the DER surgery and a SHA-256 ran once per SCT and now run once per list.\n\nverify_sct_for_precert keeps its signature and its error precedence -- split into check_sct_preconditions (SCT and log list only) and verify_precert_signature (takes the precomputed inputs), so the SCT's own preconditions are still checked before the certificates are touched.\n\nTests in pkix-ct/tests/verify_precert.rs, both directions, mutation-verified.",
+  "created_at": "2026-11-26T19:54:38.352628633Z"
+}

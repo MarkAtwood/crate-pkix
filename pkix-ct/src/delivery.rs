@@ -46,13 +46,19 @@ pub fn sct_list_from_tls_extension(tls_ext_payload: &[u8]) -> Result<SctList> {
 /// back to `tbs_response_data.response_extensions`. Returns the first
 /// list found.
 ///
-/// Returns `Ok(None)` if the OCSP response parses cleanly but contains
-/// no SCT extension at either level.
+/// Returns `Ok(None)` if the OCSP response parses cleanly, reports
+/// `successful`, and contains no SCT extension at either level.
 ///
 /// # Errors
 ///
 /// Returns `Err(Error::ParseError)` if the OCSP-response DER does not
 /// decode, or if the SCT-list extension value is malformed.
+///
+/// Returns `Err(Error::OcspResponseNotSuccessful)` if the responder
+/// returned any `responseStatus` other than `successful`, carrying that
+/// status. A refusal is reported rather than folded into `Ok(None)`:
+/// "the responder would not answer" and "the answer carried no SCTs"
+/// are different facts, and only the first is worth retrying.
 ///
 /// # Implementation note
 ///
@@ -72,9 +78,33 @@ pub fn sct_list_from_ocsp_response(ocsp_response_der: &[u8]) -> Result<Option<Sc
     // OID 1.3.6.1.4.1.11129.2.4.5 — id-pkix-ocsp-ct-sct (RFC 6962 §3.3).
     const SCT_OCSP_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.11129.2.4.5");
 
+    /// The RFC 6960 §4.2.1 numeric value of an `OCSPResponseStatus`.
+    ///
+    /// Matched exhaustively on purpose: `x509-ocsp` could add a
+    /// variant, and a catch-all would quietly report it as the wrong
+    /// code. Written here rather than taken from the enum because its
+    /// discriminants are not part of that crate's public contract.
+    fn ocsp_status_code(status: OcspResponseStatus) -> u8 {
+        match status {
+            OcspResponseStatus::Successful => 0,
+            OcspResponseStatus::MalformedRequest => 1,
+            OcspResponseStatus::InternalError => 2,
+            OcspResponseStatus::TryLater => 3,
+            OcspResponseStatus::SigRequired => 5,
+            OcspResponseStatus::Unauthorized => 6,
+        }
+    }
+
     let response = OcspResponse::from_der(ocsp_response_der).map_err(|_| Error::ParseError)?;
+    // A refusal is not an answer. Reporting it as Ok(None) made it
+    // indistinguishable from a responder that replied normally and
+    // embedded no SCTs, and those call for different actions: a
+    // tryLater or internalError is worth retrying or alerting on, while
+    // "this response carries no SCTs" is settled.
     if response.response_status != OcspResponseStatus::Successful {
-        return Ok(None);
+        return Err(Error::OcspResponseNotSuccessful(ocsp_status_code(
+            response.response_status,
+        )));
     }
     let response_bytes = response.response_bytes.as_ref().ok_or(Error::ParseError)?;
     let basic = BasicOcspResponse::from_der(response_bytes.response.as_bytes())

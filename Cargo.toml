@@ -143,7 +143,7 @@ pkix-path-builder     = { path = "pkix-path-builder",     version = "0.5.1" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.1" }
 pkix-profiles         = { path = "pkix-profiles",         version = "0.5.1" }
 pkix-lint             = { path = "pkix-lint",             version = "0.10.2" }
-pkix-ct               = { path = "pkix-ct",               version = "0.3.2" }
+pkix-ct               = { path = "pkix-ct",               version = "0.4.0" }
 pkix-ct-google        = { path = "pkix-ct-google",        version = "0.1.0" }
 pkix-composite        = { path = "pkix-composite",        version = "0.2.0" }
 pkix-ac               = { path = "pkix-ac",               version = "0.3.0" }

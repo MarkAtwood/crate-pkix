@@ -562,3 +562,56 @@ mod embedded {
         assert!(verified.is_empty());
     }
 }
+
+/// A malformed issuer certificate is an input error, not a verdict that
+/// no log vouched for the certificate.
+///
+/// `verify_embedded_scts` used to compute the issuer key hash inside the
+/// per-SCT loop, so an unreadable issuer certificate failed every SCT
+/// with `ParseError`, every failure landed in the rejected list, and the
+/// verified list came back empty. The caller saw `Ok(vec![])` — the same
+/// answer as a certificate whose SCTs all came from logs this host does
+/// not trust — with no way to tell that their own input was the problem.
+///
+/// The crate's rustdoc enumerates the failures that fold into an empty
+/// result (wrong signature, unknown log, retired log, unsupported
+/// algorithm) and has never listed `ParseError` among them.
+#[test]
+fn a_malformed_issuer_certificate_is_an_error_not_an_empty_result() {
+    let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+    let leaf = read_fixture("precert-leaf-final.der");
+
+    // Well-formed leaf, real SCTs, garbage issuer.
+    let result = v.verify_embedded_scts(&leaf, b"not a certificate");
+    assert_eq!(
+        result.err(),
+        Some(Error::ParseError),
+        "an unreadable issuer certificate must be reported, not folded \
+         into an empty verified list"
+    );
+
+    // The same holds for the reporting form: the rejected list is for
+    // SCTs that were examined and refused, not for a certificate that
+    // could never be examined at all.
+    let report = v.verify_embedded_scts_with_report(&leaf, b"not a certificate");
+    assert_eq!(report.err(), Some(Error::ParseError));
+}
+
+/// The fix must not have made a good issuer certificate fail, nor
+/// stopped the per-SCT reasons being reported.
+#[test]
+fn a_good_issuer_certificate_still_verifies_after_hoisting() {
+    let v = SctVerifier::new(precert_oracle_log_list(), DefaultVerifier);
+    let leaf = read_fixture("precert-leaf-final.der");
+    let issuer = read_fixture("precert-issuer.der");
+
+    let report = v
+        .verify_embedded_scts_with_report(&leaf, &issuer)
+        .expect("a well-formed pair must not error");
+    assert_eq!(
+        report.verified.len(),
+        1,
+        "the oracle fixture carries one verifiable SCT; got {report:?}"
+    );
+    assert!(report.rejected.is_empty(), "got {report:?}");
+}

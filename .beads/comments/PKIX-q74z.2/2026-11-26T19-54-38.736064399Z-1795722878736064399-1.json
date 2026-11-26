@@ -1,0 +1,7 @@
+{
+  "id": "1795722878736064399-1",
+  "issue_id": "PKIX-q74z.2",
+  "author": "Mark Atwood",
+  "text": "Fixed. A non-successful responseStatus is now Err(Error::OcspResponseNotSuccessful(status)) carrying the RFC 6960 4.2.1 code, instead of Ok(None) -- which was the same answer as a responder that replied normally and embedded no SCTs. A tryLater or internalError is worth retrying or alerting on; 'this response carries no SCTs' is settled.\n\nThe status is carried as a u8 rather than x509-ocsp's enum so the variant does not drag an optional dependency's type into pkix_ct::Error in every build. The mapping is an exhaustive match, not a cast: the discriminants are not part of that crate's public contract, and a catch-all would quietly report a new variant as the wrong code.\n\nError is #[non_exhaustive] so the added variant is not itself breaking, but the Ok(None) -\u003e Err change is, so pkix-ct 0.4.0 rather than the pending 0.3.2.\n\nTests cover all five non-successful statuses and pin that successful-with-no-SCTs is still Ok(None). Mutation-verified.",
+  "created_at": "2026-11-26T19:54:38.736064399Z"
+}

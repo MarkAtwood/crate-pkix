@@ -76,6 +76,12 @@ const SIG_TYPE_CERTIFICATE_TIMESTAMP: u8 = 0;
 /// `MerkleLeafType::timestamped_entry` — RFC 6962 §3.4.
 const MERKLE_LEAF_TYPE_TIMESTAMPED_ENTRY: u8 = 0;
 /// `Version::v1` — RFC 6962 §3.2.
+/// Largest `ASN.1Cert` / `TBSCertificate` RFC 6962 can frame.
+///
+/// Both are `opaque ... <1..2^24-1>`, so the length goes in a u24 and a
+/// longer certificate cannot be represented in a signed input at all.
+const MAX_ASN1_CERT_LEN: usize = 0x00FF_FFFF;
+
 const SCT_VERSION_V1: u8 = 0;
 
 /// RFC 6962 §3.3 SCT-list certificate extension OID
@@ -434,6 +440,28 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         leaf_cert_der: &[u8],
         issuer_cert_der: &[u8],
     ) -> Result<&CtLog> {
+        // Order matters and is preserved from when this was one
+        // function: the SCT's own preconditions are checked before the
+        // certificates are touched, so a wrong version is reported as
+        // a wrong version even when the issuer certificate is also
+        // unusable.
+        let (log, oid) = self.check_sct_preconditions(sct)?;
+        let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
+        let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
+        self.verify_precert_signature(sct, leaf_cert_der, &tbs_no_sct, &issuer_key_hash, oid)?;
+        Ok(log)
+    }
+
+    /// The checks that depend only on the SCT and the log list.
+    ///
+    /// Split out so [`Self::verify_embedded_scts_with_report`] can do
+    /// the certificate-derived work once for a whole SCT list instead
+    /// of once per SCT. Returns the log and the signature-algorithm OID
+    /// the caller needs next, so neither is looked up twice.
+    fn check_sct_preconditions(
+        &self,
+        sct: &SignedCertificateTimestamp,
+    ) -> Result<(&CtLog, ObjectIdentifier)> {
         if sct.version != SCT_VERSION_V1 {
             return Err(Error::UnsupportedVersion(sct.version));
         }
@@ -451,9 +479,25 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             },
         )?;
 
-        let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
-        let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
-        let signed_input = build_signed_input_precert_entry(sct, &issuer_key_hash, &tbs_no_sct)?;
+        Ok((log, oid))
+    }
+
+    /// Build the `precert_entry` signed input and check the signature.
+    ///
+    /// Takes `tbs_no_sct` and `issuer_key_hash` already computed,
+    /// because they depend on the certificates and not on the SCT: for
+    /// a list of SCTs they are the same every time, and recomputing
+    /// them per SCT repeated the DER surgery and a SHA-256 for nothing.
+    fn verify_precert_signature(
+        &self,
+        sct: &SignedCertificateTimestamp,
+        leaf_cert_der: &[u8],
+        tbs_no_sct: &[u8],
+        issuer_key_hash: &[u8; 32],
+        oid: ObjectIdentifier,
+    ) -> Result<()> {
+        let log = self.logs.get(&sct.log_id).ok_or(Error::UnknownLog)?;
+        let signed_input = build_signed_input_precert_entry(sct, issuer_key_hash, tbs_no_sct)?;
 
         let spki =
             SubjectPublicKeyInfoRef::from_der(&log.key_der).map_err(|_| Error::LogKeyMalformed)?;
@@ -482,7 +526,7 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             return Err(Error::InvalidSignature);
         }
 
-        Ok(log)
+        Ok(())
     }
 
     /// Which entry type, if either, this SCT's signature verifies
@@ -590,6 +634,15 @@ impl<V: SignatureVerifier> SctVerifier<V> {
     /// - [`Error::UnsupportedVersion`] — an SCT in the list carries
     ///   an unsupported SCT version (propagated from
     ///   [`crate::SctList::from_extension_value`]).
+    /// - [`Error::CertDerTooLong`] — the reconstructed leaf TBS exceeds
+    ///   the 2^24 - 1 octet RFC 6962 limit.
+    ///
+    /// The last two, and `ParseError` for the certificates, are facts
+    /// about the caller's input rather than verdicts about anybody's
+    /// SCT, so they are returned here instead of appearing as every
+    /// SCT's rejection reason. They used to be computed inside the
+    /// per-SCT loop, which made an unreadable issuer certificate
+    /// indistinguishable from an SCT list no log vouched for.
     pub fn verify_embedded_scts_with_report(
         &self,
         leaf_cert_der: &[u8],
@@ -622,6 +675,26 @@ impl<V: SignatureVerifier> SctVerifier<V> {
         // a certificate that carries no extension at all.
         let scts = crate::sct::SctList::from_extension_value(ext.extn_value.as_bytes())?;
 
+        // Computed once, before any SCT is examined, and errors out.
+        // These depend on the certificates, not on the SCTs: a
+        // malformed issuer certificate or an over-long leaf TBS is a
+        // fact about the caller's input, not a verdict about anybody's
+        // SCT. Folded into the per-SCT loop they made every SCT fail
+        // with ParseError, so `verify_embedded_scts` answered Ok(vec![])
+        // — "no log vouched for this certificate" — for what was really
+        // "you handed me a certificate I cannot read". The rustdoc
+        // listed the failures that fold into an empty result and never
+        // listed these two.
+        let tbs_no_sct = tbs_without_sct_list(leaf_cert_der)?;
+        let issuer_key_hash = issuer_key_hash_from_cert(issuer_cert_der)?;
+        // Also loop-invariant: the limit is on the reconstructed TBS,
+        // which is the same for every SCT in the list.
+        // `build_signed_input_precert_entry` checks it too, per SCT,
+        // where it would have become every SCT's rejection reason.
+        if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
+            return Err(Error::CertDerTooLong);
+        }
+
         let mut report = EmbeddedSctReport::default();
         for sct in scts.scts() {
             // One entry per log: a repeated SCT, or a second SCT from
@@ -635,8 +708,16 @@ impl<V: SignatureVerifier> SctVerifier<V> {
             // The reason is kept, not dropped. This was `.is_ok()`,
             // which collapsed a forged signature and a stale log list
             // into the same empty result.
-            match self.verify_sct_for_precert(sct, leaf_cert_der, issuer_cert_der) {
-                Ok(_) => report.verified.push(VerifiedSct {
+            match self.check_sct_preconditions(sct).and_then(|(_, oid)| {
+                self.verify_precert_signature(
+                    sct,
+                    leaf_cert_der,
+                    &tbs_no_sct,
+                    &issuer_key_hash,
+                    oid,
+                )
+            }) {
+                Ok(()) => report.verified.push(VerifiedSct {
                     log_id: sct.log_id,
                     timestamp_ms: sct.timestamp_ms,
                 }),
@@ -1147,7 +1228,7 @@ fn build_merkle_tree_leaf_x509_entry(
     sct: &SignedCertificateTimestamp,
     cert_der: &[u8],
 ) -> Result<Vec<u8>> {
-    if cert_der.len() > 0x00FF_FFFF {
+    if cert_der.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
     let ext_len = sct_extensions_len(sct)?;
@@ -1175,7 +1256,7 @@ fn build_merkle_tree_leaf_precert_entry(
     issuer_key_hash: &[u8; 32],
     tbs_no_sct: &[u8],
 ) -> Result<Vec<u8>> {
-    if tbs_no_sct.len() > 0x00FF_FFFF {
+    if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
     let ext_len = sct_extensions_len(sct)?;
@@ -1239,7 +1320,7 @@ fn build_signed_input_x509_entry(
     cert_der: &[u8],
 ) -> Result<Vec<u8>> {
     // ASN.1Cert is opaque<1..2^24-1>, a 3-byte big-endian length prefix.
-    if cert_der.len() > 0x00FF_FFFF {
+    if cert_der.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
     // The wire parser bounds extensions to u16, but `sct` may have been
@@ -1282,7 +1363,7 @@ fn build_signed_input_precert_entry(
     issuer_key_hash: &[u8; 32],
     tbs_no_sct: &[u8],
 ) -> Result<Vec<u8>> {
-    if tbs_no_sct.len() > 0x00FF_FFFF {
+    if tbs_no_sct.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
     let ext_len = sct_extensions_len(sct)?;
@@ -1406,7 +1487,7 @@ fn tbs_without_sct_list(leaf_cert_der: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(new_tbs_body.len() + 6);
     raw_der::push_header(&mut out, tbs_tag, new_tbs_body.len());
     out.extend_from_slice(&new_tbs_body);
-    if out.len() > 0x00FF_FFFF {
+    if out.len() > MAX_ASN1_CERT_LEN {
         return Err(Error::CertDerTooLong);
     }
     Ok(out)

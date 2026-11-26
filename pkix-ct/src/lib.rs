@@ -155,6 +155,24 @@ pub enum Error {
     /// only through [`SignedCertificateTimestamp::new`] or by setting
     /// the public `extensions` field directly.
     SctExtensionsTooLong,
+    /// The OCSP response carried a `responseStatus` other than
+    /// `successful(0)`, so it is a refusal rather than an answer about
+    /// the certificate.
+    ///
+    /// The value is the RFC 6960 §4.2.1 `OCSPResponseStatus`:
+    /// `malformedRequest(1)`, `internalError(2)`, `tryLater(3)`,
+    /// `sigRequired(5)`, `unauthorized(6)`.
+    ///
+    /// Carried as a number rather than `x509_ocsp`'s enum so that this
+    /// variant does not drag an optional dependency's type into the
+    /// error type of every build.
+    ///
+    /// This used to be reported as `Ok(None)` — the same answer as a
+    /// responder that replied normally and simply embedded no SCTs.
+    /// "The responder refused" and "there are no SCTs here" call for
+    /// different actions: the first is worth retrying or alerting on,
+    /// the second is settled.
+    OcspResponseNotSuccessful(u8),
     /// The final leaf certificate passed to
     /// [`SctVerifier::verify_sct_for_precert`] does not contain an
     /// SCT-list extension (OID 1.3.6.1.4.1.11129.2.4.2). Verifying a
@@ -216,6 +234,9 @@ impl core::fmt::Display for Error {
             }
             Self::CertDerTooLong => {
                 f.write_str("certificate DER exceeds the 2^24 - 1 octet ASN.1Cert limit")
+            }
+            Self::OcspResponseNotSuccessful(status) => {
+                write!(f, "OCSP responder returned status {status}, not successful")
             }
             Self::SctExtensionsTooLong => {
                 f.write_str("SCT extensions exceed the 2^16 - 1 octet CtExtensions limit")

@@ -153,3 +153,53 @@ mod ocsp {
         assert_eq!(err, pkix_ct::Error::ParseError);
     }
 }
+
+/// A responder that refuses is not a responder that carried no SCTs.
+///
+/// `sct_list_from_ocsp_response` used to return `Ok(None)` for any
+/// `responseStatus` other than `successful`, which is the same answer it
+/// gives for a normal response with no SCT extension. A caller asking
+/// "do I have SCTs from OCSP for this certificate?" could not tell
+/// "no, the responder answered and embedded none" — settled — from "no,
+/// the responder would not answer" — worth retrying or alerting on.
+///
+/// The input is built here rather than committed as a fixture because it
+/// is three bytes of content and entirely determined by RFC 6960 §4.2.1:
+/// `OCSPResponse ::= SEQUENCE { responseStatus OCSPResponseStatus,
+/// responseBytes [0] EXPLICIT ResponseBytes OPTIONAL }`, so a bare
+/// status with no `responseBytes` is exactly what a loaded responder
+/// sends for `tryLater(3)`.
+#[test]
+#[cfg(feature = "ocsp")]
+fn an_ocsp_refusal_is_reported_rather_than_read_as_no_scts() {
+    for (status, name) in [
+        (1u8, "malformedRequest"),
+        (2, "internalError"),
+        (3, "tryLater"),
+        (5, "sigRequired"),
+        (6, "unauthorized"),
+    ] {
+        // SEQUENCE { ENUMERATED status }
+        let der = [0x30, 0x03, 0x0A, 0x01, status];
+        let result = pkix_ct::sct_list_from_ocsp_response(&der);
+        assert_eq!(
+            result.err(),
+            Some(pkix_ct::Error::OcspResponseNotSuccessful(status)),
+            "{name}({status}) must be reported as a refusal, not as Ok(None)"
+        );
+    }
+}
+
+/// And `successful` with no SCT extension must still be `Ok(None)`, so
+/// the fix did not turn a settled answer into an error.
+#[test]
+#[cfg(feature = "ocsp")]
+fn a_successful_response_without_scts_is_still_ok_none() {
+    let der = fs::read("tests/fixtures/ocsp-no-sct.der").expect("read OCSP no-SCT fixture");
+    let result = pkix_ct::sct_list_from_ocsp_response(&der)
+        .expect("a successful response must not be an error");
+    assert!(
+        result.is_none(),
+        "this response carries no SCT extension, which is an answer"
+    );
+}
