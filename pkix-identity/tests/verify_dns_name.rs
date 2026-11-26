@@ -220,3 +220,46 @@ fn cn_only_rejected_with_missing_san() {
         Err(IdentityError::MissingSan)
     );
 }
+
+/// A certificate with two SubjectAltName extensions is rejected, not
+/// resolved.
+///
+/// RFC 5280 §4.2 forbids duplicate extensions, and real CA software emits
+/// them anyway. Reading the first instance and reading the last are both
+/// defensible, which is the problem: an attacker who knows two
+/// implementations choose differently puts a benign name in one SAN and
+/// the target in the other, and the certificate is accepted by whichever
+/// side it needs to fool.
+///
+/// So this matches `pkix-path`, which refuses such certificates during
+/// path validation for the same stated reason — "accepting duplicates
+/// would let one certificate mean different things to different
+/// validators". A caller reaching `pkix-identity` through `pkix-chain`
+/// never gets this far; the check exists so the standalone path agrees
+/// rather than forming a differential between sibling crates.
+///
+/// The fixture's first SAN *does* contain the target, so a "first wins"
+/// implementation would return `Ok`. That is what makes this a test of
+/// the decision rather than of a parse failure.
+#[test]
+fn duplicate_san_extensions_are_rejected() {
+    let cert = load("san-duplicate-ext.der");
+    let name = ServerName::dns_name("www.example.com").expect("valid target");
+
+    let err = verify_dns_name(&cert, &name)
+        .expect_err("a certificate with two SAN extensions must be refused");
+    assert_eq!(
+        err,
+        IdentityError::DuplicateSan,
+        "the duplicate must be named as the problem, not reported as a name mismatch"
+    );
+}
+
+/// The single-SAN sibling still passes, so the check above is not simply
+/// breaking every certificate.
+#[test]
+fn a_single_san_extension_is_still_accepted() {
+    let cert = load("san-exact-dns.der");
+    let name = ServerName::dns_name("www.example.com").expect("valid target");
+    verify_dns_name(&cert, &name).expect("one SAN extension is the normal case");
+}

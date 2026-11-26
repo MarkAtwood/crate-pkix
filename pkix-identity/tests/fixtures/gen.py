@@ -82,6 +82,16 @@ def build_leaf(sans, *, common_name="leaf", omit_san=False):
 fixtures = {
     # ----- DNS / IP SAN fixtures (PKIX-fmtv.11.1) -----
     # Exact DNS name only.
+    # NOTE: san-duplicate-ext.der is NOT generated here. pyca/cryptography
+    # refuses to emit two instances of one extension, which is correct of
+    # it and unhelpful for a fixture whose whole point is a certificate no
+    # conforming builder would produce. It is derived from
+    # san-exact-dns.der by appending a copy of the SubjectAltName
+    # extension and recomputing the four enclosing DER lengths; openssl
+    # reports two SAN extensions on the result. Its signature is therefore
+    # invalid, which does not matter — find_san does not verify
+    # signatures, and the certificate is rejected before any identity
+    # comparison happens.
     "san-exact-dns.der": build_leaf([x509.DNSName("www.example.com")]),
     # Single-label leftmost wildcard.
     "san-wildcard-dns.der": build_leaf([x509.DNSName("*.example.com")]),

@@ -564,6 +564,24 @@ pub enum IdentityError {
     /// The certificate's Subject Alternative Name extension was present
     /// but could not be parsed.
     MalformedSan,
+    /// The certificate carried more than one Subject Alternative Name
+    /// extension, which RFC 5280 §4.2 forbids.
+    ///
+    /// Rejected rather than resolved, for the reason `pkix-path` gives
+    /// where it makes the same check: "accepting duplicates would let one
+    /// certificate mean different things to different validators."
+    /// Reading the first instance and reading the last are both
+    /// defensible, which is precisely the problem — an attacker who knows
+    /// two implementations disagree can put a benign name in one SAN and
+    /// the target in the other, and have the certificate accepted by
+    /// whichever side it needs.
+    ///
+    /// `pkix-path` already refuses such certificates during path
+    /// validation, so a caller going through `pkix-chain` never reaches
+    /// this. It exists for callers using this crate on its own, so that
+    /// the two agree instead of forming a parser differential between
+    /// sibling crates.
+    DuplicateSan,
 }
 
 impl core::fmt::Display for IdentityError {
@@ -573,6 +591,10 @@ impl core::fmt::Display for IdentityError {
             Self::NoMatchingSan => {
                 f.write_str("no Subject Alternative Name entry matched the identity")
             }
+            Self::DuplicateSan => f.write_str(
+                "certificate carries more than one Subject Alternative Name extension \
+                 (RFC 5280 §4.2 forbids duplicates)",
+            ),
             Self::MissingSan => {
                 f.write_str("certificate has no Subject Alternative Name extension")
             }
@@ -1190,10 +1212,16 @@ fn find_san(cert: &Certificate) -> Result<SubjectAltName, IdentityError> {
         .tbs_certificate()
         .extensions()
         .ok_or(IdentityError::MissingSan)?;
-    let ext = exts
-        .iter()
-        .find(|e| e.extn_id == OID_SUBJECT_ALT_NAME)
-        .ok_or(IdentityError::MissingSan)?;
+    // Counted rather than found: `find` would silently take the first of
+    // several, and which instance a validator reads is exactly the thing
+    // an attacker exploits when two implementations choose differently.
+    // `pkix-path::check_duplicate_extensions` rejects these during path
+    // validation; this keeps the standalone path in agreement.
+    let mut found = exts.iter().filter(|e| e.extn_id == OID_SUBJECT_ALT_NAME);
+    let ext = found.next().ok_or(IdentityError::MissingSan)?;
+    if found.next().is_some() {
+        return Err(IdentityError::DuplicateSan);
+    }
     SubjectAltName::from_der(ext.extn_value.as_bytes()).map_err(|_| IdentityError::MalformedSan)
 }
 
