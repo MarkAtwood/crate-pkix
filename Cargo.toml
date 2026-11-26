@@ -137,7 +137,7 @@ authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 
 [workspace.dependencies]
 # Internal crates
-pkix-path             = { path = "pkix-path",             version = "0.4.4" }
+pkix-path             = { path = "pkix-path",             version = "0.4.5" }
 pkix-revocation       = { path = "pkix-revocation",       version = "0.5.2" }
 pkix-path-builder     = { path = "pkix-path-builder",     version = "0.5.1" }
 pkix-revocation-http  = { path = "pkix-revocation-http",  version = "0.3.1" }

@@ -347,3 +347,87 @@ impl PolicyGraph {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use x509_cert::ext::pkix::certpolicy::PolicyInformation;
+
+    const P1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.1");
+    const P2: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.2");
+    const SHARED: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.99.9");
+
+    fn policies(oids: &[ObjectIdentifier]) -> CertificatePolicies {
+        CertificatePolicies(
+            oids.iter()
+                .map(|o| PolicyInformation {
+                    policy_identifier: *o,
+                    policy_qualifiers: None,
+                })
+                .collect(),
+        )
+    }
+
+    /// At most one node per policy OID at any depth.
+    ///
+    /// RFC 9618 §6.1.3(d) builds children per expected policy of the
+    /// parent level, and two parents can expect the same policy — which
+    /// is ordinary after policy mappings, since §6.1.4(b)(1) rewrites an
+    /// `expected_policy_set` to the mapped values and two issuer domain
+    /// policies may map to one subject domain policy. A second node for
+    /// the same OID at the same depth is not a cosmetic duplicate: nodes
+    /// carry parent lists, and the §6.1.5 authorities-set and
+    /// user-policy intersection walk them, so a duplicate double-counts the
+    /// same policy and can let an intersection succeed on a policy that
+    /// should have been pruned.
+    ///
+    /// The anyPolicy expansion in §6.1.3(d)(2) is where this surfaced: it
+    /// once tested against a snapshot of the policies already present,
+    /// taken before the loop over parents, so a policy added for the
+    /// first parent was invisible when the second parent expected it too.
+    #[test]
+    fn any_policy_expansion_never_duplicates_a_policy_at_one_depth() {
+        let mut g = PolicyGraph::new();
+
+        // Depth 1: two concrete policies under the anyPolicy root.
+        assert!(!g.add_certificate_policies(&policies(&[P1, P2]), true));
+
+        // Make both nodes expect the same policy, which is what policy
+        // mappings produce when two issuer domain policies map to one
+        // subject domain policy.
+        let level = g.levels.last_mut().expect("depth 1 exists");
+        assert_eq!(level.len(), 2, "two policies asserted, two nodes");
+        for node in level.iter_mut() {
+            node.expected_policy_set = vec![SHARED];
+        }
+
+        // Depth 2: a certificate asserting anyPolicy, so (d)(2) expands
+        // every expected policy of the parent level. Both parents expect
+        // SHARED, so the expansion visits it twice.
+        assert!(!g.add_certificate_policies(&policies(&[OID_ANY_POLICY]), true));
+
+        let deepest = g.levels.last().expect("depth 2 exists");
+        let mut seen = BTreeSet::new();
+        for node in deepest {
+            assert!(
+                seen.insert(node.valid_policy),
+                "policy {} has more than one node at this depth: {deepest:#?}",
+                node.valid_policy
+            );
+        }
+        assert_eq!(
+            deepest.len(),
+            1,
+            "both parents expect only SHARED, so the level is one node: {deepest:#?}"
+        );
+
+        // And the single node records both parents, which is the reason
+        // one node is correct rather than merely tidier: §6.1.3(d)(1)(i)
+        // links a child to every parent whose expected_policy_set has it.
+        assert_eq!(
+            deepest[0].parents.len(),
+            2,
+            "the one node must list both parents: {deepest:#?}"
+        );
+    }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "1795723366399159627-1",
+  "issue_id": "PKIX-6p6p",
+  "author": "Mark Atwood",
+  "text": "Already fixed; now pinned. The already_covered snapshot Vec the bead describes is gone -- the policy code moved to pkix-path/src/policy_graph.rs and the anyPolicy expansion in 6.1.3(d)(2) now tests 'present.insert(*ep)' against a set maintained inside the loop, which is the second fix the bead recommends. So each iteration sees nodes added by prior iterations.\n\nVerified by reproducing the original defect: reinstating a pre-loop snapshot makes the expansion emit two nodes for one policy OID at one depth, exactly the scenario described (two parents whose expected_policy_set overlap, which is ordinary after 6.1.4(b)(1) rewrites expected sets and two issuer domain policies map to one subject domain policy).\n\nA refactor fixed this silently, so a refactor can break it silently. Added the invariant as a unit test in policy_graph.rs: at most one node per policy OID per depth, plus the assertion that the single node lists BOTH parents -- which is why one node is correct rather than merely tidier, since 6.1.3(d)(1)(i) links a child to every parent expecting it and 6.1.5 walks those parent lists. Mutation-verified.\n\npkix-path 0.4.5.",
+  "created_at": "2026-11-26T20:02:46.399159627Z"
+}
