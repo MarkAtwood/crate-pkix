@@ -546,12 +546,35 @@ mod google_schema {
         if bytes.len() < 20 || bytes[10] != b'T' || !s.ends_with('Z') {
             return Err(Error::ParseError);
         }
+        // The separators, not just the digits. Without this,
+        // "2024:03:04T19:00:00Z" parsed happily: every digit pair sits
+        // where it should, so nothing downstream notices that the date
+        // separators are wrong.
+        if bytes[4] != b'-' || bytes[7] != b'-' || bytes[13] != b':' || bytes[16] != b':' {
+            return Err(Error::ParseError);
+        }
         let year: i32 = parse_digits(&bytes[0..4])? as i32;
         let month: u32 = parse_digits(&bytes[5..7])?;
         let day: u32 = parse_digits(&bytes[8..10])?;
         let hour: u32 = parse_digits(&bytes[11..13])?;
         let min: u32 = parse_digits(&bytes[14..16])?;
         let sec: u32 = parse_digits(&bytes[17..19])?;
+
+        // `parse_digits` checks that they are digits, not that they are
+        // times. "2024-03-04T99:99:99Z" used to parse: the bogus fields
+        // added 99*3600 + 99*60 + 99 seconds, about four days, and came
+        // back as a perfectly ordinary timestamp four days after the
+        // date it encoded. Silently wrong is worse here than refused,
+        // because the value lands in a log's usable window and decides
+        // whether an SCT is inside it.
+        //
+        // `sec == 60` is allowed: RFC 3339 §5.6 permits it for a leap
+        // second. It rolls into the following minute, which is what
+        // treating UTC as 86400 seconds a day costs and is the same
+        // choice every other parser here makes.
+        if hour > 23 || min > 59 || sec > 60 {
+            return Err(Error::ParseError);
+        }
 
         // Optional fractional seconds — find them between offset 19 and the trailing 'Z'.
         let frac_ms: u32 = if bytes[19] == b'.' {
@@ -597,7 +620,23 @@ mod google_schema {
     /// 1970-01-01. Reference: <https://howardhinnant.github.io/date_algorithms.html#days_from_civil>.
     /// CC0 / public domain.
     fn days_from_civil(year: i32, month: u32, day: u32) -> Result<i64> {
-        if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        if !(1..=12).contains(&month) {
+            return Err(Error::ParseError);
+        }
+        // Days in *this* month, not 31 for all of them. The looser check
+        // accepted 2024-02-31 and turned it into 2024-03-02, since the
+        // day count is computed arithmetically and never consulted a
+        // calendar.
+        let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+        let days_in_month = match month {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 if leap => 29,
+            2 => 28,
+            // Unreachable: month is 1..=12 by the check above.
+            _ => return Err(Error::ParseError),
+        };
+        if !(1..=days_in_month).contains(&day) {
             return Err(Error::ParseError);
         }
         let y = if month <= 2 { year - 1 } else { year };
@@ -612,6 +651,70 @@ mod google_schema {
     #[cfg(test)]
     mod schema_tests {
         use super::*;
+
+        /// Digits in the right places are not a timestamp.
+        ///
+        /// Oracle: RFC 3339 §5.6 — `time-hour` is 00-23, `time-minute`
+        /// 00-59, `time-second` 00-60 with 60 reserved for a leap
+        /// second. Cross-checked against Python, which refuses every
+        /// one of these:
+        /// `datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ")`.
+        ///
+        /// The first case is the one that was reported. It used to
+        /// parse: 99 hours, 99 minutes and 99 seconds added about four
+        /// days, and the function returned an ordinary-looking
+        /// timestamp four days after the date in the string. The value
+        /// feeds a log's usable window, which decides whether an SCT
+        /// falls inside it, so being quietly four days out is worse
+        /// than being refused.
+        #[test]
+        fn rfc3339_refuses_out_of_range_fields() {
+            for s in [
+                "2024-03-04T99:99:99Z", // the reported input
+                "2024-03-04T24:00:00Z", // hour 24 is tomorrow's 00
+                "2024-03-04T19:60:00Z", // minute 60
+                "2024-03-04T19:00:61Z", // second 61: 60 is a leap second, 61 is not
+                "2024-13-04T19:00:00Z", // month 13
+                "2024-00-04T19:00:00Z", // month 0
+                "2024-03-00T19:00:00Z", // day 0
+                "2024-02-31T19:00:00Z", // February has no 31st
+                "2023-02-29T19:00:00Z", // nor a 29th in a common year
+                "2024-04-31T19:00:00Z", // April has 30 days
+                "2024:03:04T19:00:00Z", // ':' where '-' belongs
+                "2024-03-04T19-00-00Z", // '-' where ':' belongs
+            ] {
+                assert!(
+                    parse_rfc3339_to_unix_ms(s).is_err(),
+                    "{s} must be refused, not reinterpreted"
+                );
+            }
+        }
+
+        /// And the forms RFC 3339 does allow must still parse, so the
+        /// checks above cannot have been made by refusing everything.
+        ///
+        /// Oracle for the leap second: RFC 3339 §5.6 permits
+        /// `time-second` 60. It rolls into the following minute here,
+        /// which is what treating every UTC day as 86400 seconds costs.
+        #[test]
+        fn rfc3339_still_accepts_what_the_grammar_allows() {
+            // Boundaries of each field.
+            assert!(parse_rfc3339_to_unix_ms("2024-03-04T00:00:00Z").is_ok());
+            assert!(parse_rfc3339_to_unix_ms("2024-03-04T23:59:59Z").is_ok());
+            // 2024 is a leap year, 2023 is not.
+            assert!(parse_rfc3339_to_unix_ms("2024-02-29T19:00:00Z").is_ok());
+            assert!(parse_rfc3339_to_unix_ms("2023-02-28T19:00:00Z").is_ok());
+            // Month lengths that are not 31.
+            assert!(parse_rfc3339_to_unix_ms("2024-04-30T19:00:00Z").is_ok());
+            assert!(parse_rfc3339_to_unix_ms("2024-12-31T19:00:00Z").is_ok());
+
+            // A leap second is accepted and lands on the next minute.
+            assert_eq!(
+                parse_rfc3339_to_unix_ms("2016-12-31T23:59:60Z").unwrap(),
+                parse_rfc3339_to_unix_ms("2017-01-01T00:00:00Z").unwrap(),
+                "second 60 rolls over; the point is that it is not refused"
+            );
+        }
 
         #[test]
         fn rfc3339_parses_with_fractional_seconds() {
