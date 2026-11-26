@@ -73,14 +73,15 @@ and feed them to `from_der_iter`. The unifying currency is DER bytes; the
 adapter handles whatever source-specific API (OS keychain, HSM, cloud KMS) is
 needed to obtain them.
 
-**Placeholder adapter beads filed:**
+**Adapter crates that ship:**
 
-- `pkix-truststore-system` (PKIX-8h87) — OS-native trust stores: macOS
-  Security framework, Windows CryptoAPI, iOS Keychain, Android KeyStore,
-  Linux/BSD distro CA bundle paths. The `rustls-native-certs` analog.
-- `pkix-truststore-pkcs11` (PKIX-p8vz) — PKCS#11 tokens: HSMs (YubiHSM,
-  Thales, AWS CloudHSM, Azure Dedicated HSM, SafeNet), YubiKey PIV, smart
-  cards, TPM 2.0 via `tpm2-pkcs11`, SoftHSM for testing.
+- [`pkix-truststore-system`](../pkix-truststore-system) — OS-native trust
+  stores. The `rustls-native-certs` analog, target-gated rather than
+  feature-gated.
+- [`pkix-truststore-pkcs11`](../pkix-truststore-pkcs11) — PKCS#11 tokens.
+  See that crate for which tokens and HSMs it covers; the list used to be
+  repeated here and the two copies had already drifted apart in both
+  spelling and membership.
 
 **Adapter crates plausible — file when there is concrete demand:**
 cloud KMS (AWS / Azure / GCP), Vault PKI, NSS, EST, SCEP, CMP.

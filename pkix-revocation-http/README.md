@@ -41,23 +41,32 @@ URLs found in certificates:
 - **Authority Info Access / OCSP** (RFC 5280 §4.2.2.1) — send an OCSP
   request to the URL in the `AuthorityInfoAccess` extension.
 
-## Planned API
+## Supplying your own HTTP client
 
 ```rust
-use pkix_revocation_http::{HttpCrlFetcher, RevocationFetcher};
+use pkix_path::DefaultVerifier;
+use pkix_revocation_http::{
+    FetchError, FetchRequest, FetchResponse, HttpCrlFetcher, RevocationFetcher,
+};
 
-// Supply your own HTTP client by implementing RevocationFetcher
 struct MyHttpClient;
 
 impl RevocationFetcher for MyHttpClient {
-    fn fetch(&self, url: &str) -> Result<Vec<u8>, FetchError> {
-        // use reqwest, ureq, hyper, etc.
-        Ok(reqwest::blocking::get(url)?.bytes()?.to_vec())
+    fn fetch(&self, req: &FetchRequest<'_>) -> Result<FetchResponse, FetchError> {
+        // `req.method` carries the body for the POST case (OCSP).
+        let bytes = reqwest::blocking::get(req.url)
+            .and_then(reqwest::blocking::Response::bytes)
+            .map_err(|e| FetchError::Transport(Box::new(e)))?
+            .to_vec();
+        Ok(FetchResponse { bytes, content_type: None })
     }
 }
 
-let crl_checker = HttpCrlFetcher::new(MyHttpClient, unix_now());
-// Use as a RevocationChecker with pkix_chain::verify_chain
+// `now_unix` is fixed for the life of the fetcher, so build one per
+// validation rather than keeping one for the life of the process.
+let crl_checker = HttpCrlFetcher::new(MyHttpClient, DefaultVerifier, now_unix);
+
+// Use as a RevocationChecker with pkix_chain::verify_chain.
 verify_chain(&chain, &anchors, &policy, &DefaultVerifier, &crl_checker)?;
 ```
 
