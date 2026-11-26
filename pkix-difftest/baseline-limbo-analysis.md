@@ -319,8 +319,12 @@ RFC-literal divergence), real ground-truth-disagreement drops to
   to be right): EKU presence, critical-extension criticality, RSA
   key strength, NC type strictness. Each is a project-policy decision
   to keep pkix-path's defaults permissive. Documented per-bucket above.
-* the 5 residual StricterThanWild gt-disagreements (4 P-384 harness
-  + 1 harness/API-gap, tc60 — filed as PKIX-lwr9.4).
+* the 5 residual StricterThanWild gt-disagreements: the 4 P-384 harness
+  cases (`online::` apple / cloudflare / akamai / stackoverflow) and
+  `rfc5280::nc::permitted-self-issued`. The count was 5 before as well,
+  but the fifth used to be tc60 — now Agreement, see the PKIX-lwr9 entry
+  below — and permitted-self-issued took its place, flipping out of
+  DiagnosticDivergence in the same delta.
 
 The harness is functioning correctly: the dominant ground-truth-
 disagreement signal points at a documented design choice (CN-as-DNS),
@@ -329,14 +333,20 @@ and the smaller signal isolates the genuine follow-up work.
 ## Follow-up beads filed by this analysis
 
 * **PKIX-lwr9** — pkix-path-builder robustness on bettertls::pathbuilding.
-  After PKIX-lwr9.6 wired the harness through `build_path`, the
-  residual is **one** case (`tc60`), reframed by PKIX-lwr9.4 as a
-  consumer-side harness/API-gap (`build_path` is single-shot;
-  harness does not iterate `build_path_candidates` past a first
-  candidate whose intermediate carries an algorithm `DefaultVerifier`
-  rejects). Significantly de-scoped from the original 47-case framing.
-  Umbrella closed; substantive follow-up tracked under PKIX-lwr9.4
-  (design call pending: harness fix vs new pkix-path-builder helper).
+  **Resolved.** Kept for the diagnosis, which is the part worth having:
+  after PKIX-lwr9.6 wired the harness through `build_path`, the single
+  residual was `tc60`, and PKIX-lwr9.4 reframed it as a consumer-side
+  harness/API gap rather than a pkix-path-builder bug — `build_path` is
+  single-shot, so the harness never iterated `build_path_candidates`
+  past a first candidate whose intermediate carried an algorithm
+  `DefaultVerifier` rejects. That de-scoped the original 47-case framing
+  to one.
+  The design call this bullet recorded as pending — harness fix versus a
+  new pkix-path-builder helper — was answered with both:
+  PKIX-lwr9.4.2 added `build_first_valid_path`, and PKIX-lwr9.4.1 made
+  the limbo loader use it. tc60 flipped StricterThanWild(gt=false) to
+  Agreement(gt=true), which the delta table near the top of this file
+  records.
 * **PKIX-wmch** — pkix-difftest secondary baseline with all pkix-path
   signature features enabled (p384, etc.) to validate real-world
   ECDSA chains. Snapshot baseline maintained as

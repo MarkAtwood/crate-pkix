@@ -201,10 +201,11 @@ Violations of the critical-and-sole rule surface as
 
 `verify_chain` runs two sequential checks:
 
-1. **Path validation** — calls `pkix_path::validate_path`, which verifies
-   signatures, validity periods, name linkage, BasicConstraints, pathLen,
-   KeyUsage, critical extensions, certificate policies, name constraints, and
-   duplicate detection per RFC 5280 §6.1.
+1. **Path validation** — calls `pkix_path::validate_path`, which performs
+   the RFC 5280 §6.1 checks. [`pkix-path`'s README](../pkix-path#readme) has
+   the list; it is not repeated here, because the copy that used to be
+   had already drifted — it was missing trust-anchor matching and policy
+   mappings.
 
 2. **Revocation checking** — calls `RevocationChecker::check_revocation` for
    each certificate in the validated chain (leaf through the certificate issued
@@ -232,8 +233,8 @@ use pkix_chain::{
 
 | Feature | Enables |
 |---------|---------|
-| `crl` | `CrlChecker` (offline CRL validation, with delta CRL support) |
-| `ocsp` | `OcspChecker` (offline OCSP validation) |
+| `crl` | `CrlChecker` — offline CRL validation, delta CRLs included; you supply the DER bytes |
+| `ocsp` | `OcspChecker` — offline OCSP response validation; you supply the DER bytes |
 | `rsa` | RSA-PKCS1v15 backend in `DefaultVerifier` (default on) |
 | `p256` | ECDSA P-256 backend in `DefaultVerifier` (default on) |
 

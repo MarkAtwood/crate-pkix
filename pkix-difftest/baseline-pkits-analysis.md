@@ -50,14 +50,18 @@ bead OR a written-out justification".
 
 | Class | Count | % | previous |
 |---|---:|---:|---:|
-| LooserThanWild       | 62  | 25.1% | 60 |
-| StricterThanWild     | 57  | 23.1% | 59 |
+| LooserThanWild       | 63  | 25.5% | 62 |
+| StricterThanWild     | 56  | 22.7% | 57 |
 | OracleDivergence     | 0   | 0.0%  | 0  |
 | DiagnosticDivergence | 67  | 27.1% | 67 |
 | Agreement            | 61  | 24.7% | 61 |
 | **Total**            | **247** | | 247 |
 
-Ground-truth disagreements: **46 → 35 → 17 → 15 → 2** across four regenerations.
+Ground-truth disagreements: **46 → 35 → 17 → 15 → 2 → 1** across five
+regenerations. The last step was the delta-CRL fix: PKITS §4.15.5 was
+reported as revoked because `pkix-difftest`'s oracle consulted a base CRL
+its delta superseded, which made `removeFromCRL` unreachable. The
+disagreement was the harness's, not `pkix-revocation`'s.
 
 The last step closed the `onlySomeReasons` gap: `pkix-revocation` now
 combines reason-partitioned CRLs per RFC 5280 §6.3.3, so 4.14.18 and 4.14.19
@@ -141,23 +145,32 @@ Two chains, both predating this work and catalogued per bucket below.
 
 ### Reading this baseline
 
-The per-bucket breakdowns below were hand-classified against an earlier
-regeneration and their internal counts are from that run. The authoritative
-current totals are the summary table above and `baseline-pkits.json`, which
-the CI gate compares; re-classifying the buckets is tracked separately.
+The LooserThanWild and StricterThanWild breakdowns are derived from
+`baseline-pkits.json`, so their counts match the baseline by
+construction. Sections headed "What changed in revision X" are history:
+their numbers are the comparison that was true at that revision and are
+deliberately not updated. The authoritative current totals are the
+summary table above and the JSON, which the CI gate compares.
 
 `ground_truth_disagreements` is compared by **chain name**, not just by count,
 so a newly-disagreeing chain shows up as a diff even if the totals happen to
-match. The 2 recorded here are expected; a 3rd is a regression.
+match. The 1 recorded here (4.1.4 Valid DSA Signatures Test4)
+is expected; a 2nd is a regression.
 
 Two PKITS chains are excluded from classification (harness errors):
 
 * `4.1.5 Valid DSA Parameter Inheritance Test5` — pyca rejects the SPKI
   parameters as malformed ASN.1 (DSA inheritance encoding edge case).
   Affects only the pyca verdict; not a pkix-path divergence.
-* `4.2.3 Valid pre2000 UTC notBefore Date Test3` — pkix-path's underlying
-  `x509-cert` 0.2.5 rejects pre-2000 UTCTime encoding as malformed
-  (RustCrypto/formats issue, separately tracked upstream).
+* `4.2.3 Valid pre2000 UTC notBefore Date Test3` — the certificate's
+  `notBefore` is 1950, and `der` 0.8 supports `UTCTime` only for
+  1970-2049 ("due to common operations working on `UNIX_EPOCH`"), where
+  RFC 5280 §4.1.2.5.1 allows 1950-2049. So it fails in the DER layer and
+  never reaches validation. Fail-closed, deliberate upstream, and not
+  fixable without forking the dependency; see `pkix-path`'s Limitations
+  section. Earlier revisions of this file blamed "x509-cert 0.2.5" and
+  "pre-2000 UTCTime", both wrong: the floor is the epoch, not the
+  millennium, and the restriction is `der`'s.
 
 ## What changed in this revision (PKIX-t0w4)
 
@@ -271,20 +284,25 @@ Bucketed by the **failing** oracle and reason. pkix-path passing here is
 either a deliberate design choice (soft CRL handling) or a permissive
 default (no CA/B Forum strictures); both are documented.
 
-| Failing oracle reason | Count | Classification |
+| Reason | Count | Classification |
 |---|---:|---|
-| pyca: critical extension `2.5.29.33` / `.36` / `.54` not handled         | 29 | pyca limitation (policy-tree extensions; ext_policies permit_all does not handle them) |
-| openssl: `unable to get certificate CRL`                                  | 10 | **CRL coverage divergence** — pkix-path's soft per-cert policy lets a chain pass when no CRL covers a cert; OpenSSL's `-crl_check_all` fails closed. See "CRL coverage policy" below. |
-| openssl: `different CRL scope`                                            | 6  | **CRL coverage divergence** — same family. OpenSSL rejects CRLs whose IDP scope flags exclude the cert (RFC 5280 §5.2.5). pkix-path treats as "no determination", continues. |
-| pyca: candidates exhausted: all candidates exhausted (no chain found)     | 5  | pyca path-building difference (different intermediate selection heuristic). |
-| pyca: candidates exhausted: signature does not match                      | 3  | pyca self-issued bridge cert quirk (PKITS §4.10 Test12/13 subparts). |
-| pyca: candidates exhausted: unsupported name constraint (URI)             | 3  | pyca scope limitation; openssl + pkix-path support URI nameConstraints. |
-| openssl: `CRL has expired`                                                | 2  | **CRL coverage divergence** — OpenSSL fails closed on expired CRLs; pkix-path's CrlChecker also fails on CrlExpired but the per-CRL soft policy in oracles/pkix-path.rs treats it as "this CRL has no determination, try next", and if no other CRL covers the cert, the cert passes. |
-| openssl: `key usage does not include CRL signing`                         | 2  | **CRL coverage divergence** — OpenSSL fails closed when the CRL signer cert lacks cRLSign; pkix-path's CrlChecker returns CrlSignMissing, treated as soft skip. |
-| openssl: `unhandled critical CRL extension`                               | 1  | OpenSSL strict on unknown critical CRL extensions; pkix-path's CrlChecker fails on that too, treated as soft skip. |
-| openssl: `CRL signature failure`                                          | 1  | Same family — OpenSSL hard-fails; pkix-path soft-skips. |
-| openssl: `certificate revoked`                                            | 1  | **Real divergence** — OpenSSL finds a cert in a CRL pkix-path's soft policy skipped (probably due to a CRL parse / signature / scope difference). Worth investigating; see PKIX-cqwt for CRL signer discovery work that may close this. |
-| pyca: `GeneralizedTime in 1950–2049 rejected`                             | 1  | pyca strict reading of RFC 5280 §4.1.2.5; OpenSSL + pkix-path lenient. |
+| pyca: `invalid extension: 2.5.29.33: certificate contains unaccounted-for critical extensions` | 20 | pyca limitation — policyMappings; its `permit_all` ext_policies does not handle the policy-tree extensions. |
+| pyca: `fatal error: critical nameConstraints extension contains an unsupported directoryName co…` | 9 | pyca limitation — refuses a critical nameConstraints it cannot fully process; OpenSSL and pkix-path process these. |
+| openssl: `unable to get certificate CRL` | 8 | **CRL coverage divergence** — pkix-path's soft per-cert policy passes a chain when no CRL covers a cert; OpenSSL's `-crl_check_all` fails closed. See "CRL coverage policy" below. |
+| pyca: `all candidates exhausted with no interior errors` | 5 | pyca path-building difference — a different intermediate-selection heuristic. |
+| pyca: `invalid extension: 2.5.29.54: certificate contains unaccounted-for critical extensions` | 4 | pyca limitation — inhibitAnyPolicy, same family. |
+| openssl: `different CRL scope` | 4 | **CRL coverage divergence** — OpenSSL rejects a CRL whose IDP scope excludes the cert (§5.2.5); pkix-path treats that as no determination. |
+| pyca: `invalid extension: 2.5.29.36: certificate contains unaccounted-for critical extensions` | 4 | pyca limitation — policyConstraints, same family. |
+| pyca: `signature does not match` | 3 | pyca self-issued bridge-cert quirk (PKITS §4.10 Test12/13 subparts). |
+| pyca: `unsupported name constraint` | 2 | pyca scope limitation; OpenSSL and pkix-path support URI nameConstraints. |
+| pyca: `certificate <serial> revoked by CRL` (0x4, 0x6) | 2 | **pyca finds a revocation pkix-path does not.** pyca gained its own CRL check in PKIX-emf1.4, so these deserve a look rather than an assumption. |
+| pyca: `validity dates between 1950 and 2049 must be UtcTime (encountered processing <Certificat…` | 1 | pyca strict reading of §4.1.2.5; OpenSSL and pkix-path lenient. |
+| pyca: `invalid extension: 2.5.29.19: Certificate extension has incorrect criticality` | 1 | pyca limitation — a basicConstraints encoding it refuses. |
+
+Derived from `baseline-pkits.json` rather than hand-classified, so the
+counts cannot drift from the baseline they describe. Reasons are
+normalised — serial numbers and checker counts collapsed — so rows
+group by cause rather than by string.
 
 ### CRL coverage policy
 
@@ -312,20 +330,29 @@ OpenSSL finds a CRL pkix-path could not match to a signer).
 
 ## StricterThanWild — pkix-path Fail, ≥1 oracle Pass
 
-| Reason bucket | Count | Classification |
+| Reason | Count | Classification |
 |---|---:|---|
-| `certificate policy violation at chain index 0`     | 25 | pkix-path strict §6.1.5 policy-tree; OpenSSL lenient |
-| `pkix-path revocation: ... revoked by CRL` (various serials) | 17 | **Real revocation finding** — pkix-path agrees with OpenSSL on revocation outcome. The Stricter classification comes from pyca's no-CRL-support pass-through. 8 of these are clean "pkix-path + openssl Fail(revoked), pyca Pass" (PKITS §4.4 / §4.13). |
-| `name constraints violated at certificate index 0`  | 12 | pkix-path enforces NameConstraints per §6.1.4(g); OpenSSL lenient on certain NC types |
-| `certificate policy violation at chain index 1`     | 5  | same as policy-tree above, on intermediate |
-| `certificate at index 1 is not a CA`                | 5  | pkix-path enforces basicConstraints cA=TRUE per §6.1.4(k); OpenSSL also enforces but with subtly different rules around v1/v2 certs |
-| `signature invalid at chain index 0`                | 1  | PKITS §4.1.4 DSA (pkix-path does not currently support DSA — unrelated to path building) |
+| pkix-path: `certificate policy violation at chain index 0` | 25 | pkix-path strict §6.1.5 policy-tree enforcement; OpenSSL lenient. |
+| pkix-path: `revocation status of cert at chain index 0 is undetermined — no checker covered it` | 22 | **CRL coverage, the other direction** — pkix-path will not vouch for a cert no CRL covered, where an oracle passes it. The mirror of the `unable to get certificate CRL` bucket in LooserThanWild. |
+| pkix-path: `certificate policy violation at chain index 1` | 5 | Same, on the intermediate. |
+| pkix-path: `cert at chain index 0 revoked by CRL: certificate <serial> is revoked (reason keyComprom…` | 3 | **Real revocation finding** — pkix-path agrees with OpenSSL; the Stricter label comes from the third oracle passing the chain. |
+| pkix-path: `signature not verified at chain index 0: unsupported signature algorithm` | 1 | PKITS §4.1.4 DSA. pkix-path ships no DSA backend, and this is the corpus's one remaining ground-truth disagreement. |
 
-**Net**: 17 entries are real revocation findings (pkix-path and OpenSSL
-agree, pyca lags due to no CRL support — PKIX-emf1.4). The remaining 43
-follow the same pattern as before: pkix-path strict §6.1 enforcement vs
-OpenSSL leniency. The previous baseline's 13 `signature invalid at chain
-index N` entries are gone via the PKIX-t0w4 path-building integration.
+Derived from `baseline-pkits.json` rather than hand-classified, so the
+counts cannot drift from the baseline they describe. Reasons are
+normalised — serial numbers and checker counts collapsed — so rows
+group by cause rather than by string.
+
+**Net**: 30 of the 56 are pkix-path's strict §6.1.5 policy-tree
+enforcement against OpenSSL's leniency, which is the deliberate stance.
+22 are the CRL-coverage question in its fail-closed direction, the mirror
+of the LooserThanWild bucket above — the same policy produces entries on
+both sides depending on which oracle holds a CRL. 3 are real revocation
+findings where pkix-path and OpenSSL agree. The last is DSA, and it is
+the corpus's one remaining ground-truth disagreement.
+
+Earlier revisions of this paragraph counted 17 revocation findings and 43
+strict-enforcement entries, from a baseline two regenerations back.
 
 Follow-up beads: **PKIX-emf1.4** (pyca CRL strategy, surfaces the
 no-revocation divergence visibly here).
