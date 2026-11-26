@@ -202,7 +202,7 @@ fn a_missing_directory_is_an_io_error_not_a_panic() {
 // The candidate lists
 // ---------------------------------------------------------------------------
 
-/// The searched locations are public and absolute, so a deployment can
+/// The searched locations are public and rooted, so a deployment can
 /// print what was tried instead of reading this crate's source.
 #[test]
 fn the_candidate_lists_are_inspectable_and_absolute() {
@@ -215,7 +215,19 @@ fn the_candidate_lists_are_inspectable_and_absolute() {
     );
     assert!(!dirs.is_empty());
     for p in bundles.iter().chain(dirs.iter()) {
-        assert!(p.is_absolute(), "{p:?} must be absolute");
+        // Rooted at `/`, checked literally rather than with
+        // `Path::is_absolute`. That predicate is platform-dependent: on
+        // Windows it wants a prefix like `C:\` and calls every one of
+        // these paths relative, which failed this test there. These are
+        // Unix filesystem locations by construction — the Windows store
+        // is reached through CryptoAPI, not through this list — so the
+        // property to assert is the one that does not change with the
+        // host.
+        assert!(
+            p.starts_with("/"),
+            "{p:?} must be rooted, so NoTrustStore names a location \
+             that cannot be read two ways"
+        );
     }
 
     // The two most widely deployed layouts, named explicitly so a
@@ -265,9 +277,23 @@ fn from_system_agrees_with_reading_the_host_bundle_directly() {
 
     let (ours, report) =
         pkix_truststore_system::from_system_with_report().expect("the host has a store");
+
+    // A file on disk is only the system's answer where the platform has
+    // no store of its own. On macOS the Keychain is consulted first and
+    // wins — deliberately, see the precedence in `from_system_with_report`
+    // — and a macOS runner does have a bundle at a candidate path, which
+    // is how this test failed there. Reading the Keychain and a Homebrew
+    // bundle are two different stores, so there is nothing to compare;
+    // the native backend has its own coverage.
+    let Source::Bundle(used) = &report.source else {
+        eprintln!(
+            "skipped: this platform answered from {:?} rather than a candidate file",
+            report.source
+        );
+        return;
+    };
     assert_eq!(
-        report.source,
-        Source::Bundle(bundle.to_path_buf()),
+        used, bundle,
         "the first existing candidate should be the one used"
     );
 
@@ -287,4 +313,41 @@ fn from_system_agrees_with_reading_the_host_bundle_directly() {
         );
     }
     assert!(!ours.is_empty());
+}
+
+/// On a platform whose canonical store is not a file, the native backend
+/// must be the one that answers, and it must come back with anchors.
+///
+/// This is the only test that exercises the Keychain and CryptoAPI
+/// readers, and it exists because the test above stops being able to:
+/// where a native store wins there is no candidate file to compare it
+/// against, so that test skips and would leave the FFI unasserted.
+///
+/// Compiled only where there is a native backend. On Linux there is
+/// none, so there is nothing here to assert and `from_system` is covered
+/// by the file-based tests instead.
+#[test]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
+fn the_native_store_answers_and_returns_anchors() {
+    // Set deliberately, these override the platform, and then the
+    // native backend is correctly not consulted at all.
+    if std::env::var_os(SSL_CERT_FILE).is_some() || std::env::var_os(SSL_CERT_DIR).is_some() {
+        eprintln!("skipped: {SSL_CERT_FILE}/{SSL_CERT_DIR} override the platform store");
+        return;
+    }
+
+    let (anchors, report) = pkix_truststore_system::from_system_with_report()
+        .expect("a platform with a native trust store has a trust store");
+
+    assert!(
+        matches!(report.source, Source::Native(_)),
+        "the platform store should answer before any file is searched, \
+         got {:?}",
+        report.source
+    );
+    assert!(
+        !anchors.is_empty(),
+        "the platform store answered with nothing, which from_system \
+         treats as no answer at all"
+    );
 }
