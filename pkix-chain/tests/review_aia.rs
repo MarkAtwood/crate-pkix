@@ -693,3 +693,46 @@ fn a_wrong_key_intermediate_reports_the_typed_validation_failure() {
         other => panic!("expected PathBuild(NoValidPath {{ .. }}), got {other:?}"),
     }
 }
+
+/// A fetch that succeeds and adds nothing reports `NoNewIssuer`, not
+/// `FetchingDisabled`.
+///
+/// The repository here serves the same wrong-key intermediate the caller
+/// already supplied — a stale CA generation still published at its AIA
+/// URI, which is an ordinary misconfiguration rather than an attack. The
+/// fetch is made and answered, so there is no fetch error to report, and
+/// the pool refuses the duplicate, so nothing advances.
+///
+/// That used to surface as `Aia(FetchingDisabled)`, which is untrue in a
+/// way that misdirects: an operator reads it as "my fetcher is switched
+/// off" and goes auditing configuration, when the fetcher is working
+/// perfectly and the repository is the problem. It was found while
+/// writing the test for the topology-only fallback removal, where it was
+/// one of two reports that outranked the one under test.
+#[test]
+fn a_fetch_that_adds_nothing_is_not_reported_as_fetching_disabled() {
+    let anchors = [TrustAnchor::from_cert(load("nvp-root.der"))];
+    let policy = ValidationPolicy::new(NOW_UNIX);
+    let f = MapFetcher::new(HashMap::from([(
+        "http://aia.test/nvp-int.der".to_owned(),
+        bytes("tests/fixtures/review", "nvp-int-wrong.der"),
+    )]));
+
+    let err = Verifier::new(&anchors, &DefaultVerifier, &NoRevocation, &policy, &f)
+        .verify_one(&[load("nvp-leaf.der"), load("nvp-int-wrong.der")])
+        .expect_err("the repository serves a certificate already in the pool");
+
+    assert_eq!(
+        f.count(),
+        1,
+        "the fetch must actually have happened, or this proves nothing"
+    );
+    assert!(
+        matches!(err, Error::Aia(AiaError::NoNewIssuer)),
+        "expected Aia(NoNewIssuer); got {err:?}"
+    );
+    assert!(
+        !matches!(err, Error::Aia(AiaError::FetchingDisabled)),
+        "fetching was not disabled — a request was made and answered"
+    );
+}

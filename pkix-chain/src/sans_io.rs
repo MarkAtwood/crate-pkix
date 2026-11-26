@@ -300,11 +300,18 @@ impl<V: SignatureVerifier> ChainBuilder<'_, V> {
         if added_any {
             None
         } else {
+            // A fetch that was attempted and failed is the more
+            // informative report, so it wins. Only when nothing failed
+            // does the fallback apply, and then the truth is that the
+            // fetches worked and produced no new issuer — not that
+            // fetching is disabled, which is what this used to say. That
+            // reading sends an operator to their configuration when the
+            // fetcher is fine and the repository is stale or mispointed.
             Some(Error::Aia(
                 state
                     .last_aia_error
                     .clone()
-                    .unwrap_or(AiaError::FetchingDisabled),
+                    .unwrap_or(AiaError::NoNewIssuer),
             ))
         }
     }

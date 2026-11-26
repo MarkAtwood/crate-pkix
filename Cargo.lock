@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1494,7 +1494,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-chain"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "der",
  "mockito",

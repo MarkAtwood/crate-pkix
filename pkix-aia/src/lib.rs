@@ -119,6 +119,28 @@ pub enum AiaError {
     /// chain".
     FetchingDisabled,
 
+    /// Every fetch in a round succeeded and none of them produced a new
+    /// candidate issuer.
+    ///
+    /// Distinct from [`FetchingDisabled`](Self::FetchingDisabled), which
+    /// means no request was made. Here requests were made and answered;
+    /// the answers just did not advance the chain build. Three ways that
+    /// happens, all reported the same because all three mean "AIA cannot
+    /// help from here":
+    ///
+    /// - the response held no CA certificate, so nothing in it could be
+    ///   an issuer — usually a misconfigured AIA pointing at a leaf;
+    /// - every certificate in it was already pooled, which is what a
+    ///   repository still publishing a stale CA generation looks like;
+    /// - the response parsed to no certificates at all.
+    ///
+    /// This variant exists because the chain builder used to report all
+    /// of the above as `FetchingDisabled`, which was untrue in a way that
+    /// misdirects: an operator reads it as "my fetcher is switched off"
+    /// and goes looking at configuration, when the fetcher is working and
+    /// the repository is the problem.
+    NoNewIssuer,
+
     /// The remote endpoint responded with a non-success HTTP status.
     ///
     /// Carries the numeric status code (e.g. `404`, `503`). Fired for
@@ -222,6 +244,10 @@ impl core::fmt::Display for AiaError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::FetchingDisabled => f.write_str("AIA fetching is disabled"),
+            Self::NoNewIssuer => f.write_str(
+                "AIA fetch succeeded but produced no new candidate issuer \
+                 (no CA certificate in the response, or all of them already known)",
+            ),
             Self::HttpStatus(code) => write!(f, "AIA fetch returned HTTP status {code}"),
             Self::ResponseTooLarge { limit, actual } => write!(
                 f,

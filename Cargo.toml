@@ -149,7 +149,7 @@ pkix-mta-sts-http     = { path = "pkix-mta-sts-http",     version = "0.1.0" }
 pkix-mta-sts-resolver = { path = "pkix-mta-sts-resolver", version = "0.1.0" }
 pkix-tlsrpt           = { path = "pkix-tlsrpt",           version = "0.2.0" }
 pkix-net-guard        = { path = "pkix-net-guard",        version = "0.1.0" }
-pkix-chain            = { path = "pkix-chain",            version = "0.7.0" }
+pkix-chain            = { path = "pkix-chain",            version = "0.7.1" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.2.0" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
 pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.0" }
@@ -158,7 +158,7 @@ pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.1.0" 
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.0" }
 pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.0" }
 pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.0" }
-pkix-aia                = { path = "pkix-aia",                version = "0.2.0" }
+pkix-aia                = { path = "pkix-aia",                version = "0.2.1" }
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.3.0" }
 pkix-dane               = { path = "pkix-dane",               version = "0.2.1" }
 pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.2.0" }
