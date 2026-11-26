@@ -23,9 +23,12 @@
 //!
 //! - [`pkix-chain`] composes path validation + identity matching in its
 //!   `verify_tls_server` / `verify_smime_signer` wrappers.
-//! - Future trust-store adapters ([`pkix-truststore-system`],
-//!   [`pkix-truststore-pkcs11`]) use it to answer "what identities does
-//!   this anchored cert claim?".
+//! - A trust-store adapter can use it to answer "what identities does
+//!   this anchored cert claim?". [`pkix-truststore-system`] and
+//!   [`pkix-truststore-pkcs11`] both ship, and neither depends on this
+//!   crate today — they load anchors and leave identity to the caller.
+//!   The bullet is here as a use this split makes available, not as an
+//!   attribution.
 //! - ACME / TLS-ALPN-01 implementations use it for leaf-cert identity
 //!   checks without paying for a full chain validator.
 //!

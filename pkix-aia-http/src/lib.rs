@@ -134,7 +134,7 @@
 //!   AIA `accessLocation` `GeneralName`s; in practice HTTP and HTTPS
 //!   dominate. An `ldap://` fetcher could ship as a sibling
 //!   `pkix-aia-ldap` crate if demand surfaces.
-//! - No HTTP/2 connection pooling tuning beyond `ureq::Agent`'s
+//! - No connection-pool tuning beyond `ureq::Agent`'s
 //!   defaults. Sharing an agent across many fetches (the default
 //!   when you construct one [`HttpFetcher`] and keep it) reuses
 //!   connections; per-request tuning is not exposed.

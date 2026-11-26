@@ -1480,7 +1480,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia-http"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1616,7 +1616,7 @@ version = "0.1.1"
 
 [[package]]
 name = "pkix-identity"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "der",
  "idna",
@@ -1741,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-profiles"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "der",
  "pkix-lint",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-truststore"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "der",
  "pkix-path",

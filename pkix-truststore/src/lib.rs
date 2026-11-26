@@ -89,14 +89,13 @@
 //!   startup, share `&[TrustAnchor]` across worker threads, surface
 //!   `Error` from any thread) is supported.
 //! - **No panics on valid Rust input.** All loader entry points return
-//!   [`Result`] for every error category; the only known panic mode in
-//!   the dependency stack is an upstream x509-cert 0.2.x edge case
-//!   (RustCrypto/formats#1965, empty/whitespace-only PEM input causing a
-//!   subtract-with-overflow) which is defended against by an explicit
-//!   guard in [`from_pem`]. The workaround is documented inline and is
-//!   removed once the workspace bumps to x509-cert 0.3.x. Allocation
-//!   failure can panic in `alloc::vec::Vec` and is not specially handled
-//!   (consistent with std behaviour).
+//!   [`Result`] for every error category, and no panic mode is known in
+//!   the dependency stack. There used to be one — an x509-cert 0.2.x
+//!   subtract-with-overflow on PEM input that was empty after its
+//!   internal whitespace strip (RustCrypto/formats#1965) — fixed
+//!   upstream and gone since the workspace moved to x509-cert 0.3.
+//!   Allocation failure can panic in `alloc::vec::Vec` and is not
+//!   specially handled (consistent with std behaviour).
 //!
 //! # Features
 //!
@@ -505,14 +504,21 @@ pub fn from_pem(bytes: &[u8]) -> Result<Vec<TrustAnchor>> {
     // and the rustdoc above promises to accept it, so trim all trailing
     // ASCII whitespace here.
     let bytes = strip_bom(bytes).trim_ascii_end();
-    // x509-cert 0.2.x's `load_pem_chain` panics on input that is empty after
-    // its internal trailing-whitespace strip (subtract-with-overflow at
-    // `certificate.rs:256`). Fixed upstream in RustCrypto/formats#1965 and
-    // shipped in x509-cert 0.3.0-rc.2+; this guard can be removed once the
-    // workspace bumps to x509-cert 0.3.x stable. Until then, defend against
-    // the panic here so consumers see `Error::NoCertificates` instead. The
-    // check is also correct for input with no `-----BEGIN CERTIFICATE-----`
-    // markers at all.
+    // This began as a workaround for an x509-cert 0.2.x
+    // subtract-with-overflow (RustCrypto/formats#1965) on input that was
+    // empty after its internal whitespace strip. That is fixed upstream
+    // and the workspace is on 0.3, so the panic is gone — but the guard
+    // stays, for the second reason the original comment mentioned
+    // almost in passing: it is what makes input carrying no
+    // `-----BEGIN CERTIFICATE-----` marker report
+    // `Error::NoCertificates` rather than a PEM parse error.
+    //
+    // Without it, 0.3 answers these three ways: empty input gives
+    // `Ok(vec![])`, caught by the `is_empty` check below; whitespace-only
+    // and marker-less input give "PEM error in post-encapsulation
+    // boundary", which describes the shape of the bytes rather than the
+    // thing the caller got wrong. `from_pem_degenerate_input_is_no_certificates`
+    // pins all of that.
     if !bytes
         .windows(BEGIN_BOUNDARY.len())
         .any(|w| w == BEGIN_BOUNDARY)
@@ -699,6 +705,38 @@ mod tests {
     //! the fixtures are full files rather than `include_bytes!` blobs. These
     //! in-source tests cover only the unit-level behaviours that do not
     //! benefit from on-disk fixtures.
+
+    /// Degenerate PEM input is `NoCertificates`, not a PEM parse error.
+    ///
+    /// This pins both halves of the guard in [`from_pem`]. It began as a
+    /// workaround for an x509-cert 0.2.x panic
+    /// (RustCrypto/formats#1965), which 0.3 fixed — so the test also
+    /// records what upstream now does, since that is the only reason
+    /// keeping the guard is still justified rather than cargo-culted.
+    ///
+    /// Oracle: `x509_cert::Certificate::load_pem_chain` on 0.3.1
+    /// answers empty input with `Ok(vec![])`, and whitespace-only or
+    /// marker-less input with "PEM error in post-encapsulation
+    /// boundary". None of the three panics. The first is caught by the
+    /// `is_empty` check; the other two would otherwise surface a PEM
+    /// error describing the shape of the bytes rather than what the
+    /// caller got wrong.
+    #[test]
+    fn from_pem_degenerate_input_is_no_certificates() {
+        for input in [
+            &b""[..],
+            b"   \n\t ",
+            b"hello",
+            b"-----BEGIN SOMETHING ELSE-----\nAAAA\n-----END SOMETHING ELSE-----\n",
+        ] {
+            assert!(
+                matches!(from_pem(input), Err(Error::NoCertificates)),
+                "input {:?} must be NoCertificates, got {:?}",
+                core::str::from_utf8(input).unwrap_or("<non-utf8>"),
+                from_pem(input)
+            );
+        }
+    }
     use super::*;
 
     #[test]

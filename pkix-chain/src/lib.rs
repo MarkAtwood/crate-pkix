@@ -90,10 +90,11 @@
 //!   handled by `pkix-revocation-http`; this crate accepts any
 //!   `RevocationChecker` impl — including `NoRevocation` for the
 //!   zero-cost "I'll handle revocation myself" path.
-//! - **Algorithm coverage tracks `pkix-path`.** Bundled `SignatureVerifier`
-//!   backends cover RSA-PKCS1v15-SHA-{256,384,512}, ECDSA-P-256-SHA-256,
-//!   and (with the `p384` feature) ECDSA-P-384-SHA-384. Ed25519, P-521,
-//!   and RSA-PSS are tracked under `PKIX-gphz`.
+//! - **Algorithm coverage tracks `pkix-path`.** The default feature set
+//!   wires in RustCrypto backends for RSA — PKCS#1 v1.5 and RSASSA-PSS
+//!   with SHA-256/384/512 — and ECDSA on P-256. The optional `p384`,
+//!   `p521` and `ed25519` features add ECDSA on P-384 and P-521 and
+//!   Ed25519; `rustcrypto` enables all of them.
 //! - **Use-case wrappers.** `verify_tls_server`,
 //!   `verify_tls_client_dns`, `verify_tls_client_mailbox`,
 //!   `verify_smime_signer`, `verify_smime_recipient`, `verify_code_signer`,

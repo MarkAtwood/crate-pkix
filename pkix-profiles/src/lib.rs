@@ -54,10 +54,20 @@
 //!
 //! # `std` requirement
 //!
-//! This crate requires `std`. [`ValidationPolicy`] holds owned `Vec` fields that
-//! currently require the standard allocator. `no_std` + `alloc` support is planned
-//! for a future release; until then, downstream `no_std` crates should construct
-//! [`ValidationPolicy`] directly rather than using this crate.
+//! This crate requires `std`, for `std::sync::OnceLock`: the
+//! [`pkix_lint::LintProfile`] impls cache their lint lists in a lazily
+//! initialised `static`, and `OnceLock` is not in `core` or `alloc`.
+//!
+//! Not, as this said before, because [`ValidationPolicy`] "holds owned
+//! `Vec` fields that currently require the standard allocator".
+//! `ValidationPolicy` is defined in [`pkix_path`], which is
+//! `no_std` + `alloc`, and `Vec` comes from `alloc`. Nothing about the
+//! policy type stands in the way.
+//!
+//! So this is a conversion nobody has done rather than a blocker, and no
+//! release is promised for it. A `no_std` consumer that wants these
+//! profiles today can construct [`ValidationPolicy`] directly, which is
+//! what the policy accessors return anyway.
 //!
 //! # Limitations
 //!
