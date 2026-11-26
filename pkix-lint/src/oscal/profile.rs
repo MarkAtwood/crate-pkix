@@ -331,11 +331,37 @@ fn resolve_profile_inner(
                     }
                 }
             }
-            // Preserve the source order; only keep ids present in the
-            // source (silently drop wanted ids that aren't in the
-            // source — operators see this via the `filter_to_ids`
-            // round-trip failing later if it matters).
+            // Preserve the source order, keeping only ids the source
+            // defines — and refuse any the source does not.
+            //
+            // These used to be dropped silently, on the reasoning that
+            // an operator would notice through the `filter_to_ids`
+            // round-trip failing later if it mattered. It does not
+            // fail: `filter_to_ids` is given the resolved set, which by
+            // then no longer mentions the id. So a typo'd control id in
+            // a Profile produced a clean run against a smaller profile
+            // than the one asked for, and nothing in the output said
+            // which controls had gone missing. For a compliance tool
+            // that is the worst of the available outcomes — not a
+            // refusal, but a passing report for the wrong question.
             available_ids.retain(|id| wanted.contains(id));
+            if available_ids.len() != wanted.len() {
+                let present: HashSet<&String> = available_ids.iter().collect();
+                // Named in the Profile's own order, not the catalog's,
+                // so the message points at what the operator wrote.
+                // `wanted` is a HashSet, so sort for a stable message:
+                // the same bad Profile must not name different ids on
+                // different runs.
+                let mut missing: Vec<&String> =
+                    wanted.iter().filter(|id| !present.contains(id)).collect();
+                missing.sort();
+                if let Some(id) = missing.first() {
+                    return Err(ParseError::ProfileUnknownControlId {
+                        index: import_index,
+                        id: (*id).clone(),
+                    });
+                }
+            }
             available_ids.clone()
         } else {
             // Neither `include-all` nor `include-controls` present:
@@ -551,6 +577,95 @@ mod tests {
             "profile": {
                 "uuid": "00000000-0000-0000-0000-000000000002",
                 "metadata": { "title": "explicit", "oscal-version": "1.1.2" },
+                "imports": [
+                    {
+                        "href": "#rs.pkix.rfc5280",
+                        "include-controls": [
+                            { "with-ids": ["rfc5280.cert.serial_number.max_octets"] }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        let resolved = resolve_profile(&profile, &sources).expect("resolve");
+        assert_eq!(
+            resolved.control_ids,
+            vec!["rfc5280.cert.serial_number.max_octets".to_owned()]
+        );
+    }
+
+    /// A control id the Catalog does not define is refused, not dropped.
+    ///
+    /// Oracle: the Profile JSON asks for two controls and the Catalog
+    /// defines one of them, so the only faithful answers are "error" or
+    /// "resolved to both", and the second is impossible. Resolving to
+    /// just the one that exists answers a question nobody asked.
+    ///
+    /// This was silently dropped, on the reasoning that an operator
+    /// would notice later through the `filter_to_ids` round trip. They
+    /// would not: `filter_to_ids` receives the already-resolved set,
+    /// which no longer mentions the missing id. The run came back clean
+    /// against a smaller profile than the one requested — a passing
+    /// compliance report for the wrong question.
+    #[test]
+    fn an_unknown_control_id_is_refused_rather_than_dropped() {
+        let mut sources = HashMap::new();
+        sources.insert("#rs.pkix.rfc5280".to_owned(), rfc_catalog());
+
+        let profile = json!({
+            "profile": {
+                "uuid": "00000000-0000-0000-0000-000000000009",
+                "metadata": { "title": "typo", "oscal-version": "1.1.2" },
+                "imports": [
+                    {
+                        "href": "#rs.pkix.rfc5280",
+                        "include-controls": [
+                            { "with-ids": [
+                                "rfc5280.cert.serial_number.max_octets",
+                                "rfc5280.cert.serial_number.max_octet"
+                            ] }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        assert_eq!(
+            resolve_profile(&profile, &sources),
+            Err(ParseError::ProfileUnknownControlId {
+                index: 0,
+                // The typo, not the id that exists.
+                id: "rfc5280.cert.serial_number.max_octet".to_owned(),
+            }),
+            "a control id the catalog does not define must be an error"
+        );
+    }
+
+    /// The message names the id, because "a control id was wrong" sends
+    /// the operator to diff two JSON files by hand.
+    #[test]
+    fn the_unknown_control_id_error_names_the_id() {
+        let rendered = ParseError::ProfileUnknownControlId {
+            index: 3,
+            id: "rfc5280.typo".to_owned(),
+        }
+        .to_string();
+        assert!(rendered.contains("rfc5280.typo"), "got {rendered}");
+        assert!(rendered.contains("imports[3]"), "got {rendered}");
+    }
+
+    /// And a Profile naming only ids the Catalog defines still resolves,
+    /// so the check above cannot have been made by refusing everything.
+    #[test]
+    fn every_known_control_id_still_resolves() {
+        let mut sources = HashMap::new();
+        sources.insert("#rs.pkix.rfc5280".to_owned(), rfc_catalog());
+
+        let profile = json!({
+            "profile": {
+                "uuid": "00000000-0000-0000-0000-00000000000a",
+                "metadata": { "title": "all known", "oscal-version": "1.1.2" },
                 "imports": [
                     {
                         "href": "#rs.pkix.rfc5280",

@@ -1,0 +1,7 @@
+{
+  "id": "1795724101125901481-1",
+  "issue_id": "PKIX-cf0b",
+  "author": "Mark Atwood",
+  "text": "Fixed. resolve_profile now returns ParseError::ProfileUnknownControlId naming the first id the imported Catalog does not define, instead of dropping it.\n\nThe code comment defended the old behaviour: 'operators see this via the filter_to_ids round-trip failing later if it matters.' They do not. filter_to_ids receives the already-resolved set, which by then no longer mentions the missing id, so nothing fails. A typo'd control id produced a clean run against a smaller profile than the one requested, with nothing in the output saying which controls had gone missing. For a compliance tool that is the worst available outcome -- not a refusal, but a passing report for a question nobody asked.\n\nThe missing ids are sorted before the first is reported, so the same bad Profile names the same id on every run; wanted is a HashSet and the message would otherwise be nondeterministic.\n\nParseError is #[non_exhaustive], so the variant is additive. But a Profile that previously resolved now errors, so pkix-lint 0.11.0 rather than the pending 0.10.3 -- same reasoning as pkix-ct 0.4.0 and pkix-chain 0.9.0 today.\n\nThree tests: the refusal, that the message names both the id and the import index, and that a Profile naming only known ids still resolves. Mutation-verified.",
+  "created_at": "2026-11-26T20:15:01.125901481Z"
+}

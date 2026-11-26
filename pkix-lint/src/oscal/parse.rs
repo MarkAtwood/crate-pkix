@@ -296,6 +296,19 @@ pub enum ParseError {
         /// Position of the offending entry in the directives array.
         entry_index: usize,
     },
+    /// A control id the Profile asked to include is not in the Catalog
+    /// it imported from.
+    ///
+    /// Almost always a typo in the Profile. It used to be dropped
+    /// silently, which for a compliance tool is the worst available
+    /// outcome: the run reports against a profile that was not the one
+    /// requested, and the report cannot say so.
+    ProfileUnknownControlId {
+        /// Position of the import in `profile.imports`.
+        index: usize,
+        /// The id that the imported Catalog does not define.
+        id: String,
+    },
     /// An id in a `with-ids` array was not a JSON string.
     ProfileWithIdNotString {
         /// Position of the parent import in `profile.imports`.
@@ -516,6 +529,11 @@ impl std::fmt::Display for ParseError {
             Self::ProfileWithIdsNotArray { index, entry_index } => write!(
                 f,
                 "profile.imports[{index}] include/exclude-controls[{entry_index}].with-ids is not a JSON array"
+            ),
+            Self::ProfileUnknownControlId { index, id } => write!(
+                f,
+                "profile.imports[{index}] include-controls names control id {id:?}, \
+                 which the imported catalog does not define"
             ),
             Self::ProfileWithIdNotString { index, entry_index } => write!(
                 f,
