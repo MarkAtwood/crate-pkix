@@ -99,3 +99,57 @@ fn pkix_path_oracle_does_not_check_revocation_when_crls_empty() {
         "PKITS 4.1.1 must validate with no CRLs; got {verdict}"
     );
 }
+
+/// PKITS 4.15.5: a base CRL holds the certificate, the delta releases it.
+///
+/// Oracle: PKITS §4.15.5 "Valid delta-CRL Test5" — ShouldValidate=true, and
+/// `openssl verify -crl_check_all` agrees. RFC 5280 §5.3.1 `removeFromCRL`
+/// in a delta means the certificate is no longer revoked.
+///
+/// This is a regression test for a defect in the oracle, not in
+/// `pkix-revocation`: that crate's own `pkits_4_15_5_valid_delta_remove_from_crl`
+/// passed throughout. The oracle offered both a base+delta checker and a bare
+/// base checker for the same base, and failed closed on the first revocation
+/// any checker reported — so the bare base's `certificateHold` always won and
+/// `removeFromCRL` could never take effect. It was reported as a real
+/// disagreement with NIST for as long as the baseline recorded it.
+///
+/// The bare base must not be consulted by any route once a delta amends it,
+/// signer discovery included: putting the supersession guard in one place and
+/// leaving a second construction site outside it is what made the first
+/// attempt at this fix insufficient.
+#[test]
+fn pkix_path_oracle_honours_remove_from_crl_in_a_delta() {
+    let chain = pkits_chain("4.15.5 Valid delta-CRL Test5");
+    assert!(
+        chain.crls.len() >= 2,
+        "precondition: 4.15.5 ships a base CRL and a delta; got {}",
+        chain.crls.len()
+    );
+    let verdict =
+        oracles::pkix_path::verify(&chain).expect("pkix-path oracle ran without harness error");
+    assert_eq!(
+        verdict,
+        Verdict::Pass,
+        "4.15.5: the delta's removeFromCRL releases serial 4, so the chain must \
+         validate; got {verdict}"
+    );
+}
+
+/// The other direction, so the fix above cannot have been a blanket
+/// "ignore the base when a delta is present".
+///
+/// Oracle: PKITS §4.15.3 "Invalid delta-CRL Test3" — ShouldValidate=false.
+/// The certificate is revoked in the base and the delta does not release it,
+/// so it stays revoked. A delta amends the base rather than replacing it.
+#[test]
+fn pkix_path_oracle_keeps_a_base_revocation_a_delta_does_not_release() {
+    let chain = pkits_chain("4.15.3 Invalid delta-CRL Test3");
+    let verdict =
+        oracles::pkix_path::verify(&chain).expect("pkix-path oracle ran without harness error");
+    assert!(
+        matches!(verdict, Verdict::Fail { .. }),
+        "4.15.3: revoked in the base and not released by the delta must stay \
+         revoked; got {verdict}"
+    );
+}

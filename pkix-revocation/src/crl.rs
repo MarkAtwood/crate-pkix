@@ -469,6 +469,29 @@ impl<V: SignatureVerifier> CrlChecker<V> {
     ///   base.
     /// - The merged result is used for all subsequent `check_revocation` calls.
     ///
+    /// # Do not also consult the base alone
+    ///
+    /// Once a delta amends a base, the pairing is the only thing that
+    /// should be asked about a certificate. A base CRL and its delta are
+    /// not two opinions to be weighed: the delta supersedes the base.
+    ///
+    /// A caller that holds both a checker built here and a plain
+    /// [`CrlChecker::new`] over the same base, and that treats a
+    /// revocation from either as decisive, has made `removeFromCRL`
+    /// unreachable — the bare base still lists the certificate, so it
+    /// still reports it revoked and the release is never seen. The
+    /// certificate is refused rather than wrongly accepted, so the
+    /// failure is fail-closed and easy to miss.
+    ///
+    /// This is not hypothetical: `pkix-difftest`'s PKITS oracle did
+    /// exactly this and reported `certificateHold` for PKITS 4.15.5,
+    /// where NIST and OpenSSL both validate, while this crate's own
+    /// §4.15.5 test passed the whole time.
+    ///
+    /// Dropping the bare base loses nothing. A delta does not replace
+    /// the base's entries, it amends them: anything revoked in the base
+    /// stays revoked unless the delta carries `removeFromCRL` for it.
+    ///
     /// # Errors
     ///
     /// Returns `Err(Error::CrlParseError)` if either the base or delta CRL DER

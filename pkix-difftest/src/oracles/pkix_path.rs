@@ -276,24 +276,87 @@ fn is_delta_crl(crl_der: &[u8]) -> bool {
 /// construct and is dropped, so offering candidates is safe and keeps the
 /// matching rules in the library rather than restated here.
 ///
-/// Each base is also kept unpaired, because a certificate revoked in the base
-/// must still be caught when no delta applies.
+/// A base is kept unpaired only when no delta paired with it. Offering both
+/// the pairing and the bare base defeats the pairing: a base CRL and its delta
+/// are not two opinions to be weighed, the delta supersedes the base, and this
+/// loop fails closed on the first checker that reports a revocation. So the
+/// bare base always won and `removeFromCRL` could never take effect.
+///
+/// PKITS 4.15.5 is exactly that shape — serial 4 held by
+/// `deltaCRLCA1CRL` and released by `deltaCRLCA1deltaCRL` with
+/// `removeFromCRL` (§5.3.1). NIST says validate and OpenSSL agrees;
+/// this oracle reported `certificateHold` from the base it should no
+/// longer have been consulting. `pkix-revocation` had the rule right the
+/// whole time: its own `pkits_4_15_5_valid_delta_remove_from_crl`
+/// passes, and 26 of 26 PKITS CRL vectors pass at that layer. The
+/// disagreement with NIST was manufactured here.
+///
+/// Dropping the bare base is safe because a delta does not erase the
+/// base's entries, it amends them: anything revoked in the base stays
+/// revoked unless the delta carries `removeFromCRL` for it. PKITS
+/// 4.15.3 pins that direction — revoked in base, delta present, still
+/// revoked.
 ///
 /// Standalone deltas are deliberately not added: they can only ever return
 /// `DeltaCrlAsComplete`, which carries no determination.
-fn build_checkers(crls: &[Vec<u8>], now_unix: u64) -> Vec<CrlChecker<DefaultVerifier>> {
+///
+/// # Signer discovery
+///
+/// For each base this also offers a checker built by signer discovery, which
+/// finds which `bundle` certificate actually signed the CRL. That is the
+/// key-rollover and separate-CRL-signing-key case: one CA holding several
+/// certificates, signing its CRL with one while having issued this certificate
+/// from another, so the signature-chain issuer is the wrong signer to hand
+/// over.
+///
+/// It is safe only because the caller has already restricted `crls` to the
+/// ones this certificate points at. Discovery answers "who signed this CRL",
+/// not "is this the right CRL" — offered the whole CRL set it will happily
+/// authenticate a CRL the certificate never pointed at, which is how an
+/// earlier attempt broke Invalid Wrong CRL and friends.
+/// `new_with_signer_discovery` is self-validating beyond that: it enforces
+/// cRLSign per §6.3.3(f) and requires the discovered signer to chain to a
+/// self-signed certificate.
+fn build_checkers(
+    crls: &[Vec<u8>],
+    bundle: &[Certificate],
+    now_unix: u64,
+) -> Vec<CrlChecker<DefaultVerifier>> {
     let (deltas, bases): (Vec<&Vec<u8>>, Vec<&Vec<u8>>) =
         crls.iter().partition(|c| is_delta_crl(c));
 
     let mut checkers = Vec::new();
     for base in &bases {
-        if let Ok(c) = CrlChecker::new((*base).clone(), now_unix, DefaultVerifier) {
-            checkers.push(c);
-        }
+        let mut superseded = false;
         for delta in &deltas {
             if let Ok(c) = CrlChecker::with_delta(base, delta, now_unix, DefaultVerifier) {
                 checkers.push(c);
+                superseded = true;
             }
+        }
+        // A superseded base is not consulted alone by any route. A
+        // pairing that does not belong fails to construct, so the
+        // certificate revoked in a base with no applicable delta is
+        // still covered here.
+        if superseded {
+            continue;
+        }
+        if let Ok(c) = CrlChecker::new((*base).clone(), now_unix, DefaultVerifier) {
+            checkers.push(c);
+        }
+        // Signer discovery is built here, under the same supersession
+        // guard, rather than alongside the call. Keeping it outside is
+        // what made the first fix insufficient: the guard was added to
+        // this function while a second site went on adding a bare
+        // checker for every non-delta CRL, so the superseded base was
+        // still consulted and still won.
+        if let Ok(c) = CrlChecker::new_with_signer_discovery(
+            (*base).clone(),
+            bundle,
+            now_unix,
+            DefaultVerifier,
+        ) {
+            checkers.push(c);
         }
     }
     checkers
@@ -323,37 +386,7 @@ fn check_revocation(
             .filter(|c| crl_applies_to(cert, c).is_ok())
             .cloned()
             .collect();
-        let mut checkers = build_checkers(&applicable, now_unix);
-
-        // Among the CRLs this certificate points at, find which bundle
-        // certificate actually signed each one. This is the key-rollover and
-        // "separate CRL signing key" case: one CA holding several
-        // certificates, signing its CRL with one while having issued this
-        // certificate from another, so the signature-chain issuer is the
-        // wrong signer to hand over.
-        //
-        // Safe only because of the filter above. Discovery answers "who signed
-        // this CRL", not "is this the right CRL" — offered the whole CRL set it
-        // will happily authenticate a CRL the certificate never pointed at,
-        // which is how an earlier attempt broke Invalid Wrong CRL and friends.
-        //
-        // new_with_signer_discovery is self-validating beyond that: it enforces
-        // cRLSign per §6.3.3(f) and requires the discovered signer to chain to
-        // a self-signed certificate.
-        checkers.extend(
-            applicable
-                .iter()
-                .filter(|c| !is_delta_crl(c))
-                .filter_map(|crl| {
-                    CrlChecker::new_with_signer_discovery(
-                        crl.clone(),
-                        bundle,
-                        now_unix,
-                        DefaultVerifier,
-                    )
-                    .ok()
-                }),
-        );
+        let checkers = build_checkers(&applicable, bundle, now_unix);
 
         // Did any CRL actually reach a verdict about this certificate?
         let mut cleared_by_some_crl = false;

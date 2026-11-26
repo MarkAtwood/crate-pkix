@@ -993,6 +993,28 @@
     {
       "class": "LooserThanWild",
       "ground_truth_agreement": true,
+      "name": "4.15.5 Valid delta-CRL Test5",
+      "verdicts": [
+        {
+          "oracle": "pkix-path",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "openssl",
+          "reason": null,
+          "verdict": "pass"
+        },
+        {
+          "oracle": "pyca",
+          "reason": "pyca: certificate 0x4 revoked by CRL",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "class": "LooserThanWild",
+      "ground_truth_agreement": true,
       "name": "4.15.7 Valid delta-CRL Test7",
       "verdicts": [
         {
@@ -2152,28 +2174,6 @@
         {
           "oracle": "pyca",
           "reason": "pyca: certificate 0x2 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.15.5 Valid delta-CRL Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 04 is revoked (reason certificateHold)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x4 revoked by CRL",
           "verdict": "fail"
         }
       ]
@@ -3373,7 +3373,7 @@
       "verdicts": [
         {
           "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 05 is revoked (reason certificateHold)",
+          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 05 is revoked (reason keyCompromise)",
           "verdict": "fail"
         },
         {
@@ -5457,28 +5457,6 @@
           "verdict": "fail"
         }
       ]
-    },
-    {
-      "class": "StricterThanWild",
-      "ground_truth_agreement": false,
-      "name": "4.15.5 Valid delta-CRL Test5",
-      "verdicts": [
-        {
-          "oracle": "pkix-path",
-          "reason": "pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 04 is revoked (reason certificateHold)",
-          "verdict": "fail"
-        },
-        {
-          "oracle": "openssl",
-          "reason": null,
-          "verdict": "pass"
-        },
-        {
-          "oracle": "pyca",
-          "reason": "pyca: certificate 0x4 revoked by CRL",
-          "verdict": "fail"
-        }
-      ]
     }
   ],
   "harness_errored_chains": [
@@ -5488,9 +5466,9 @@
   "summary": {
     "Agreement": 61,
     "DiagnosticDivergence": 67,
-    "LooserThanWild": 62,
+    "LooserThanWild": 63,
     "OracleDivergence": 0,
-    "StricterThanWild": 57,
+    "StricterThanWild": 56,
     "total": 247
   }
 }
