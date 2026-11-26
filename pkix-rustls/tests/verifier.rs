@@ -11,10 +11,7 @@
 //! there is one copy and it cannot drift. See
 //! `pkix-chain/tests/fixtures/gen.py`.
 
-use std::sync::Arc;
-
 use rustls::client::danger::ServerCertVerifier;
-use rustls::crypto::CryptoProvider;
 use rustls::{CertificateError, Error as RustlsError};
 use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
 
@@ -37,17 +34,10 @@ fn parse(der: &[u8]) -> x509_cert::Certificate {
     x509_cert::Certificate::from_der(der).expect("fixture parses")
 }
 
-/// The provider is only ever asked about handshake signatures and
-/// advertised schemes, never about the chain, but the trait needs one.
-fn provider() -> Arc<CryptoProvider> {
-    Arc::new(rustls::crypto::ring::default_provider())
-}
-
 fn verifier() -> PkixServerCertVerifier {
-    PkixServerCertVerifier::new(
-        vec![TrustAnchor::from_cert(parse(&fixture("root.der")))],
-        provider(),
-    )
+    // No CryptoProvider: the chain and the handshake signatures both go
+    // through pkix-path, so rustls's crypto is not consulted here.
+    PkixServerCertVerifier::new(vec![TrustAnchor::from_cert(parse(&fixture("root.der")))])
 }
 
 fn verify(v: &PkixServerCertVerifier, leaf: &str, name: &str, now: u64) -> Result<(), RustlsError> {
@@ -94,7 +84,7 @@ fn a_name_mismatch_maps_to_not_valid_for_name() {
 /// the one that tells an operator their trust store is wrong.
 #[test]
 fn an_untrusted_chain_maps_to_unknown_issuer() {
-    let v = PkixServerCertVerifier::new(Vec::new(), provider());
+    let v = PkixServerCertVerifier::new(Vec::new());
     let err = verify(&v, "host-exact-foo.der", "foo.example.com", NOW)
         .expect_err("no anchors means no path");
     assert!(
@@ -239,18 +229,36 @@ fn an_unmappable_error_survives_inside_other() {
     }
 }
 
-/// The schemes advertised to the peer are the provider's, because
-/// handshake signatures are the provider's job. A verifier that
-/// answered this from its own opinion could advertise a scheme the
-/// provider cannot verify.
+/// The schemes advertised to the peer must be exactly the ones this
+/// crate can verify.
+///
+/// This used to echo the `CryptoProvider`'s list, which was right while
+/// the handshake signatures were delegated to it. They are not any
+/// more, so the provider's opinion is no longer the relevant one —
+/// advertising a scheme the provider supports but this crate does not
+/// would make a server choose it and then fail.
+///
+/// The lists genuinely differ: `ring` does not offer
+/// `ECDSA_NISTP521_SHA512` and `pkix-path` does, so ours is not a
+/// subset of the provider's and cannot be checked against it.
 #[test]
-fn advertised_schemes_come_from_the_provider() {
-    let p = provider();
-    let expected = p.signature_verification_algorithms.supported_schemes();
-    let v = PkixServerCertVerifier::new(Vec::new(), p);
-    assert_eq!(v.supported_verify_schemes(), expected);
-    assert!(
-        !expected.is_empty(),
-        "a provider with no schemes would make this vacuous"
-    );
+fn advertised_schemes_are_the_ones_this_crate_verifies() {
+    let advertised = PkixServerCertVerifier::new(Vec::new()).supported_verify_schemes();
+    assert_eq!(advertised, pkix_rustls::handshake::SUPPORTED_SCHEMES);
+    assert!(!advertised.is_empty());
+
+    // The safety property: nothing advertised may be a scheme the
+    // handshake code refuses. `pkix-rustls`'s own unit tests check the
+    // converse — that nothing implemented is left unadvertised.
+    for scheme in &advertised {
+        assert!(
+            !matches!(
+                scheme,
+                rustls::SignatureScheme::RSA_PKCS1_SHA1
+                    | rustls::SignatureScheme::ECDSA_SHA1_Legacy
+                    | rustls::SignatureScheme::ED448
+            ),
+            "{scheme:?} must not be advertised"
+        );
+    }
 }

@@ -18,9 +18,11 @@
 //! // none, and neither does the rest of the workspace.
 //! let anchors: Vec<pkix_chain::TrustAnchor> = vec![];
 //!
-//! let provider = Arc::new(rustls::crypto::ring::default_provider());
-//! let verifier = PkixServerCertVerifier::new(anchors, provider.clone());
+//! // The verifier needs no CryptoProvider; rustls still needs one for
+//! // the rest of TLS.
+//! let verifier = PkixServerCertVerifier::new(anchors);
 //!
+//! let provider = Arc::new(rustls::crypto::ring::default_provider());
 //! let config = rustls::ClientConfig::builder_with_provider(provider)
 //!     .with_safe_default_protocol_versions()?
 //!     .dangerous()
@@ -40,17 +42,22 @@
 //!   [`pkix_chain::verify_tls_server`]: path construction, signatures,
 //!   validity, name constraints, policies, profile rules, revocation if
 //!   you configure it, and RFC 6125 name matching.
-//! - **The TLS 1.2 and 1.3 handshake signatures.** Not a PKI question —
-//!   it is the peer proving possession of the key in the certificate,
-//!   during the handshake. Delegated to the [`rustls::crypto::CryptoProvider`]
-//!   you supply, through rustls's own
-//!   [`verify_tls12_signature`](rustls::crypto::verify_tls12_signature) and
-//!   [`verify_tls13_signature`](rustls::crypto::verify_tls13_signature).
-//! - **Which signature schemes to advertise.** Also the provider's.
+//! - **The TLS 1.2 and 1.3 handshake signatures.** Not a PKI question
+//!   in itself — it is the peer proving possession of the key in the
+//!   certificate. But rustls's helper for it parses the certificate
+//!   with webpki to extract that key, so delegating meant a second
+//!   X.509 parser touching the same bytes. Done here instead, with
+//!   this workspace's parser and [`pkix_path::SignatureVerifier`]; see
+//!   the [`handshake`] module for what the TLS schemes require beyond
+//!   an X.509 OID.
+//! - **Which signature schemes to advertise.** Consequently ours, and
+//!   exactly the set the handshake code implements.
 //!
-//! So this crate does not replace rustls's cryptography and does not
-//! want to. It replaces the trust decision, which is the part
-//! `rustls-webpki` was doing and the part this workspace exists for.
+//! This crate still does not implement any cryptography: key exchange,
+//! AEAD, HKDF and the TLS state machine are all rustls's, and the
+//! signature primitives are `pkix-path`'s existing backends. What it
+//! replaces is the trust decision and the certificate parsing that
+//! feeds it.
 //!
 //! # What about `rustls-webpki`?
 //!
@@ -60,11 +67,13 @@
 //! webpki's signature-algorithm types, which the handshake path uses
 //! whatever verifier is installed.
 //!
-//! What changes is which code decides whether to trust a chain. With
-//! this verifier installed, `rustls-webpki` performs no path
-//! validation, no name matching and no trust decision: it is reduced to
-//! rustls's internal algorithm plumbing. That is the part that was
-//! worth replacing.
+//! What changes is that none of it runs. With this verifier installed
+//! webpki performs no path validation, no name matching, no trust
+//! decision — and, since the handshake signatures are verified here
+//! too, it does not parse the certificate either. The two live paths
+//! into it are the default verifier, which is not installed, and
+//! rustls's signature helpers, which are not called. It is linked and
+//! dead.
 //!
 //! Getting it out of the tree altogether would take an upstream change
 //! making the dependency optional, which is rustls's call and not
@@ -96,7 +105,6 @@ use std::sync::Arc;
 
 use der::Decode as _;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
-use rustls::crypto::CryptoProvider;
 use rustls::{CertificateError, DigitallySignedStruct, Error as RustlsError, SignatureScheme};
 use rustls_pki_types::{CertificateDer, ServerName as RustlsServerName, UnixTime};
 use x509_cert::Certificate;
@@ -107,8 +115,13 @@ use pkix_chain::{
 };
 
 mod error;
+/// Verifying the TLS handshake signature with this workspace's parser
+/// and crypto rather than rustls's helper. See the module
+/// documentation for why.
+pub mod handshake;
 
 pub use error::map_error;
+pub use handshake::CurveMismatch;
 
 /// A rustls [`ServerCertVerifier`] that validates chains with
 /// [`pkix_chain`].
@@ -131,10 +144,6 @@ pub struct PkixServerCertVerifier<
     profile: P,
     revocation: R,
     aia: A,
-    /// Supplies the handshake-signature verification and the advertised
-    /// schemes. Not used for the certificate chain, which goes through
-    /// `verifier`.
-    provider: Arc<CryptoProvider>,
 }
 
 impl PkixServerCertVerifier {
@@ -144,32 +153,31 @@ impl PkixServerCertVerifier {
     /// (RFC 5280 plus RFC 6125 plus the serverAuth EKU), and no
     /// revocation or AIA fetching.
     ///
-    /// `provider` is used only for the handshake signatures and the
-    /// advertised signature schemes — pass the same provider the
-    /// `ClientConfig` is built with, or the two can disagree about
-    /// which schemes are supported.
+    /// No [`rustls::crypto::CryptoProvider`] is needed. The handshake
+    /// signatures are verified with `verifier` too, so nothing here
+    /// defers to rustls's crypto and there is no provider to keep in
+    /// step with the one the `ClientConfig` was built from.
     ///
     /// Revocation is off because a revocation checker needs a source of
     /// CRLs or OCSP responses, and silently having none would be worse
     /// than saying so. Add one with
     /// [`builder`](PkixServerCertVerifier::builder).
     #[must_use]
-    pub fn new(anchors: Vec<TrustAnchor>, provider: Arc<CryptoProvider>) -> Self {
+    pub fn new(anchors: Vec<TrustAnchor>) -> Self {
         Self {
             anchors,
             verifier: DefaultVerifier,
             profile: pkix_profiles::BasicTlsProfile,
             revocation: NoRevocation,
             aia: NoAiaFetcher,
-            provider,
         }
     }
 
     /// Start from the defaults of [`new`](PkixServerCertVerifier::new)
     /// and replace individual pieces.
     #[must_use]
-    pub fn builder(anchors: Vec<TrustAnchor>, provider: Arc<CryptoProvider>) -> Self {
-        Self::new(anchors, provider)
+    pub fn builder(anchors: Vec<TrustAnchor>) -> Self {
+        Self::new(anchors)
     }
 }
 
@@ -184,7 +192,6 @@ impl<V, P, R, A> PkixServerCertVerifier<V, P, R, A> {
             profile: self.profile,
             revocation: self.revocation,
             aia: self.aia,
-            provider: self.provider,
         }
     }
 
@@ -198,7 +205,6 @@ impl<V, P, R, A> PkixServerCertVerifier<V, P, R, A> {
             profile,
             revocation: self.revocation,
             aia: self.aia,
-            provider: self.provider,
         }
     }
 
@@ -212,7 +218,6 @@ impl<V, P, R, A> PkixServerCertVerifier<V, P, R, A> {
             profile: self.profile,
             revocation,
             aia: self.aia,
-            provider: self.provider,
         }
     }
 
@@ -225,7 +230,6 @@ impl<V, P, R, A> PkixServerCertVerifier<V, P, R, A> {
             profile: self.profile,
             revocation: self.revocation,
             aia,
-            provider: self.provider,
         }
     }
 }
@@ -282,14 +286,13 @@ where
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, RustlsError> {
-        // The handshake signature is the peer proving it holds the key,
-        // not a question about the certificate's trustworthiness, so it
-        // belongs to the crypto provider rather than here.
-        rustls::crypto::verify_tls12_signature(
+        handshake::verify(
+            &self.verifier,
             message,
             cert,
-            dss,
-            &self.provider.signature_verification_algorithms,
+            dss.scheme,
+            dss.signature(),
+            handshake::Protocol::Tls12,
         )
     }
 
@@ -299,18 +302,22 @@ where
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, RustlsError> {
-        rustls::crypto::verify_tls13_signature(
+        handshake::verify(
+            &self.verifier,
             message,
             cert,
-            dss,
-            &self.provider.signature_verification_algorithms,
+            dss.scheme,
+            dss.signature(),
+            handshake::Protocol::Tls13,
         )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        self.provider
-            .signature_verification_algorithms
-            .supported_schemes()
+        // What this crate can actually verify, not what the provider
+        // can: the handshake signatures no longer go through the
+        // provider, so advertising its list would offer the peer
+        // schemes that would then be refused.
+        handshake::SUPPORTED_SCHEMES.to_vec()
     }
 }
 
