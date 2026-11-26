@@ -1,7 +1,7 @@
 [package]
 name        = "pkix-path"
 description = "RFC 5280 X.509 certificate path validation — pure Rust, no_std"
-version               = "0.4.1"
+version               = "0.4.2"
 edition.workspace     = true
 rust-version.workspace = true
 license.workspace     = true
@@ -11,7 +11,26 @@ keywords    = ["x509", "certificate", "pki", "pkix", "no-std"]
 categories  = ["cryptography", "no-std"]
 
 [features]
-default   = ["rsa", "p256"]
+# Every RustCrypto backend, on by default.
+#
+# The project stance is that ordinary modern algorithms should not be an
+# opt-in: a plain dependency on this crate verifies RSA PKCS#1 v1.5,
+# RSASSA-PSS, ECDSA P-256/P-384/P-521 and Ed25519. The default used to be
+# ["rsa", "p256"], which meant a caller who did nothing got a verifier
+# that rejected a P-384 chain as `unsupported_key` — correct behaviour,
+# baffling default.
+#
+# Constrained environments are served by turning backends OFF rather than
+# on: `default-features = false` plus whatever a regulator permits, or
+# none at all to supply your own `SignatureVerifier`. An algorithm that is
+# not compiled in returns `unsupported_algorithm` (or `unsupported_key`
+# for a curve), distinct from `MalformedKey`, so a caller can tell "this
+# build does not do that" from "that key is broken". Nothing panics and
+# nothing silently succeeds.
+#
+# `rustcrypto` rather than the expanded list, so there is one place that
+# says what the full set is.
+default   = ["rustcrypto"]
 
 # Enable std::error::Error impl on Error type (no_std cores stay no_std without this).
 # Propagate std to all workspace crates that gate behaviour behind it.
