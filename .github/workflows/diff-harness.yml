@@ -94,6 +94,37 @@ jobs:
         # succession and wants the queue to clear.
         run: cargo build -p pkix-difftest --release
 
+      # WHAT THIS GATE CATCHES
+      #
+      #   - a chain pkix-path now accepts that the oracles reject
+      #     (LooserThanWild), which is the class that matters most;
+      #   - the reverse (StricterThanWild);
+      #   - oracle-vs-oracle disagreement;
+      #   - a pkix-path verdict that contradicts NIST ground truth, for
+      #     the 214 of 249 PKITS vectors whose RFC 5280 §6.1.1 policy
+      #     inputs are the defaults this harness supplies;
+      #   - a NEW chain that no oracle can be run on, since the baseline
+      #     names the two that already cannot be.
+      #
+      # WHAT IT DOES NOT CATCH
+      #
+      #   - a change in any oracle's error WORDING. Agreement and
+      #     DiagnosticDivergence are compared as one bucket and the
+      #     reason strings are dropped, because neither is a verdict
+      #     disagreement and both move with oracle releases.
+      #   - anything about the 35 vectors that ask for non-default policy
+      #     inputs. No oracle applies them, so their expected results are
+      #     not comparable and are withheld rather than scored. Tracked
+      #     in PKIX-zd45.
+      #   - DSA (PKIX-vb4o) and delta-CRL removeFromCRL (PKIX-i39n),
+      #     which are known and pinned as the two real ground-truth
+      #     disagreements.
+      #
+      # pyca is pinned in setup-venv.sh and OpenSSL is whatever
+      # ubuntu-latest ships. An OpenSSL bump can still move the verdict
+      # classes; when it does, the fix is to review the diff and
+      # regenerate the baseline in the same commit, not to widen the
+      # gate.
       - name: Run PKITS diff against committed baseline
         run: |
           ./pkix-difftest/scripts/ci-diff-baseline.sh \

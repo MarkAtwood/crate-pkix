@@ -278,9 +278,27 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
         validation_time_unix: None,
     };
 
-    Ok(CorpusItem {
-        name: vec.name.clone(),
-        expected: Some(if vec.should_validate {
+    // PKITS `should_validate` is the expected result UNDER THIS VECTOR'S
+    // policy inputs. No oracle here applies them — see
+    // `honours_policy_inputs` — so for the 35 vectors that ask for
+    // anything but the defaults, `should_validate` is the answer to a
+    // question that was never asked, and comparing a verdict against it
+    // reports a harness limitation as the implementation disagreeing
+    // with NIST.
+    //
+    // Ground truth is therefore withheld for those, which
+    // `classify` already handles: `expected: None` leaves
+    // `ground_truth_agreement` as `None` and the chain out of the
+    // ground-truth comparison entirely. It is still classified
+    // cross-oracle, which stays meaningful because every oracle is
+    // given the same (default) inputs.
+    //
+    // This hid 13 of the 15 ground-truth disagreements the baseline used
+    // to pin, every one of them a §4.8/§4.10/§4.12 policy vector. The
+    // two that remain are real: see PKIX-vb4o (DSA unimplemented, which
+    // pyca also refuses) and PKIX-i39n (delta-CRL removeFromCRL).
+    let expected = if honours_policy_inputs(vec) {
+        Some(if vec.should_validate {
             Verdict::Pass
         } else {
             // The reason field is intentionally empty: PKITS does not
@@ -290,7 +308,40 @@ fn build_item(certs_dir: &Path, crls_dir: &Path, vec: &PkitsVector) -> io::Resul
             Verdict::Fail {
                 reason: String::new(),
             }
-        }),
+        })
+    } else {
+        None
+    };
+
+    Ok(CorpusItem {
+        name: vec.name.clone(),
+        expected,
         chain,
     })
+}
+
+/// Whether this vector's PKITS policy inputs are ones the harness
+/// actually supplies to its oracles — which today means the defaults.
+///
+/// PKITS §4.8, §4.10 and §4.12 drive the same certificate bundle several
+/// times with different RFC 5280 §6.1.1 initial inputs, and the
+/// "(Subpart N)" suffixes are exactly those repeats. 35 of 249 vectors
+/// ask for non-default inputs.
+///
+/// `PkitsVector` parses all four, and nothing reads them: the pkix-path
+/// oracle builds a bare `ValidationPolicy::new(now)`. They are `pub`
+/// fields on a `pub` struct, so dead-code analysis never objected. Until
+/// an oracle honours them, a vector that asks for non-default inputs
+/// cannot be scored against its expected result.
+///
+/// pkix-path supports all four directly
+/// (`ValidationPolicy::initial_policy_set`,
+/// `initial_policy_mapping_inhibit`, `initial_explicit_policy`,
+/// `initial_any_policy_inhibit`), so wiring it up is tracked in
+/// PKIX-zd45 rather than being impossible.
+fn honours_policy_inputs(vec: &PkitsVector) -> bool {
+    vec.initial_policy_set.as_slice() == ["anyPolicy"]
+        && !vec.initial_policy_mapping_inhibit
+        && !vec.initial_explicit_policy
+        && !vec.initial_any_policy_inhibit
 }

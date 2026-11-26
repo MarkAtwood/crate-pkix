@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-i39n",
+  "title": "pkix-revocation reports PKITS 4.15.5 Valid delta-CRL Test5 as revoked",
+  "description": "PKITS 4.15.5 'Valid delta-CRL Test5' expects the chain to VALIDATE. pkix-path reports:\n\n  pkix-path revocation: cert at chain index 0 revoked by CRL: certificate 04 is revoked (reason c...)\n\npyca agrees ('pyca: certificate 0x4 revoked by CRL'). OpenSSL passes.\n\nPKITS §4.15.5 exercises a certificate placed on hold by the base CRL and then released by the delta CRL. RFC 5280 §5.3.1 gives removeFromCRL (8) for exactly that: an entry in a delta CRL with that reason means the certificate is no longer revoked and must be removed from the local CRL cache. If a delta is applied without honouring removeFromCRL, a released certificate stays revoked -- which is what the reported reason (certificateHold) suggests happened.\n\nThat direction is FAIL-CLOSED: a usable certificate is refused, not a revoked one accepted. Lower urgency than the reverse, but still wrong, and it means delta-CRL support is incomplete rather than merely strict.\n\npyca failing the same way is not evidence pkix-path is right -- it is evidence both share the gap, with OpenSSL and NIST on the other side.\n\nTo verify: check whether pkix-revocation's delta-CRL application handles CrlReason::RemoveFromCrl at all, and whether the base entry is dropped when a delta carries it.\n\nOne of two remaining real ground-truth disagreements after PKIX-vcpy removed the 13 caused by unapplied policy inputs.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "bug",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-26T02:37:21.384568146Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-26T02:37:21.384568146Z"
+}

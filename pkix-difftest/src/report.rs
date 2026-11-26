@@ -172,11 +172,23 @@ fn escape_md(s: &str) -> String {
 /// ```json
 /// {
 ///   "summary": { "LooserThanWild": N, ..., "total": N },
+///   "harness_errored_chains": ["...", ...],
 ///   "ground_truth_disagreements": [...],
 ///   "classified": [{ "name": "...", "class": "...", "verdicts": [...], ... }, ...]
 /// }
 /// ```
-pub fn write_json(out: &mut impl io::Write, classified: &[Classified]) -> io::Result<()> {
+/// `harness_errored` is the chain names no oracle could be run to
+/// completion on. They are reported rather than only counted, so the
+/// committed baseline pins *which* chains are known gaps and a new one
+/// changes the set instead of hiding inside a bigger number. Before
+/// this, two long-standing gaps surfaced only as an anonymous
+/// "2 harness error(s) during run", which reads as breakage and makes a
+/// third invisible.
+pub fn write_json(
+    out: &mut impl io::Write,
+    classified: &[Classified],
+    harness_errored: &[String],
+) -> io::Result<()> {
     let counts = count_per_class(classified);
     let mut summary = serde_json::Map::new();
     for class in CLASSES_WORST_FIRST {
@@ -196,8 +208,14 @@ pub fn write_json(out: &mut impl io::Write, classified: &[Classified]) -> io::Re
         .map(classified_to_json)
         .collect();
 
+    // Sorted so the baseline does not churn on corpus iteration order.
+    let mut errored: Vec<&str> = harness_errored.iter().map(String::as_str).collect();
+    errored.sort_unstable();
+    errored.dedup();
+
     let body = serde_json::json!({
         "summary": summary,
+        "harness_errored_chains": errored,
         "ground_truth_disagreements": gt_disagreements,
         "classified": classified.iter().map(classified_to_json).collect::<Vec<_>>(),
     });
@@ -358,7 +376,7 @@ mod tests {
         let mut data = sample_classified();
         sort_by_severity(&mut data);
         let mut buf = Vec::new();
-        write_json(&mut buf, &data).unwrap();
+        write_json(&mut buf, &data, &[]).unwrap();
         let parsed: serde_json::Value = serde_json::from_slice(&buf).unwrap();
         assert!(parsed.get("summary").is_some());
         assert!(parsed.get("classified").is_some());
@@ -371,7 +389,7 @@ mod tests {
     fn write_json_classified_entry_shape() {
         let data = sample_classified();
         let mut buf = Vec::new();
-        write_json(&mut buf, &data).unwrap();
+        write_json(&mut buf, &data, &[]).unwrap();
         let parsed: serde_json::Value = serde_json::from_slice(&buf).unwrap();
         let entries = parsed["classified"].as_array().unwrap();
         let first = &entries[0];

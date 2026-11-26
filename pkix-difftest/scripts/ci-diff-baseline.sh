@@ -126,6 +126,7 @@ JQ_FILTER='
     OracleDivergence: (.summary.OracleDivergence // 0),
     total:            (.summary.total            // 0)
   },
+  harness_errored_chains: (.harness_errored_chains // []),
   ground_truth_disagreements:
     [ (.ground_truth_disagreements // [])[]
       | {

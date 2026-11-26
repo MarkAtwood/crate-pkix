@@ -226,6 +226,14 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
     }
     sort_by_severity(&mut classified);
 
+    // Names, not just a count: the baseline pins which chains are known
+    // harness gaps so that a new one is visible instead of being
+    // absorbed into a larger tally.
+    let errored_chains: Vec<String> = harness_errors
+        .iter()
+        .map(|(name, _)| name.clone())
+        .collect();
+
     let md_opts = MarkdownOptions {
         sample_size: opts.sample_size,
         title: opts.title.clone(),
@@ -241,10 +249,10 @@ fn run_corpus(cmd: &CorpusCmd) -> std::io::Result<()> {
     }
     if let Some(target) = &opts.output_json {
         if target == "-" {
-            write_json(&mut std::io::stdout(), &classified)?;
+            write_json(&mut std::io::stdout(), &classified, &errored_chains)?;
         } else {
             let mut f = std::fs::File::create(target)?;
-            write_json(&mut f, &classified)?;
+            write_json(&mut f, &classified, &errored_chains)?;
         }
     }
     if opts.output_md.is_none() && opts.output_json.is_none() {

@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-vb4o",
+  "title": "pkix-path rejects PKITS 4.1.4 Valid DSA Signatures Test4 (DSA unimplemented)",
+  "description": "pkix-path: fail, 'signature not verified at chain index 0: unsupported signature algorithm'. PKITS ground truth says valid.\n\nNot obviously a defect. pyca refuses it too ('Forbidden public key algorithm'); only OpenSSL accepts it. Refusing DSA in 2026 is a defensible deliberate choice, and two of three implementations make it.\n\nThe decision to record is whether pkix-path intends to never implement DSA, in which case this is a permanent known gap and should be named as one rather than sitting in the ground-truth disagreement list, or whether DSA verification belongs in the legacy tier alongside the SHA-1 verifiers from PKIX-qws.4 (verify-only, opt-in, outside the rustcrypto umbrella).\n\nOne of two remaining real ground-truth disagreements after PKIX-vcpy removed the 13 caused by unapplied policy inputs.",
+  "status": "open",
+  "priority": 3,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-26T02:37:21.298490174Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-26T02:37:21.298490174Z"
+}

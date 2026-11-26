@@ -20,7 +20,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.venv"
-REQUIRED_VERSION="cryptography>=45"
+# PINNED, not a floor. The committed baseline records pyca's verdicts and
+# its error wording, so whichever release CI installs decides whether the
+# gate is green. ">=45" let every run pick up whatever was newest, and
+# that is how diff-harness sat red from 2026-11-16 through 2026-11-24
+# while nothing in pkix-path had changed: the runner's cryptography and
+# the baseline's had drifted apart.
+#
+# Bump this deliberately and regenerate the baseline in the same commit,
+# so an oracle change is a reviewed change rather than a surprise.
+#
+# This is the version the current baseline was generated with.
+REQUIRED_VERSION="cryptography==50.0.2"
 
 echo "pkix-difftest/python: setting up venv at ${VENV_DIR}"
 
