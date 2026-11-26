@@ -16,7 +16,10 @@
 //! the workspace contributes the framework, not the policy. The hand-
 //! authored [`pkix-lint-cabf`] reference set covers a small curated
 //! subset of marquee BR predicates; this crate covers the whole catalog
-//! (~400 lints at the time of writing).
+//! (~400 lints: 419 measured against zlint dev-unknown on 2026-05-12,
+//! and it moves with the zlint version —
+//! `pkix-zlint-bridge/tests/enumerate_lints.rs` records how it was
+//! counted).
 //!
 //! # Usage
 //!

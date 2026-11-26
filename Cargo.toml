@@ -160,8 +160,8 @@ pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.1" 
 pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.3.1" }
 pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.2.1" }
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.2" }
-pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.1" }
-pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.0" }
+pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.2" }
+pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.1" }
 pkix-aia                = { path = "pkix-aia",                version = "0.2.2" }
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.3.2" }
 pkix-dane               = { path = "pkix-dane",               version = "0.3.0" }

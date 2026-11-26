@@ -15,6 +15,15 @@
 //! - **`pkix-difftest`**'s zlint oracle — differential testing of
 //!   workspace lints against zlint's verdicts on the same certificate.
 //!
+//! The "~400" is a measured figure, not a guess: 419 lints (353 `e_`,
+//! 55 `w_`, 11 `n_`) counted with
+//! `zlint -list-lints-json | jq -r .name | sed 's/_.*$//' | sort | uniq -c`
+//! against zlint dev-unknown on 2026-05-12. It moves with the zlint
+//! version, which is why nothing here asserts an exact count;
+//! `tests/enumerate_lints.rs` records the method so the next reader can
+//! recount rather than re-guess. A figure of ~700 appeared elsewhere in
+//! the workspace at one point and was wrong.
+//!
 //! Per AGENTS.md non-negotiable #5 (three-mode policy-class model), the
 //! workspace does not transcribe CA/B Forum or other industry-forum
 //! rules into Rust. Instead, this bridge defers to zlint at runtime
