@@ -89,6 +89,20 @@ const OID_SHA512: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.10
 /// `id-Ed25519` (RFC 8410 §3): 1.3.101.112.
 pub(crate) const OID_ED25519: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
 
+/// `sha1WithRSAEncryption` — RFC 3279 §2.2.1.
+///
+/// Only reachable with the `rsa-sha1` feature. See
+/// [`RsaPkcs1v15Sha1Verifier`] for why it is not on by default.
+#[cfg(feature = "rsa-sha1")]
+const OID_SHA1_WITH_RSA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
+
+/// `ecdsa-with-SHA1` — RFC 3279 §2.2.3.
+///
+/// Only reachable with the `ecdsa-sha1` feature. See
+/// [`EcdsaP256Sha1Verifier`].
+#[cfg(feature = "ecdsa-sha1")]
+const OID_ECDSA_WITH_SHA1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.1");
+
 // ---------------------------------------------------------------------------
 // Digest selection
 // ---------------------------------------------------------------------------
@@ -109,6 +123,23 @@ fn ecdsa_digest(oid: ObjectIdentifier) -> Option<Sha2> {
         OID_ECDSA_WITH_SHA512 => Some(Sha2::Sha512),
         _ => None,
     }
+}
+
+// SHA-1 is kept off the `Sha2` path on purpose. Adding a variant to that
+// enum would put SHA-1 into every digest match in this file, including the
+// ones reached by default, and would make "is this build willing to use
+// SHA-1?" a question about runtime values rather than about compilation.
+// Separate functions behind separate features mean the answer is: only if
+// you asked for it, and otherwise the code is not here.
+// Gated on `ecdsa-sha1` alone, not on both. ECDSA verifies over a
+// pre-computed digest so it needs this; the RSA path hands SHA-1 to
+// `VerifyingKey<sha1::Sha1>` and never digests separately. With only
+// `rsa-sha1` enabled a broader gate leaves this dead, which is an error
+// under -D warnings and was caught by the feature powerset.
+#[cfg(feature = "ecdsa-sha1")]
+fn sha1_digest(message: &[u8]) -> Vec<u8> {
+    use sha1::Digest as _;
+    sha1::Sha1::digest(message).to_vec()
 }
 
 #[cfg(any(feature = "p256", feature = "p384", feature = "p521", feature = "rsa"))]
@@ -481,6 +512,124 @@ rsa_pkcs1v15_verifier!(
     Sha512
 );
 
+/// Verifies RSA PKCS#1 v1.5 signatures over SHA-1. **Legacy interop only.**
+///
+/// # Security
+///
+/// SHA-1 collisions are practical. SHAttered (2017) produced a colliding
+/// pair for roughly 2^63 operations, and chosen-prefix collisions followed
+/// in 2020 at lower cost. An attacker able to mint a certificate that
+/// collides with one a CA signed can substitute it, and the signature will
+/// verify. Treat a SHA-1-signed chain as evidence of provenance, not as
+/// proof of identity.
+///
+/// It exists because messages outlive algorithms. S/MIME signed in 2015
+/// sits in a mailbox today, and a client that cannot check its chain can
+/// tell the user nothing useful — "verify, then warn" is what clients
+/// actually do. CA/Browser Forum rules forbid new SHA-1 issuance; they do
+/// not delete the archive.
+///
+/// Off by default, behind the `rsa-sha1` feature, and deliberately *not*
+/// in the `rustcrypto` umbrella — that umbrella means "algorithms we
+/// recommend". New deployments MUST NOT enable this.
+///
+/// Verification only. Nothing in this workspace signs with SHA-1 and
+/// nothing is intended to.
+#[cfg(feature = "rsa-sha1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rsa-sha1")))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct RsaPkcs1v15Sha1Verifier;
+
+#[cfg(feature = "rsa-sha1")]
+impl SignatureVerifier for RsaPkcs1v15Sha1Verifier {
+    fn verify_signature(
+        &self,
+        algorithm: AlgorithmIdentifierRef<'_>,
+        issuer_spki: SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> VerifyResult {
+        use rsa::pkcs1v15::{Signature, VerifyingKey};
+        use rsa::signature::Verifier as _;
+
+        if algorithm.oid != OID_SHA1_WITH_RSA {
+            return Err(VerificationError::unsupported_algorithm());
+        }
+        if !algorithm.parameters.is_none_or(|p| p.is_null()) {
+            return Err(VerificationError::unsupported_algorithm());
+        }
+        let key = rsa_public_key(&issuer_spki, false)?;
+        let sig =
+            Signature::try_from(signature).map_err(|_| VerificationError::invalid_signature())?;
+        VerifyingKey::<sha1::Sha1>::new(key)
+            .verify(message, &sig)
+            .map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
+    }
+}
+
+/// Verifies ECDSA P-256 signatures over SHA-1. **Legacy interop only.**
+///
+/// # Security
+///
+/// See [`RsaPkcs1v15Sha1Verifier`]: the same practical collision attacks
+/// apply and the same conclusion follows. A SHA-1-signed chain is
+/// provenance, not proof.
+///
+/// Off by default, behind the `ecdsa-sha1` feature, outside the
+/// `rustcrypto` umbrella. New deployments MUST NOT enable this.
+///
+/// # Scope
+///
+/// P-256 only. `ecdsa-with-SHA1` names no curve, so P-384 and P-521 with
+/// SHA-1 are expressible and do occur, but a deployment old enough to
+/// still sign with SHA-1 is overwhelmingly on P-256 or RSA. Those
+/// combinations are out of scope rather than overlooked, and surface as
+/// [`UnsupportedKey`](VerificationErrorKind::UnsupportedKey), which says
+/// the curve was the problem.
+///
+/// Verification only.
+#[cfg(feature = "ecdsa-sha1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ecdsa-sha1")))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct EcdsaP256Sha1Verifier;
+
+#[cfg(feature = "ecdsa-sha1")]
+impl SignatureVerifier for EcdsaP256Sha1Verifier {
+    fn verify_signature(
+        &self,
+        algorithm: AlgorithmIdentifierRef<'_>,
+        issuer_spki: SubjectPublicKeyInfoRef<'_>,
+        message: &[u8],
+        signature: &[u8],
+    ) -> VerifyResult {
+        use p256::ecdsa::{DerSignature, VerifyingKey};
+        use signature::hazmat::PrehashVerifier as _;
+
+        if algorithm.oid != OID_ECDSA_WITH_SHA1 {
+            return Err(VerificationError::unsupported_algorithm());
+        }
+        if algorithm.parameters.is_some() {
+            return Err(VerificationError::unsupported_algorithm());
+        }
+        // P-256 only, so a P-384 or P-521 key is reported as an
+        // unsupported key rather than checked against the wrong curve.
+        if ec_named_curve(&issuer_spki) != Some(OID_SECP256R1) {
+            return Err(VerificationError::unsupported_key());
+        }
+        let vk =
+            VerifyingKey::try_from(issuer_spki).map_err(|_| VerificationError::malformed_key())?;
+        let sig = DerSignature::try_from(signature)
+            .map_err(|_| VerificationError::invalid_signature())?;
+        // Left-padded to the field width: FIPS 186-4 uses the leftmost
+        // min(N, outlen) bits of the hash, which for a 160-bit digest and
+        // a 256-bit field is all of it, and zero-padding on the left
+        // preserves the integer value.
+        let prehash = pad_prehash(sha1_digest(message), 32);
+        vk.verify_prehash(&prehash, &sig)
+            .map_err(|e| VerificationError::with_source(VerificationErrorKind::InvalidSignature, e))
+    }
+}
+
 /// RSASSA-PSS signature verifier (RFC 4055 §3.1).
 ///
 /// Handles OID `id-RSASSA-PSS` (1.2.840.113549.1.1.10) with
@@ -640,6 +789,27 @@ impl SignatureVerifier for DefaultVerifier {
         #[cfg(feature = "ed25519")]
         if oid == OID_ED25519 {
             return Ed25519Verifier.verify_signature(algorithm, issuer_spki, message, signature);
+        }
+        // Legacy SHA-1, last and only when asked for. Placed after every
+        // modern algorithm so enabling it cannot change how anything else
+        // is dispatched.
+        #[cfg(feature = "rsa-sha1")]
+        if oid == OID_SHA1_WITH_RSA {
+            return RsaPkcs1v15Sha1Verifier.verify_signature(
+                algorithm,
+                issuer_spki,
+                message,
+                signature,
+            );
+        }
+        #[cfg(feature = "ecdsa-sha1")]
+        if oid == OID_ECDSA_WITH_SHA1 {
+            return EcdsaP256Sha1Verifier.verify_signature(
+                algorithm,
+                issuer_spki,
+                message,
+                signature,
+            );
         }
         Err(VerificationError::unsupported_algorithm())
     }

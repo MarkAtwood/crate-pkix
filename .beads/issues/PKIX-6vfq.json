@@ -1,0 +1,12 @@
+{
+  "id": "PKIX-6vfq",
+  "title": "pkix-tlsrpt tests do not compile without --all-features",
+  "description": "pkix-tlsrpt/tests/report.rs:53 calls Report::to_json_string(), which is feature-gated, so the test file does not compile in a default-features build:\n\n    error[E0599]: no method named `to_json_string` found for struct `pkix_tlsrpt::Report`\n\nPre-existing, from b7de7a6b (the crate's initial TLSRPT content) -- not a regression.\n\nWhy nobody noticed: quality-gates runs the suite only as `cargo test --workspace --all-features` (quality-gates.yml:160). The default-features test build is never exercised, so any test file that reaches for a gated item compiles there and nowhere else.\n\nFound while implementing PKIX-qws.4, where `cargo test --workspace` (no flags) was run to confirm the new SHA-1 features were genuinely absent by default. Two files failed; the other one was mine from the same day (pkix-chain/tests/readme_examples.rs, gating the CrlChecker/OcspChecker examples) and is fixed.\n\nFix: gate the call, or add the feature to pkix-tlsrpt's dev-dependencies so its own tests always have it.\n\nWorth considering alongside: a CI step that runs `cargo test --workspace` with default features. The feature powerset checks that everything COMPILES, and cargo-hack's --no-dev-deps skips test targets, so test files specifically have no coverage outside the all-features run. That is the gap that let both of these sit.",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-26T01:24:42.698840212Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-26T01:24:42.698840212Z"
+}

@@ -131,6 +131,9 @@ mod verifiers;
     feature = "ed25519"
 ))]
 pub use verifiers::DefaultVerifier;
+#[cfg(feature = "ecdsa-sha1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ecdsa-sha1")))]
+pub use verifiers::EcdsaP256Sha1Verifier;
 #[cfg(feature = "p256")]
 pub use verifiers::EcdsaP256Verifier;
 #[cfg(feature = "p384")]
@@ -139,6 +142,9 @@ pub use verifiers::EcdsaP384Verifier;
 pub use verifiers::EcdsaP521Verifier;
 #[cfg(feature = "ed25519")]
 pub use verifiers::Ed25519Verifier;
+#[cfg(feature = "rsa-sha1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rsa-sha1")))]
+pub use verifiers::RsaPkcs1v15Sha1Verifier;
 #[cfg(feature = "rsa")]
 pub use verifiers::{
     RsaPkcs1v15Sha256Verifier, RsaPkcs1v15Sha384Verifier, RsaPkcs1v15Sha512Verifier, RsaPssVerifier,

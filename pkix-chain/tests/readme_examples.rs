@@ -28,10 +28,17 @@
 
 use pkix_chain::{
     verify_chain, verify_chain_default, verify_code_signer, verify_smime_signer,
-    verify_time_stamper, verify_tls_client_dns, verify_tls_server, CrlChecker, DefaultVerifier,
-    MailboxName, NoAiaFetcher, NoRevocation, OcspChecker, ServerName, TrustAnchor,
-    ValidationPolicy,
+    verify_time_stamper, verify_tls_client_dns, verify_tls_server, DefaultVerifier, MailboxName,
+    NoAiaFetcher, NoRevocation, ServerName, TrustAnchor, ValidationPolicy,
 };
+// The CRL and OCSP examples name checkers that live behind those
+// features. Gated so this guard compiles in a default build too — it did
+// not, and nothing noticed, because CI runs the test suite only with
+// --all-features.
+#[cfg(feature = "crl")]
+use pkix_chain::CrlChecker;
+#[cfg(feature = "ocsp")]
+use pkix_chain::OcspChecker;
 use pkix_profiles::{
     BasicCodeSigningProfile, BasicSmimeProfile, BasicTimeStampingProfile, BasicTlsProfile,
     Rfc5280Profile,
@@ -54,6 +61,7 @@ fn quick_start(chain: Chain, anchors: Anchors, policy: ValidationPolicy) -> pkix
 /// README: "With CRL revocation" — `CrlChecker::new` returns a `Result`, so
 /// the `?` is load-bearing: `&Result<CrlChecker>` is not a
 /// `RevocationChecker`.
+#[cfg(feature = "crl")]
 fn with_crl(
     chain: Chain,
     anchors: Anchors,
@@ -66,6 +74,7 @@ fn with_crl(
 }
 
 /// README: "With delta CRL".
+#[cfg(feature = "crl")]
 fn with_delta_crl(
     chain: Chain,
     anchors: Anchors,
@@ -79,6 +88,7 @@ fn with_delta_crl(
 }
 
 /// README: "With OCSP revocation" — same `Result` point as the CRL case.
+#[cfg(feature = "ocsp")]
 fn with_ocsp(
     chain: Chain,
     anchors: Anchors,

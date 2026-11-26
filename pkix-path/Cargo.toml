@@ -68,6 +68,18 @@ p384       = ["dep:p384", "dep:sha2"]
 p521       = ["dep:p521", "dep:sha2"]
 ed25519    = ["dep:ed25519-dalek"]
 
+# Legacy SHA-1 verification, for validating chains issued before SHA-1 was
+# retired. Deliberately NOT in `rustcrypto` and not in `default`: that
+# umbrella means "algorithms we recommend", and these are not recommended.
+# Verification only — nothing here signs with SHA-1.
+#
+# Split in two because the populations differ. RSA-PKCS1v15+SHA-1 is
+# everywhere in pre-2018 government PKI, federal bridge cross-certs and
+# long-lived enterprise CAs; ECDSA+SHA-1 is real but rare. A consumer who
+# needs the first should not be made to compile the second.
+rsa-sha1   = ["rsa", "dep:sha1"]
+ecdsa-sha1 = ["p256", "dep:sha1"]
+
 [dependencies]
 der       = { workspace = true }
 spki      = { workspace = true }
@@ -80,6 +92,7 @@ p384 = { workspace = true, optional = true }
 p521 = { workspace = true, optional = true }
 rsa  = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
+sha1 = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true }
 
 # Serde support (optional, gated behind the `serde` feature).

@@ -38,6 +38,37 @@ const PKITS_NOW: u64 = 1_580_000_000;
 /// BetterTLS tc60 fixture's pinned validation_time (2026-01-19T17:25:55Z).
 const TC60_NOW: u64 = 1_768_843_555;
 
+/// Does this build verify SHA-1 signatures?
+///
+/// Asked of `DefaultVerifier` rather than of a feature flag: the flag is
+/// `pkix-path`'s and reaches this crate only through feature unification,
+/// so there is no local `cfg` to test. Probing with
+/// `sha1WithRSAEncryption` and an unusable key separates the two cases —
+/// without the feature the OID is unknown and the answer is
+/// `UnsupportedAlgorithm`; with it the OID dispatches and the key is
+/// rejected instead.
+fn sha1_verification_compiled_in() -> bool {
+    use pkix_path::{SignatureVerifier as _, VerificationErrorKind};
+    use spki::der::referenced::OwnedToRef as _;
+
+    let alg = spki::AlgorithmIdentifierOwned {
+        oid: "1.2.840.113549.1.1.5".parse().expect("static oid"),
+        parameters: None,
+    };
+    let spki = spki::SubjectPublicKeyInfoOwned {
+        algorithm: spki::AlgorithmIdentifierOwned {
+            oid: "1.2.840.113549.1.1.1".parse().expect("static oid"),
+            parameters: None,
+        },
+        subject_public_key: spki::der::asn1::BitString::new(0, vec![0u8; 8])
+            .expect("static bitstring"),
+    };
+    match DefaultVerifier.verify_signature(alg.owned_to_ref(), spki.owned_to_ref(), b"x", b"y") {
+        Err(e) => e.kind() != VerificationErrorKind::UnsupportedAlgorithm,
+        Ok(()) => true,
+    }
+}
+
 fn pkits_cert(name: &str) -> Certificate {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../pkix-path/tests/pkits/certs")
@@ -78,6 +109,17 @@ impl pkix_path::SignatureVerifier for AlwaysRejectVerifier {
 /// Positive: tc60. [`build_path`] alone yields a SHA-1 intermediate that
 /// `validate_path` rejects; `build_first_valid_path` iterates past it and
 /// returns a SHA-256-only chain that validates.
+///
+/// The fixture's premise is that the SHA-1 intermediate is *unverifiable*,
+/// so this demonstrates nothing in a build with `pkix-path/rsa-sha1` or
+/// `ecdsa-sha1` enabled: `build_path`'s first candidate validates on its
+/// own and there is no rejection to iterate past. The test says so and
+/// returns, rather than asserting an invariant the configuration has
+/// removed.
+///
+/// Worth noting because the assertion below used to blame DFS ordering
+/// for exactly this failure, which would have sent a reader looking in
+/// the wrong place.
 #[test]
 fn tc60_build_first_valid_path_succeeds_where_build_path_fails() {
     let mut peer_certs = load_pem_chain("peer.pem");
@@ -97,6 +139,19 @@ fn tc60_build_first_valid_path_succeeds_where_build_path_fails() {
 
     let policy = ValidationPolicy::new(TC60_NOW);
     let verifier = DefaultVerifier;
+
+    if sha1_verification_compiled_in() {
+        // The rejected candidate this fixture relies on is a SHA-1 chain,
+        // and this build verifies those. Assert the consequence rather
+        // than skipping silently: build_path's first candidate now
+        // validates, so there is nothing to iterate past.
+        let bp_chain = build_path(&peer, &pool, &anchors).expect("tc60: build_path yields a chain");
+        pkix_path::validate_path(&bp_chain, &anchors, &policy, &verifier).expect(
+            "with legacy SHA-1 enabled, tc60's first DFS candidate is expected to validate; \
+             if it does not, the fixture or the DFS ordering has changed",
+        );
+        return;
+    }
 
     // (1) Confirm the baseline: build_path picks a candidate that
     //     validate_path rejects (this matches bettertls.rs's baseline-pkix-path.json
@@ -280,7 +335,7 @@ fn an_exhausted_budget_propagates_verbatim_and_is_not_reported_as_no_valid_path(
         matches!(err, Error::BudgetExceeded { .. }),
         "expected BudgetExceeded to propagate verbatim, got {err:?}"
     );
-    // Stated separately: this is the specific mis-reporting the propagation
+    // Stated separately: this is the specific misreporting the propagation
     // exists to prevent, and the assertion above would also pass if the
     // variant were renamed rather than kept distinct.
     assert!(
@@ -330,8 +385,14 @@ fn the_two_budget_exhaustion_cases_report_differently() {
     );
 
     // The cause is reachable for the case that has one, and absent for
-    // the case that does not.
-    use std::error::Error as _;
-    assert!(after_some.source().is_some());
-    assert!(before_any.source().is_none());
+    // the case that does not. Gated: the `std::error::Error` impl that
+    // provides `source` is behind this crate's `std` feature, which is
+    // not on by default — and this assertion was written in a run that
+    // had it, so the default build never saw it.
+    #[cfg(feature = "std")]
+    {
+        use std::error::Error as _;
+        assert!(after_some.source().is_some());
+        assert!(before_any.source().is_none());
+    }
 }

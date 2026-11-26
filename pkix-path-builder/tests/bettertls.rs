@@ -231,6 +231,38 @@ fn run_fixture(case_dir: &Path) -> (Testcase, Observed) {
     (tc, observed)
 }
 
+/// Does this build verify SHA-1 signatures?
+///
+/// Probes `DefaultVerifier` with `sha1WithRSAEncryption` and a key it
+/// cannot parse. Without the legacy features the OID is unknown and the
+/// answer is `UnsupportedAlgorithm`; with them the OID dispatches and the
+/// verifier gets as far as rejecting the key, so the answer is something
+/// else. Cheap, and it asks about behaviour rather than about cargo
+/// metadata.
+fn sha1_verification_compiled_in() -> bool {
+    use pkix_path::{SignatureVerifier as _, VerificationErrorKind};
+    use spki::der::referenced::OwnedToRef as _;
+
+    let alg = spki::AlgorithmIdentifierOwned {
+        oid: "1.2.840.113549.1.1.5".parse().expect("static oid"),
+        parameters: None,
+    };
+    // Structurally a SubjectPublicKeyInfo, with key bytes that are not a
+    // usable RSA key — enough to get past decoding and be rejected.
+    let spki = spki::SubjectPublicKeyInfoOwned {
+        algorithm: spki::AlgorithmIdentifierOwned {
+            oid: "1.2.840.113549.1.1.1".parse().expect("static oid"),
+            parameters: None,
+        },
+        subject_public_key: spki::der::asn1::BitString::new(0, vec![0u8; 8])
+            .expect("static bitstring"),
+    };
+    match DefaultVerifier.verify_signature(alg.owned_to_ref(), spki.owned_to_ref(), b"x", b"y") {
+        Err(e) => e.kind() != VerificationErrorKind::UnsupportedAlgorithm,
+        Ok(()) => true,
+    }
+}
+
 fn load_baseline(root: &Path) -> BTreeMap<String, String> {
     let path = root.join("baseline-pkix-path.json");
     let text =
@@ -337,6 +369,38 @@ fn bettertls_pathbuilding_characterization() {
     let baseline = load_baseline(&root);
     let mut mismatches: Vec<String> = Vec::new();
 
+    // The baseline records behaviour under pkix-path's DEFAULT features,
+    // which is the recommended configuration and excludes legacy SHA-1.
+    //
+    // Enabling `rsa-sha1` or `ecdsa-sha1` changes the answer for exactly
+    // these fixtures: chains this library previously refused as
+    // UnsupportedAlgorithm now validate. That is the whole point of the
+    // feature and also precisely its risk, so it is recorded here by name
+    // rather than absorbed into the baseline — a reader comparing the two
+    // configurations should be able to see which real-world chains the
+    // choice admits. BetterTLS is a third-party corpus, so this is not
+    // our own fixture agreeing with itself.
+    //
+    // Pinned tightly: the delta is allowed only in this direction, only
+    // for these ids, and only from an UnsupportedAlgorithm failure to a
+    // successful build. Any other change still fails.
+    const SHA1_ADMITS: &[&str] = &["tc41", "tc60"];
+
+    // Asked of the build rather than of a feature flag, because the flag
+    // is pkix-path's and reaches here only through feature unification —
+    // this crate has no `rsa-sha1` of its own to test. What matters is
+    // what the linked DefaultVerifier actually does, which is also the
+    // more honest question.
+    let sha1_enabled = sha1_verification_compiled_in();
+
+    let sha1_delta_ok = |short: &str, expected: &str, observed: &str| {
+        sha1_enabled
+            && SHA1_ADMITS.contains(&short)
+            && expected.contains("\"validation_failed\"")
+            && expected.contains("UnsupportedAlgorithm")
+            && observed.contains("\"built_and_valid\"")
+    };
+
     for (tc, obs) in &results {
         let short = tc.id.rsplit("::").next().unwrap_or(&tc.id);
         let observed_json = obs.to_json();
@@ -357,6 +421,10 @@ fn bettertls_pathbuilding_characterization() {
                     tc.id,
                     tc.expected_result
                 );
+            }
+            Some(expected) if sha1_delta_ok(short, expected, &observed_json) => {
+                // A legacy-SHA-1 build admits this chain. Expected, and
+                // named in SHA1_ADMITS above.
             }
             Some(expected) => {
                 mismatches.push(format!(
