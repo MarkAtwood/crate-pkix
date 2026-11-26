@@ -157,16 +157,16 @@ pkix-chain            = { path = "pkix-chain",            version = "0.9.0" }
 pkix-truststore       = { path = "pkix-truststore",       version = "0.2.2" }
 # Namespace-reservation stubs (published at 0.1.0; real impl per the linked beads):
 pkix-profiles-cabf      = { path = "pkix-profiles-cabf",      version = "0.3.1" }
-pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.3.1" }
+pkix-lint-cabf          = { path = "pkix-lint-cabf",          version = "0.3.2" }
 pkix-truststore-system  = { path = "pkix-truststore-system",  version = "0.2.1" }
 pkix-truststore-pkcs11  = { path = "pkix-truststore-pkcs11",  version = "0.1.2" }
 pkix-zlint-bridge       = { path = "pkix-zlint-bridge",       version = "0.2.2" }
 pkix-policy-zlint       = { path = "pkix-policy-zlint",       version = "0.2.1" }
-pkix-aia                = { path = "pkix-aia",                version = "0.2.2" }
+pkix-aia                = { path = "pkix-aia",                version = "0.2.3" }
 pkix-aia-http           = { path = "pkix-aia-http",           version = "0.3.2" }
-pkix-dane               = { path = "pkix-dane",               version = "0.3.0" }
+pkix-dane               = { path = "pkix-dane",               version = "0.3.1" }
 pkix-dane-resolver      = { path = "pkix-dane-resolver",      version = "0.3.0" }
-pkix-dnssec-anchor      = { path = "pkix-dnssec-anchor",      version = "0.1.1" }
+pkix-dnssec-anchor      = { path = "pkix-dnssec-anchor",      version = "0.1.2" }
 pkix-pkilint-bridge     = { path = "pkix-pkilint-bridge",     version = "0.1.0" }
 pkix-policy-pkilint     = { path = "pkix-policy-pkilint",     version = "0.1.0" }
 pkix-rustls             = { path = "pkix-rustls",             version = "0.1.0" }

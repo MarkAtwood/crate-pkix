@@ -2,8 +2,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
-//! # pkix-aia-http
-//!
 //! Reference synchronous HTTP fetcher for
 //! [`pkix-aia`](https://docs.rs/pkix-aia)'s
 //! [`AiaFetcher`] trait.

@@ -2,8 +2,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
-//! # pkix-dane-resolver
-//!
 //! DNSSEC-validating resolution of DANE TLSA records.
 //!
 //! Fetches TLSA records, validates the DNSSEC chain over them, and returns

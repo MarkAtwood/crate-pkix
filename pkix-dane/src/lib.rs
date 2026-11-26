@@ -3,8 +3,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
-//! # pkix-dane
-//!
 //! DANE TLSA record parsing and per-usage match logic, per
 //! [RFC 6698](https://www.rfc-editor.org/rfc/rfc6698),
 //! [RFC 7218](https://www.rfc-editor.org/rfc/rfc7218) (the mnemonics) and

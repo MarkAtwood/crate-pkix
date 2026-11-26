@@ -3,8 +3,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
-//! # pkix-dnssec-anchor
-//!
 //! The IANA DNS root zone trust anchors, as data.
 //!
 //! This crate is nothing but IANA's published root key material and the

@@ -3,8 +3,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms)]
 
-//! # pkix-aia
-//!
 //! Authority Information Access (AIA) fetcher trait and types for
 //! `pkix-chain`, per
 //! [RFC 5280 §4.2.2.1](https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1).

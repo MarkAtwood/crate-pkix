@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-aia"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -1563,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-dane"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "der",
  "pkix-identity",
@@ -1612,7 +1612,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-dnssec-anchor"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "pkix-identity"
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "pkix-lint-cabf"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "der",
  "pkix-lint",

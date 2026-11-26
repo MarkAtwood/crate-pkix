@@ -1,0 +1,7 @@
+{
+  "id": "1795734131525079304-1",
+  "issue_id": "PKIX-hz8g",
+  "author": "Mark Atwood",
+  "text": "Heading-style call: keep them deleted, confirmed by Mark. All 17 items now closed.\n\nApplying the decision turned up that the workspace was split THREE ways, not two: 7 crates never had the heading, 5 had it removed in the prose pass, and 6 still carried it (pkix-aia, pkix-aia-http, pkix-dane, pkix-dane-resolver, pkix-dnssec-anchor, pkix-lint-cabf). So 'the minority was aligned with the majority' was itself wrong -- the five removals left the split wider than before. All six now start with the sentence that says what the crate is for.\n\nRecorded the convention in AGENTS.md rather than leaving it as a pile of edits, since an unwritten convention is exactly how this drifted in the first place. It also states the boundary that was never explicit: rustdoc drops the heading because rustdoc already renders the crate name as the page title; README.md KEEPS its '# \u003ccrate-name\u003e' title, because nothing else supplies one when it renders on crates.io or in a file viewer. All 27 READMEs still have theirs.\n\nVerified mechanically across every crate: 0 rustdoc headings repeating the crate name, 27 READMEs with theirs intact.\n\npkix-aia 0.2.3, pkix-dane 0.3.1, pkix-dnssec-anchor 0.1.2, pkix-lint-cabf 0.3.2.",
+  "created_at": "2026-11-26T23:02:11.525079304Z"
+}

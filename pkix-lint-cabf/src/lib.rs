@@ -1,5 +1,3 @@
-//! # pkix-lint-cabf
-//!
 //! **Reference CA/Browser Forum lint bundles for [`pkix-lint`]. Not authoritative.**
 //!
 //! CA/B Forum Baseline Requirements (TLS BR, S/MIME BR) change on a ballot

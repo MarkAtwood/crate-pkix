@@ -212,6 +212,28 @@ The commit message records what the patch does and why. Who or what typed it
 is not part of that, and a trailer claiming assistance establishes nothing a
 reviewer can use.
 
+## Crate docs: no heading that repeats the crate name
+
+**Do not open a crate's rustdoc with `//! # <crate-name>`.** rustdoc already
+renders the crate name as the page title, so the heading shows it twice, and
+it pushes the one sentence that says what the crate is for below a line
+carrying no information.
+
+Start with that sentence instead:
+
+```rust
+//! DNSSEC-validating resolution of DANE TLSA records.
+```
+
+The workspace was split three ways on this — some crates never had one, some
+had it removed in a prose pass, some still carried it — which is the actual
+cost of leaving a convention unwritten. All of them now start with the
+sentence.
+
+This applies to rustdoc only. A `README.md` keeps its `# <crate-name>`
+heading: nothing else supplies a title when it renders on crates.io or in a
+file viewer.
+
 ## Changelogs: don't
 
 **Do not write `CHANGELOG.md` entries as part of ordinary work.** The git
