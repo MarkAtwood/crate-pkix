@@ -108,6 +108,13 @@ der        = { workspace = true, features = ["derive"] }
 serde      = { workspace = true }
 serde_json = { workspace = true }
 
+# The Arc forwarding impl this exercises is gated on `std`, so the test
+# target is too. Without the declaration `cargo test -p pkix-path` would
+# fail to compile, which is the defect the per-crate CI step exists for.
+[[test]]
+name = "verifier_forwarding"
+required-features = ["std"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
