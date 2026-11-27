@@ -240,6 +240,43 @@ that it carries the value asked for, and that the new signature checks under
 the key that is supposed to have made it -- since a fixture whose signature
 broke tests the error path it was built to avoid.
 
+### "Subsumed" usually means the fixture is the wrong shape
+
+A guard whose verdict a later check reaches anyway looks untestable: mutate it,
+and the certificate is still refused, with the same error. The conclusion to
+resist is that the guard is redundant. The honest question is whether some
+*other* input reaches the guard on a path where the later check does not fire.
+
+`check_san_name_form`'s unevaluable-name-form guard spent a day recorded as
+subsumed on exactly that reasoning. Every fixture put the unevaluable form in a
+**permitted** subtree, where the refusal is overdetermined -- a name the
+matchers cannot decide matches no subtree, and a constrained type matching
+nothing is a violation, so the generic check refuses it whether or not the
+guard ran. Move the same form into an **excluded** subtree and it inverts: the
+generic check asks whether the name *matches*, one it cannot decide matches
+none, no violation is raised, and the certificate passes. The guard was the
+only thing refusing it, and the fail-open direction widens a CA's trust scope
+past what the CA published.
+
+So for any guard that looks subsumed, ask what the subsuming check is asking.
+If it asks "does this match something required", a name that matches nothing
+fails it for you. If it asks "does this match something forbidden", a name that
+matches nothing passes. Those are opposite, and one of them needs the guard.
+
+### A test can be thorough about a rule and blind to where it applies
+
+`required_leaf_policy_oids` and `required_leaf_subject_dn_attrs` are checked
+only on the leaf, `if i == 0`. Both guards survived mutation to `i != 0`, which
+applies each requirement to every certificate *but* the leaf, because the only
+chain testing them is PKITS `AllCertificatesSamePoliciesTest10` -- and the name
+is the reason. Every certificate in it asserts the same policies, so no verdict
+in that suite can distinguish "check the leaf" from "check everything but the
+leaf", however many policy combinations it tries.
+
+When a rule names a position in a chain -- the leaf, the anchor, an
+intermediate -- the fixture has to differ at that position. A chain whose
+certificates are alike in the property under test cannot see the index at all.
+
 ## Commit messages: no tool attribution
 
 Never add `Assisted-by`, `Co-Authored-By`, `Generated with`, or any other
