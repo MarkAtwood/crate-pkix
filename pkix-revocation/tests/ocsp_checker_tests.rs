@@ -45,7 +45,11 @@
 //!                                      embedded responder cert is corrupted
 //!
 //! Validation time: 2026-06-01 00:00:00 UTC = `1_780_272_000`.
-//! All valid OCSP responses have producedAt=2026-01-01, nextUpdate=2027-01-01.
+//! All valid OCSP responses have thisUpdate=2026-01-01 and
+//! nextUpdate=2027-01-01. `producedAt` is generation time, so it moves
+//! when the fixtures are regenerated; a test that needs it reads it from
+//! the response (see `freshness_window_boundaries.rs`) rather than
+//! naming a date.
 
 use der::Decode as _;
 use pkix_path::{DefaultVerifier, TrustAnchor};
