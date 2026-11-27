@@ -24,6 +24,14 @@ refusing case. Anything else -- a different key, a different name --
 would be rejected a step earlier and the KeyUsage check would decide
 nothing.
 
+ALSO USED FOR THE ANCHOR PATH
+-----------------------------
+`check_revocation_against_anchor` picks its effective CRL signer from the
+pairing of (caller-supplied cRLIssuer, the CRL's indirectCRL flag), and
+reaching each of its four arms needs an indirect CRL and a direct one from
+the same CA. `direct-crl.der` is the direct half: issued by the CA itself,
+with no IssuingDistributionPoint at all.
+
 Oracle: pyca/cryptography. The Rust checker never participates.
 
 Run from this directory:
@@ -140,7 +148,20 @@ def main():
         .sign(crl_issuer_key, hashes.SHA256())
     )
 
+    # A plain CRL from the CA itself, for the cases that need a CRL which
+    # does NOT declare itself indirect. `check_revocation_against_anchor`
+    # branches on the pairing of (crl_issuer_cert, indirectCRL), and three
+    # of its four arms are unreachable without one of each.
+    direct = (
+        x509.CertificateRevocationListBuilder()
+        .issuer_name(ca_name)
+        .last_update(CRL_THIS)
+        .next_update(CRL_NEXT)
+        .sign(ca_key, hashes.SHA256())
+    )
+
     write("ca.der", ca.public_bytes(serialization.Encoding.DER))
+    write("direct-crl.der", direct.public_bytes(serialization.Encoding.DER))
     write("leaf.der", leaf.public_bytes(serialization.Encoding.DER))
     write(
         "crl-issuer-with-crlsign.der",

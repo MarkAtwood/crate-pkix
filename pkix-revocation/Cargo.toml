@@ -113,6 +113,10 @@ required-features = ["ocsp"]
 name = "dp_scope_guards"
 required-features = ["crl"]
 
+[[test]]
+name = "anchor_path_signer"
+required-features = ["crl"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
