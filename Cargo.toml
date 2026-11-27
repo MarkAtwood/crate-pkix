@@ -135,6 +135,28 @@ license      = "Apache-2.0 OR MIT"
 repository   = "https://github.com/MarkAtwood/crate-pkix"
 authors      = ["Mark Atwood <mark@reviewcommit.com>"]
 
+# Test and debug binaries carry full debuginfo by default, and this workspace
+# builds a great many of them: 218 test binaries across 34 crates, multiplied
+# by every feature combination `cargo hack --feature-powerset` visits, by the
+# per-feature doc job, and by each `cargo mutants` job, which builds its own
+# copy of the tree.
+#
+# Measured 2026-11-27 on pkix-chain's aia_http_e2e test binary:
+#
+#   debug = 2 (the default)   135_767_128 bytes
+#   debug = "line-tables-only"  52_864_152 bytes
+#
+# 2.6x, and line tables are what a test failure actually needs — a backtrace
+# still names the file and line. Variable inspection under a debugger is what
+# this gives up; set `debug = 2` locally when that is what you are doing.
+#
+# This is not the whole story. The dominant cost was accumulation, not unit
+# size: Cargo keys artifacts by configuration hash and never collects the old
+# ones, so target/debug reached 278G — roughly 23 full builds — and filled the
+# disk. `scripts/prune-build-exhaust.sh` handles that half. See PKIX-xami.
+[profile.dev]
+debug = "line-tables-only"
+
 [workspace.dependencies]
 # Internal crates
 pkix-path             = { path = "pkix-path",             version = "0.4.7" }

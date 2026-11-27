@@ -264,6 +264,33 @@ came from, written per-commit and read by nobody.
 Same rule, stated as a smell: if the commit message and the changelog entry
 would say the same thing, the changelog entry is the one to drop.
 
+## Clean up build exhaust
+
+Cargo keys build artifacts by configuration hash and never collects the old
+ones. Anything that sweeps configurations piles them up:
+`cargo hack --feature-powerset`, the per-feature doc job, and `cargo mutants`,
+which copies the whole tree per job and builds each copy.
+
+Measured 2026-11-27: `target/debug` reached 278G — roughly 23 full builds,
+with 2572 configuration directories under `target/debug/build/pkix-chain`
+alone and a 135 MB test binary in each. The disk filled and a mutation sweep
+died with ENOSPC.
+
+So:
+
+- Run `scripts/prune-build-exhaust.sh` after a powerset run or a mutation
+  sweep. Not before — the point is to not leave the exhaust behind.
+- Check free space before starting a sweep, and keep the job count modest.
+  `-j 10` is what exhausted the disk; each job is a tree copy plus its own
+  build.
+- `cargo mutants` removes its own tree copies on a clean exit and leaves them
+  behind when killed. The prune script collects those, and refuses to while a
+  sweep is running.
+
+`[profile.dev] debug = "line-tables-only"` in the workspace manifest cuts
+each test binary by 2.6x and keeps file and line in backtraces. It does not
+address accumulation, which was the larger half.
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
