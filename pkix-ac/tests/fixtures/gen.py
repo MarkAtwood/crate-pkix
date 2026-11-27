@@ -804,6 +804,31 @@ def main() -> None:
                seq(extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")))
     (HERE / "ac-issuer-unique-id.der").write_bytes(attribute_certificate(info))
 
+    # §4.2.2: the entityName "MUST be the same as the PKC subject field
+    # OR ONE OF THE VALUES OF THE PKC subjectAltName field extension (if
+    # present)". The holder certificate every other fixture uses --
+    # pkix-ct's precert-leaf-final -- carries no subjectAltName at all,
+    # so the SAN half of that sentence had no fixture and holder matching
+    # was only ever tried against a subject DN.
+    #
+    # These two name the holder by dNSName. `holder-san-cert.der` (see
+    # make_holder_san.py) carries exactly one, ac-holder.example, which
+    # is not its subject DN -- so a match can only come through the SAN.
+    # The second names a host that certificate does not claim, which is
+    # the same AC shape with the one thing under test changed.
+    #
+    # Re-running this script re-signs every fixture with a fresh ECDSA
+    # nonce, so the whole directory shows as modified. Only genuinely new
+    # or changed fixtures belong in a commit; restore the rest.
+    for serial, fname, host in (
+        (0x4A, "ac-holder-dns-name.der", "ac-holder.example"),
+        (0x4B, "ac-holder-dns-name-other.der", "other-holder.example"),
+    ):
+        (HERE / fname).write_bytes(attribute_certificate(info_with(
+            serial,
+            holder_override=seq(tlv(0xA1, general_name_dns(host))),
+        )))
+
     for f in sorted(HERE.glob("ac-*.der")):
         print(f"{f.name}: {f.stat().st_size} bytes")
 

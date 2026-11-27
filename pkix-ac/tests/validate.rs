@@ -1391,3 +1391,91 @@ fn as_der_returns_the_bytes_it_parsed() {
         "acinfo is a proper part of the certificate, so the two differ"
     );
 }
+
+/// A holder certificate carrying a `subjectAltName`.
+///
+/// Distinct from [`holder`] on purpose: that certificate has no
+/// `subjectAltName` at all, so every other test here matches the holder
+/// through its subject DN. See `tests/fixtures/make_holder_san.py`.
+fn san_holder() -> Certificate {
+    let der = fixture("holder-san-cert.der");
+    Certificate::from_der(&der).expect("the SAN holder certificate parses")
+}
+
+/// §4.2.2: an `entityName` may name one of the holder's
+/// `subjectAltName` values rather than its subject DN.
+///
+/// "The entityName MUST be the same as the PKC subject field or one of
+/// the values of the PKC subjectAltName field extension (if present)."
+/// The second half had no fixture, because the holder certificate the
+/// suite borrows carries no subjectAltName -- so `subject_alt_names`
+/// could have returned nothing at all and every test would still pass,
+/// while an AC issued against a holder's dNSName silently failed to
+/// match the holder it names.
+///
+/// The fixture's dNSName is not its subject DN, so a match can only come
+/// through the SAN.
+#[test]
+fn an_entity_name_matches_a_holder_subject_alt_name() {
+    ac("ac-holder-dns-name.der")
+        .validate(
+            &aa(),
+            &san_holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier,
+        )
+        .expect("§4.2.2 permits naming the holder by a subjectAltName value");
+}
+
+/// And a `dNSName` the holder does not claim does not match it.
+///
+/// The same AC shape with one host name changed, so the verdict turns on
+/// the comparison and not on the form. Without this the SAN lookup could
+/// answer "every name matches" and the positive case above would not
+/// notice.
+#[test]
+fn an_entity_name_naming_another_host_does_not_match_the_holder() {
+    assert_eq!(
+        ac("ac-holder-dns-name-other.der").validate(
+            &aa(),
+            &san_holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::CallerChecks,
+            &DefaultVerifier
+        ),
+        Err(Error::HolderMismatch),
+        "the holder certificate does not claim other-holder.example"
+    );
+}
+
+/// §4.5 permits an attribute authority with no `keyUsage` at all.
+///
+/// The rule is that `keyUsage` "MUST NOT explicitly indicate that the AC
+/// issuer's public key cannot be used to validate a digital signature",
+/// and an absent extension indicates nothing. Every other authority
+/// fixture carries one, which left the duplicate-extension count unable
+/// to tell `> 1` from `< 1`: with one basicConstraints and one keyUsage,
+/// both readings agree. A certificate missing one of the two separates
+/// them -- and an authority rejected for not saying something it was
+/// never required to say is a conforming deployment refused.
+#[test]
+fn an_authority_without_key_usage_is_permitted() {
+    let der = fixture("aa-no-key-usage-cert.der");
+    let aa = Certificate::from_der(&der).expect("the fixture parses");
+    let exts = aa
+        .tbs_certificate()
+        .extensions()
+        .expect("the fixture has extensions");
+    assert!(
+        !exts.iter().any(|e| e.extn_id.to_string() == "2.5.29.15"),
+        "precondition: the fixture carries no keyUsage"
+    );
+
+    pkix_ac::check_issuer_profile(&aa)
+        .expect("§4.5 requires keyUsage not to forbid signing, not that it be present");
+}
