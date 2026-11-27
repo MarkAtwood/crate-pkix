@@ -62,3 +62,17 @@ default `DefaultVerifier` covers signature checking.
 Regenerate with `gen.py`. Uses pyca/cryptography as the external oracle for
 DER encoding; the Rust verifier under test never participates in fixture
 creation.
+
+## Subdirectories
+
+`gen.py` regenerates every fixture listed above from a fresh random key, so a
+test needing a certificate the corpus does not have gets its own directory
+with its own generator rather than an entry here. Each one's script says what
+it builds and why the shape matters:
+
+| Directory | Built for |
+|---|---|
+| `constrained-no-san/` | a path asserting `nameConstraints` over a leaf with no DNS-ID (RFC 7672 §3.2.3) |
+| `tsa-ku/` | one certificate per non-signing KeyUsage bit (RFC 3161 §2.3) |
+| `ocsp-depth2/` | a depth-2 delegated OCSP responder chain, with a deliberate serial collision (RFC 6960 §4.2.2.2.1) |
+| `review/` | AIA fetching and path building: sequential-discovery depth chains, 64-way issuer fan-out, and a topological path to the anchor that does not validate (`review_aia.rs`, `review_*.rs`) |
