@@ -1683,4 +1683,180 @@ mod tests {
             Some(IdentityError::MalformedInput),
         );
     }
+
+    #[test]
+    fn mailbox_parse_rejects_forbidden_chars_in_internationalized_local() {
+        // The character loop in `parse` and `validate_ascii_local_part`
+        // overlap for ASCII input: every character the loop rejects is
+        // also non-`atext`, so `mailbox_parse_rejects_whitespace_in_local`
+        // and `mailbox_parse_rejects_quoted_local` prove nothing about the
+        // loop -- the ASCII validator would refuse those inputs with the
+        // loop deleted entirely.
+        //
+        // A non-ASCII local-part skips `validate_ascii_local_part`
+        // (RFC 6531 permits UTF-8 there, and `atext` does not describe
+        // it), so the loop is the only thing standing between these
+        // characters and an accepted mailbox. `<`, `>`, `,` and `"` are
+        // the RFC 5322 §3.2.3 specials that terminate an address in a
+        // header field: accepting one inside a local-part would let a
+        // certificate assert a mailbox that a header parser reads as
+        // two.
+        for ch in [' ', '\t', '\0', '<', '>', ',', '"'] {
+            let s = alloc::format!("用户{ch}x@example.com");
+            assert_eq!(
+                MailboxName::parse(&s).err(),
+                Some(IdentityError::MalformedInput),
+                "should reject {ch:?} in a non-ASCII local-part"
+            );
+        }
+        // The control: the same shape without a forbidden character is
+        // accepted, so the loop is what the assertions above measure and
+        // not some unrelated refusal of non-ASCII input.
+        assert!(MailboxName::parse("用户x@example.com").is_ok());
+    }
+
+    // -----------------------------------------------------------------
+    // The public accessors
+    //
+    // Every test above reads the private fields (`m.local`,
+    // `m.domain_a_label`, `n.repr`) directly, so the accessors a
+    // consumer actually calls were unexercised: `local_part` could
+    // return the domain, `as_dns_name` could return `None` for every
+    // DNS name, and nothing in the crate would notice.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn mailbox_accessors_return_the_parsed_halves() {
+        let m = MailboxName::parse("Alice.Smith@Example.COM").unwrap();
+        assert_eq!(m.local_part(), "Alice.Smith");
+        assert_eq!(m.domain(), "example.com");
+        assert!(!m.is_internationalized());
+    }
+
+    #[test]
+    fn mailbox_is_internationalized_follows_the_local_part_only() {
+        // RFC 8398 §3 keys SmtpUTF8Mailbox off the local-part, so a
+        // U-label domain with an ASCII local-part is not an
+        // internationalized mailbox and must still match rfc822Name.
+        assert!(MailboxName::parse("用户@example.com")
+            .unwrap()
+            .is_internationalized());
+        assert!(!MailboxName::parse("user@bücher.example")
+            .unwrap()
+            .is_internationalized());
+    }
+
+    #[test]
+    fn mailbox_display_is_local_at_domain() {
+        let m = MailboxName::parse("Alice@Example.COM").unwrap();
+        assert_eq!(alloc::format!("{m}"), "Alice@example.com");
+    }
+
+    #[test]
+    fn server_name_accessors_discriminate_dns_from_ip() {
+        let dns = ServerName::dns_name("Example.COM").unwrap();
+        assert_eq!(dns.as_dns_name(), Some("example.com"));
+        assert_eq!(dns.as_ip_bytes(), None);
+
+        let v4 = ServerName::ip_address("192.0.2.1").unwrap();
+        assert_eq!(v4.as_dns_name(), None);
+        assert_eq!(v4.as_ip_bytes(), Some(&[192u8, 0, 2, 1][..]));
+
+        let v6 = ServerName::ip_address("::1").unwrap();
+        assert_eq!(v6.as_dns_name(), None);
+        assert_eq!(
+            v6.as_ip_bytes(),
+            Some(&[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1][..])
+        );
+    }
+
+    #[test]
+    fn server_name_display_renders_the_identity() {
+        // A verification failure is reported against a name; an empty or
+        // wrong rendering here corrupts every such message.
+        assert_eq!(
+            alloc::format!("{}", ServerName::dns_name("Example.COM").unwrap()),
+            "example.com"
+        );
+        assert_eq!(
+            alloc::format!("{}", ServerName::ip_address("192.0.2.1").unwrap()),
+            "192.0.2.1"
+        );
+        // Uncompressed, deliberately: see the comment on the impl.
+        assert_eq!(
+            alloc::format!("{}", ServerName::ip_address("2001:db8::1").unwrap()),
+            "[2001:db8:0:0:0:0:0:1]"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Boundaries the existing cases miss
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn ip_address_v4_accepts_the_largest_octet() {
+        // `ip_address_v4_rejects_out_of_range` uses 256, which an
+        // off-by-one in the range check (`value >= 255`) also rejects.
+        // Only 255 itself distinguishes the two.
+        let n = ServerName::ip_address("255.255.255.255").unwrap();
+        match n.repr {
+            ServerNameRepr::Ip(IpRepr::V4(b)) => assert_eq!(b, [255, 255, 255, 255]),
+            _ => panic!("expected V4"),
+        }
+    }
+
+    #[test]
+    fn ip_address_v6_places_every_group_after_the_elision() {
+        // Every other `::` case here has at most one group following the
+        // elision, so the loop that writes them runs at most once and the
+        // index arithmetic (`at + elided + i`) is never exercised for
+        // i > 0. Two trailing groups pin it: an error in that expression
+        // writes the second group to the wrong position, which does not
+        // fail to parse -- it parses as a different address.
+        let n = ServerName::ip_address("2001:db8::1:2").unwrap();
+        let expected = [0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2];
+        match n.repr {
+            ServerNameRepr::Ip(IpRepr::V6(b)) => assert_eq!(b, expected),
+            _ => panic!("expected V6"),
+        }
+    }
+
+    #[test]
+    fn dns_name_accepts_underscore_labels() {
+        // Underscore is non-LDH, and `validate_ascii_label` tolerates it
+        // on purpose: `_dmarc`, `_domainkey` and SRV names are real
+        // hostnames a caller will hand us. Nothing asserted that before,
+        // so narrowing the accepted set to strict LDH was invisible.
+        let n = ServerName::dns_name("_dmarc.example.com").unwrap();
+        assert_eq!(n.as_dns_name(), Some("_dmarc.example.com"));
+    }
+
+    // -----------------------------------------------------------------
+    // dns_name_matches_pattern (the public wildcard rule)
+    //
+    // Exported for RFC 8461 §4.1, where the patterns come from an
+    // MTA-STS policy file rather than a certificate. No caller lives in
+    // this crate, so the whole function could be replaced by `true` and
+    // every test here still passed.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn dns_name_matches_pattern_applies_the_wildcard_rule() {
+        assert!(dns_name_matches_pattern("mx.example.com", "mx.example.com"));
+        assert!(dns_name_matches_pattern("*.example.com", "mx.example.com"));
+
+        // Left-most label only, and it must match exactly one label.
+        assert!(!dns_name_matches_pattern("*.example.com", "example.com"));
+        assert!(!dns_name_matches_pattern(
+            "*.example.com",
+            "a.mx.example.com"
+        ));
+        // Public-suffix-shaped wildcard.
+        assert!(!dns_name_matches_pattern("*.com", "example.com"));
+        // Embedded wildcard. The reference identity is caller-supplied
+        // here -- unlike the certificate path, nothing has normalized it
+        // -- so it can itself contain the `*` that a defeated
+        // embedded-wildcard check would match against.
+        assert!(!dns_name_matches_pattern("*.foo.*.com", "x.foo.*.com"));
+    }
 }
