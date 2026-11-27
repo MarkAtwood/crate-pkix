@@ -1,0 +1,22 @@
+{
+  "id": "PKIX-zu81",
+  "title": "tbs_certificate_der's whole purpose has no fixture: a pre-2050 GeneralizedTime",
+  "description": "## Why\n\n`tbs_certificate_der` exists for one reason, stated in its own rustdoc:\n\n\u003e x509-cert 0.3 re-encodes the validity times of a `Certificate` under the\n\u003e RFC 5280 profile (dates before 2050 become `UTCTime`), so a certificate\n\u003e whose issuer used `GeneralizedTime` for such a date would no longer match\n\u003e its signature. This function keeps each time in the form it was parsed\n\u003e from.\n\nNo fixture in the workspace has that shape. Every certificate here encodes\npre-2050 dates as UTCTime, which is what RFC 5280 §4.1.2.5 requires, so\n`tbs_certificate_der` and a plain `cert.tbs_certificate().to_der()` return\nthe same bytes for all of them -- and `tests/public_helpers.rs`, which\nverifies four self-signed certificates through it, would pass either way.\n\nThe function's purpose is therefore untested. A certificate that trips it\nis non-conformant but real: a CA that encoded a 2020 date as\nGeneralizedTime produces one, and refusing to verify its signature is a\nvalidation failure for a certificate that is otherwise fine.\n\n## What a fixture needs\n\nA certificate with `notBefore` or `notAfter` before 2050 encoded as\nGeneralizedTime, with a valid signature over those bytes.\n\npyca/cryptography will not emit it -- it follows §4.1.2.5 -- so this is DER\nsurgery followed by a re-sign, the pattern\n`pkix-path/tests/fixtures/dup-ext/gen.py` already uses: rebuild the\nTBSCertificate with the time re-tagged, then sign the rebuilt bytes with the\nissuer key the generator holds.\n\nThe test is then one assertion: the certificate's own key verifies its own\nsignature over `tbs_certificate_der`'s output, and does not over\n`to_der`'s.\n\n## Found by\n\nWriting `tests/public_helpers.rs` (2d0bfec4) for the mutation survivors in\nthese two helpers, and noticing that the test which kills the mutants does\nnot reach the rule.\n",
+  "status": "open",
+  "priority": 2,
+  "issue_type": "task",
+  "owner": "mark@reviewcommit.com",
+  "created_at": "2026-11-27T17:54:41.536492952Z",
+  "created_by": "Mark Atwood",
+  "updated_at": "2026-11-27T17:54:41.536492952Z",
+  "dependencies": [
+    {
+      "issue_id": "PKIX-zu81",
+      "depends_on_id": "PKIX-8d92",
+      "type": "discovered-from",
+      "created_at": "2026-11-27T17:54:44.993917051Z",
+      "created_by": "Mark Atwood",
+      "metadata": "{}"
+    }
+  ]
+}
