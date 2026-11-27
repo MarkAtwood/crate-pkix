@@ -117,6 +117,10 @@ required-features = ["crl"]
 name = "anchor_path_signer"
 required-features = ["crl"]
 
+[[test]]
+name = "delta_crl_numbers"
+required-features = ["crl"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
