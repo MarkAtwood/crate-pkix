@@ -457,3 +457,41 @@ fn no_character_strings_is_not_a_record() {
     );
     assert!(!StsTxtRecord::is_sts_txt_strings(&[]));
 }
+
+/// §3.3's suggested numbers are the numbers the RFC gives.
+///
+/// These four are public constants a caller configures its fetcher from,
+/// and none of them is read anywhere inside the crate -- `plan` takes
+/// its own `DiscoveryConfig`. So each sat unasserted, and the size cap
+/// in particular is the one a caller uses to bound what it will read
+/// from a policy host: §3.3 says "a suggested maximum policy size is 64
+/// kilobytes", and a caller fetching without a bound is exposed to
+/// resource exhaustion by a hostile host.
+///
+/// The expected values are the RFC's own, written as the arithmetic that
+/// produces them rather than as a single literal, so a changed constant
+/// has to be changed here deliberately.
+#[test]
+fn the_suggested_limits_are_the_rfcs_own_numbers() {
+    use pkix_mta_sts::discovery::{
+        SUGGESTED_FETCH_BACKOFF_SECS, SUGGESTED_FETCH_TIMEOUT_SECS, SUGGESTED_MAX_POLICY_BYTES,
+        SUGGESTED_REFRESH_INTERVAL_SECS,
+    };
+
+    assert_eq!(
+        SUGGESTED_MAX_POLICY_BYTES,
+        64 * 1024,
+        "§3.3: a suggested maximum policy size is 64 kilobytes"
+    );
+    assert_eq!(SUGGESTED_FETCH_TIMEOUT_SECS, 60, "§3.3: a 60-second GET");
+    assert_eq!(
+        SUGGESTED_FETCH_BACKOFF_SECS,
+        5 * 60,
+        "§3.3: five minutes between attempts after a failure"
+    );
+    assert_eq!(
+        SUGGESTED_REFRESH_INTERVAL_SECS,
+        24 * 60 * 60,
+        "§3.3: a daily refresh"
+    );
+}

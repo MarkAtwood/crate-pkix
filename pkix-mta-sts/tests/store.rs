@@ -459,3 +459,116 @@ fn a_refresh_suppressed_by_the_backoff_still_uses_the_cache() {
         "a declined refresh must not stop a still-valid policy being applied"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The blanket impl for `&S`
+// ---------------------------------------------------------------------------
+
+/// A store that records which methods were called on it.
+///
+/// The blanket `impl PolicyStore for &S` is five one-line forwards. Each
+/// can be replaced by a no-op, or by `None`, without any test noticing:
+/// the suite builds stores by value, so the forwards have no caller. A
+/// `put` that dropped its argument would make a caller holding a borrow
+/// re-fetch every policy forever, and a `get` answering `None` would do
+/// the same while looking like a cold cache.
+#[derive(Default)]
+struct Recording {
+    inner: InMemoryPolicyStore,
+    calls: std::sync::Mutex<Vec<&'static str>>,
+}
+
+impl Recording {
+    fn calls(&self) -> Vec<&'static str> {
+        self.calls.lock().expect("not poisoned").clone()
+    }
+    fn note(&self, what: &'static str) {
+        self.calls.lock().expect("not poisoned").push(what);
+    }
+}
+
+impl PolicyStore for Recording {
+    fn get(&self, policy_domain: &str) -> Option<pkix_mta_sts::discovery::CachedPolicy> {
+        self.note("get");
+        self.inner.get(policy_domain)
+    }
+    fn put(&self, policy_domain: &str, policy: pkix_mta_sts::discovery::CachedPolicy) {
+        self.note("put");
+        self.inner.put(policy_domain, policy);
+    }
+    fn invalidate(&self, policy_domain: &str) {
+        self.note("invalidate");
+        self.inner.invalidate(policy_domain);
+    }
+    fn note_fetch_failure(&self, policy_domain: &str, policy_id: &str, at_unix: u64) {
+        self.note("note_fetch_failure");
+        self.inner
+            .note_fetch_failure(policy_domain, policy_id, at_unix);
+    }
+    fn last_fetch_failure(&self, policy_domain: &str, policy_id: &str) -> Option<u64> {
+        self.note("last_fetch_failure");
+        self.inner.last_fetch_failure(policy_domain, policy_id)
+    }
+}
+
+/// Calls all five methods through an opaque `S: PolicyStore`.
+///
+/// Opaque is the point. Written as `store.get(..)` on a concrete
+/// `&Recording`, method resolution auto-derefs and reaches
+/// `Recording::get` directly, so the blanket impl is never selected --
+/// which is what the first version of this test did, leaving all seven
+/// of its mutants alive under a test that looked like it covered them.
+/// Inside a generic function the compiler has no concrete type to deref
+/// through and must use `<S as PolicyStore>`, so passing `&Recording`
+/// as `S` selects the impl under test.
+fn exercise<S: PolicyStore>(store: S, cached: pkix_mta_sts::discovery::CachedPolicy) {
+    assert_eq!(store.get(DOMAIN), None, "nothing cached yet");
+    store.put(DOMAIN, cached);
+    let got = store
+        .get(DOMAIN)
+        .expect("put through the borrow is visible");
+    assert_eq!(got.id(), "id1", "and carried its argument");
+
+    assert_eq!(store.last_fetch_failure(DOMAIN, "id1"), None);
+    store.note_fetch_failure(DOMAIN, "id1", NOW);
+    assert_eq!(
+        store.last_fetch_failure(DOMAIN, "id1"),
+        Some(NOW),
+        "the failure instant forwarded too"
+    );
+
+    store.invalidate(DOMAIN);
+    assert_eq!(store.get(DOMAIN), None, "invalidate reached the store");
+}
+
+/// A `&S` forwards every method to the store it borrows.
+///
+/// Called through the reference, so each of the five forwards is the
+/// path under test. Both halves matter: the recording store proves the
+/// call arrived, and reading the value back proves the argument did too
+/// -- a `put` that forwarded nothing would still be recorded by a test
+/// that only counted calls.
+#[test]
+fn a_borrowed_store_forwards_every_method() {
+    let owned = Recording::default();
+    let cached = pkix_mta_sts::discovery::CachedPolicy::new(week_policy(), "id1".into(), NOW);
+
+    // `S` binds to `&Recording`, so every call inside goes through
+    // `impl PolicyStore for &S` rather than through an auto-deref.
+    exercise(&owned, cached);
+
+    assert_eq!(
+        owned.calls(),
+        vec![
+            "get",
+            "put",
+            "get",
+            "last_fetch_failure",
+            "note_fetch_failure",
+            "last_fetch_failure",
+            "invalidate",
+            "get",
+        ],
+        "every call arrived at the borrowed store, in order"
+    );
+}

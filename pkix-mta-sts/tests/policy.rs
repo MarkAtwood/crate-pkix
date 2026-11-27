@@ -480,3 +480,77 @@ fn case_insensitivity_does_not_let_a_future_version_through() {
         Err(PolicyError::UnsupportedVersion(String::from("STSV2")))
     );
 }
+
+// ---------------------------------------------------------------------------
+// §3.2 `max_age` syntax: 1*10(DIGIT), and only that
+// ---------------------------------------------------------------------------
+
+/// Ten digits is the ABNF's limit, and leading zeros are digits.
+///
+/// `sts-policy-max-age-value = 1*10(DIGIT)` admits `0031557600`: ten
+/// characters, every one a DIGIT, and the value is exactly
+/// [`MAX_AGE_LIMIT`]. So a conforming policy can express the maximum
+/// that way and must be accepted.
+///
+/// This is the only input that separates the length guard from the
+/// `MAX_AGE_LIMIT` check below it. Every other over-long value is
+/// refused twice over -- rejected by the guard, or parsed and then
+/// rejected for exceeding the limit -- and both produce the same
+/// `InvalidMaxAge` carrying the same string, so no verdict changes. With
+/// `> 10` read as `>= 10` or `== 10`, this policy is the one that stops
+/// parsing.
+#[test]
+fn ten_digits_with_leading_zeros_is_within_the_grammar() {
+    let p = policy(&format!(
+        "version: STSv1\nmode: enforce\nmx: mail.example.com\nmax_age: {:010}\n",
+        MAX_AGE_LIMIT
+    ));
+    assert_eq!(p.max_age(), MAX_AGE_LIMIT, "ten digits, value at the limit");
+}
+
+/// A leading `+` is not a DIGIT, however willingly `u64::from_str` takes
+/// it.
+///
+/// The grammar is digits and nothing else, which is why the parser
+/// checks the bytes rather than deferring to `parse`. Rust's integer
+/// parser accepts `+100` as 100, so dropping that check admits a policy
+/// the ABNF excludes -- and a sender that accepts `+100` while another
+/// refuses it has the two disagreeing about how long to enforce TLS for
+/// a domain.
+#[test]
+fn a_signed_max_age_is_not_a_digit_string() {
+    assert_eq!(
+        StsPolicy::parse("version: STSv1\nmode: enforce\nmx: a.example.com\nmax_age: +100\n"),
+        Err(PolicyError::InvalidMaxAge(String::from("+100"))),
+        "`+` is excluded by 1*10(DIGIT) even though u64::from_str allows it"
+    );
+    assert_eq!(
+        StsPolicy::parse("version: STSv1\nmode: enforce\nmx: a.example.com\nmax_age: 1_0\n"),
+        Err(PolicyError::InvalidMaxAge(String::from("1_0"))),
+        "and so is an underscore"
+    );
+}
+
+/// Eleven digits is outside the grammar whatever it evaluates to.
+///
+/// `00000000001` is eleven characters, every one a DIGIT, and parses to
+/// 1 -- comfortably inside [`MAX_AGE_LIMIT`]. So the length is the only
+/// thing wrong with it, and it is the input that makes the `is_empty()`
+/// and `len() > 10` checks load-bearing rather than merely early: every
+/// other malformed value is caught again further down, an empty string
+/// by `parse` failing and an over-long one by the limit, both producing
+/// the same `InvalidMaxAge`. This one would be accepted.
+///
+/// The mirror of the leading-zeros case above: there ten digits are in
+/// the grammar however large the value, here eleven are outside it
+/// however small.
+#[test]
+fn eleven_digits_is_outside_the_grammar_however_small_the_value() {
+    assert_eq!(
+        StsPolicy::parse(
+            "version: STSv1\nmode: enforce\nmx: a.example.com\nmax_age: 00000000001\n"
+        ),
+        Err(PolicyError::InvalidMaxAge(String::from("00000000001"))),
+        "1*10(DIGIT) caps the field at ten characters, not at its numeric value"
+    );
+}
