@@ -141,9 +141,13 @@ def role_attribute(role_uri: str) -> bytes:
     roleName is a uniformResourceIdentifier [6], which §4.4.5 says
     SHOULD be used.
     """
+    return seq(oid(ID_AT_ROLE), tlv(0x31, role_value(role_uri)))
+
+
+def role_value(role_uri: str) -> bytes:
+    """One Role AttributeValue, without the enclosing SET OF."""
     role_name = tlv(0x86, role_uri.encode())  # [6] IMPLICIT IA5String
-    role = seq(tlv(0xA1, role_name))  # [1] holding the GeneralName
-    return seq(oid(ID_AT_ROLE), tlv(0x31, role))  # SET OF AttributeValue
+    return seq(tlv(0xA1, role_name))  # [1] holding the GeneralName
 
 
 # RFC 5755 §4.3 extension OIDs.
@@ -324,11 +328,26 @@ def main() -> None:
 
     # Two attributes, to pin that `attributes` is a SEQUENCE OF and the
     # parser keeps the order.
+    # ONE id-at-role attribute carrying TWO values, which is how §4.2.7
+    # says to express several: "only one instance of each attribute can
+    # occur in a single AC, but each instance can be multi-valued".
+    #
+    # This fixture used to be two separate id-at-role attributes, which
+    # §4.2.7 forbids -- and a test asserted it conformed.
+    two_roles = seq(oid(ID_AT_ROLE), tlv(0x31,
+        role_value("urn:example:role:auditor")
+        + role_value("urn:example:role:approver")))
     info = acinfo(leaf_subject, aa_subject, 0x2B,
+                  "20250101000000Z", "20340101000000Z", seq(two_roles))
+    (HERE / "ac-two-roles.der").write_bytes(attribute_certificate(info))
+
+    # And the violation, so the new rule has a fixture.
+    info = acinfo(leaf_subject, aa_subject, 0x2F,
                   "20250101000000Z", "20340101000000Z",
                   seq(role_attribute("urn:example:role:auditor"),
-                      role_attribute("urn:example:role:approver")))
-    (HERE / "ac-two-roles.der").write_bytes(attribute_certificate(info))
+                      role_attribute("urn:example:role:admin")))
+    (HERE / "ac-duplicate-attribute-type.der").write_bytes(
+        attribute_certificate(info))
 
     # Expired: notAfter in the past, everything else identical. For the
     # validity check, not the parser.
@@ -417,9 +436,27 @@ def main() -> None:
     (HERE / "ac-audit-identity.der").write_bytes(attribute_certificate(info))
     info = with_exts(0x39, extension(ID_PE_AC_AUDIT_IDENTITY, False, audit))
     (HERE / "ac-audit-not-critical.der").write_bytes(attribute_certificate(info))
-    too_long = tlv(0x04, bytes(21))
-    info = with_exts(0x3A, extension(ID_PE_AC_AUDIT_IDENTITY, True, too_long))
-    (HERE / "ac-audit-too-long.der").write_bytes(attribute_certificate(info))
+    # The boundaries, which is where this rule was wrong. §4.3.1: the
+    # VALUE must be 1..=20 octets. Measuring the extension value's DER
+    # instead put the real window at 1..=18 and let a zero-length value
+    # through as a two-byte `04 00`. 21 octets was far enough over the
+    # line to be refused under either reading, which is why the original
+    # fixture caught nothing.
+    for serial, n, label in (
+        (0x3A, 21, "too-long"),   # over by one
+        (0x3B, 20, "max"),        # the largest permitted
+        (0x3C, 19, "near-max"),   # inside under both readings
+        (0x3D, 0, "empty"),       # the one length the RFC forbids
+    ):
+        value = tlv(0x04, bytes(range(n)) if n else b"")
+        info = with_exts(serial, extension(ID_PE_AC_AUDIT_IDENTITY, True, value))
+        (HERE / f"ac-audit-{label}.der").write_bytes(attribute_certificate(info))
+
+    # And a value that is not an OCTET STRING at all -- §4.3.1 gives the
+    # syntax, and nothing checked it.
+    info = with_exts(0x3E, extension(ID_PE_AC_AUDIT_IDENTITY, True, integer(0x2A)))
+    (HERE / "ac-audit-not-octet-string.der").write_bytes(
+        attribute_certificate(info))
 
     # AttCertVersion ::= INTEGER { v2(1) }. The profile permits exactly
     # one value, and it is modelled as an enumeration so a wrong version

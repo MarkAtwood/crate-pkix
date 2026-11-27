@@ -19,7 +19,7 @@ use x509_cert::Certificate;
 
 /// Inside every fixture's window: the valid ACs run 2025-01-01 to
 /// 2034-01-01, and the authority's certificate 2025-01-01 to 2035-01-01.
-const NOW: u64 = 1_767_225_600; // 2025-12-31T12:00:00Z
+const NOW: u64 = 1_767_225_600; // 2026-01-01T00:00:00Z
 
 fn fixture(name: &str) -> Vec<u8> {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -188,11 +188,36 @@ fn the_holder_is_matched_by_name() {
 /// `attributes` is a `SEQUENCE OF`, so order is part of the value.
 #[test]
 fn attributes_are_returned_in_order() {
+    // One id-at-role attribute carrying two values, which is how §4.2.7
+    // says to express several: "only one instance of each attribute can
+    // occur in a single AC, but each instance can be multi-valued". This
+    // fixture used to be two separate id-at-role attributes — a §4.2.7
+    // violation that this test asserted conformed.
     let ac = ac("ac-two-roles.der");
-    assert_eq!(ac.attributes().len(), 2);
-    ac.check_profile().expect("two roles still conform");
+    assert_eq!(ac.attributes().len(), 1, "one attribute type");
+    assert_eq!(ac.attributes()[0].values.len(), 2, "carrying two values");
+    ac.check_profile()
+        .expect("a multi-valued attribute is the conforming shape");
     ac.verify(&aa(), NOW, &DefaultVerifier)
-        .expect("the two-role certificate is signed too");
+        .expect("the two-value certificate is signed too");
+}
+
+/// §4.2.7: two attributes of one type is a divergent-interpretation
+/// hazard, not a convenience.
+///
+/// Given `Role=auditor` followed by `Role=admin`, a consumer reading the
+/// first match sees auditor and one reading the last sees admin — the
+/// same hazard this crate already refuses for duplicate extensions, and
+/// here the consequence is a concrete privilege difference rather than a
+/// theoretical one.
+#[test]
+fn two_attributes_of_one_type_are_refused() {
+    assert_eq!(
+        ac("ac-duplicate-attribute-type.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::DuplicateAttributeType
+        ))
+    );
 }
 
 /// The profile checks must actually fire, and must say which rule broke.
@@ -355,10 +380,38 @@ fn the_profiled_extensions_criticality_is_enforced() {
             ProfileViolation::AuditIdentityNotCritical
         ))
     );
+
+    // The boundaries, which is where this was wrong. §4.3.1 bounds the
+    // VALUE at 1..=20 octets; the length was taken from the extension
+    // value's DER instead, which is two more for a short OCTET STRING.
+    // So the real window was 1..=18 real octets, and the one length the
+    // RFC forbids — zero — got through as a two-byte `04 00`.
+    //
+    // 21 octets, the only case tested before, is far enough over the
+    // line to be refused under either reading, which is why nothing
+    // caught it.
+    ac("ac-audit-max.der")
+        .check_profile()
+        .expect("20 octets is the largest §4.3.1 permits");
+    ac("ac-audit-near-max.der")
+        .check_profile()
+        .expect("19 octets is inside the window under any reading");
+    for name in ["ac-audit-too-long.der", "ac-audit-empty.der"] {
+        assert_eq!(
+            ac(name).check_profile(),
+            Err(Error::ProfileViolation(
+                ProfileViolation::AuditIdentityLength
+            )),
+            "{name} is outside 1..=20 octets"
+        );
+    }
+
+    // §4.3.1 gives auditIdentity the syntax OCTET STRING, and nothing
+    // required the value to be one.
     assert_eq!(
-        ac("ac-audit-too-long.der").check_profile(),
+        ac("ac-audit-not-octet-string.der").check_profile(),
         Err(Error::ProfileViolation(
-            ProfileViolation::AuditIdentityLength
+            ProfileViolation::AuditIdentityNotOctetString
         ))
     );
 }
@@ -397,9 +450,11 @@ fn no_rev_avail_and_audit_identity_are_readable() {
     assert!(ac("ac-norevavail.der").no_revocation_available());
     assert_eq!(
         ac("ac-audit-identity.der").audit_identity(),
-        // The generator writes an OCTET STRING of 0..8 as the value, so
-        // the extension value is that DER, header included.
-        Some(&[0x04, 0x08, 0, 1, 2, 3, 4, 5, 6, 7][..])
+        // The OCTET STRING's contents, with no ASN.1 header. This
+        // assertion previously pinned the header-included form, which is
+        // how the wrong behaviour became load-bearing in the suite: the
+        // test recorded what the code did rather than what the value is.
+        Some(&[0, 1, 2, 3, 4, 5, 6, 7][..])
     );
 }
 
@@ -479,6 +534,7 @@ fn each_profile_rule_is_driven_by_a_fixture() {
         // §4.1 on the attributes.
         ("ac-no-attributes", V::NoAttributes),
         ("ac-attribute-no-values", V::AttributeWithoutValues),
+        ("ac-duplicate-attribute-type", V::DuplicateAttributeType),
     ] {
         let ac = ac(&format!("{name}.der"));
         assert_eq!(
@@ -519,8 +575,27 @@ fn issuer_unique_id_and_extensions_are_both_read() {
         ac.no_revocation_available(),
         "the extension must be readable, not merely counted"
     );
+    // Conforming *as a profile matter*: §4.2.8 makes issuerUniqueID
+    // conditional on the AUTHORITY's certificate carrying one, and
+    // check_profile has no authority certificate to consult. So this
+    // says the field parsed and broke no rule check_profile can see —
+    // not that the certificate is conforming overall.
     ac.check_profile()
-        .expect("carrying issuerUniqueID is conforming");
+        .expect("check_profile cannot judge §4.2.8 and must not try");
+
+    // verify() does hold the authority's certificate, and refuses it:
+    // the authority is a v3 certificate with no unique identifier, so
+    // §4.2.8's "MUST NOT be used unless it is also used in the AC
+    // issuer's PKC" is violated. This fixture is deliberately on the
+    // wrong side of that rule, and an earlier version of this test
+    // called it conforming.
+    assert_eq!(
+        ac.verify(&aa(), NOW, &DefaultVerifier),
+        Err(Error::ProfileViolation(
+            ProfileViolation::IssuerUniqueIdMismatch
+        )),
+        "the authority has no issuerUniqueID, so the AC must not carry one"
+    );
 }
 
 /// `otherObjectTypes` MUST NOT be used (§4.1), and cannot be reached.

@@ -221,6 +221,14 @@ pub const AIA_MAX_DEPTH: usize = 5;
 /// handed to the DER parser.
 pub const AIA_MAX_RESPONSE_BYTES: usize = 256 * 1024;
 
+/// `serde(default)` for [`AiaConfig::max_response_bytes`]. A function
+/// rather than `Default::default()` because the fail-safe value is the
+/// documented cap, not zero — which would refuse every response.
+#[cfg(feature = "serde")]
+const fn default_max_response_bytes() -> usize {
+    AIA_MAX_RESPONSE_BYTES
+}
+
 // DANE composition. Gated on `dane`, which is default-on: the gate pulls
 // only the no_std pkix-dane crate, so the API surface costs a consumer
 // nothing until they also enable `dane-resolver`.
@@ -296,6 +304,12 @@ pub struct AiaConfig {
     ///
     /// Defence in depth behind the fetcher's own body cap — see
     /// [`AIA_MAX_RESPONSE_BYTES`] for why both exist.
+    ///
+    /// `#[serde(default)]` so an `AiaConfig` serialised before this
+    /// field existed still deserialises, rather than failing with
+    /// "missing field". The default is the fail-safe value, so an older
+    /// stored config loads with the cap on rather than off.
+    #[cfg_attr(feature = "serde", serde(default = "default_max_response_bytes"))]
     pub max_response_bytes: usize,
     /// Overall wall-clock budget for AIA fetching in one
     /// [`Verifier::verify_one`] call, checked before each fetch round.
@@ -1662,9 +1676,12 @@ pub struct ValidatedAttributeCert {
     pub holder: ValidatedPath,
     /// The validated path of the Attribute Authority that issued it.
     pub authority: ValidatedPath,
-    /// Whether the AC named this verifier among its targets — RFC 5755
-    /// §4.3.2. [`pkix_ac::Targeting::Untargeted`] means the AC carries no
-    /// `targetInformation` and any verifier may use it.
+    /// How the AC named this verifier — RFC 5755 §4.3.2. Either
+    /// [`Untargeted`](pkix_ac::Targeting::Untargeted), meaning it
+    /// carries no `targetInformation` and any verifier may use it, or
+    /// [`Matched`](pkix_ac::Targeting::Matched). Never
+    /// [`NotATarget`](pkix_ac::Targeting::NotATarget): §4.3.2 requires
+    /// such an AC to be rejected, so it arrives as an error instead.
     pub targeting: pkix_ac::Targeting,
 }
 
@@ -1709,13 +1726,25 @@ pub struct ValidatedAttributeCert {
 /// reusing a PKI CA as an authority cannot happen silently. A non-CA
 /// certificate chosen wrongly still can.
 ///
-/// # Targeting is not a verdict
+/// # Targeting is enforced, not reported
 ///
-/// [`Targeting::NotATarget`](pkix_ac::Targeting::NotATarget) is returned,
-/// not raised as an error. The AC is valid; it is simply not for this
-/// verifier, and whether that is fatal is the caller's policy. Treating
-/// it as success without reading the field is the mistake this shape
-/// makes visible instead of hiding.
+/// An AC targeted at somebody else is **refused**, with
+/// [`pkix_ac::Error::NotATarget`]. RFC 5755 §4.3.2: "An (honest) AC
+/// verifier who is not amongst the named servers/services MUST reject
+/// the AC."
+///
+/// So [`ValidatedAttributeCert::targeting`] only ever holds
+/// [`Untargeted`](pkix_ac::Targeting::Untargeted) or
+/// [`Matched`](pkix_ac::Targeting::Matched) — it says which of those
+/// applied, not whether to proceed. An earlier version returned
+/// `NotATarget` as an `Ok` and left the choice to the caller; that is
+/// fail-open on a MUST, because the obvious use of this function is
+/// `let v = verify_attribute_cert(..)?` followed by granting the
+/// attribute.
+///
+/// A caller who genuinely wants the verdict without the refusal — an
+/// audit tool reporting on an AC not addressed to it, say — can call
+/// [`pkix_ac::AttributeCertificate::check_targeting`] directly.
 ///
 /// # Errors
 ///
@@ -1723,7 +1752,8 @@ pub struct ValidatedAttributeCert {
 ///   either path validation, the holder's checked first.
 /// - [`Error::AttributeCert`] for every RFC 5755 failure: a broken
 ///   profile rule, an expired AC, a bad signature, an authority that is
-///   not the issuer named, or a holder mismatch.
+///   not the issuer named, a holder mismatch, or an AC targeted at
+///   another verifier.
 #[cfg(feature = "attribute-certs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
 #[allow(clippy::too_many_arguments)]
@@ -1780,8 +1810,24 @@ where
         return Err(Error::AttributeCert(pkix_ac::Error::HolderMismatch));
     }
 
-    // Rule 6.
+    // Rule 6, and it is a refusal rather than a report. RFC 5755
+    // §4.3.2: "An (honest) AC verifier who is not amongst the named
+    // servers/services MUST reject the AC", and §5 rule 6 requires the
+    // targeting check to *pass*.
+    //
+    // This returned Ok(.. NotATarget) and left the decision to the
+    // caller, on the reasoning that being outside an AC's targets is
+    // policy rather than invalidity. That reasoning was wrong against a
+    // MUST, and wrong in the dangerous direction: the obvious use of a
+    // Result-returning verifier is `let v = verify_attribute_cert(..)?;`
+    // followed by granting the attribute, which honours an AC scoped to
+    // somebody else's service. A caller who wants the verdict without
+    // the refusal has pkix_ac::check_targeting, which still reports all
+    // three states.
     let targeting = ac.check_targeting(my_names, my_groups)?;
+    if targeting == pkix_ac::Targeting::NotATarget {
+        return Err(Error::AttributeCert(pkix_ac::Error::NotATarget));
+    }
 
     Ok(ValidatedAttributeCert {
         holder,

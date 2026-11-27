@@ -209,6 +209,28 @@ impl AttributeCertificate {
                 ProfileViolation::AttributeWithoutValues,
             ));
         }
+        // §4.2.7: "For a given AC, each AttributeType OBJECT IDENTIFIER
+        // in the sequence MUST be unique. That is, only one instance of
+        // each attribute can occur in a single AC, but each instance can
+        // be multi-valued."
+        //
+        // The same divergent-interpretation hazard as a duplicate
+        // extension, and for once the consequence is concrete rather
+        // than theoretical: given Role=auditor followed by Role=admin, a
+        // consumer that reads the first match sees auditor and one that
+        // reads the last sees admin. Multi-valued attributes are how the
+        // RFC says to express several values, and they leave no such
+        // room.
+        for (i, a) in info.attributes.iter().enumerate() {
+            if info.attributes[i + 1..]
+                .iter()
+                .any(|o| o.r#type == a.r#type)
+            {
+                return Err(Error::ProfileViolation(
+                    ProfileViolation::DuplicateAttributeType,
+                ));
+            }
+        }
 
         // §5 rule 7 and the §4.3 criticality rules. Called from here
         // rather than left for the caller to remember: a caller doing
@@ -274,6 +296,18 @@ impl AttributeCertificate {
             return Err(Error::IssuerMismatch);
         }
 
+        // §4.2.8: issuerUniqueID "MUST NOT be used unless it is also
+        // used in the AC issuer's PKC, in which case it MUST be used".
+        // Conditional on the authority's certificate, so it cannot live
+        // in check_profile, which does not have one — this is the only
+        // place that does.
+        let aa_has_uid = aa_cert.tbs_certificate().issuer_unique_id().is_some();
+        if info.issuer_unique_id.is_some() != aa_has_uid {
+            return Err(Error::ProfileViolation(
+                ProfileViolation::IssuerUniqueIdMismatch,
+            ));
+        }
+
         // RFC 5755 §4.1: both bounds are GeneralizedTime, with no
         // UTCTime alternative and no "no well-defined expiry" encoding,
         // so neither end is optional the way a public-key certificate's
@@ -337,6 +371,13 @@ impl AttributeCertificate {
     /// its public-key certificate — issuer and serial — or by name, and
     /// this checks whichever form the AC uses.
     ///
+    /// An `entityName` matches either the certificate's subject or one
+    /// of its `subjectAltName` values, as §4.2.2 requires. Checking only
+    /// the subject would restrict the form to distinguished names, and
+    /// an AC naming its holder by DNS name or mailbox has nowhere else
+    /// to match — nor does one whose holder has an empty subject DN,
+    /// which RFC 5280 requires a `subjectAltName` for.
+    ///
     /// Names compare under RFC 5280 §7.1 via
     /// [`pkix_path::names_match`], not byte equality, so a holder whose
     /// distinguished name differs from the certificate's only in string
@@ -360,12 +401,41 @@ impl AttributeCertificate {
                 [GeneralName::DirectoryName(name)]
                     if pkix_path::names_match(name, tbs.issuer())
             );
+            // §4.2.2: "The AC holder.baseCertificateID.issuerUID field
+            // MUST only be used if the holder's PKC contains an
+            // issuerUniqueID field. If both ... are present, the same
+            // value MUST be present in both fields." Neither half was
+            // checked, so an AC could carry a uid the holder's
+            // certificate did not, or a different one, and still match.
+            let uid_matches = match (&base.issuer_uid, tbs.issuer_unique_id()) {
+                (None, _) => true,
+                (Some(ac_uid), Some(pkc_uid)) => ac_uid == pkc_uid,
+                (Some(_), None) => false,
+            };
             // Serial numbers compare as DER INTEGERs, which have one
             // canonical encoding per value, so bytes are the value here.
-            return issuer_matches && base.serial.as_bytes() == tbs.serial_number().as_bytes();
+            return issuer_matches
+                && uid_matches
+                && base.serial.as_bytes() == tbs.serial_number().as_bytes();
         }
-        if let Some([GeneralName::DirectoryName(name)]) = holder.entity_name.as_deref() {
-            return pkix_path::names_match(name, tbs.subject());
+        if let Some([name]) = holder.entity_name.as_deref() {
+            // §4.2.2: "the entityName MUST be the same as the PKC
+            // subject field OR ONE OF THE VALUES OF THE PKC
+            // subjectAltName field extension (if present)".
+            //
+            // Only the subject was checked, which quietly restricted
+            // this branch to directoryName entityNames: an AC naming
+            // its holder by dNSName or rfc822Name — both ordinary, and
+            // the only option when the subject is an empty DN, which
+            // RFC 5280 requires a subjectAltName for — could never
+            // match anything.
+            if let GeneralName::DirectoryName(dn) = name {
+                if pkix_path::names_match(dn, tbs.subject()) {
+                    return true;
+                }
+            }
+            return subject_alt_names(holder_cert)
+                .is_some_and(|sans| sans.iter().any(|san| general_names_match(name, san)));
         }
         false
     }
@@ -428,11 +498,21 @@ impl AttributeCertificate {
     ///
     /// An opaque identifier for audit logs, deliberately not the
     /// holder's name, so that logs can be correlated without recording
-    /// who the holder was. Returned as bytes because that is all it is.
+    /// who the holder was. Returned as the `OCTET STRING`'s contents —
+    /// the value itself, with no ASN.1 header — because correlating on
+    /// anything else would key on bytes specific to this implementation.
+    ///
+    /// `None` if the extension is absent or its value is not an
+    /// `OCTET STRING`; [`Self::check_extensions`] refuses the latter
+    /// outright.
     #[must_use]
     pub fn audit_identity(&self) -> Option<&[u8]> {
-        self.extension(&ID_PE_AC_AUDIT_IDENTITY)
-            .map(|e| e.extn_value.as_bytes())
+        let e = self.extension(&ID_PE_AC_AUDIT_IDENTITY)?;
+        // The OCTET STRING's contents. `extn_value` is its DER, and
+        // handing that back gave callers an ASN.1 header on the front of
+        // an identifier they are meant to correlate logs on — bytes no
+        // other implementation produces for the same AC.
+        octet_string_value(e.extn_value.as_bytes())
     }
 
     fn extension(&self, oid: &ObjectIdentifier) -> Option<&x509_cert::ext::Extension> {
@@ -484,7 +564,20 @@ impl AttributeCertificate {
                             ProfileViolation::AuditIdentityNotCritical,
                         ));
                     }
-                    let len = e.extn_value.as_bytes().len();
+                    // The VALUE's length, not the extension value's.
+                    // `extn_value` is the DER of an OCTET STRING, so
+                    // `as_bytes().len()` is two more than the octet
+                    // count for short values — which put the window at
+                    // 1..=18 real octets and let the one length §4.3.1
+                    // forbids, zero, through as a two-byte `04 00`.
+                    //
+                    // §4.3.1: "the value of an audit identity MUST be
+                    // longer than zero octets. The value of an audit
+                    // identity MUST NOT be longer than 20 octets."
+                    let value = octet_string_value(e.extn_value.as_bytes()).ok_or(
+                        Error::ProfileViolation(ProfileViolation::AuditIdentityNotOctetString),
+                    )?;
+                    let len = value.len();
                     if len == 0 || len > 20 {
                         return Err(Error::ProfileViolation(
                             ProfileViolation::AuditIdentityLength,
@@ -567,6 +660,12 @@ impl AttributeCertificate {
     /// Is this verifier among the certificate's intended targets —
     /// RFC 5755 §5 rule 6?
     ///
+    /// Names compare by form rather than by bytes: `directoryName`
+    /// under RFC 5280 §7.1, `dNSName` case-insensitively per RFC 4343,
+    /// `rfc822Name` with a case-insensitive domain and an exact local
+    /// part. A verifier that is the named target must not be told it is
+    /// not because the AC spelled its name in a different string type.
+    ///
     /// `my_names` are the names this verifier answers to and `my_groups`
     /// the groups it belongs to. Both come from the caller because the
     /// RFC leaves membership undefined: *"any given target 'knows' the
@@ -596,12 +695,12 @@ impl AttributeCertificate {
         for t in &targets {
             match t {
                 types::Target::TargetName(n) => {
-                    if my_names.contains(n) {
+                    if my_names.iter().any(|mine| general_names_match(n, mine)) {
                         matched = true;
                     }
                 }
                 types::Target::TargetGroup(g) => {
-                    if my_groups.contains(g) {
+                    if my_groups.iter().any(|mine| general_names_match(g, mine)) {
                         matched = true;
                     }
                 }
@@ -635,6 +734,91 @@ fn acinfo_range(der: &[u8]) -> Option<core::ops::Range<usize>> {
         return None;
     }
     Some(outer_header..outer_header + total)
+}
+
+/// A certificate's `subjectAltName` values, if it has the extension.
+///
+/// Needed because RFC 5755 §4.2.2 lets a holder's `entityName` match
+/// either the subject or one of these, and an AC that names its holder
+/// by anything other than a distinguished name has no other way to.
+fn subject_alt_names(cert: &Certificate) -> Option<alloc::vec::Vec<GeneralName>> {
+    const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
+    let exts = cert.tbs_certificate().extensions()?;
+    // Counted, not found: two subjectAltName extensions would let two
+    // implementations read one certificate differently, the same hazard
+    // this crate refuses elsewhere. RFC 5280 §4.2 forbids the repeat, so
+    // treat such a certificate as having no usable names rather than
+    // picking one.
+    let mut matching = exts.iter().filter(|e| e.extn_id == OID_SUBJECT_ALT_NAME);
+    let ext = matching.next()?;
+    if matching.next().is_some() {
+        return None;
+    }
+    x509_cert::ext::pkix::SubjectAltName::from_der(ext.extn_value.as_bytes())
+        .ok()
+        .map(|san| san.0)
+}
+
+/// Compare two `GeneralName`s the way their own name forms require.
+///
+/// Byte equality is wrong here for the same reason it was wrong for the
+/// issuer and holder names: a name can be re-encoded without becoming a
+/// different name. The forms differ in how:
+///
+/// - `directoryName` compares under RFC 5280 §7.1 via
+///   [`pkix_path::names_match`], so string type, letter case and
+///   insignificant whitespace do not matter.
+/// - `dNSName` is case-insensitive (RFC 4343, "domain name system case
+///   insensitivity clarification"), ASCII-folded.
+/// - `rfc822Name`'s domain half is likewise case-insensitive, while its
+///   local part is not — RFC 5280 §4.2.1.6 says to compare the local
+///   part exactly.
+/// - Everything else falls back to byte equality, which is what the
+///   remaining forms give us no basis to relax.
+///
+/// Getting this wrong fails closed and looks like a configuration
+/// error: a verifier that *is* the named target is told it is not, for
+/// the one deployment the AC was issued for.
+fn general_names_match(a: &GeneralName, b: &GeneralName) -> bool {
+    use GeneralName as G;
+    match (a, b) {
+        (G::DirectoryName(x), G::DirectoryName(y)) => pkix_path::names_match(x, y),
+        (G::DnsName(x), G::DnsName(y)) => x.as_str().eq_ignore_ascii_case(y.as_str()),
+        (G::Rfc822Name(x), G::Rfc822Name(y)) => {
+            let (xs, ys) = (x.as_str(), y.as_str());
+            match (xs.rsplit_once('@'), ys.rsplit_once('@')) {
+                (Some((xl, xd)), Some((yl, yd))) => xl == yl && xd.eq_ignore_ascii_case(yd),
+                // No '@' in one or both: nothing to split on, so compare
+                // whole rather than guess which half is which.
+                _ => xs == ys,
+            }
+        }
+        _ => a == b,
+    }
+}
+
+/// The contents of `input`, if `input` is exactly one DER `OCTET STRING`.
+///
+/// Borrowed rather than decoded into `der`'s owned `OctetString`,
+/// because the accessor hands the value straight out and an allocation
+/// per call to read 20 bytes would be silly. Reuses [`header`], so a
+/// non-minimal or over-long length is refused here too.
+///
+/// `None` unless the whole of `input` is one `OCTET STRING`: trailing
+/// bytes after it mean the extension value is not what it claims, and
+/// accepting them would make the length check describe only the first
+/// part of it.
+fn octet_string_value(input: &[u8]) -> Option<&[u8]> {
+    const TAG_OCTET_STRING: u8 = 0x04;
+    if input.first() != Some(&TAG_OCTET_STRING) {
+        return None;
+    }
+    let (value_len, header_len) = header(input)?;
+    let end = header_len.checked_add(value_len)?;
+    if end != input.len() {
+        return None;
+    }
+    input.get(header_len..end)
 }
 
 /// `(value_len, header_len)` of the DER triple at the start of `input`.
@@ -709,6 +893,20 @@ pub fn check_issuer_profile(aa_cert: &Certificate) -> Result<()> {
         return Ok(());
     };
 
+    // Counted, not found. `find` takes the first of several, so a
+    // certificate carrying basicConstraints twice — cA=FALSE then
+    // cA=TRUE — passed as an attribute authority, which is fail-open on
+    // the one rule §4.5 exists to enforce. `pkix-path` rejects duplicate
+    // extensions outright, so the composed path was covered; this
+    // function is documented as usable standalone, and was not.
+    for oid in [OID_BASIC_CONSTRAINTS, OID_KEY_USAGE] {
+        if exts.iter().filter(|e| e.extn_id == oid).count() > 1 {
+            return Err(Error::ProfileViolation(
+                ProfileViolation::IssuerDuplicateExtension,
+            ));
+        }
+    }
+
     if let Some(ext) = exts.iter().find(|e| e.extn_id == OID_BASIC_CONSTRAINTS) {
         let bc = x509_cert::ext::pkix::BasicConstraints::from_der(ext.extn_value.as_bytes())
             .map_err(|_| Error::ProfileViolation(ProfileViolation::IssuerExtensionMalformed))?;
@@ -754,12 +952,27 @@ pub enum ProfileViolation {
     /// §4.2.3: `baseCertificateID` or `objectDigestInfo` appeared in the
     /// v2 form, where neither is permitted.
     IssuerExtraFields,
+    /// §4.2.8: `issuerUniqueID` is present on the AC but not on the
+    /// Attribute Authority's certificate, or the other way round. It
+    /// "MUST NOT be used unless it is also used in the AC issuer's PKC,
+    /// in which case it MUST be used" — a condition that needs the
+    /// authority's certificate, so it is checked by
+    /// [`AttributeCertificate::verify`] rather than
+    /// [`AttributeCertificate::check_profile`].
+    IssuerUniqueIdMismatch,
     /// §4.2.2: the holder gives both `baseCertificateID` and
     /// `entityName`, so which identifies it is ambiguous.
     HolderAmbiguous,
     /// §4.2.2: the holder gives neither.
     HolderMissing,
-    /// §4.2.2: the holder carries more than one name.
+    /// §4.2.2: the holder's `entityName` carries more than one name.
+    ///
+    /// Stricter than the RFC, deliberately. §4.2.2 says "only one name
+    /// SHOULD be present", not MUST — but several names leave which one
+    /// identifies the holder undetermined, and deciding that for a
+    /// caller is exactly what this crate refuses to do elsewhere. A
+    /// verifier that picked one would differ from a verifier that picked
+    /// another about the same certificate.
     HolderNameNotSingular,
     /// §4.1: the holder used `objectDigestInfo`, which this profile does
     /// not cover.
@@ -768,12 +981,20 @@ pub enum ProfileViolation {
     NoAttributes,
     /// §4.1: an attribute carries no values, though one is required.
     AttributeWithoutValues,
+    /// §4.2.7: two attributes share an `AttributeType` OID, where "only
+    /// one instance of each attribute can occur in a single AC, but each
+    /// instance can be multi-valued".
+    DuplicateAttributeType,
     /// §4.2: the same extension appears more than once.
     DuplicateExtension,
     /// §4.3.1: `auditIdentity` is not marked critical, though it must be.
     AuditIdentityNotCritical,
-    /// §4.3.1: `auditIdentity` is empty or longer than 20 octets.
+    /// §4.3.1: `auditIdentity`'s value is empty or longer than 20
+    /// octets.
     AuditIdentityLength,
+    /// §4.3.1: `auditIdentity`'s extension value is not an
+    /// `OCTET STRING`, which is the syntax the section gives it.
+    AuditIdentityNotOctetString,
     /// §4.3.2: `targetInformation` is not marked critical, though it
     /// must be.
     TargetInformationNotCritical,
@@ -792,6 +1013,10 @@ pub enum ProfileViolation {
     /// §4.5: the Attribute Authority's `basicConstraints` or `keyUsage`
     /// extension will not decode.
     IssuerExtensionMalformed,
+    /// RFC 5280 §4.2: the Attribute Authority's certificate carries
+    /// `basicConstraints` or `keyUsage` more than once, so which copy
+    /// §4.5 applies to is not determined.
+    IssuerDuplicateExtension,
 }
 
 impl core::fmt::Display for ProfileViolation {
@@ -808,18 +1033,29 @@ impl core::fmt::Display for ProfileViolation {
             Self::IssuerExtraFields => {
                 "v2Form carries baseCertificateID or objectDigestInfo, which §4.2.3 forbids"
             }
+            Self::IssuerUniqueIdMismatch => {
+                "issuerUniqueID is present on only one of the AC and the authority's \
+                 certificate, where RFC 5755 §4.2.8 requires both or neither"
+            }
             Self::HolderAmbiguous => "holder gives both baseCertificateID and entityName",
             Self::HolderMissing => "holder gives neither baseCertificateID nor entityName",
             Self::HolderNameNotSingular => "holder carries more than one name",
             Self::HolderObjectDigestInfo => "holder uses objectDigestInfo, which is not profiled",
             Self::NoAttributes => "no attributes, though RFC 5755 §4.1 requires at least one",
             Self::AttributeWithoutValues => "an attribute carries no values",
+            Self::DuplicateAttributeType => {
+                "two attributes share one type OID, though RFC 5755 §4.2.7 requires \
+                 each to be unique and multi-valued instead"
+            }
             Self::DuplicateExtension => "the same extension appears more than once",
             Self::AuditIdentityNotCritical => {
                 "auditIdentity is not critical, though RFC 5755 §4.3.1 requires it to be"
             }
             Self::AuditIdentityLength => {
-                "auditIdentity must be between 1 and 20 octets (RFC 5755 §4.3.1)"
+                "auditIdentity's value must be between 1 and 20 octets (RFC 5755 §4.3.1)"
+            }
+            Self::AuditIdentityNotOctetString => {
+                "auditIdentity's value is not an OCTET STRING (RFC 5755 §4.3.1)"
             }
             Self::TargetInformationNotCritical => {
                 "targetInformation is not critical, though RFC 5755 §4.3.2 requires it to be"
@@ -836,6 +1072,9 @@ impl core::fmt::Display for ProfileViolation {
             }
             Self::IssuerExtensionMalformed => {
                 "the attribute authority's basicConstraints or keyUsage will not decode"
+            }
+            Self::IssuerDuplicateExtension => {
+                "the attribute authority's certificate repeats basicConstraints or keyUsage"
             }
         };
         f.write_str(s)
@@ -870,6 +1109,15 @@ pub enum Error {
     /// them choose the algorithm the check runs with. RFC 5280 §4.1.1.2
     /// requires the two to be equal.
     SignatureAlgorithmMismatch,
+    /// The attribute certificate is targeted at verifiers this one is
+    /// not among — RFC 5755 §4.3.2.
+    ///
+    /// [`AttributeCertificate::check_targeting`] reports this as
+    /// [`Targeting::NotATarget`] rather than an error, because an audit
+    /// tool may legitimately want to read an AC not addressed to it.
+    /// This variant is for the composed check, where §4.3.2's "MUST
+    /// reject the AC" applies.
+    NotATarget,
     /// The attribute certificate names a different holder than the
     /// entity presenting it.
     ///
@@ -901,6 +1149,9 @@ impl core::fmt::Display for Error {
             Self::SignatureAlgorithmMismatch => f.write_str(
                 "outer signatureAlgorithm differs from the signature field inside acinfo",
             ),
+            Self::NotATarget => {
+                f.write_str("attribute certificate is targeted at another verifier")
+            }
             Self::HolderMismatch => {
                 f.write_str("attribute certificate was issued to a different holder")
             }
@@ -991,21 +1242,25 @@ mod tests {
             V::IssuerNameEmptyDn,
             V::IssuerNameNotDirectoryName,
             V::IssuerExtraFields,
+            V::IssuerUniqueIdMismatch,
             V::HolderAmbiguous,
             V::HolderMissing,
             V::HolderNameNotSingular,
             V::HolderObjectDigestInfo,
             V::NoAttributes,
             V::AttributeWithoutValues,
+            V::DuplicateAttributeType,
             V::DuplicateExtension,
             V::AuditIdentityNotCritical,
             V::AuditIdentityLength,
+            V::AuditIdentityNotOctetString,
             V::TargetInformationNotCritical,
             V::NoRevAvailCritical,
             V::TargetCertUsed,
             V::IssuerIsACa,
             V::IssuerCannotSign,
             V::IssuerExtensionMalformed,
+            V::IssuerDuplicateExtension,
         ];
 
         for v in all {
@@ -1018,21 +1273,25 @@ mod tests {
                 V::IssuerNameEmptyDn => "IssuerNameEmptyDn",
                 V::IssuerNameNotDirectoryName => "IssuerNameNotDirectoryName",
                 V::IssuerExtraFields => "IssuerExtraFields",
+                V::IssuerUniqueIdMismatch => "IssuerUniqueIdMismatch",
                 V::HolderAmbiguous => "HolderAmbiguous",
                 V::HolderMissing => "HolderMissing",
                 V::HolderNameNotSingular => "HolderNameNotSingular",
                 V::HolderObjectDigestInfo => "HolderObjectDigestInfo",
                 V::NoAttributes => "NoAttributes",
                 V::AttributeWithoutValues => "AttributeWithoutValues",
+                V::DuplicateAttributeType => "DuplicateAttributeType",
                 V::DuplicateExtension => "DuplicateExtension",
                 V::AuditIdentityNotCritical => "AuditIdentityNotCritical",
                 V::AuditIdentityLength => "AuditIdentityLength",
+                V::AuditIdentityNotOctetString => "AuditIdentityNotOctetString",
                 V::TargetInformationNotCritical => "TargetInformationNotCritical",
                 V::NoRevAvailCritical => "NoRevAvailCritical",
                 V::TargetCertUsed => "TargetCertUsed",
                 V::IssuerIsACa => "IssuerIsACa",
                 V::IssuerCannotSign => "IssuerCannotSign",
                 V::IssuerExtensionMalformed => "IssuerExtensionMalformed",
+                V::IssuerDuplicateExtension => "IssuerDuplicateExtension",
             };
             let rendered = Error::ProfileViolation(v).to_string();
             assert!(

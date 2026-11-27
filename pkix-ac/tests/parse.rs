@@ -61,36 +61,43 @@ fn a_role_attribute_certificate_parses() {
     assert!(ac.acinfo.extensions.is_none());
 }
 
-/// `attributes` is a `SEQUENCE OF`, so order is part of the value and
-/// must survive parsing. A `SET OF` would be free to reorder.
+/// A multi-valued attribute keeps both values, and `attributes` is a
+/// `SEQUENCE OF` so its order is part of the value.
+///
+/// The fixture is one `id-at-role` attribute with two values, which is
+/// what §4.2.7 requires — "only one instance of each attribute can occur
+/// in a single AC, but each instance can be multi-valued". It used to be
+/// two separate `id-at-role` attributes, which that section forbids.
+///
+/// Note the values come back in DER `SET OF` order rather than the order
+/// the generator wrote them, because `SetOfVec` sorts on decode. That is
+/// the behaviour `validate.rs` leans on to show why the signed bytes
+/// must be a slice of the original rather than a re-encoding.
 #[test]
-fn two_attributes_keep_their_order() {
+fn a_multi_valued_attribute_keeps_both_values() {
     let der = fixture("ac-two-roles.der");
     let ac = AttributeCertificateInner::from_der(&der).expect("parses");
-    assert_eq!(ac.acinfo.attributes.len(), 2);
-    for a in &ac.acinfo.attributes {
-        assert_eq!(a.r#type, ID_AT_ROLE);
-    }
+    assert_eq!(ac.acinfo.attributes.len(), 1, "one attribute type");
+    assert_eq!(ac.acinfo.attributes[0].r#type, ID_AT_ROLE);
 
-    let first = ac.acinfo.attributes[0].values.as_slice()[0]
-        .to_der()
-        .expect("re-encode the first value");
-    let second = ac.acinfo.attributes[1].values.as_slice()[0]
-        .to_der()
-        .expect("re-encode the second value");
-    assert_ne!(first, second, "the two roles must not have collapsed");
+    let values = &ac.acinfo.attributes[0].values;
+    assert_eq!(values.len(), 2, "both values survive");
 
-    // The generator writes auditor first, then approver.
-    let as_text = |v: &[u8]| String::from_utf8_lossy(v).to_string();
+    let rendered: Vec<String> = values
+        .as_slice()
+        .iter()
+        .map(|v| {
+            let der = v.to_der().expect("re-encode a value");
+            String::from_utf8_lossy(&der).to_string()
+        })
+        .collect();
     assert!(
-        as_text(&first).contains("auditor"),
-        "first attribute should be the auditor role, got {}",
-        as_text(&first)
+        rendered.iter().any(|s| s.contains("auditor")),
+        "the auditor role must be present, got {rendered:?}"
     );
     assert!(
-        as_text(&second).contains("approver"),
-        "second attribute should be the approver role, got {}",
-        as_text(&second)
+        rendered.iter().any(|s| s.contains("approver")),
+        "and the approver role, got {rendered:?}"
     );
 }
 

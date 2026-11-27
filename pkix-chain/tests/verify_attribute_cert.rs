@@ -37,7 +37,7 @@ use x509_cert::der::Decode as _;
 use x509_cert::Certificate;
 
 /// Inside every fixture's window.
-const NOW: u64 = 1_767_225_600; // 2025-12-31T12:00:00Z
+const NOW: u64 = 1_767_225_600; // 2026-01-01T00:00:00Z
 
 const ROOT_DER: &[u8] =
     include_bytes!("../../pkix-ct/tests/fixtures/sct-oracle/precert-issuer.der");
@@ -47,6 +47,12 @@ const AA_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/aa-cert.der")
 const AC_VALID: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-role-valid.der");
 const AC_EXPIRED: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-expired.der");
 const AC_TARGETED: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ac-targeted.der");
+
+fn dns(host: &str) -> x509_cert::ext::pkix::name::GeneralName {
+    x509_cert::ext::pkix::name::GeneralName::DnsName(
+        x509_cert::der::asn1::Ia5String::new(host).expect("host"),
+    )
+}
 
 fn load(der: &[u8]) -> Certificate {
     Certificate::from_der(der).expect("fixture parses")
@@ -192,24 +198,51 @@ fn an_unanchored_authority_is_refused() {
     );
 }
 
-/// Targeting reaches the caller through the wrapper, in all three
-/// states.
+/// An AC targeted at somebody else is refused — RFC 5755 §4.3.2.
 ///
-/// The end-to-end test above only ever saw `Untargeted`, because every
-/// fixture it used was untargeted -- so the field was returned and
-/// never shown to carry anything else. A targeted AC validates
-/// identically whether or not this verifier is a target: the AC is
-/// valid, and whether being outside its targets is fatal is the
-/// caller's policy, not an error from here.
+/// "An (honest) AC verifier who is not amongst the named
+/// servers/services MUST reject the AC."
+///
+/// This function returned `Ok(.. NotATarget)` and left the decision to
+/// the caller, reasoning that being outside an AC's targets is policy
+/// rather than invalidity. That was fail-open on a MUST: the obvious use
+/// is `let v = verify_attribute_cert(..)?` followed by granting the
+/// attribute, which honours an AC scoped to another service.
 #[test]
-fn targeting_is_reported_through_the_wrapper() {
+fn an_attribute_certificate_targeted_elsewhere_is_refused() {
     let holder = vec![load(HOLDER_DER)];
     let aa = vec![load(AA_DER)];
-    let dns = |h: &str| {
-        x509_cert::ext::pkix::name::GeneralName::DnsName(
-            x509_cert::der::asn1::Ia5String::new(h).expect("host"),
+
+    assert_eq!(
+        run_as(
+            AC_TARGETED,
+            &holder,
+            &aa,
+            std::slice::from_ref(&dns("elsewhere.example.com")),
+            &[],
         )
-    };
+        .err(),
+        Some(Error::AttributeCert(pkix_ac::Error::NotATarget)),
+        "§4.3.2 requires rejection, not a field the caller may ignore"
+    );
+
+    // A verifier that supplies no names at all is not among the targets
+    // either, so a targeted AC must not pass by default.
+    assert_eq!(
+        run(AC_TARGETED, &holder, &aa).err(),
+        Some(Error::AttributeCert(pkix_ac::Error::NotATarget)),
+        "supplying no names must not be a way past targeting"
+    );
+}
+
+/// And a verifier that IS a target validates, by name or by group.
+///
+/// `targeting` then reports which of the two permitted states applied.
+/// It can never hold `NotATarget`, since that is now an error.
+#[test]
+fn a_named_target_validates_by_name_or_group() {
+    let holder = vec![load(HOLDER_DER)];
+    let aa = vec![load(AA_DER)];
 
     let named = run_as(
         AC_TARGETED,
@@ -218,7 +251,7 @@ fn targeting_is_reported_through_the_wrapper() {
         std::slice::from_ref(&dns("verifier.example.com")),
         &[],
     )
-    .expect("a targeted AC is still a valid AC");
+    .expect("this verifier is named by the AC");
     assert_eq!(named.targeting, Targeting::Matched);
 
     let by_group = run_as(
@@ -228,21 +261,26 @@ fn targeting_is_reported_through_the_wrapper() {
         &[],
         std::slice::from_ref(&dns("printers.example.com")),
     )
-    .expect("matching by group is still valid");
+    .expect("matching by group counts");
     assert_eq!(by_group.targeting, Targeting::Matched);
 
-    // Not a target: Ok, with the fact reported. A caller that ignores
-    // the field treats this as success, which is why it is a field and
-    // not a silent pass.
-    let stranger = run_as(
+    // Case differs from the AC's spelling. DNS names are
+    // case-insensitive (RFC 4343), so this is the same target — and
+    // being told otherwise would fail closed for the one deployment the
+    // AC was issued for.
+    let shouting = run_as(
         AC_TARGETED,
         &holder,
         &aa,
-        std::slice::from_ref(&dns("elsewhere.example.com")),
+        std::slice::from_ref(&dns("VERIFIER.EXAMPLE.COM")),
         &[],
     )
-    .expect("being outside the targets is not a validation failure");
-    assert_eq!(stranger.targeting, Targeting::NotATarget);
+    .expect("dNSName comparison is case-insensitive");
+    assert_eq!(shouting.targeting, Targeting::Matched);
+
+    // An untargeted AC still validates for anyone.
+    let untargeted = run(AC_VALID, &holder, &aa).expect("untargeted");
+    assert_eq!(untargeted.targeting, Targeting::Untargeted);
 }
 
 const ICA_DER: &[u8] = include_bytes!("../../pkix-ac/tests/fixtures/ica-cert.der");
