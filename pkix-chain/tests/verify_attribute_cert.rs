@@ -30,7 +30,10 @@
 #![cfg(feature = "attribute-certs")]
 
 use pkix_ac::{AttributeCertificate, Targeting};
-use pkix_chain::{verify_attribute_cert, AcRevocation, Error, NoAiaFetcher, NoRevocation};
+use pkix_chain::{
+    verify_attribute_cert, AcRevocation, AttributeCertError, AttributeCertProfileViolation, Error,
+    NoAiaFetcher, NoRevocation,
+};
 use pkix_path::{DefaultVerifier, TrustAnchor};
 use pkix_profiles::Rfc5280Profile;
 use x509_cert::der::Decode as _;
@@ -153,7 +156,7 @@ fn an_attribute_certificate_for_a_different_holder_is_refused() {
 
     assert_eq!(
         run(AC_VALID, &wrong_holder, &aa).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::HolderMismatch))
+        Some(Error::AttributeCert(AttributeCertError::HolderMismatch))
     );
 }
 
@@ -165,7 +168,7 @@ fn an_expired_attribute_certificate_is_refused() {
 
     assert_eq!(
         run(AC_EXPIRED, &holder, &aa).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::Expired))
+        Some(Error::AttributeCert(AttributeCertError::Expired))
     );
 }
 
@@ -227,7 +230,7 @@ fn an_attribute_certificate_targeted_elsewhere_is_refused() {
             &[],
         )
         .err(),
-        Some(Error::AttributeCert(pkix_ac::Error::NotATarget)),
+        Some(Error::AttributeCert(AttributeCertError::NotATarget)),
         "§4.3.2 requires rejection, not a field the caller may ignore"
     );
 
@@ -235,7 +238,7 @@ fn an_attribute_certificate_targeted_elsewhere_is_refused() {
     // either, so a targeted AC must not pass by default.
     assert_eq!(
         run(AC_TARGETED, &holder, &aa).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::NotATarget)),
+        Some(Error::AttributeCert(AttributeCertError::NotATarget)),
         "supplying no names must not be a way past targeting"
     );
 }
@@ -356,8 +359,8 @@ fn a_reversed_authority_chain_is_refused_as_a_ca() {
 
     assert_eq!(
         run(AC_DEEP, &holder, &reversed).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::ProfileViolation(
-            pkix_ac::ProfileViolation::IssuerIsACa
+        Some(Error::AttributeCert(AttributeCertError::ProfileViolation(
+            AttributeCertProfileViolation::IssuerIsACa
         )))
     );
 }
@@ -376,7 +379,7 @@ fn swapping_the_holder_and_authority_chains_is_refused() {
 
     assert_eq!(
         run(AC_DEEP, &aa, &holder).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::IssuerMismatch))
+        Some(Error::AttributeCert(AttributeCertError::IssuerMismatch))
     );
 }
 
@@ -421,7 +424,9 @@ fn an_ac_without_no_rev_avail_is_refused_unless_the_caller_checks() {
 
     assert_eq!(
         run_with(AcRevocation::NeverRevokeOnly).err(),
-        Some(Error::AttributeCert(pkix_ac::Error::RevocationUnsupported)),
+        Some(Error::AttributeCert(
+            AttributeCertError::RevocationUnsupported
+        )),
         "this AC carries no noRevAvail, and §6 requires rejecting it"
     );
 

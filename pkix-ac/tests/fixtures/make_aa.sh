@@ -124,7 +124,29 @@ openssl req -new -key aa-nonrep-key.pem   -subj "/CN=pkix-ac nonrepudiation auth
 WORK="$WORK" openssl ca -batch -config "$WORK/ca.cnf"   -in "$WORK/aanr.csr" -extensions aa_nonrep_ext   -startdate 20250101000000Z -enddate 20350101000000Z   -out "$WORK/aanr.pem" >/dev/null 2>&1
 openssl x509 -in "$WORK/aanr.pem" -out aa-nonrep-cert.der -outform DER
 
-for f in aa-cert.der ica-cert.der aa-deep-cert.der holder-deep-cert.der          aa-nonrep-cert.der; do
+# An authority whose keyUsage asserts NEITHER digitalSignature nor
+# nonRepudiation, and which is not a CA. §4.5 refuses it as
+# IssuerCannotSign. Every existing negative test used a CA fixture,
+# which trips IssuerIsACa first -- basicConstraints is tested before
+# keyUsage -- so IssuerCannotSign was never produced by any test, and
+# deleting the keyUsage rule outright left the whole suite green.
+cat >> "$WORK/ca.cnf" <<'CNF'
+[aa_nosign_ext]
+basicConstraints     = critical,CA:FALSE
+keyUsage             = critical,keyEncipherment
+subjectKeyIdentifier = hash
+CNF
+openssl ecparam -name prime256v1 -genkey -noout -out aa-nosign-key.pem
+openssl req -new -key aa-nosign-key.pem \
+  -subj "/CN=pkix-ac non-signing authority" -out "$WORK/aans.csr"
+WORK="$WORK" openssl ca -batch -config "$WORK/ca.cnf" \
+  -in "$WORK/aans.csr" -extensions aa_nosign_ext \
+  -startdate 20250101000000Z -enddate 20350101000000Z \
+  -out "$WORK/aans.pem" >/dev/null 2>&1
+openssl x509 -in "$WORK/aans.pem" -out aa-nosign-cert.der -outform DER
+
+for f in aa-cert.der ica-cert.der aa-deep-cert.der holder-deep-cert.der \
+         aa-nonrep-cert.der aa-nosign-cert.der; do
   echo "--- $f ---"
   openssl x509 -in "$f" -inform DER -noout -subject -issuer     -ext basicConstraints,keyUsage 2>/dev/null | sed 's/^/  /'
 done

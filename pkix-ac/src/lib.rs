@@ -281,10 +281,26 @@ impl AttributeCertificate {
         // octets — so a conforming 20-octet serial whose top byte has
         // its high bit set is 21 DER content octets. Measuring those
         // rejected it, which is roughly half of all 20-octet serials.
+        // `as_bytes` yields the DER content octets, sign padding and
+        // all — NOT, as x509-cert's own doc comment claims, the value
+        // "with all leading zeros stripped". It forwards to
+        // `der::asn1::Int::as_bytes`, and `der`'s canonical check
+        // rejects a leading `0x00` unless the next octet has its high
+        // bit set, so at most one can ever be present and this strip is
+        // exact. Were upstream's doc true, this arm would be dead and
+        // the cap below would be measuring the wrong thing.
         let magnitude = match serial {
             [0x00, rest @ ..] => rest,
             other => other,
         };
+        // Zero. §4.2.5 requires "a positive integer", and zero is not
+        // one. It reaches here as content `00`: the sign test above
+        // passes because the high bit is clear, and the strip leaves an
+        // empty magnitude — which is the only way to get one, so this
+        // is exactly the zero case.
+        if magnitude.is_empty() {
+            return Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive));
+        }
         if magnitude.len() > 20 {
             return Err(Error::ProfileViolation(ProfileViolation::SerialTooLong));
         }
@@ -503,8 +519,10 @@ impl AttributeCertificate {
     ///
     /// # Errors
     ///
-    /// Any error from the calls it makes, in the order above, plus
-    /// [`Error::NotATarget`] when the AC names targets and
+    /// [`Error::RevocationUnsupported`] when `ac_revocation` is
+    /// [`AcRevocation::NeverRevokeOnly`] and the AC carries no
+    /// `noRevAvail`, [`Error::HolderMismatch`] when the AC names
+    /// someone other than `holder_cert`, and [`Error::NotATarget`] when the AC names targets and
     /// `my_names`/`my_groups` are not among them — §4.3.2's "an
     /// (honest) AC verifier who is not amongst the named
     /// servers/services MUST reject the AC".
@@ -757,14 +775,22 @@ impl AttributeCertificate {
         // reading only the first it looks at would differ from one
         // reading the other.
         let has_no_rev_avail = exts.iter().any(|e| e.extn_id == ID_CE_NO_REV_AVAIL);
-        // A revocation pointer specifically. §6 defines the scheme as
-        // pointing "to sources of revocation status information, using
-        // either an authorityInfoAccess extension or a
-        // crlDistributionPoints extension" — and an AIA carrying only
-        // `id-ad-caIssuers` points at the issuer's certificate, not at
-        // revocation status. §4.3.4 makes caIssuers support optional
-        // precisely because it is a different thing. Treating any AIA
-        // as a pointer refused an AC that had chosen one scheme.
+        // A revocation pointer specifically — and this is an
+        // interpretation that relaxes a literal MUST, not a reading of
+        // what §6 says. §6 defines the scheme at EXTENSION
+        // granularity: ACs may "'point' to sources of revocation
+        // status information, using either an authorityInfoAccess
+        // extension or a crlDistributionPoints extension within the
+        // AC". Taken literally, `noRevAvail` beside any AIA violates
+        // "MUST NOT contain both".
+        //
+        // Narrowed to the OCSP accessMethod because an AIA carrying
+        // only `id-ad-caIssuers` points at the issuer's certificate
+        // rather than at revocation status, so refusing it serves
+        // nothing §6 is protecting. §4.3.4 supports reading the two
+        // apart — it makes caIssuers support OPTIONAL — though its
+        // stated reason is "since AC chains are not expected" rather
+        // than the distinction drawn here.
         let has_pointer = exts.iter().any(|e| {
             e.extn_id == ID_CE_CRL_DISTRIBUTION_POINTS
                 || (e.extn_id == ID_PE_AUTHORITY_INFO_ACCESS
@@ -856,11 +882,30 @@ impl AttributeCertificate {
                 // critical in a conforming AC, and if one is, the rule
                 // below refuses it rather than this arm waving it
                 // through.
-                ID_CE_AUTHORITY_KEY_IDENTIFIER
-                | ID_CE_CRL_DISTRIBUTION_POINTS
-                | ID_PE_AUTHORITY_INFO_ACCESS => {
+                ID_CE_AUTHORITY_KEY_IDENTIFIER | ID_CE_CRL_DISTRIBUTION_POINTS => {
                     if e.critical {
                         return Err(Error::UnsupportedCriticalExtension(e.extn_id));
+                    }
+                }
+                ID_PE_AUTHORITY_INFO_ACCESS => {
+                    if e.critical {
+                        return Err(Error::UnsupportedCriticalExtension(e.extn_id));
+                    }
+                    // The value, not just the criticality. §6's pointer
+                    // test has to decode this extension to tell a
+                    // revocation pointer from a `caIssuers`-only AIA,
+                    // and a value it cannot decode read as "no
+                    // pointer" — so an AC carrying `noRevAvail` beside
+                    // an undecodable non-critical AIA slipped past
+                    // §6's "MUST NOT contain both".
+                    if x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(
+                        e.extn_value.as_bytes(),
+                    )
+                    .is_err()
+                    {
+                        return Err(Error::ProfileViolation(
+                            ProfileViolation::AuthorityInfoAccessMalformed,
+                        ));
                     }
                 }
                 other => {
@@ -1013,8 +1058,12 @@ fn subject_alt_names(cert: &Certificate) -> Option<alloc::vec::Vec<GeneralName>>
 /// `id-ad-caIssuers` points at the issuer's certificate instead, which
 /// §4.3.4 treats as a separate and optional feature.
 ///
-/// A value that will not decode names nothing, so it is not a pointer —
-/// `check_extensions` has its own arm for a malformed AIA.
+/// A value that will not decode names nothing, so it is not a pointer.
+/// That is safe only because [`AttributeCertificate::check_extensions`]
+/// rejects an undecodable AIA before this runs; without that, an AC
+/// could carry `noRevAvail` beside a pointer this could not see. An
+/// earlier version of this comment asserted that arm existed when it
+/// did not.
 fn aia_names_ocsp(value: &[u8]) -> bool {
     const ID_AD_OCSP: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.48.1");
     x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(value)
@@ -1317,6 +1366,14 @@ pub enum ProfileViolation {
     /// `basicConstraints` or `keyUsage` more than once, so which copy
     /// §4.5 applies to is not determined.
     IssuerDuplicateExtension,
+    /// §4.3.4: the AC's `authorityInfoAccess` value is not a
+    /// well-formed `AuthorityInfoAccessSyntax`.
+    ///
+    /// Checked because §6's pointer test must decode it to tell a
+    /// revocation pointer from a `caIssuers`-only AIA. A value that
+    /// will not decode would otherwise read as "no pointer" and let an
+    /// AC carry both `noRevAvail` and a pointer.
+    AuthorityInfoAccessMalformed,
 }
 
 impl core::fmt::Display for ProfileViolation {
@@ -1390,6 +1447,9 @@ impl core::fmt::Display for ProfileViolation {
             }
             Self::IssuerExtensionMalformed => {
                 "the attribute authority's basicConstraints or keyUsage will not decode"
+            }
+            Self::AuthorityInfoAccessMalformed => {
+                "the authorityInfoAccess extension value is malformed (RFC 5755 §4.3.4)"
             }
             Self::IssuerDuplicateExtension => {
                 "the attribute authority's certificate repeats basicConstraints or keyUsage"
@@ -1598,6 +1658,7 @@ mod tests {
             V::IssuerCannotSign,
             V::IssuerExtensionMalformed,
             V::IssuerDuplicateExtension,
+            V::AuthorityInfoAccessMalformed,
         ];
 
         for v in all {
@@ -1634,6 +1695,7 @@ mod tests {
                 V::IssuerCannotSign => "IssuerCannotSign",
                 V::IssuerExtensionMalformed => "IssuerExtensionMalformed",
                 V::IssuerDuplicateExtension => "IssuerDuplicateExtension",
+                V::AuthorityInfoAccessMalformed => "AuthorityInfoAccessMalformed",
             };
             let rendered = Error::ProfileViolation(v).to_string();
             assert!(

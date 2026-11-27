@@ -554,6 +554,18 @@ def main() -> None:
     (HERE / "ac-serial-20-octet-high-bit.der").write_bytes(
         attribute_certificate(acinfo_raw_serial(tlv(0x02, b"\x00" + mag20))))
 
+    # Zero. §4.2.5 requires a POSITIVE integer, and zero is not one.
+    (HERE / "ac-serial-zero.der").write_bytes(
+        attribute_certificate(acinfo_raw_serial(tlv(0x02, b"\x00"))))
+
+    # noRevAvail beside a non-critical AIA whose value will not decode.
+    # §6's "MUST NOT contain both" should refuse it; a pointer test that
+    # cannot read the AIA sees no pointer.
+    info = with_exts(0x96, extension(ID_CE_NO_REV_AVAIL, False, b"\x05\x00")
+                     + extension("1.3.6.1.5.5.7.1.1", False, b"\x30\x03\x02\x01\x00"))
+    (HERE / "ac-norevavail-with-bad-aia.der").write_bytes(
+        attribute_certificate(info))
+
     # §4.2.2: an entityName present but carrying no names. `A1 00`.
     (HERE / "ac-holder-no-names.der").write_bytes(attribute_certificate(
         acinfo(b"", aa_subject, 0x93, *window, role,

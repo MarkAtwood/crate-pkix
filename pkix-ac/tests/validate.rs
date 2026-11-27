@@ -1006,6 +1006,16 @@ fn the_revocation_schemes_are_mutually_exclusive_and_typed() {
         )),
         "an OCSP accessMethod is a revocation pointer, and §6 forbids the pair"
     );
+
+    // An AIA the pointer test cannot decode must not read as "no
+    // pointer": that let an AC carry noRevAvail beside a pointer.
+    assert_eq!(
+        ac("ac-norevavail-with-bad-aia.der").check_profile(),
+        Err(Error::ProfileViolation(
+            ProfileViolation::AuthorityInfoAccessMalformed
+        )),
+        "an undecodable AIA is refused rather than treated as absent"
+    );
 }
 
 /// `targetCert` is refused by the profile check, not only by
@@ -1186,15 +1196,101 @@ fn an_authority_with_only_non_repudiation_is_permitted() {
 
     pkix_ac::check_issuer_profile(&aa)
         .expect("§4.5 permits an authority whose keyUsage asserts nonRepudiation");
+}
 
-    // And a keyUsage that asserts neither is still refused.
-    let ca = ct_fixture("precert-issuer.der");
-    assert!(matches!(
-        pkix_ac::check_issuer_profile(&ca),
-        Err(Error::ProfileViolation(
-            ProfileViolation::IssuerIsACa | ProfileViolation::IssuerCannotSign
-        ))
-    ));
+/// §4.5 refuses an authority whose `keyUsage` asserts neither
+/// `digitalSignature` nor `nonRepudiation`.
+///
+/// This is the rule's negative side, and it had no coverage. Every
+/// other test that mentions `IssuerCannotSign` alternates it with
+/// `IssuerIsACa` against a CA fixture — and `check_issuer_profile`
+/// tests `basicConstraints` before `keyUsage`, so those always return
+/// `IssuerIsACa` and the keyUsage arm was never reached. Deleting the
+/// §4.5 keyUsage rule outright left all 38 tests green.
+///
+/// The fixture is therefore deliberately NOT a CA: `CA:FALSE` with
+/// `keyUsage = critical, keyEncipherment`.
+#[test]
+fn an_authority_that_cannot_sign_is_refused() {
+    let der = fixture("aa-nosign-cert.der");
+    let aa = Certificate::from_der(&der).expect("the fixture parses");
+
+    // Precondition, so this cannot pass for the old reason: the
+    // fixture must not be a CA, or IssuerIsACa would mask the rule.
+    let exts = aa
+        .tbs_certificate()
+        .extensions()
+        .expect("the fixture has extensions");
+    let bc_der = exts
+        .iter()
+        .find(|e| e.extn_id.to_string() == "2.5.29.19")
+        .expect("and basicConstraints");
+    let bc = x509_cert::ext::pkix::BasicConstraints::from_der(bc_der.extn_value.as_bytes())
+        .expect("which decodes");
+    assert!(!bc.ca, "the fixture must not be a CA");
+
+    assert_eq!(
+        pkix_ac::check_issuer_profile(&aa),
+        Err(Error::ProfileViolation(ProfileViolation::IssuerCannotSign)),
+        "keyEncipherment alone excludes validating a signature"
+    );
+}
+
+/// §4.2.5 requires "a positive integer", and zero is not one.
+#[test]
+fn a_zero_serial_is_not_positive() {
+    assert_eq!(
+        ac("ac-serial-zero.der").check_profile(),
+        Err(Error::ProfileViolation(ProfileViolation::SerialNotPositive)),
+        "DER content 00 is zero, which §4.2.5 does not permit"
+    );
+
+    // The minimal conforming case on the other side of the same rule:
+    // +128, encoded with the leading 00 §4.2.5 prescribes.
+    ac("ac-serial-positive-high-bit.der")
+        .check_profile()
+        .expect("a positive serial needing one pad octet conforms");
+}
+
+/// §6's MUST lives in this crate now, so this crate tests it.
+///
+/// The rule moved here precisely so the two entry points could not
+/// disagree about it — and then only `pkix-chain` tested it, which
+/// meant stubbing the check out left every `pkix-ac` test green and a
+/// future split would have been caught in the wrong crate.
+#[test]
+fn never_revoke_only_refuses_an_ac_without_no_rev_avail() {
+    let ac = ac("ac-role-valid.der");
+    assert!(
+        !ac.no_revocation_available(),
+        "precondition: this fixture carries no noRevAvail"
+    );
+
+    assert_eq!(
+        ac.validate(
+            &aa(),
+            &holder(),
+            NOW,
+            &[],
+            &[],
+            AcRevocation::NeverRevokeOnly,
+            &DefaultVerifier
+        ),
+        Err(Error::RevocationUnsupported),
+        "§6: a verifier supporting only 'never revoke' MUST reject it"
+    );
+
+    // And the same AC passes when the caller takes on §6's obligation.
+    ac.validate(
+        &aa(),
+        &holder(),
+        NOW,
+        &[],
+        &[],
+        AcRevocation::CallerChecks,
+        &DefaultVerifier,
+    )
+    .expect("CallerChecks accepts it");
 }
 
 /// §4.2.5's 20-octet cap is on the VALUE, not on its DER encoding.

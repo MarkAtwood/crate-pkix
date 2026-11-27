@@ -154,6 +154,13 @@
 // `pkix-ac` to their own manifest and keeping its version in lockstep
 // with this crate's.
 //
+// Both error types are renamed, for the same reason: this crate
+// already has a `ProfileViolation` concept, and it is a different one.
+// `Error::ProfileViolation { kind }` is a leaf-profile failure carrying
+// a `ProfileViolationKind`, so an unrenamed re-export would put two
+// public names side by side that look like they belong together and do
+// not typecheck together.
+//
 // The error types come too. An earlier version re-exported only the two
 // argument types, which left a consumer able to call the function and
 // unable to match `Error::AttributeCert` — the one useful thing to do
@@ -163,7 +170,8 @@
 #[cfg(feature = "attribute-certs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "attribute-certs")))]
 pub use pkix_ac::{
-    AcRevocation, AttributeCertificate, Error as AttributeCertError, ProfileViolation, Targeting,
+    AcRevocation, AttributeCertificate, Error as AttributeCertError,
+    ProfileViolation as AttributeCertProfileViolation, Targeting,
 };
 pub use pkix_aia::{AiaError, AiaFetcher, NoAiaFetcher};
 pub use pkix_identity::{IdentityError, MailboxName, ServerName};
@@ -1743,6 +1751,24 @@ pub struct ValidatedAttributeCert {
 ///    else is refused.
 /// 8. **Rule 6** — the targeting check, from `my_names` and
 ///    `my_groups`.
+///
+/// # `ac_revocation` is not `revocation`
+///
+/// This function takes both, and they answer different questions.
+/// `revocation: &R` applies to the holder's and the authority's
+/// public-key chains — it is the `RevocationChecker` used by
+/// [`verify_chain`]. `ac_revocation` is about the attribute
+/// certificate's OWN revocation status, which RFC 5755 §6 makes a
+/// separate question with its own two schemes, and which nothing in
+/// this crate answers.
+///
+/// So supplying a real [`CrlChecker`] or [`OcspChecker`] does not let
+/// you pass [`AcRevocation::CallerChecks`]: that checker never looks at
+/// the AC. Choosing `CallerChecks` on the strength of it is fail-open
+/// on §6's MUST, which is the mistake this parameter exists to make
+/// visible. This paragraph was lost when `AcRevocation` moved to
+/// `pkix-ac`, where there is no `RevocationChecker` to contrast it
+/// with.
 ///
 /// # Rule 4 is yours
 ///
