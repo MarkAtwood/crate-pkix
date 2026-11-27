@@ -65,3 +65,36 @@ fn an_indirect_crl_issuer_without_crl_sign_is_refused() {
          CrlSignMissing, got: {r:?}"
     );
 }
+
+/// A discovered signer on an indirect CRL is not a domain violation on the
+/// issuer path either.
+///
+/// `check_revocation` applies the same RFC 5280 §6.3.3 domain check the
+/// anchor path does, under a condition that has to admit three situations
+/// and refuse one:
+///
+///     crl_issuer_cert.is_none() || (signer_discovered && !indirect)
+///
+/// Loosen the inner conjunction to a disjunction and discovery mode alone
+/// switches the check on, which refuses every indirect CRL found by
+/// discovery -- their issuer DN differs from the certificate's by design,
+/// which is what indirect means.
+///
+/// `anchor_path_signer.rs` covers the same rule against a `TrustAnchor`;
+/// this is its twin on the entry point that takes an issuer certificate,
+/// and the condition is written out separately in each.
+#[test]
+fn a_discovered_signer_on_an_indirect_crl_passes_the_domain_check() {
+    let bundle = [load("crl-issuer-with-crlsign.der"), load("ca.der")];
+    let checker = CrlChecker::new_with_signer_discovery(
+        fixture("indirect-crl.der"),
+        &bundle,
+        NOW,
+        DefaultVerifier,
+    )
+    .expect("the cRLIssuer is in the bundle and reaches a self-signed certificate");
+
+    checker
+        .check_revocation(&load("leaf.der"), &load("ca.der"))
+        .expect("an indirect CRL's issuer is expected to differ from the certificate's");
+}
