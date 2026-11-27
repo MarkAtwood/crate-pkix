@@ -341,6 +341,27 @@ helper asserting that error messages are distinct.
 Check what the regex actually removed rather than assuming -- module names
 vary, and a regex that matches nothing is silent.
 
+### Sweeps are I/O bound, and one mutant class leaves a process behind
+
+Two things learned the hard way on 2026-11-27.
+
+A sweep's limit is disk, not cores. Each job is a tree copy that builds
+independently, so six jobs under `--all-features` drove this machine to 64-80%
+I/O wait with 2.9 GB of swap in use, and the rate fell from 556 mutants in
+24 minutes to one mutant every four. `vmstat 1` tells you which: a high `wa`
+column and a long `b` queue mean adding jobs makes it slower. Keep the count at
+4 or below, and do not run heavy `cargo test --workspace` builds beside one.
+
+A mutation that turns a bounded loop into an unbounded one leaves a runaway
+process behind when verified by hand. `reaches_self_signed`'s step counter is
+one: with `+= 1` mutated to `*= 1` the walk never terminates, and the test
+binary kept a core busy for an hour and 42 minutes after the verification
+finished -- the test's own deadline is on the thread waiting for the answer,
+not on the thread computing it. After hand-verifying any mutation to a loop
+bound, check:
+
+    ps -eo pid,etime,pcpu,comm --sort=-pcpu | head
+
 ## Escalation rule
 
 If you hit 3 failed attempts at the same error without progress, stop and surface to the human.
